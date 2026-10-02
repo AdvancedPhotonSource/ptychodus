@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
 
 from ptychodus.api.constants import LengthUnit
 from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.probe import OPRWeightPolicy
 from ptychodus.api.parameters import StringParameter
 
 from ...model.product.probe import (
@@ -590,6 +591,16 @@ class ProbeEditorViewControllerFactory:
             probe_builder.num_coherent_modes,
             'Number of Modes:',
             tool_tip=expand_only_tool_tip,
+            group=coherent_modes_group,
+        )
+        dialog_builder.add_combo_box(
+            probe_builder.opr_weight_policy,
+            [policy.name for policy in OPRWeightPolicy],
+            'Weight Policy:',
+            tool_tip=(
+                'How OPR weights loaded from a file carry over when they were solved for'
+                ' a different number of probe positions than this run has.'
+            ),
             group=coherent_modes_group,
         )
 

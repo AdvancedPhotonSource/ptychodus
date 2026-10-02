@@ -7,6 +7,7 @@ import pytest
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.probe import (
     FocusPolarity,
+    OPRWeightPolicy,
     PatchBounds,
     Probe,
     ProbeFocusCurves,
@@ -15,6 +16,7 @@ from ptychodus.api.probe import (
     ProbeSequence,
     ProbeSizeMetrics,
     compute_amplitude_deviation,
+    conform_opr_weights,
     compute_phase_deviation_rad,
     compute_probe_focus_curves,
     compute_rms_contrast,
@@ -880,3 +882,164 @@ def test_resample_probe_sequence_passes_through_without_a_pixel_geometry() -> No
     )
     target = ProbeGeometry(width_px=64, height_px=64, pixel_width_m=1.0e-8, pixel_height_m=1.0e-8)
     assert resample_probe_sequence(probes, target) is probes
+
+
+class TestConformOPRWeights:
+    """Reconciling a loaded OPR basis with a scan of a different size.
+
+    OPR weights carry one row per probe position, so a probe solved on one scan is
+    unusable on another until those rows are resolved. Every policy here is checked for
+    the shape it produces and for what it does to the weights, because a wrong shape
+    fails loudly downstream while wrong *values* -- averaging the wrong axis, keeping
+    another scan's per-position variation -- quietly degrade a reconstruction.
+    """
+
+    NUM_SOURCE_POSITIONS = 7
+    NUM_TARGET_POSITIONS = 11
+    NUM_COHERENT_MODES = 3
+    NUM_INCOHERENT_MODES = 2
+
+    def _rng(self) -> numpy.random.Generator:
+        return numpy.random.default_rng(42)
+
+    def _weights(self) -> numpy.ndarray:
+        return self._rng().normal(size=(self.NUM_SOURCE_POSITIONS, self.NUM_COHERENT_MODES))
+
+    def _array(self) -> numpy.ndarray:
+        shape = (self.NUM_COHERENT_MODES, self.NUM_INCOHERENT_MODES, 4, 4)
+        rng = self._rng()
+        return (rng.normal(size=shape) + 1j * rng.normal(size=shape)).astype(numpy.complex64)
+
+    def _sequence(self) -> ProbeSequence:
+        return ProbeSequence(self._array(), self._weights(), PIXEL_GEOMETRY)
+
+    def _conform(self, policy: OPRWeightPolicy, num_positions: int | None = None) -> ProbeSequence:
+        return conform_opr_weights(
+            self._rng(),
+            self._sequence(),
+            self.NUM_TARGET_POSITIONS if num_positions is None else num_positions,
+            policy,
+        )
+
+    @pytest.mark.parametrize(
+        ('policy', 'num_coherent_modes', 'has_weights'),
+        [
+            (OPRWeightPolicy.AVERAGE, NUM_COHERENT_MODES, True),
+            (OPRWeightPolicy.REINITIALIZE, NUM_COHERENT_MODES, True),
+            (OPRWeightPolicy.COLLAPSE, 1, False),
+            (OPRWeightPolicy.DISCARD, 1, False),
+        ],
+    )
+    def test_conformed_shape(
+        self, policy: OPRWeightPolicy, num_coherent_modes: int, has_weights: bool
+    ) -> None:
+        conformed = self._conform(policy)
+        assert conformed.num_coherent_modes == num_coherent_modes
+        assert conformed.num_incoherent_modes == self.NUM_INCOHERENT_MODES
+        weights = conformed.get_opr_weights_or_none()
+
+        if has_weights:
+            assert weights is not None
+            assert weights.shape == (self.NUM_TARGET_POSITIONS, num_coherent_modes)
+            assert len(conformed) == self.NUM_TARGET_POSITIONS
+        else:
+            assert weights is None
+            assert len(conformed) == 1
+
+    def test_conformed_dtype_is_preserved(self) -> None:
+        """Weights are real and the array complex64; the collapse must not promote it."""
+        assert self._conform(OPRWeightPolicy.COLLAPSE).dtype == numpy.complex64
+
+    def test_keep_returns_the_input_when_the_counts_agree(self) -> None:
+        probes = self._sequence()
+        conformed = conform_opr_weights(
+            self._rng(), probes, self.NUM_SOURCE_POSITIONS, OPRWeightPolicy.KEEP
+        )
+        assert conformed is probes
+
+    def test_keep_rejects_a_different_scan_naming_both_counts(self) -> None:
+        with pytest.raises(ValueError) as exc_info:
+            self._conform(OPRWeightPolicy.KEEP)
+
+        message = str(exc_info.value)
+        assert str(self.NUM_SOURCE_POSITIONS) in message
+        assert str(self.NUM_TARGET_POSITIONS) in message
+
+    def test_average_gives_every_position_the_column_mean(self) -> None:
+        conformed = self._conform(OPRWeightPolicy.AVERAGE)
+        numpy.testing.assert_allclose(
+            conformed.get_opr_weights(),
+            numpy.broadcast_to(
+                self._weights().mean(axis=0),
+                (self.NUM_TARGET_POSITIONS, self.NUM_COHERENT_MODES),
+            ),
+        )
+
+    def test_average_keeps_the_coherent_modes_untouched(self) -> None:
+        numpy.testing.assert_array_equal(
+            self._conform(OPRWeightPolicy.AVERAGE).get_array(), self._array()
+        )
+
+    def test_reinitialize_puts_unit_weight_on_the_primary_mode(self) -> None:
+        weights = self._conform(OPRWeightPolicy.REINITIALIZE).get_opr_weights()
+        numpy.testing.assert_array_equal(weights[:, 0], 1.0)
+        # Small but non-zero, so the reconstruction can move off the primary mode.
+        assert 0.0 < numpy.absolute(weights[:, 1:]).max() < 1.0e-5
+
+    def test_reinitialize_is_reproducible_from_a_seeded_generator(self) -> None:
+        numpy.testing.assert_array_equal(
+            self._conform(OPRWeightPolicy.REINITIALIZE).get_opr_weights(),
+            self._conform(OPRWeightPolicy.REINITIALIZE).get_opr_weights(),
+        )
+
+    def test_collapse_combines_the_modes_under_the_mean_row(self) -> None:
+        expected = numpy.tensordot(self._weights().mean(axis=0), self._array(), axes=1)
+        numpy.testing.assert_allclose(
+            self._conform(OPRWeightPolicy.COLLAPSE).get_array()[0],
+            expected.astype(numpy.complex64),
+            rtol=1.0e-6,
+        )
+
+    def test_collapse_applies_the_mean_row_to_every_incoherent_mode(self) -> None:
+        """__getitem__ only ever rewrites incoherent mode 0; collapsing must not."""
+        collapsed = self._conform(OPRWeightPolicy.COLLAPSE).get_array()[0]
+        assert not numpy.allclose(collapsed[1], self._array()[0, 1])
+
+    def test_discard_keeps_the_primary_mode_exactly(self) -> None:
+        numpy.testing.assert_array_equal(
+            self._conform(OPRWeightPolicy.DISCARD).get_array()[0], self._array()[0]
+        )
+
+    def test_discard_does_not_alias_the_source_buffer(self) -> None:
+        probes = self._sequence()
+        conformed = conform_opr_weights(
+            self._rng(), probes, self.NUM_TARGET_POSITIONS, OPRWeightPolicy.DISCARD
+        )
+        conformed.get_array()[:] = 0.0
+        numpy.testing.assert_array_equal(probes.get_array(), self._array())
+
+    @pytest.mark.parametrize('policy', list(OPRWeightPolicy))
+    def test_a_probe_without_an_opr_basis_is_untouched(self, policy: OPRWeightPolicy) -> None:
+        probes = ProbeSequence(self._array()[0], None, PIXEL_GEOMETRY)
+        assert conform_opr_weights(self._rng(), probes, 11, policy) is probes
+
+    def test_several_coherent_modes_without_weights_gain_them_on_reinitialize(self) -> None:
+        probes = ProbeSequence(self._array(), None, PIXEL_GEOMETRY)
+        conformed = conform_opr_weights(self._rng(), probes, 11, OPRWeightPolicy.REINITIALIZE)
+        assert conformed.get_opr_weights().shape == (11, self.NUM_COHERENT_MODES)
+
+    def test_several_coherent_modes_without_weights_collapse_to_the_primary_mode(self) -> None:
+        """With no weights there is no mean row, so COLLAPSE can only do what DISCARD does."""
+        probes = ProbeSequence(self._array(), None, PIXEL_GEOMETRY)
+        conformed = conform_opr_weights(self._rng(), probes, 11, OPRWeightPolicy.COLLAPSE)
+        numpy.testing.assert_array_equal(conformed.get_array()[0], self._array()[0])
+
+    def test_a_probe_without_a_pixel_size_conforms_without_raising(self) -> None:
+        probes = ProbeSequence(self._array(), self._weights(), None)
+        conformed = conform_opr_weights(self._rng(), probes, 11, OPRWeightPolicy.AVERAGE)
+        assert conformed.get_opr_weights_or_none() is not None
+
+    @pytest.mark.parametrize('num_positions', [0, -1])
+    def test_non_positive_position_count_is_rejected(self, num_positions: int) -> None:
+        with pytest.raises(ValueError, match='positive'):
+            self._conform(OPRWeightPolicy.AVERAGE, num_positions)

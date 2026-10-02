@@ -1,8 +1,12 @@
+from collections.abc import Mapping
+
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QAbstractItemView,
+    QButtonGroup,
     QCheckBox,
     QDialog,
+    QDialogButtonBox,
     QFormLayout,
     QGridLayout,
     QGroupBox,
@@ -21,9 +25,100 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
+from ptychodus.api.probe import OPRWeightPolicy
+
 from .image import ImageView, box_image_view
 from .visualization import VisualizationParametersView, VisualizationWidget
 from .widgets import DecimalLineEdit
+
+
+_OPR_WEIGHT_POLICY_LABELS: Mapping[OPRWeightPolicy, tuple[str, str]] = {
+    OPRWeightPolicy.KEEP: (
+        'Use as is',
+        'Keep the weights unchanged. Available only when the counts match.',
+    ),
+    OPRWeightPolicy.AVERAGE: (
+        'Average the weights',
+        'Give every probe position the mean of the loaded weights, keeping the modes.',
+    ),
+    OPRWeightPolicy.REINITIALIZE: (
+        'Reinitialize the weights',
+        'Keep the modes, but start the weights where a fresh OPR run would.',
+    ),
+    OPRWeightPolicy.COLLAPSE: (
+        'Remove OPR, keep the average probe',
+        'Combine the modes under the mean weights into one, then drop the OPR basis.',
+    ),
+    OPRWeightPolicy.DISCARD: (
+        'Remove OPR, keep the primary mode',
+        'Keep the dominant coherent mode and drop the rest along with the weights.',
+    ),
+}
+
+
+class OPRWeightPolicyDialog(QDialog):
+    """Asks how a loaded probe's OPR weights should carry over to this run."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle('Probe Has OPR Modes')
+        self.setModal(True)
+
+        self._counts_label = QLabel()
+        self._counts_label.setWordWrap(True)
+        self._button_group = QButtonGroup()
+        self._buttons: dict[int, QRadioButton] = {}
+        self.button_box = QDialogButtonBox()
+
+        layout = QVBoxLayout()
+        layout.addWidget(self._counts_label)
+
+        for policy, (label, description) in _OPR_WEIGHT_POLICY_LABELS.items():
+            button = QRadioButton(label)
+            button.setToolTip(description)
+            self._button_group.addButton(button, policy.value)
+            self._buttons[policy.value] = button
+            layout.addWidget(button)
+
+            caption = QLabel(description)
+            caption.setWordWrap(True)
+            caption.setIndent(20)
+            caption.setEnabled(False)
+            layout.addWidget(caption)
+
+        self._button_group.setExclusive(True)
+
+        self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.addButton(QDialogButtonBox.StandardButton.Cancel)
+        self.button_box.rejected.connect(self.reject)
+        layout.addWidget(self.button_box)
+
+        self.setLayout(layout)
+
+    def set_counts(
+        self, num_weight_rows: int, num_scan_points: int, num_coherent_modes: int
+    ) -> None:
+        """State what the file holds and what this run needs, and gate "use as is" on it."""
+        counts_agree = num_weight_rows == num_scan_points
+        agreement = 'matches' if counts_agree else 'does not match'
+        self._counts_label.setText(
+            f'This probe has {num_coherent_modes} coherent (OPR) mode(s) with weights for'
+            f' {num_weight_rows} probe position(s), which {agreement} the'
+            f' {num_scan_points} probe position(s) in this run.'
+        )
+        self._buttons[OPRWeightPolicy.KEEP.value].setEnabled(counts_agree)
+
+    def set_policy(self, policy: OPRWeightPolicy) -> None:
+        button = self._buttons[policy.value]
+
+        if button.isEnabled():
+            button.setChecked(True)
+        else:
+            self._buttons[OPRWeightPolicy.AVERAGE.value].setChecked(True)
+
+    def get_policy(self) -> OPRWeightPolicy:
+        return OPRWeightPolicy(self._button_group.checkedId())
 
 
 class ProbeMetricsView(QGroupBox):

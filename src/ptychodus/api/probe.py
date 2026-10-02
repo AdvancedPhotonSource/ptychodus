@@ -1200,6 +1200,147 @@ def resample_probe_sequence(
     )
 
 
+class OPRWeightPolicy(Enum):
+    """How a loaded probe's OPR weights are reconciled with the current probe positions."""
+
+    KEEP = auto()
+    """Use the weights unchanged, and reject a probe sized for a different scan."""
+
+    AVERAGE = auto()
+    """Give every probe position the mean of the loaded weight rows.
+
+    The coherent-mode basis survives and every position starts from the ensemble average
+    of the scan that solved it, so the reconstruction refines per-position variation from
+    a neutral start rather than from another scan's.
+    """
+
+    REINITIALIZE = auto()
+    """Start the weights over: unit weight on the primary mode, noise on the rest.
+
+    This is the state a fresh OPR run begins from. The loaded coherent modes are kept as
+    a basis while the weights carry nothing from the scan that solved them.
+    """
+
+    COLLAPSE = auto()
+    """Combine the coherent modes under the mean weight row into a single coherent mode.
+
+    The result is the ensemble-average illumination the reconstruction solved for,
+    expressed without an OPR basis.
+    """
+
+    DISCARD = auto()
+    """Keep coherent mode 0 and drop the remaining modes along with the weights."""
+
+
+def _pixel_geometry_or_none(probes: ProbeSequence) -> PixelGeometry | None:
+    """Pixel geometry of ``probes``, or ``None`` when it records none."""
+    try:
+        return probes.get_pixel_geometry()
+    except ValueError:
+        return None
+
+
+def conform_opr_weights(
+    rng: numpy.random.Generator,
+    probes: ProbeSequence,
+    num_positions: int,
+    policy: OPRWeightPolicy,
+    *,
+    small_value: float = 1.0e-6,
+) -> ProbeSequence:
+    """Re-express ``probes`` so its OPR weights describe ``num_positions`` probe positions.
+
+    OPR weights carry one row per probe position, so a probe solved on one scan cannot
+    initialize a reconstruction of another without a decision about what those rows mean
+    there. ``policy`` names that decision; see :class:`OPRWeightPolicy`.
+
+    The transform is unconditional: a probe whose weights already have ``num_positions``
+    rows is still averaged, reinitialized or collapsed when asked. A caller that only
+    wants to resolve a disagreement compares the row count itself and skips the call.
+
+    A probe with no OPR weights and a single coherent mode names no basis to act on and
+    is returned unchanged under every policy. With no weights but several coherent modes,
+    :attr:`OPRWeightPolicy.COLLAPSE` has no mean row to weight by and reduces to
+    :attr:`OPRWeightPolicy.DISCARD`, while :attr:`OPRWeightPolicy.REINITIALIZE` builds the
+    weights the modes lack.
+
+    :attr:`OPRWeightPolicy.COLLAPSE` applies the mean row across every incoherent mode,
+    where :meth:`ProbeSequence.__getitem__` only ever rewrites incoherent mode 0 from the
+    coherent basis.
+
+    Args:
+        rng: Random generator for :attr:`OPRWeightPolicy.REINITIALIZE`; unused otherwise.
+        probes: Probe ensemble to re-express, typically an initial guess read from a file.
+        num_positions: Number of probe positions the result must describe.
+        policy: How the loaded weights carry over.
+        small_value: Scale of the Gaussian noise :attr:`OPRWeightPolicy.REINITIALIZE` puts
+            on the non-primary modes. Larger values let the reconstruction move off the
+            primary mode sooner, at the cost of starting further from the probe the modes
+            were solved for.
+
+    Raises:
+        ValueError: If ``num_positions`` is not positive, or if ``policy`` is
+            :attr:`OPRWeightPolicy.KEEP` and the weights describe a different number of
+            probe positions.
+    """
+    if num_positions < 1:
+        raise ValueError(f'Number of probe positions must be positive; got {num_positions}!')
+
+    array = probes.get_array()
+    weights = probes.get_opr_weights_or_none()
+    num_cmodes = probes.num_coherent_modes
+    pixel_geometry = _pixel_geometry_or_none(probes)
+
+    if weights is None and num_cmodes < 2:
+        # Nothing here names an OPR basis, so there is nothing to reconcile.
+        return probes
+
+    match policy:
+        case OPRWeightPolicy.KEEP:
+            if weights is not None and weights.shape[0] != num_positions:
+                raise ValueError(
+                    'OPR weights describe a different scan!'
+                    f' weight rows={weights.shape[0]}'
+                    f' probe positions={num_positions}'
+                )
+
+            return probes
+        case OPRWeightPolicy.AVERAGE if weights is not None:
+            mean_row = weights.mean(axis=0)
+            return ProbeSequence(
+                array=array,
+                opr_weights=numpy.broadcast_to(mean_row, (num_positions, num_cmodes)).copy(),
+                pixel_geometry=pixel_geometry,
+            )
+        case OPRWeightPolicy.AVERAGE:
+            # Several coherent modes, but no weight rows to average over.
+            return probes
+        case OPRWeightPolicy.REINITIALIZE:
+            reinitialized = small_value * rng.normal(size=(num_positions, num_cmodes))
+            reinitialized[:, 0] = 1.0
+            return ProbeSequence(
+                array=array,
+                opr_weights=reinitialized,
+                pixel_geometry=pixel_geometry,
+            )
+        case OPRWeightPolicy.COLLAPSE if weights is not None:
+            mean_row = weights.mean(axis=0)
+            return ProbeSequence(
+                array=numpy.tensordot(mean_row, array, axes=1).astype(array.dtype),
+                opr_weights=None,
+                pixel_geometry=pixel_geometry,
+            )
+        case _:
+            # DISCARD, and COLLAPSE with no mean row to weight by. Copying rather than
+            # slicing keeps the discarded modes from staying resident behind a view of
+            # the original buffer.
+            return ProbeSequence(
+                array=array[:1].copy(),
+                opr_weights=None,
+                pixel_geometry=pixel_geometry,
+            )
+
+
 class ProbeFileReader(ABC):
     """Plugin interface for reading probe sequences."""
 

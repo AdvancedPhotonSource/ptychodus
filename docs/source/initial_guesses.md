@@ -250,6 +250,26 @@ For `num_coherent_modes > 1`:
 - Additional OPR modes are initialized as random complex arrays only in incoherent mode 0. Other incoherent modes in those OPR modes are left zero.
 - The random OPR mode images are normalized by their mean intensity when `normalize_cmodes` is true.
 
+### Reusing an OPR Probe on Another Scan
+
+OPR weights carry one row per probe position, so a probe solved on one scan cannot initialize a reconstruction of another until those rows are resolved. {py:func}`ptychodus.api.probe.conform_opr_weights` does that under a policy named by {py:class}`ptychodus.api.probe.OPRWeightPolicy`:
+
+| Policy | Effect |
+| --- | --- |
+| `KEEP` | Use the weights unchanged. Raises when they describe a different number of probe positions. |
+| `AVERAGE` | Give every probe position the mean of the loaded weight rows, keeping the coherent modes. |
+| `REINITIALIZE` | Keep the coherent modes and start the weights where a fresh OPR run would: `1.0` on the primary mode, small noise on the rest. |
+| `COLLAPSE` | Combine the coherent modes under the mean weight row into a single mode, then drop the OPR basis. |
+| `DISCARD` | Keep coherent mode 0, dropping the remaining modes along with the weights. |
+
+The setting is `OPRWeightPolicy` in the `Probe` group, defaulting to `Average`. It is consulted **only when the row count disagrees** with the run's probe positions, so a warm start whose weights already fit is never altered. The reconciliation happens before the expand-only mode pipeline, which means `DISCARD` together with a larger `num_coherent_modes` discards the stale basis and builds a fresh one sized to the current scan.
+
+Opening a probe file that carries OPR weights in the GUI prompts for the policy, stating both counts, and that choice applies to that one load whether or not the counts agree. `Use as is` is offered only when they do.
+
+```{note}
+`COLLAPSE` applies the mean weight row across every incoherent mode. Indexing a position out of a {py:class}`ptychodus.api.probe.ProbeSequence` instead rewrites only incoherent mode 0 from the coherent basis.
+```
+
 ### Examples
 
 #### Generate a multimode probe from scratch

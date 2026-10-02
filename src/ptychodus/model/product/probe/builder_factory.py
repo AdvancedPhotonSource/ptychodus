@@ -5,7 +5,12 @@ import logging
 import numpy
 
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.probe import ProbeFileReader, ProbeFileWriter, ProbeSequence
+from ptychodus.api.probe import (
+    OPRWeightPolicy,
+    ProbeFileReader,
+    ProbeFileWriter,
+    ProbeSequence,
+)
 from ptychodus.api.simulate.probe import FresnelZonePlate, KirkpatrickBaezMirrorPair
 
 from ...diffraction import AssembledDiffractionDataset
@@ -108,11 +113,33 @@ class ProbeBuilderFactory(Iterable[str]):
     def get_open_file_filter(self) -> str:
         return self._file_reader_chooser.get_current_plugin().display_name
 
-    def create_probe_from_file(self, file_path: Path, file_filter: str) -> ProbeSequenceBuilder:
+    def read_probe_from_file(self, file_path: Path, file_filter: str) -> ProbeSequence:
+        """Read a probe without binding it to a repository item.
+
+        This is the probe the builder from `create_probe_from_file` would ingest, read
+        once so a caller can inspect what the file holds -- an OPR basis, in particular --
+        before deciding how to ingest it. Read errors surface here rather than being
+        swallowed by a rebuild.
+        """
+        self._file_reader_chooser.set_current_plugin(file_filter)
+        file_type = self._file_reader_chooser.get_current_plugin().simple_name
+        logger.debug(f'Reading "{file_path}" as "{file_type}"')
+        file_reader = self._file_reader_chooser.get_current_plugin().strategy
+        return file_reader.read(file_path)
+
+    def create_probe_from_file(
+        self,
+        file_path: Path,
+        file_filter: str,
+        *,
+        opr_weight_policy: OPRWeightPolicy | None = None,
+    ) -> ProbeSequenceBuilder:
         self._file_reader_chooser.set_current_plugin(file_filter)
         file_reader = self._file_reader_chooser.get_current_plugin().strategy
 
-        builder = FromFileProbeBuilder(self._rng, self._settings, file_reader)
+        builder = FromFileProbeBuilder(
+            self._rng, self._settings, file_reader, opr_weight_policy=opr_weight_policy
+        )
         builder.file_path.set_value(file_path)
         builder.file_type.set_value(self._file_reader_chooser.get_current_plugin().simple_name)
         return builder

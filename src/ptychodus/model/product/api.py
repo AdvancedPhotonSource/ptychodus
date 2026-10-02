@@ -6,6 +6,7 @@ import threading
 
 from ptychodus.api.diffraction import Polarization
 from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.probe import OPRWeightPolicy
 from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter
 
 from ..diffraction import AssembledDiffractionDataset
@@ -237,10 +238,41 @@ class ProbeAPI:
     def get_open_file_filter(self) -> str:
         return self._builder_factory.get_open_file_filter()
 
-    def open_probe(self, index: int, file_path: Path, *, file_type: str | None = None) -> None:
+    def peek_opr_weights(
+        self, file_path: Path, *, file_type: str | None = None
+    ) -> tuple[int, int] | None:
+        """Shape of the OPR weights in a probe file, or ``None`` when it carries none.
+
+        Returns ``(number of weight rows, number of coherent modes)``. The row count is
+        the number of probe positions the file was solved on, which is what a caller
+        compares against this run before choosing how to ingest it.
+
+        The file is read to answer this, and a read error propagates rather than being
+        reported as an absence.
+        """
+        probes = self._builder_factory.read_probe_from_file(
+            file_path,
+            self._settings.file_type.get_value() if file_type is None else file_type,
+        )
+        weights = probes.get_opr_weights_or_none()
+
+        if weights is None:
+            return None
+
+        return int(weights.shape[0]), int(weights.shape[1])
+
+    def open_probe(
+        self,
+        index: int,
+        file_path: Path,
+        *,
+        file_type: str | None = None,
+        opr_weight_policy: OPRWeightPolicy | None = None,
+    ) -> None:
         builder = self._builder_factory.create_probe_from_file(
             file_path,
             self._settings.file_type.get_value() if file_type is None else file_type,
+            opr_weight_policy=opr_weight_policy,
         )
 
         try:

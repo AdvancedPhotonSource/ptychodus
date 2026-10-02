@@ -57,6 +57,13 @@ class ProbeRepositoryItem(ParameterGroup):
     def get_probes(self) -> ProbeSequence:
         return self._probe_seq
 
+    def get_num_scan_points(self) -> int:
+        """Number of probe positions this probe is being built against.
+
+        Named after the geometry-provider property it forwards.
+        """
+        return self._geometry_provider.num_scan_points
+
     def get_size_metrics(self) -> ProbeSizeMetrics | None:
         probe_seq = self._probe_seq
 

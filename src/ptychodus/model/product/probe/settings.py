@@ -47,6 +47,7 @@ class ProbeSettings(Observable, Observer):
         self.num_coherent_modes = self._group.create_integer_parameter(
             'NumberOfCoherentModes', 1, minimum=1
         )
+        self.opr_weight_policy = self._group.create_string_parameter('OPRWeightPolicy', 'Average')
 
         self.disk_diameter_m = self._group.create_real_parameter(
             'DiskDiameterInMeters', 1e-6, minimum=0.0

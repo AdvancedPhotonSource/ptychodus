@@ -30,6 +30,7 @@ import pytest
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.probe import (
+    OPRWeightPolicy,
     ProbeFileReader,
     ProbeGeometry,
     ProbeGeometryProvider,
@@ -111,9 +112,17 @@ class _StubProbeGeometryProvider(ProbeGeometryProvider):
 
 
 def _make_probe_seq(
-    num_cmodes: int, num_imodes: int, *, with_opr_weights: bool = False
+    num_cmodes: int,
+    num_imodes: int,
+    *,
+    with_opr_weights: bool = False,
+    num_positions: int = NUM_SCAN_POINTS,
 ) -> ProbeSequence:
-    """A deterministic, non-degenerate probe of the requested mode structure."""
+    """A deterministic, non-degenerate probe of the requested mode structure.
+
+    ``num_positions`` sizes the OPR weights, so passing something other than
+    ``NUM_SCAN_POINTS`` produces the probe of a *different* scan.
+    """
     rng = numpy.random.default_rng(7)
     shape = (num_cmodes, num_imodes, 8, 8)
     array = (rng.normal(size=shape) + 1j * rng.normal(size=shape)).astype(complex)
@@ -121,7 +130,7 @@ def _make_probe_seq(
     opr_weights = None
 
     if with_opr_weights:
-        opr_weights = rng.normal(size=(NUM_SCAN_POINTS, num_cmodes))
+        opr_weights = rng.normal(size=(num_positions, num_cmodes))
         opr_weights[:, 0] = 1.0
 
     return ProbeSequence(
@@ -140,9 +149,17 @@ class _StubProbeFileReader(ProbeFileReader):
 
 
 def _make_from_file_builder(
-    settings: ProbeSettings, probe_seq: ProbeSequence
+    settings: ProbeSettings,
+    probe_seq: ProbeSequence,
+    *,
+    opr_weight_policy: OPRWeightPolicy | None = None,
 ) -> FromFileProbeBuilder:
-    return FromFileProbeBuilder(_make_rng(), settings, _StubProbeFileReader(probe_seq))
+    return FromFileProbeBuilder(
+        _make_rng(),
+        settings,
+        _StubProbeFileReader(probe_seq),
+        opr_weight_policy=opr_weight_policy,
+    )
 
 
 def _total_intensity(probe_seq: ProbeSequence) -> float:
@@ -335,6 +352,7 @@ def test_copy_preserves_mode_parameters(builder_name: str) -> None:
 
     assert duplicate.num_incoherent_modes.get_value() == 3
     assert duplicate.num_coherent_modes.get_value() == 2
+    assert duplicate.opr_weight_policy.get_value() == builder.opr_weight_policy.get_value()
 
     probe_seq = duplicate.build(_StubProbeGeometryProvider(pixel_size_m=KB_PIXEL_SIZE_M))
     assert probe_seq.get_array().shape[:2] == (2, 3)
@@ -549,3 +567,154 @@ class TestIncoherentModeStrategySettings:
 
         assert probe_seq.num_incoherent_modes == 3
         assert _total_intensity(probe_seq) == pytest.approx(PROBE_PHOTON_COUNT)
+
+
+OTHER_SCAN_POSITIONS = NUM_SCAN_POINTS + 4
+"""A probe-position count that is deliberately not this run's."""
+
+
+def _opr_from_another_scan(num_cmodes: int = 3, num_imodes: int = 2) -> ProbeSequence:
+    return _make_probe_seq(
+        num_cmodes, num_imodes, with_opr_weights=True, num_positions=OTHER_SCAN_POSITIONS
+    )
+
+
+def test_from_file_builder_conforms_opr_weights_from_another_scan(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The motivating case: a solved OPR probe reused on a scan of a different size.
+
+    Left alone the weights keep the old scan's row count, which pty-chi rejects outright
+    and the per-position probe lookup turns into an IndexError. The default policy
+    conforms them and says so.
+    """
+    settings = _make_settings()
+    from_file = _opr_from_another_scan()
+    builder = _make_from_file_builder(settings, from_file)
+
+    with caplog.at_level('INFO'):
+        probe_seq = builder.build(_StubProbeGeometryProvider())
+
+    weights = probe_seq.get_opr_weights()
+    assert weights.shape == (NUM_SCAN_POINTS, 3)
+    assert len(probe_seq) == NUM_SCAN_POINTS
+    # The default is AVERAGE, so every position starts from the same row.
+    numpy.testing.assert_allclose(
+        weights,
+        numpy.broadcast_to(from_file.get_opr_weights().mean(axis=0), weights.shape),
+    )
+    assert str(OTHER_SCAN_POSITIONS) in caplog.text
+    assert 'AVERAGE' in caplog.text
+
+
+def test_from_file_builder_leaves_matching_opr_weights_alone() -> None:
+    """A warm start whose weights already fit must come through untouched."""
+    settings = _make_settings()
+    from_file = _make_probe_seq(3, 2, with_opr_weights=True)
+    builder = _make_from_file_builder(settings, from_file)
+
+    probe_seq = builder.build(_StubProbeGeometryProvider())
+
+    numpy.testing.assert_array_equal(probe_seq.get_opr_weights(), from_file.get_opr_weights())
+
+
+@pytest.mark.parametrize(
+    ('policy', 'expected_cmodes'),
+    [
+        (OPRWeightPolicy.AVERAGE, 3),
+        (OPRWeightPolicy.REINITIALIZE, 3),
+        (OPRWeightPolicy.COLLAPSE, 1),
+        (OPRWeightPolicy.DISCARD, 1),
+    ],
+)
+def test_from_file_builder_honors_the_policy_setting(
+    policy: OPRWeightPolicy, expected_cmodes: int
+) -> None:
+    settings = _make_settings()
+    settings.opr_weight_policy.set_value(policy.name)
+    builder = _make_from_file_builder(settings, _opr_from_another_scan())
+
+    probe_seq = builder.build(_StubProbeGeometryProvider())
+
+    assert probe_seq.num_coherent_modes == expected_cmodes
+
+
+def test_an_unknown_policy_name_still_builds() -> None:
+    """The setting is a free string; a value with no matching policy must not stop the build."""
+    settings = _make_settings()
+    settings.opr_weight_policy.set_value('NotAPolicy')
+    builder = _make_from_file_builder(settings, _opr_from_another_scan())
+
+    probe_seq = builder.build(_StubProbeGeometryProvider())
+
+    assert probe_seq.get_opr_weights().shape == (NUM_SCAN_POINTS, 3)
+
+
+def test_an_override_applies_even_when_the_counts_already_agree() -> None:
+    """A policy chosen for one ingest is a deliberate instruction, not a mismatch fix."""
+    settings = _make_settings()
+    from_file = _make_probe_seq(3, 2, with_opr_weights=True)
+    builder = _make_from_file_builder(
+        settings, from_file, opr_weight_policy=OPRWeightPolicy.REINITIALIZE
+    )
+
+    probe_seq = builder.build(_StubProbeGeometryProvider())
+
+    weights = probe_seq.get_opr_weights()
+    assert weights.shape == (NUM_SCAN_POINTS, 3)
+    numpy.testing.assert_array_equal(weights[:, 0], 1.0)
+    assert numpy.absolute(weights[:, 1:]).max() < 1.0e-5
+
+
+def test_an_override_survives_copy() -> None:
+    settings = _make_settings()
+    builder = _make_from_file_builder(
+        settings, _opr_from_another_scan(), opr_weight_policy=OPRWeightPolicy.DISCARD
+    )
+
+    probe_seq = builder.copy().build(_StubProbeGeometryProvider())
+
+    assert probe_seq.num_coherent_modes == 1
+    assert probe_seq.get_opr_weights_or_none() is None
+
+
+def test_discarding_an_old_basis_composes_with_a_new_mode_count() -> None:
+    """DISCARD runs before the expand-only pipeline, so a fresh basis can be requested."""
+    settings = _make_settings()
+    settings.opr_weight_policy.set_value(OPRWeightPolicy.DISCARD.name)
+    builder = _make_from_file_builder(settings, _opr_from_another_scan(num_imodes=1))
+    builder.num_coherent_modes.set_value(3)
+
+    probe_seq = builder.build(_StubProbeGeometryProvider())
+
+    assert probe_seq.num_coherent_modes == 3
+    assert probe_seq.get_opr_weights().shape == (NUM_SCAN_POINTS, 3)
+
+
+def test_from_memory_builder_conforms_opr_weights_from_another_scan() -> None:
+    """Copying a probe between products reaches the same mismatch, through this builder."""
+    settings = _make_settings()
+    builder = FromMemoryProbeBuilder(_make_rng(), settings, _opr_from_another_scan())
+
+    probe_seq = builder.build(_StubProbeGeometryProvider())
+
+    assert probe_seq.get_opr_weights().shape == (NUM_SCAN_POINTS, 3)
+
+
+def test_from_memory_builder_is_untouched_when_the_counts_agree() -> None:
+    """The regression guard for reconstruction output.
+
+    ProcessingTaskMonitor re-assigns the reconstructor's probe through this builder on
+    every iteration, and those weights always match the run. Conforming must be a strict
+    no-op there, or the reconstruction is averaged away one iteration at a time.
+    """
+    settings = _make_settings()
+    settings.opr_weight_policy.set_value(OPRWeightPolicy.REINITIALIZE.name)
+    in_memory = _make_probe_seq(3, 2, with_opr_weights=True)
+    builder = FromMemoryProbeBuilder(_make_rng(), settings, in_memory)
+    provider = _StubProbeGeometryProvider()
+
+    for _ in range(3):
+        probe_seq = builder.build(provider)
+        numpy.testing.assert_array_equal(probe_seq.get_opr_weights(), in_memory.get_opr_weights())
+        numpy.testing.assert_array_equal(probe_seq.get_array(), in_memory.get_array())

@@ -5,6 +5,7 @@ from PyQt5.QtCore import QModelIndex, QStringListModel
 from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ptychodus.api.observer import SequenceObserver
+from ptychodus.api.probe import OPRWeightPolicy
 
 from ...model.analysis import (
     IlluminationMapper,
@@ -15,6 +16,7 @@ from ...model.analysis import (
 from ...model.product import ProbeAPI, ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem
 from ...model.visualization import VisualizationEngine
+from ...view.probe import OPRWeightPolicyDialog
 from ...view.repository import RepositoryTreeView
 from ...view.widgets import (
     ComboBoxItemDelegate,
@@ -140,6 +142,22 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         logger.warning('No current index!')
         return -1
 
+    def _prompt_for_opr_weight_policy(
+        self, item_index: int, opr_weights_shape: tuple[int, int]
+    ) -> OPRWeightPolicy | None:
+        """Ask how a loaded probe's OPR weights should carry over; None if the user cancels."""
+        num_weight_rows, num_coherent_modes = opr_weights_shape
+        num_scan_points = self._repository[item_index].get_num_scan_points()
+
+        dialog = OPRWeightPolicyDialog(self._view)
+        dialog.set_counts(num_weight_rows, num_scan_points, num_coherent_modes)
+        dialog.set_policy(OPRWeightPolicy.KEEP)
+
+        if dialog.exec_() != QDialog.DialogCode.Accepted:
+            return None
+
+        return dialog.get_policy()
+
     def _load_current_probe_from_file(self) -> None:
         item_index = self._get_current_item_index()
 
@@ -154,8 +172,33 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         )
 
         if file_path:
+            # Reading here, rather than leaving it to the builder, is what lets the
+            # prompt below know whether there is an OPR basis to ask about -- and it
+            # puts a read failure in front of the user instead of in the log.
             try:
-                self._api.open_probe(item_index, file_path, file_type=name_filter)
+                opr_weights_shape = self._api.peek_opr_weights(file_path, file_type=name_filter)
+            except Exception as err:
+                logger.exception(err)
+                ExceptionDialog.show_exception('File Reader', err)
+                return
+
+            opr_weight_policy: OPRWeightPolicy | None = None
+
+            if opr_weights_shape is not None:
+                opr_weight_policy = self._prompt_for_opr_weight_policy(
+                    item_index, opr_weights_shape
+                )
+
+                if opr_weight_policy is None:
+                    return
+
+            try:
+                self._api.open_probe(
+                    item_index,
+                    file_path,
+                    file_type=name_filter,
+                    opr_weight_policy=opr_weight_policy,
+                )
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.show_exception('File Reader', err)

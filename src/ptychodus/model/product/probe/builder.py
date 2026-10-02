@@ -17,10 +17,12 @@ from ptychodus.api.simulate.probe import (
     rescale_probe_intensity,
 )
 from ptychodus.api.probe import (
+    OPRWeightPolicy,
     Probe,
     ProbeSequence,
     ProbeFileReader,
     ProbeGeometryProvider,
+    conform_opr_weights,
     resample_probe_sequence,
 )
 
@@ -74,6 +76,14 @@ class ProbeSequenceBuilder(ParameterGroup):
 
         self.num_coherent_modes = settings.num_coherent_modes.copy()
         self._add_parameter('num_coherent_modes', self.num_coherent_modes)
+
+        self.opr_weight_policy = settings.opr_weight_policy.copy()
+        self._add_parameter('opr_weight_policy', self.opr_weight_policy)
+
+        # Set for a single ingest, by a caller that has already chosen; see
+        # `_conform_opr_weights`. Deliberately not a parameter: a one-off choice
+        # belongs to that ingest, not to the stored settings.
+        self._opr_weight_policy_override: OPRWeightPolicy | None = None
 
     def get_name(self) -> str:
         return self._name.get_value()
@@ -190,6 +200,60 @@ class ProbeSequenceBuilder(ParameterGroup):
         logger.debug(f'Unknown incoherent mode strategy "{name}"')
         return next(iter(_IMODE_STRATEGY_FACTORIES.values()))(self)
 
+    def _get_opr_weight_policy(self) -> OPRWeightPolicy:
+        """Resolve the OPR weight policy setting, tolerating a name the api does not know.
+
+        The setting is a free string, as the incoherent-mode settings are, so a stored
+        value with no matching policy should leave a usable probe rather than stop the
+        build.
+        """
+        text = self.opr_weight_policy.get_value()
+
+        try:
+            return OPRWeightPolicy[text.upper()]
+        except KeyError:
+            logger.debug(f'Unknown OPR weight policy "{text}"')
+            return OPRWeightPolicy.AVERAGE
+
+    def _conform_opr_weights(
+        self, probe_seq: ProbeSequence, geometry_provider: ProbeGeometryProvider
+    ) -> ProbeSequence:
+        """Reconcile an ingested probe's OPR weights with this run's probe positions.
+
+        The weights carry one row per probe position, so a probe solved on another scan
+        cannot initialize this one until those rows are resolved. The policy setting
+        names how, and is consulted only when the counts actually disagree -- a warm
+        start whose weights already fit comes through untouched.
+
+        An override supplied for a single ingest takes precedence and applies even when
+        the counts agree, which is what lets a caller ask for a fresh basis on a scan of
+        the same size.
+        """
+        weights = probe_seq.get_opr_weights_or_none()
+
+        if weights is None:
+            return probe_seq
+
+        num_positions = geometry_provider.num_scan_points
+
+        if num_positions < 1:
+            # No probe positions bound yet; the observer chain re-runs the build.
+            return probe_seq
+
+        policy = self._opr_weight_policy_override
+
+        if policy is None:
+            if weights.shape[0] == num_positions:
+                return probe_seq
+
+            policy = self._get_opr_weight_policy()
+
+        logger.info(
+            f'Probe carries OPR weights for {weights.shape[0]} probe position(s)'
+            f' and this run has {num_positions}; applying {policy.name}.'
+        )
+        return conform_opr_weights(self._rng, probe_seq, num_positions, policy)
+
     def _condition_probe(
         self, probe_seq: ProbeSequence, geometry_provider: ProbeGeometryProvider
     ) -> ProbeSequence:
@@ -208,7 +272,13 @@ class ProbeSequenceBuilder(ParameterGroup):
         here rather than in the ingesting subclasses. Generative builders always
         emit a single coherent, single incoherent mode, which makes every guard
         inert on that path.
+
+        The OPR weights are reconciled first, so a `COLLAPSE` or `DISCARD` policy leaves
+        a single-coherent-mode probe that then goes through the expand-only pipeline
+        below like any other -- which is what lets discarding a stale basis and
+        requesting a new mode count compose into a basis sized to this run.
         """
+        probe_seq = self._conform_opr_weights(probe_seq, geometry_provider)
         num_imodes_requested = self.num_incoherent_modes.get_value()
         num_cmodes_requested = self.num_coherent_modes.get_value()
 
@@ -294,6 +364,11 @@ class FromMemoryProbeBuilder(ProbeSequenceBuilder):
     The expand-only guards in `_condition_probe` would in fact catch most of this
     on their own, but the bypass is explicit so that the invariant does not depend
     on them.
+
+    Reconciling the OPR weights is the one step that still runs, because a probe
+    copied onto a scan of a different size is unusable until its weight rows are
+    resolved. It runs no generator and is a strict no-op whenever the row count
+    already matches, which it always does for reconstruction output.
     """
 
     def __init__(
@@ -323,10 +398,13 @@ class FromMemoryProbeBuilder(ProbeSequenceBuilder):
             pixel_geometry = probe_geometry.get_pixel_geometry()
 
         # TODO regrid probe as needed based on probe geometry from file/provider
-        return ProbeSequence(
-            self._probe.get_array(),
-            self._probe.get_opr_weights_or_none(),
-            pixel_geometry,
+        return self._conform_opr_weights(
+            ProbeSequence(
+                self._probe.get_array(),
+                self._probe.get_opr_weights_or_none(),
+                pixel_geometry,
+            ),
+            geometry_provider,
         )
 
     def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
@@ -347,6 +425,11 @@ class FromFileProbeBuilder(ProbeSequenceBuilder):
     size. None of the probe formats currently record one, so today this only ever
     fires for a reader that supplies it.
 
+    An OPR basis read from a product solved on another scan carries weights sized for
+    that scan. `_condition_probe` reconciles them against this run's probe positions
+    before anything else, under the policy setting or under an override passed here for
+    a single ingest.
+
     The photon-count rescale is deliberately not applied; see
     `ProbeSequenceBuilder._rescale_to_photon_count`.
     """
@@ -356,10 +439,16 @@ class FromFileProbeBuilder(ProbeSequenceBuilder):
         rng: numpy.random.Generator,
         settings: ProbeSettings,
         file_reader: ProbeFileReader,
+        *,
+        opr_weight_policy: OPRWeightPolicy | None = None,
     ) -> None:
         super().__init__(rng, settings, 'from_file')
         self._settings = settings
         self._file_reader = file_reader
+
+        if opr_weight_policy is not None:
+            self._opr_weight_policy_override = opr_weight_policy
+            self.opr_weight_policy.set_value(opr_weight_policy.name)
 
         self.file_path = settings.file_path.copy()
         self._add_parameter('file_path', self.file_path)
@@ -368,7 +457,12 @@ class FromFileProbeBuilder(ProbeSequenceBuilder):
         self._add_parameter('file_type', self.file_type)
 
     def copy(self) -> FromFileProbeBuilder:
-        builder = FromFileProbeBuilder(self._rng, self._settings, self._file_reader)
+        builder = FromFileProbeBuilder(
+            self._rng,
+            self._settings,
+            self._file_reader,
+            opr_weight_policy=self._opr_weight_policy_override,
+        )
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
