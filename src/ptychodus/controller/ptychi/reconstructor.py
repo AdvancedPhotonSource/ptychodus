@@ -24,18 +24,18 @@ from ...model.ptychi import (
 )
 from ..parameters import (
     CheckBoxParameterViewController,
-    CheckableGroupBoxParameterViewController,
     ComboBoxParameterViewController,
     DecimalLineEditParameterViewController,
     DecimalSliderParameterViewController,
     ParameterViewController,
     SpinBoxParameterViewController,
 )
+from .group_box import PtyChiCheckableGroupBoxViewController
 
 __all__ = ['PtyChiReconstructorViewController']
 
 
-class PtyChiDeviceViewController(CheckableGroupBoxParameterViewController):
+class PtyChiDeviceViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         use_devices: BooleanParameter,
@@ -50,7 +50,7 @@ class PtyChiDeviceViewController(CheckableGroupBoxParameterViewController):
             device_label = QLabel(device)
             layout.addWidget(device_label)
 
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
 class PtyChiPrecisionParameterViewController(ParameterViewController, Observer):
@@ -102,7 +102,7 @@ class PtyChiPrecisionParameterViewController(ParameterViewController, Observer):
 
 
 class PtyChiMomentumAccelerationGradientMixingFactorViewController(
-    CheckableGroupBoxParameterViewController
+    PtyChiCheckableGroupBoxViewController
 ):
     def __init__(
         self,
@@ -125,7 +125,7 @@ class PtyChiMomentumAccelerationGradientMixingFactorViewController(
 
         layout = QVBoxLayout()
         layout.addWidget(self._gradient_mixing_factor_view_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
 class PtyChiReconstructorViewController(ParameterViewController):
@@ -204,7 +204,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
             'Save Data on Device',
             tool_tip='Keep the diffraction data on the compute device (e.g. GPU).',
         )
-        self._diffraction_pattern_blur_view_controller = CheckableGroupBoxParameterViewController(
+        self._diffraction_pattern_blur_view_controller = PtyChiCheckableGroupBoxViewController(
             settings.enable_diffraction_pattern_blur,
             'Blur Diffraction Patterns',
             tool_tip='When enabled, diffraction patterns will be blurred with a Gaussian kernel',
@@ -218,12 +218,10 @@ class PtyChiReconstructorViewController(ParameterViewController):
                 ),
             )
         )
-        self._exclude_measured_pixels_below_view_controller = (
-            CheckableGroupBoxParameterViewController(
-                settings.enable_exclude_measured_pixels_below,
-                'Exclude Measured Pixels Below',
-                tool_tip='When enabled, measured pixels below the threshold will be excluded',
-            )
+        self._exclude_measured_pixels_below_view_controller = PtyChiCheckableGroupBoxViewController(
+            settings.enable_exclude_measured_pixels_below,
+            'Exclude Measured Pixels Below',
+            tool_tip='When enabled, measured pixels below the threshold will be excluded',
         )
         self._exclude_measured_pixels_below_value_view_controller = DecimalLineEditParameterViewController(
             settings.exclude_measured_pixels_below,
@@ -233,14 +231,14 @@ class PtyChiReconstructorViewController(ParameterViewController):
         _diffraction_blur_layout.addWidget(
             self._diffraction_pattern_blur_sigma_view_controller.get_widget()
         )
-        self._diffraction_pattern_blur_view_controller.get_widget().setLayout(
+        self._diffraction_pattern_blur_view_controller.get_widget().set_contents_layout(
             _diffraction_blur_layout
         )
         _exclude_pixels_layout = QVBoxLayout()
         _exclude_pixels_layout.addWidget(
             self._exclude_measured_pixels_below_value_view_controller.get_widget()
         )
-        self._exclude_measured_pixels_below_view_controller.get_widget().setLayout(
+        self._exclude_measured_pixels_below_view_controller.get_widget().set_contents_layout(
             _exclude_pixels_layout
         )
         self._widget = QGroupBox('Reconstructor')

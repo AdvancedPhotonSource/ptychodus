@@ -1,4 +1,4 @@
-from .group_box import GroupBoxWithPresets
+from .group_box import CheckableGroupBox, GroupBoxWithPresets
 from .combo_box_item_delegate import ComboBoxItemDelegate
 from .decimal_line_edit import DecimalLineEdit
 from .decimal_slider import DecimalSlider
@@ -8,6 +8,7 @@ from .progress_bar_item_delegate import ProgressBarItemDelegate
 from .task_status_view import TaskStatusView
 
 __all__ = [
+    'CheckableGroupBox',
     'ComboBoxItemDelegate',
     'DecimalLineEdit',
     'DecimalSlider',

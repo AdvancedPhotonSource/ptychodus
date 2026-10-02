@@ -56,7 +56,7 @@ Two edits per function: append `-> None` to the signature and `# noqa: N802` to 
 
 ## Step 4 — Wire it into `ViewCore`
 
-Add a call to `self.navigation.add_panel(...)` in [`src/ptychodus/view/core.py`](../../src/ptychodus/view/core.py) `ViewCore.__init__`. Order matters — **the sequence of `add_panel` calls is the source of truth for the left/right stacked-panel indexes** (per CLAUDE.md). Mirror the fluorescence pattern at [`view/core.py:275-280`](../../src/ptychodus/view/core.py#L275-L280):
+Add a call to `self.navigation.add_panel(...)` in [`src/ptychodus/view/core.py`](../../src/ptychodus/view/core.py) `ViewCore.__init__`. Order matters — **the sequence of `add_panel` calls is the source of truth for the left/right stacked-panel indexes** (per CLAUDE.md). Mirror the fluorescence pattern at [`view/core.py:298-305`](../../src/ptychodus/view/core.py#L298-L305):
 
 ```python
 self.my_feature_view = MyFeatureView()
@@ -69,7 +69,7 @@ self.my_feature_action = self.navigation.add_panel(
 )
 ```
 
-If the new panel belongs nested under a parent (Products or Processing today), add its action to the existing `add_subview_group` call at [`view/core.py:336-352`](../../src/ptychodus/view/core.py#L336-L352). Otherwise it renders as a top-level toolbar button.
+If the new panel belongs nested under a parent (Products or Processing today), add its action to the existing `add_subview_group` call at [`view/core.py:325-342`](../../src/ptychodus/view/core.py#L325-L342). Otherwise it renders as a top-level toolbar button.
 
 `ControllerCore` uses stacked-widget indexes matching `ViewCore`'s `add_panel` order — inserting a panel in the middle shifts every downstream index. Prefer appending, or run the app afterward and confirm nothing underneath shifted.
 

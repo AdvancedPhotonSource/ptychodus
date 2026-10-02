@@ -17,19 +17,19 @@ from ...model.ptychi import (
 )
 from ..parameters import (
     CheckBoxParameterViewController,
-    CheckableGroupBoxParameterViewController,
     ComboBoxParameterViewController,
     DecimalLineEditParameterViewController,
     DecimalSliderParameterViewController,
     LengthParameterViewController,
     SpinBoxParameterViewController,
 )
+from .group_box import PtyChiCheckableGroupBoxViewController
 from .optimizer import PtyChiOptimizationPlanViewController, PtyChiOptimizerParameterViewController
 
 __all__ = ['PtyChiObjectViewController']
 
 
-class PtyChiOptimizeSliceSpacingViewController(CheckableGroupBoxParameterViewController):
+class PtyChiOptimizeSliceSpacingViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         optimize_slice_spacing: BooleanParameter,
@@ -63,10 +63,10 @@ class PtyChiOptimizeSliceSpacingViewController(CheckableGroupBoxParameterViewCon
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
         layout.addRow('Optimizer:', self._optimizer_view_controller.get_widget())
         layout.addRow('Step Size:', self._step_size_view_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
-class PtyChiConstrainL1NormViewController(CheckableGroupBoxParameterViewController):
+class PtyChiConstrainL1NormViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         constrain_l1_norm: BooleanParameter,
@@ -92,10 +92,10 @@ class PtyChiConstrainL1NormViewController(CheckableGroupBoxParameterViewControll
         layout = QFormLayout()
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
         layout.addRow('Weight:', self._weight_view_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
-class PtyChiConstrainL2NormViewController(CheckableGroupBoxParameterViewController):
+class PtyChiConstrainL2NormViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         constrain_l2_norm: BooleanParameter,
@@ -121,10 +121,10 @@ class PtyChiConstrainL2NormViewController(CheckableGroupBoxParameterViewControll
         layout = QFormLayout()
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
         layout.addRow('Weight:', self._weight_view_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
-class PtyChiConstrainSmoothnessViewController(CheckableGroupBoxParameterViewController):
+class PtyChiConstrainSmoothnessViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         constrain_smoothness: BooleanParameter,
@@ -150,10 +150,10 @@ class PtyChiConstrainSmoothnessViewController(CheckableGroupBoxParameterViewCont
         layout = QFormLayout()
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
         layout.addRow('Alpha:', self._alpha_view_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
-class PtyChiConstrainTotalVariationViewController(CheckableGroupBoxParameterViewController):
+class PtyChiConstrainTotalVariationViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         constrain_total_variation: BooleanParameter,
@@ -179,10 +179,10 @@ class PtyChiConstrainTotalVariationViewController(CheckableGroupBoxParameterView
         layout = QFormLayout()
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
         layout.addRow('Weight:', self._weight_view_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
-class PtyChiRemoveGridArtifactsViewController(CheckableGroupBoxParameterViewController):
+class PtyChiRemoveGridArtifactsViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         remove_grid_artifacts: BooleanParameter,
@@ -230,10 +230,10 @@ class PtyChiRemoveGridArtifactsViewController(CheckableGroupBoxParameterViewCont
         layout.addRow('Window Size [px]:', self._window_size_view_controller.get_widget())
         layout.addRow('Direction:', self._direction_view_controller.get_widget())
         layout.addRow('Component:', self._component_view_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
-class PtyChiRegularizeMultisliceViewController(CheckableGroupBoxParameterViewController):
+class PtyChiRegularizeMultisliceViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         regularize_multislice: BooleanParameter,
@@ -281,10 +281,10 @@ class PtyChiRegularizeMultisliceViewController(CheckableGroupBoxParameterViewCon
         layout.addRow(self._unwrap_phase_view_controller.get_widget())
         layout.addRow('Gradient Method:', self._gradient_method_view_controller.get_widget())
         layout.addRow('Integration Method:', self._integration_method_view_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
-class PtyChiRemoveObjectProbeAmbiguityViewController(CheckableGroupBoxParameterViewController):
+class PtyChiRemoveObjectProbeAmbiguityViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         remove_object_probe_ambiguity: BooleanParameter,
@@ -304,10 +304,10 @@ class PtyChiRemoveObjectProbeAmbiguityViewController(CheckableGroupBoxParameterV
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
-class PtyChiConstrainHardLimitsViewController(CheckableGroupBoxParameterViewController):
+class PtyChiConstrainHardLimitsViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         constrain_hard_limits: BooleanParameter,
@@ -357,10 +357,10 @@ class PtyChiConstrainHardLimitsViewController(CheckableGroupBoxParameterViewCont
         layout.addRow(self._enable_phase_view_controller.get_widget())
         layout.addRow('Phase Min [deg]:', self._phase_min_deg_view_controller.get_widget())
         layout.addRow('Phase Max [deg]:', self._phase_max_deg_view_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
-class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
+class PtyChiObjectViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         settings: PtyChiObjectSettings,
@@ -563,4 +563,4 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
             )
             layout.addRow('Alpha:', self._alpha_view_controller.get_widget())
 
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)

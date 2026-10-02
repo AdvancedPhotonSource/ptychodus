@@ -112,7 +112,7 @@ class ScanBoundingBoxViewController(CheckableGroupBoxParameterViewController):
         layout.addRow('Maximum X:', self._xmax_controller.get_widget())
         layout.addRow('Minimum Y:', self._ymin_controller.get_widget())
         layout.addRow('Maximum Y:', self._ymax_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
 class ProbePositionsEditorViewControllerFactory:

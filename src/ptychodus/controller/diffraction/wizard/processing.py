@@ -89,7 +89,7 @@ class StorageViewController(CheckableGroupBoxParameterViewController):
 
         layout = QFormLayout()
         layout.addRow('Scratch Directory:', self._view_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
 class BadPixelsViewController(CheckableGroupBoxParameterViewController):
@@ -112,7 +112,7 @@ class BadPixelsViewController(CheckableGroupBoxParameterViewController):
 
         layout = QFormLayout()
         layout.addRow('File:', self._file_path_view_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
         self._file_reader_parameter.add_observer(self)
 
@@ -155,7 +155,7 @@ class CropViewController(CheckableGroupBoxParameterViewController):
         layout.addWidget(self._estimate_button, 2, 0, 1, 3)
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
         self._observed = (
             diffraction_settings.beam_center_x_px,
@@ -272,7 +272,7 @@ class BinningViewController(CheckableGroupBoxParameterViewController):
         layout.addWidget(self._bin_size_y_spin_box, 0, 2)
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
         # Also observe crop_enabled + crop extents because the effective bin-size upper bound
         # depends on the crop settings.
@@ -356,7 +356,7 @@ class UpsampleViewController(CheckableGroupBoxParameterViewController):
         layout.addWidget(QLabel('Factor:'), 0, 0)
         layout.addWidget(self._factor_view_controller.get_widget(), 0, 1)
         layout.setColumnStretch(1, 1)
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
 class PaddingViewController(CheckableGroupBoxParameterViewController):
@@ -371,7 +371,7 @@ class PaddingViewController(CheckableGroupBoxParameterViewController):
         layout.addWidget(self._pad_y_view_controller.get_widget(), 0, 2)
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
 class ValueFilterViewController:

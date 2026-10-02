@@ -251,12 +251,18 @@ class ControllerCore:
         self._run_tasks_timer.timeout.connect(self._run_tasks)
         self._run_tasks_timer.start(1000)
 
-        self._action_permitted: dict[QAction, bool] = {
+        action_permitted: dict[QAction, bool] = {
             view.globus_action: model.globus_core.is_supported,
             view.genesis_action: model.genesis_core.is_supported,
         }
 
-        self._swap_central_widgets(view.diffraction_action, animated=False)
+        # Support is fixed for the life of the process, so this runs once rather than
+        # on every navigation.
+        for group in view.navigation.subview_groups:
+            for child in group.child_actions:
+                group.container.set_child_button_visible(child, action_permitted.get(child, True))
+
+        self._swap_central_widgets(view.diffraction_action)
         view.diffraction_action.setChecked(True)
         view.navigation.action_group.triggered.connect(
             lambda action: self._swap_central_widgets(action)
@@ -269,22 +275,11 @@ class ControllerCore:
         self.view.setWindowTitle(window_title)
         self.view.show()
 
-    def _swap_central_widgets(self, action: QAction | None, *, animated: bool = True) -> None:
+    def _swap_central_widgets(self, action: QAction | None) -> None:
         if action is None:
             raise ValueError('QAction is None!')
 
         self.view.navigation.set_current_index(action.data())
-        self._update_subview_visibility(action, animated=animated)
-
-    def _update_subview_visibility(self, action: QAction, *, animated: bool = True) -> None:
-        for group in self.view.navigation.subview_groups:
-            expanded = action is group.parent_action or action in group.child_actions
-            for child in group.child_actions:
-                allowed = self._action_permitted.get(child, True)
-                group.container.set_child_button_visible(child, allowed)
-            group.container.set_expanded(expanded, animated=animated)
-            group.top_separator.setVisible(expanded)
-            group.bottom_separator.setVisible(expanded)
 
     def _run_tasks(self) -> None:
         self.model.run_tasks()

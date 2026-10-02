@@ -18,7 +18,6 @@ from ...model.ptychi import (
 )
 from ..parameters import (
     CheckBoxParameterViewController,
-    CheckableGroupBoxParameterViewController,
     ComboBoxParameterViewController,
     DecimalLineEditParameterViewController,
     DecimalSliderParameterViewController,
@@ -26,6 +25,7 @@ from ..parameters import (
     ParameterViewController,
     SpinBoxParameterViewController,
 )
+from .group_box import PtyChiCheckableGroupBoxViewController
 from .optimizer import PtyChiOptimizationPlanViewController, PtyChiOptimizerParameterViewController
 
 __all__ = ['PtyChiProbePositionsViewController']
@@ -207,7 +207,7 @@ class PtyChiAffineDegreesOfFreedomViewController(ParameterViewController, Observ
             self._sync_model_to_view()
 
 
-class PtyChiConstrainAffineTransformViewController(CheckableGroupBoxParameterViewController):
+class PtyChiConstrainAffineTransformViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         is_optimizable: BooleanParameter,
@@ -270,10 +270,10 @@ class PtyChiConstrainAffineTransformViewController(CheckableGroupBoxParameterVie
             self._override_update_flexibility_view_controller.get_widget(),
             self._update_flexibility_value_view_controller.get_widget(),
         )
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
-class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewController):
+class PtyChiProbePositionsViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         settings: PtyChiProbePositionSettings,
@@ -367,4 +367,4 @@ class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewControlle
             self._update_magnitude_limit_view_controller.get_widget(),
         )
         layout.addRow(self._constrain_affine_transform_view_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
