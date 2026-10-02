@@ -10,8 +10,8 @@ import h5py
 import numpy
 
 from .assemble import AssembledDiffractionData
-from .diffraction import Polarization
-from .preprocess.diffraction import zero_bad_pixels
+from .diffraction import BadPixels, DiffractionPatterns, Polarization
+from .preprocess.diffraction import inpaint_bad_pixels, zero_bad_pixels
 from .fluorescence import ElementMap, FluorescenceDataset
 from .geometry import PixelGeometry
 from .object import Object, ObjectCenter
@@ -23,6 +23,7 @@ from .reconstruct import ReconstructInput
 __all__ = [
     'FluorescenceFileKeys',
     'StandardFileLayout',
+    'TrainingDataFileKeys',
     'load_diffraction_data',
     'load_fluorescence_data',
     'load_product',
@@ -30,6 +31,7 @@ __all__ = [
     'save_fluorescence_data',
     'save_product',
     'save_ptychopinn_training_data',
+    'save_training_data',
     'sanitize_path_component',
     'resolve_external_link_path',
 ]
@@ -550,28 +552,48 @@ def save_fluorescence_data(file: Path, dataset: FluorescenceDataset) -> None:
         names_group.create_dataset(names_ds_name, data=channel_names, dtype='S256')
 
 
+def _repair_bad_pixels(
+    parameters: ReconstructInput, *, inpaint: bool
+) -> tuple[DiffractionPatterns, BadPixels]:
+    """Repair the patterns, and return them with the mask saying which pixels were filled.
+
+    An absent mask becomes an all-False one so every training file carries the
+    dataset and a reader needs no optional branch.
+    """
+    patterns = parameters.diffraction_patterns
+    bad_pixels = parameters.bad_pixels
+
+    if bad_pixels is None:
+        bad_pixels = numpy.zeros(patterns.shape[1:], dtype=bool)
+
+    repaired = (
+        inpaint_bad_pixels(patterns, bad_pixels)
+        if inpaint
+        else zero_bad_pixels(patterns, bad_pixels)
+    )
+
+    return repaired, bad_pixels
+
+
 def save_ptychopinn_training_data(
     file_path: Path,
     parameters: ReconstructInput,
     *,
-    multimodal_probe: bool,
+    inpaint_bad_pixels: bool = True,
 ) -> None:
     """Write a ReconstructInput to the NPZ format consumed by PtychoPINN trainers.
 
-    Bad pixels are zeroed in `diff3d` before writing. `multimodal_probe`
-    selects the `probeGuess` shape: True writes the full `(N_modes, H, W)`
-    array (ptycho_torch); False writes only mode 0 as `(H, W)` (legacy
-    ptycho). All scan points are assigned `scan_index=0` (single-object
-    assumption).
+    Bad pixels are filled by biharmonic inpainting, or zeroed when
+    `inpaint_bad_pixels` is False; `diff3d` keeps the source dtype either way, and
+    `bad_pixels` records which positions were filled rather than measured.
+    `probeGuess` is the full `(N_modes, H, W)` mode stack at OPR index zero. All
+    scan points are assigned `scan_index=0` (single-object assumption).
     """
     object_geometry = parameters.product.object_.get_geometry()
     positions = parameters.product.probe_positions
     xcoords = object_geometry.map_probe_positions_to_object_x_px(positions)
     ycoords = object_geometry.map_probe_positions_to_object_y_px(positions)
-    diff3d = zero_bad_pixels(parameters.diffraction_patterns, parameters.bad_pixels)
-
-    probe = parameters.product.probes.get_probe_no_opr()
-    probe_array = probe.get_array() if multimodal_probe else probe.get_incoherent_mode(0)
+    diff3d, bad_pixels = _repair_bad_pixels(parameters, inpaint=inpaint_bad_pixels)
 
     numpy.savez(
         file_path,
@@ -580,7 +602,103 @@ def save_ptychopinn_training_data(
         xcoords_start=xcoords,
         ycoords_start=ycoords,
         diff3d=diff3d,
-        probeGuess=probe_array,
+        bad_pixels=bad_pixels,
+        probeGuess=parameters.product.probes.get_probe_no_opr().get_array(),
         objectGuess=parameters.product.object_.get_layer(0),
         scan_index=numpy.zeros(len(parameters.product.probe_positions), dtype=int),
     )
+
+
+class TrainingDataFileKeys(StrEnum):
+    """HDF5 dataset names for the training data file."""
+
+    DETECTOR_OBJECT_DISTANCE = 'detector_object_distance_m'
+    PROBE_ENERGY = 'probe_energy_eV'
+    PATTERNS = 'patterns'
+    BAD_PIXELS = 'bad_pixels'
+    PROBE_ARRAY = 'probe'
+    PROBE_POSITION_X_PX = 'probe_position_x_px'
+    PROBE_POSITION_Y_PX = 'probe_position_y_px'
+    OBJECT_ARRAY = 'object'
+    OBJECT_PIXEL_HEIGHT = 'object_pixel_height_m'
+    OBJECT_PIXEL_WIDTH = 'object_pixel_width_m'
+
+
+def save_training_data(
+    file_path: Path,
+    parameters: ReconstructInput,
+    *,
+    inpaint_bad_pixels: bool = True,
+    compression: str = 'lzf',
+) -> None:
+    """Write a ReconstructInput to the ptychodus HDF5 training data format.
+
+    Bad pixels are filled by biharmonic inpainting, or zeroed when
+    `inpaint_bad_pixels` is False; the patterns keep the source dtype either way,
+    and `bad_pixels` records which positions were filled rather than measured. The
+    probe is the full `(N_modes, H, W)` mode stack at OPR index zero, and the
+    object is layer zero.
+
+    The geometry is far field. The detector pixel size is not written because it
+    is recoverable from the object pixel size, the energy and the detector
+    distance, and `focus_object_distance_m` is not written at all -- a product
+    with a focusing optic is logged as a warning, because it would reload as
+    parallel beam.
+
+    Probe positions are written in object pixels about the object array's own
+    center, so the absolute scan origin is not recoverable; scan indexes, OPR
+    weights, object layers past zero and the remaining product metadata are not
+    carried either.
+    """
+    metadata = parameters.product.metadata
+
+    if metadata.focus_object_distance_m != 0.0:
+        logger.warning(
+            'Training data assumes far-field geometry; focus_object_distance_m=%g is lost.',
+            metadata.focus_object_distance_m,
+        )
+
+    object_ = parameters.product.object_
+    object_geometry = object_.get_geometry()
+    positions = parameters.product.probe_positions
+    patterns, bad_pixels = _repair_bad_pixels(parameters, inpaint=inpaint_bad_pixels)
+
+    with h5py.File(file_path, 'w') as h5_file:
+        h5_file.create_dataset(
+            TrainingDataFileKeys.PATTERNS, data=patterns, compression=compression
+        )
+        h5_file.create_dataset(
+            TrainingDataFileKeys.BAD_PIXELS, data=bad_pixels, compression=compression
+        )
+        h5_file.create_dataset(
+            TrainingDataFileKeys.PROBE_ARRAY,
+            data=parameters.product.probes.get_probe_no_opr().get_array(),
+            compression=compression,
+        )
+        h5_file.create_dataset(
+            TrainingDataFileKeys.OBJECT_ARRAY,
+            data=object_.get_layer(0),
+            compression=compression,
+        )
+        h5_file.create_dataset(
+            TrainingDataFileKeys.PROBE_POSITION_X_PX,
+            data=object_geometry.map_probe_positions_to_object_x_px(positions),
+            compression=compression,
+        )
+        h5_file.create_dataset(
+            TrainingDataFileKeys.PROBE_POSITION_Y_PX,
+            data=object_geometry.map_probe_positions_to_object_y_px(positions),
+            compression=compression,
+        )
+
+        # Scalar datasets cannot be chunked, so the compression filter cannot apply.
+        h5_file.create_dataset(
+            TrainingDataFileKeys.OBJECT_PIXEL_WIDTH, data=object_geometry.pixel_width_m
+        )
+        h5_file.create_dataset(
+            TrainingDataFileKeys.OBJECT_PIXEL_HEIGHT, data=object_geometry.pixel_height_m
+        )
+        h5_file.create_dataset(
+            TrainingDataFileKeys.DETECTOR_OBJECT_DISTANCE, data=metadata.detector_distance_m
+        )
+        h5_file.create_dataset(TrainingDataFileKeys.PROBE_ENERGY, data=metadata.probe_energy_eV)

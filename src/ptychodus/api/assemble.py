@@ -871,6 +871,10 @@ class DiffractionSummary:
     The frame-shaped arrays have bad-pixel positions filled by
     :func:`~ptychodus.api.preprocess.diffraction.inpaint_bad_pixels` so the maps stay smooth for display and
     thresholding. Per-pattern ``total_counts`` sum only the good pixels.
+
+    ``minimum_pattern`` and ``maximum_pattern`` carry the pattern dtype and
+    ``mean_pattern`` is float64, whether or not the dataset had bad pixels and
+    whether or not it had any patterns at all.
     """
 
     minimum_pattern: DiffractionPattern
@@ -961,10 +965,12 @@ def summarize_dataset(
     frames = statistics.get_frames()
 
     if frames is None:
+        # Dtypes match the populated branch below, where the extrema come from
+        # reductions over the patterns and the mean from a float64 accumulator.
         return DiffractionSummary(
-            minimum_pattern=numpy.zeros((height, width), dtype=numpy.float64),
+            minimum_pattern=numpy.zeros((height, width), dtype=metadata.pattern_dtype),
             mean_pattern=numpy.zeros((height, width), dtype=numpy.float64),
-            maximum_pattern=numpy.zeros((height, width), dtype=numpy.float64),
+            maximum_pattern=numpy.zeros((height, width), dtype=metadata.pattern_dtype),
             indexes=indexes[summarized],
             total_counts=total_counts[summarized],
         )

@@ -33,6 +33,7 @@ File readers are implemented using a Python namespace plugin system. We would be
   - NumPy Binary Files (`*.npy`, `*.npz`)
   - Ptychodus Diffraction Patterns (`*.h5`, `*.npz`)
   - Ptychodus Product (`*.h5`, `*.npz`)
+  - Ptychodus Training Data (`*.h5`)
   - Space-Separated Values (`*.txt`)
   - Tagged Image File Format (`*.tif`, `*.tiff`)
 

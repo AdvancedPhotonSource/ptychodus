@@ -32,7 +32,7 @@ from typing import Any
 
 import numpy
 
-from ptychodus.api.preprocess.diffraction import zero_bad_pixels
+from ptychodus.api.preprocess.diffraction import inpaint_bad_pixels
 from ptychodus.api.object import Object
 from ptychodus.api.product import LossValue, Product
 from ptychodus.api.reconstruct import ReconstructOutput, TrainOutput
@@ -109,7 +109,9 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
         )
     )
 
-    diff_patterns = zero_bad_pixels(parameters.diffraction_patterns, parameters.bad_pixels)
+    # Repaired the same way exported training data is, so inference sees the
+    # preprocessing the model was trained on.
+    diff_patterns = inpaint_bad_pixels(parameters.diffraction_patterns, parameters.bad_pixels)
     data_loader = PtychoDataLoader.from_np(
         diff_patterns=diff_patterns,
         probe=parameters.product.probes.get_probe_no_opr().get_array(),

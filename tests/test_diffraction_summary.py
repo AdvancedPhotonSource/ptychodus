@@ -1,4 +1,4 @@
-"""Unit tests for inpaint_bad_pixels and summarize_dataset."""
+"""Unit tests for the bad-pixel inpainters and summarize_dataset."""
 
 from collections.abc import Sequence
 import threading
@@ -121,14 +121,14 @@ class _BlockingArray(DiffractionArray):
 # ------------------------------ inpaint_bad_pixels ------------------------------
 
 
-def test_inpaint_returns_input_unchanged_when_mask_is_none() -> None:
+def test_inpaint_frame_returns_input_unchanged_when_mask_is_none() -> None:
     """A None mask short-circuits: the input is returned as-is."""
     pattern = numpy.arange(20, dtype=numpy.float64).reshape(4, 5)
     result = inpaint_bad_pixels(pattern, None)
     assert result is pattern
 
 
-def test_inpaint_returns_input_unchanged_when_mask_all_false() -> None:
+def test_inpaint_frame_returns_input_unchanged_when_mask_all_false() -> None:
     """An all-good mask short-circuits: the input is returned as-is."""
     pattern = numpy.arange(20, dtype=numpy.float64).reshape(4, 5)
     bad = numpy.zeros((4, 5), dtype=numpy.bool_)
@@ -136,7 +136,7 @@ def test_inpaint_returns_input_unchanged_when_mask_all_false() -> None:
     assert result is pattern
 
 
-def test_inpaint_replaces_bad_positions_and_preserves_good() -> None:
+def test_inpaint_frame_replaces_bad_positions_and_preserves_good() -> None:
     """Bad-pixel positions are filled by biharmonic; good positions are unchanged."""
     pattern = numpy.ones((8, 8), dtype=numpy.float64) * 5.0
     pattern[3, 3] = 1.0e9
@@ -155,6 +155,144 @@ def test_inpaint_replaces_bad_positions_and_preserves_good() -> None:
     assert result[4, 4] != pytest.approx(-1.0e9)
     assert result[3, 3] == pytest.approx(5.0, abs=1.0)
     assert result[4, 4] == pytest.approx(5.0, abs=1.0)
+
+
+def _pattern_stack(dtype: numpy.typing.DTypeLike) -> DiffractionPatterns:
+    rng = numpy.random.default_rng(0)
+    return rng.integers(0, 1000, size=(6, 16, 16)).astype(dtype)
+
+
+def _square_mask(height: int = 16, width: int = 16) -> BadPixels:
+    bad = numpy.zeros((height, width), dtype=numpy.bool_)
+    bad[5:8, 5:8] = True
+    return bad
+
+
+def test_inpaint_patterns_returns_input_unchanged_when_mask_is_none() -> None:
+    """A None mask short-circuits: the input is returned as-is."""
+    patterns = _pattern_stack(numpy.uint16)
+    assert inpaint_bad_pixels(patterns, None) is patterns
+
+
+def test_inpaint_patterns_returns_input_unchanged_when_mask_all_false() -> None:
+    """An all-good mask short-circuits: the input is returned as-is."""
+    patterns = _pattern_stack(numpy.uint16)
+    bad = numpy.zeros(patterns.shape[1:], dtype=numpy.bool_)
+    assert inpaint_bad_pixels(patterns, bad) is patterns
+
+
+def test_inpaint_patterns_equals_the_per_frame_loop() -> None:
+    """Solving the shared mask once matches inpainting each frame separately.
+
+    The stack solves one biharmonic system for all frames rather than one per
+    frame; that optimization is only valid if it changes nothing.
+    """
+    patterns = _pattern_stack(numpy.float64)
+    bad = _square_mask()
+
+    result = inpaint_bad_pixels(patterns, bad)
+    expected = numpy.stack([inpaint_bad_pixels(frame, bad) for frame in patterns])
+
+    numpy.testing.assert_allclose(result, expected)
+
+
+def test_inpaint_patterns_replaces_bad_positions_and_preserves_good() -> None:
+    """Bad-pixel positions are filled; good positions are untouched."""
+    patterns = numpy.full((4, 8, 8), 5.0)
+    patterns[:, 3, 3] = 1.0e9
+    bad = numpy.zeros((8, 8), dtype=numpy.bool_)
+    bad[3, 3] = True
+
+    result = inpaint_bad_pixels(patterns, bad)
+
+    good = numpy.logical_not(bad)
+    numpy.testing.assert_array_equal(result[:, good], patterns[:, good])
+    assert result[:, 3, 3] == pytest.approx(5.0, abs=1.0)
+
+
+@pytest.mark.parametrize('dtype', [numpy.uint16, numpy.int32, numpy.float32, numpy.float64])
+def test_inpaint_patterns_preserves_dtype(dtype: numpy.typing.DTypeLike) -> None:
+    """The detector dtype survives, unlike the float64 frame-level helper."""
+    patterns = _pattern_stack(dtype)
+    result = inpaint_bad_pixels(patterns, _square_mask())
+    assert result.dtype == numpy.dtype(dtype)
+
+
+def test_inpaint_patterns_rounds_rather_than_truncates() -> None:
+    """Integer fills are rounded; truncating would bias every filled pixel low."""
+    patterns = numpy.full((1, 8, 8), 10, dtype=numpy.uint16)
+    patterns[0, :4, :] = 11
+    bad = numpy.zeros((8, 8), dtype=numpy.bool_)
+    bad[3:5, 3:5] = True
+
+    exact = inpaint_bad_pixels(patterns[0].astype(numpy.float64), bad)[bad]
+    result = inpaint_bad_pixels(patterns, bad)[0][bad]
+
+    numpy.testing.assert_array_equal(result, numpy.rint(exact).astype(numpy.uint16))
+    assert numpy.any(exact % 1.0 != 0.0), 'fixture must exercise a fractional fill'
+
+
+def test_inpaint_patterns_fills_stay_within_each_frame_good_pixel_range() -> None:
+    """Fills never leave the range of their own frame's measured pixels.
+
+    This is what makes the integer cast safe: a fill outside the dtype range
+    would wrap, and an unsigned wrap turns a dim pixel into the brightest one in
+    the frame. The bound is per frame, so a stack whose frames differ in scale
+    cannot borrow another frame's headroom.
+    """
+    patterns = numpy.zeros((2, 16, 16), dtype=numpy.uint16)
+    patterns[0, 4:8, :] = 60000
+    patterns[1, 4:8, :] = 100
+    bad = numpy.zeros((16, 16), dtype=numpy.bool_)
+    bad[9:12, 4:12] = True
+
+    result = inpaint_bad_pixels(patterns, bad)
+
+    good = numpy.logical_not(bad)
+    for frame, filled in zip(patterns, result):
+        assert filled[bad].min() >= frame[good].min()
+        assert filled[bad].max() <= frame[good].max()
+
+
+def test_inpaint_frame_matches_a_one_frame_stack() -> None:
+    """The two arities are one operation: same mask, same answer.
+
+    This is the contract the merge creates -- a frame and a stack of one take
+    different code paths (a plain call vs the shared-mask channel_axis solve)
+    and must still agree.
+    """
+    rng = numpy.random.default_rng(2)
+    frame = rng.integers(0, 1000, size=(16, 16)).astype(numpy.uint16)
+    bad = _square_mask()
+
+    from_frame = inpaint_bad_pixels(frame, bad)
+    from_stack = inpaint_bad_pixels(frame[numpy.newaxis], bad)[0]
+
+    numpy.testing.assert_array_equal(from_frame, from_stack)
+
+
+def test_inpaint_frame_preserves_integer_dtype() -> None:
+    """A frame keeps its dtype, as a stack does and as zero_bad_pixels does.
+
+    The frame path used to return float64 unconditionally, so every other frame
+    test here uses float64 input and would not notice a regression to it.
+    """
+    rng = numpy.random.default_rng(4)
+    frame = rng.integers(0, 1000, size=(16, 16)).astype(numpy.uint16)
+
+    result = inpaint_bad_pixels(frame, _square_mask())
+
+    assert result.dtype == numpy.uint16
+
+
+@pytest.mark.parametrize('shape', [(16,), (2, 3, 16, 16)])
+def test_inpaint_rejects_other_ranks(shape: tuple[int, ...]) -> None:
+    """Anything but a frame or a stack is refused rather than mis-dispatched."""
+    data = numpy.zeros(shape, dtype=numpy.uint16)
+    bad = numpy.ones((16, 16), dtype=numpy.bool_)
+
+    with pytest.raises(ValueError):
+        inpaint_bad_pixels(data, bad)
 
 
 # ------------------------------ summarize_dataset ------------------------------

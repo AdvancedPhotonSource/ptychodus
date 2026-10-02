@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import fields, replace
 from pathlib import Path
+import logging
 from typing import Any, Final
 
 import h5py
@@ -16,13 +17,18 @@ from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import (
     ProductFileKeys,
     StandardFileLayout,
+    TrainingDataFileKeys,
     load_diffraction_data,
     load_product,
     resolve_external_link_path,
     sanitize_path_component,
     save_diffraction_data,
     save_product,
+    save_ptychopinn_training_data,
+    save_training_data,
 )
+from ptychodus.api.preprocess.diffraction import zero_bad_pixels
+from ptychodus.api.reconstruct import ReconstructInput
 from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
@@ -59,10 +65,12 @@ def _make_product(
     probe_width: int = 8,
     obj_height: int = 16,
     obj_width: int = 16,
+    num_incoherent_modes: int = 1,
     with_opr: bool = False,
     with_layer_spacing: bool = False,
     with_losses: bool = False,
     with_position_photon_counts: bool = False,
+    object_center: ObjectCenter | None = None,
     metadata: ProductMetadata | None = None,
 ) -> Product:
     rng = numpy.random.default_rng(1)
@@ -91,11 +99,10 @@ def _make_product(
         ]
     )
 
-    # Probe: shape (coherent=1 or 2, incoherent=1, height, width)
+    # Probe: shape (coherent=1 or 2, incoherent, height, width)
     num_coherent = 2 if with_opr else 1
-    probe_array = rng.standard_normal(
-        (num_coherent, 1, probe_height, probe_width)
-    ) + 1j * rng.standard_normal((num_coherent, 1, probe_height, probe_width))
+    probe_shape = (num_coherent, num_incoherent_modes, probe_height, probe_width)
+    probe_array = rng.standard_normal(probe_shape) + 1j * rng.standard_normal(probe_shape)
     opr_weights: numpy.ndarray | None = None
     if with_opr:
         opr_weights = rng.standard_normal((num_positions, num_coherent)).astype(numpy.float64)
@@ -114,7 +121,7 @@ def _make_product(
     object_ = Object(
         array=obj_array,
         pixel_geometry=PixelGeometry(width_m=10e-9, height_m=10e-9),
-        center=ObjectCenter(x_m=0.0, y_m=0.0),
+        center=ObjectCenter(x_m=0.0, y_m=0.0) if object_center is None else object_center,
         layer_spacing_m=layer_spacing,
     )
 
@@ -654,6 +661,267 @@ class TestProductRoundTrip:
 
         assert loaded.metadata.polarization is None
         assert 'Unknown polarization' in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# Training data writers
+# ---------------------------------------------------------------------------
+
+
+_TRAINING_DATA_KEYS: Final[set[str]] = {
+    'patterns',
+    'bad_pixels',
+    'probe',
+    'object',
+    'probe_position_x_px',
+    'probe_position_y_px',
+    'object_pixel_width_m',
+    'object_pixel_height_m',
+    'detector_object_distance_m',
+    'probe_energy_eV',
+}
+
+_PTYCHOPINN_NPZ_KEYS: Final[set[str]] = {
+    'xcoords',
+    'ycoords',
+    'xcoords_start',
+    'ycoords_start',
+    'diff3d',
+    'bad_pixels',
+    'probeGuess',
+    'objectGuess',
+    'scan_index',
+}
+
+
+def _make_reconstruct_input(
+    *,
+    num_incoherent_modes: int = 3,
+    detector_px: int = 8,
+    dtype: Any = numpy.uint16,
+    with_bad_pixels: bool = True,
+    **product_kwargs: Any,
+) -> ReconstructInput:
+    rng = numpy.random.default_rng(7)
+    product = _make_product(
+        probe_height=detector_px,
+        probe_width=detector_px,
+        num_incoherent_modes=num_incoherent_modes,
+        **product_kwargs,
+    )
+    num_patterns = len(product.probe_positions)
+    patterns = rng.integers(0, 1000, size=(num_patterns, detector_px, detector_px)).astype(dtype)
+
+    bad_pixels: numpy.ndarray | None = None
+    if with_bad_pixels:
+        bad_pixels = numpy.zeros((detector_px, detector_px), dtype=bool)
+        bad_pixels[2:4, 2:4] = True
+
+    return ReconstructInput(patterns, bad_pixels, product)
+
+
+class TestSaveTrainingData:
+    def test_writes_exactly_the_expected_datasets(self, tmp_path: Path) -> None:
+        """The file is a flat namespace of ten datasets and nothing else."""
+        path = tmp_path / 'training.h5'
+        save_training_data(path, _make_reconstruct_input())
+
+        with h5py.File(path, 'r') as h5_file:
+            assert set(h5_file.keys()) == _TRAINING_DATA_KEYS
+            assert dict(h5_file.attrs) == {}
+            for key in h5_file:
+                assert dict(h5_file[key].attrs) == {}, f'{key} carries attributes'
+
+    def test_every_key_enum_member_is_written(self, tmp_path: Path) -> None:
+        """No enum member names a dataset the writer forgets to emit."""
+        path = tmp_path / 'training.h5'
+        save_training_data(path, _make_reconstruct_input())
+
+        with h5py.File(path, 'r') as h5_file:
+            written = set(h5_file.keys())
+
+        assert {str(key) for key in TrainingDataFileKeys} == written
+
+    def test_shapes_and_dtypes(self, tmp_path: Path) -> None:
+        """Arrays keep their source shapes, and the patterns keep their source dtype."""
+        parameters = _make_reconstruct_input(num_incoherent_modes=3, detector_px=8)
+        path = tmp_path / 'training.h5'
+        save_training_data(path, parameters)
+
+        num_positions = len(parameters.product.probe_positions)
+
+        with h5py.File(path, 'r') as h5_file:
+            assert h5_file['patterns'].shape == (num_positions, 8, 8)
+            assert h5_file['patterns'].dtype == parameters.diffraction_patterns.dtype
+            assert h5_file['bad_pixels'].shape == (8, 8)
+            assert h5_file['bad_pixels'].dtype == numpy.bool_
+            assert h5_file['probe'].shape == (3, 8, 8)
+            assert h5_file['object'].ndim == 2
+            assert h5_file['probe_position_x_px'].shape == (num_positions,)
+            assert h5_file['probe_position_y_px'].shape == (num_positions,)
+            for key in ('object_pixel_width_m', 'object_pixel_height_m'):
+                assert h5_file[key].shape == ()
+
+    def test_bad_pixels_are_inpainted_not_zeroed(self, tmp_path: Path) -> None:
+        """Masked positions are filled from their neighbours rather than blanked."""
+        parameters = _make_reconstruct_input()
+        assert parameters.bad_pixels is not None
+        bad = parameters.bad_pixels
+        path = tmp_path / 'training.h5'
+        save_training_data(path, parameters)
+
+        with h5py.File(path, 'r') as h5_file:
+            patterns = h5_file['patterns'][()]
+            numpy.testing.assert_array_equal(h5_file['bad_pixels'][()], bad)
+
+        good = numpy.logical_not(bad)
+        assert numpy.all(patterns[:, bad] != 0)
+        numpy.testing.assert_array_equal(
+            patterns[:, good], parameters.diffraction_patterns[:, good]
+        )
+
+    def test_inpaint_disabled_matches_zero_bad_pixels(self, tmp_path: Path) -> None:
+        """The toggle off reproduces the previous behaviour exactly."""
+        parameters = _make_reconstruct_input()
+        path = tmp_path / 'training.h5'
+        save_training_data(path, parameters, inpaint_bad_pixels=False)
+
+        expected = zero_bad_pixels(parameters.diffraction_patterns, parameters.bad_pixels)
+
+        with h5py.File(path, 'r') as h5_file:
+            numpy.testing.assert_array_equal(h5_file['patterns'][()], expected)
+
+    def test_absent_mask_writes_all_false(self, tmp_path: Path) -> None:
+        """The mask dataset is always present, so a reader needs no optional branch."""
+        parameters = _make_reconstruct_input(with_bad_pixels=False)
+        path = tmp_path / 'training.h5'
+        save_training_data(path, parameters)
+
+        with h5py.File(path, 'r') as h5_file:
+            assert not h5_file['bad_pixels'][()].any()
+            numpy.testing.assert_array_equal(
+                h5_file['patterns'][()], parameters.diffraction_patterns
+            )
+
+    def test_writes_every_probe_mode_at_opr_index_zero(self, tmp_path: Path) -> None:
+        """The full mode stack is written, taken from the first OPR coherent mode."""
+        parameters = _make_reconstruct_input(num_incoherent_modes=4, with_opr=True)
+        path = tmp_path / 'training.h5'
+        save_training_data(path, parameters)
+
+        expected = parameters.product.probes.get_array()[0]
+
+        with h5py.File(path, 'r') as h5_file:
+            numpy.testing.assert_array_equal(h5_file['probe'][()], expected)
+            assert h5_file['probe'].shape[0] == 4
+
+    def test_writes_object_layer_zero(self, tmp_path: Path) -> None:
+        """A multislice object contributes only its first layer."""
+        parameters = _make_reconstruct_input(with_layer_spacing=True)
+        path = tmp_path / 'training.h5'
+        save_training_data(path, parameters)
+
+        with h5py.File(path, 'r') as h5_file:
+            numpy.testing.assert_array_equal(
+                h5_file['object'][()], parameters.product.object_.get_layer(0)
+            )
+
+    def test_warns_when_geometry_is_not_far_field(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A focusing optic cannot be represented, so exporting one is not silent."""
+        metadata = replace(_make_product().metadata, focus_object_distance_m=-0.5)
+        parameters = _make_reconstruct_input(metadata=metadata)
+        path = tmp_path / 'training.h5'
+
+        with caplog.at_level(logging.WARNING, logger='ptychodus.api.io'):
+            save_training_data(path, parameters)
+
+        assert 'far-field' in caplog.text
+        assert path.is_file()
+
+
+class TestSavePtychopinnTrainingData:
+    def test_writes_the_expected_keys(self, tmp_path: Path) -> None:
+        """The eight original keys survive, plus the bad-pixel mask."""
+        path = tmp_path / 'training.npz'
+        save_ptychopinn_training_data(path, _make_reconstruct_input())
+
+        with numpy.load(path) as npz_file:
+            assert set(npz_file.files) == _PTYCHOPINN_NPZ_KEYS
+
+    def test_writes_every_probe_mode(self, tmp_path: Path) -> None:
+        """probeGuess is always the full mode stack, never just mode zero."""
+        parameters = _make_reconstruct_input(num_incoherent_modes=4, with_opr=True)
+        path = tmp_path / 'training.npz'
+        save_ptychopinn_training_data(path, parameters)
+
+        expected = parameters.product.probes.get_array()[0]
+
+        with numpy.load(path) as npz_file:
+            assert npz_file['probeGuess'].shape == (4, 8, 8)
+            numpy.testing.assert_array_equal(npz_file['probeGuess'], expected)
+
+    def test_bad_pixels_are_inpainted_and_recorded(self, tmp_path: Path) -> None:
+        """diff3d is repaired and the mask says which positions were filled."""
+        parameters = _make_reconstruct_input()
+        assert parameters.bad_pixels is not None
+        bad = parameters.bad_pixels
+        path = tmp_path / 'training.npz'
+        save_ptychopinn_training_data(path, parameters)
+
+        with numpy.load(path) as npz_file:
+            numpy.testing.assert_array_equal(npz_file['bad_pixels'], bad)
+            assert numpy.all(npz_file['diff3d'][:, bad] != 0)
+            assert npz_file['diff3d'].dtype == parameters.diffraction_patterns.dtype
+
+    def test_inpaint_disabled_matches_zero_bad_pixels(self, tmp_path: Path) -> None:
+        """The toggle off reproduces the previous behaviour exactly."""
+        parameters = _make_reconstruct_input()
+        path = tmp_path / 'training.npz'
+        save_ptychopinn_training_data(path, parameters, inpaint_bad_pixels=False)
+
+        expected = zero_bad_pixels(parameters.diffraction_patterns, parameters.bad_pixels)
+
+        with numpy.load(path) as npz_file:
+            numpy.testing.assert_array_equal(npz_file['diff3d'], expected)
+
+    def test_scan_index_is_still_all_zeros(self, tmp_path: Path) -> None:
+        """The single-object assumption is unchanged."""
+        parameters = _make_reconstruct_input()
+        path = tmp_path / 'training.npz'
+        save_ptychopinn_training_data(path, parameters)
+
+        with numpy.load(path) as npz_file:
+            assert not npz_file['scan_index'].any()
+            assert len(npz_file['scan_index']) == len(parameters.product.probe_positions)
+
+    def test_agrees_with_the_hdf5_writer(self, tmp_path: Path) -> None:
+        """Both formats carry the same quantities for the same input.
+
+        The two writers share no code past the repair step, so nothing but this
+        keeps them from drifting apart on what a training file contains.
+        """
+        parameters = _make_reconstruct_input(num_incoherent_modes=3)
+        npz_path = tmp_path / 'training.npz'
+        h5_path = tmp_path / 'training.h5'
+        save_ptychopinn_training_data(npz_path, parameters)
+        save_training_data(h5_path, parameters)
+
+        pairs = [
+            ('xcoords', 'probe_position_x_px'),
+            ('ycoords', 'probe_position_y_px'),
+            ('diff3d', 'patterns'),
+            ('bad_pixels', 'bad_pixels'),
+            ('probeGuess', 'probe'),
+            ('objectGuess', 'object'),
+        ]
+
+        with numpy.load(npz_path) as npz_file, h5py.File(h5_path, 'r') as h5_file:
+            for npz_key, h5_key in pairs:
+                numpy.testing.assert_array_equal(
+                    npz_file[npz_key], h5_file[h5_key][()], err_msg=f'{npz_key} != {h5_key}'
+                )
 
 
 class TestSanitizePathComponent:
