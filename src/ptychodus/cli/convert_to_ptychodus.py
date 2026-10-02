@@ -406,10 +406,7 @@ def _build_probe(
         )
 
     if args.num_probe_modes > 1:
-        # Geometric weights: each successive incoherent mode carries half the power of
-        # the one before it.
-        weights = [0.5**imode for imode in range(args.num_probe_modes)]
-        probe = generate_incoherent_probe_modes(rng, probe, weights)
+        probe = generate_incoherent_probe_modes(probe, args.num_probe_modes)
 
     return generate_coherent_probe_modes(
         rng,

@@ -9,6 +9,7 @@ from ptychodus.api.geometry import (
     HermiteMode,
     ImageExtent,
     Interval,
+    LegendreMode,
     Line2D,
     PixelGeometry,
     Point2D,
@@ -340,6 +341,91 @@ def test_hermite_grid() -> None:
 
     plt.savefig('hermite_grid.png', bbox_inches='tight', dpi=my_dpi)
     plt.close(fig)
+
+
+# ---------------------------------------------------------------------------
+# LegendreMode
+# ---------------------------------------------------------------------------
+
+
+def test_legendre_str() -> None:
+    assert str(LegendreMode(1.0, 0)) == '1.0$P_{0}(u)$'
+    assert str(LegendreMode(2.5e-09, 3)) == '2.5e-09$P_{3}(u)$'
+
+
+@pytest.mark.parametrize(
+    'order,expected',
+    [
+        # P_0(u) = 1
+        (0, lambda u: numpy.ones_like(u)),
+        # P_1(u) = u
+        (1, lambda u: u),
+        # P_2(u) = (3u^2 - 1) / 2
+        (2, lambda u: 0.5 * (3.0 * u**2 - 1.0)),
+        # P_3(u) = (5u^3 - 3u) / 2
+        (3, lambda u: 0.5 * (5.0 * u**3 - 3.0 * u)),
+        # P_4(u) = (35u^4 - 30u^2 + 3) / 8
+        (4, lambda u: (35.0 * u**4 - 30.0 * u**2 + 3.0) / 8.0),
+    ],
+)
+def test_legendre_known_values(order: int, expected) -> None:
+    u = numpy.linspace(-1.0, 1.0, 11)
+    mode = LegendreMode(1.0, order)
+
+    numpy.testing.assert_allclose(mode(u), expected(u), atol=1e-12)
+
+
+@pytest.mark.parametrize('order', [0, 1, 2, 5, 9])
+def test_legendre_matches_scipy(order: int) -> None:
+    u = numpy.linspace(-1.0, 1.0, 101)
+    mode = LegendreMode(1.0, order)
+
+    numpy.testing.assert_allclose(mode(u), scipy.special.eval_legendre(order, u), atol=1e-12)
+
+
+def test_legendre_coefficient_scaling() -> None:
+    """Output scales linearly with the real height coefficient."""
+    u = numpy.linspace(-1.0, 1.0, 21)
+    unit = LegendreMode(1.0, 3)
+    scaled = LegendreMode(-2.5e-9, 3)
+
+    numpy.testing.assert_allclose(scaled(u), -2.5e-9 * unit(u), atol=1e-18)
+
+
+@pytest.mark.parametrize('m,n', [(0, 0), (1, 1), (2, 2), (0, 2), (1, 4), (3, 5)])
+def test_legendre_orthogonality(m: int, n: int) -> None:
+    """Legendre polynomials integrate to 2 / (2n + 1) against themselves, zero otherwise.
+
+    This is the property that makes the order index meaningful as a figure-error basis.
+    Note it does *not* extend to their derivatives, which are strongly non-orthogonal.
+    """
+    nodes, weights = numpy.polynomial.legendre.leggauss(m + n + 2)
+    integral = numpy.sum(weights * LegendreMode(1.0, m)(nodes) * LegendreMode(1.0, n)(nodes))
+    expected = 2.0 / (2 * n + 1) if m == n else 0.0
+
+    assert integral == pytest.approx(expected, abs=1e-12)
+
+
+def test_legendre_derivatives_are_not_orthogonal() -> None:
+    """Pins the reason a figure-error rms slope cannot be normalized per coefficient.
+
+    If the derivatives were orthogonal, each Legendre order could be scaled independently
+    by 1 / sqrt(n (n + 1)) to hit a target rms slope. They are not: the Gram matrix of the
+    derivatives carries off-diagonal entries as large as its diagonal.
+    """
+    nodes, weights = numpy.polynomial.legendre.leggauss(16)
+
+    def derivative(order: int) -> numpy.ndarray:
+        series = numpy.zeros(order + 1)
+        series[order] = 1.0
+        return numpy.polynomial.legendre.legval(nodes, numpy.polynomial.legendre.legder(series))
+
+    gram = numpy.array(
+        [[numpy.sum(weights * derivative(m) * derivative(n)) for n in range(6)] for m in range(6)]
+    )
+
+    numpy.testing.assert_allclose(numpy.diag(gram), [n * (n + 1) for n in range(6)], atol=1e-10)
+    assert numpy.abs(gram - numpy.diag(numpy.diag(gram))).max() > 1.0
 
 
 # ---------------------------------------------------------------------------

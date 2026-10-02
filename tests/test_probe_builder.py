@@ -360,3 +360,61 @@ def test_from_file_builder_leaves_a_probe_without_a_pixel_size_alone() -> None:
 
     numpy.testing.assert_array_equal(probe_seq.get_array(), source.get_array())
     assert probe_seq.get_pixel_geometry().width_m == pytest.approx(PIXEL_SIZE_M)
+
+
+class TestIncoherentModeDecaySettings:
+    """The settings are looser than the api strategies, so the builder must absorb that.
+
+    `IncoherentModeDecayRatio` permits 0.0 and the decay type is a free string, while
+    `ProbeMomentPolynomialStrategy` rejects a non-positive ratio outright. A stored value
+    the api would refuse has to leave the probe with a single occupied mode, not stop the
+    build.
+    """
+
+    def _build_mode_powers(self, decay_type: str, decay_ratio: float) -> numpy.ndarray:
+        settings = _make_settings()
+        settings.num_incoherent_modes.set_value(4)
+        settings.incoherent_mode_decay_type.set_value(decay_type)
+        settings.incoherent_mode_decay_ratio.set_value(decay_ratio)
+
+        probe_seq = DiskProbeBuilder(_make_rng(), settings).build(_StubProbeGeometryProvider())
+        array = probe_seq.get_probe_no_opr().get_array()
+        powers = numpy.array([numpy.square(numpy.abs(mode)).sum() for mode in array])
+        return powers / powers.sum()
+
+    def test_exponential_decay_reaches_the_modes(self) -> None:
+        numpy.testing.assert_allclose(
+            self._build_mode_powers('Exponential', 0.5),
+            [8 / 15, 4 / 15, 2 / 15, 1 / 15],
+            rtol=1e-9,
+        )
+
+    def test_polynomial_decay_reaches_the_modes(self) -> None:
+        expected = numpy.array([1.0, 1 / 2, 1 / 3, 1 / 4])
+        numpy.testing.assert_allclose(
+            self._build_mode_powers('Polynomial', 0.5), expected / expected.sum(), rtol=1e-9
+        )
+
+    @pytest.mark.parametrize(
+        ('decay_type', 'decay_ratio'),
+        [('NotADecayType', 0.5), ('Exponential', 0.0)],
+    )
+    def test_a_value_the_api_would_reject_falls_back_to_one_occupied_mode(
+        self, decay_type: str, decay_ratio: float
+    ) -> None:
+        powers = self._build_mode_powers(decay_type, decay_ratio)
+
+        assert powers[0] == pytest.approx(1.0, rel=1e-9)
+        numpy.testing.assert_allclose(powers[1:], 0.0, atol=1e-12)
+
+    def test_the_photon_count_holds_whatever_the_decay_settings_say(self) -> None:
+        for decay_type, decay_ratio in (('Exponential', 0.5), ('Exponential', 0.0)):
+            settings = _make_settings()
+            settings.num_incoherent_modes.set_value(4)
+            settings.incoherent_mode_decay_type.set_value(decay_type)
+            settings.incoherent_mode_decay_ratio.set_value(decay_ratio)
+
+            probe_seq = DiskProbeBuilder(_make_rng(), settings).build(_StubProbeGeometryProvider())
+            total = numpy.square(numpy.abs(probe_seq.get_array())).sum()
+
+            assert total == pytest.approx(PROBE_PHOTON_COUNT, rel=1e-9)

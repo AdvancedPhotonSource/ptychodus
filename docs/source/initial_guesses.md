@@ -194,7 +194,21 @@ The incoherent-mode controls are:
 `incoherent_mode_decay_ratio`
 : Relative strength of later modes. The builder converts this to a list of unnormalized mode weights.
 
-The low-level `generate_incoherent_probe_modes` routine preserves any existing modes in the input probe. If more modes are requested than already exist, it creates each additional mode by duplicating the 0-th incoherent mode and applying random separable phase wraps along the horizontal and vertical axes. In other words, the added modes start with the same amplitude structure as the dominant mode, but receive different random linear phase ramps in `x` and `y`. After optional orthogonalization, the modes are rescaled so their intensities follow the requested relative weights and their summed intensity matches the original base-probe intensity.
+The low-level `generate_incoherent_probe_modes` routine takes a mode count and, optionally, an `IncoherentModeStrategy`. A strategy answers only two questions: what shape the new modes take, and how power would divide across a sequence of a given length. Everything else is the same for every strategy and belongs to the routine itself.
+
+What the routine guarantees, whatever strategy is in play:
+
+- Modes the probe already carries are **kept in order, by identity** — not merely their span — and the strategy supplies only the shortfall.
+- Asking for fewer modes than the probe has keeps the strongest.
+- Preserved modes keep the share of the power they arrived with; the new modes divide the share the strategy's profile assigns to their indices. A 90/10 two-mode probe expanded to four at a decay ratio of 0.5 comes out `[0.727, 0.073, 0.133, 0.067]`, so the 9:1 ratio survives.
+- **Total power is unchanged**, expanding or truncating, and a mode dropped as linearly dependent passes its share to the modes that survive rather than leaving the probe dimmer. The number of modes used to represent a beam is a modeling choice; the illumination is not, and a probe read from file is never rescaled afterward.
+- Orthogonalization is modified Gram-Schmidt in mode order, which is what keeps mode `n` paired with mode `n`. `mode_dependence_floor` sets how much of its own length a mode's orthogonal part must retain to be kept.
+
+`ProbeMomentPolynomialStrategy` is the default, and needs no physical parameters at all. It measures the intensity-weighted centroid and variance of the probe it is given — from the incoherent sum of its modes, which is the footprint the illumination actually covers — and uses that width as its own length scale, so one call suits any illumination without being told how the probe was formed. A new mode is the dominant mode times `u**m * v**n`, with `u` and `v` the transverse coordinates centered on the probe and measured in units of its rms width, damped by a Gaussian of that same width so the polynomial does not push the higher orders into the tails. Orders are graded by total degree and skip the constant term. Weights come from `ProbeModeDecayType` and depend on a mode's index rather than its order.
+
+`RandomPhaseRampStrategy` creates each new mode by duplicating the dominant mode and applying random separable phase wraps along the horizontal and vertical axes, so the added modes share the dominant mode's amplitude structure and differ only by a random linear phase ramp in `x` and `y`. It is the only strategy that consumes randomness, and so the only one that takes an `rng`.
+
+`GaussianSchellStrategy` builds the Hermite-Gauss eigenmodes of a Gaussian-Schell source and *predicts* the weights rather than taking them from a decay profile: given a beam size and coherence length per axis, the two-dimensional spectrum is the outer product of two geometric series and the strongest modes are kept. That spectrum describes its own eigenmodes, so on a probe that already carries modes the weights at the preserved indices are approximate.
 
 The weight rules are:
 
@@ -304,9 +318,8 @@ with ModelCore(Path('settings.ini')) as model:
     base_probe = product.probes.get_probe_no_opr()
 
     probe_with_incoherent_modes = generate_incoherent_probe_modes(
-        model.rng,
         base_probe,
-        imode_weights=[1.0, 0.25, 0.1],
+        3,
         orthogonalize=True,
     )
 
@@ -417,9 +430,8 @@ base_probe = generate_fresnel_zone_plate_probe(
 base_probe = rescale_probe_intensity(base_probe, 1.0e6)
 
 probe_with_imodes = generate_incoherent_probe_modes(
-    rng,
     base_probe,
-    imode_weights=[1.0, 0.25, 0.1],
+    3,
     orthogonalize=True,
 )
 probe_sequence = generate_coherent_probe_modes(

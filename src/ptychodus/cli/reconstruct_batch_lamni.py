@@ -399,10 +399,7 @@ def _reconstruct_one_scan(
         probe = Probe(array=array, pixel_geometry=probe_geometry.get_pixel_geometry())
 
     if args.num_probe_modes > 1 and probe.get_array().shape[0] < args.num_probe_modes:
-        # Geometric weights: each successive incoherent mode carries half the power of
-        # the one before it. A warm-started probe already carries its modes.
-        weights = [0.5**imode for imode in range(args.num_probe_modes)]
-        probe = generate_incoherent_probe_modes(rng, probe, weights)
+        probe = generate_incoherent_probe_modes(probe, args.num_probe_modes)
 
     probe_sequence = generate_coherent_probe_modes(
         rng,

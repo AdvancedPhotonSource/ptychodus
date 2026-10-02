@@ -204,13 +204,37 @@ class HermiteMode:
     order_x: int  # m
     order_y: int  # n
 
-    def _hermite(self, order: int, value: RealArrayType) -> RealArrayType:
-        return scipy.special.eval_hermite(order, value)
-
     def __call__(self, x: RealArrayType, y: RealArrayType) -> ComplexArrayType:
-        hx = self._hermite(self.order_x, x)
-        hy = self._hermite(self.order_y, y)
+        hx = scipy.special.eval_hermite(self.order_x, x)
+        hy = scipy.special.eval_hermite(self.order_y, y)
         return self.coefficient * hx * hy
 
     def __str__(self) -> str:
         return f'{self.coefficient}$H_{{{self.order_x},{self.order_y}}}(x,y)$'
+
+
+@dataclass(frozen=True)
+class LegendreMode:
+    """A single Legendre polynomial term P_n(u) with a real height coefficient and order n.
+
+    Unlike :class:`ZernikeMode` and :class:`HermiteMode`, which carry complex coefficients
+    and are summed into a complex amplitude, this mode describes a *surface height* and so
+    carries a real coefficient in meters. Converting a height to a phase depends on the
+    wavelength and, for a grazing-incidence surface, on the incidence angle; neither is
+    known here, so :meth:`__call__` returns the height and the conversion belongs to
+    whatever applies the mode to a wavefield.
+
+    Legendre polynomials are orthogonal on ``[-1, 1]``, so *u* is the aperture coordinate
+    normalized to that interval. Low orders carry the conventional meanings: 0 is piston,
+    1 is tilt, 2 is defocus, 3 is coma.
+    """
+
+    coefficient_m: float
+    order: int  # n
+
+    def __call__(self, u: RealArrayType) -> RealArrayType:
+        """Return the surface height in meters at normalized aperture coordinate *u*."""
+        return self.coefficient_m * scipy.special.eval_legendre(self.order, u)
+
+    def __str__(self) -> str:
+        return f'{self.coefficient_m}$P_{{{self.order}}}(u)$'

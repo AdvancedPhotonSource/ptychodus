@@ -1,13 +1,13 @@
 from __future__ import annotations
 from abc import abstractmethod
-from collections.abc import Sequence
-from enum import auto, IntEnum
 import logging
 
 import numpy
 
 from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.simulate.probe import (
+    ProbeMomentPolynomialStrategy,
+    ProbeModeDecayType,
     generate_coherent_probe_modes,
     generate_incoherent_probe_modes,
     rescale_probe_intensity,
@@ -23,23 +23,6 @@ from ptychodus.api.probe import (
 from .settings import ProbeSettings
 
 logger = logging.getLogger(__name__)
-
-
-class ProbeModeDecayType(IntEnum):
-    NONE = auto()
-    POLYNOMIAL = auto()
-    EXPONENTIAL = auto()
-
-    def get_weights(self, num_modes: int, decay_ratio: float) -> Sequence[float]:
-        match self.value:
-            case ProbeModeDecayType.EXPONENTIAL:
-                b = 1.0 / decay_ratio
-                return [b**-n for n in range(num_modes)]
-            case ProbeModeDecayType.POLYNOMIAL:
-                b = numpy.log(decay_ratio) / numpy.log(2.0)
-                return [(n + 1) ** b for n in range(num_modes)]
-            case _:
-                return [1.0] + [0.0] * (num_modes - 1)
 
 
 class ProbeSequenceBuilder(ParameterGroup):
@@ -113,7 +96,13 @@ class ProbeSequenceBuilder(ParameterGroup):
         rescaled = rescale_probe_intensity(probe, geometry_provider.probe_photon_count)
         return ProbeSequence.from_probe(rescaled)
 
-    def _get_imode_weights(self) -> Sequence[float]:
+    def _get_imode_decay(self) -> tuple[ProbeModeDecayType, float]:
+        """Resolve the incoherent-mode decay settings, tolerating values the api rejects.
+
+        The settings permit a zero ratio and any string at all, while the api strategies
+        raise on a non-positive ratio; a bad stored value should leave the probe with a
+        single occupied mode, not stop the build.
+        """
         imode_decay_ratio = self.incoherent_mode_decay_ratio.get_value()
         imode_decay_type_text = self.incoherent_mode_decay_type.get_value()
         imode_decay_type = ProbeModeDecayType.NONE
@@ -124,8 +113,7 @@ class ProbeSequenceBuilder(ParameterGroup):
             except KeyError:
                 logger.debug(f'Unknown probe mode decay type "{imode_decay_type_text}"')
 
-        num_imodes = self.num_incoherent_modes.get_value()
-        return imode_decay_type.get_weights(num_imodes, imode_decay_ratio)
+        return imode_decay_type, imode_decay_ratio
 
     def _condition_probe(
         self, probe_seq: ProbeSequence, geometry_provider: ProbeGeometryProvider
@@ -169,10 +157,13 @@ class ProbeSequenceBuilder(ParameterGroup):
         num_imodes_actual = probe.num_incoherent_modes
 
         if num_imodes_actual < num_imodes_requested:
+            decay_type, decay_ratio = self._get_imode_decay()
             probe = generate_incoherent_probe_modes(
-                self._rng,
                 probe,
-                self._get_imode_weights(),
+                num_imodes_requested,
+                strategy=ProbeMomentPolynomialStrategy(
+                    decay_type=decay_type, decay_ratio=decay_ratio
+                ),
                 orthogonalize=self.orthogonalize_incoherent_modes.get_value(),
             )
         elif num_imodes_actual > num_imodes_requested:
