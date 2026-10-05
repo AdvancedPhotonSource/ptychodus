@@ -272,7 +272,7 @@ class OLCFFacilityAdapter(IRIFacilityAdapter):
         #    'module load miniforge3',
         #    'conda create --prefix /ccsopen/proj/csc682/ptychodus-env python==3.11',
         #    'conda activate /ccsopen/proj/csc682/ptychodus-env',
-        #    'pip install -e ptychodus[ptychi,ptychopinn]',
+        #    'pip install -e ptychodus[ptychi]',
         account = self._settings.account.get_value()
         conda_env = f'/ccsopen/proj/{account}/ptychodus-env'
         return JobSpecification(

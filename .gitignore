@@ -101,6 +101,11 @@ ipython_config.py
 #   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
 #poetry.lock
 
+# uv
+#   The lock would pin resolutions for one machine's extras and interpreter;
+#   ptychodus is distributed as a package, so the lock is a local artifact.
+uv.lock
+
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow
 __pypackages__/
 
