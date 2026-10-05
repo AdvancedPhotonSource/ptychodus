@@ -270,6 +270,12 @@ Opening a probe file that carries OPR weights in the GUI prompts for the policy,
 `COLLAPSE` applies the mean weight row across every incoherent mode. Indexing a position out of a {py:class}`ptychodus.api.probe.ProbeSequence` instead rewrites only incoherent mode 0 from the coherent basis.
 ```
 
+### Inspecting an OPR Probe
+
+{py:func}`ptychodus.api.probe.compute_opr_mode_series` reduces a probe ensemble to per-position diagnostics: the weights, the power in the composed mode, the power in its difference from the across-scan mean, and per-mode statistics. {py:attr}`ptychodus.api.probe.OPRModeSeries.relative_variation` reports the share of the composed mode's power that varies across the scan — near zero means the OPR basis is not modeling anything — and {py:attr}`ptychodus.api.probe.OPRModeSeries.effective_mode_count` reports how many coherent modes account for most of that variation, which is the number to compare against `num_coherent_modes`.
+
+In the GUI this is **Analyze → Coherent (OPR) Modes...** on the probe panel. The dialog plays through the probe positions while plotting the counts and the per-mode weights against scan index, and maps either quantity over the scan grid. Because a few-percent variation is invisible against the composed probe on a fixed color scale, the display selector also offers the deviation from the across-scan mean — where a beam translation reads as a dipole and an intensity drift as a concentric change — and the coherent basis modes themselves. When the diffraction dataset is loaded, the measured per-frame photon counts are overlaid on the predicted curve, which is what distinguishes OPR tracking real flux drift from OPR absorbing noise.
+
 ### Examples
 
 #### Generate a multimode probe from scratch

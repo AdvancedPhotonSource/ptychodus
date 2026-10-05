@@ -9,6 +9,7 @@ from ptychodus.api.probe import OPRWeightPolicy
 
 from ...model.analysis import (
     IlluminationMapper,
+    OPRModeAnalyzer,
     ProbeOverlapAnalyzer,
     ProbePropagatorSettings,
     ProbePropagator,
@@ -28,6 +29,7 @@ from ..helpers import connect_triggered_signal, create_brush_for_editable_cell
 from ..image import ImageController
 from .editor_factory import ProbeEditorViewControllerFactory
 from .illumination import IlluminationViewController
+from .opr import OPRModeViewController
 from .overlap import ProbeOverlapViewController
 from .propagator import ProbePropagationViewController
 from .tree_model import ProbeTreeModel, try_get_probe
@@ -48,6 +50,8 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         illumination_visualization_engine: VisualizationEngine,
         overlap_analyzer: ProbeOverlapAnalyzer,
         overlap_visualization_engine: VisualizationEngine,
+        opr_mode_analyzer: OPRModeAnalyzer,
+        opr_mode_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
@@ -72,6 +76,12 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             overlap_analyzer,
             overlap_visualization_engine,
             file_dialog_factory,
+        )
+        self._opr_mode_view_controller = OPRModeViewController(
+            opr_mode_analyzer,
+            opr_mode_visualization_engine,
+            file_dialog_factory,
+            view,
         )
 
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
@@ -126,6 +136,9 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         overlap_action = view.button_box.analyze_menu.addAction('Overlap Metrics...')
         connect_triggered_signal(overlap_action, self._analyze_overlap)
+
+        opr_mode_action = view.button_box.analyze_menu.addAction('Coherent (OPR) Modes...')
+        connect_triggered_signal(opr_mode_action, self._analyze_opr_modes)
 
     def _get_current_item_index(self) -> int:
         model_index = self._view.tree_view.currentIndex()
@@ -279,6 +292,14 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             logger.warning('No current item!')
         else:
             self._overlap_view_controller.analyze(item_index)
+
+    def _analyze_opr_modes(self) -> None:
+        item_index = self._get_current_item_index()
+
+        if item_index < 0:
+            logger.warning('No current item!')
+        else:
+            self._opr_mode_view_controller.launch(item_index)
 
     def _update_view(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()

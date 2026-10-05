@@ -1091,6 +1091,244 @@ class ProbeSequence(Sequence[Probe]):
         return f'{self._array.dtype}{self._array.shape}'
 
 
+@dataclass(frozen=True)
+class OPRModeStatistics:
+    """Across-scan statistics for one coherent (OPR) mode."""
+
+    mean_weight: float
+    """Mean of this mode's weight over all probe positions."""
+
+    weight_deviation: float
+    """Standard deviation of this mode's weight over all probe positions."""
+
+    variance_fraction: float
+    """Share of the across-scan variance attributed to this mode, in ``[0, 1]``.
+
+    This is the mode's own contribution ``var(w[:, c]) * G[c, c]`` divided by the sum of
+    those contributions over every mode, so the fractions sum to one. The cross terms
+    between modes are left out, which makes the split exact for an orthogonal coherent
+    basis and approximate otherwise; :attr:`OPRModeSeries.relative_variation` keeps them
+    and so is exact either way.
+
+    Zero throughout in the degenerate case where no mode's weight varies at all -- a
+    single probe position, or a basis carrying no power -- since there is then no
+    variance to apportion.
+    """
+
+
+@dataclass(frozen=True)
+class OPRModeSeries:
+    """Per-probe-position OPR diagnostics for a probe ensemble.
+
+    Row ``i`` of every per-position array describes probe position ``i`` by row order,
+    which is how a probe ensemble pairs with a sequence of probe positions; it is not
+    the scan index.
+
+    Powers are expressed the way a probe array stores them, as the sum of ``abs(psi)**2``
+    over the pixels of a mode, so they are comparable with
+    :attr:`ptychodus.api.product.ProductMetadata.probe_photon_count` and with each other
+    but not with raw detector counts.
+    """
+
+    opr_weight: RealArrayType
+    """OPR weights, shape ``(num_positions, num_coherent_modes)``."""
+
+    primary_mode_photon_count: RealArrayType
+    """Power in the OPR-composed incoherent mode 0, shape ``(num_positions,)``."""
+
+    deviation_photon_count: RealArrayType
+    """Power in the difference between that mode and its across-scan mean, shape
+    ``(num_positions,)``. This isolates what OPR models: it is zero at every position of
+    an ensemble whose weight rows are all equal."""
+
+    secondary_mode_photon_count: float
+    """Power in incoherent modes 1 and above.
+
+    A probe ensemble composes only incoherent mode 0 from the coherent basis, so the
+    remaining modes are the same at every probe position and their power is one number
+    rather than a series.
+    """
+
+    mode_statistics: Sequence[OPRModeStatistics]
+    """One entry per coherent mode, in mode order."""
+
+    effective_mode_count: int
+    """Coherent modes needed to account for the requested share of the across-scan
+    variance, counting from the largest contributor down.
+
+    The answer to how many coherent modes a reconstruction actually needs. Zero in the
+    degenerate case where the variance is exactly zero; an ensemble whose weight rows
+    agree only to roundoff reports one, alongside a :attr:`relative_variation` that
+    rounds to nothing.
+    """
+
+    @property
+    def num_positions(self) -> int:
+        return self.opr_weight.shape[0]
+
+    @property
+    def num_coherent_modes(self) -> int:
+        return self.opr_weight.shape[1]
+
+    @property
+    def total_photon_count(self) -> RealArrayType:
+        """Whole-probe power per position: the composed mode plus the fixed remainder.
+
+        This differs from :attr:`primary_mode_photon_count` by a constant, so the two
+        curves have the same shape and the constant is the power the unvarying modes
+        carry.
+        """
+        return self.primary_mode_photon_count + self.secondary_mode_photon_count
+
+    @property
+    def relative_variation(self) -> float:
+        """Mean deviation power as a fraction of mean composed-mode power.
+
+        The single number answering whether the OPR basis is doing anything: ``0.0`` for
+        an ensemble that does not vary across the scan, and growing with the share of the
+        illumination that the weights move around. Unlike the per-mode
+        :attr:`OPRModeStatistics.variance_fraction` split, this keeps the cross terms
+        between modes and so is exact for a non-orthogonal basis too.
+
+        Returns ``0.0`` when the probe carries no power.
+        """
+        if self.primary_mode_photon_count.size == 0:
+            return 0.0
+
+        mean_primary = self.primary_mode_photon_count.mean()
+
+        if mean_primary <= 0.0:
+            return 0.0
+
+        return float(self.deviation_photon_count.mean() / mean_primary)
+
+    def save_npz(self, file_path: Path) -> None:
+        numpy.savez_compressed(
+            file_path,
+            allow_pickle=False,
+            opr_weight=self.opr_weight,
+            primary_mode_photon_count=self.primary_mode_photon_count,
+            deviation_photon_count=self.deviation_photon_count,
+            total_photon_count=self.total_photon_count,
+            secondary_mode_photon_count=self.secondary_mode_photon_count,
+            mean_weight=numpy.array([stat.mean_weight for stat in self.mode_statistics]),
+            weight_deviation=numpy.array([stat.weight_deviation for stat in self.mode_statistics]),
+            variance_fraction=numpy.array(
+                [stat.variance_fraction for stat in self.mode_statistics]
+            ),
+            effective_mode_count=self.effective_mode_count,
+            relative_variation=self.relative_variation,
+        )
+
+
+def _evaluate_weight_quadratic_form(weight: RealArrayType, gram: RealArrayType) -> RealArrayType:
+    """Row-wise ``w G w`` over a Hermitian Gram matrix's real part, floored at zero.
+
+    Algebraically each row evaluates a sum of squared magnitudes and so cannot be
+    negative, but routing it through the Gram matrix subtracts large terms: a weight row
+    that nearly annihilates the basis can land a hair below zero by roundoff. A power
+    must not be negative, so the floor applies unconditionally rather than at a
+    caller-chosen tolerance.
+    """
+    value = numpy.einsum('nc,cd,nd->n', weight, gram, weight)
+    return numpy.maximum(value, 0.0)
+
+
+def compute_opr_mode_series(
+    probes: ProbeSequence, *, variance_fraction_threshold: float = 0.95
+) -> OPRModeSeries:
+    """Reduce an OPR probe ensemble to per-position diagnostics.
+
+    A probe ensemble composes incoherent mode 0 at probe position ``i`` as
+    ``sum_c w[i, c] * A[c, 0]`` over the coherent basis ``A`` and leaves every other
+    incoherent mode alone. Each quantity reported here is therefore a quadratic form in
+    the weight row against the Hermitian Gram matrix ``G[c, d] = sum_pixels A[c, 0] *
+    conj(A[d, 0])``, and no per-position probe is ever built: cost scales as
+    ``num_coherent_modes**2`` in both the pixel count and the position count, where
+    materializing the ensemble would scale in the pixel count per position.
+
+    Only the real part of the Gram matrix contributes. The weights are real, so the
+    product ``w[i, c] * w[i, d]`` is symmetric in its two indices while the Gram matrix's
+    anti-Hermitian part is antisymmetric, and that contraction vanishes exactly. The Gram
+    matrix is accumulated in double precision whatever the probe's own dtype, since a
+    single-precision probe would otherwise sum one term per pixel in single precision.
+
+    An ensemble with no OPR weights names a single probe position whose composed mode is
+    the basis's first mode, which is the weight row this reports for it.
+
+    Args:
+        probes: Probe ensemble to measure, with or without an OPR basis.
+        variance_fraction_threshold: Share of the across-scan variance that
+            :attr:`OPRModeSeries.effective_mode_count` must reach. Lowering it reports
+            fewer modes as sufficient; raising it toward one reports more.
+
+    Raises:
+        ValueError: If ``variance_fraction_threshold`` is outside ``(0, 1]``.
+    """
+    if not 0.0 < variance_fraction_threshold <= 1.0:
+        raise ValueError(
+            f'Variance fraction threshold must be in (0, 1]; got {variance_fraction_threshold}!'
+        )
+
+    array = probes.get_array()
+    num_coherent_modes = probes.num_coherent_modes
+    weights = probes.get_opr_weights_or_none()
+
+    if weights is None:
+        # With no weights the composed mode is the basis's first mode unchanged, which
+        # is what a single row of unit weight on that mode reproduces.
+        opr_weight = numpy.eye(1, num_coherent_modes)
+    else:
+        opr_weight = numpy.asarray(weights, dtype=numpy.float64)
+
+    basis = array[:, 0, :, :].reshape(num_coherent_modes, -1).astype(numpy.complex128)
+    gram: RealArrayType = (basis @ basis.conj().T).real
+
+    mean_weight = (
+        opr_weight.mean(axis=0) if opr_weight.size > 0 else numpy.zeros(num_coherent_modes)
+    )
+    primary_mode_photon_count = _evaluate_weight_quadratic_form(opr_weight, gram)
+    deviation_photon_count = _evaluate_weight_quadratic_form(opr_weight - mean_weight, gram)
+
+    secondary_mode_photon_count = float(
+        numpy.sum(numpy.square(numpy.absolute(array[0, 1:, :, :])), dtype=numpy.float64)
+    )
+
+    weight_deviation = (
+        opr_weight.std(axis=0) if opr_weight.size > 0 else numpy.zeros(num_coherent_modes)
+    )
+    mode_contribution = numpy.square(weight_deviation) * numpy.diagonal(gram)
+    total_contribution = mode_contribution.sum()
+
+    if total_contribution > 0.0:
+        variance_fraction = mode_contribution / total_contribution
+        # Count the largest contributors first: the question the count answers is how
+        # many modes are worth keeping, not where they sit in the basis.
+        ranked = numpy.sort(variance_fraction)[::-1]
+        cumulative = numpy.cumsum(ranked)
+        reached = numpy.flatnonzero(cumulative >= variance_fraction_threshold)
+        effective_mode_count = int(reached[0]) + 1 if reached.size > 0 else int(num_coherent_modes)
+    else:
+        variance_fraction = numpy.zeros(num_coherent_modes)
+        effective_mode_count = 0
+
+    return OPRModeSeries(
+        opr_weight=opr_weight,
+        primary_mode_photon_count=primary_mode_photon_count,
+        deviation_photon_count=deviation_photon_count,
+        secondary_mode_photon_count=secondary_mode_photon_count,
+        mode_statistics=tuple(
+            OPRModeStatistics(
+                mean_weight=float(mean_weight[mode]),
+                weight_deviation=float(weight_deviation[mode]),
+                variance_fraction=float(variance_fraction[mode]),
+            )
+            for mode in range(num_coherent_modes)
+        ),
+        effective_mode_count=effective_mode_count,
+    )
+
+
 def _centered_grid_indexes(
     source_pixel_m: float, source_px: int, target_pixel_m: float, target_px: int
 ) -> RealArrayType:

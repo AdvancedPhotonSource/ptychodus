@@ -155,6 +155,8 @@ class ControllerCore:
             model.analysis_core.illumination_visualization_engine,
             model.analysis_core.probe_overlap_analyzer,
             model.analysis_core.probe_overlap_visualization_engine,
+            model.analysis_core.opr_mode_analyzer,
+            model.analysis_core.opr_mode_visualization_engine,
             view.probe_view,
             self._file_dialog_factory,
         )

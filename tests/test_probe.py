@@ -16,6 +16,7 @@ from ptychodus.api.probe import (
     ProbeSequence,
     ProbeSizeMetrics,
     compute_amplitude_deviation,
+    compute_opr_mode_series,
     conform_opr_weights,
     compute_phase_deviation_rad,
     compute_probe_focus_curves,
@@ -1043,3 +1044,215 @@ class TestConformOPRWeights:
     def test_non_positive_position_count_is_rejected(self, num_positions: int) -> None:
         with pytest.raises(ValueError, match='positive'):
             self._conform(OPRWeightPolicy.AVERAGE, num_positions)
+
+
+class TestComputeOPRModeSeries:
+    """Per-position OPR diagnostics for a probe ensemble.
+
+    The point of every check here is that the Gram-matrix route agrees with actually
+    building each position's probe. The shortcut exists because materializing an
+    ensemble over a long scan is expensive, so its correctness is the thing that has to
+    be pinned down -- in particular for a non-orthogonal coherent basis, where dropping
+    the off-diagonal terms would still look plausible.
+    """
+
+    NUM_POSITIONS = 7
+    NUM_COHERENT_MODES = 3
+    NUM_INCOHERENT_MODES = 2
+
+    def _probes(
+        self,
+        *,
+        weights: numpy.ndarray | None = None,
+        dtype: numpy.dtype | type = numpy.complex64,
+    ) -> ProbeSequence:
+        rng = numpy.random.default_rng(42)
+        shape = (self.NUM_COHERENT_MODES, self.NUM_INCOHERENT_MODES, 4, 4)
+        # Deliberately not orthogonalized: the off-diagonal Gram terms must be carried.
+        array = (rng.normal(size=shape) + 1j * rng.normal(size=shape)).astype(dtype)
+
+        if weights is None:
+            weights = rng.normal(size=(self.NUM_POSITIONS, self.NUM_COHERENT_MODES))
+
+        return ProbeSequence(array, weights, PixelGeometry(width_m=1e-9, height_m=2e-9))
+
+    def test_total_matches_materialized_probes(self) -> None:
+        probes = self._probes()
+        series = compute_opr_mode_series(probes)
+        expected = numpy.array(
+            [probes[index].get_intensity().sum() for index in range(len(probes))]
+        )
+        numpy.testing.assert_allclose(series.total_photon_count, expected, rtol=1e-6)
+
+    def test_deviation_matches_materialized_probes(self) -> None:
+        probes = self._probes()
+        series = compute_opr_mode_series(probes)
+        composed = numpy.array(
+            [probes[index].get_incoherent_mode(0) for index in range(len(probes))]
+        )
+        mean_mode = composed.mean(axis=0)
+        expected = numpy.array(
+            [numpy.square(numpy.absolute(mode - mean_mode)).sum() for mode in composed]
+        )
+        numpy.testing.assert_allclose(series.deviation_photon_count, expected, rtol=1e-5)
+
+    def test_total_is_primary_plus_secondary(self) -> None:
+        series = compute_opr_mode_series(self._probes())
+        numpy.testing.assert_allclose(
+            series.total_photon_count,
+            series.primary_mode_photon_count + series.secondary_mode_photon_count,
+        )
+
+    def test_shape_accessors(self) -> None:
+        series = compute_opr_mode_series(self._probes())
+        assert series.num_positions == self.NUM_POSITIONS
+        assert series.num_coherent_modes == self.NUM_COHERENT_MODES
+        assert len(series.mode_statistics) == self.NUM_COHERENT_MODES
+
+    def test_variance_fractions_sum_to_one(self) -> None:
+        series = compute_opr_mode_series(self._probes())
+        total = sum(statistics.variance_fraction for statistics in series.mode_statistics)
+        assert total == pytest.approx(1.0)
+
+    def test_mode_statistics_match_the_weights(self) -> None:
+        probes = self._probes()
+        series = compute_opr_mode_series(probes)
+        weights = probes.get_opr_weights()
+
+        for mode, statistics in enumerate(series.mode_statistics):
+            assert statistics.mean_weight == pytest.approx(weights[:, mode].mean())
+            assert statistics.weight_deviation == pytest.approx(weights[:, mode].std())
+
+    def test_without_weights_reports_the_unweighted_probe(self) -> None:
+        """No OPR weights names one position whose composed mode is the basis's first."""
+        probes = ProbeSequence(
+            self._probes().get_array(), None, PixelGeometry(width_m=1e-9, height_m=2e-9)
+        )
+        series = compute_opr_mode_series(probes)
+
+        assert series.num_positions == 1
+        numpy.testing.assert_allclose(series.opr_weight, [[1.0, 0.0, 0.0]])
+        numpy.testing.assert_allclose(
+            series.total_photon_count,
+            [probes.get_probe_no_opr().get_intensity().sum()],
+            rtol=1e-6,
+        )
+        assert series.deviation_photon_count == pytest.approx(0.0)
+        assert series.relative_variation == 0.0
+        assert series.effective_mode_count == 0
+
+    def test_identical_weight_rows_do_not_vary(self) -> None:
+        weights = numpy.broadcast_to(
+            numpy.array([1.0, 0.03, -0.02]), (self.NUM_POSITIONS, self.NUM_COHERENT_MODES)
+        ).copy()
+        series = compute_opr_mode_series(self._probes(weights=weights))
+
+        numpy.testing.assert_allclose(series.deviation_photon_count, 0.0, atol=1e-12)
+        assert series.relative_variation == pytest.approx(0.0, abs=1e-12)
+
+    def test_single_coherent_mode(self) -> None:
+        rng = numpy.random.default_rng(7)
+        shape = (1, 1, 4, 4)
+        array = rng.normal(size=shape) + 1j * rng.normal(size=shape)
+        weights = rng.normal(size=(5, 1))
+        probes = ProbeSequence(array, weights, PixelGeometry(width_m=1e-9, height_m=1e-9))
+        series = compute_opr_mode_series(probes)
+
+        expected = numpy.array([probes[index].get_intensity().sum() for index in range(5)])
+        numpy.testing.assert_allclose(series.total_photon_count, expected)
+        assert series.secondary_mode_photon_count == pytest.approx(0.0)
+
+    def test_null_sentinel_probe_sequence(self) -> None:
+        """The repository holds a zero-sized sequence until a dataset binds."""
+        series = compute_opr_mode_series(ProbeSequence(None, None, None))
+
+        numpy.testing.assert_allclose(series.total_photon_count, [0.0])
+        assert series.relative_variation == 0.0
+        assert series.effective_mode_count == 0
+
+    def test_counts_are_never_negative(self) -> None:
+        """A weight row that nearly annihilates the basis must not report negative power.
+
+        Evaluating the quadratic form subtracts large terms where the direct sum of
+        squared magnitudes cannot go below zero, so the floor has to be applied.
+        """
+        rng = numpy.random.default_rng(3)
+        base = rng.normal(size=(1, 1, 8, 8)) + 1j * rng.normal(size=(1, 1, 8, 8))
+        array = numpy.concatenate([base, base * (1.0 + 1.0e-9)], axis=0)
+        weights = numpy.array([[1.0, -1.0], [1.0, -1.0]])
+        series = compute_opr_mode_series(
+            ProbeSequence(array, weights, PixelGeometry(width_m=1e-9, height_m=1e-9))
+        )
+
+        assert (series.primary_mode_photon_count >= 0.0).all()
+        assert (series.deviation_photon_count >= 0.0).all()
+
+    def test_single_precision_agrees_with_double(self) -> None:
+        """The Gram matrix is accumulated in double precision whatever the probe's dtype."""
+        single = compute_opr_mode_series(self._probes(dtype=numpy.complex64))
+        double = compute_opr_mode_series(self._probes(dtype=numpy.complex128))
+        numpy.testing.assert_allclose(
+            single.total_photon_count, double.total_photon_count, rtol=1e-6
+        )
+
+    @pytest.mark.parametrize('threshold', [0.0, -0.1, 1.5])
+    def test_invalid_variance_threshold_is_rejected(self, threshold: float) -> None:
+        with pytest.raises(ValueError, match='Variance fraction threshold'):
+            compute_opr_mode_series(self._probes(), variance_fraction_threshold=threshold)
+
+    def test_one_dominant_mode_suffices(self) -> None:
+        rng = numpy.random.default_rng(11)
+        weights = 1.0e-9 * rng.normal(size=(self.NUM_POSITIONS, self.NUM_COHERENT_MODES))
+        weights[:, 1] = rng.normal(size=self.NUM_POSITIONS)
+
+        assert compute_opr_mode_series(self._probes(weights=weights)).effective_mode_count == 1
+
+    def test_effective_mode_count_follows_the_threshold(self) -> None:
+        """Raising the threshold past one mode's share pulls the next one in.
+
+        The counting runs over the modes ranked by contribution rather than in basis
+        order, so the thresholds here are built from the ranked fractions themselves.
+        """
+        probes = self._probes()
+        series = compute_opr_mode_series(probes)
+        ranked = sorted(
+            (statistics.variance_fraction for statistics in series.mode_statistics),
+            reverse=True,
+        )
+
+        assert (
+            compute_opr_mode_series(
+                probes, variance_fraction_threshold=0.5 * ranked[0]
+            ).effective_mode_count
+            == 1
+        )
+        assert (
+            compute_opr_mode_series(
+                probes, variance_fraction_threshold=ranked[0] + 0.5 * ranked[1]
+            ).effective_mode_count
+            == 2
+        )
+
+    def test_save_npz_round_trip(self, tmp_path) -> None:  # noqa: ANN001
+        series = compute_opr_mode_series(self._probes())
+        file_path = tmp_path / 'opr.npz'
+        series.save_npz(file_path)
+
+        with numpy.load(file_path) as contents:
+            numpy.testing.assert_allclose(contents['opr_weight'], series.opr_weight)
+            numpy.testing.assert_allclose(
+                contents['primary_mode_photon_count'], series.primary_mode_photon_count
+            )
+            numpy.testing.assert_allclose(
+                contents['deviation_photon_count'], series.deviation_photon_count
+            )
+            numpy.testing.assert_allclose(contents['total_photon_count'], series.total_photon_count)
+            assert contents['secondary_mode_photon_count'] == pytest.approx(
+                series.secondary_mode_photon_count
+            )
+            numpy.testing.assert_allclose(
+                contents['variance_fraction'],
+                [statistics.variance_fraction for statistics in series.mode_statistics],
+            )
+            assert int(contents['effective_mode_count']) == series.effective_mode_count
+            assert contents['relative_variation'] == pytest.approx(series.relative_variation)

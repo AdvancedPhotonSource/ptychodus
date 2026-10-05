@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
     QAbstractItemView,
     QButtonGroup,
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -12,9 +13,11 @@ from PyQt5.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QListWidget,
     QPushButton,
     QRadioButton,
     QSlider,
+    QSplitter,
     QStatusBar,
     QTableView,
     QVBoxLayout,
@@ -119,6 +122,256 @@ class OPRWeightPolicyDialog(QDialog):
 
     def get_policy(self) -> OPRWeightPolicy:
         return OPRWeightPolicy(self._button_group.checkedId())
+
+
+class OPRModeStatisticsView(QGroupBox):
+    """Per-mode weight statistics, and the two numbers that summarize them.
+
+    The table says how each coherent mode behaves across the scan; the two summary rows
+    beneath it answer whether the OPR basis is earning its degrees of freedom at all,
+    and how many of its modes are doing the work.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__('Mode Statistics', parent)
+        self.relative_variation_label = QLabel('—')
+        self.effective_mode_count_label = QLabel('—')
+
+        self.relative_variation_label.setToolTip(
+            'Share of the composed mode’s power that varies across the scan.'
+            ' Near zero means the OPR basis is not modeling anything.'
+        )
+        self.effective_mode_count_label.setToolTip(
+            'Coherent modes needed to account for most of that variation.'
+            ' Fewer than the basis holds means the extra modes are idle.'
+        )
+
+        self._table_layout = QGridLayout()
+        self._table_layout.addWidget(QLabel('Mode'), 0, 0)
+        self._table_layout.addWidget(QLabel('Mean'), 0, 1, Qt.AlignmentFlag.AlignCenter)
+        self._table_layout.addWidget(QLabel('Std Dev'), 0, 2, Qt.AlignmentFlag.AlignCenter)
+        self._table_layout.addWidget(QLabel('Variance [%]'), 0, 3, Qt.AlignmentFlag.AlignCenter)
+        self._table_layout.setColumnStretch(1, 1)
+        self._table_layout.setColumnStretch(2, 1)
+        self._table_layout.setColumnStretch(3, 1)
+        self._rows: list[tuple[QLabel, QLabel, QLabel, QLabel]] = []
+
+        summary_layout = QFormLayout()
+        summary_layout.addRow('Varying Power [%]:', self.relative_variation_label)
+        summary_layout.addRow('Modes Needed:', self.effective_mode_count_label)
+
+        layout = QVBoxLayout()
+        layout.addLayout(self._table_layout)
+        layout.addLayout(summary_layout)
+        self.setLayout(layout)
+
+    def set_num_modes(self, num_modes: int) -> None:
+        """Grow or shrink the table to ``num_modes`` rows.
+
+        Rows are built once and reused, since the mode count only changes when a
+        different probe is analyzed.
+        """
+        while len(self._rows) < num_modes:
+            # One-based, matching how the probe tree names modes.
+            row = len(self._rows) + 1
+            labels = (QLabel(f'{row}'), QLabel('—'), QLabel('—'), QLabel('—'))
+
+            for column, label in enumerate(labels):
+                if column > 0:
+                    label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+                self._table_layout.addWidget(label, row, column)
+
+            self._rows.append(labels)
+
+        for index, labels in enumerate(self._rows):
+            for label in labels:
+                label.setVisible(index < num_modes)
+
+    def set_mode(self, mode: int, mean: str, deviation: str, variance: str) -> None:
+        _, mean_label, deviation_label, variance_label = self._rows[mode]
+        mean_label.setText(mean)
+        deviation_label.setText(deviation)
+        variance_label.setText(variance)
+
+    def clear_modes(self) -> None:
+        for _, mean_label, deviation_label, variance_label in self._rows:
+            mean_label.setText('—')
+            deviation_label.setText('—')
+            variance_label.setText('—')
+
+        self.relative_variation_label.setText('—')
+        self.effective_mode_count_label.setText('—')
+
+
+class OPRModeDisplayView(QGroupBox):
+    """Chooses what the image pane renders at the selected probe position.
+
+    The composed mode barely changes from position to position -- OPR variation is
+    typically a fraction of a percent -- so on a fixed color scale it looks frozen.
+    Subtracting the across-scan mean leaves only what the weights move, which is the
+    view in which the variation is actually visible. The basis modes themselves are
+    position-independent and say what *kind* of variation each one models.
+    """
+
+    def __init__(self, mode_spin_box: QWidget, parent: QWidget | None = None) -> None:
+        super().__init__('Display', parent)
+        self.composed_button = QRadioButton('Composed Probe')
+        self.deviation_button = QRadioButton('Deviation from Mean')
+        self.basis_button = QRadioButton('Basis Mode')
+
+        self.composed_button.setToolTip(
+            'Incoherent mode 0 after the coherent weighted sum, at the selected position'
+        )
+        self.deviation_button.setToolTip(
+            'That mode minus its across-scan mean: what the OPR weights actually change'
+        )
+        self.basis_button.setToolTip(
+            'One coherent basis mode on its own; the same at every probe position'
+        )
+
+        layout = QFormLayout()
+        layout.addRow(self.composed_button)
+        layout.addRow(self.deviation_button)
+        layout.addRow(self.basis_button)
+        layout.addRow('Coherent Mode:', mode_spin_box)
+        self.setLayout(layout)
+
+
+class OPRModeCurvesView(QGroupBox):
+    """Picks which weight curves are plotted and what colors the scan grid."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__('Curves', parent)
+        self.color_by_combo_box = QComboBox()
+        self.normalize_check_box = QCheckBox('Normalize Weight Curves')
+        self.mode_list_widget = QListWidget()
+
+        self.color_by_combo_box.setToolTip('Quantity the scan grid colors each position by')
+        self.normalize_check_box.setToolTip(
+            'Rescale each weight curve to unit standard deviation so a weak mode’s'
+            ' shape can be compared against a strong one'
+        )
+        self.mode_list_widget.setToolTip('Coherent modes whose weights are plotted')
+        self.mode_list_widget.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+
+        layout = QFormLayout()
+        layout.addRow('Color By:', self.color_by_combo_box)
+        layout.addRow(self.normalize_check_box)
+        layout.addRow(self.mode_list_widget)
+        self.setLayout(layout)
+
+
+class OPRModePlotView(QWidget):
+    """Toolbar over a single matplotlib canvas."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.figure = Figure()
+        self.figure_canvas = FigureCanvasQTAgg(self.figure)
+        self.navigation_toolbar = NavigationToolbar(self.figure_canvas, self)
+        self.axes = self.figure.add_subplot(111)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.navigation_toolbar)
+        layout.addWidget(self.figure_canvas)
+        self.setLayout(layout)
+
+
+class OPRModeDialog(QDialog):
+    """How a probe's coherent (OPR) basis varies over a scan.
+
+    The image pane and the two plots are three views of one selection: the slider picks
+    a probe position, and the series plot and scan grid mark where it sits.
+    """
+
+    def __init__(
+        self,
+        mode_spin_box: QWidget,
+        play_button: QWidget,
+        frame_rate_spin_box: QWidget,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.probe_view = ImageView()
+        self.display_view = OPRModeDisplayView(mode_spin_box)
+        self.series_plot_view = OPRModePlotView()
+        self.scan_grid_plot_view = OPRModePlotView()
+        self.statistics_view = OPRModeStatisticsView()
+        self.curves_view = OPRModeCurvesView()
+        self.position_slider = QSlider(Qt.Orientation.Horizontal)
+        self.position_label = QLabel()
+        self.save_button = QPushButton('Save')
+        self.status_bar = QStatusBar()
+
+        self.position_slider.setToolTip('Probe Position')
+        self.save_button.setToolTip('Save the per-position series to a NumPy archive')
+
+        # The reading gains digits as the scan index grows; reserve room for the widest
+        # one so the control strip does not shift while playing.
+        self.position_label.setMinimumWidth(
+            self.position_label.fontMetrics().horizontalAdvance('Position 000000 / 000000')
+        )
+        self.position_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # `ImageView` hangs its ribbon off `setMenuBar`, which keeps the ribbon out of the
+        # layout's width calculation. The probe pane sits in the narrow column here, so it
+        # has to carry the ribbon's width itself or the Data Range group is clipped.
+        self.probe_view.setMinimumWidth(self.probe_view.image_ribbon.minimumSizeHint().width())
+
+        probe_widget = QWidget()
+        probe_layout = QVBoxLayout()
+        probe_layout.setContentsMargins(0, 0, 0, 0)
+        probe_layout.addWidget(box_image_view('Probe', self.probe_view), 1)
+        probe_layout.addWidget(self.display_view)
+        probe_widget.setLayout(probe_layout)
+
+        series_group = QGroupBox('Across the Scan')
+        series_layout = QVBoxLayout()
+        series_layout.addWidget(self.series_plot_view)
+        series_group.setLayout(series_layout)
+
+        # The image-to-plot ratio is a matter of what the user is looking for, so it is
+        # theirs to set rather than fixed here.
+        left_splitter = QSplitter(Qt.Orientation.Vertical)
+        left_splitter.addWidget(probe_widget)
+        left_splitter.addWidget(series_group)
+        left_splitter.setStretchFactor(0, 2)
+        left_splitter.setStretchFactor(1, 1)
+
+        scan_grid_group = QGroupBox('Across the Scan Grid')
+        scan_grid_layout = QVBoxLayout()
+        scan_grid_layout.addWidget(self.scan_grid_plot_view)
+        scan_grid_group.setLayout(scan_grid_layout)
+
+        right_layout = QVBoxLayout()
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.addWidget(scan_grid_group, 1)
+        right_layout.addWidget(self.statistics_view)
+        right_layout.addWidget(self.curves_view)
+
+        position_layout = QHBoxLayout()
+        position_layout.setContentsMargins(0, 0, 0, 0)
+        position_layout.addWidget(self.position_slider, 1)
+        position_layout.addWidget(play_button)
+        position_layout.addWidget(frame_rate_spin_box)
+        position_layout.addWidget(self.position_label)
+        position_layout.addWidget(self.save_button)
+
+        contents_layout = QGridLayout()
+        contents_layout.addWidget(left_splitter, 0, 0)
+        contents_layout.addLayout(right_layout, 0, 1)
+        contents_layout.addLayout(position_layout, 1, 0, 1, 2)
+        contents_layout.setColumnStretch(0, 2)
+        contents_layout.setColumnStretch(1, 1)
+        contents_layout.setRowStretch(0, 1)
+        contents_layout.setRowStretch(1, 0)
+
+        layout = QVBoxLayout()
+        layout.addLayout(contents_layout)
+        layout.addWidget(self.status_bar)
+        self.setLayout(layout)
 
 
 class ProbeMetricsView(QGroupBox):
