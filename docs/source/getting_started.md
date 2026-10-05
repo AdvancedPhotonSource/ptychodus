@@ -83,7 +83,7 @@ The GPU files default to recent versions and expose `--build-arg` knobs to switc
 
 ## Podman
 
-The repository ships [scripts/podman/build](../../scripts/podman/build), a helper that builds every backend in one shot and threads the checkout's PEP 440 version (from `setuptools_scm`) into both the tag and the image so `ptychodus --version` inside the container reports the real value instead of the `setuptools_scm` fallback. Tags follow the pytorch/pytorch shape: **`ptychodus:<version>-<backend>`**, where `<backend>` is `cpu`, `cuda12.8`, `cuda13.0`, `cuda13.2`, `rocm7.2.4`, or `xpu`. OCI tags accept only `[A-Za-z0-9._-]`, so any character outside that set is replaced with `_` in the tag — a dev checkout's `1.5.2.dev14+g79157a2b2` tags as **`1.5.2.dev14_g79157a2b2`** while the image itself still reports the true PEP 440 version.
+The repository ships [scripts/podman/build](../../scripts/podman/build), a helper that builds every backend in one shot and threads the checkout's PEP 440 version (from `setuptools_scm`) into both the tag and the image so `ptychodus --version` inside the container reports the real value instead of the `setuptools_scm` fallback. Tags follow the pytorch/pytorch shape: **`ptychodus:<version>-<backend>`**, where `<backend>` is `cpu`, `cuda12.8`, `cuda13.0`, `cuda13.2`, `rocm7.2.4`, or `xpu`. OCI tags accept only `[A-Za-z0-9._-]`, so any character outside that set is replaced with `_` in the tag — a dev checkout's `1.5.2.dev14+g79157a2b2` tags as **`1.5.2.dev14_g79157a2b2`** while the image itself still reports the true PEP 440 version. The launcher applies the same substitution to `PTYCHODUS_VERSION`, so either spelling pins the same image.
 
 ```sh
 $ scripts/podman/build                       # cpu + cuda12.8/13.0/13.2 + rocm7.2.4 + xpu
@@ -197,6 +197,7 @@ stderr will show a one-line notice such as `ptychodus: using image localhost/pty
 $ ptychodus                                          # GUI, auto-detect GPU
 $ ptychodus -s settings.ini                          # GUI with settings
 $ ptychodus -b reconstruct -i ./input -o ./output    # headless batch
+$ PTYCHODUS_VERSION=1.5.1 ptychodus                  # pin the version, keep GPU detection
 $ PTYCHODUS_IMAGE=ptychodus:1.5.1-cpu ptychodus      # force a specific image
 $ PTYCHODUS_QUIET=1 ptychodus -v                     # silent, version only
 ```
@@ -207,10 +208,11 @@ File paths passed via `-i`, `-o`, `-s`, or as positional arguments resolve natur
 
 | Variable | Effect |
 | --- | --- |
-| `PTYCHODUS_IMAGE` | Skip GPU auto-detection; use this image tag verbatim. |
+| `PTYCHODUS_IMAGE` | Skip GPU auto-detection; use this image tag verbatim. Wins over `PTYCHODUS_VERSION`. |
+| `PTYCHODUS_VERSION` | Pin the ptychodus version, keeping GPU and CUDA detection. Matched exactly against the version part of the tag. |
 | `PTYCHODUS_QUIET` | Suppress the stderr "using image" notice. |
 
-The `BACKEND_FOR` map (which backend suffix pairs with each detected GPU family) and the `BEAMLINE_MOUNTS` list live near the top of `scripts/podman/ptychodus` and can be edited in place to change the default ROCm version per site or to add mount points (for example `/data`, `/nsls2`). The wrapper joins the suffix to the newest matching `ptychodus:*-<suffix>` image at runtime, so a rebuild does not require editing the script.
+The `BACKEND_FOR` map (which backend suffix pairs with each detected GPU family) and the `BEAMLINE_MOUNTS` list live near the top of `scripts/podman/ptychodus` and can be edited in place to change the default ROCm version per site or to add mount points (for example `/data`, `/nsls2`). The wrapper joins the suffix to the newest matching `ptychodus:*-<suffix>` image at runtime, so a rebuild does not require editing the script. "Newest" is PEP 440 order rather than plain string order: `1.5.10` outranks `1.5.9`, and a pre-release tag sorts *below* the release it precedes, so a stale `1.5.2.dev14_g79157a2b2` image does not shadow `1.5.2`. Set `PTYCHODUS_VERSION` to pin a different one; GPU and CUDA detection still run, and the CUDA candidates are narrowed to the variants that version was built for.
 
 The NVIDIA row is different: it is only the **fallback** used when `nvidia-smi` does not report a CUDA version. Normally the CUDA variant is sensed at launch — the candidate versions are read from the `ptychodus:*-cuda<X.Y>` tags in podman storage, and the newest one that is no newer than the driver's ceiling wins. A CUDA major version bump is not covered by minor version compatibility, so a `cuda13.x` image on a CUDA 12.x driver leaves `torch.cuda.is_available()` `False`; sensing the version is what keeps that from turning into a silently CPU-speed reconstruction. Building a new CUDA variant with `scripts/podman/build` is enough to make it selectable — there is no list in the wrapper to keep in sync.
 
@@ -221,6 +223,8 @@ The NVIDIA row is different: it is only the **fallback** used when `nvidia-smi` 
 - **"podman: command not found"** — ask facility IT to install rootless podman.
 - **"host NVIDIA driver supports CUDA \<= \<X.Y\>, but every ptychodus CUDA image in podman storage is newer"** — the driver predates every CUDA variant that has been built. Build one no newer than the reported ceiling, choosing it from the matrix at the top of `scripts/podman/build`, or upgrade the driver.
 - **Wrong GPU family or CUDA version detected** — override with `PTYCHODUS_IMAGE=ptychodus:1.5.1-cpu` (or any other versioned tag).
+- **Wrong ptychodus version picked, or you want an older release** — set `PTYCHODUS_VERSION=1.5.1`. Use it rather than `PTYCHODUS_IMAGE` whenever the backend is not the thing you are changing: the pin keeps GPU and CUDA detection, while `PTYCHODUS_IMAGE` skips both and makes you name the backend yourself.
+- **"no ptychodus:\<version\>-\<suffix\> image found"** — that version/backend pairing was never built. The message lists the versions built for that backend and the backends built for that version; build the missing one from a checkout of that version, or drop the pin.
 - **Files written by the container are owned by root** — rootless `--userns=keep-id` is not in effect; check `podman info` for `rootless: true`.
 - **"permission denied" on a path argument** — the path is outside the bind-mounted set. Run from under `$HOME` or one of the beamline roots, or add the path to `BEAMLINE_MOUNTS` at the top of the wrapper. A symlinked home (`/home/beams/$USER` → `/home/beams0/$USER`) is mounted under both spellings, so an absolute path in either form resolves.
 

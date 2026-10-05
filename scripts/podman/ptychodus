@@ -8,6 +8,8 @@
 #
 # Env-var overrides:
 #   PTYCHODUS_IMAGE   skip GPU detection; use this image tag verbatim
+#   PTYCHODUS_VERSION pin the ptychodus version, keeping GPU detection; matched
+#                     exactly against the version part of the tag
 #   PTYCHODUS_QUIET   set to any non-empty value to suppress the stderr notice
 
 set -euo pipefail
@@ -152,41 +154,102 @@ for arg in "$@"; do
     esac
 done
 
+# --- Prerequisite checks -----------------------------------------------------
+
+# Ahead of the image choice below rather than after it, because choosing
+# shells out to `podman images` and would otherwise fail first, on a bare
+# exit status instead of on this message.
+command -v podman >/dev/null 2>&1 \
+    || die "podman not installed; see docs/source/getting_started.md"
+
 # --- Choose image ------------------------------------------------------------
 
-# Print the newest ptychodus:*-<suffix> tag in local storage (empty if none).
+# Print every ptychodus image in local podman storage, one per line, as four
+# TAB-separated fields: `<sort-key> <version> <backend> <reference>`. The
+# helpers below are all filters over this table, and $TAG_TABLE holds one
+# snapshot of it, because `podman images` is the slowest thing this script
+# runs.
 #
 # podman reports a locally built image's repository fully qualified, as
 # `localhost/ptychodus`, so the name has to be compared against the last path
 # component rather than the whole field -- matching `$1 == "ptychodus"` finds
-# nothing at all. The full reference is what gets printed, since that is what
+# nothing at all. The full reference is carried along, since that is what
 # `podman run` wants.
+#
+# The sort key is the version with a `~` inserted before a PEP 440 `dev` or
+# `rc` marker, which is not a typo: GNU `sort -V` ranks `~` below the empty
+# string, so `1.5.2~dev14` sorts below `1.5.2` the way PEP 440 says a dev build
+# precedes its release. Without it a stale `1.5.2.dev14_g79157a2b2` image
+# shadows the real 1.5.2 forever. `a` and `b` markers are deliberately left
+# out: a setuptools_scm local segment is a hex hash (`_g79157a2b2`), where
+# `a2` can occur but `dev` and `rc` cannot.
+ptychodus_tags() {
+    # The tag is taken as the field after the LAST colon so that a reference
+    # carrying a registry port parses; splitting at the first colon reads the
+    # port as the tag. Version and backend split at the last `-`, which no
+    # backend name and no normalized PEP 440 version contains; a tag with no
+    # `-` at all is skipped rather than mis-parsed.
+    podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
+        | awk -F: '{ tag = $NF; ref = $0; sub(/:[^:]*$/, "", ref)
+                     repo = ref; sub(/.*\//, "", repo) }
+                   repo == "ptychodus" && match(tag, /-[^-]*$/) {
+                       version = substr(tag, 1, RSTART - 1)
+                       key = version; sub(/\.?(dev|rc)[0-9]/, "~&", key)
+                       sub(/~\./, "~", key)
+                       printf "%s\t%s\t%s\t%s\n",
+                              key, version, substr(tag, RSTART + 1), $0 }'
+}
+
+# Print the newest ptychodus image with backend suffix $1 (empty if none),
+# honouring a $version_pin when one is set.
+#
+# The suffix is compared literally rather than as a regex: every backend name
+# carrying a version has dots in it, and as a pattern `cuda13.0` would also
+# match a `cuda1320` tag.
 newest_image_for_suffix() {
     local suffix=$1
-    # The suffix is compared literally rather than as a regex: every backend
-    # name carrying a version has dots in it, and as a pattern `cuda13.0`
-    # would also match a `cuda1320` tag.
-    podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
-        | awk -F: -v s="$suffix" \
-            '{ repo = $1; sub(/.*\//, "", repo) }
-             repo == "ptychodus" && substr($2, length($2) - length(s)) == "-" s' \
-        | sort -V \
-        | tail -n1
+    awk -F'\t' -v s="$suffix" -v pin="$version_pin" \
+        '$3 == s && (pin == "" || $2 == pin)' <<<"$TAG_TABLE" \
+        | sort -V -k1,1 \
+        | tail -n1 \
+        | cut -f4
 }
 
 # Print the CUDA versions that have a ptychodus image in local storage, newest
-# first, one `<major>.<minor>` per line.
+# first, one `<major>.<minor>` per line. A $version_pin restricts the
+# candidates to that version, so the chosen CUDA variant is one the pinned
+# version was actually built for.
 #
 # Reading the candidates out of podman storage rather than restating
 # scripts/podman/build's VARIANT_ARGS matrix here is deliberate: a new CUDA row
 # over there becomes selectable the moment it is built, and a row that was
 # never built is never chosen.
 available_cuda_versions() {
-    podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
-        | awk -F: '{ repo = $1; sub(/.*\//, "", repo) }
-                   repo == "ptychodus" && match($2, /-cuda[0-9]+\.[0-9]+$/) {
-                       print substr($2, RSTART + 5) }' \
+    awk -F'\t' -v pin="$version_pin" \
+        '(pin == "" || $2 == pin) && $3 ~ /^cuda[0-9]+\.[0-9]+$/ { print substr($3, 5) }' \
+        <<<"$TAG_TABLE" \
         | sort -Vru
+}
+
+# Print the versions built for backend suffix $1, and the backend suffixes
+# built for version $1, respectively. Both ignore $version_pin: they exist to
+# tell an operator what a failed pinned lookup could have matched.
+versions_for_suffix() {
+    awk -F'\t' -v s="$1" '$3 == s { print $2 }' <<<"$TAG_TABLE" | sort -V -u
+}
+
+backends_for_version() {
+    awk -F'\t' -v v="$1" '$2 == v { print $3 }' <<<"$TAG_TABLE" | sort -u
+}
+
+# Render a newline-separated list on one line for an error message.
+list_or_none() {
+    local items=$1
+    if [[ -n "$items" ]]; then
+        printf '%s' "${items//$'\n'/ }"
+    else
+        printf '(none)'
+    fi
 }
 
 # Set $1 to the backend suffix for an NVIDIA host: the newest built CUDA
@@ -233,6 +296,9 @@ choose_cuda_suffix() {
         printf '  CUDA image in podman storage is newer:'
         printf ' cuda%s' "${built[@]}"
         printf '\n'
+        if [[ -n "$version_pin" ]]; then
+            printf '  (candidates restricted to the pinned version %s)\n' "$version_pin"
+        fi
         printf '  Build a variant no newer than CUDA %s from the repository root,\n' "$host_cuda"
         printf '  choosing one from the matrix at the top of scripts/podman/build:\n'
         printf '    scripts/podman/build cuda%s\n' "$host_cuda"
@@ -241,11 +307,27 @@ choose_cuda_suffix() {
     exit 1
 }
 
+# OCI tags accept only [A-Za-z0-9._-], and scripts/podman/build substitutes `_`
+# for everything else when it tags an image. Applying the same rule to the pin
+# lets a real PEP 440 version be pasted in: 1.5.2.dev14+g79157a2b2 finds the
+# image tagged 1.5.2.dev14_g79157a2b2.
+version_pin=''
+if [[ -n "${PTYCHODUS_VERSION:-}" ]]; then
+    version_pin="${PTYCHODUS_VERSION//[^A-Za-z0-9._-]/_}"
+    if [[ "$version_pin" != "$PTYCHODUS_VERSION" ]]; then
+        notice "PTYCHODUS_VERSION=$PTYCHODUS_VERSION is not tag-safe; matching $version_pin"
+    fi
+fi
+
 if [[ -n "${PTYCHODUS_IMAGE:-}" ]]; then
     IMAGE="$PTYCHODUS_IMAGE"
     family="override"
+    if [[ -n "$version_pin" ]]; then
+        notice "PTYCHODUS_IMAGE is set; ignoring PTYCHODUS_VERSION=$PTYCHODUS_VERSION"
+    fi
     notice "using image $IMAGE (override: PTYCHODUS_IMAGE)"
 else
+    TAG_TABLE=$(ptychodus_tags)
     family=$(detect_gpu)
     detected="$family"
     if [[ "$family" == nvidia ]]; then
@@ -258,23 +340,36 @@ else
         suffix="${BACKEND_FOR[$family]:-}"
     fi
     [[ -n "$suffix" ]] || die "no backend mapped for family '$family'"
+    [[ -n "$version_pin" ]] && detected="$detected, pinned to $version_pin"
     IMAGE=$(newest_image_for_suffix "$suffix")
     if [[ -z "$IMAGE" ]]; then
-        # Fall back to the unversioned tag so the "not found" branch below
-        # can print an actionable build command.
-        IMAGE="ptychodus:$suffix"
+        # Fall back to the tag that was looked for, so the "not found" branch
+        # below can report it with an actionable build command.
+        IMAGE="ptychodus:${version_pin:+$version_pin-}$suffix"
     fi
     notice "using image $IMAGE (detected: $detected)"
 fi
 
-# --- Prerequisite checks -----------------------------------------------------
-
-command -v podman >/dev/null 2>&1 \
-    || die "podman not installed; see docs/source/getting_started.md"
+# --- Verify the chosen image exists ------------------------------------------
 
 if ! podman image exists "$IMAGE"; then
     {
-        if [[ -n "${suffix:-}" ]]; then
+        if [[ -n "${suffix:-}" && -n "$version_pin" ]]; then
+            # A pinned lookup fails for one of two reasons -- the version was
+            # never built, or it was never built for this backend -- and the
+            # operator cannot tell which without seeing both lists.
+            printf 'ptychodus: no ptychodus:%s-%s image found in rootless podman storage.\n' \
+                "$version_pin" "$suffix"
+            printf '  Versions built for %s: %s\n' \
+                "$suffix" "$(list_or_none "$(versions_for_suffix "$suffix")")"
+            printf '  Backends built for %s: %s\n' \
+                "$version_pin" "$(list_or_none "$(backends_for_version "$version_pin")")"
+            # Not `PTYCHODUS_VERSION=... scripts/podman/build`: over there the
+            # same variable only relabels the tag, so suggesting it would
+            # invite tagging current code as an old release.
+            printf '  Build it from a %s checkout with:\n' "$version_pin"
+            printf '    scripts/podman/build %s\n' "$suffix"
+        elif [[ -n "${suffix:-}" ]]; then
             printf 'ptychodus: no ptychodus:*-%s image found in rootless podman storage.\n' "$suffix"
             printf '  Build it from the repository root with:\n'
             printf '    scripts/podman/build %s\n' "$suffix"
