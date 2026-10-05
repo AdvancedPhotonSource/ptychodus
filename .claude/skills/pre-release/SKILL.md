@@ -208,35 +208,26 @@ for k in sorted(p['project']['optional-dependencies']):
 
 **Suggested fix**: either add the extra to `pyproject.toml` (rare — usually intentional) or remove/rename the extra reference in `README.md`.
 
-**4b. Every `[project.scripts]` entry is documented or referenced.**
+**4b. CLAUDE.md and the skill files — invoke the `curate-claude-md` skill.**
 
-```sh
-uv run python -c "
-import tomllib
-with open('pyproject.toml','rb') as f:
-    p = tomllib.load(f)
-for name in sorted(p['project'].get('scripts', {})):
-    print(name)
-"
-```
+That skill owns every CLAUDE.md check: symbol and `Class.method` existence, dead packages, closed enumerations that lost a member, universal "each X exposes a Y" claims, embedded audit commands whose stated result has drifted, volatile phrasing, config scalars, local-artifact leakage, contradictions within and across `CLAUDE.md` and `.claude/skills/*/SKILL.md`, and the word budget.
 
-For each script name, confirm it appears in `CLAUDE.md` OR `docs/source/getting_started.md`. `PASS` if all are referenced.
+It subsumes what used to be **4b** (every `[project.scripts]` name documented — now checked in both directions, so a command block naming a *deleted* script fails too) and **4c** (the `requires-python` claim).
 
-**Suggested fix**: add a `uv run <script>` example under the "Common Commands" section of CLAUDE.md (project convention — see the existing block).
+`PASS` if it reports clean. Otherwise carry each of its findings into the final report table as its own row.
 
-**4c. Python version claim matches pyproject.**
+**Suggested fix**: take the per-finding fix the skill proposes; it asks before applying each one.
 
-- CLAUDE.md says "Python ≥3.11".
-- Confirm `pyproject.toml` `requires-python` matches. `PASS`/`FAIL` accordingly.
+Do not re-implement these checks here. A second copy is how two documents drift into disagreeing — which is itself one of the things the skill looks for.
 
 ---
 
 ### Section 5 — Installation instructions are fresh
 
-**5a. Dockerfile variants referenced still exist.** Every Dockerfile name mentioned in `docs/source/getting_started.md` and `CLAUDE.md` should be a real file in `containers/`:
+**5a. Dockerfile variants referenced still exist.** Every Dockerfile name mentioned in `docs/source/getting_started.md` should be a real file in `containers/`. CLAUDE.md is covered by §4b — do not scan it twice:
 
 ```sh
-grep -hoE 'Dockerfile\.[a-z]+' docs/source/getting_started.md CLAUDE.md | sort -u | while read f; do
+grep -hoE 'Dockerfile\.[a-z0-9]+' docs/source/getting_started.md | sort -u | while read f; do
     [ -f "containers/$f" ] || echo "MISSING: containers/$f"
 done
 ```

@@ -1,6 +1,6 @@
 ---
 name: pre-push
-description: Run the ptychodus CI gate locally before pushing — ruff check, ruff format --check, mypy, pytest, and the Markdown linter, matching what .github/workflows/python-package.yml runs on PR. Runs as two concurrent tiers so a lint slip fails in seconds. Use when the user says "check before push", "run CI locally", "pre-push", or after a batch of code changes when they're about to open/update a PR.
+description: Run the ptychodus CI gate locally before pushing — ruff check, ruff format --check, mypy and pytest, matching what .github/workflows/python-package.yml runs on PR, plus the Markdown linter, which is a local-only gate with no CI job. Runs as two concurrent tiers so a lint slip fails in seconds. Use when the user says "check before push", "run CI locally", "pre-push", or after a batch of code changes when they're about to open/update a PR.
 ---
 
 # pre-push
