@@ -24,13 +24,24 @@ Launch each section's command with `run <section-name> <command>`, then `wait`, 
 
 ### Phase B — sequential, environment-mutating
 
-Sync **once**, naming every extra the gate depends on, then run Sections 6, 7, and 9 in order:
+**Check the lock before syncing.** `uv.lock` is gitignored and per-developer, so nothing refreshes it for you and a stale one rewrites the environment the gate is about to test:
+
+```sh
+uv lock --check || uv lock --upgrade
+uv sync --extra docs --extra gui --extra globus --extra ptychi --extra store --dry-run
+```
+
+`--check` answers "is this lock consistent with the manifest", not "is this lock current" — the two come apart. Plain `uv lock` is conservative and keeps any pin that still satisfies the manifest, so a lock can pass `--check` while carrying resolutions inherited from a manifest that no longer exists. Only `--upgrade` re-resolves. Measured here: after the `ptychopinn`/`ptycho-fm` path sources were dropped, a plain `uv lock` still pinned `torch 2.6.0` from the PtychoPINN era; `--upgrade` moved it to `2.14.1`.
+
+Then read the dry-run diff. Sync for real only when it is empty or confined to the extras being added. A torch or CUDA version moving, an editable install reverting to a registry release, or packages being removed all mean the lock is stale — fix that first, because the gate would otherwise report `PASS` for an environment nobody has.
 
 ```sh
 uv sync --extra docs --extra gui --extra globus --extra ptychi --extra store
 ```
 
-Sections 6, 7, and 9 must not overlap — with each other or with Phase A. See "Why the phases" below.
+If the developer deliberately runs an editable sibling checkout (pty-chi is the usual one), skip the sync entirely and pass `--no-sync` to every `uv run` below, as the `pre-push` skill does — an exact sync silently swaps that checkout for the published release.
+
+Then run Sections 6, 7, and 9 in order. They must not overlap — with each other or with Phase A. See "Why the phases" below.
 
 ---
 
@@ -408,6 +419,7 @@ Three constraints force Phase B to be serial. Do not re-flatten the phases witho
 - **`uv sync` is exact by default.** It uninstalls anything outside the extras named on that one invocation (`--inexact` opts out). A narrow `uv sync --extra docs` therefore strips `gui`, `globus`, `ptychi`, and `store` — which silently narrows Section 7's pytest collection and inflates Section 3's "modules skipped at load" count. That is why the sync is hoisted to the top of Phase B and names every extra at once.
 - **`uv build` and `uv sync` contend on the same project lock.** Section 9 must not overlap Section 6 or the hoisted sync.
 - **Section 9's stale-`build/` guard only means something if nothing else is building.** A concurrent build would create the very directory the guard is checking for.
+- **The lock guard is not ceremony.** `uv.lock` is untracked, so it drifts per machine with nothing to refresh it, and `uv sync` is exact. A stale lock silently narrows or rewrites what Sections 6, 7 and 9 test, and every one of them still reports `PASS` — against an environment the developer does not have. Keep the `uv lock --check` and the `--dry-run` read ahead of the real sync.
 
 Phase A is safe to fan out because every section in it only reads: filesystem scans, an AST walk, a plugin-registry load, and `--version`/`--help` invocations of the entry points.
 
