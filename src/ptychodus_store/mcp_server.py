@@ -103,7 +103,7 @@ def _resolve_resource_file(kind: str, uuid: UUID, filename: str) -> Path:
 
 async def _ensure_row_exists(kind: str, uuid: UUID) -> None:
     async with _session() as session:
-        row = await repo.get_row(session, kind, uuid)
+        row = await repo.get_row_by_kind(session, kind, uuid)
         if row is None:
             raise ToolError(f'{kind} {uuid} not found')
 
@@ -149,7 +149,7 @@ def create_mcp_server() -> FastMCP:
             if ingest_state is not None:
                 where.append(Campaign.ingest_state == ingest_state)
             items, total = await repo.list_rows(
-                session, ResourceKind.CAMPAIGN, limit=limit, offset=offset, where=where
+                session, Campaign, limit=limit, offset=offset, where=where
             )
             return Page(
                 items=[campaign_to_read(i) for i in items],
@@ -162,7 +162,7 @@ def create_mcp_server() -> FastMCP:
     async def get_campaign(uuid: str) -> CampaignRead | None:
         """Get a campaign by UUID."""
         async with _session() as session:
-            row = await repo.get_row(session, ResourceKind.CAMPAIGN, UUID(uuid))
+            row = await repo.get_row(session, Campaign, UUID(uuid))
             return campaign_to_read(row) if row is not None else None
 
     @mcp.tool()
@@ -212,17 +212,17 @@ def create_mcp_server() -> FastMCP:
                     )
                 )
             items, total = await repo.list_rows(
-                session, ResourceKind.DIFFRACTION, limit=limit, offset=offset, where=where
+                session, Diffraction, limit=limit, offset=offset, where=where
             )
-            reads = [await diffraction_to_read(session, i) for i in items]  # type: ignore[arg-type]
+            reads = [await diffraction_to_read(session, i) for i in items]
             return Page(items=reads, total=total, limit=limit, offset=offset)
 
     @mcp.tool()
     async def get_diffraction(uuid: str) -> DiffractionRead | None:
         """Get a diffraction dataset by UUID."""
         async with _session() as session:
-            row = await repo.get_row(session, ResourceKind.DIFFRACTION, UUID(uuid))
-            return await diffraction_to_read(session, row) if row is not None else None  # type: ignore[arg-type]
+            row = await repo.get_row(session, Diffraction, UUID(uuid))
+            return await diffraction_to_read(session, row) if row is not None else None
 
     @mcp.tool()
     async def list_product(
@@ -246,17 +246,17 @@ def create_mcp_server() -> FastMCP:
                     )
                 )
             items, total = await repo.list_rows(
-                session, ResourceKind.PRODUCT, limit=limit, offset=offset, where=where
+                session, Product, limit=limit, offset=offset, where=where
             )
-            reads = [await product_to_read(session, i) for i in items]  # type: ignore[arg-type]
+            reads = [await product_to_read(session, i) for i in items]
             return Page(items=reads, total=total, limit=limit, offset=offset)
 
     @mcp.tool()
     async def get_product(uuid: str) -> ProductRead | None:
         """Get a product by UUID."""
         async with _session() as session:
-            row = await repo.get_row(session, ResourceKind.PRODUCT, UUID(uuid))
-            return await product_to_read(session, row) if row is not None else None  # type: ignore[arg-type]
+            row = await repo.get_row(session, Product, UUID(uuid))
+            return await product_to_read(session, row) if row is not None else None
 
     @mcp.tool()
     async def list_fluorescence(
@@ -282,17 +282,17 @@ def create_mcp_server() -> FastMCP:
                     func.instr(func.cast(Fluorescence.element_names, String), f'"{element}"') > 0  # type: ignore[arg-type]
                 )
             items, total = await repo.list_rows(
-                session, ResourceKind.FLUORESCENCE, limit=limit, offset=offset, where=where
+                session, Fluorescence, limit=limit, offset=offset, where=where
             )
-            reads = [await fluorescence_to_read(session, i) for i in items]  # type: ignore[arg-type]
+            reads = [await fluorescence_to_read(session, i) for i in items]
             return Page(items=reads, total=total, limit=limit, offset=offset)
 
     @mcp.tool()
     async def get_fluorescence(uuid: str) -> FluorescenceRead | None:
         """Get a fluorescence dataset by UUID."""
         async with _session() as session:
-            row = await repo.get_row(session, ResourceKind.FLUORESCENCE, UUID(uuid))
-            return await fluorescence_to_read(session, row) if row is not None else None  # type: ignore[arg-type]
+            row = await repo.get_row(session, Fluorescence, UUID(uuid))
+            return await fluorescence_to_read(session, row) if row is not None else None
 
     @mcp.tool()
     async def get_lineage(uuid: str) -> LineageRead | None:
@@ -311,7 +311,7 @@ def create_mcp_server() -> FastMCP:
             if resolved is None:
                 return None
             kind, row = resolved
-            node = LineageNode(kind=kind, uuid=target, label=_label_for(row))  # type: ignore[arg-type]
+            node = LineageNode(kind=kind, uuid=target, label=_label_for(row))
             ancestors = await _walk_ancestors(session, target)
             descendants = await _walk_descendants(session, target)
             campaign = await _find_campaign(session, target, ancestors)
@@ -324,7 +324,7 @@ def create_mcp_server() -> FastMCP:
         """Return resource counts and invalid-row count for the store."""
         async with _session() as session:
 
-            async def _count(model):  # type: ignore[no-untyped-def]
+            async def _count(model):
                 return int(
                     (await session.execute(select(func.count()).select_from(model))).scalar_one()
                 )

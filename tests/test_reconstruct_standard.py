@@ -16,8 +16,18 @@ import pytest
 
 pytest.importorskip('ptychi')
 
+from ptychodus.api.assemble import AssembledDiffractionData  # noqa: E402
+from ptychodus.api.diffraction import (  # noqa: E402
+    DiffractionIndexes,
+    DiffractionPatternCounts,
+    SimpleDiffractionDataset,
+)
+from ptychodus.api.geometry import PixelGeometry  # noqa: E402
+from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence  # noqa: E402
 from ptychodus.cli import _reconstruct_standard as rs  # noqa: E402
 from ptychodus.cli._reconstruct_standard import InstrumentProfile  # noqa: E402
+
+from diffraction_dataset_fixtures import FailingArray, make_dataset  # noqa: E402
 
 logger = logging.getLogger('test_reconstruct_standard')
 
@@ -131,42 +141,46 @@ def test_mad_bounds_brackets_the_median_of_a_spread() -> None:
     assert upper < 1000.0
 
 
-class _FakeAssembled:
-    def __init__(self, indexes: numpy.ndarray, counts: numpy.ndarray | None = None) -> None:
-        self._indexes = indexes
-        self._counts = counts
-        self._patterns = numpy.ones((indexes.size, 2, 2), dtype=numpy.uint16)
+def _assembled(
+    indexes: DiffractionIndexes, counts: DiffractionPatternCounts | None = None
+) -> AssembledDiffractionData:
+    """A real AssembledDiffractionData over constant 2x2 frames.
 
-    def get_indexes(self) -> numpy.ndarray:
-        return self._indexes
+    The filters under test slice one of these and rebuild it, so they are handed
+    the real class rather than a stand-in: a stand-in only has to look right, and
+    nothing would notice it drifting from the class it imitates.
+    """
+    return AssembledDiffractionData(
+        indexes=indexes,
+        patterns=numpy.ones((indexes.size, 2, 2), dtype=numpy.uint16),
+        pixel_geometry=PixelGeometry(width_m=1.0, height_m=1.0),
+        bad_pixels=numpy.zeros((2, 2), dtype=numpy.bool_),
+        probe_photon_counts=counts,
+    )
 
-    def get_patterns(self) -> numpy.ndarray:
-        return self._patterns
 
-    def get_num_patterns(self) -> int:
-        return int(self._indexes.size)
+def _never_read_dataset() -> SimpleDiffractionDataset:
+    """A dataset whose only array raises if anything reads it.
 
-    def get_pixel_geometry(self):  # noqa: ANN201
-        return None
-
-    def get_bad_pixels(self):  # noqa: ANN201
-        return None
-
-    def has_measured_probe_photon_counts(self) -> bool:
-        return self._counts is not None
-
-    def get_probe_photon_counts(self) -> numpy.ndarray | None:
-        return self._counts
+    The two bounds tests below assert the raw dataset goes untouched when the MAD
+    bound is off. A dataset that fails loudly proves that; the `None` they used to
+    pass only proved that nothing was type-checking them.
+    """
+    return make_dataset(
+        [FailingArray('never-read', AssertionError('raw_dataset must not be read'))],
+        (1, 1),
+        pattern_dtype=numpy.uint16,
+    )
 
 
 def test_select_patterns_returns_the_input_when_nothing_is_dropped() -> None:
-    data = _FakeAssembled(numpy.arange(4))
+    data = _assembled(numpy.arange(4))
     keep = numpy.ones(4, dtype=bool)
     assert rs._select_patterns(logger, data, keep, 'A filter') is data
 
 
 def test_select_patterns_refuses_to_drop_everything() -> None:
-    data = _FakeAssembled(numpy.arange(4))
+    data = _assembled(numpy.arange(4))
     keep = numpy.zeros(4, dtype=bool)
 
     with pytest.raises(ValueError, match='dropped every pattern'):
@@ -174,26 +188,31 @@ def test_select_patterns_refuses_to_drop_everything() -> None:
 
 
 def test_trim_ends_refuses_to_consume_every_pattern() -> None:
-    data = _FakeAssembled(numpy.arange(4))
+    data = _assembled(numpy.arange(4))
 
     with pytest.raises(ValueError, match='consume all 4'):
         rs._trim_ends(logger, data, 2, 2)
 
 
 def test_reject_i0_outliers_is_a_no_op_without_i0() -> None:
-    class _NoI0:
-        def get_probe_photon_counts(self) -> None:
-            return None
+    data = _assembled(numpy.arange(4))
+    positions = ProbePositionSequence([ProbePosition(i, float(i), 0.0) for i in range(4)])
 
-    data = _FakeAssembled(numpy.arange(4))
-    assert rs._reject_i0_outliers(logger, data, _NoI0(), 5.0) is data
+    assert positions.get_probe_photon_counts() is None
+    assert rs._reject_i0_outliers(logger, data, positions, 5.0) is data
 
 
 def test_total_counts_bounds_passes_min_through_when_mad_is_off() -> None:
     args = argparse.Namespace(min_total_counts=42, dp_mad_k=None)
-    assert rs._total_counts_bounds(logger, args, None, None, None, None) == (42, None)
+    assert rs._total_counts_bounds(logger, args, _never_read_dataset(), None, None, None) == (
+        42,
+        None,
+    )
 
 
 def test_total_counts_bounds_is_inert_when_both_options_are_off() -> None:
     args = argparse.Namespace(min_total_counts=None, dp_mad_k=None)
-    assert rs._total_counts_bounds(logger, args, None, None, None, None) == (None, None)
+    assert rs._total_counts_bounds(logger, args, _never_read_dataset(), None, None, None) == (
+        None,
+        None,
+    )

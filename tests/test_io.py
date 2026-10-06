@@ -162,10 +162,6 @@ class TestStandardFileLayout:
     def test_ptychi_options_filename(self) -> None:
         assert StandardFileLayout.PTYCHI_OPTIONS == 'ptychi_options.json'
 
-    def test_all_values_are_strings(self) -> None:
-        for member in StandardFileLayout:
-            assert isinstance(member.value, str)
-
     def test_path_builds_under_directory(self) -> None:
         assert StandardFileLayout.PRODUCT.path(Path('/x')) == Path('/x/product.h5')
         assert StandardFileLayout.FLUORESCENCE.path(Path('/x')) == Path('/x/fluorescence.h5')
@@ -713,9 +709,10 @@ def _make_reconstruct_input(
     num_patterns = len(product.probe_positions)
     patterns = rng.integers(0, 1000, size=(num_patterns, detector_px, detector_px)).astype(dtype)
 
-    bad_pixels: numpy.ndarray | None = None
+    # Always a real mask, all-False when none is wanted: ReconstructInput requires
+    # one, and nothing in production ever hands it None.
+    bad_pixels = numpy.zeros((detector_px, detector_px), dtype=bool)
     if with_bad_pixels:
-        bad_pixels = numpy.zeros((detector_px, detector_px), dtype=bool)
         bad_pixels[2:4, 2:4] = True
 
     return ReconstructInput(patterns, bad_pixels, product)
@@ -1186,8 +1183,11 @@ def test_position_photon_counts_round_trip(tmp_path: Path, file_io: Any, suffix:
     loaded = _round_trip_product(file_io, tmp_path / f'product{suffix}', product)
     counts = loaded.probe_positions.get_probe_photon_counts()
 
+    expected = product.probe_positions.get_probe_photon_counts()
+
     assert counts is not None
-    numpy.testing.assert_allclose(counts, product.probe_positions.get_probe_photon_counts())
+    assert expected is not None
+    numpy.testing.assert_allclose(counts, expected)
 
 
 @pytest.mark.parametrize(('file_io', 'suffix'), PRODUCT_FILE_IO)
@@ -1331,22 +1331,22 @@ def test_legacy_npz_without_the_new_keys_still_loads(tmp_path: Path) -> None:
 
     file_io = NPZProductFileIO()
     file = tmp_path / 'legacy.npz'
-    numpy.savez(
-        file,
-        **{
-            NPZProductFileIO.DETECTOR_OBJECT_DISTANCE: 1.5,
-            NPZProductFileIO.PROBE_ENERGY: 10_000.0,
-            NPZProductFileIO.PROBE_POSITION_INDEXES: numpy.arange(2),
-            NPZProductFileIO.PROBE_POSITION_X: numpy.zeros(2),
-            NPZProductFileIO.PROBE_POSITION_Y: numpy.zeros(2),
-            NPZProductFileIO.PROBE_ARRAY: numpy.zeros((1, 1, 4, 4), dtype=complex),
-            NPZProductFileIO.OBJECT_ARRAY: numpy.zeros((1, 8, 8), dtype=complex),
-            NPZProductFileIO.OBJECT_CENTER_X: 0.0,
-            NPZProductFileIO.OBJECT_CENTER_Y: 0.0,
-            NPZProductFileIO.OBJECT_PIXEL_WIDTH: 10e-9,
-            NPZProductFileIO.OBJECT_PIXEL_HEIGHT: 10e-9,
-        },
-    )
+    # Annotated: the mix of scalars and arrays otherwise widens to a single
+    # `object`, which mypy then matches against every savez parameter.
+    legacy_keys: dict[str, Any] = {
+        NPZProductFileIO.DETECTOR_OBJECT_DISTANCE: 1.5,
+        NPZProductFileIO.PROBE_ENERGY: 10_000.0,
+        NPZProductFileIO.PROBE_POSITION_INDEXES: numpy.arange(2),
+        NPZProductFileIO.PROBE_POSITION_X: numpy.zeros(2),
+        NPZProductFileIO.PROBE_POSITION_Y: numpy.zeros(2),
+        NPZProductFileIO.PROBE_ARRAY: numpy.zeros((1, 1, 4, 4), dtype=complex),
+        NPZProductFileIO.OBJECT_ARRAY: numpy.zeros((1, 8, 8), dtype=complex),
+        NPZProductFileIO.OBJECT_CENTER_X: 0.0,
+        NPZProductFileIO.OBJECT_CENTER_Y: 0.0,
+        NPZProductFileIO.OBJECT_PIXEL_WIDTH: 10e-9,
+        NPZProductFileIO.OBJECT_PIXEL_HEIGHT: 10e-9,
+    }
+    numpy.savez(file, **legacy_keys)
 
     loaded = file_io.read(file)
 

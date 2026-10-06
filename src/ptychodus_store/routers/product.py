@@ -50,24 +50,22 @@ async def list_product(
         )
         where.append(exists(edge_subq))
 
-    items, total = await repo.list_rows(
-        session, ResourceKind.PRODUCT, limit=limit, offset=offset, where=where
-    )
-    reads = [await product_to_read(session, i) for i in items]  # type: ignore[arg-type]
+    items, total = await repo.list_rows(session, Product, limit=limit, offset=offset, where=where)
+    reads = [await product_to_read(session, i) for i in items]
     return Page(items=reads, total=total, limit=limit, offset=offset)
 
 
 @router.get('/{uuid}', response_model=ProductRead)
 async def get_product(uuid: UUID, session: SessionDep) -> ProductRead:
-    row = await repo.get_row(session, ResourceKind.PRODUCT, uuid)
+    row = await repo.get_row(session, Product, uuid)
     if row is None:
         raise HTTPException(status_code=404, detail=f'product {uuid} not found')
-    return await product_to_read(session, row)  # type: ignore[arg-type]
+    return await product_to_read(session, row)
 
 
 @router.get('/{uuid}/files/product')
 async def get_product_file(uuid: UUID, session: SessionDep, layout: LayoutDep) -> FileResponse:
-    row = await repo.get_row(session, ResourceKind.PRODUCT, uuid)
+    row = await repo.get_row(session, Product, uuid)
     if row is None:
         raise HTTPException(status_code=404, detail=f'product {uuid} not found')
     path = layout.resource_folder(ResourceKind.PRODUCT, uuid) / 'product.h5'
@@ -79,7 +77,7 @@ async def get_product_file(uuid: UUID, session: SessionDep, layout: LayoutDep) -
 async def _load_product_or_404(
     uuid: UUID, session: SessionDep, layout: LayoutDep
 ) -> ProductAggregate:
-    row = await repo.get_row(session, ResourceKind.PRODUCT, uuid)
+    row = await repo.get_row(session, Product, uuid)
     if row is None:
         raise HTTPException(status_code=404, detail=f'product {uuid} not found')
     path = layout.resource_folder(ResourceKind.PRODUCT, uuid) / 'product.h5'

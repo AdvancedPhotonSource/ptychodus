@@ -110,9 +110,9 @@ class ProbePositionSequence(Sequence[ProbePosition]):
     def __getitem__(self, index: int) -> ProbePosition: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[ProbePosition]: ...
+    def __getitem__(self, index: slice) -> ProbePositionSequence: ...
 
-    def __getitem__(self, index: int | slice) -> ProbePosition | Sequence[ProbePosition]:
+    def __getitem__(self, index: int | slice) -> ProbePosition | ProbePositionSequence:
         if isinstance(index, slice):
             # Slice the backing arrays directly rather than materializing a
             # ProbePosition per element. Basic numpy slicing returns views; that

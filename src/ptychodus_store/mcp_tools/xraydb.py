@@ -87,7 +87,7 @@ def _resolve_element(element: str | int) -> str:
         raise ToolError(f'unknown element: {element!r}') from exc
 
 
-async def _run(func, /, *args, **kwargs):  # type: ignore[no-untyped-def]
+async def _run(func, /, *args, **kwargs):
     return await asyncio.to_thread(func, *args, **kwargs)
 
 

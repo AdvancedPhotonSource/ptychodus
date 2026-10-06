@@ -24,7 +24,7 @@ from ptychodus_store.db.session import create_engine, create_schema
 _COLUMN = 'focus_object_distance_m'
 
 
-async def _product_columns(engine) -> set[str]:  # type: ignore[no-untyped-def]
+async def _product_columns(engine) -> set[str]:
     async with engine.begin() as conn:
         return await conn.run_sync(
             lambda sync_conn: {c['name'] for c in inspect(sync_conn).get_columns('product')}

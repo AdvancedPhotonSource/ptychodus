@@ -39,6 +39,8 @@ Then read the dry-run diff. Sync for real only when it is empty or confined to t
 uv sync --extra docs --extra gui --extra globus --extra ptychi --extra store
 ```
 
+`ptychi` is the CPU torch extra, which is what this audit wants: no release check needs a GPU, and the CUDA variants (`ptychi-cuda128` and friends) are mutually exclusive with it. Section 5c below validates the extras README names against `pyproject.toml`, so both lists have to move together.
+
 If the developer deliberately runs an editable sibling checkout (pty-chi is the usual one), skip the sync entirely and pass `--no-sync` to every `uv run` below, as the `pre-push` skill does — an exact sync silently swaps that checkout for the published release.
 
 Then run Sections 6, 7, and 9 in order. They must not overlap — with each other or with Phase A. See "Why the phases" below.

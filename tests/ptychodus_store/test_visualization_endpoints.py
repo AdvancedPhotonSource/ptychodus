@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from httpx import AsyncClient
+from pathlib import Path
+from ptychodus_store.storage.layout import StoreLayout
+from sqlalchemy.ext.asyncio import AsyncEngine
+from uuid import UUID
+
 import base64
 from io import BytesIO
 
@@ -11,7 +18,7 @@ from ptychodus_store.ingest.pipeline import ingest_manifest
 pytestmark = pytest.mark.asyncio
 
 
-async def _ingest(db_engine, layout, manifest_path) -> None:  # type: ignore[no-untyped-def]
+async def _ingest(db_engine: AsyncEngine, layout: StoreLayout, manifest_path: Path) -> None:
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
     factory = async_sessionmaker(db_engine, expire_on_commit=False)
@@ -31,7 +38,7 @@ def _decode_png(body: dict, expected_h: int, expected_w: int) -> Image.Image:
     return image
 
 
-async def test_visualization_options(app_client) -> None:  # type: ignore[no-untyped-def]
+async def test_visualization_options(app_client: AsyncClient) -> None:
     resp = await app_client.get('/api/v1/visualization/options')
     assert resp.status_code == 200
     body = resp.json()
@@ -43,8 +50,11 @@ async def test_visualization_options(app_client) -> None:  # type: ignore[no-unt
     assert 'gray' in body['colormaps_linear'] or 'gray' in body['colormaps_cyclic']
 
 
-async def test_diffraction_pattern_image(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_diffraction
+async def test_diffraction_pattern_image(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
     await _ingest(db_engine, layout, layout.manifest_path('diffraction', d))
@@ -59,8 +69,11 @@ async def test_diffraction_pattern_image(  # type: ignore[no-untyped-def]
     assert body['pixel_width_m'] == pytest.approx(55e-6)
 
 
-async def test_diffraction_pattern_out_of_range(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_diffraction
+async def test_diffraction_pattern_out_of_range(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
     await _ingest(db_engine, layout, layout.manifest_path('diffraction', d))
@@ -69,8 +82,11 @@ async def test_diffraction_pattern_out_of_range(  # type: ignore[no-untyped-def]
     assert resp.status_code == 404
 
 
-async def test_diffraction_aggregate_image(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_diffraction
+async def test_diffraction_aggregate_image(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
     await _ingest(db_engine, layout, layout.manifest_path('diffraction', d))
@@ -80,8 +96,11 @@ async def test_diffraction_aggregate_image(  # type: ignore[no-untyped-def]
     _decode_png(resp.json(), expected_h=8, expected_w=12)
 
 
-async def test_probe_image(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_product
+async def test_probe_image(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
     await _ingest(db_engine, layout, layout.manifest_path('product', p))
@@ -94,8 +113,11 @@ async def test_probe_image(  # type: ignore[no-untyped-def]
     _decode_png(resp.json(), expected_h=8, expected_w=8)
 
 
-async def test_probe_image_cylindrical(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_product
+async def test_probe_image_cylindrical(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
     await _ingest(db_engine, layout, layout.manifest_path('product', p))
@@ -106,8 +128,11 @@ async def test_probe_image_cylindrical(  # type: ignore[no-untyped-def]
     assert resp.status_code == 200
 
 
-async def test_probe_image_component_and_color_model_rejected(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_product
+async def test_probe_image_component_and_color_model_rejected(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
     await _ingest(db_engine, layout, layout.manifest_path('product', p))
@@ -119,8 +144,11 @@ async def test_probe_image_component_and_color_model_rejected(  # type: ignore[n
     assert resp.status_code == 400
 
 
-async def test_probe_incoherent_out_of_range(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_product
+async def test_probe_incoherent_out_of_range(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
     await _ingest(db_engine, layout, layout.manifest_path('product', p))
@@ -129,8 +157,11 @@ async def test_probe_incoherent_out_of_range(  # type: ignore[no-untyped-def]
     assert resp.status_code == 404
 
 
-async def test_probe_modes_image(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_product
+async def test_probe_modes_image(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
     await _ingest(db_engine, layout, layout.manifest_path('product', p))
@@ -141,8 +172,11 @@ async def test_probe_modes_image(  # type: ignore[no-untyped-def]
     _decode_png(resp.json(), expected_h=8, expected_w=8)
 
 
-async def test_object_layer_image(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_product
+async def test_object_layer_image(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
     await _ingest(db_engine, layout, layout.manifest_path('product', p))
@@ -154,8 +188,11 @@ async def test_object_layer_image(  # type: ignore[no-untyped-def]
     _decode_png(resp.json(), expected_h=16, expected_w=16)
 
 
-async def test_object_layer_out_of_range(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_product
+async def test_object_layer_out_of_range(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
     await _ingest(db_engine, layout, layout.manifest_path('product', p))
@@ -164,8 +201,11 @@ async def test_object_layer_out_of_range(  # type: ignore[no-untyped-def]
     assert resp.status_code == 404
 
 
-async def test_fluorescence_element_image(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_fluorescence
+async def test_fluorescence_element_image(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_fluorescence: Callable[..., UUID],
 ) -> None:
     f = seed_fluorescence(elements=['Fe', 'Cu'])
     await _ingest(db_engine, layout, layout.manifest_path('fluorescence', f))
@@ -175,8 +215,11 @@ async def test_fluorescence_element_image(  # type: ignore[no-untyped-def]
     _decode_png(resp.json(), expected_h=6, expected_w=10)
 
 
-async def test_fluorescence_element_missing(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_fluorescence
+async def test_fluorescence_element_missing(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_fluorescence: Callable[..., UUID],
 ) -> None:
     f = seed_fluorescence(elements=['Fe', 'Cu'])
     await _ingest(db_engine, layout, layout.manifest_path('fluorescence', f))
@@ -187,8 +230,12 @@ async def test_fluorescence_element_missing(  # type: ignore[no-untyped-def]
     assert 'Fe' in detail['available']
 
 
-async def test_fluorescence_with_product_pixel_geometry(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_product, seed_fluorescence
+async def test_fluorescence_with_product_pixel_geometry(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
+    seed_fluorescence: Callable[..., UUID],
 ) -> None:
     p = seed_product()
     f = seed_fluorescence(elements=['Fe'])
@@ -207,8 +254,11 @@ async def test_fluorescence_with_product_pixel_geometry(  # type: ignore[no-unty
     assert body['pixel_width_m'] == pytest.approx(1e-9)
 
 
-async def test_bad_colormap_returns_400(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_diffraction
+async def test_bad_colormap_returns_400(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
     await _ingest(db_engine, layout, layout.manifest_path('diffraction', d))
@@ -222,8 +272,11 @@ async def test_bad_colormap_returns_400(  # type: ignore[no-untyped-def]
     assert 'valid_cyclic' in detail
 
 
-async def test_bad_transform_returns_400(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_diffraction
+async def test_bad_transform_returns_400(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
     await _ingest(db_engine, layout, layout.manifest_path('diffraction', d))
@@ -234,8 +287,11 @@ async def test_bad_transform_returns_400(  # type: ignore[no-untyped-def]
     assert resp.status_code == 400
 
 
-async def test_component_on_real_endpoint_rejected(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_diffraction
+async def test_component_on_real_endpoint_rejected(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
     await _ingest(db_engine, layout, layout.manifest_path('diffraction', d))

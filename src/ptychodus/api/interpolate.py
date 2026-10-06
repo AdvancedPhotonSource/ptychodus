@@ -114,7 +114,7 @@ class BarycentricArrayInterpolator(Generic[InexactDType]):
         patch = numpy.subtract(y_interp[..., :, 1:], y_interp[..., :, :-1])
         patch *= x_frac
         patch += y_interp[..., :, :-1]
-        return patch  # type: ignore
+        return patch
 
     def add_patch(
         self,

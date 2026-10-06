@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, TypeVar, cast
 from uuid import UUID
 
 from sqlalchemy import delete, func, select
@@ -17,6 +17,11 @@ from ptychodus_store.db.models import (
     Product,
 )
 from ptychodus_store.storage.manifest import ResourceKind
+
+# Every row model this module reads or writes. Generic helpers below are keyed on the
+# model class rather than the kind string, so a caller that names a concrete table gets
+# that table's row type back instead of the four-way union.
+_RowT = TypeVar('_RowT', Campaign, Diffraction, Product, Fluorescence)
 
 KIND_TO_MODEL: dict[str, type[Campaign | Diffraction | Product | Fluorescence]] = {
     ResourceKind.CAMPAIGN: Campaign,
@@ -40,22 +45,32 @@ async def delete_row(session: AsyncSession, kind: str, uuid: UUID) -> None:
     await session.execute(delete(model).where(model.uuid == uuid))
 
 
-async def get_row(
+async def get_row(session: AsyncSession, model: type[_RowT], uuid: UUID) -> _RowT | None:
+    return await session.get(model, uuid)
+
+
+async def get_row_by_kind(
     session: AsyncSession, kind: str, uuid: UUID
 ) -> Campaign | Diffraction | Product | Fluorescence | None:
-    model = KIND_TO_MODEL[kind]
-    return await session.get(model, uuid)
+    """Row lookup for callers that only know the kind at run time.
+
+    Prefer :func:`get_row`, which keys on the model class and hands back that row
+    type. The cast is the one place the kind-to-model mapping is laundered: indexing
+    KIND_TO_MODEL yields ``type[Campaign | Diffraction | Product | Fluorescence]``,
+    which ``session.get`` widens to the declarative base.
+    """
+    row = await session.get(KIND_TO_MODEL[kind], uuid)
+    return cast('Campaign | Diffraction | Product | Fluorescence | None', row)
 
 
 async def list_rows(
     session: AsyncSession,
-    kind: str,
+    model: type[_RowT],
     *,
     limit: int,
     offset: int,
     where: Sequence[Any] = (),
-) -> tuple[list[Campaign | Diffraction | Product | Fluorescence], int]:
-    model = KIND_TO_MODEL[kind]
+) -> tuple[list[_RowT], int]:
     stmt = select(model)
     for clause in where:
         stmt = stmt.where(clause)
@@ -66,8 +81,7 @@ async def list_rows(
     for clause in where:
         count_stmt = count_stmt.where(clause)
     total = (await session.execute(count_stmt)).scalar_one()
-    items: list[Campaign | Diffraction | Product | Fluorescence] = list(raw_items)  # type: ignore[arg-type]
-    return items, int(total)
+    return list(raw_items), int(total)
 
 
 async def replace_edges(
@@ -103,11 +117,11 @@ async def outgoing_edges(session: AsyncSession, source_uuid: UUID) -> list[Deriv
 
 
 async def row_exists(session: AsyncSession, kind: str, uuid: UUID) -> bool:
-    return (await get_row(session, kind, uuid)) is not None
+    return (await get_row_by_kind(session, kind, uuid)) is not None
 
 
 async def update_state(session: AsyncSession, kind: str, uuid: UUID, state: IngestState) -> None:
-    row = await get_row(session, kind, uuid)
+    row = await get_row_by_kind(session, kind, uuid)
     if row is not None:
         row.ingest_state = state
 

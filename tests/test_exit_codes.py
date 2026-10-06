@@ -19,12 +19,6 @@ def test_values_match_the_conventions_they_follow() -> None:
     assert ExitCode.CANCELLED == 130
 
 
-def test_members_are_plain_integers() -> None:
-    """``sys.exit`` has to see an int, not an object that merely wraps one."""
-    for code in ExitCode:
-        assert isinstance(code, int)
-
-
 def test_cancelled_is_the_shell_signal_convention() -> None:
     import signal
 

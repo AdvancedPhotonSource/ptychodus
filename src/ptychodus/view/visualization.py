@@ -6,7 +6,7 @@ import logging
 import numpy
 
 from PyQt5.QtCore import pyqtSignal, Qt, QObject, QPointF, QLineF, QRectF, QSize, QSizeF
-from PyQt5.QtGui import QIcon, QImage, QPalette, QPen, QPixmap, QWheelEvent
+from PyQt5.QtGui import QGuiApplication, QIcon, QImage, QPalette, QPen, QPixmap, QWheelEvent
 from PyQt5.QtWidgets import (
     QAction,
     QApplication,
@@ -157,7 +157,7 @@ class ImageItem(QGraphicsPixmapItem):
             if self._mouse_tool == ImageMouseTool.MOVE_TOOL:
                 cursor = Qt.CursorShape.OpenHandCursor
 
-            app.setOverrideCursor(cursor)  # type: ignore
+            QGuiApplication.setOverrideCursor(cursor)
 
         super().hoverEnterEvent(event)
 
@@ -180,7 +180,7 @@ class ImageItem(QGraphicsPixmapItem):
         app = QApplication.instance()
 
         if app:
-            app.restoreOverrideCursor()  # type: ignore
+            QGuiApplication.restoreOverrideCursor()
 
         self._status_bar.clearMessage()
         super().hoverLeaveEvent(event)
@@ -189,7 +189,7 @@ class ImageItem(QGraphicsPixmapItem):
         app = QApplication.instance()
 
         if app:
-            app.changeOverrideCursor(cursor)  # type: ignore
+            QGuiApplication.changeOverrideCursor(cursor)
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent | None) -> None:  # noqa: N802
         if event is None:

@@ -13,11 +13,13 @@ filter emptied from reaching the repository.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+
+from typing import cast
 
 import numpy
 import pytest
 
+from ptychodus.model.task_manager import BackgroundTask, ForegroundTask, TaskManager
 from ptychodus.api.assemble import (
     AssembledDiffractionData,
     compute_dataset_total_counts,
@@ -34,6 +36,7 @@ from ptychodus.api.diffraction import (
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.preprocess.diffraction import DiffractionPrepStepUnion
 from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.diffraction.api import DiffractionAPI
 from ptychodus.model.diffraction.dataset import (
     AssembledDiffractionArray,
     AssembledDiffractionDataset,
@@ -90,17 +93,21 @@ def test_assembled_get_total_counts_delegates_to_free_helper() -> None:
 # ---------- Settings-to-assembly wiring ----------
 
 
-class _InlineTaskManager:
-    """Runs queued tasks immediately, so loads complete before the call returns."""
+class _InlineTaskManager(TaskManager):
+    """Runs queued tasks immediately, so loads complete before the call returns.
 
-    is_stopping = False
-    background_queue_size = 0
-    foreground_queue_size = 0
+    Subclasses the real manager rather than imitating it: the base constructor only
+    builds two queues and an event (no worker thread until ``start()``), so the
+    inherited surface stays checked against what production actually passes around.
+    """
 
-    def put_background_task(self, task: Callable[[], None]) -> None:
-        task()
+    def put_background_task(self, task: BackgroundTask) -> None:
+        foreground_task = task()
 
-    def put_foreground_task(self, task: Callable[[], None]) -> None:
+        if foreground_task is not None:
+            foreground_task()
+
+    def put_foreground_task(self, task: ForegroundTask) -> None:
         task()
 
 
@@ -142,8 +149,8 @@ def _load_dataset_with_bounds(
     dataset = AssembledDiffractionDataset(
         diffraction_settings,
         detector_settings,
-        task_manager,  # type: ignore[arg-type]
-        DiffractionTaskMonitor(task_manager),  # type: ignore[arg-type]
+        task_manager,
+        DiffractionTaskMonitor(task_manager),
     )
     array = _known_counts_array()
     metadata = DiffractionMetadata(
@@ -283,8 +290,8 @@ def _load_unequal_arrays_dataset() -> AssembledDiffractionDataset:
     dataset = AssembledDiffractionDataset(
         diffraction_settings,
         detector_settings,
-        task_manager,  # type: ignore[arg-type]
-        DiffractionTaskMonitor(task_manager),  # type: ignore[arg-type]
+        task_manager,
+        DiffractionTaskMonitor(task_manager),
     )
     patterns = _known_counts_array().get_patterns()
     arrays = [
@@ -391,7 +398,7 @@ def test_prep_pipeline_has_no_counts_filter_step() -> None:
     1:1 invariant that prepare_reconstruct_input relies on, because
     DiffractionPrepPipeline.__call__ passes the original indexes through unchanged.
     """
-    step_names = {getattr(cls, '__name__', '') for cls in DiffractionPrepStepUnion.__args__}  # type: ignore[attr-defined]
+    step_names = {getattr(cls, '__name__', '') for cls in DiffractionPrepStepUnion.__args__}
     forbidden = {'FilterCountsStep', 'CountsFilterStep', 'DropPatternsByCountsStep'}
     assert step_names.isdisjoint(forbidden)
 
@@ -411,8 +418,8 @@ def _summary_service(
     dataset = AssembledDiffractionDataset(
         diffraction_settings,
         detector_settings,
-        task_manager,  # type: ignore[arg-type]
-        DiffractionTaskMonitor(task_manager),  # type: ignore[arg-type]
+        task_manager,
+        DiffractionTaskMonitor(task_manager),
     )
     dataset.reload(source)
 
@@ -426,8 +433,10 @@ def _summary_service(
             raise FileNotFoundError(file_path)
 
     service = DiffractionSummaryService(
-        task_manager,  # type: ignore[arg-type]
-        _FakeAPI(),  # type: ignore[arg-type]
+        task_manager,
+        # cast, not a subclass: the real DiffractionAPI needs seven collaborators
+        # including three plugin choosers, and the service touches two of its methods.
+        cast('DiffractionAPI', _FakeAPI()),
         detector_settings,
         diffraction_settings,
     )
@@ -506,7 +515,7 @@ def test_a_failing_pass_leaves_the_error_and_the_actor_describing_it() -> None:
 @pytest.mark.parametrize(
     'dtype', [numpy.uint8, numpy.uint16, numpy.int32, numpy.float32, numpy.float64]
 )
-def test_compute_total_counts_matches_the_masked_form_when_nothing_is_masked(dtype) -> None:  # type: ignore[no-untyped-def]
+def test_compute_total_counts_matches_the_masked_form_when_nothing_is_masked(dtype) -> None:
     # Nothing masked takes a reduction over the frame axes instead of a boolean fancy
     # index. The two must agree in value and dtype, or a total-counts bound would admit
     # different patterns depending on whether a bad-pixel mask happened to be empty.

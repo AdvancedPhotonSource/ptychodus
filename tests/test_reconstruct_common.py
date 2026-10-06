@@ -174,6 +174,7 @@ def _run(
     )
 
     assert sync_points, 'the reconstruction generator was never iterated'
+    assert product is not None
     return product
 
 
@@ -759,11 +760,12 @@ def test_the_value_filter_is_applied_to_the_mean_pattern_before_estimating(
     monkeypatch.setattr(
         _reconstruct_common, 'summarize_dataset', lambda dataset, bad_pixels=None: _FakeSummary()
     )
-    monkeypatch.setattr(
-        _reconstruct_common,
-        'estimate_beam_center',
-        lambda pattern: (seen.append(pattern), BeamCenter(x_px=256, y_px=256))[1],
-    )
+
+    def record_and_center(pattern: numpy.ndarray) -> BeamCenter:
+        seen.append(pattern)
+        return BeamCenter(x_px=256, y_px=256)
+
+    monkeypatch.setattr(_reconstruct_common, 'estimate_beam_center', record_and_center)
     value_filter = FilterValuesStep(lower_bound=0, upper_bound=5)
     dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), beam_center=None)
 

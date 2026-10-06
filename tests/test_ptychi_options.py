@@ -16,6 +16,7 @@ these tests also pin down that separation.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 import dataclasses
 import json
 import logging
@@ -38,6 +39,7 @@ from ptychodus.api.settings import SettingsRegistry
 from ptychi.api import (
     RECONSTRUCTOR_OPTIONS_MAP,
     LSQMLOptions,
+    LSQMLReconstructorOptions,
     ObjectPosOriginCoordsMethods,
     Reconstructors,
 )
@@ -128,6 +130,26 @@ def _make_reconstruct_input() -> ReconstructInput:
         bad_pixels=bad_pixels,
         product=product,
     )
+
+
+@pytest.fixture(scope='module', autouse=True)
+def _stub_the_device_probe() -> Iterator[None]:
+    """Skip the spawned GPU enumeration; nothing here reads the device list.
+
+    PtyChiDeviceRepository probes devices in a child process that imports
+    torch -- about 17 seconds, once per library construction, and this module
+    builds sixteen. The repository resolves the probe on its module at call
+    time, so patching the module attribute takes effect.
+
+    Module-scoped, and therefore not the function-scoped ``monkeypatch``
+    fixture: ``built_options_by_algorithm`` below is itself module-scoped and
+    would build its library before any function-scoped patch was in place.
+    """
+    from ptychodus.model.ptychi import device
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(device, '_probe_devices_via_subprocess', lambda: ['cpu'])
+        yield
 
 
 def _make_library() -> PtyChiReconstructorLibrary:
@@ -378,6 +400,9 @@ def test_lsqml_algorithm_specific_field_survives_round_trip() -> None:
 
     loaded = load_task_options(dump_task_options(task_options))
 
+    # Narrowed, not cast: the round trip must preserve the LSQML subclass, and only
+    # that subclass carries the field.
+    assert isinstance(loaded.reconstructor_options, LSQMLReconstructorOptions)
     assert loaded.reconstructor_options.momentum_acceleration_gain == pytest.approx(0.75)
 
 
@@ -875,7 +900,8 @@ def test_slice_spacings_from_an_ndarray_product_are_lists() -> None:
         ).astype(numpy.complex128),
         pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=PIXEL_M),
         center=ObjectCenter(x_m=0.0, y_m=0.0),
-        layer_spacing_m=numpy.array([3.0e-8]),
+        # An ndarray on purpose: converting it to a list is what is under test.
+        layer_spacing_m=numpy.array([3.0e-8]),  # type: ignore[arg-type]
     )
     product = dataclasses.replace(parameters.product, object_=multislice)
 

@@ -162,7 +162,7 @@ def test_fly_scan_patterns_pair_with_triggers_offset_by_one(tmp_path: Path) -> N
     # Negated, because the readers report probe-relative coordinates rather than the
     # stage readback the stream holds.
     for pattern_index in pattern_indexes:
-        assert by_index[pattern_index].x_m == pytest.approx(-x_nm[pattern_index] * NANOMETER_M)
+        assert by_index[int(pattern_index)].x_m == pytest.approx(-x_nm[pattern_index] * NANOMETER_M)
 
 
 def test_step_scan_patterns_pair_with_positions_one_to_one(tmp_path: Path) -> None:
@@ -192,7 +192,7 @@ def test_step_scan_patterns_pair_with_positions_one_to_one(tmp_path: Path) -> No
     by_index = {point.index: point for point in positions}
 
     for ordinal, pattern_index in enumerate(pattern_indexes):
-        assert by_index[pattern_index].x_m == pytest.approx(-motor_x[ordinal] * 1e-6)
+        assert by_index[int(pattern_index)].x_m == pytest.approx(-motor_x[ordinal] * 1e-6)
 
 
 def test_gapped_fly_scan_pairing_survives_dropped_frames(tmp_path: Path) -> None:
@@ -223,7 +223,7 @@ def test_gapped_fly_scan_pairing_survives_dropped_frames(tmp_path: Path) -> None
     # Negated, because the readers report probe-relative coordinates rather than the
     # stage readback the stream holds.
     for pattern_index in pattern_indexes:
-        assert by_index[pattern_index].x_m == pytest.approx(-x_nm[pattern_index] * NANOMETER_M)
+        assert by_index[int(pattern_index)].x_m == pytest.approx(-x_nm[pattern_index] * NANOMETER_M)
 
 
 def test_polar_diffraction_reader_registers() -> None:

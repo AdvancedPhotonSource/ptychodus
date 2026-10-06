@@ -8,6 +8,7 @@ import time
 import numpy
 
 from PyQt5.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt
+from PyQt5.QtGui import QGuiApplication
 from PyQt5.QtWidgets import QApplication, QHeaderView, QWidget
 
 from ptychodus.api.constants import LengthUnit, format_length
@@ -251,7 +252,7 @@ class ProbeFocusViewController:
             application = QApplication.instance()
 
             if application is not None:
-                application.setOverrideCursor(Qt.CursorShape.WaitCursor)  # type: ignore
+                QGuiApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
 
             try:
                 curves = compute_focus_curves(propagated_probe, mode)
@@ -261,7 +262,7 @@ class ProbeFocusViewController:
                 return
             finally:
                 if application is not None:
-                    application.restoreOverrideCursor()  # type: ignore
+                    QGuiApplication.restoreOverrideCursor()
 
             self._propagated_probe = propagated_probe
             self._curves = curves

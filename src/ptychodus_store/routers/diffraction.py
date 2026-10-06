@@ -67,23 +67,23 @@ async def list_diffraction(
         where.append(exists(edge_subq))
 
     items, total = await repo.list_rows(
-        session, ResourceKind.DIFFRACTION, limit=limit, offset=offset, where=where
+        session, Diffraction, limit=limit, offset=offset, where=where
     )
-    reads = [await diffraction_to_read(session, i) for i in items]  # type: ignore[arg-type]
+    reads = [await diffraction_to_read(session, i) for i in items]
     return Page(items=reads, total=total, limit=limit, offset=offset)
 
 
 @router.get('/{uuid}', response_model=DiffractionRead)
 async def get_diffraction(uuid: UUID, session: SessionDep) -> DiffractionRead:
-    row = await repo.get_row(session, ResourceKind.DIFFRACTION, uuid)
+    row = await repo.get_row(session, Diffraction, uuid)
     if row is None:
         raise HTTPException(status_code=404, detail=f'diffraction {uuid} not found')
-    return await diffraction_to_read(session, row)  # type: ignore[arg-type]
+    return await diffraction_to_read(session, row)
 
 
 @router.get('/{uuid}/files/diffraction')
 async def get_diffraction_file(uuid: UUID, session: SessionDep, layout: LayoutDep) -> FileResponse:
-    row = await repo.get_row(session, ResourceKind.DIFFRACTION, uuid)
+    row = await repo.get_row(session, Diffraction, uuid)
     if row is None:
         raise HTTPException(status_code=404, detail=f'diffraction {uuid} not found')
     path = layout.resource_folder(ResourceKind.DIFFRACTION, uuid) / 'diffraction.h5'
@@ -95,7 +95,7 @@ async def get_diffraction_file(uuid: UUID, session: SessionDep, layout: LayoutDe
 async def _load_diffraction_or_404(
     uuid: UUID, session: SessionDep, layout: LayoutDep
 ) -> tuple[AssembledDiffractionData, PixelGeometry]:
-    row = await repo.get_row(session, ResourceKind.DIFFRACTION, uuid)
+    row = await repo.get_row(session, Diffraction, uuid)
     if row is None:
         raise HTTPException(status_code=404, detail=f'diffraction {uuid} not found')
     path = layout.resource_folder(ResourceKind.DIFFRACTION, uuid) / 'diffraction.h5'

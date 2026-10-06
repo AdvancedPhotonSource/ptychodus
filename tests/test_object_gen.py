@@ -36,10 +36,6 @@ that all three vertices of each simplex cell contribute at every interior
 point regardless of `grid_scale_px`.
 """
 
-import matplotlib
-
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import numpy
 import numpy.testing
 import pytest
@@ -600,99 +596,30 @@ class TestSimplexCoordinateMappings:
         assert contrib[0, 0] == pytest.approx(0.0, abs=1e-12)
 
 
-class TestSimplexVisualOutput:
-    """Outputs saved to pytest's tmp_path for manual inspection."""
+def test_autocorrelation_length_increases_with_grid_scale() -> None:
+    """The 1/e autocorrelation crossing must track the grid scale it was generated at.
 
-    def test_single_noise_image(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
-        """Save a grayscale simplex noise image."""
-        scale = 16.0
-        noise = _generate_simplex_noise(_rng(), 256, 256, scale)
-        vmax = float(numpy.abs(noise).max()) or 1.0
+    This is the property that makes `grid_scale` meaningful: a larger scale has to
+    produce a visibly coarser texture, not merely a differently seeded one.
+    """
+    crossings: list[tuple[float, float]] = []
 
-        fig, ax = plt.subplots(figsize=(5, 5))
-        im = ax.imshow(noise, cmap='gray', vmin=-vmax, vmax=vmax, interpolation='nearest')
-        fig.colorbar(im, ax=ax, shrink=0.8)
-        ax.set_title(f'Simplex Noise  scale={scale:.0f} px  std={noise.std():.3f}')
-        ax.axis('off')
-        fig.tight_layout()
-        out = tmp_path / 'simplex_noise_single.png'
-        fig.savefig(out, dpi=100)
-        plt.close(fig)
-        assert out.exists()
+    for scale in (4.0, 8.0, 16.0):
+        noise = _generate_simplex_noise(_rng(0), 256, 256, scale)
+        row = noise.mean(axis=0)
+        row = row - row.mean()
+        n = len(row)
+        acf_full = numpy.fft.irfft(numpy.abs(numpy.fft.rfft(row, n=2 * n)) ** 2)[:n]
+        acf = acf_full / acf_full[0] if acf_full[0] > 0 else acf_full
 
-    def test_multi_scale_comparison(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
-        """Compare simplex noise texture at four grid scales side by side."""
-        scales = [4.0, 8.0, 16.0, 32.0]
-        fig, axes = plt.subplots(1, len(scales), figsize=(16, 4))
-        for ax, scale in zip(axes, scales):
-            noise = _generate_simplex_noise(_rng(0), 128, 128, scale)
-            vmax = float(numpy.abs(noise).max()) or 1.0
-            ax.imshow(noise, cmap='seismic', vmin=-vmax, vmax=vmax, interpolation='nearest')
-            ax.set_title(f'scale={scale:.0f} px\nstd={noise.std():.3f}')
-            ax.axis('off')
-        fig.suptitle('Simplex Noise at Different Grid Scales')
-        fig.tight_layout()
-        out = tmp_path / 'simplex_noise_scales.png'
-        fig.savefig(out, dpi=100)
-        plt.close(fig)
-        assert out.exists()
+        idx = numpy.where(acf < numpy.exp(-1.0))[0]
+        crossings.append((scale, float(idx[0]) if len(idx) else float(n)))
 
-    def test_power_spectrum_plot(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
-        """Plot radial power spectra for several scales; characteristic frequency marked."""
-        scales = [4.0, 8.0, 16.0]
-        fig, ax = plt.subplots(figsize=(7, 4))
-        for scale in scales:
-            noise = _generate_simplex_noise(_rng(0), 256, 256, scale)
-            freqs, power = _radial_power_spectrum(noise)
-            ax.semilogy(freqs, power + 1e-30, label=f'scale={scale:.0f} px')
-            ax.axvline(1.0 / scale, linestyle='--', alpha=0.4, color='gray')
-        ax.set_xlabel('Spatial frequency (cycles/pixel)')
-        ax.set_ylabel('Mean power (log scale)')
-        ax.set_title('Radial Power Spectrum of Simplex Noise\n(dashed lines = 1/scale)')
-        ax.legend()
-        fig.tight_layout()
-        out = tmp_path / 'simplex_noise_spectrum.png'
-        fig.savefig(out, dpi=100)
-        plt.close(fig)
-        assert out.exists()
-
-    def test_autocorrelation_plot(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
-        """Plot 1-D autocorrelation functions; verify 1/e crossing scales with grid_scale."""
-        scales = [4.0, 8.0, 16.0]
-        fig, ax = plt.subplots(figsize=(7, 4))
-        crossings: list[tuple[float, float]] = []
-        for scale in scales:
-            noise = _generate_simplex_noise(_rng(0), 256, 256, scale)
-            row = noise.mean(axis=0)
-            row = row - row.mean()
-            n = len(row)
-            acf_full = numpy.fft.irfft(numpy.abs(numpy.fft.rfft(row, n=2 * n)) ** 2)[:n]
-            acf = acf_full / acf_full[0] if acf_full[0] > 0 else acf_full
-            lags = numpy.arange(n)
-            ax.plot(lags[: n // 2], acf[: n // 2], label=f'scale={scale:.0f} px')
-            idx = numpy.where(acf < numpy.exp(-1.0))[0]
-            crossing = float(idx[0]) if len(idx) else float(n)
-            crossings.append((scale, crossing))
-
-        ax.axhline(numpy.exp(-1.0), linestyle=':', color='black', label='1/e')
-        ax.set_xlabel('Lag (pixels)')
-        ax.set_ylabel('Normalised autocorrelation')
-        ax.set_title('1-D Autocorrelation of Simplex Noise')
-        ax.set_xlim(0, 80)
-        ax.legend()
-        fig.tight_layout()
-        out = tmp_path / 'simplex_noise_autocorrelation.png'
-        fig.savefig(out, dpi=100)
-        plt.close(fig)
-        assert out.exists()
-
-        # Quantitative check embedded in the visual test:
-        # 1/e crossing should increase with scale
-        for (s1, c1), (s2, c2) in zip(crossings[:-1], crossings[1:]):
-            assert c2 > c1, (
-                f'1/e crossing should increase from scale={s1} ({c1:.1f} px) '
-                f'to scale={s2} ({c2:.1f} px).'
-            )
+    for (s1, c1), (s2, c2) in zip(crossings[:-1], crossings[1:]):
+        assert c2 > c1, (
+            f'1/e crossing should increase from scale={s1} ({c1:.1f} px) '
+            f'to scale={s2} ({c2:.1f} px).'
+        )
 
 
 # ===========================================================================

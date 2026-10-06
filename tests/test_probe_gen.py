@@ -1,5 +1,6 @@
 """Unit tests for probe generation functions in ptychodus.api.simulate.probe."""
 
+from typing import Any
 import math
 
 import numpy
@@ -592,7 +593,8 @@ class TestFresnelZonePlate:
     def test_rejects_an_unknown_field(self) -> None:
         """A preset is a bare literal call, so a misspelled field must not pass silently."""
         with pytest.raises(ValidationError, match='zoneplate_diameter_m'):
-            FresnelZonePlate(**self._sound(), zoneplate_diameter_m=1.0)
+            # Misspelled on purpose; mypy agreeing the field is unknown is the point.
+            FresnelZonePlate(**self._sound(), zoneplate_diameter_m=1.0)  # type: ignore[call-arg]
 
 
 class TestGenerateFresnelZonePlateProbe:
@@ -899,7 +901,8 @@ class TestKirkpatrickBaezMirror:
     def test_rejects_an_unknown_field(self) -> None:
         """A preset is a bare literal call, so a misspelled field must not pass silently."""
         with pytest.raises(ValidationError, match='grazing_angle'):
-            KirkpatrickBaezMirror(
+            # Misspelled on purpose; mypy agreeing the field is unknown is the point.
+            KirkpatrickBaezMirror(  # type: ignore[call-arg]
                 acceptance_length_m=0.1,
                 grazing_angle=3e-3,
                 focus_distance_m=0.05,
@@ -910,9 +913,11 @@ class TestKirkpatrickBaezMirror:
         sound = dict(acceptance_length_m=0.1, grazing_angle_rad=3e-3, focus_distance_m=0.05)
 
         with pytest.raises(ValidationError, match='horizontal'):
+            # Pydantic coerces each mapping into a KirkpatrickBaezMirror; that
+            # coercion is what the nested-validation message under test comes from.
             KirkpatrickBaezMirrorPair(
-                horizontal={**sound, 'focus_distance_m': 0.0},
-                vertical=sound,
+                horizontal={**sound, 'focus_distance_m': 0.0},  # type: ignore[arg-type]
+                vertical=sound,  # type: ignore[arg-type]
             )
 
     def test_reference_distance_is_the_mean_of_the_two_mirrors(self) -> None:
@@ -1261,7 +1266,9 @@ class TestGenerateMirrorFigureError:
             )
 
     def test_is_reproducible_from_the_seed(self) -> None:
-        kwargs = dict(rms_slope_error_rad=50e-9, acceptance_length_m=0.1, num_modes=8)
+        kwargs: dict[str, Any] = dict(
+            rms_slope_error_rad=50e-9, acceptance_length_m=0.1, num_modes=8
+        )
 
         first = generate_mirror_figure_error(numpy.random.default_rng(7), **kwargs)
         again = generate_mirror_figure_error(numpy.random.default_rng(7), **kwargs)
@@ -1315,7 +1322,9 @@ class TestGenerateMirrorFigureError:
         ],
     )
     def test_rejects_invalid_arguments(self, override: dict, match: str) -> None:
-        kwargs = dict(rms_slope_error_rad=50e-9, acceptance_length_m=0.1, num_modes=5)
+        kwargs: dict[str, Any] = dict(
+            rms_slope_error_rad=50e-9, acceptance_length_m=0.1, num_modes=5
+        )
         kwargs.update(override)
 
         with pytest.raises(ValueError, match=match):
@@ -1748,7 +1757,10 @@ class TestGramSchmidt:
         still, reaching 8.85e-06 orthogonality error at 1e-160.
         """
         rng = numpy.random.default_rng(0)
-        rows = (rng.normal(size=(5, 200)) + 1j * rng.normal(size=(5, 200))) * scale
+        # astype: numpy's stubs lose complexity through `complex_array * scalar`.
+        rows = ((rng.normal(size=(5, 200)) + 1j * rng.normal(size=(5, 200))) * scale).astype(
+            complex
+        )
 
         result = _gram_schmidt(rows, dependence_floor=1e-8)
         norms = numpy.linalg.norm(result, axis=1)

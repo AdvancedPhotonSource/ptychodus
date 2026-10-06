@@ -8,6 +8,7 @@ touch no GPU framework. See ``tests/subprocess_child_fixtures.py``.
 from __future__ import annotations
 
 import logging
+import multiprocessing
 import sys
 from collections.abc import Generator
 from pathlib import Path
@@ -22,6 +23,7 @@ from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
+from ptychodus.model.processing import _subprocess_protocol
 from ptychodus.model.processing._subprocess_protocol import ChildError
 from ptychodus.model.processing.subprocess_reconstructor import (
     SubprocessReconstructor,
@@ -118,24 +120,68 @@ def test_child_exception_propagates_as_child_error() -> None:
     assert 'boom' in str(excinfo.value.child_exception)
 
 
-def test_hanging_child_is_terminated_on_iterator_close() -> None:
+class _ProcessRecordingContext:
+    """A spawn context that hands back the processes it was asked to build.
+
+    Wraps rather than subclasses the real context: spawn pickles the Process
+    object itself, and a locally defined subclass would not survive that.
+    """
+
+    def __init__(self, context: Any) -> None:
+        self._context = context
+        self.processes: list[Any] = []
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._context, name)
+
+    def Process(self, *args: Any, **kwargs: Any) -> Any:  # noqa: N802
+        process = self._context.Process(*args, **kwargs)
+        self.processes.append(process)
+        return process
+
+
+def test_hanging_child_is_terminated_on_iterator_close(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The child sleeps for an hour, so only the cleanup path can end this test.
+
+    Asserting the child is reaped matters: without it the test passes whenever it
+    merely fails to hang, including if the process were left running and only
+    collected when the interpreter exits.
+    """
+
+    product = _minimal_product()
+
     def build_payload(parameters: ReconstructInput, _loaded: Path | None) -> Any:
-        return {}
+        return {'product': product}
+
+    recorded = _ProcessRecordingContext(multiprocessing.get_context('spawn'))
+    monkeypatch.setattr(
+        _subprocess_protocol.multiprocessing, 'get_context', lambda method: recorded
+    )
 
     adapter = SubprocessReconstructor(
         name='FAKE',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:hang_forever',
-        progress_goal_fn=lambda: 0,
+        reconstruct_entry_point=f'{FIXTURES_MODULE}:emit_output_then_hang',
+        progress_goal_fn=lambda: 1,
         build_reconstruct_payload=build_payload,
         terminate_grace_sec=1.0,
     )
 
-    # Get one message (there is none coming) - close the iterator to trigger cleanup.
-    iterator = adapter.reconstruct(_minimal_reconstruct_input())
-    # Close immediately; the context manager's finally must terminate the child.
-    # Reconstructor.reconstruct is declared Iterator, but the generator-close path
-    # is exactly what this test exercises.
-    cast(Generator[ReconstructOutput, None, None], iterator).close()
+    # Take the child's one output. That both spawns it and leaves the parent
+    # generator suspended inside the context manager -- closing a generator that
+    # was never advanced runs no cleanup, so this step is what arms the test.
+    iterator = cast(
+        Generator[ReconstructOutput, None, None], adapter.reconstruct(_minimal_reconstruct_input())
+    )
+    next(iterator)
+
+    (process,) = recorded.processes
+    assert process.is_alive()
+
+    # The context manager's finally must terminate the still-sleeping child.
+    iterator.close()
+
+    assert not process.is_alive()
+    assert process.exitcode is not None
 
 
 def test_child_log_is_forwarded_to_parent_logger(caplog: pytest.LogCaptureFixture) -> None:

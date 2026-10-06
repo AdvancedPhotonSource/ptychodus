@@ -9,10 +9,11 @@ live in tests/test_assemble.py.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 
 import numpy
 
+from ptychodus.model.task_manager import BackgroundTask, ForegroundTask, TaskManager
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.diffraction import (
     DiffractionArray,
@@ -28,17 +29,21 @@ from ptychodus.model.diffraction.monitor import DiffractionTaskMonitor
 from ptychodus.model.diffraction.settings import DetectorSettings, DiffractionSettings
 
 
-class InlineTaskManager:
-    """Runs queued tasks immediately, so loads complete before the call returns."""
+class InlineTaskManager(TaskManager):
+    """Runs queued tasks immediately, so loads complete before the call returns.
 
-    is_stopping = False
-    background_queue_size = 0
-    foreground_queue_size = 0
+    Subclasses the real manager rather than imitating it: the base constructor only
+    builds two queues and an event (no worker thread until ``start()``), so the
+    inherited surface stays checked against what production actually passes around.
+    """
 
-    def put_background_task(self, task: Callable[[], None]) -> None:
-        task()
+    def put_background_task(self, task: BackgroundTask) -> None:
+        foreground_task = task()
 
-    def put_foreground_task(self, task: Callable[[], None]) -> None:
+        if foreground_task is not None:
+            foreground_task()
+
+    def put_foreground_task(self, task: ForegroundTask) -> None:
         task()
 
 
@@ -67,8 +72,8 @@ def make_dataset(
     dataset = AssembledDiffractionDataset(
         diffraction_settings,
         detector_settings,
-        task_manager,  # type: ignore[arg-type]
-        DiffractionTaskMonitor(task_manager),  # type: ignore[arg-type]
+        task_manager,
+        DiffractionTaskMonitor(task_manager),
     )
     metadata = DiffractionMetadata(
         num_patterns_per_array=(

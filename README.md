@@ -22,6 +22,14 @@ $ cd ptychodus
 $ uv sync --extra globus --extra gui --extra ptychi
 ```
 
+The `ptychi` extra installs a **CPU** build of PyTorch. For GPU reconstruction, swap it for the extra matching your driver's CUDA ceiling — `nvidia-smi` reports that ceiling on its banner line:
+
+```sh
+$ uv sync --extra globus --extra gui --extra ptychi-cuda128   # or -cuda130, -cuda132
+```
+
+A build newer than the driver leaves `torch.cuda.is_available()` false and reconstruction silently falls back to the CPU; `uv run ptychodus-system-check` reports the driver ceiling, the PyTorch build and whether the two agree. These extras pin PyTorch to the matching index through `[tool.uv.sources]`, which only `uv` reads — a `pip install` of the same extra takes whatever PyTorch PyPI offers.
+
 Launch `ptychodus`:
 
 ```sh

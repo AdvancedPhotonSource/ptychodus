@@ -557,7 +557,8 @@ def _cluster_burst_positions(
     already folds duplicate indexes into one anchor, rather than averaging patterns
     here.
     """
-    # Optional dependency, and only this branch needs it; sklearn ships no stubs.
+    # Imported here rather than at module scope: sklearn is slow to import and only
+    # this branch needs it.
     from sklearn.cluster import DBSCAN  # type: ignore[import-untyped]
 
     coordinates = numpy.array([[position.y_m, position.x_m] for position in positions])
@@ -594,7 +595,6 @@ def _build_lsqml_options(params: PearParameters, num_patterns: int) -> LSQMLOpti
 
     is_multislice = params.object_thickness_m > 0 and params.number_of_slices > 1
 
-    # --- data ---
     data_options = options.data_options
     data_options.save_data_on_device = True
     data_options.free_space_propagation_distance_m = (
@@ -604,7 +604,6 @@ def _build_lsqml_options(params: PearParameters, num_patterns: int) -> LSQMLOpti
     if params.near_field_ptycho:
         data_options.fft_shift = False
 
-    # --- object ---
     object_options = options.object_options
     object_options.optimizable = True
     object_options.optimizer = Optimizers.SGD
@@ -633,7 +632,6 @@ def _build_lsqml_options(params: PearParameters, num_patterns: int) -> LSQMLOpti
             ImageIntegrationMethods.FOURIER
         )
 
-    # --- probe ---
     # No initial guess here: pty-chi takes reconstruction data as PtychographyTask
     # keyword arguments, and reconstruct_with_ptychi supplies the probe from the
     # product. Setting probe_options.initial_guess would be ignored in favour of
@@ -649,7 +647,6 @@ def _build_lsqml_options(params: PearParameters, num_patterns: int) -> LSQMLOpti
     probe_options.center_constraint.enabled = params.center_probe
     probe_options.support_constraint.enabled = params.probe_support
 
-    # --- probe positions ---
     position_options = options.probe_position_options
     position_options.optimizable = params.position_correction
     position_options.optimizer = Optimizers.SGD
@@ -677,9 +674,8 @@ def _build_lsqml_options(params: PearParameters, num_patterns: int) -> LSQMLOpti
     correction_layer = params.position_correction_layer
 
     if is_multislice and correction_layer and position_options.optimizable:
-        position_options.correction_options.slice_for_correction = correction_layer  # type: ignore[assignment]
+        position_options.correction_options.slice_for_correction = correction_layer
 
-    # --- OPR mode weights ---
     opr_options = options.opr_mode_weight_options
 
     if params.number_opr_modes > 0:
@@ -691,7 +687,6 @@ def _build_lsqml_options(params: PearParameters, num_patterns: int) -> LSQMLOpti
 
     opr_options.optimize_intensity_variation = params.intensity_correction
 
-    # --- reconstructor ---
     reconstructor_options = options.reconstructor_options
     reconstructor_options.num_epochs = params.number_of_iterations
     reconstructor_options.batch_size = _batch_size(params, num_patterns)

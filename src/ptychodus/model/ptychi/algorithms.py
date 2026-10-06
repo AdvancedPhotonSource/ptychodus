@@ -517,7 +517,7 @@ class PtyChiCommon:
                 cross_correlation_scale=s.cross_correlation_scale.get_value(),
                 cross_correlation_real_space_width=s.cross_correlation_real_space_width.get_value(),
                 cross_correlation_probe_threshold=s.cross_correlation_probe_threshold.get_value(),
-                slice_for_correction=slice_for_correction,  # type: ignore
+                slice_for_correction=slice_for_correction,
                 clip_update_magnitude_by_mad=s.clip_update_magnitude_by_mad.get_value(),
                 update_magnitude_limit=update_magnitude_limit,
             ),

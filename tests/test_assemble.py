@@ -1,3 +1,5 @@
+from pathlib import Path
+
 """Unit tests for ptychodus.api.assemble.
 
 Covers the pure assembly layer: buffer allocation, the per-array preprocessing
@@ -5,11 +7,11 @@ step, and the threaded fan-out over a whole dataset. No ptychodus.model import -
 pipelines are built by hand rather than derived from PrepPipelineBuilder.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
+from typing import cast
 import concurrent.futures
 import os
 import threading
-import time
 
 import numpy
 import pytest
@@ -24,14 +26,9 @@ from ptychodus.api.assemble import (
     preprocess_array,
 )
 from ptychodus.api.diffraction import (
-    BadPixels,
     BeamCenter,
     CropRegion,
     DiffractionArray,
-    DiffractionDatasetLayoutNode,
-    DiffractionIndexes,
-    DiffractionMetadata,
-    DiffractionPatterns,
     SimpleDiffractionArray,
     SimpleDiffractionDataset,
 )
@@ -42,118 +39,31 @@ from ptychodus.api.preprocess.diffraction import (
     TransposeStep,
 )
 
-GEOMETRY = PixelGeometry(width_m=75e-6, height_m=75e-6)
+from diffraction_dataset_fixtures import (
+    GEOMETRY,
+    BlockingArray,
+    FailingArray,
+    make_array,
+    make_dataset,
+)
 
-
-def _make_dataset(
-    arrays: Sequence[DiffractionArray],
-    frame_shape: tuple[int, int],
-    bad_pixels: BadPixels | None = None,
-    num_patterns_per_array: Sequence[int] | None = None,
-    pixel_geometry: PixelGeometry | None = GEOMETRY,
-    exposure_time_s: float | None = None,
-) -> SimpleDiffractionDataset:
-    height, width = frame_shape
-    metadata = DiffractionMetadata(
-        num_patterns_per_array=(
-            [a.get_num_patterns() for a in arrays]
-            if num_patterns_per_array is None
-            else list(num_patterns_per_array)
-        ),
-        pattern_dtype=arrays[0].get_patterns().dtype if arrays else numpy.dtype(numpy.uint16),
-        detector_extent=ImageExtent(width_px=width, height_px=height),
-        detector_pixel_geometry=pixel_geometry,
-        exposure_time_s=exposure_time_s,
-    )
-    return SimpleDiffractionDataset(
-        metadata, DiffractionDatasetLayoutNode.create_root(), arrays, bad_pixels
-    )
+FRAME_SHAPE = (4, 4)
 
 
 def _array(label: str, first_index: int, num_patterns: int, fill: int) -> SimpleDiffractionArray:
-    patterns = numpy.full((num_patterns, 4, 4), fill, dtype=numpy.int32)
-    indexes = numpy.arange(first_index, first_index + num_patterns, dtype=numpy.intp)
-    return SimpleDiffractionArray(label, indexes, patterns)
-
-
-class _FailingArray(DiffractionArray):
-    """An array whose read raises, to exercise the error and skip paths."""
-
-    def __init__(self, label: str, error: BaseException, num_patterns: int = 2) -> None:
-        self._label = label
-        self._error = error
-        self._num_patterns = num_patterns
-
-    def get_label(self) -> str:
-        return self._label
-
-    def get_indexes(self) -> DiffractionIndexes:
-        return numpy.arange(self._num_patterns, dtype=numpy.intp)
-
-    def get_patterns(self, *, read_region: CropRegion | None = None) -> DiffractionPatterns:
-        raise self._error
-
-    def get_num_patterns(self) -> int:
-        return self._num_patterns
-
-
-class _BlockingArray(DiffractionArray):
-    """Parks its read on `gate`, to hold a worker at a known point in the fan-out.
-
-    `entered` is set once the read is parked, so a test can wait until a worker is
-    definitely inside this array before acting on that fact. `release_delay_sec`
-    then keeps the worker busy for a beat after the gate opens, giving whoever
-    opened it time to finish before this worker moves on to the next array.
-    """
-
-    def __init__(
-        self,
-        label: str,
-        first_index: int,
-        fill: int,
-        gate: threading.Event,
-        *,
-        release_delay_sec: float = 0.0,
-    ) -> None:
-        self._inner = _array(label, first_index, 2, fill)
-        self._gate = gate
-        self._release_delay_sec = release_delay_sec
-        self.entered = threading.Event()
-        self.timed_out = False
-
-    def get_label(self) -> str:
-        return self._inner.get_label()
-
-    def get_indexes(self) -> DiffractionIndexes:
-        return self._inner.get_indexes()
-
-    def get_patterns(self, *, read_region: CropRegion | None = None) -> DiffractionPatterns:
-        self.entered.set()
-
-        # The timeout is a deadlock guard, not a synchronization mechanism; a test
-        # whose gate never opens should fail on `timed_out` rather than hang.
-        if not self._gate.wait(timeout=10.0):
-            self.timed_out = True
-
-        if self._release_delay_sec > 0.0:
-            time.sleep(self._release_delay_sec)
-
-        return self._inner.get_patterns(read_region=read_region)
-
-    def get_num_patterns(self) -> int:
-        return self._inner.get_num_patterns()
+    return make_array(label, first_index, num_patterns, fill, frame_shape=FRAME_SHAPE)
 
 
 # ---------- compute_array_offsets ----------
 
 
 def test_offsets_are_cumulative_and_include_the_total() -> None:
-    metadata = _make_dataset([], (2, 2), num_patterns_per_array=[3, 0, 5]).get_metadata()
+    metadata = make_dataset([], (2, 2), num_patterns_per_array=[3, 0, 5]).get_metadata()
     assert list(compute_array_offsets(metadata)) == [0, 3, 3, 8]
 
 
 def test_offsets_of_an_empty_dataset_are_just_zero() -> None:
-    metadata = _make_dataset([], (2, 2)).get_metadata()
+    metadata = make_dataset([], (2, 2)).get_metadata()
     assert list(compute_array_offsets(metadata)) == [0]
 
 
@@ -161,25 +71,25 @@ def test_offsets_of_an_empty_dataset_are_just_zero() -> None:
 
 
 def test_shape_without_a_pipeline_is_the_detector_extent() -> None:
-    dataset = _make_dataset([_array('a', 0, 3, 1)], (4, 4))
+    dataset = make_dataset([_array('a', 0, 3, 1)], (4, 4))
     assert compute_assembled_patterns_shape(dataset) == (3, 4, 4)
 
 
 def test_shape_reflects_the_pipeline_output() -> None:
-    dataset = _make_dataset([_array('a', 0, 3, 1)], (4, 4))
+    dataset = make_dataset([_array('a', 0, 3, 1)], (4, 4))
     pipeline = DiffractionPrepPipeline(steps=(BinningStep(bin_size_x=2, bin_size_y=2),))
     assert compute_assembled_patterns_shape(dataset, pipeline) == (3, 2, 2)
 
 
 def test_shape_honors_an_explicit_bad_pixels_override() -> None:
-    dataset = _make_dataset([_array('a', 0, 3, 1)], (4, 4))
+    dataset = make_dataset([_array('a', 0, 3, 1)], (4, 4))
     override = numpy.zeros((4, 4), dtype=numpy.bool_)
     override[0, 0] = True
     assert compute_assembled_patterns_shape(dataset, bad_pixels=override) == (3, 4, 4)
 
 
 def test_bad_pixels_shape_must_match_the_detector_extent() -> None:
-    dataset = _make_dataset([_array('a', 0, 3, 1)], (4, 4))
+    dataset = make_dataset([_array('a', 0, 3, 1)], (4, 4))
     override = numpy.zeros((8, 8), dtype=numpy.bool_)
 
     with pytest.raises(ValueError, match='detector extent'):
@@ -190,7 +100,7 @@ def test_bad_pixels_shape_must_match_the_detector_extent() -> None:
 
 
 def test_allocation_prefills_indexes_with_the_sentinel() -> None:
-    dataset = _make_dataset([_array('a', 0, 3, 1)], (4, 4))
+    dataset = make_dataset([_array('a', 0, 3, 1)], (4, 4))
     data = allocate_assembled_data(dataset)
 
     assert data.get_patterns_shape() == (3, 4, 4)
@@ -200,7 +110,7 @@ def test_allocation_prefills_indexes_with_the_sentinel() -> None:
 
 
 def test_allocation_uses_a_supplied_buffer_in_place_without_zeroing_it() -> None:
-    dataset = _make_dataset([_array('a', 0, 3, 1)], (4, 4))
+    dataset = make_dataset([_array('a', 0, 3, 1)], (4, 4))
     buffer = numpy.full((3, 4, 4), 99, dtype=numpy.int32)
 
     data = allocate_assembled_data(dataset, patterns=buffer)
@@ -210,14 +120,14 @@ def test_allocation_uses_a_supplied_buffer_in_place_without_zeroing_it() -> None
 
 
 def test_allocation_rejects_a_wrongly_shaped_buffer() -> None:
-    dataset = _make_dataset([_array('a', 0, 3, 1)], (4, 4))
+    dataset = make_dataset([_array('a', 0, 3, 1)], (4, 4))
 
     with pytest.raises(ValueError, match='wrong shape'):
         allocate_assembled_data(dataset, patterns=numpy.zeros((3, 8, 8), dtype=numpy.int32))
 
 
 def test_allocation_rejects_a_read_only_buffer() -> None:
-    dataset = _make_dataset([_array('a', 0, 3, 1)], (4, 4))
+    dataset = make_dataset([_array('a', 0, 3, 1)], (4, 4))
     buffer = numpy.zeros((3, 4, 4), dtype=numpy.int32)
     buffer.flags.writeable = False
 
@@ -226,7 +136,7 @@ def test_allocation_rejects_a_read_only_buffer() -> None:
 
 
 def test_allocation_honors_an_explicit_dtype_override() -> None:
-    dataset = _make_dataset([_array('a', 0, 3, 1)], (4, 4))
+    dataset = make_dataset([_array('a', 0, 3, 1)], (4, 4))
     data = allocate_assembled_data(dataset, dtype=numpy.dtype(numpy.int64))
     assert data.get_patterns_dtype() == numpy.dtype(numpy.int64)
 
@@ -235,25 +145,29 @@ def test_allocation_promotes_buffer_dtype_for_binning_pipeline() -> None:
     """A uint16 dataset binned 4x4 needs at least uint32 headroom (65535*16 = 1048560)."""
     patterns = numpy.full((3, 4, 4), 1, dtype=numpy.uint16)
     array = SimpleDiffractionArray('a', numpy.arange(3, dtype=numpy.intp), patterns)
-    dataset = _make_dataset([array], (4, 4))
+    dataset = make_dataset([array], (4, 4))
     pipeline = DiffractionPrepPipeline(steps=(BinningStep(bin_size_x=4, bin_size_y=4),))
 
     data = allocate_assembled_data(dataset, pipeline)
 
-    assert numpy.issubdtype(data.get_patterns_dtype(), numpy.unsignedinteger)
-    assert numpy.iinfo(data.get_patterns_dtype()).max >= 65535 * 16
+    patterns_dtype = data.get_patterns_dtype()
+
+    assert numpy.issubdtype(patterns_dtype, numpy.unsignedinteger)
+    # cast: the assert above is what makes this an integer dtype, and iinfo only
+    # accepts one -- mypy cannot carry that narrowing across issubdtype.
+    assert numpy.iinfo(cast('numpy.dtype[numpy.unsignedinteger]', patterns_dtype)).max >= 65535 * 16
 
 
 # ---------- processed pixel geometry ----------
 
 
 def test_geometry_is_unchanged_without_a_pipeline() -> None:
-    dataset = _make_dataset([_array('a', 0, 3, 1)], (4, 4))
+    dataset = make_dataset([_array('a', 0, 3, 1)], (4, 4))
     assert allocate_assembled_data(dataset).get_pixel_geometry() == GEOMETRY
 
 
 def test_geometry_is_multiplied_by_the_bin_size() -> None:
-    dataset = _make_dataset([_array('a', 0, 3, 1)], (4, 4))
+    dataset = make_dataset([_array('a', 0, 3, 1)], (4, 4))
     pipeline = DiffractionPrepPipeline(steps=(BinningStep(bin_size_x=2, bin_size_y=4),))
 
     geometry = allocate_assembled_data(dataset, pipeline).get_pixel_geometry()
@@ -263,7 +177,7 @@ def test_geometry_is_multiplied_by_the_bin_size() -> None:
 
 
 def test_geometry_is_swapped_by_a_transpose() -> None:
-    dataset = _make_dataset(
+    dataset = make_dataset(
         [_array('a', 0, 3, 1)], (4, 4), pixel_geometry=PixelGeometry(width_m=1e-6, height_m=2e-6)
     )
     pipeline = DiffractionPrepPipeline(steps=(TransposeStep(),))
@@ -274,14 +188,14 @@ def test_geometry_is_swapped_by_a_transpose() -> None:
 
 
 def test_explicit_raw_geometry_overrides_the_metadata() -> None:
-    dataset = _make_dataset([_array('a', 0, 3, 1)], (4, 4))
+    dataset = make_dataset([_array('a', 0, 3, 1)], (4, 4))
     override = PixelGeometry(width_m=1e-3, height_m=2e-3)
     data = allocate_assembled_data(dataset, raw_pixel_geometry=override)
     assert data.get_pixel_geometry() == override
 
 
 def test_missing_geometry_raises_rather_than_defaulting_to_zero() -> None:
-    dataset = _make_dataset([_array('a', 0, 3, 1)], (4, 4), pixel_geometry=None)
+    dataset = make_dataset([_array('a', 0, 3, 1)], (4, 4), pixel_geometry=None)
 
     with pytest.raises(ValueError, match='pixel geometry'):
         allocate_assembled_data(dataset)
@@ -300,7 +214,7 @@ def test_photon_count_is_the_brightest_pattern_total() -> None:
     )
     array = SimpleDiffractionArray('a', numpy.arange(3, dtype=numpy.intp), patterns)
 
-    data = assemble_dataset(_make_dataset([array], (4, 4)))
+    data = assemble_dataset(make_dataset([array], (4, 4)))
 
     assert data.get_probe_photon_count() == 80
 
@@ -312,14 +226,14 @@ def test_photon_count_excludes_bad_pixels() -> None:
     bad = numpy.zeros((4, 4), dtype=numpy.bool_)
     bad[0, 0] = True
 
-    data = assemble_dataset(_make_dataset([array], (4, 4), bad_pixels=bad))
+    data = assemble_dataset(make_dataset([array], (4, 4), bad_pixels=bad))
 
     assert data.get_probe_photon_count() == 45  # 15 good pixels x 3
 
 
 def test_photon_count_of_an_unfilled_buffer_is_zero() -> None:
     """Regression: .max() on an empty reduction used to raise from the GUI button."""
-    dataset = _make_dataset([], (4, 4), num_patterns_per_array=[4])
+    dataset = make_dataset([], (4, 4), num_patterns_per_array=[4])
 
     assert allocate_assembled_data(dataset).get_probe_photon_count() == 0
     assert AssembledDiffractionData.create_null().get_probe_photon_count() == 0
@@ -407,7 +321,7 @@ def test_preprocess_propagates_a_missing_file() -> None:
 
     with pytest.raises(FileNotFoundError):
         preprocess_array(
-            _FailingArray('gone', FileNotFoundError('nope')),
+            FailingArray('gone', FileNotFoundError('nope')),
             raw_bad_pixels=good,
             processed_bad_pixels=good,
             raw_pixel_geometry=GEOMETRY,
@@ -454,7 +368,7 @@ def test_counts_filter_keeps_indexes_aligned_with_patterns() -> None:
 
 def _three_arrays() -> SimpleDiffractionDataset:
     """Arrays of length 2, 3, 1 with distinct fills and contiguous scan indexes."""
-    return _make_dataset([_array('a', 0, 2, 1), _array('b', 2, 3, 2), _array('c', 5, 1, 3)], (4, 4))
+    return make_dataset([_array('a', 0, 2, 1), _array('b', 2, 3, 2), _array('c', 5, 1, 3)], (4, 4))
 
 
 def test_assemble_lays_arrays_out_in_offset_order() -> None:
@@ -482,14 +396,16 @@ def test_assemble_reports_progress_and_each_assembled_array() -> None:
 
 
 def test_assemble_places_arrays_by_offset_even_when_they_finish_out_of_order() -> None:
+    # The gated array is arrays[0], so pattern_dtype has to be supplied: deriving it
+    # would read the gated array on this thread, before the gate can ever be opened,
+    # and burn the whole deadlock guard before the scenario starts.
     gate_first = threading.Event()
-    dataset = _make_dataset(
-        [
-            _BlockingArray('slow', 0, 1, gate_first),
-            _array('fast', 2, 2, 2),
-        ],
+    slow = BlockingArray(_array('slow', 0, 2, 1), gate_first)
+    dataset = make_dataset(
+        [slow, _array('fast', 2, 2, 2)],
         (4, 4),
         num_patterns_per_array=[2, 2],
+        pattern_dtype=numpy.int32,
     )
 
     def release_after_fast(array_index: int, label: str, view: AssembledDiffractionData) -> None:
@@ -498,6 +414,9 @@ def test_assemble_places_arrays_by_offset_even_when_they_finish_out_of_order() -
 
     data = assemble_dataset(dataset, on_array_assembled=release_after_fast, max_workers=4)
 
+    # Without this the test passes on the degenerate path, where the gate never opened
+    # and the read fell through on the timeout instead of on 'fast' finishing first.
+    assert not slow.timed_out
     numpy.testing.assert_array_equal(data.get_indexes(), [0, 1, 2, 3])
     numpy.testing.assert_array_equal(data.get_patterns()[:, 0, 0], [1, 1, 2, 2])
 
@@ -508,7 +427,7 @@ def test_assemble_leaves_sentinel_holes_where_the_counts_filter_dropped_patterns
         [numpy.full((4, 4), 1, dtype=numpy.int32), numpy.full((4, 4), 100, dtype=numpy.int32)]
     )
     array_a = SimpleDiffractionArray('a', numpy.array([0, 1], dtype=numpy.intp), patterns_a)
-    dataset = _make_dataset([array_a, _array('b', 2, 2, 2)], (4, 4))
+    dataset = make_dataset([array_a, _array('b', 2, 2, 2)], (4, 4))
 
     data = assemble_dataset(dataset, total_counts_upper_bound=100)
 
@@ -520,10 +439,10 @@ def test_assemble_leaves_sentinel_holes_where_the_counts_filter_dropped_patterns
 def test_assemble_skips_a_missing_array_without_reporting_an_error() -> None:
     errors: list[tuple[int, str]] = []
     progress: list[tuple[int, int]] = []
-    dataset = _make_dataset(
+    dataset = make_dataset(
         [
             _array('a', 0, 2, 1),
-            _FailingArray('gone', FileNotFoundError('nope')),
+            FailingArray('gone', FileNotFoundError('nope')),
             _array('c', 4, 2, 3),
         ],
         (4, 4),
@@ -543,8 +462,8 @@ def test_assemble_skips_a_missing_array_without_reporting_an_error() -> None:
 
 def test_assemble_reports_other_errors_and_keeps_going() -> None:
     errors: list[tuple[int, str, str]] = []
-    dataset = _make_dataset(
-        [_array('a', 0, 2, 1), _FailingArray('bad', RuntimeError('boom')), _array('c', 4, 2, 3)],
+    dataset = make_dataset(
+        [_array('a', 0, 2, 1), FailingArray('bad', RuntimeError('boom')), _array('c', 4, 2, 3)],
         (4, 4),
         num_patterns_per_array=[2, 2, 2],
     )
@@ -567,7 +486,7 @@ def test_assemble_stops_early_when_asked() -> None:
     # release delay then keeps that worker inside the gated read while the sweep,
     # microseconds of work on an already-running thread, lands ahead of it.
     gate = threading.Event()
-    gated = _BlockingArray('a1', 2, 2, gate, release_delay_sec=0.05)
+    gated = BlockingArray(_array('a1', 2, 2, 2), gate, release_delay_sec=0.05)
     arrays: list[DiffractionArray] = [_array(f'a{i}', 2 * i, 2, i + 1) for i in range(8)]
     arrays[1] = gated
     assembled: list[int] = []
@@ -578,7 +497,7 @@ def test_assemble_stops_early_when_asked() -> None:
         return True
 
     assemble_dataset(
-        _make_dataset(arrays, (4, 4)),
+        make_dataset(arrays, (4, 4)),
         on_array_assembled=lambda i, label, view: assembled.append(i),
         should_stop=stop_once_the_worker_is_parked,
         max_workers=1,
@@ -608,7 +527,7 @@ def test_assemble_stamps_the_buffer_geometry_onto_every_view() -> None:
     assert seen == [PixelGeometry(1e-3, 2e-3)] * 3
 
 
-def test_assemble_into_a_memmap_yields_read_only_views_over_a_writable_base(tmp_path) -> None:  # type: ignore[no-untyped-def]
+def test_assemble_into_a_memmap_yields_read_only_views_over_a_writable_base(tmp_path: Path) -> None:
     dataset = _three_arrays()
     buffer = numpy.memmap(tmp_path / 'scratch.npy', dtype=numpy.int32, mode='w+', shape=(6, 4, 4))
     out = allocate_assembled_data(dataset, patterns=buffer)
@@ -626,7 +545,7 @@ def test_assemble_into_a_memmap_yields_read_only_views_over_a_writable_base(tmp_
 
 
 def test_assemble_rejects_more_arrays_than_metadata_accounts_for() -> None:
-    dataset = _make_dataset(
+    dataset = make_dataset(
         [_array('a', 0, 2, 1), _array('b', 2, 2, 2)], (4, 4), num_patterns_per_array=[2]
     )
 
@@ -636,7 +555,7 @@ def test_assemble_rejects_more_arrays_than_metadata_accounts_for() -> None:
 
 def test_assemble_rejects_an_array_that_overflows_its_reserved_slice() -> None:
     errors: list[str] = []
-    dataset = _make_dataset(
+    dataset = make_dataset(
         [_array('a', 0, 4, 1), _array('b', 4, 2, 2)], (4, 4), num_patterns_per_array=[2, 2]
     )
 
@@ -648,7 +567,7 @@ def test_assemble_rejects_an_array_that_overflows_its_reserved_slice() -> None:
 
 def test_assemble_accepts_an_empty_array_list_with_reserved_capacity() -> None:
     """The streaming path reloads with no arrays and appends frames later."""
-    dataset = _make_dataset([], (4, 4), num_patterns_per_array=[2, 2])
+    dataset = make_dataset([], (4, 4), num_patterns_per_array=[2, 2])
 
     data = assemble_dataset(dataset)
 
@@ -818,15 +737,13 @@ def test_counts_filter_keeps_probe_photon_counts_aligned_with_patterns() -> None
 def test_assemble_dataset_allocates_counts_buffer_only_when_flux_is_available() -> None:
     flux_hz = numpy.array([10.0, 20.0, 30.0], dtype=numpy.float64)
 
-    with_flux = _make_dataset(
-        [_array_with_flux('a', 0, 3, 4, flux_hz)], (4, 4), exposure_time_s=0.5
-    )
+    with_flux = make_dataset([_array_with_flux('a', 0, 3, 4, flux_hz)], (4, 4), exposure_time_s=0.5)
     data = assemble_dataset(with_flux)
 
     assert data.has_measured_probe_photon_counts()
     numpy.testing.assert_array_equal(data.get_probe_photon_counts(), [5.0, 10.0, 15.0])
 
-    without_flux = _make_dataset([_array('a', 0, 3, 4)], (4, 4), exposure_time_s=0.5)
+    without_flux = make_dataset([_array('a', 0, 3, 4)], (4, 4), exposure_time_s=0.5)
     data_no_flux = assemble_dataset(without_flux)
 
     assert not data_no_flux.has_measured_probe_photon_counts()
@@ -839,7 +756,7 @@ def test_assemble_dataset_uses_fallback_when_any_array_lacks_flux() -> None:
     a_with = _array_with_flux('a', 0, 2, 4, flux_hz)
     b_without = _array('b', 2, 2, 5)  # No flux -> no counts buffer reserved.
 
-    dataset = _make_dataset([a_with, b_without], (4, 4), exposure_time_s=0.5)
+    dataset = make_dataset([a_with, b_without], (4, 4), exposure_time_s=0.5)
 
     data = assemble_dataset(dataset)
 
@@ -873,8 +790,8 @@ def _fully_assembled() -> AssembledDiffractionData:
 
 def _partly_assembled() -> AssembledDiffractionData:
     """A buffer with one array's slots left unfilled, so the getters have to gather."""
-    dataset = _make_dataset(
-        [_array('a', 0, 2, 1), _FailingArray('b', OSError('unreadable'), num_patterns=3)],
+    dataset = make_dataset(
+        [_array('a', 0, 2, 1), FailingArray('b', OSError('unreadable'), num_patterns=3)],
         (4, 4),
     )
     return assemble_dataset(dataset, on_array_error=lambda *_: None)
@@ -944,7 +861,7 @@ def _record_pool_sizes(monkeypatch: pytest.MonkeyPatch) -> list[int | None]:
     class _Recorder(real):  # type: ignore[valid-type,misc]
         def __init__(self, max_workers: int | None = None, **kwargs: object) -> None:
             sizes.append(max_workers)
-            super().__init__(max_workers=max_workers, **kwargs)  # type: ignore[arg-type]
+            super().__init__(max_workers=max_workers, **kwargs)
 
     monkeypatch.setattr(concurrent.futures, 'ThreadPoolExecutor', _Recorder)
     return sizes

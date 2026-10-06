@@ -37,7 +37,7 @@ Reached only when Tier 1 is clean. Probe for `pytest-xdist` first so this still 
 ```sh
 uv run python -c "import xdist" 2>/dev/null && PAR="-n auto --dist loadfile" || PAR=""
 
-run mypy   uv run mypy src/ptychodus scripts
+run mypy   uv run mypy --warn-unused-ignores src/ptychodus src/ptychodus_store scripts tests
 run pytest uv run pytest -q $PAR
 wait
 
@@ -76,7 +76,8 @@ Use this only when the user asks for a fast local check on WIP; the full sweep a
 
 - Ruff rules for this repo: `F, N, NPY`; single-quoted strings; 100-char lines; py311 target (see `pyproject.toml`).
 - `pytest-xdist` is in `[dependency-groups] dev`, so `uv sync` installs it. It is deliberately **not** in `[tool.pytest.ini_options] addopts`: CI installs with `pip install . pytest` and has no xdist, so a global `addopts` would break every CI run. Parallelism stays a command-line flag the skill passes.
-- `mypy` targets `src/ptychodus` and the top-level `scripts/` tree. `src/ptychodus_store` is not currently in CI's mypy job — check `pyproject.toml`/`.github/workflows/python-package.yml` before assuming coverage.
+- `--warn-unused-ignores` is a local-only flag, not a `pyproject.toml` setting: whether a `# type: ignore` is needed depends on which optional extras are installed, so turning it on globally would fire differently for every environment. One module is exempted in `pyproject.toml` — `ptychodus.plugins.mda.mda_position_file`, whose xdrlib import pair always has one dead half (`[import-not-found]` on <=3.12, `[no-redef]` on 3.13).
+- The local `mypy` target is wider than CI's. Here it covers `src/ptychodus`, `src/ptychodus_store`, `scripts/` and `tests/`; CI's job runs only `mypy src/ptychodus scripts`, because its bare install has neither pytest nor the `store` extra. A type error in `tests/` therefore fails this gate and nothing else — do not skip the mypy tier on the assumption CI will catch it.
 - `pymarkdown` is a local-only gate; there is no Markdown job in CI. Scan via `git ls-files` so `.venv/`, `docs/build/`, and other untracked trees stay out of scope.
 - If pty-chi is installed editable from a sibling checkout, add `--no-sync` to every `uv run` above. `ptychi` is on PyPI, so a sync does not fail — it silently swaps the checkout for the published release, and the gate then tests a different pty-chi than the developer is working on.
 - Do not add `--no-verify` or skip hooks to work around a failure; investigate and fix instead.

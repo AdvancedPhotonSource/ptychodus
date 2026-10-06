@@ -86,9 +86,10 @@ def _make_reconstruct_input(*, with_bad_pixels: bool = True) -> ReconstructInput
         numpy.uint16
     )
 
-    bad_pixels: numpy.ndarray | None = None
+    # Always a real mask, all-False when none is wanted: ReconstructInput requires
+    # one, and nothing in production ever hands it None.
+    bad_pixels = numpy.zeros((DETECTOR_PX, DETECTOR_PX), dtype=bool)
     if with_bad_pixels:
-        bad_pixels = numpy.zeros((DETECTOR_PX, DETECTOR_PX), dtype=bool)
         bad_pixels[4:7, 4:7] = True
 
     return ReconstructInput(patterns, bad_pixels, product)

@@ -115,8 +115,14 @@ class ResourceRef(BaseModel):
     uuid: UUID
 
 
+# The four resource kinds, as the literal type the API exposes. Shared so that a
+# helper resolving a kind at run time can hand back something assignable here
+# rather than a bare str.
+ResourceKindLiteral = Literal['campaign', 'diffraction', 'product', 'fluorescence']
+
+
 class LineageNode(BaseModel):
-    kind: Literal['campaign', 'diffraction', 'product', 'fluorescence']
+    kind: ResourceKindLiteral
     uuid: UUID
     label: str = ''
 

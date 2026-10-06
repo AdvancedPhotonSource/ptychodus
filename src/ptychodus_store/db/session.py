@@ -24,7 +24,7 @@ def _enable_sqlite_fk_pragma(engine: AsyncEngine) -> None:
         return
 
     @event.listens_for(sync_engine, 'connect')
-    def _set_pragma(dbapi_connection, _connection_record):  # type: ignore[no-untyped-def]
+    def _set_pragma(dbapi_connection, _connection_record):
         cursor = dbapi_connection.cursor()
         try:
             cursor.execute('PRAGMA foreign_keys=ON')

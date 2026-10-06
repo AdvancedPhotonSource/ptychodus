@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
+from typing import cast
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
@@ -11,7 +12,7 @@ from ptychodus_store.db import repositories as repo
 from ptychodus_store.db.models import Campaign, DerivationEdge, Diffraction
 from ptychodus_store.routers._convert import campaign_to_read
 from ptychodus_store.routers.deps import SessionDep
-from ptychodus_store.routers.schemas import LineageNode, LineageRead
+from ptychodus_store.routers.schemas import LineageNode, LineageRead, ResourceKindLiteral
 
 router = APIRouter(tags=['lineage'])
 
@@ -20,14 +21,18 @@ def _label_for(row: object) -> str:
     return str(getattr(row, 'label', '') or getattr(row, 'name', '') or '')
 
 
-async def _resolve_node(session: AsyncSession, uuid: UUID) -> tuple[str, object] | None:
+async def _resolve_node(
+    session: AsyncSession, uuid: UUID
+) -> tuple[ResourceKindLiteral, object] | None:
     kind = await repo.find_kind_for_uuid(session, uuid)
     if kind is None:
         return None
-    row = await repo.get_row(session, kind, uuid)
+    row = await repo.get_row_by_kind(session, kind, uuid)
     if row is None:
         return None
-    return kind, row
+    # find_kind_for_uuid only ever returns a KIND_TO_MODEL key, and those are exactly
+    # the four literals LineageNode accepts.
+    return cast('ResourceKindLiteral', kind), row
 
 
 async def _walk_ancestors(session: AsyncSession, root: UUID) -> list[LineageNode]:
@@ -46,7 +51,7 @@ async def _walk_ancestors(session: AsyncSession, root: UUID) -> list[LineageNode
             if resolved is None:
                 continue
             kind, row = resolved
-            out.append(LineageNode(kind=kind, uuid=edge.target_uuid, label=_label_for(row)))  # type: ignore[arg-type]
+            out.append(LineageNode(kind=kind, uuid=edge.target_uuid, label=_label_for(row)))
             queue.append(edge.target_uuid)
     return out
 
@@ -75,7 +80,7 @@ async def _walk_descendants(session: AsyncSession, root: UUID) -> list[LineageNo
             if resolved is None:
                 continue
             kind, row = resolved
-            out.append(LineageNode(kind=kind, uuid=edge.source_uuid, label=_label_for(row)))  # type: ignore[arg-type]
+            out.append(LineageNode(kind=kind, uuid=edge.source_uuid, label=_label_for(row)))
             queue.append(edge.source_uuid)
     return out
 
@@ -98,7 +103,7 @@ async def get_lineage(uuid: UUID, session: SessionDep) -> LineageRead:
     if resolved is None:
         raise HTTPException(status_code=404, detail=f'no resource with uuid {uuid}')
     kind, row = resolved
-    node = LineageNode(kind=kind, uuid=uuid, label=_label_for(row))  # type: ignore[arg-type]
+    node = LineageNode(kind=kind, uuid=uuid, label=_label_for(row))
 
     ancestors = await _walk_ancestors(session, uuid)
     descendants = await _walk_descendants(session, uuid)

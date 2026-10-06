@@ -14,7 +14,7 @@ from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.product.geometry import ProductGeometry
-from ptychodus.model.product.metadata import MetadataRepositoryItem
+from ptychodus.model.product.metadata import MetadataRepositoryItem, UniqueNameFactory
 from ptychodus.model.product.settings import ProductSettings
 
 
@@ -25,7 +25,7 @@ _DETECTOR_DISTANCE_M = 1.0
 _WAVELENGTH_M = energy_eV_to_wavelength_m(_PROBE_ENERGY_EV)
 
 
-class _NameFactory:
+class _NameFactory(UniqueNameFactory):
     def create_unique_name(self, candidate_name: str) -> str:
         return candidate_name
 

@@ -1,5 +1,5 @@
 from dataclasses import replace
-from typing import cast
+from typing import Any, cast
 from unittest.mock import MagicMock
 import math
 
@@ -692,11 +692,14 @@ def test_joint_fit_rejects_outliers() -> None:
     pair = (uncorrected, ProbePositionSequence(corrupted))
     # The coarse pass is deliberately slack enough to admit the corrupted points, so that what
     # differs between the two fits is the trim and not the consensus threshold.
-    options = {'inlier_threshold_m': 1.0e-5, 'rng': numpy.random.default_rng(0)}
-    trimmed = estimate_affine_transform([pair], **options)  # type: ignore[arg-type]
-    untrimmed = estimate_affine_transform(  # type: ignore[arg-type]
-        [pair], outlier_sigma=math.inf, **options
-    )
+    # Annotated: the mixed value types otherwise widen to a single `object`, which
+    # mypy then matches against every parameter the ** expansion could reach.
+    options: dict[str, Any] = {
+        'inlier_threshold_m': 1.0e-5,
+        'rng': numpy.random.default_rng(0),
+    }
+    trimmed = estimate_affine_transform([pair], **options)
+    untrimmed = estimate_affine_transform([pair], outlier_sigma=math.inf, **options)
 
     assert trimmed.pairs[0].num_inliers == 97
     assert untrimmed.pairs[0].num_inliers == 100

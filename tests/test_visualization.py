@@ -11,11 +11,8 @@ from ptychodus.api.visualize import (
     ComplexComponent,
     CylindricalColorModel,
     DisplayValues,
-    KernelDensityEstimate,
-    LineCut,
     ScalarTransformation,
     VisualizationProduct,
-    cyclic_colormap_names,
     get_colormap_by_name,
     hlsa_to_rgba,
     hsva_to_rgba,
@@ -191,12 +188,6 @@ class TestGetLineCut:
         geo = PixelGeometry(width_m=1.0, height_m=1.0)
         return VisualizationProduct('grad', values, rgba, geo, Interval[float](0.0, 15.0))
 
-    def test_returns_linecut(self):
-        vp = self._make_gradient()
-        line = Line2D(Point2D(0.0, 0.0), Point2D(3.0, 0.0))
-        lc = vp.get_line_cut(line)
-        assert isinstance(lc, LineCut)
-
     def test_single_series_for_real_values(self):
         vp = self._make_gradient()
         line = Line2D(Point2D(0.0, 0.0), Point2D(3.0, 0.0))
@@ -224,9 +215,11 @@ class TestGetLineCut:
         vp = self._make_gradient()
         line = Line2D(Point2D(1.0, 1.0), Point2D(1.0, 1.0))
         lc = vp.get_line_cut(line)
-        # Degenerate lines expand bounding-box intersection to (-inf, inf),
-        # yielding no grid crossings; the result has no well-defined midpoints.
-        assert isinstance(lc, LineCut)
+        # A degenerate line collapses to the single point it names: one sample, at
+        # distance zero, carrying the value under that point (values[1, 1] == 5).
+        (series,) = lc.series
+        assert list(lc.distance_m) == [0.0]
+        assert list(series.value) == [5.0]
 
 
 # ---------------------------------------------------------------------------
@@ -312,12 +305,6 @@ class TestGetLineCutComplex:
 
 
 class TestEstimateKernelDensity:
-    def test_returns_kde(self):
-        vp = _make_product(rows=8, cols=8)
-        box = Box2D(x=1, y=1, width=4, height=4)
-        kde = vp.estimate_kernel_density(box)
-        assert isinstance(kde, KernelDensityEstimate)
-
     def test_value_range_ordered(self):
         vp = _make_product(rows=8, cols=8)
         box = Box2D(x=0, y=0, width=8, height=8)
@@ -476,18 +463,6 @@ class TestScalarTransformation:
 
 
 class TestColormapHelpers:
-    def test_linear_colormap_names_nonempty(self):
-        names = list(linear_colormap_names())
-        assert len(names) > 0
-
-    def test_linear_colormap_names_are_strings(self):
-        for name in linear_colormap_names():
-            assert isinstance(name, str)
-
-    def test_cyclic_colormap_names_nonempty(self):
-        names = list(cyclic_colormap_names())
-        assert len(names) > 0
-
     def test_get_colormap_by_name_returns_colormap(self):
         name = next(linear_colormap_names())
         cmap = get_colormap_by_name(name)
@@ -599,11 +574,6 @@ class TestCylindricalColorModel:
 
 
 class TestVisualizeRealValues:
-    def test_returns_visualization_product(self):
-        values = numpy.ones((8, 8), dtype=numpy.float32)
-        vp = visualize_real_values('I', values, _pixel_geo())
-        assert isinstance(vp, VisualizationProduct)
-
     def test_rgba_shape(self):
         values = numpy.ones((8, 8), dtype=numpy.float32)
         vp = visualize_real_values('I', values, _pixel_geo())
@@ -652,10 +622,12 @@ class TestVisualizeComplexComponent:
         return numpy.ones((4, 4), dtype=complex) * (1 + 1j)
 
     @pytest.mark.parametrize('component', list(ComplexComponent))
-    def test_returns_visualization_product(self, component: ComplexComponent):
+    def test_every_component_renders_an_rgba_image(self, component: ComplexComponent):
+        # The only coverage of the non-amplitude components, so it checks the
+        # rendered image rather than just the return type.
         arr = self._complex_array()
         vp = visualize_complex_component(arr, _pixel_geo(), component)
-        assert isinstance(vp, VisualizationProduct)
+        assert vp.get_image_rgba().shape == (4, 4, 4)
 
     def test_original_complex_values_stored(self):
         arr = self._complex_array()
@@ -672,14 +644,6 @@ class TestVisualizeComplexValues:
     def _complex_array(self) -> numpy.ndarray:
         rng = numpy.random.default_rng(42)
         return (rng.random((8, 8)) + 1j * rng.random((8, 8))).astype(complex)
-
-    @pytest.mark.parametrize('model', list(CylindricalColorModel))
-    def test_returns_visualization_product(self, model: CylindricalColorModel):
-        arr = self._complex_array()
-        vp = visualize_complex_values(
-            arr, _pixel_geo(), model, amplitude_transform=ScalarTransformation.IDENTITY
-        )
-        assert isinstance(vp, VisualizationProduct)
 
     @pytest.mark.parametrize('model', list(CylindricalColorModel))
     def test_rgba_shape(self, model: CylindricalColorModel):

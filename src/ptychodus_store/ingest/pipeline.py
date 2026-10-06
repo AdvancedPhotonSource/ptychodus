@@ -194,7 +194,7 @@ def _introspect(
 
 async def _reevaluate_orphan(session: AsyncSession, kind: str, uuid: UUID) -> None:
     """Flip VALID↔ORPHANED for one row based on whether its outgoing edges resolve."""
-    row = await repo.get_row(session, kind, uuid)
+    row = await repo.get_row_by_kind(session, kind, uuid)
     if row is None or row.ingest_state in (IngestState.INVALID, IngestState.MISSING_FILES):
         return
     edges = await repo.outgoing_edges(session, uuid)

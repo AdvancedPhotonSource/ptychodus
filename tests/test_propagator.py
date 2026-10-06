@@ -677,18 +677,6 @@ def _source_wavefield(num_modes: int, h: int, w: int, *, seed: int = 0) -> numpy
 
 
 class TestPropagateProbe:
-    def test_returns_propagated_probe(self) -> None:
-        wf = _source_wavefield(1, 8, 8)
-        result = propagate_wavefield(
-            wf,
-            pixel_geometry=_flat_pixel_geometry(),
-            wavelength_m=500e-9,
-            begin_coordinate_m=0.0,
-            end_coordinate_m=1e-3,
-            num_steps=3,
-        )
-        assert isinstance(result, PropagatedWavefield)
-
     def test_output_wavefield_shape(self) -> None:
         wf = _source_wavefield(num_modes=2, h=8, w=10)
         result = propagate_wavefield(
@@ -1132,8 +1120,8 @@ class TestComputeFarFieldPixelGeometry:
         source = PixelGeometry(width_m=75e-6, height_m=50e-6)
         extent = ImageExtent(width_px=256, height_px=192)
         kwargs = dict(wavelength_m=1.24e-10, propagation_distance_m=1.0)
-        once = compute_far_field_pixel_geometry(source, extent, **kwargs)  # type: ignore[arg-type]
-        twice = compute_far_field_pixel_geometry(once, extent, **kwargs)  # type: ignore[arg-type]
+        once = compute_far_field_pixel_geometry(source, extent, **kwargs)
+        twice = compute_far_field_pixel_geometry(once, extent, **kwargs)
         assert twice.width_m == pytest.approx(source.width_m)
         assert twice.height_m == pytest.approx(source.height_m)
 

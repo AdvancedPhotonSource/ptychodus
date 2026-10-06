@@ -140,7 +140,7 @@ def _make_inference_dataset(
 
     empty = torch.empty(0)
 
-    class _InMemoryPatternDataset(Dataset):  # type: ignore[type-arg]
+    class _InMemoryPatternDataset(Dataset):
         def __len__(self) -> int:
             return int(diffraction_amplitude.shape[0])
 

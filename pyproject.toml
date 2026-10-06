@@ -22,6 +22,7 @@ dependencies = [
     "pydantic-ai>=1.0,<3",
     "pyyaml",
     "scikit-image",
+    "scikit-learn",
     "scipy",
     "tifffile",
     "watchdog",
@@ -58,7 +59,12 @@ ptychodus-store = "ptychodus_store.cli:main"
 docs = ["myst-parser", "sphinx", "sphinx-copybutton", "sphinx-rtd-theme"]
 globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]
 gui = ["PyQt5"]
-ptychi = ["ptychi==2.1.*"]
+# pty-chi pins torch to a CUDA-matched index in its own pyproject, but uv does not
+# inherit `tool.uv.sources` from a dependency, so ptychodus has to pin it again below.
+ptychi = ["ptychi==2.1.*", "torch>=2.4", "torchvision"]
+ptychi-cuda128 = ["ptychi==2.1.*", "torch>=2.4", "torchvision"]
+ptychi-cuda130 = ["ptychi==2.1.*", "torch>=2.4", "torchvision"]
+ptychi-cuda132 = ["ptychi==2.1.*", "torch>=2.4", "torchvision"]
 ptychozoon = ["ptychozoon"]
 store = [
     "fastapi>=0.115",
@@ -90,12 +96,67 @@ where = ["src"]
 
 [tool.setuptools_scm]
 
+[tool.uv]
+# One torch build at a time: these extras pin the same package to different indexes.
+conflicts = [
+    [
+        { extra = "ptychi" },
+        { extra = "ptychi-cuda128" },
+        { extra = "ptychi-cuda130" },
+        { extra = "ptychi-cuda132" },
+    ],
+]
+
+# Each extra above lists torch and torchvision rather than letting them arrive through
+# ptychi: uv ignores a source for a package that is not a declared dependency.
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "ptychi" },
+    { index = "pytorch-cu128", extra = "ptychi-cuda128", marker = "sys_platform == 'linux'" },
+    { index = "pytorch-cu130", extra = "ptychi-cuda130", marker = "sys_platform == 'linux'" },
+    { index = "pytorch-cu132", extra = "ptychi-cuda132", marker = "sys_platform == 'linux'" },
+]
+torchvision = [
+    { index = "pytorch-cpu", extra = "ptychi" },
+    { index = "pytorch-cu128", extra = "ptychi-cuda128", marker = "sys_platform == 'linux'" },
+    { index = "pytorch-cu130", extra = "ptychi-cuda130", marker = "sys_platform == 'linux'" },
+    { index = "pytorch-cu132", extra = "ptychi-cuda132", marker = "sys_platform == 'linux'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu132"
+url = "https://download.pytorch.org/whl/cu132"
+explicit = true
+
 [tool.mypy]
 # The unpackaged scripts/ tree has same-named modules in sibling directories
-# (three genesis submit_job.py). Deriving module names from the repo root keeps
-# them distinct without adding __init__.py to a tree that is never imported.
+# (three genesis submit_job.py), as does tests/ (two conftest.py). Deriving module
+# names from the repo root keeps them distinct without adding __init__.py to trees
+# that are never imported as packages.
 explicit_package_bases = true
-mypy_path = "src"
+# tests/ is on the path because its shared fixture modules are imported by bare name.
+mypy_path = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+# Half of this module's xdrlib import pair is always unused -- [import-not-found] on
+# <=3.12, [no-redef] on 3.13 -- and neither half may be removed.
+module = "ptychodus.plugins.mda.mda_position_file"
+warn_unused_ignores = false
 
 [[tool.mypy.overrides]]
 module = [

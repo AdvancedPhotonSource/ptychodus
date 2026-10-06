@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from sqlalchemy.ext.asyncio import AsyncEngine
+
 import json
 from collections.abc import AsyncIterator, Callable
 from datetime import datetime, timezone
@@ -44,7 +46,7 @@ async def db_engine() -> AsyncIterator:
 
 
 @pytest_asyncio.fixture
-async def session_provider(db_engine) -> AsyncIterator[SessionProvider]:  # type: ignore[no-untyped-def]
+async def session_provider(db_engine: AsyncEngine) -> AsyncIterator[SessionProvider]:
     yield SessionProvider(db_engine)
 
 
@@ -229,7 +231,7 @@ def seed_fluorescence(tmp_storage_root: Path) -> Callable[..., UUID]:
 @pytest_asyncio.fixture
 async def app_client(
     tmp_storage_root: Path,
-    db_engine,  # type: ignore[no-untyped-def]
+    db_engine: AsyncEngine,
 ) -> AsyncIterator[AsyncClient]:
     from fastapi import FastAPI
 
@@ -249,7 +251,7 @@ async def app_client(
     layout = StoreLayout(tmp_storage_root)
     provider = SessionProvider(db_engine)
     bind_session_provider(provider)
-    settings = Settings(  # type: ignore[call-arg]
+    settings = Settings(
         storage_root=tmp_storage_root,
         database_url='sqlite+aiosqlite:///:memory:',
         auto_reconcile_on_startup=False,

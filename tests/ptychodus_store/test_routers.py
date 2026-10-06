@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from httpx import AsyncClient
+from pathlib import Path
+from ptychodus_store.storage.layout import StoreLayout
+from sqlalchemy.ext.asyncio import AsyncEngine
+from uuid import UUID
+
 import pytest
 
 from ptychodus_store.ingest.pipeline import ingest_manifest
@@ -7,7 +14,7 @@ from ptychodus_store.ingest.pipeline import ingest_manifest
 pytestmark = pytest.mark.asyncio
 
 
-async def _ingest(client, db_engine, layout, manifest_path) -> None:  # type: ignore[no-untyped-def]
+async def _ingest(client, db_engine: AsyncEngine, layout: StoreLayout, manifest_path: Path) -> None:
     # Use a fresh session from the same engine the app is wired to.
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
@@ -17,7 +24,7 @@ async def _ingest(client, db_engine, layout, manifest_path) -> None:  # type: ig
         await session.commit()
 
 
-async def test_health(app_client) -> None:  # type: ignore[no-untyped-def]
+async def test_health(app_client: AsyncClient) -> None:
     resp = await app_client.get('/api/v1/health')
     assert resp.status_code == 200
     body = resp.json()
@@ -25,8 +32,11 @@ async def test_health(app_client) -> None:  # type: ignore[no-untyped-def]
     assert body['watcher'] == 'disabled'
 
 
-async def test_campaign_list_and_get(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_campaign
+async def test_campaign_list_and_get(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_campaign: Callable[..., UUID],
 ):
     c = seed_campaign(sample_name='alpha', tags=['benchmark'])
     await _ingest(app_client, db_engine, layout, layout.manifest_path('campaign', c))
@@ -46,8 +56,12 @@ async def test_campaign_list_and_get(  # type: ignore[no-untyped-def]
     assert miss.status_code == 404
 
 
-async def test_diffraction_filter_by_campaign(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_campaign, seed_diffraction
+async def test_diffraction_filter_by_campaign(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_campaign: Callable[..., UUID],
+    seed_diffraction: Callable[..., UUID],
 ):
     c = seed_campaign()
     other = seed_campaign()
@@ -68,8 +82,12 @@ async def test_diffraction_filter_by_campaign(  # type: ignore[no-untyped-def]
     assert body['items'][0]['uuid'] == str(d1)
 
 
-async def test_product_derived_from_filter(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_diffraction, seed_product
+async def test_product_derived_from_filter(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
+    seed_product: Callable[..., UUID],
 ):
     d = seed_diffraction()
     p_match = seed_product(derived_from=[{'kind': 'diffraction', 'uuid': str(d)}])
@@ -88,14 +106,14 @@ async def test_product_derived_from_filter(  # type: ignore[no-untyped-def]
     assert body['items'][0]['uuid'] == str(p_match)
 
 
-async def test_lineage_dag_walk(  # type: ignore[no-untyped-def]
-    app_client,
-    db_engine,
-    layout,
-    seed_campaign,
-    seed_diffraction,
-    seed_product,
-    seed_fluorescence,
+async def test_lineage_dag_walk(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_campaign: Callable[..., UUID],
+    seed_diffraction: Callable[..., UUID],
+    seed_product: Callable[..., UUID],
+    seed_fluorescence: Callable[..., UUID],
 ):
     c = seed_campaign()
     d = seed_diffraction(campaign_uuid=c)
@@ -127,8 +145,11 @@ async def test_lineage_dag_walk(  # type: ignore[no-untyped-def]
     assert str(f) in desc_uuids
 
 
-async def test_file_download(  # type: ignore[no-untyped-def]
-    app_client, db_engine, layout, seed_diffraction
+async def test_file_download(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
 ):
     d = seed_diffraction()
     await _ingest(app_client, db_engine, layout, layout.manifest_path('diffraction', d))
@@ -139,12 +160,12 @@ async def test_file_download(  # type: ignore[no-untyped-def]
     assert len(resp.content) > 0
 
 
-async def test_admin_stats(  # type: ignore[no-untyped-def]
-    app_client,
-    db_engine,
-    layout,
-    seed_campaign,
-    seed_diffraction,
+async def test_admin_stats(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_campaign: Callable[..., UUID],
+    seed_diffraction: Callable[..., UUID],
 ):
     c = seed_campaign()
     d = seed_diffraction()

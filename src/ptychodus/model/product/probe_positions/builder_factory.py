@@ -1,4 +1,5 @@
 from collections.abc import Callable, Iterable, Iterator
+from functools import partial
 from pathlib import Path
 import logging
 
@@ -38,7 +39,7 @@ class ProbePositionsBuilderFactory(Iterable[str]):
         self._file_reader_chooser = file_reader_chooser
         self._file_writer_chooser = file_writer_chooser
         self._builders: dict[str, Callable[[], ProbePositionsBuilder]] = {
-            variant.name.lower(): lambda variant=variant: self._create_cartesian_builder(variant)  # type: ignore
+            variant.name.lower(): partial(self._create_cartesian_builder, variant)
             for variant in CartesianProbePositionsVariant
         }
         self._builders.update(

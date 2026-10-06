@@ -16,7 +16,7 @@ def _iv(lower, upper) -> Interval[Decimal]:
 
 
 @pytest.fixture
-def slider(qapp) -> Iterator[DecimalRangeSlider]:  # type: ignore[no-untyped-def]
+def slider(qapp) -> Iterator[DecimalRangeSlider]:
     """A shown slider, torn down deterministically after the test.
 
     The teardown is load-bearing, not tidiness. Showing a top-level widget queues a

@@ -116,7 +116,7 @@ def raw_data_kwargs(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
             return object()
 
     package = ModuleType('ptycho')
-    package.__path__ = []  # type: ignore[attr-defined]
+    package.__path__ = []
     raw_data_module = ModuleType('ptycho.raw_data')
     raw_data_module.RawData = FakeRawData  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, 'ptycho', package)

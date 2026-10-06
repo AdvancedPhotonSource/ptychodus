@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from ptychodus_store.db.session import SessionProvider
+from ptychodus_store.storage.layout import StoreLayout
+
 import asyncio
 import logging
 import uuid as uuid_lib
@@ -28,7 +31,7 @@ router = APIRouter(prefix='/admin', tags=['admin'])
 _rescan_lock = asyncio.Lock()
 
 
-async def _do_rescan(session_provider, layout) -> None:  # type: ignore[no-untyped-def]
+async def _do_rescan(session_provider: SessionProvider, layout: StoreLayout) -> None:
     try:
         async with _rescan_lock:
             async with session_provider.session_factory() as session:
@@ -69,7 +72,7 @@ async def rescan_one(
 
 @router.get('/stats', response_model=StoreStats)
 async def stats(session: SessionDep) -> StoreStats:
-    async def _count(model) -> int:  # type: ignore[no-untyped-def]
+    async def _count(model) -> int:
         return int((await session.execute(select(func.count()).select_from(model))).scalar_one())
 
     async def _invalid_count() -> int:

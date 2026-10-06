@@ -26,6 +26,14 @@ $ python -m pip install ptychodus[globus,gui,ptychi]
    $ ptychodus
    ```
 
+   ```{note}
+   The `ptychi` extra installs a **CPU** build of PyTorch. For GPU reconstruction, replace it with the extra matching the CUDA ceiling your driver reports on the `nvidia-smi` banner line — `ptychi-cuda128`, `ptychi-cuda130` or `ptychi-cuda132`. These mirror the CUDA versions the container variants are built for, and they are mutually exclusive.
+
+   A PyTorch build newer than the driver's ceiling is not rescued by minor version compatibility: `torch.cuda.is_available()` comes back false and reconstruction silently runs on the CPU. Run `ptychodus-system-check` to see the driver ceiling, the PyTorch build and whether the two agree, or `ptychodus-system-check --require-cuda` to make a mismatch a non-zero exit.
+
+   The pinning lives in `[tool.uv.sources]`, which only uv reads. `pip install ptychodus[ptychi-cuda128]` installs whatever PyTorch PyPI serves — with pip, select the build yourself with `--index-url https://download.pytorch.org/whl/cu128`.
+   ```
+
 4. To upgrade ptychodus, use uv tool upgrade:
 
    ```sh

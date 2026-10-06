@@ -594,9 +594,10 @@ class TestComputeAmplitudeDeviation:
         rng = numpy.random.default_rng(4)
         wavefield = rng.random((16, 16)) + 1j * rng.random((16, 16))
 
+        # astype: numpy's stubs lose complexity through `scalar * complex_array`.
         numpy.testing.assert_allclose(
             compute_amplitude_deviation(wavefield),
-            compute_amplitude_deviation(1e6 * wavefield),
+            compute_amplitude_deviation((1e6 * wavefield).astype(complex)),
             rtol=1e-12,
         )
 

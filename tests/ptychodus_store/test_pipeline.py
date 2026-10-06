@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from pathlib import Path
+from ptychodus_store.db.models import Diffraction, Product
+from ptychodus_store.storage.layout import StoreLayout
+from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
+
 import json
 
 import pytest
@@ -12,13 +19,15 @@ from ptychodus_store.ingest.pipeline import delete_manifest, ingest_manifest
 pytestmark = pytest.mark.asyncio
 
 
-async def test_ingest_diffraction_valid(db_session, layout, seed_diffraction):  # type: ignore[no-untyped-def]
+async def test_ingest_diffraction_valid(
+    db_session: AsyncSession, layout: StoreLayout, seed_diffraction: Callable[..., UUID]
+):
     uuid = seed_diffraction()
     manifest_path = layout.manifest_path('diffraction', uuid)
     await ingest_manifest(db_session, layout, manifest_path)
     await db_session.commit()
 
-    row = await repo.get_row(db_session, 'diffraction', uuid)
+    row = await repo.get_row(db_session, Diffraction, uuid)
     assert row is not None
     assert row.ingest_state == IngestState.VALID
     assert row.probe_energy_eV == 8000.0
@@ -28,16 +37,20 @@ async def test_ingest_diffraction_valid(db_session, layout, seed_diffraction):  
     assert row.detector_pixel_width_m is not None
 
 
-async def test_ingest_diffraction_missing_h5(db_session, layout, seed_diffraction):  # type: ignore[no-untyped-def]
+async def test_ingest_diffraction_missing_h5(
+    db_session: AsyncSession, layout: StoreLayout, seed_diffraction: Callable[..., UUID]
+):
     uuid = seed_diffraction(write_h5=False)
     await ingest_manifest(db_session, layout, layout.manifest_path('diffraction', uuid))
     await db_session.commit()
-    row = await repo.get_row(db_session, 'diffraction', uuid)
+    row = await repo.get_row(db_session, Diffraction, uuid)
     assert row is not None
     assert row.ingest_state == IngestState.MISSING_FILES
 
 
-async def test_ingest_bad_json(db_session, layout, tmp_storage_root):  # type: ignore[no-untyped-def]
+async def test_ingest_bad_json(
+    db_session: AsyncSession, layout: StoreLayout, tmp_storage_root: Path
+):
     from uuid import uuid4
 
     uuid = uuid4()
@@ -47,14 +60,17 @@ async def test_ingest_bad_json(db_session, layout, tmp_storage_root):  # type: i
     await ingest_manifest(db_session, layout, folder / 'manifest.json')
     await db_session.commit()
 
-    row = await repo.get_row(db_session, 'product', uuid)
+    row = await repo.get_row(db_session, Product, uuid)
     assert row is not None
     assert row.ingest_state == IngestState.INVALID
     assert row.error_message is not None
 
 
-async def test_derived_from_creates_edge(  # type: ignore[no-untyped-def]
-    db_session, layout, seed_diffraction, seed_product
+async def test_derived_from_creates_edge(
+    db_session: AsyncSession,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
+    seed_product: Callable[..., UUID],
 ):
     d_uuid = seed_diffraction()
     await ingest_manifest(db_session, layout, layout.manifest_path('diffraction', d_uuid))
@@ -67,13 +83,16 @@ async def test_derived_from_creates_edge(  # type: ignore[no-untyped-def]
     assert edges[0].target_uuid == d_uuid
     assert edges[0].target_kind == 'diffraction'
 
-    p_row = await repo.get_row(db_session, 'product', p_uuid)
+    p_row = await repo.get_row(db_session, Product, p_uuid)
     assert p_row is not None
     assert p_row.ingest_state == IngestState.VALID
 
 
-async def test_orphan_then_resolves(  # type: ignore[no-untyped-def]
-    db_session, layout, seed_diffraction, seed_product
+async def test_orphan_then_resolves(
+    db_session: AsyncSession,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
+    seed_product: Callable[..., UUID],
 ):
     # Ingest a product whose parent doesn't yet exist
     from uuid import uuid4
@@ -83,7 +102,7 @@ async def test_orphan_then_resolves(  # type: ignore[no-untyped-def]
     await ingest_manifest(db_session, layout, layout.manifest_path('product', p_uuid))
     await db_session.commit()
 
-    p = await repo.get_row(db_session, 'product', p_uuid)
+    p = await repo.get_row(db_session, Product, p_uuid)
     assert p is not None
     assert p.ingest_state == IngestState.ORPHANED
 
@@ -92,13 +111,16 @@ async def test_orphan_then_resolves(  # type: ignore[no-untyped-def]
     await ingest_manifest(db_session, layout, layout.manifest_path('diffraction', d_uuid))
     await db_session.commit()
 
-    p_again = await repo.get_row(db_session, 'product', p_uuid)
+    p_again = await repo.get_row(db_session, Product, p_uuid)
     assert p_again is not None
     assert p_again.ingest_state == IngestState.VALID
 
 
-async def test_delete_manifest_removes_row_and_propagates(  # type: ignore[no-untyped-def]
-    db_session, layout, seed_diffraction, seed_product
+async def test_delete_manifest_removes_row_and_propagates(
+    db_session: AsyncSession,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
+    seed_product: Callable[..., UUID],
 ):
     d_uuid = seed_diffraction()
     await ingest_manifest(db_session, layout, layout.manifest_path('diffraction', d_uuid))
@@ -109,14 +131,17 @@ async def test_delete_manifest_removes_row_and_propagates(  # type: ignore[no-un
     await delete_manifest(db_session, layout, layout.manifest_path('diffraction', d_uuid))
     await db_session.commit()
 
-    assert await repo.get_row(db_session, 'diffraction', d_uuid) is None
-    p = await repo.get_row(db_session, 'product', p_uuid)
+    assert await repo.get_row(db_session, Diffraction, d_uuid) is None
+    p = await repo.get_row(db_session, Product, p_uuid)
     assert p is not None
     assert p.ingest_state == IngestState.ORPHANED
 
 
-async def test_multi_parent_edges(  # type: ignore[no-untyped-def]
-    db_session, layout, seed_diffraction, seed_product
+async def test_multi_parent_edges(
+    db_session: AsyncSession,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
+    seed_product: Callable[..., UUID],
 ):
     d1 = seed_diffraction()
     d2 = seed_diffraction()
@@ -136,8 +161,11 @@ async def test_multi_parent_edges(  # type: ignore[no-untyped-def]
     assert {e.target_uuid for e in edges} == {d1, d2}
 
 
-async def test_rewrite_manifest_shrinks_edges(  # type: ignore[no-untyped-def]
-    db_session, layout, seed_diffraction, seed_product
+async def test_rewrite_manifest_shrinks_edges(
+    db_session: AsyncSession,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
+    seed_product: Callable[..., UUID],
 ):
     d1 = seed_diffraction()
     d2 = seed_diffraction()

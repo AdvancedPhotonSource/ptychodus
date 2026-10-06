@@ -1,5 +1,16 @@
 from __future__ import annotations
 
+from typing import Any
+
+from fastmcp.tools import ToolResult
+
+from collections.abc import Callable
+from fastmcp import FastMCP
+from pathlib import Path
+from ptychodus_store.db.session import SessionProvider
+from ptychodus_store.storage.layout import StoreLayout
+from uuid import UUID
+
 import base64
 from io import BytesIO
 
@@ -13,11 +24,22 @@ from ptychodus_store.mcp_server import bind_layout, bind_session_provider, creat
 pytestmark = pytest.mark.asyncio
 
 
-def _decode_image_content(result, expected_h: int, expected_w: int) -> Image.Image:  # type: ignore[no-untyped-def]
+def _structured(result: ToolResult) -> dict[str, Any]:
+    """The tool's structured payload, asserted present.
+
+    `structured_content` is Optional on every fastmcp result; a tool that returned
+    nothing is a test failure here rather than a TypeError three lines later.
+    """
+    payload = result.structured_content
+    assert payload is not None
+    return payload
+
+
+def _decode_image_content(result: ToolResult, expected_h: int, expected_w: int) -> Image.Image:
     assert len(result.content) == 1
     item = result.content[0]
     assert item.type == 'image'
-    assert item.mimeType == 'image/png'
+    assert item.mime_type == 'image/png'
     png_bytes = base64.b64decode(item.data)
     image = Image.open(BytesIO(png_bytes))
     image.load()
@@ -25,12 +47,12 @@ def _decode_image_content(result, expected_h: int, expected_w: int) -> Image.Ima
     return image
 
 
-async def test_mcp_tools_registered_and_callable(  # type: ignore[no-untyped-def]
-    session_provider,
-    layout,
-    seed_campaign,
-    seed_diffraction,
-    seed_product,
+async def test_mcp_tools_registered_and_callable(
+    session_provider: SessionProvider,
+    layout: StoreLayout,
+    seed_campaign: Callable[..., UUID],
+    seed_diffraction: Callable[..., UUID],
+    seed_product: Callable[..., UUID],
 ):
     # Seed a tiny graph
     c = seed_campaign(sample_name='alpha')
@@ -69,13 +91,13 @@ async def test_mcp_tools_registered_and_callable(  # type: ignore[no-untyped-def
     assert expected.issubset(names), f'missing MCP tools: {expected - names}'
 
     stats_result = await mcp.call_tool('get_store_stats', {})
-    payload = stats_result.structured_content
+    payload = _structured(stats_result)
     assert payload['campaign_count'] == 1
     assert payload['diffraction_count'] == 1
     assert payload['product_count'] == 1
 
     lineage_result = await mcp.call_tool('get_lineage', {'uuid': str(p)})
-    payload = lineage_result.structured_content
+    payload = _structured(lineage_result)
     # Optional return types are wrapped as {'result': ...} by fastmcp
     lineage_payload = payload['result'] if 'result' in payload else payload
     assert lineage_payload is not None
@@ -84,28 +106,33 @@ async def test_mcp_tools_registered_and_callable(  # type: ignore[no-untyped-def
 
 
 @pytest.fixture
-def bound_mcp(session_provider, layout):  # type: ignore[no-untyped-def]
+def bound_mcp(session_provider: SessionProvider, layout: StoreLayout):
     bind_session_provider(session_provider)
     bind_layout(layout)
     return create_mcp_server()
 
 
-async def _ingest(session_provider, layout, manifest_path) -> None:  # type: ignore[no-untyped-def]
+async def _ingest(
+    session_provider: SessionProvider, layout: StoreLayout, manifest_path: Path
+) -> None:
     async with session_provider.session_factory() as session:
         await ingest_manifest(session, layout, manifest_path)
         await session.commit()
 
 
-async def test_mcp_get_visualization_options(bound_mcp) -> None:  # type: ignore[no-untyped-def]
+async def test_mcp_get_visualization_options(bound_mcp: FastMCP) -> None:
     result = await bound_mcp.call_tool('get_visualization_options', {})
-    payload = result.structured_content
+    payload = _structured(result)
     assert 'amplitude' in payload['components']
     assert 'hsv_value' in payload['color_models']
     assert payload['transforms'] == ['identity', 'sqrt', 'log2', 'log', 'log10']
 
 
-async def test_mcp_render_diffraction_pattern(  # type: ignore[no-untyped-def]
-    bound_mcp, session_provider, layout, seed_diffraction
+async def test_mcp_render_diffraction_pattern(
+    bound_mcp: FastMCP,
+    session_provider: SessionProvider,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
     await _ingest(session_provider, layout, layout.manifest_path('diffraction', d))
@@ -115,8 +142,11 @@ async def test_mcp_render_diffraction_pattern(  # type: ignore[no-untyped-def]
     _decode_image_content(result, expected_h=8, expected_w=12)
 
 
-async def test_mcp_render_diffraction_aggregate(  # type: ignore[no-untyped-def]
-    bound_mcp, session_provider, layout, seed_diffraction
+async def test_mcp_render_diffraction_aggregate(
+    bound_mcp: FastMCP,
+    session_provider: SessionProvider,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
     await _ingest(session_provider, layout, layout.manifest_path('diffraction', d))
@@ -124,8 +154,11 @@ async def test_mcp_render_diffraction_aggregate(  # type: ignore[no-untyped-def]
     _decode_image_content(result, expected_h=8, expected_w=12)
 
 
-async def test_mcp_render_probe(  # type: ignore[no-untyped-def]
-    bound_mcp, session_provider, layout, seed_product
+async def test_mcp_render_probe(
+    bound_mcp: FastMCP,
+    session_provider: SessionProvider,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
     await _ingest(session_provider, layout, layout.manifest_path('product', p))
@@ -133,8 +166,11 @@ async def test_mcp_render_probe(  # type: ignore[no-untyped-def]
     _decode_image_content(result, expected_h=8, expected_w=8)
 
 
-async def test_mcp_render_probe_cylindrical(  # type: ignore[no-untyped-def]
-    bound_mcp, session_provider, layout, seed_product
+async def test_mcp_render_probe_cylindrical(
+    bound_mcp: FastMCP,
+    session_provider: SessionProvider,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
     await _ingest(session_provider, layout, layout.manifest_path('product', p))
@@ -142,8 +178,11 @@ async def test_mcp_render_probe_cylindrical(  # type: ignore[no-untyped-def]
     _decode_image_content(result, expected_h=8, expected_w=8)
 
 
-async def test_mcp_render_probe_modes(  # type: ignore[no-untyped-def]
-    bound_mcp, session_provider, layout, seed_product
+async def test_mcp_render_probe_modes(
+    bound_mcp: FastMCP,
+    session_provider: SessionProvider,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
     await _ingest(session_provider, layout, layout.manifest_path('product', p))
@@ -151,8 +190,11 @@ async def test_mcp_render_probe_modes(  # type: ignore[no-untyped-def]
     _decode_image_content(result, expected_h=8, expected_w=8)
 
 
-async def test_mcp_render_object_layer(  # type: ignore[no-untyped-def]
-    bound_mcp, session_provider, layout, seed_product
+async def test_mcp_render_object_layer(
+    bound_mcp: FastMCP,
+    session_provider: SessionProvider,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
     await _ingest(session_provider, layout, layout.manifest_path('product', p))
@@ -162,8 +204,11 @@ async def test_mcp_render_object_layer(  # type: ignore[no-untyped-def]
     _decode_image_content(result, expected_h=16, expected_w=16)
 
 
-async def test_mcp_render_fluorescence_element(  # type: ignore[no-untyped-def]
-    bound_mcp, session_provider, layout, seed_fluorescence
+async def test_mcp_render_fluorescence_element(
+    bound_mcp: FastMCP,
+    session_provider: SessionProvider,
+    layout: StoreLayout,
+    seed_fluorescence: Callable[..., UUID],
 ) -> None:
     f = seed_fluorescence(elements=['Fe', 'Cu'])
     await _ingest(session_provider, layout, layout.manifest_path('fluorescence', f))
@@ -173,8 +218,11 @@ async def test_mcp_render_fluorescence_element(  # type: ignore[no-untyped-def]
     _decode_image_content(result, expected_h=6, expected_w=10)
 
 
-async def test_mcp_render_object_layer_out_of_range(  # type: ignore[no-untyped-def]
-    bound_mcp, session_provider, layout, seed_product
+async def test_mcp_render_object_layer_out_of_range(
+    bound_mcp: FastMCP,
+    session_provider: SessionProvider,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
     await _ingest(session_provider, layout, layout.manifest_path('product', p))
@@ -182,8 +230,11 @@ async def test_mcp_render_object_layer_out_of_range(  # type: ignore[no-untyped-
         await bound_mcp.call_tool('render_object_layer', {'uuid': str(p), 'layer': 99})
 
 
-async def test_mcp_render_bad_colormap(  # type: ignore[no-untyped-def]
-    bound_mcp, session_provider, layout, seed_diffraction
+async def test_mcp_render_bad_colormap(
+    bound_mcp: FastMCP,
+    session_provider: SessionProvider,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
     await _ingest(session_provider, layout, layout.manifest_path('diffraction', d))
@@ -194,8 +245,11 @@ async def test_mcp_render_bad_colormap(  # type: ignore[no-untyped-def]
         )
 
 
-async def test_mcp_render_probe_component_and_color_model_rejected(  # type: ignore[no-untyped-def]
-    bound_mcp, session_provider, layout, seed_product
+async def test_mcp_render_probe_component_and_color_model_rejected(
+    bound_mcp: FastMCP,
+    session_provider: SessionProvider,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
     await _ingest(session_provider, layout, layout.manifest_path('product', p))
@@ -206,8 +260,11 @@ async def test_mcp_render_probe_component_and_color_model_rejected(  # type: ign
         )
 
 
-async def test_mcp_render_fluorescence_missing_element(  # type: ignore[no-untyped-def]
-    bound_mcp, session_provider, layout, seed_fluorescence
+async def test_mcp_render_fluorescence_missing_element(
+    bound_mcp: FastMCP,
+    session_provider: SessionProvider,
+    layout: StoreLayout,
+    seed_fluorescence: Callable[..., UUID],
 ) -> None:
     f = seed_fluorescence(elements=['Fe', 'Cu'])
     await _ingest(session_provider, layout, layout.manifest_path('fluorescence', f))
