@@ -314,39 +314,35 @@ def test_initial_opr_mode_weights_passes_through_existing_weights() -> None:
     assert _initial_opr_mode_weights(probes) is probes.get_opr_weights()
 
 
-def test_far_field_propagation_flag_is_read_by_value() -> None:
-    """The far-field checkbox must select the propagation mode.
+def test_no_setting_selects_the_propagation_mode() -> None:
+    """The regime is a property of the experiment, so the reconstructor settings must
+    not carry a second switch for it.
 
-    Regression test: the flag used to be read as a ``BooleanParameter`` object
-    rather than via ``.get_value()``, so it was always truthy and the distance
-    was pinned to infinity no matter what the user selected.
-
-    ``data_options`` now carries only the mode -- infinity for far field, NaN as
-    the near-field placeholder -- because the distance itself belongs to the
-    product. See ``test_near_field_distance_comes_from_the_product``.
+    ``data_options`` leaves ``free_space_propagation_distance_m`` at pty-chi's own
+    default; the product supplies the value during alignment. See
+    ``test_near_field_distance_comes_from_the_product``.
     """
     library = _make_library()
     common = _make_common(library)
 
-    library.settings.use_far_field_propagation.set_value(True)
-    assert common.data_options().free_space_propagation_distance_m == numpy.inf
-
-    library.settings.use_far_field_propagation.set_value(False)
-    assert math.isnan(common.data_options().free_space_propagation_distance_m)
+    assert not hasattr(library.settings, 'use_far_field_propagation')
+    assert (
+        common.data_options().free_space_propagation_distance_m
+        == PtychographyDataOptions().free_space_propagation_distance_m
+    )
 
 
 def test_near_field_distance_comes_from_the_product() -> None:
-    """The near-field placeholder must be replaced by the product's detector distance."""
+    """A product declaring near field supplies the distance; far field stays infinite."""
     library = _make_library()
     parameters = _make_reconstruct_input()
 
-    library.settings.use_far_field_propagation.set_value(False)
-    options = _make_algorithms(library)[0].build_task_options(parameters.product)
+    near_field = _with_far_field(parameters.product, False)
+    options = _make_algorithms(library)[0].build_task_options(near_field)
     assert options.data_options.free_space_propagation_distance_m == pytest.approx(
-        parameters.product.metadata.detector_distance_m
+        near_field.metadata.detector_distance_m
     )
 
-    library.settings.use_far_field_propagation.set_value(True)
     options = _make_algorithms(library)[0].build_task_options(parameters.product)
     assert options.data_options.free_space_propagation_distance_m == numpy.inf
 
@@ -643,10 +639,12 @@ def test_align_does_not_mutate_its_argument() -> None:
 
 
 def test_align_is_idempotent(caplog) -> None:
-    """Re-aligning against the same product changes nothing and warns about nothing.
+    """Re-aligning against the same product changes nothing and overrides nothing.
 
     A child process re-aligns over options its launcher already aligned; that second
-    pass must be silent.
+    pass must emit no override warning. The regime self-consistency warning is a
+    property of the product rather than of the options diff, so it would fire on both
+    passes -- this fixture is far-field consistent, so neither pass emits it.
     """
     parameters = _make_reconstruct_input()
     once = align_task_options_with_product(LSQMLOptions(), parameters.product)
@@ -681,7 +679,7 @@ def test_align_warns_only_when_it_overrides_a_caller_value(caplog) -> None:
 
 
 def test_align_preserves_a_far_field_propagation_distance() -> None:
-    """An infinite incoming distance is the caller's far-field choice, not a placeholder."""
+    """A far-field product keeps pty-chi's infinite distance."""
     parameters = _make_reconstruct_input()
     options = LSQMLOptions()
     assert options.data_options.free_space_propagation_distance_m == numpy.inf
@@ -691,25 +689,54 @@ def test_align_preserves_a_far_field_propagation_distance() -> None:
     assert aligned.data_options.free_space_propagation_distance_m == numpy.inf
 
 
-def test_align_replaces_the_near_field_placeholder() -> None:
-    parameters = _make_reconstruct_input()
-    options = LSQMLOptions()
-    options.data_options.free_space_propagation_distance_m = math.nan
+def test_align_writes_the_near_field_distance_from_the_product() -> None:
+    product = _with_far_field(_make_reconstruct_input().product, False)
 
-    aligned = align_task_options_with_product(options, parameters.product)
+    aligned = align_task_options_with_product(LSQMLOptions(), product)
 
     assert aligned.data_options.free_space_propagation_distance_m == pytest.approx(
         DETECTOR_DISTANCE_M
     )
 
 
+def test_align_overwrites_a_contradicting_caller_distance_and_warns(caplog) -> None:
+    """A ptychi_options.json that hard-codes a distance disagreeing with the product
+    is corrected, loudly -- the product owns the field outright."""
+    parameters = _make_reconstruct_input()
+    options = LSQMLOptions()
+    options.data_options.free_space_propagation_distance_m = 0.5
+
+    with caplog.at_level(logging.WARNING, logger='ptychodus.model.ptychi.task'):
+        aligned = align_task_options_with_product(options, parameters.product)
+
+    assert aligned.data_options.free_space_propagation_distance_m == numpy.inf
+    warnings = [
+        record
+        for record in caplog.records
+        if 'free_space_propagation_distance_m' in record.getMessage()
+    ]
+    assert len(warnings) == 1
+
+
+def _with_far_field(product: Product, far_field: bool) -> Product:
+    return dataclasses.replace(
+        product, metadata=dataclasses.replace(product.metadata, far_field=far_field)
+    )
+
+
 def _make_cone_beam_product(focus_object_distance_m: float) -> Product:
-    """The shared fixture declares no focusing optic; these need one."""
+    """The shared fixture declares no focusing optic; these need one.
+
+    Near field as well: these pin the demagnified propagation distance, which is only
+    written for a product that declares near-field propagation.
+    """
     product = _make_reconstruct_input().product
     return dataclasses.replace(
         product,
         metadata=dataclasses.replace(
-            product.metadata, focus_object_distance_m=focus_object_distance_m
+            product.metadata,
+            focus_object_distance_m=focus_object_distance_m,
+            far_field=False,
         ),
     )
 
@@ -720,10 +747,8 @@ def test_align_demagnifies_the_near_field_distance_for_a_cone_beam() -> None:
     """
     focus_m = 5e-3
     product = _make_cone_beam_product(focus_m)
-    options = LSQMLOptions()
-    options.data_options.free_space_propagation_distance_m = math.nan
 
-    aligned = align_task_options_with_product(options, product)
+    aligned = align_task_options_with_product(LSQMLOptions(), product)
 
     magnification = (DETECTOR_DISTANCE_M - focus_m) / focus_m
     assert aligned.data_options.free_space_propagation_distance_m == pytest.approx(
@@ -736,7 +761,6 @@ def test_align_distinguishes_converging_from_diverging_illumination() -> None:
     the propagation distance rather than being absorbed as a magnitude.
     """
     options = LSQMLOptions()
-    options.data_options.free_space_propagation_distance_m = math.nan
 
     converging = align_task_options_with_product(options, _make_cone_beam_product(5e-3))
     diverging = align_task_options_with_product(options, _make_cone_beam_product(-5e-3))
@@ -748,10 +772,7 @@ def test_align_distinguishes_converging_from_diverging_illumination() -> None:
 
 def test_align_without_a_focusing_optic_uses_the_raw_detector_distance() -> None:
     """The parallel-beam path must be untouched by the cone-beam support."""
-    options = LSQMLOptions()
-    options.data_options.free_space_propagation_distance_m = math.nan
-
-    aligned = align_task_options_with_product(options, _make_cone_beam_product(0.0))
+    aligned = align_task_options_with_product(LSQMLOptions(), _make_cone_beam_product(0.0))
 
     assert aligned.data_options.free_space_propagation_distance_m == pytest.approx(
         DETECTOR_DISTANCE_M

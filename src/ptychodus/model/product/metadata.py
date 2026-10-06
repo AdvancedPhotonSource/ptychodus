@@ -65,6 +65,7 @@ class MetadataRepositoryItem(ParameterGroup):
         focus_object_distance_m: float | None = None,
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
+        far_field: bool | None = None,
     ) -> None:
         super().__init__()
         self._settings = settings
@@ -139,6 +140,13 @@ class MetadataRepositoryItem(ParameterGroup):
 
         self._add_parameter('polarization', self.polarization)
 
+        self.far_field = settings.far_field.copy()
+
+        if far_field is not None:
+            self.far_field.set_value(far_field)
+
+        self._add_parameter('far_field', self.far_field)
+
     def assign(self, metadata: ProductMetadata) -> None:
         self.name.set_value(metadata.name)
         self.comments.set_value(metadata.comments)
@@ -153,6 +161,7 @@ class MetadataRepositoryItem(ParameterGroup):
         self.polarization.set_value(
             metadata.polarization.value if metadata.polarization is not None else ''
         )
+        self.far_field.set_value(metadata.far_field)
 
     def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
@@ -171,6 +180,7 @@ class MetadataRepositoryItem(ParameterGroup):
             focus_object_distance_m=self.focus_object_distance_m.get_value(),
             tilt_angle_deg=self.tilt_angle_deg.get_value(),
             polarization=self._parse_polarization(self.polarization.get_value()),
+            far_field=self.far_field.get_value(),
         )
 
     @staticmethod

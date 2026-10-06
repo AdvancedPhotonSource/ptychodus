@@ -1,5 +1,5 @@
 from enum import IntEnum
-from typing import Any
+from typing import Any, Final
 import logging
 
 from PyQt5.QtCore import (
@@ -54,6 +54,12 @@ class _Row(IntEnum):
     DEPTH_OF_FIELD_NM = 14
     DIFFRACTION_DATASET = 15
     FOCUS_OBJECT_DISTANCE_MM = 16
+    FAR_FIELD = 17
+
+
+# The regime is a two-state physical property, so the cell reads as a named choice
+# rather than a bare True/False.
+_FAR_FIELD_CHOICES: Final[dict[bool, str]] = {True: 'Far Field', False: 'Near Field'}
 
 
 class _Col(IntEnum):
@@ -76,6 +82,7 @@ _EDITABLE_ROWS = frozenset(
         _Row.POLARIZATION,
         _Row.DIFFRACTION_DATASET,
         _Row.FOCUS_OBJECT_DISTANCE_MM,
+        _Row.FAR_FIELD,
     }
 )
 
@@ -111,6 +118,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
             'Depth of Field [nm]',
             'Diffraction Dataset',
             'Focus-Object Distance [mm]',
+            'Far Field',
         ]
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
@@ -188,6 +196,8 @@ class ProductPropertyTableModel(QAbstractTableModel):
                             case _Row.FOCUS_OBJECT_DISTANCE_MM:
                                 distance_m = metadata_item.focus_object_distance_m.get_value()
                                 return f'{LengthUnit.MILLIMETER.convert(distance_m):.4g}'
+                            case _Row.FAR_FIELD:
+                                return _FAR_FIELD_CHOICES[metadata_item.far_field.get_value()]
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
                     return self._editable_item_brush
@@ -264,6 +274,14 @@ class ProductPropertyTableModel(QAbstractTableModel):
                         LengthUnit.MILLIMETER.to_meters(distance_mm)
                     )
                     return True
+                case _Row.FAR_FIELD:
+                    text = str(value)
+
+                    if text not in _FAR_FIELD_CHOICES.values():
+                        return False
+
+                    metadata_item.far_field.set_value(text == _FAR_FIELD_CHOICES[True])
+                    return True
 
         return False
 
@@ -301,6 +319,13 @@ class _PropertyValueDelegate(QStyledItemDelegate):
         self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex
     ) -> QWidget:
         match self._source_row(index):
+            case _Row.FAR_FIELD:
+                combo = QComboBox(parent)
+
+                for text in _FAR_FIELD_CHOICES.values():
+                    combo.addItem(text, text)
+
+                return combo
             case _Row.POLARIZATION:
                 combo = QComboBox(parent)
                 combo.addItem('(unset)', '')

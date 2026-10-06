@@ -876,12 +876,10 @@ def main() -> ExitCode:
         # the parallel-beam case -- no focusing optic, so M is exactly 1 and the object
         # pixel equals the detector pixel -- down the far-field branch, which returns a
         # completely different pixel size with nothing to signal the substitution.
-        pixel_m = detector_pixel_geometry.width_m / magnification
-        probe_geometry = ProbeGeometry(
-            width_px=image_extent.width_px,
-            height_px=image_extent.height_px,
-            pixel_width_m=pixel_m,
-            pixel_height_m=pixel_m,
+        probe_geometry = ProbeGeometry.from_near_field(
+            detector_pixel_geometry,
+            image_extent,
+            magnification=magnification,
         )
     else:
         probe_geometry = ProbeGeometry.from_far_field(
@@ -1037,6 +1035,7 @@ def main() -> ExitCode:
             mass_attenuation_m2_kg=0.0,
             tomography_angle_deg=0.0,
             focus_object_distance_m=focus_object_distance_m,
+            far_field=not params.near_field_ptycho,
         ),
         probe_positions=positions,
         probes=probe_sequence,

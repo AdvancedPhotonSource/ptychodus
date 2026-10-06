@@ -127,3 +127,29 @@ class TestMetadataMagnification:
 
     def test_defaults_to_no_focusing_optic(self) -> None:
         assert _make_metadata().magnification == 1.0
+
+
+class TestMetadataFarField:
+    """The propagation regime is declared, not inferred from the illumination.
+
+    Regression guard for the conflation this field removed: a nonzero focus-object
+    distance used to be the only near-field signal, which made parallel-beam near
+    field and far field with a focusing optic both inexpressible.
+    """
+
+    def test_defaults_to_far_field(self) -> None:
+        assert _make_metadata().far_field
+
+    def test_is_independent_of_the_magnification(self) -> None:
+        with_optic = replace(
+            _make_metadata(), detector_distance_m=1.0, focus_object_distance_m=5e-3
+        )
+
+        assert with_optic.magnification != 1.0
+        assert with_optic.far_field
+
+    def test_near_field_without_a_focusing_optic_is_expressible(self) -> None:
+        parallel_beam = replace(_make_metadata(), focus_object_distance_m=0.0, far_field=False)
+
+        assert parallel_beam.magnification == 1.0
+        assert not parallel_beam.far_field

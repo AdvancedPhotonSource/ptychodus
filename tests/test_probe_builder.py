@@ -84,6 +84,10 @@ class _StubProbeGeometryProvider(ProbeGeometryProvider):
         return 1.0
 
     @property
+    def far_field(self) -> bool:
+        return True
+
+    @property
     def probe_photon_count(self) -> float:
         return self._probe_photon_count
 

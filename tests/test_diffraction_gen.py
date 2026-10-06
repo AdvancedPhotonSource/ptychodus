@@ -3,12 +3,14 @@
 Behaviors verified:
   - Output shapes, dtypes, and basic invariants (non-negativity, no bad pixels)
   - Detector pixel geometry formula (λz / probe_width)
-  - Flat object at integer position reproduces |Fraunhofer(probe)|²
+  - Flat object at integer position reproduces |FresnelTransform(probe)|²
   - Subpixel Fourier shift alters the pattern for a non-symmetric probe
   - Incoherent modes accumulate as an intensity sum
   - Poisson noise: applied only when rng is provided, reproducible with fixed seed
   - Multislice: zero inter-layer spacing is the identity; non-zero spacing changes the pattern
 """
+
+import dataclasses
 
 import numpy
 import numpy.testing
@@ -20,7 +22,11 @@ from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.propagate import FraunhoferPropagator, PropagatorParameters
+from ptychodus.api.propagate import (
+    AngularSpectrumPropagator,
+    FresnelTransformPropagator,
+    PropagatorParameters,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -106,8 +112,14 @@ def _center_pos(index: int = 0) -> ProbePosition:
     return ProbePosition(index=index, x_m=0.0, y_m=0.0)
 
 
-def _fraunhofer_intensity(probe_mode: numpy.ndarray, product: Product) -> numpy.ndarray:
-    """Return |FraunhoferPropagator.propagate(probe_mode)|² using the same parameters."""
+def _far_field_intensity(probe_mode: numpy.ndarray, product: Product) -> numpy.ndarray:
+    """Return |FresnelTransformPropagator.propagate(probe_mode)|² using the same parameters.
+
+    The Fresnel transform rather than Fraunhofer: the two share an output grid, but
+    Fraunhofer drops the input quadratic phase, which is only valid while
+    ``N**2 * pixel_fresnel_number_x << 1``. That is 0.012 here, enough to move the
+    intensities by about 10% in the corners.
+    """
     metadata = product.metadata
     probe_geometry = product.probes.get_geometry()
     params = PropagatorParameters(
@@ -118,7 +130,7 @@ def _fraunhofer_intensity(probe_mode: numpy.ndarray, product: Product) -> numpy.
         pixel_height_m=probe_geometry.pixel_height_m,
         propagation_distance_m=metadata.detector_distance_m,
     )
-    return numpy.square(numpy.abs(FraunhoferPropagator(params).propagate(probe_mode)))
+    return numpy.square(numpy.abs(FresnelTransformPropagator(params).propagate(probe_mode)))
 
 
 # ---------------------------------------------------------------------------
@@ -163,9 +175,9 @@ class TestOutputProperties:
 
 
 class TestPatternValues:
-    def test_flat_object_matches_fraunhofer_of_probe(self) -> None:
+    def test_flat_object_matches_far_field_propagation_of_probe(self) -> None:
         """For an all-ones object at the integer center, exit wave = probe, so the
-        pattern must equal |Fraunhofer(probe)|²."""
+        pattern must equal |FresnelTransform(probe)|²."""
         rng = numpy.random.default_rng(10)
         probe = _random_probe(rng)  # shape (1, H, W)
         product = _make_product([_center_pos()], probe, _flat_object())
@@ -173,7 +185,7 @@ class TestPatternValues:
         result = generate_diffraction_data(product)
 
         # probe[0] is the single incoherent mode; object patch is all ones → no effect
-        expected = _fraunhofer_intensity(probe[0], product)
+        expected = _far_field_intensity(probe[0], product)
         numpy.testing.assert_allclose(result.get_pattern(0), expected, rtol=1e-12)
 
     def test_subpixel_shift_changes_pattern(self) -> None:
@@ -329,3 +341,128 @@ class TestMultiPositionWithoutOpr:
         # The bug symptom was patterns[1:] all zero. Assert every position has signal.
         for i in range(3):
             assert numpy.sum(result.get_pattern(i)) > 0.0
+
+
+# ---------------------------------------------------------------------------
+# Near field
+# ---------------------------------------------------------------------------
+
+
+# Angular spectrum is the correctly-sampled choice while z <= N dx^2 / lambda, which is
+# 0.73 mm for this 16 x 16 grid at 75 nm. These distances sit well inside that, so the
+# geometry is genuinely near field rather than merely declared so.
+_NEAR_FIELD_DISTANCE_M = 1e-4
+_NEAR_FIELD_FOCUS_M = 1e-5
+_NEAR_FIELD_MAGNIFICATION = 9.0  # |(1e-4 - 1e-5) / 1e-5|
+
+
+def _near_field_product(
+    probe_array: numpy.ndarray,
+    *,
+    focus_object_distance_m: float = 0.0,
+    detector_distance_m: float = _NEAR_FIELD_DISTANCE_M,
+) -> Product:
+    """A product declaring near-field propagation, optionally through a cone."""
+    return dataclasses.replace(
+        _make_product([_center_pos()], probe_array, _flat_object()),
+        metadata=dataclasses.replace(
+            _metadata(),
+            far_field=False,
+            focus_object_distance_m=focus_object_distance_m,
+            detector_distance_m=detector_distance_m,
+        ),
+    )
+
+
+class TestNearField:
+    """A near-field product propagates in the equivalent parallel-beam geometry, then
+    reports the detector pitch scaled back up by the magnification.
+    """
+
+    def test_parallel_beam_detector_pitch_equals_the_probe_pitch(self) -> None:
+        """At M = 1 the object grid and the detector grid coincide; angular spectrum
+        preserves pitch, so the reported detector pitch is the probe pitch."""
+        probe = _random_probe(numpy.random.default_rng(50))
+
+        result = generate_diffraction_data(_near_field_product(probe))
+
+        assert result.get_pixel_geometry().width_m == pytest.approx(_PIXEL_SIZE_M)
+        assert result.get_pixel_geometry().height_m == pytest.approx(_PIXEL_SIZE_M)
+
+    def test_parallel_beam_does_not_report_the_far_field_pitch(self) -> None:
+        probe = _random_probe(numpy.random.default_rng(51))
+        far = dataclasses.replace(
+            _near_field_product(probe),
+            metadata=dataclasses.replace(
+                _metadata(), far_field=True, detector_distance_m=_NEAR_FIELD_DISTANCE_M
+            ),
+        )
+
+        near_pitch = generate_diffraction_data(_near_field_product(probe)).get_pixel_geometry()
+        far_pitch = generate_diffraction_data(far).get_pixel_geometry()
+
+        assert near_pitch.width_m != pytest.approx(far_pitch.width_m)
+
+    def test_cone_beam_detector_pitch_is_scaled_by_the_magnification(self) -> None:
+        """The scaling theorem maps the equivalent plane back onto the real detector."""
+        probe = _random_probe(numpy.random.default_rng(52))
+        product = _near_field_product(probe, focus_object_distance_m=_NEAR_FIELD_FOCUS_M)
+
+        result = generate_diffraction_data(product)
+
+        assert result.get_pixel_geometry().width_m == pytest.approx(
+            _PIXEL_SIZE_M * _NEAR_FIELD_MAGNIFICATION
+        )
+
+    def test_detector_at_the_focus_raises(self) -> None:
+        probe = _random_probe(numpy.random.default_rng(53))
+        product = _near_field_product(probe, focus_object_distance_m=_NEAR_FIELD_DISTANCE_M)
+
+        with pytest.raises(ValueError, match='magnification'):
+            generate_diffraction_data(product)
+
+    def test_matches_a_directly_constructed_angular_spectrum_propagator(self) -> None:
+        """The forward model must agree with the propagator applied by hand."""
+        probe = _random_probe(numpy.random.default_rng(54))
+        product = _near_field_product(probe)
+
+        result = generate_diffraction_data(product)
+
+        params = PropagatorParameters(
+            wavelength_m=product.metadata.probe_wavelength_m,
+            width_px=_PROBE_PX,
+            height_px=_PROBE_PX,
+            pixel_width_m=_PIXEL_SIZE_M,
+            pixel_height_m=_PIXEL_SIZE_M,
+            propagation_distance_m=_NEAR_FIELD_DISTANCE_M,
+        )
+        expected = numpy.square(numpy.abs(AngularSpectrumPropagator(params).propagate(probe[0])))
+
+        numpy.testing.assert_allclose(result.get_pattern(0), expected, rtol=1e-12)
+
+    def test_the_propagator_is_chosen_by_sampling_not_by_declaration(self) -> None:
+        """Declaring near field does not force a near-field grid: choose_propagator
+        picks whatever is correctly sampled, so a far-field-sampled geometry still
+        lands on the reciprocal grid. A product declaring a regime its own geometry
+        contradicts is what warn_if_propagation_regime_disagrees reports.
+        """
+        probe = _random_probe(numpy.random.default_rng(56))
+        # 1 m is three orders beyond the angular-spectrum crossover for this grid.
+        product = _near_field_product(probe, detector_distance_m=_DETECTOR_DISTANCE_M)
+
+        result = generate_diffraction_data(product)
+
+        far_field_pitch_m = (
+            product.metadata.probe_wavelength_m * _DETECTOR_DISTANCE_M / (_PROBE_PX * _PIXEL_SIZE_M)
+        )
+        assert result.get_pixel_geometry().width_m == pytest.approx(far_field_pitch_m)
+
+    def test_far_field_product_is_unaffected_by_the_near_field_path(self) -> None:
+        """The regime is read off the product, so a far-field one must be untouched."""
+        probe = _random_probe(numpy.random.default_rng(55))
+        product = _make_product([_center_pos()], probe, _flat_object())
+
+        result = generate_diffraction_data(product)
+
+        expected = _far_field_intensity(probe[0], product)
+        numpy.testing.assert_allclose(result.get_pattern(0), expected, rtol=1e-12)

@@ -57,6 +57,7 @@ class ProductRepositoryItemFactory:
         name: str = '',
         comments: str = '',
         detector_distance_m: float | None = None,
+        focus_object_distance_m: float | None = None,
         probe_energy_eV: float | None = None,  # noqa: N803
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
@@ -64,6 +65,7 @@ class ProductRepositoryItemFactory:
         tomography_angle_deg: float | None = None,
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
+        far_field: bool | None = None,
         dataset: AssembledDiffractionDataset | None = None,
     ) -> ProductRepositoryItem:
         metadata_item = MetadataRepositoryItem(
@@ -72,6 +74,7 @@ class ProductRepositoryItemFactory:
             name=name,
             comments=comments,
             detector_distance_m=detector_distance_m,
+            focus_object_distance_m=focus_object_distance_m,
             probe_energy_eV=probe_energy_eV,
             probe_photon_count=probe_photon_count,
             exposure_time_s=exposure_time_s,
@@ -79,6 +82,7 @@ class ProductRepositoryItemFactory:
             tomography_angle_deg=tomography_angle_deg,
             tilt_angle_deg=tilt_angle_deg,
             polarization=polarization,
+            far_field=far_field,
         )
 
         scan_item = self._scan_item_factory.create()
@@ -111,6 +115,7 @@ class ProductRepositoryItemFactory:
             name=product.metadata.name if name is None else name,
             comments=product.metadata.comments,
             detector_distance_m=product.metadata.detector_distance_m,
+            focus_object_distance_m=product.metadata.focus_object_distance_m,
             probe_energy_eV=product.metadata.probe_energy_eV,
             probe_photon_count=product.metadata.probe_photon_count,
             exposure_time_s=product.metadata.exposure_time_s,
@@ -118,6 +123,7 @@ class ProductRepositoryItemFactory:
             tomography_angle_deg=product.metadata.tomography_angle_deg,
             tilt_angle_deg=product.metadata.tilt_angle_deg,
             polarization=product.metadata.polarization,
+            far_field=product.metadata.far_field,
         )
 
         scan_item = self._scan_item_factory.create(product.probe_positions)

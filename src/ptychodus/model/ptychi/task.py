@@ -48,7 +48,11 @@ from ptychodus.api.object import Object, ObjectPosition
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import LossValue, Product
-from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
+from ptychodus.api.reconstruct import (
+    ReconstructInput,
+    ReconstructOutput,
+    warn_if_propagation_regime_disagrees,
+)
 from ptychodus.api.typing import RealArrayType
 
 logger = logging.getLogger(__name__)
@@ -132,13 +136,11 @@ def _differs(lhs: Any, rhs: Any) -> bool:
     return bool(lhs != rhs)
 
 
-def _overwrite(options: Any, name: str, value: Any, *, unset: bool = False) -> None:
+def _overwrite(options: Any, name: str, value: Any) -> None:
     """Write `value` onto `options.name`, logging what changed.
 
     Warns only when the caller had expressed an intent that disagrees, i.e. the
-    old value was neither pty-chi's default nor the value being written. Pass
-    `unset` for a field whose incoming value is an internal placeholder rather
-    than a caller's intent; it suppresses the warning but not the debug line.
+    old value was neither pty-chi's default nor the value being written.
     """
     options_cls = type(options)
     old = getattr(options, name)
@@ -148,9 +150,6 @@ def _overwrite(options: Any, name: str, value: Any, *, unset: bool = False) -> N
     # below see the stored form and an ndarray does not warn against itself.
     new = getattr(options, name)
     logger.debug('%s.%s: %r -> %r', options_cls.__name__, name, old, new)
-
-    if unset:
-        return
 
     # Defaults come off a throwaway instance rather than ``dataclasses.fields``:
     # pty-chi declares its constrained scalars with ``PydanticField(...)``, whose
@@ -238,10 +237,11 @@ def align_task_options_with_product(
     the settings alone. The copy is deep: a caller that has attached task arrays
     to the options pays to duplicate them, though no in-ptychodus path does.
 
-    `free_space_propagation_distance_m` is the one field split between a setting
-    and the product. An infinite incoming value means the caller chose far-field
-    propagation and is left alone; anything else is near-field, and the product
-    supplies the distance.
+    `free_space_propagation_distance_m` follows the product's declared propagation
+    regime: infinite for far field, and the demagnified detector distance for near
+    field. A caller-supplied distance that disagrees is overwritten with a warning,
+    as any other product-derived field would be. A product whose declared regime
+    contradicts its own geometry warns separately and is not corrected.
 
     The probe pixel fields are written from the product's probe pixel geometry
     by :func:`_align_probe_pixel_geometry`, which leaves them ``None`` -- pty-chi
@@ -284,18 +284,16 @@ def align_task_options_with_product(
 
     _overwrite(aligned.data_options, 'wavelength_m', metadata.probe_wavelength_m)
 
-    propagation_distance_m = aligned.data_options.free_space_propagation_distance_m
+    # Near field: pty-chi propagates in the equivalent parallel-beam geometry, so a
+    # cone beam contributes its demagnified distance. Without a focusing optic the
+    # magnification is 1 and this is the detector distance unchanged.
+    _overwrite(
+        aligned.data_options,
+        'free_space_propagation_distance_m',
+        math.inf if metadata.far_field else metadata.detector_distance_m / metadata.magnification,
+    )
 
-    if not math.isinf(propagation_distance_m):
-        # Near field: pty-chi propagates in the equivalent parallel-beam geometry, so
-        # a cone beam contributes its demagnified distance. Without a focusing optic
-        # the magnification is 1 and this is the detector distance unchanged.
-        _overwrite(
-            aligned.data_options,
-            'free_space_propagation_distance_m',
-            metadata.detector_distance_m / metadata.magnification,
-            unset=math.isnan(propagation_distance_m),
-        )
+    warn_if_propagation_regime_disagrees(product)
 
     _overwrite(aligned.probe_options.power_constraint, 'probe_power', metadata.probe_photon_count)
 
@@ -352,10 +350,9 @@ def reconstruct_with_ptychi(
     context."""
     from ptychi.api.task import PtychographyTask
 
-    # The near-field placeholder that PtyChiCommon emits, escaping into a run.
-    # pty-chi neither validates it nor warns -- both of its near-field guards
-    # test `< inf`, which NaN fails -- so the only other symptom would be a NaN
-    # loss on the first epoch.
+    # A hand-built options object that skipped alignment. pty-chi neither validates
+    # NaN nor warns -- both of its near-field guards test `< inf`, which NaN fails --
+    # so the only other symptom would be a NaN loss on the first epoch.
     if math.isnan(task_options.data_options.free_space_propagation_distance_m):
         raise ValueError(
             'free_space_propagation_distance_m is NaN; call '

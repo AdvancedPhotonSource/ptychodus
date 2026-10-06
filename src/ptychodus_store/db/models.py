@@ -3,7 +3,18 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Index, Integer, String, Uuid, func
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Uuid,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ptychodus_store.db.base import Base, IngestState
@@ -115,6 +126,7 @@ class Product(Base):
     comments: Mapped[str | None] = mapped_column(String, nullable=True)
     detector_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
     focus_object_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    far_field: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     probe_energy_eV: Mapped[float | None] = mapped_column(Float, nullable=True)  # noqa: N815
     probe_photon_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     exposure_time_s: Mapped[float | None] = mapped_column(Float, nullable=True)

@@ -554,6 +554,7 @@ class ProductAPI:
         *,
         comments: str = '',
         detector_distance_m: float | None = None,
+        focus_object_distance_m: float | None = None,
         probe_energy_eV: float | None = None,  # noqa: N803
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
@@ -561,6 +562,7 @@ class ProductAPI:
         tomography_angle_deg: float | None = None,
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
+        far_field: bool | None = None,
         dataset: AssembledDiffractionDataset | None = None,
         block: bool = True,
     ) -> int:
@@ -569,6 +571,7 @@ class ProductAPI:
                 name=name,
                 comments=comments,
                 detector_distance_m=detector_distance_m,
+                focus_object_distance_m=focus_object_distance_m,
                 probe_energy_eV=probe_energy_eV,
                 probe_photon_count=probe_photon_count,
                 exposure_time_s=exposure_time_s,
@@ -576,6 +579,7 @@ class ProductAPI:
                 tomography_angle_deg=tomography_angle_deg,
                 tilt_angle_deg=tilt_angle_deg,
                 polarization=polarization,
+                far_field=far_field,
                 dataset=dataset,
             )
 

@@ -34,6 +34,7 @@ def _make_geometry(
     *,
     detector_distance_m: float = _DETECTOR_DISTANCE_M,
     focus_object_distance_m: float = 0.0,
+    far_field: bool = True,
     bind_detector: bool = True,
 ) -> ProductGeometry:
     metadata_item = MetadataRepositoryItem(
@@ -42,6 +43,7 @@ def _make_geometry(
         detector_distance_m=detector_distance_m,
         focus_object_distance_m=focus_object_distance_m,
         probe_energy_eV=_PROBE_ENERGY_EV,
+        far_field=far_field,
     )
     geometry = ProductGeometry(metadata_item, MagicMock())
 
@@ -126,9 +128,10 @@ class TestFresnelNumber:
 
 
 class TestConeBeamGeometry:
-    """A focusing optic switches the sample plane from the far-field reciprocal
-    relation to a geometric projection. The sign of the focus coordinate selects
-    which side of the object the focus sits on, and therefore which geometry.
+    """A focusing optic sets the magnification, which scales the near-field geometric
+    projection and the equivalent parallel-beam distance. The sign of the focus
+    coordinate selects which side of the object the focus sits on. The optic does not
+    select the propagation regime -- the product declares that independently.
     """
 
     # Focus 5 mm downstream of the object: the object sits in a converging beam that
@@ -155,7 +158,7 @@ class TestConeBeamGeometry:
         assert geometry.magnification == pytest.approx(self._DIVERGING_MAGNIFICATION)
 
     def test_object_plane_pixel_is_the_demagnified_detector_pixel(self) -> None:
-        geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M)
+        geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M, far_field=False)
         expected_m = _DETECTOR_PITCH_M / self._CONVERGING_MAGNIFICATION
 
         pixel_geometry = geometry.get_object_plane_pixel_geometry()
@@ -163,12 +166,17 @@ class TestConeBeamGeometry:
         assert pixel_geometry.width_m == pytest.approx(expected_m)
         assert pixel_geometry.height_m == pytest.approx(expected_m)
 
-    def test_object_plane_pixel_is_unchanged_without_a_focusing_optic(self) -> None:
-        """The far-field path must be bit-identical when no optic is declared."""
-        far_field = _make_geometry().get_object_plane_pixel_geometry()
-        explicit_parallel = _make_geometry(focus_object_distance_m=0.0)
+    def test_a_focusing_optic_does_not_imply_near_field_sampling(self) -> None:
+        """Regression guard: the optic sets M, the product sets the regime.
 
-        assert explicit_parallel.get_object_plane_pixel_geometry() == far_field
+        Before the regime was declared, a nonzero focus distance alone switched the
+        sample plane to the geometric projection, which made far field with a
+        focusing optic inexpressible.
+        """
+        without_optic = _make_geometry().get_object_plane_pixel_geometry()
+        with_optic = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M)
+
+        assert with_optic.get_object_plane_pixel_geometry() == without_optic
 
     def test_propagation_distance_is_reduced_by_the_magnification(self) -> None:
         geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M)
@@ -180,7 +188,7 @@ class TestConeBeamGeometry:
         assert _make_geometry().object_plane_propagation_distance_m == _DETECTOR_DISTANCE_M
 
     def test_fresnel_number_uses_the_equivalent_parallel_beam_distance(self) -> None:
-        geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M)
+        geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M, far_field=False)
         magnification = self._CONVERGING_MAGNIFICATION
         width_m = _NUM_PX * _DETECTOR_PITCH_M / magnification
         expected = width_m**2 / (_WAVELENGTH_M * _DETECTOR_DISTANCE_M / magnification)
@@ -189,16 +197,75 @@ class TestConeBeamGeometry:
 
     def test_fresnel_number_reports_near_field_for_a_magnifying_geometry(self) -> None:
         """The indicator must actually flip regime, not merely change value."""
-        geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M)
+        geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M, far_field=False)
 
         assert _make_geometry().fresnel_number < 1.0
         assert geometry.fresnel_number > 1.0
 
     def test_detector_at_the_focus_degrades_rather_than_dividing_by_zero(self) -> None:
         """M = 0 is degenerate; follow the class's degrade-to-zero convention."""
-        geometry = _make_geometry(focus_object_distance_m=_DETECTOR_DISTANCE_M)
+        geometry = _make_geometry(focus_object_distance_m=_DETECTOR_DISTANCE_M, far_field=False)
 
         assert geometry.magnification == 0.0
         assert geometry.object_plane_propagation_distance_m == 0.0
         assert geometry.get_object_plane_pixel_geometry() == PixelGeometry(0.0, 0.0)
         assert geometry.fresnel_number == 0.0
+
+
+class TestNearFieldSampling:
+    """A declared near-field product samples the object on the back-projected detector
+    grid, including the parallel-beam case where the magnification is exactly one and
+    the two grids coincide. That case has no cone to key off, which is why the regime
+    is declared rather than inferred.
+    """
+
+    _FOCUS_M = 5e-3
+    _MAGNIFICATION = 199.0
+
+    def test_parallel_beam_object_pixel_is_the_detector_pixel(self) -> None:
+        pixel_geometry = _make_geometry(far_field=False).get_object_plane_pixel_geometry()
+
+        assert pixel_geometry.width_m == pytest.approx(_DETECTOR_PITCH_M)
+        assert pixel_geometry.height_m == pytest.approx(_DETECTOR_PITCH_M)
+
+    def test_parallel_beam_does_not_return_the_far_field_value(self) -> None:
+        """The two differ by orders of magnitude here, so the branch is unambiguous."""
+        near = _make_geometry(far_field=False).get_object_plane_pixel_geometry()
+        far = _make_geometry(far_field=True).get_object_plane_pixel_geometry()
+
+        assert near.width_m != pytest.approx(far.width_m)
+
+    def test_cone_beam_object_pixel_is_demagnified(self) -> None:
+        geometry = _make_geometry(focus_object_distance_m=self._FOCUS_M, far_field=False)
+
+        pixel_geometry = geometry.get_object_plane_pixel_geometry()
+
+        assert pixel_geometry.width_m == pytest.approx(_DETECTOR_PITCH_M / self._MAGNIFICATION)
+
+    def test_probe_geometry_carries_the_near_field_pitch(self) -> None:
+        geometry = _make_geometry(far_field=False)
+
+        assert geometry.get_probe_geometry().pixel_width_m == pytest.approx(_DETECTOR_PITCH_M)
+
+    def test_object_geometry_carries_the_near_field_pitch(self) -> None:
+        geometry = _make_geometry(far_field=False)
+        geometry._scan_item.get_probe_positions.return_value = []  # type: ignore[attr-defined]
+
+        assert geometry.get_object_geometry().pixel_width_m == pytest.approx(_DETECTOR_PITCH_M)
+
+    def test_parallel_beam_fresnel_number_reports_near_field(self) -> None:
+        """Declaring near field on this geometry is self-consistent: 256 x 75 um at
+        1 m is deeply near field, where the far-field declaration reads 0.022."""
+        assert _make_geometry(far_field=True).fresnel_number < 1.0
+        assert _make_geometry(far_field=False).fresnel_number > 1.0
+
+    def test_flipping_the_regime_notifies_observers(self) -> None:
+        """The probe and object rebuild off this notification, so the sampling change
+        must propagate without a separate push."""
+        geometry = _make_geometry()
+        observer = MagicMock()
+        geometry.add_observer(observer)
+
+        geometry._metadata_item.far_field.set_value(False)
+
+        observer._update.assert_called_once_with(geometry)

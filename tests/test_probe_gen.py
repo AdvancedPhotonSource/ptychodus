@@ -31,6 +31,7 @@ from ptychodus.api.simulate.probe import (
     generate_incoherent_probe_modes,
 )
 from ptychodus.api.propagate import (
+    AngularSpectrumPropagator,
     FresnelTransformPropagator,
     compute_far_field_pixel_geometry,
     PropagatorParameters,
@@ -370,6 +371,102 @@ class TestGenerateAveragePatternProbe:
                 _assembled_data(patterns),
                 probe_wavelength_m=_BACKPROP_WAVELENGTH_M,
                 detector_distance_m=0.0,
+            )
+
+
+# A near-field product samples the object on the detector grid itself, so the
+# "sample pitch" is the detector pitch demagnified rather than the reciprocal relation.
+_NEAR_FIELD_MAGNIFICATION = 4.0
+_NEAR_FIELD_SAMPLE_PITCH_M = _BACKPROP_DETECTOR_PITCH_M / _NEAR_FIELD_MAGNIFICATION
+
+
+def _near_field_sample_geometry(magnification: float = _NEAR_FIELD_MAGNIFICATION) -> ProbeGeometry:
+    pitch_m = _BACKPROP_DETECTOR_PITCH_M / magnification
+    return ProbeGeometry(
+        width_px=_BACKPROP_NUM_PX,
+        height_px=_BACKPROP_NUM_PX,
+        pixel_width_m=pitch_m,
+        pixel_height_m=pitch_m,
+    )
+
+
+class TestGenerateAveragePatternProbeNearField:
+    """Near field back-propagates with the angular spectrum, which preserves pitch, so
+    the probe lands on the grid the caller already declared and there is no output
+    pitch to reconcile.
+    """
+
+    def test_returns_the_declared_sample_pitch(self) -> None:
+        patterns = numpy.ones((1, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
+        geometry = _near_field_sample_geometry()
+
+        result = generate_average_pattern_probe(
+            geometry,
+            _assembled_data(patterns),
+            probe_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            detector_distance_m=_BACKPROP_DISTANCE_M,
+            far_field=False,
+        )
+
+        assert result.get_pixel_geometry() == geometry.get_pixel_geometry()
+        assert result.get_array().shape[-2:] == (_BACKPROP_NUM_PX, _BACKPROP_NUM_PX)
+
+    def test_the_far_field_pitch_check_does_not_fire(self) -> None:
+        """A near-field grid disagrees with the Fraunhofer relation by orders of
+        magnitude; before near field was supported this raised, which left the
+        estimator unusable on exactly the products it suits best.
+        """
+        patterns = numpy.ones((1, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
+
+        assert _NEAR_FIELD_SAMPLE_PITCH_M != pytest.approx(_BACKPROP_SAMPLE_PITCH_M)
+        generate_average_pattern_probe(
+            _near_field_sample_geometry(),
+            _assembled_data(patterns),
+            probe_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            detector_distance_m=_BACKPROP_DISTANCE_M,
+            far_field=False,
+        )
+
+    def test_matches_a_directly_constructed_angular_spectrum_propagator(self) -> None:
+        """The magnification is read off the pitch ratio, which fixes the equivalent
+        parallel-beam distance at z_d / M."""
+        rng = numpy.random.default_rng(7)
+        patterns = rng.random((3, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
+        geometry = _near_field_sample_geometry()
+
+        result = generate_average_pattern_probe(
+            geometry,
+            _assembled_data(patterns),
+            probe_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            detector_distance_m=_BACKPROP_DISTANCE_M,
+            far_field=False,
+        )
+
+        params = PropagatorParameters(
+            wavelength_m=_BACKPROP_WAVELENGTH_M,
+            width_px=_BACKPROP_NUM_PX,
+            height_px=_BACKPROP_NUM_PX,
+            pixel_width_m=_NEAR_FIELD_SAMPLE_PITCH_M,
+            pixel_height_m=_NEAR_FIELD_SAMPLE_PITCH_M,
+            propagation_distance_m=-_BACKPROP_DISTANCE_M / _NEAR_FIELD_MAGNIFICATION,
+        )
+        expected = AngularSpectrumPropagator(params).propagate(
+            numpy.sqrt(numpy.mean(patterns, axis=0)).astype(complex)
+        )
+
+        # get_array normalizes the single mode to a (1, H, W) stack.
+        numpy.testing.assert_allclose(result.get_array()[0], expected, rtol=1e-12)
+
+    def test_the_far_field_path_is_unchanged_by_default(self) -> None:
+        """far_field defaults to True, so existing callers keep the Fraunhofer check."""
+        patterns = numpy.ones((1, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
+
+        with pytest.raises(ValueError, match='does not match'):
+            generate_average_pattern_probe(
+                _near_field_sample_geometry(),
+                _assembled_data(patterns),
+                probe_wavelength_m=_BACKPROP_WAVELENGTH_M,
+                detector_distance_m=_BACKPROP_DISTANCE_M,
             )
 
 

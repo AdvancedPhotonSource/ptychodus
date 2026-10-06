@@ -422,6 +422,7 @@ class TestProductRoundTrip:
         assert a.focus_object_distance_m == pytest.approx(b.focus_object_distance_m)
         assert a.tilt_angle_deg == pytest.approx(b.tilt_angle_deg)
         assert a.polarization == b.polarization
+        assert a.far_field == b.far_field
 
     def test_basic_round_trip(self, tmp_path: Path) -> None:
         original = _make_product()
@@ -1130,6 +1131,8 @@ DISTINCTIVE_METADATA: Final[dict[str, Any]] = {
     'focus_object_distance_m': -2.5e-3,
     'tilt_angle_deg': 61.0,
     'polarization': Polarization.RIGHT_CIRCULAR,
+    # Away from the True default, so a writer that drops the field is caught.
+    'far_field': False,
 }
 
 

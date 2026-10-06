@@ -20,6 +20,7 @@ from ..probe import Probe, ProbeGeometry, ProbeSequence, ProbeTransverseCoordina
 from ..propagate import (
     AngularSpectrumPropagator,
     FresnelTransformPropagator,
+    Propagator,
     PropagatorParameters,
     compute_far_field_pixel_geometry,
     intensity,
@@ -132,14 +133,23 @@ def generate_average_pattern_probe(
     *,
     probe_wavelength_m: float,
     detector_distance_m: float,
+    far_field: bool = True,
     rtol: float = 1.0e-3,
 ) -> Probe:
     """Back-propagate the square root of the mean diffraction pattern to estimate the probe.
 
-    Raises ValueError if the diffraction-pattern shape or the Fresnel-transform's implied
-    sample-plane pixel size are inconsistent with *geometry*. The single-FFT Fresnel
-    propagator preserves array shape, and its output pitch is ``lambda * |z| / (N * dx_det)``;
-    both must match what *geometry* declares for the returned Probe to be self-consistent.
+    Far field back-propagates with the single-FFT Fresnel transform, whose output pitch
+    is ``lambda * |z| / (N * dx_det)``; that pitch must match what *geometry* declares
+    for the returned Probe to be self-consistent, so it is checked against *rtol*.
+
+    Near field back-propagates with the angular spectrum, which preserves pitch, so the
+    probe lands on the grid *geometry* already describes and there is no output pitch to
+    check. The sample grid is the detector grid demagnified, which pins the magnification
+    at ``dx_det / dx_probe`` and the equivalent parallel-beam distance at ``z_d / M``.
+
+    Raises ValueError if the diffraction-pattern shape is inconsistent with *geometry*,
+    if the detector distance is zero, or -- far field only -- if the implied
+    sample-plane pixel size disagrees with *geometry*.
     """
     if detector_distance_m == 0.0:
         raise ValueError(
@@ -157,36 +167,53 @@ def generate_average_pattern_probe(
         )
 
     detector_pixel_geometry = assembled_data.get_pixel_geometry()
-    implied_geometry = ProbeGeometry.from_far_field(
-        detector_pixel_geometry,
-        ImageExtent(width_px=width_px, height_px=height_px),
-        wavelength_m=probe_wavelength_m,
-        distance_m=detector_distance_m,
-    )
+    probe_pixel_geometry = geometry.get_pixel_geometry()
 
-    if not numpy.isclose(
-        implied_geometry.pixel_width_m, geometry.pixel_width_m, rtol=rtol
-    ) or not numpy.isclose(implied_geometry.pixel_height_m, geometry.pixel_height_m, rtol=rtol):
-        raise ValueError(
-            'Fresnel-transform output pixel size '
-            f'({implied_geometry.pixel_width_m:.3e} x '
-            f'{implied_geometry.pixel_height_m:.3e} m) does not match '
-            f'probe geometry ({geometry.pixel_width_m:.3e} x {geometry.pixel_height_m:.3e} m) '
-            f'within rtol={rtol}.'
+    if far_field:
+        implied_geometry = ProbeGeometry.from_far_field(
+            detector_pixel_geometry,
+            ImageExtent(width_px=width_px, height_px=height_px),
+            wavelength_m=probe_wavelength_m,
+            distance_m=detector_distance_m,
         )
 
-    # Backward propagation, so PropagatorParameters' pitch describes the *output*
-    # (upstream) plane -- the sample plane, not the detector.
-    probe_pixel_geometry = geometry.get_pixel_geometry()
-    propagator_parameters = PropagatorParameters(
-        wavelength_m=probe_wavelength_m,
-        width_px=width_px,
-        height_px=height_px,
-        pixel_width_m=probe_pixel_geometry.width_m,
-        pixel_height_m=probe_pixel_geometry.height_m,
-        propagation_distance_m=-detector_distance_m,
-    )
-    propagator = FresnelTransformPropagator(propagator_parameters)
+        if not numpy.isclose(
+            implied_geometry.pixel_width_m, geometry.pixel_width_m, rtol=rtol
+        ) or not numpy.isclose(implied_geometry.pixel_height_m, geometry.pixel_height_m, rtol=rtol):
+            raise ValueError(
+                'Fresnel-transform output pixel size '
+                f'({implied_geometry.pixel_width_m:.3e} x '
+                f'{implied_geometry.pixel_height_m:.3e} m) does not match '
+                f'probe geometry ({geometry.pixel_width_m:.3e} x '
+                f'{geometry.pixel_height_m:.3e} m) within rtol={rtol}.'
+            )
+
+        # Backward propagation, so PropagatorParameters' pitch describes the *output*
+        # (upstream) plane -- the sample plane, not the detector.
+        propagator_parameters = PropagatorParameters(
+            wavelength_m=probe_wavelength_m,
+            width_px=width_px,
+            height_px=height_px,
+            pixel_width_m=probe_pixel_geometry.width_m,
+            pixel_height_m=probe_pixel_geometry.height_m,
+            propagation_distance_m=-detector_distance_m,
+        )
+        propagator: Propagator = FresnelTransformPropagator(propagator_parameters)
+    else:
+        # The sample grid is the detector grid demagnified, so the pitch ratio is the
+        # magnification and no separate output-pitch check is possible or needed:
+        # angular spectrum returns the field on the grid it was given.
+        magnification = detector_pixel_geometry.width_m / probe_pixel_geometry.width_m
+        propagator_parameters = PropagatorParameters(
+            wavelength_m=probe_wavelength_m,
+            width_px=width_px,
+            height_px=height_px,
+            pixel_width_m=probe_pixel_geometry.width_m,
+            pixel_height_m=probe_pixel_geometry.height_m,
+            propagation_distance_m=-detector_distance_m / magnification,
+        )
+        propagator = AngularSpectrumPropagator(propagator_parameters)
+
     array = propagator.propagate(numpy.sqrt(detector_intensity).astype(complex))
 
     return Probe(array=array, pixel_geometry=probe_pixel_geometry)

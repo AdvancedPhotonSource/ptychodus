@@ -76,6 +76,67 @@ def compute_far_field_pixel_geometry(
     )
 
 
+def compute_near_field_pixel_geometry(
+    pixel_geometry: PixelGeometry, *, magnification: float
+) -> PixelGeometry:
+    """Pixel geometry of the object plane under the geometric projection ``dx_out = dx_in / M``.
+
+    A cone beam of magnification ``M`` projects the detector pixels back onto the object
+    demagnified by ``M``, so this is pure projection geometry: it involves no diffraction
+    and therefore takes neither a wavelength nor a propagation distance, unlike
+    :func:`compute_far_field_pixel_geometry`. Without a focusing optic ``M`` is 1 and the
+    result is the input unchanged -- the defining property of the near-field regime, where
+    the object grid and the detector grid coincide.
+
+    Each axis is projected independently, so an anisotropic detector pixel stays
+    anisotropic.
+
+    Raises:
+        ZeroDivisionError: at zero magnification, which places the detector at the focus
+            where the projection is undefined. Callers that must degrade gracefully catch
+            it rather than receiving an invented sentinel.
+    """
+    # Python-float arithmetic throughout, for the reason given in
+    # compute_far_field_pixel_geometry: a numpy intermediate yields inf rather than
+    # raising, and callers rely on the exception.
+    return PixelGeometry(
+        width_m=pixel_geometry.width_m / magnification,
+        height_m=pixel_geometry.height_m / magnification,
+    )
+
+
+def compute_full_aperture_fresnel_number(
+    pixel_geometry: PixelGeometry,
+    extent: ImageExtent,
+    *,
+    wavelength_m: float,
+    propagation_distance_m: float,
+) -> float:
+    """Full-aperture Fresnel number ``W H / (lambda z)`` of a plane of this pitch and extent.
+
+    The propagation-regime indicator: much less than one is far field, near one is
+    transitional, much greater than one is near field.
+
+    Distinct from :attr:`PropagatorParameters.pixel_fresnel_number_x`, the signed
+    per-pixel quantity ``dx^2 / (lambda z)`` taken along the width axis alone; the two
+    differ by a factor of ``width_px * height_px * (dy / dx)``, the ``dy / dx`` arising
+    precisely because that one is width-only. This number spans both axes instead,
+    since an aperture has no preferred one.
+
+    The distance is used as given rather than as a magnitude, so the two agree on sign
+    convention. That convention carries less weight here: a regime indicator has no
+    direction, and this is only ever evaluated at a positive distance, whereas the sign
+    of the per-pixel number is load-bearing in the propagator phases.
+
+    Raises:
+        ZeroDivisionError: at zero wavelength or zero propagation distance, where the
+            number is undefined.
+    """
+    width_m = extent.width_px * pixel_geometry.width_m
+    height_m = extent.height_px * pixel_geometry.height_m
+    return width_m * height_m / (wavelength_m * propagation_distance_m)
+
+
 def compute_far_field_propagation_distance(
     pixel_geometry: PixelGeometry,
     extent: ImageExtent,
@@ -170,16 +231,25 @@ class PropagatorParameters:
         return self.propagation_distance_m / self.wavelength_m
 
     @property
-    def pixel_fresnel_number(self) -> float:
-        """Signed per-pixel Fresnel number ``dx^2 / (lambda z)``.
+    def pixel_fresnel_number_x(self) -> float:
+        """Signed per-pixel Fresnel number ``dx^2 / (lambda z)`` along the width axis.
 
-        Signed because the propagator phase terms must conjugate when the propagation
+        Meaningful only paired with :attr:`pixel_aspect_ratio`, which is how the
+        propagator algebra carries the height: every use of this number inside the
+        single-FFT propagators is combined with a power of the aspect ratio that
+        recovers the corresponding per-axis quantity. The amplitude prefactor, for
+        one, computes the symmetric ``dx dy / (lambda z)`` as ``Fr / ar`` rather than
+        storing it. Redefining this number to span both axes would therefore
+        double-count the height -- and would do so silently, since every such error
+        vanishes for square pixels.
+
+        Signed because those phase terms must conjugate when the propagation
         direction reverses; take :func:`numpy.absolute` where only the magnitude is
-        meant. Width-only because the propagator algebra carries the y-axis separately
-        through :attr:`pixel_aspect_ratio`.
+        meant. Contrast :func:`compute_full_aperture_fresnel_number`, which shares the
+        signed convention incidentally rather than load-bearingly.
 
-        Distinct from ``ProductGeometry.fresnel_number``, which is the full-aperture
-        number ``W H / (lambda z)``; the two differ by a factor of ``width_px *
+        Distinct from that function in value as well: it is the full-aperture number
+        ``W H / (lambda z)``, and the two differ by a factor of ``width_px *
         height_px * (dy / dx)``.
         """
         return numpy.square(self.dx) / self.z
@@ -253,7 +323,7 @@ class FresnelTransformPropagator(Propagator):
     stays accurate outside the far field.
 
     The dropped/retained quadratic phase spans ``X_max = N / 2``, so the controlling
-    quantity for far-field validity is ``N^2 * pixel_fresnel_number``, not the pixel
+    quantity for far-field validity is ``N^2 * pixel_fresnel_number_x``, not the pixel
     Fresnel number alone. For N=256 that makes the honest condition ``Fr << 1.5e-5``.
     """
 
@@ -269,7 +339,7 @@ class FresnelTransformPropagator(Propagator):
 
         # Signed: C2 and _B are pure phases that must conjugate when the direction
         # reverses, which is what makes the backward branch the forward branch's inverse.
-        Fr = parameters.pixel_fresnel_number  # noqa: N806
+        Fr = parameters.pixel_fresnel_number_x  # noqa: N806
         ar = parameters.pixel_aspect_ratio
         N = parameters.width_px  # noqa: N806
         M = parameters.height_px  # noqa: N806
@@ -298,7 +368,7 @@ class FraunhoferPropagator(Propagator):
     input quadratic phase ``exp(i pi Fr (X^2 + Y^2))`` dropped.
 
     The dropped/retained quadratic phase spans ``X_max = N / 2``, so the controlling
-    quantity for far-field validity is ``N^2 * pixel_fresnel_number``, not the pixel
+    quantity for far-field validity is ``N^2 * pixel_fresnel_number_x``, not the pixel
     Fresnel number alone. For N=256 that makes the honest condition ``Fr << 1.5e-5``.
 
     Shares the pitch and direction conventions of :class:`FresnelTransformPropagator`.
@@ -315,7 +385,7 @@ class FraunhoferPropagator(Propagator):
         ipi = 1j * numpy.pi
 
         # Signed phase, magnitude-only prefactor -- see FresnelTransformPropagator.
-        Fr = parameters.pixel_fresnel_number  # noqa: N806
+        Fr = parameters.pixel_fresnel_number_x  # noqa: N806
         ar = parameters.pixel_aspect_ratio
         N = parameters.width_px  # noqa: N806
         M = parameters.height_px  # noqa: N806
@@ -351,7 +421,7 @@ def choose_propagator(parameters: PropagatorParameters) -> tuple[Propagator, Pix
       on the source grid;
     - otherwise -> :class:`FresnelTransformPropagator` on the far-field grid.
 
-    For square pixels this is the scalar condition ``|pixel_fresnel_number| <= 1 / N``.
+    For square pixels this is the scalar condition ``|pixel_fresnel_number_x| <= 1 / N``.
     The two methods are numerically interchangeable at that crossover (measured
     agreement 2.5e-08); away from it they disagree by tens of percent, but that is grid
     disagreement rather than physics.

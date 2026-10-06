@@ -7,7 +7,12 @@ from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider, compute_object_geometry
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider
-from ptychodus.api.propagate import compute_far_field_pixel_geometry, compute_magnification
+from ptychodus.api.propagate import (
+    compute_far_field_pixel_geometry,
+    compute_full_aperture_fresnel_number,
+    compute_magnification,
+    compute_near_field_pixel_geometry,
+)
 from ptychodus.api.probe_positions import ProbePosition
 
 from .metadata import MetadataRepositoryItem
@@ -94,6 +99,10 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         return self._metadata_item.focus_object_distance_m.get_value()
 
     @property
+    def far_field(self) -> bool:
+        return self._metadata_item.far_field.get_value()
+
+    @property
     def magnification(self) -> float:
         """See :func:`ptychodus.api.product.compute_magnification`."""
         return compute_magnification(self.detector_distance_m, self.focus_object_distance_m)
@@ -112,10 +121,6 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         except ZeroDivisionError:
             return 0.0
 
-    @property
-    def _lambda_z_m2(self) -> float:
-        return self.probe_wavelength_m * self.object_plane_propagation_distance_m
-
     def _get_detector_extent(self) -> ImageExtent:
         # No dataset bound yet: degrade to a zero-sized extent so downstream
         # divisions bail out gracefully (they already handle ZeroDivisionError).
@@ -133,32 +138,26 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         return geometry
 
     def get_object_plane_pixel_geometry(self) -> PixelGeometry:
-        """Sample-plane sampling implied by the detector and the illumination geometry.
+        """Sample-plane sampling implied by the detector and the declared regime.
 
-        With a focusing optic the cone beam projects the detector pixels onto the
-        sample demagnified by ``M``; without one the sampling is the far-field
-        reciprocal relation. Degrades to zero-sized on any degenerate geometry, as
-        the rest of this class does.
+        Far field samples the Fraunhofer reciprocal relation; near field is the
+        geometric back-projection of the detector pixels through the cone, which
+        without a focusing optic leaves them unchanged. The regime is read from the
+        product rather than inferred from the magnification: the two are independent,
+        and a focusing optic constrains neither. Degrades to zero-sized on any
+        degenerate geometry, as the rest of this class does.
         """
-        magnification = self.magnification
-
-        if magnification != 1.0:
-            detector_pixel_geometry = self.get_detector_pixel_geometry()
-
-            try:
-                return PixelGeometry(
-                    width_m=detector_pixel_geometry.width_m / magnification,
-                    height_m=detector_pixel_geometry.height_m / magnification,
-                )
-            except ZeroDivisionError:
-                return PixelGeometry(width_m=0.0, height_m=0.0)
-
         try:
-            return compute_far_field_pixel_geometry(
-                self.get_detector_pixel_geometry(),
-                self._get_detector_extent(),
-                wavelength_m=self.probe_wavelength_m,
-                propagation_distance_m=self.detector_distance_m,
+            if self.far_field:
+                return compute_far_field_pixel_geometry(
+                    self.get_detector_pixel_geometry(),
+                    self._get_detector_extent(),
+                    wavelength_m=self.probe_wavelength_m,
+                    propagation_distance_m=self.detector_distance_m,
+                )
+
+            return compute_near_field_pixel_geometry(
+                self.get_detector_pixel_geometry(), magnification=self.magnification
             )
         except ZeroDivisionError:
             return PixelGeometry(width_m=0.0, height_m=0.0)
@@ -173,9 +172,6 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         Fr_object == width_px * height_px`` exactly -- so reporting the detector plane
         would read large precisely when the geometry is deeply far field.
 
-        Distinct from ``PropagatorParameters.pixel_fresnel_number``, which is the
-        per-pixel quantity ``dx^2 / (lambda z)``.
-
         ``z`` is the equivalent parallel-beam distance
         :attr:`object_plane_propagation_distance_m`, so the indicator stays meaningful
         when a focusing optic magnifies the geometry.
@@ -186,13 +182,13 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         z -> 0. With one the object-plane width is fixed at ``N dx_d / M`` and the true
         limit diverges, so the zero is a degenerate-input guard rather than a limit.
         """
-        extent = self._get_detector_extent()
-        pixel_geometry = self.get_object_plane_pixel_geometry()
-        width_m = extent.width_px * pixel_geometry.width_m
-        height_m = extent.height_px * pixel_geometry.height_m
-        area_m2 = width_m * height_m
         try:
-            return area_m2 / self._lambda_z_m2
+            return compute_full_aperture_fresnel_number(
+                self.get_object_plane_pixel_geometry(),
+                self._get_detector_extent(),
+                wavelength_m=self.probe_wavelength_m,
+                propagation_distance_m=self.object_plane_propagation_distance_m,
+            )
         except ZeroDivisionError:
             return 0.0
 
@@ -226,12 +222,6 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
             pixel_height_m=pixel_geometry.height_m,
         )
 
-    def is_probe_geometry_valid(self, geometry: ProbeGeometry) -> bool:
-        expected = self.get_probe_geometry()
-        if not geometry.get_pixel_geometry().is_valid:
-            return False
-        return geometry.width_m == expected.width_m and geometry.height_m == expected.height_m
-
     def get_probe_positions(self) -> Sequence[ProbePosition]:
         return self._scan_item.get_probe_positions()
 
@@ -255,10 +245,6 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
             center_x_m=0.0,
             center_y_m=0.0,
         )
-
-    def is_object_geometry_valid(self, geometry: ObjectGeometry) -> bool:
-        expected_geometry = self.get_object_geometry()
-        return geometry.get_pixel_geometry().is_valid and geometry.contains(expected_geometry)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._metadata_item:

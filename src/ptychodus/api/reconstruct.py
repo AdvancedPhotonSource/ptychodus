@@ -12,10 +12,12 @@ import numpy
 
 from .assemble import AssembledDiffractionData
 from .diffraction import BadPixels, DiffractionPatterns
+from .geometry import ImageExtent
 from .object import Object
 from .probe import ProbeSequence
 from .probe_positions import ProbePositionSequence, ProbePosition
 from .product import LossValue, Product
+from .propagate import compute_full_aperture_fresnel_number
 from .typing import RealArrayType
 
 logger = logging.getLogger(__name__)
@@ -340,6 +342,62 @@ def prepare_reconstruct_input(
     )
 
     return ReconstructInput(patterns, assembled_data.get_bad_pixels(), product)
+
+
+def warn_if_propagation_regime_disagrees(
+    product: Product,
+    *,
+    far_field_fresnel_number: float = 1.0,
+    near_field_fresnel_number: float = 1.0,
+) -> None:
+    """Warn when a product's declared propagation regime contradicts its own geometry.
+
+    The regime is a declaration, so nothing stops it disagreeing with the geometry it
+    describes -- and the consequence is a reconstruction on the wrong sample-plane
+    sampling, which fails as a bad image rather than as an error. The object-plane
+    Fresnel number is the regime indicator: much less than one is far field, much
+    greater is near field.
+
+    Raising `far_field_fresnel_number` tolerates a more transitional geometry before
+    objecting to a far-field declaration; lowering `near_field_fresnel_number` does the
+    same for a near-field one. Between the two the geometry is transitional and neither
+    declaration is questioned.
+
+    Degenerate geometry -- no probe, zero wavelength, detector at the focus -- is
+    reported by nothing and warns about nothing; this never raises.
+    """
+    metadata = product.metadata
+
+    try:
+        probe_geometry = product.probes.get_geometry()
+        propagation_distance_m = metadata.detector_distance_m / metadata.magnification
+        fresnel_number = compute_full_aperture_fresnel_number(
+            probe_geometry.get_pixel_geometry(),
+            ImageExtent(width_px=probe_geometry.width_px, height_px=probe_geometry.height_px),
+            wavelength_m=metadata.probe_wavelength_m,
+            propagation_distance_m=propagation_distance_m,
+        )
+    except (ValueError, ZeroDivisionError):
+        logger.debug('Product geometry is degenerate; skipping the propagation-regime check.')
+        return
+
+    if metadata.far_field:
+        if fresnel_number > far_field_fresnel_number:
+            logger.warning(
+                'Product "%s" declares far-field propagation, but its object-plane '
+                'Fresnel number is %g, which indicates near field. The sample-plane '
+                'sampling follows the declaration, so verify it before reconstructing.',
+                metadata.name,
+                fresnel_number,
+            )
+    elif fresnel_number < near_field_fresnel_number:
+        logger.warning(
+            'Product "%s" declares near-field propagation, but its object-plane '
+            'Fresnel number is %g, which indicates far field. The sample-plane '
+            'sampling follows the declaration, so verify it before reconstructing.',
+            metadata.name,
+            fresnel_number,
+        )
 
 
 @dataclass(frozen=True)

@@ -366,6 +366,46 @@ class TestProbeGeometryFromFarField:
         assert forward == backward
 
 
+class TestProbeGeometryFromNearField:
+    """The geometric projection dx_sample = dx_detector / M, which at M = 1 is the
+    identity -- the case the far-field relation cannot express."""
+
+    def test_returns_expected_pixel_size_for_square_setup(self) -> None:
+        detector = PixelGeometry(width_m=75e-6, height_m=75e-6)
+
+        geometry = ProbeGeometry.from_near_field(
+            detector, ImageExtent(width_px=256, height_px=256), magnification=200.0
+        )
+
+        assert geometry.width_px == 256
+        assert geometry.height_px == 256
+        numpy.testing.assert_allclose(geometry.pixel_width_m, 75e-6 / 200.0, rtol=1.0e-12)
+        numpy.testing.assert_allclose(geometry.pixel_height_m, 75e-6 / 200.0, rtol=1.0e-12)
+
+    def test_maps_each_axis_independently_for_non_square(self) -> None:
+        detector = PixelGeometry(width_m=50e-6, height_m=100e-6)
+
+        geometry = ProbeGeometry.from_near_field(
+            detector, ImageExtent(width_px=256, height_px=128), magnification=4.0
+        )
+
+        assert geometry.width_px == 256
+        assert geometry.height_px == 128
+        numpy.testing.assert_allclose(geometry.pixel_width_m, 50e-6 / 4.0, rtol=1.0e-12)
+        numpy.testing.assert_allclose(geometry.pixel_height_m, 100e-6 / 4.0, rtol=1.0e-12)
+
+    def test_unity_magnification_returns_the_detector_pitch(self) -> None:
+        """Parallel-beam near field: the object grid is the detector grid."""
+        detector = PixelGeometry(width_m=75e-6, height_m=50e-6)
+
+        geometry = ProbeGeometry.from_near_field(
+            detector, ImageExtent(width_px=64, height_px=64), magnification=1.0
+        )
+
+        numpy.testing.assert_allclose(geometry.pixel_width_m, detector.width_m, rtol=1.0e-12)
+        numpy.testing.assert_allclose(geometry.pixel_height_m, detector.height_m, rtol=1.0e-12)
+
+
 class TestProbeGeometryStr:
     def test_square_pixels_collapse_to_single_value(self) -> None:
         geometry = ProbeGeometry(

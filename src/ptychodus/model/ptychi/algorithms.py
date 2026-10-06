@@ -209,19 +209,13 @@ class PtyChiCommon:
     def data_options(self) -> PtychographyDataOptions:
         """Return the settings-derived data options.
 
-        `free_space_propagation_distance_m` carries only the propagation *mode*:
-        infinite for far field, NaN as a placeholder for near field, whose
-        distance comes from the product. The NaN never escapes -- it lives
-        between this call and the
-        :func:`~ptychodus.model.ptychi.task.align_task_options_with_product`
-        call at the end of ``build_task_options`` -- which matters because
-        ``json.dumps`` emits it as the bare token ``NaN``, invalid strict JSON.
+        `free_space_propagation_distance_m` is left at its pty-chi default: the
+        propagation regime is a property of the experiment, so it is described by
+        the product rather than by a reconstructor setting, and
+        :func:`~ptychodus.model.ptychi.task.align_task_options_with_product` writes
+        it.
         """
-        free_space_propagation_distance_m = (
-            math.inf if self._reconstructor.use_far_field_propagation.get_value() else math.nan
-        )
         return PtychographyDataOptions(
-            free_space_propagation_distance_m=free_space_propagation_distance_m,
             fft_shift=self._reconstructor.fft_shift_diffraction_patterns.get_value(),
             save_data_on_device=self._reconstructor.save_data_on_device.get_value(),
         )

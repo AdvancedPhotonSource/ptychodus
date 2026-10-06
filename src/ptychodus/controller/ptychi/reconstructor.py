@@ -189,11 +189,6 @@ class PtyChiReconstructorViewController(ParameterViewController):
             tool_tip='Number of pixels to pad arrays (with border values) before shifting',
         )
 
-        self._use_far_field_propagation_view_controller = CheckBoxParameterViewController(
-            settings.use_far_field_propagation,
-            'Use Far Field Propagation',
-            tool_tip='When checked, far field propagation will be used instead of near field propagation',
-        )
         self._fft_shift_diffraction_patterns_view_controller = CheckBoxParameterViewController(
             settings.fft_shift_diffraction_patterns,
             'FFT Shift Diffraction Patterns',
@@ -265,7 +260,6 @@ class PtyChiReconstructorViewController(ParameterViewController):
         layout.addRow(self._use_low_memory_view_controller.get_widget())
         layout.addRow('Pad For Shift:', self._pad_for_shift_view_controller.get_widget())
 
-        layout.addRow(self._use_far_field_propagation_view_controller.get_widget())
         layout.addRow(self._fft_shift_diffraction_patterns_view_controller.get_widget())
         layout.addRow(self._save_data_on_device_view_controller.get_widget())
         layout.addRow(self._diffraction_pattern_blur_view_controller.get_widget())

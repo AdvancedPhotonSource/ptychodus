@@ -19,7 +19,12 @@ from .fourier import fourier_shift_2d
 from .geometry import ImageExtent, PixelGeometry
 from .interpolate import resample_along_axis
 from .preprocess.noise import estimate_noise_floor
-from .propagate import PropagatedWavefield, compute_far_field_pixel_geometry, intensity
+from .propagate import (
+    PropagatedWavefield,
+    compute_far_field_pixel_geometry,
+    compute_near_field_pixel_geometry,
+    intensity,
+)
 from .typing import ComplexArrayType, RealArrayType
 
 logger = logging.getLogger(__name__)
@@ -725,6 +730,25 @@ class ProbeGeometry:
             pixel_height_m=pixel_geometry.height_m,
         )
 
+    @classmethod
+    def from_near_field(
+        cls,
+        detector_pixel_geometry: PixelGeometry,
+        image_extent: ImageExtent,
+        *,
+        magnification: float,
+    ) -> ProbeGeometry:
+        """Sample-plane probe geometry from the geometric projection ``dx_sample = dx_detector / M``."""
+        pixel_geometry = compute_near_field_pixel_geometry(
+            detector_pixel_geometry, magnification=magnification
+        )
+        return cls(
+            width_px=image_extent.width_px,
+            height_px=image_extent.height_px,
+            pixel_width_m=pixel_geometry.width_m,
+            pixel_height_m=pixel_geometry.height_m,
+        )
+
     @property
     def width_m(self) -> float:
         return self.width_px * self.pixel_width_m
@@ -790,6 +814,11 @@ class ProbeGeometryProvider(ABC):
     @abstractmethod
     def detector_distance_m(self) -> float:
         pass
+
+    @property
+    @abstractmethod
+    def far_field(self) -> bool:
+        """Whether the detector records the Fraunhofer diffraction pattern."""
 
     @property
     @abstractmethod

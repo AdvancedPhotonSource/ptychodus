@@ -345,6 +345,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         *,
         comments: str = '',
         detector_distance_m: float | None = None,
+        focus_object_distance_m: float | None = None,
         probe_energy_eV: float | None = None,  # noqa: N803
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
@@ -352,12 +353,14 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         tomography_angle_deg: float | None = None,
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
+        far_field: bool | None = None,
         diffraction: DiffractionWorkflowAPI | None = None,
     ) -> ProductWorkflowAPI:
         product_index = self._product_api.insert_new_product(
             name,
             comments=comments,
             detector_distance_m=detector_distance_m,
+            focus_object_distance_m=focus_object_distance_m,
             probe_energy_eV=probe_energy_eV,
             probe_photon_count=probe_photon_count,
             exposure_time_s=exposure_time_s,
@@ -365,6 +368,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
             tomography_angle_deg=tomography_angle_deg,
             tilt_angle_deg=tilt_angle_deg,
             polarization=polarization,
+            far_field=far_field,
             dataset=self._fetch_dataset(diffraction),
         )
         return self.get_product(product_index)

@@ -46,6 +46,7 @@ HDF5_OWNED_KEYS: dict[str, frozenset[str]] = {
             'comments',
             'detector_distance_m',
             'focus_object_distance_m',
+            'far_field',
             'probe_energy_eV',
             'probe_photon_count',
             'exposure_time_s',

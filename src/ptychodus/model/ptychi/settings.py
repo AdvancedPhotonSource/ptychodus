@@ -54,9 +54,6 @@ class PtyChiSettings(Observable, Observer):
         )
 
         # PtychographyDataOptions
-        self.use_far_field_propagation = self._group.create_boolean_parameter(
-            'UseFarFieldPropagation', True
-        )
         self.fft_shift_diffraction_patterns = self._group.create_boolean_parameter(
             'FFTShiftDiffractionPatterns', True
         )

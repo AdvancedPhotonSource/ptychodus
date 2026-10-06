@@ -18,6 +18,8 @@ from ptychodus.api.propagate import (
     PropagatorParameters,
     choose_propagator,
     compute_far_field_pixel_geometry,
+    compute_full_aperture_fresnel_number,
+    compute_near_field_pixel_geometry,
     compute_far_field_propagation_distance,
     compute_magnification,
     intensity,
@@ -119,7 +121,20 @@ class TestPropagatorParameters:
     def test_pixel_fresnel_number(self) -> None:
         # dx=100, z=0.1/500e-9=2e5  →  Fr = 100²/2e5 = 0.05
         params = _make_params(0.1, wavelength_m=500e-9, pixel_width_m=50e-6)
-        assert params.pixel_fresnel_number == pytest.approx(0.05)
+        assert params.pixel_fresnel_number_x == pytest.approx(0.05)
+
+    def test_pixel_fresnel_number_ignores_the_pixel_height(self) -> None:
+        """Width-only is deliberate, not an oversight: the propagators reach the y-axis
+        through pixel_aspect_ratio, and folding the height in here would double-count it.
+
+        Without a non-square witness the square default makes every other assertion on
+        this property agree with an area-based definition too.
+        """
+        square = _make_params(0.1, pixel_width_m=50e-6, pixel_height_m=50e-6)
+        tall = _make_params(0.1, pixel_width_m=50e-6, pixel_height_m=25e-6)
+
+        assert tall.pixel_aspect_ratio != pytest.approx(square.pixel_aspect_ratio)
+        assert tall.pixel_fresnel_number_x == pytest.approx(square.pixel_fresnel_number_x)
 
     def test_pixel_fresnel_number_is_signed(self) -> None:
         """Negating the distance must negate Fr, not leave it unchanged.
@@ -130,7 +145,9 @@ class TestPropagatorParameters:
         """
         params_pos = _make_params(+0.1)
         params_neg = _make_params(-0.1)
-        assert params_neg.pixel_fresnel_number == pytest.approx(-params_pos.pixel_fresnel_number)
+        assert params_neg.pixel_fresnel_number_x == pytest.approx(
+            -params_pos.pixel_fresnel_number_x
+        )
 
     def test_get_spatial_coordinates_shape(self) -> None:
         params = _make_params(0.1, width_px=16, height_px=24)
@@ -1012,7 +1029,7 @@ class TestFarFieldAnalytic:
         num_px = 128
         aperture_px = 15
         params = _make_params(5.0e3, width_px=num_px, height_px=num_px)
-        assert abs(params.pixel_fresnel_number) * num_px**2 < 1.0, (
+        assert abs(params.pixel_fresnel_number_x) * num_px**2 < 1.0, (
             'Test precondition: in the far field'
         )
 
@@ -1249,7 +1266,7 @@ class TestSingleFftDirectionSemantics:
         what rules out a perturbation of the forward path.
         """
         params = _roundtrip_params(+_ROUNDTRIP_DISTANCE_M)
-        fresnel_number = params.pixel_fresnel_number
+        fresnel_number = params.pixel_fresnel_number_x
         assert fresnel_number > 0.0
         assert numpy.absolute(fresnel_number) == fresnel_number
 
@@ -1264,6 +1281,250 @@ class TestSingleFftDirectionSemantics:
         forward = propagator_type(_roundtrip_params(+_ROUNDTRIP_DISTANCE_M))
         backward = propagator_type(_roundtrip_params(-_ROUNDTRIP_DISTANCE_M))
         numpy.testing.assert_allclose(forward._A * backward._A, 1.0, atol=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# Anisotropic single-FFT propagation
+# ---------------------------------------------------------------------------
+
+
+# ar = 2. Both axes reach the far-field/angular-spectrum crossover together when
+# N*pw^2 == M*ph^2 == lambda*z, which is what lets the two propagators be compared
+# on a shared grid below.
+_ANISO_WAVELENGTH_M = 500e-9
+_ANISO_PIXEL_WIDTH_M = 50e-6
+_ANISO_PIXEL_HEIGHT_M = 25e-6
+_ANISO_WIDTH_PX = 32
+_ANISO_HEIGHT_PX = 128
+_ANISO_CROSSOVER_M = _ANISO_WIDTH_PX * _ANISO_PIXEL_WIDTH_M**2 / _ANISO_WAVELENGTH_M
+
+
+def _aniso_params(distance_m: float) -> PropagatorParameters:
+    return PropagatorParameters(
+        wavelength_m=_ANISO_WAVELENGTH_M,
+        width_px=_ANISO_WIDTH_PX,
+        height_px=_ANISO_HEIGHT_PX,
+        pixel_width_m=_ANISO_PIXEL_WIDTH_M,
+        pixel_height_m=_ANISO_PIXEL_HEIGHT_M,
+        propagation_distance_m=distance_m,
+    )
+
+
+def _aniso_gaussian(params: PropagatorParameters, sigma_px: float = 3.0) -> numpy.ndarray:
+    YY, XX = params.get_spatial_coordinates()  # noqa: N806
+    return numpy.exp(-(numpy.square(XX) + numpy.square(YY)) / (2.0 * sigma_px**2)).astype(complex)
+
+
+class TestAnisotropicSingleFftPropagation:
+    """The single-FFT propagators handle non-square pixels by pairing
+    ``pixel_fresnel_number_x`` -- a width-only quantity -- with ``pixel_aspect_ratio``
+    at every use, so that each term recovers its correct per-axis form.
+
+    Nothing else in the suite propagates a wavefield at ``ar != 1``, and the obvious
+    tests are blind to an error here: the aspect ratio cancels between the forward and
+    backward branches, so a round trip still inverts exactly, and peak-normalized
+    comparisons cancel the amplitude prefactor. These therefore check absolute,
+    un-normalized references, one per term that carries an aspect-ratio factor.
+    """
+
+    def test_the_geometry_is_actually_anisotropic(self) -> None:
+        """Guard the premise: these tests say nothing if the pixels turn out square."""
+        assert _aniso_params(1.0).pixel_aspect_ratio == pytest.approx(2.0)
+
+    def test_amplitude_prefactor_conserves_energy_across_the_planes(self) -> None:
+        """Pins ``C0``, which is ``abs(Fr) / (1j * ar)`` and must equal ``pw ph / lambda z``.
+
+        Power is invariant once each plane is weighted by its own pixel area. Dropping
+        the aspect ratio scales the recovered power by ``ar**2`` -- a factor of 4 here.
+        """
+        params = _aniso_params(_ANISO_CROSSOVER_M)
+        wavefield = _aniso_gaussian(params)
+        propagated = FresnelTransformPropagator(params).propagate(wavefield)
+
+        conjugate = compute_far_field_pixel_geometry(
+            PixelGeometry(width_m=params.pixel_width_m, height_m=params.pixel_height_m),
+            ImageExtent(width_px=params.width_px, height_px=params.height_px),
+            wavelength_m=params.wavelength_m,
+            propagation_distance_m=params.propagation_distance_m,
+        )
+        power_in = numpy.sum(intensity(wavefield)) * params.pixel_width_m * params.pixel_height_m
+        power_out = numpy.sum(intensity(propagated)) * conjugate.width_m * conjugate.height_m
+
+        assert power_out == pytest.approx(power_in, rel=1e-9)
+
+    def test_output_quadratic_phase_curves_independently_per_axis(self) -> None:
+        """Pins ``C2``, the output-plane quadratic phase, which is a *pure* phase and so
+        invisible to any magnitude comparison.
+
+        Fraunhofer rather than the Fresnel transform: it carries no input chirp, so for
+        a real even input the transform is real and the output phase is ``C2`` alone.
+        The distance is chosen to keep the phase span near a radian; at a realistic
+        far-field distance it wraps some 10^5 times and no comparison survives.
+        """
+        distance_m = 4.0 * _ANISO_PIXEL_WIDTH_M**2 / (numpy.pi * _ANISO_WAVELENGTH_M)
+        params = _aniso_params(distance_m)
+        YY, XX = params.get_spatial_coordinates()  # noqa: N806
+        propagated = FraunhoferPropagator(params).propagate(_aniso_gaussian(params))
+
+        center = (params.height_px // 2, params.width_px // 2)
+        relative = numpy.angle(propagated * numpy.conjugate(propagated[center]))
+        expected = (
+            numpy.pi
+            * params.wavelength_m
+            * distance_m
+            * (
+                numpy.square(XX / (params.width_px * params.pixel_width_m))
+                + numpy.square(YY / (params.height_px * params.pixel_height_m))
+            )
+        )
+        expected = expected - expected[center]
+
+        # The spectrum tails dip just below zero around 1e-6 of peak, where the phase
+        # flips by pi; compare only where there is signal to carry a phase.
+        carries_signal = numpy.abs(propagated) > 1e-3 * numpy.abs(propagated).max()
+        residual = numpy.abs(numpy.angle(numpy.exp(1j * (relative - expected))))
+
+        assert numpy.max(residual[carries_signal]) < 1e-9
+
+    def test_agrees_with_angular_spectrum_at_the_crossover(self) -> None:
+        """Pins the whole operator, and ``_B`` in particular, against an exact reference.
+
+        At the crossover the two propagators share a grid and agree closely, and angular
+        spectrum reaches the y-axis through ``pixel_aspect_ratio`` alone -- it never
+        reads the pixel Fresnel number -- so it is an independent witness. Compared as
+        complex fields, so a prefactor, an output phase or an input chirp error all show.
+        """
+        params = _aniso_params(_ANISO_CROSSOVER_M)
+        wavefield = _aniso_gaussian(params)
+
+        exact = AngularSpectrumPropagator(params).propagate(wavefield)
+        single_fft = FresnelTransformPropagator(params).propagate(wavefield)
+
+        scale = numpy.abs(exact).max()
+        assert numpy.abs(single_fft - exact).max() / scale < 1e-5
+
+
+class TestComputeNearFieldPixelGeometry:
+    """The geometric back-projection of detector pixels onto the object plane.
+
+    Pure projection: no wavelength, no distance. Its defining case is the one the
+    far-field relation cannot express -- a parallel beam, where the two planes share
+    a grid.
+    """
+
+    def test_unity_magnification_is_the_identity(self) -> None:
+        source = PixelGeometry(width_m=75e-6, height_m=50e-6)
+
+        geometry = compute_near_field_pixel_geometry(source, magnification=1.0)
+
+        assert geometry.width_m == pytest.approx(source.width_m)
+        assert geometry.height_m == pytest.approx(source.height_m)
+
+    def test_demagnifies_both_axes(self) -> None:
+        geometry = compute_near_field_pixel_geometry(
+            PixelGeometry(width_m=75e-6, height_m=50e-6), magnification=200.0
+        )
+
+        assert geometry.width_m == pytest.approx(75e-6 / 200.0)
+        assert geometry.height_m == pytest.approx(50e-6 / 200.0)
+
+    def test_maps_each_axis_independently(self) -> None:
+        """An anisotropic detector pixel stays anisotropic by the same ratio."""
+        source = PixelGeometry(width_m=75e-6, height_m=50e-6)
+
+        geometry = compute_near_field_pixel_geometry(source, magnification=4.0)
+
+        assert geometry.width_m / geometry.height_m == pytest.approx(
+            source.width_m / source.height_m
+        )
+
+    def test_agrees_with_probe_geometry_from_near_field(self) -> None:
+        detector = PixelGeometry(width_m=75e-6, height_m=50e-6)
+        extent = ImageExtent(width_px=256, height_px=192)
+        expected = ProbeGeometry.from_near_field(detector, extent, magnification=12.0)
+
+        geometry = compute_near_field_pixel_geometry(detector, magnification=12.0)
+
+        assert geometry.width_m == pytest.approx(expected.pixel_width_m)
+        assert geometry.height_m == pytest.approx(expected.pixel_height_m)
+
+    def test_zero_magnification_raises(self) -> None:
+        """M = 0 puts the detector at the focus, where the projection is undefined."""
+        with pytest.raises(ZeroDivisionError):
+            compute_near_field_pixel_geometry(
+                PixelGeometry(width_m=75e-6, height_m=50e-6), magnification=0.0
+            )
+
+
+class TestComputeFullApertureFresnelNumber:
+    """The propagation-regime indicator, and the full-aperture half of the repo's two
+    Fresnel quantities.
+    """
+
+    def test_matches_closed_form(self) -> None:
+        number = compute_full_aperture_fresnel_number(
+            PixelGeometry(width_m=75e-6, height_m=50e-6),
+            ImageExtent(width_px=256, height_px=192),
+            wavelength_m=1.24e-10,
+            propagation_distance_m=1.0,
+        )
+
+        expected = (256 * 75e-6) * (192 * 50e-6) / (1.24e-10 * 1.0)
+        assert number == pytest.approx(expected)
+
+    def test_reports_far_field_for_a_small_aperture_at_a_long_distance(self) -> None:
+        number = compute_full_aperture_fresnel_number(
+            PixelGeometry(width_m=1e-8, height_m=1e-8),
+            ImageExtent(width_px=16, height_px=16),
+            wavelength_m=1.24e-10,
+            propagation_distance_m=1.0,
+        )
+
+        assert number < 1.0
+
+    def test_reports_near_field_for_a_large_aperture_at_a_short_distance(self) -> None:
+        number = compute_full_aperture_fresnel_number(
+            PixelGeometry(width_m=75e-6, height_m=75e-6),
+            ImageExtent(width_px=256, height_px=256),
+            wavelength_m=1.24e-10,
+            propagation_distance_m=1e-3,
+        )
+
+        assert number > 1.0
+
+    def test_differs_from_the_pixel_number_by_the_documented_factor(self) -> None:
+        """Both docstrings state the conversion; pin it so the two cannot drift."""
+        pixel_geometry = PixelGeometry(width_m=75e-6, height_m=50e-6)
+        extent = ImageExtent(width_px=256, height_px=192)
+        parameters = PropagatorParameters(
+            wavelength_m=1.24e-10,
+            width_px=extent.width_px,
+            height_px=extent.height_px,
+            pixel_width_m=pixel_geometry.width_m,
+            pixel_height_m=pixel_geometry.height_m,
+            propagation_distance_m=1.0,
+        )
+
+        full_aperture = compute_full_aperture_fresnel_number(
+            pixel_geometry,
+            extent,
+            wavelength_m=parameters.wavelength_m,
+            propagation_distance_m=parameters.propagation_distance_m,
+        )
+
+        factor = (
+            extent.width_px * extent.height_px * (pixel_geometry.height_m / pixel_geometry.width_m)
+        )
+        assert full_aperture == pytest.approx(parameters.pixel_fresnel_number_x * factor)
+
+    def test_zero_distance_raises(self) -> None:
+        with pytest.raises(ZeroDivisionError):
+            compute_full_aperture_fresnel_number(
+                PixelGeometry(width_m=75e-6, height_m=50e-6),
+                ImageExtent(width_px=256, height_px=192),
+                wavelength_m=1.24e-10,
+                propagation_distance_m=0.0,
+            )
 
 
 # ---------------------------------------------------------------------------

@@ -218,6 +218,7 @@ class ProductFileKeys(StrEnum):
     TOMOGRAPHY_ANGLE = 'tomography_angle_deg'
     TILT_ANGLE = 'tilt_angle_deg'
     POLARIZATION = 'polarization'
+    FAR_FIELD = 'far_field'
     PROBE_ARRAY = 'probe'
     OPR_WEIGHTS = 'opr_weights'
     PROBE_PIXEL_HEIGHT = 'pixel_height_m'
@@ -251,6 +252,8 @@ def load_product(file: Path) -> Product:
         focus_object_distance_m = float(
             h5_file.attrs.get(ProductFileKeys.FOCUS_OBJECT_DISTANCE, 0.0)
         )
+        # HDF5 hands back numpy.bool_; cast at the boundary as the floats above do.
+        far_field = bool(h5_file.attrs.get(ProductFileKeys.FAR_FIELD, True))
 
         polarization: Polarization | None = None
         if ProductFileKeys.POLARIZATION in h5_file.attrs:
@@ -278,6 +281,7 @@ def load_product(file: Path) -> Product:
             focus_object_distance_m=focus_object_distance_m,
             tilt_angle_deg=tilt_angle_deg,
             polarization=polarization,
+            far_field=far_field,
         )
 
         h5_object = h5_file[ProductFileKeys.OBJECT_ARRAY]
@@ -426,6 +430,7 @@ def save_product(file: Path, product: Product) -> None:
         h5_file.attrs[ProductFileKeys.TOMOGRAPHY_ANGLE] = metadata.tomography_angle_deg
         h5_file.attrs[ProductFileKeys.FOCUS_OBJECT_DISTANCE] = metadata.focus_object_distance_m
         h5_file.attrs[ProductFileKeys.TILT_ANGLE] = metadata.tilt_angle_deg
+        h5_file.attrs[ProductFileKeys.FAR_FIELD] = metadata.far_field
         if metadata.polarization is not None:
             h5_file.attrs[ProductFileKeys.POLARIZATION] = metadata.polarization.value
 

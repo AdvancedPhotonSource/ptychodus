@@ -29,6 +29,13 @@ class ProductMetadata:
     focus_object_distance_m: float = 0.0
     tilt_angle_deg: float = 0.0
     polarization: Polarization | None = None
+    far_field: bool = True
+    """Whether the detector records the Fraunhofer diffraction pattern.
+
+    Independent of :attr:`magnification`: a focusing optic says where the beam waist
+    sits, not which propagation regime the detector samples. Far field with an optic
+    and near field without one are both expressible, and both occur.
+    """
 
     @property
     def magnification(self) -> float:
@@ -56,6 +63,7 @@ class ProductMetadata:
         sz += getsizeof(self.focus_object_distance_m)
         sz += getsizeof(self.tilt_angle_deg)
         sz += getsizeof(self.polarization)
+        sz += getsizeof(self.far_field)
         return sz
 
 

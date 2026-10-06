@@ -67,7 +67,7 @@ def introspect_product(path: Path) -> dict[str, Any]:
       * name, comments
       * detector_distance_m, focus_object_distance_m, probe_energy_eV,
         probe_photon_count, exposure_time_s, mass_attenuation_m2_kg,
-        tomography_angle_deg, tilt_angle_deg, polarization
+        tomography_angle_deg, tilt_angle_deg, polarization, far_field
       * object_shape:        tuple[int, int, int] | None — (layers, h, w)
       * object_pixel_width_m, object_pixel_height_m: float | None
       * probe_shape:         tuple[int, int, int] | None — (modes, h, w)
@@ -132,6 +132,7 @@ def introspect_product(path: Path) -> dict[str, Any]:
                 'comments': comments,
                 'detector_distance_m': _root_attr(ProductFileKeys.DETECTOR_OBJECT_DISTANCE, float),
                 'focus_object_distance_m': _root_attr(ProductFileKeys.FOCUS_OBJECT_DISTANCE, float),
+                'far_field': _root_attr(ProductFileKeys.FAR_FIELD, bool),
                 'probe_energy_eV': _root_attr(ProductFileKeys.PROBE_ENERGY, float),
                 'probe_photon_count': _root_attr(ProductFileKeys.PROBE_PHOTON_COUNT, int),
                 'exposure_time_s': _root_attr(ProductFileKeys.EXPOSURE_TIME, float),

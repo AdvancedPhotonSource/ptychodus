@@ -38,6 +38,7 @@ class ProductSettings(Observable, Observer):
         )
         self.tilt_angle_deg = self._group.create_real_parameter('TiltAngleInDegrees', 0.0)
         self.polarization = self._group.create_string_parameter('Polarization', '')
+        self.far_field = self._group.create_boolean_parameter('FarField', True)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:

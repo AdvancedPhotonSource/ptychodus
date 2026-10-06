@@ -246,6 +246,7 @@ class WorkflowAPI(ABC):
         *,
         comments: str = '',
         detector_distance_m: float | None = None,
+        focus_object_distance_m: float | None = None,
         probe_energy_eV: float | None = None,  # noqa: N803
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
@@ -253,6 +254,7 @@ class WorkflowAPI(ABC):
         tomography_angle_deg: float | None = None,
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
+        far_field: bool | None = None,
         diffraction: DiffractionWorkflowAPI | None = None,
     ) -> ProductWorkflowAPI:
         """Create a new product with optional metadata overrides and return a handle to it.
