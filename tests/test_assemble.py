@@ -647,7 +647,7 @@ def _array_with_flux(
 ) -> SimpleDiffractionArray:
     patterns = numpy.full((num_patterns, 4, 4), fill, dtype=numpy.int32)
     indexes = numpy.arange(first_index, first_index + num_patterns, dtype=numpy.intp)
-    return SimpleDiffractionArray(label, indexes, patterns, probe_photon_flux_Hz=flux_hz)
+    return SimpleDiffractionArray(label, indexes, patterns, probe_photon_flux_per_s=flux_hz)
 
 
 def test_preprocess_array_converts_flux_Hz_to_counts_using_exposure() -> None:  # noqa: N802
@@ -718,7 +718,7 @@ def test_counts_filter_keeps_probe_photon_counts_aligned_with_patterns() -> None
     )
     flux_hz = numpy.array([100.0, 500.0, 200.0], dtype=numpy.float64)
     array = SimpleDiffractionArray(
-        'a', numpy.array([7, 8, 9], dtype=numpy.intp), patterns, probe_photon_flux_Hz=flux_hz
+        'a', numpy.array([7, 8, 9], dtype=numpy.intp), patterns, probe_photon_flux_per_s=flux_hz
     )
 
     block = preprocess_array(

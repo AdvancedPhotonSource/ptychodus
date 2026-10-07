@@ -248,6 +248,19 @@ class FresnelZonePlate(BaseModel):
         """Return the zone plate focal length at *central_wavelength_m* (thin-lens formula)."""
         return self.zone_plate_diameter_m * self.outermost_zone_width_m / central_wavelength_m
 
+    def get_numerical_aperture(self, central_wavelength_m: float) -> float:
+        """Return the half-angle the outer zone subtends at the focus.
+
+        ``D / (2 f)``, which reduces to ``lambda / (2 dr_N)`` -- the convergence aperture
+        implied by :attr:`outermost_zone_width_m` alone, independent of the diameter.
+        Counterpart of :meth:`KirkpatrickBaezMirror.get_numerical_aperture`, and distinct
+        from the detector's collection aperture.
+
+        Raises:
+            ZeroDivisionError: at zero wavelength, where the focal length is undefined.
+        """
+        return 0.5 * self.zone_plate_diameter_m / self.get_focal_length_m(central_wavelength_m)
+
 
 def generate_fresnel_zone_plate_probe(
     geometry: ProbeGeometry,

@@ -103,13 +103,13 @@ def _make_illumination_map(
     photon_energy_J: float = 1.6e-15,  # noqa: N803
     exposure_time_s: float = 0.5,
     mass_attenuation_m2_kg: float = 3.0,
-    photon_flux_Hz: float = 1.0e10,  # noqa: N803
+    photon_flux_per_s: float = 1.0e10,  # noqa: N803
 ) -> IlluminationMap:
     if photon_number is None:
         photon_number = numpy.array([[1.0, 2.0], [3.0, 4.0]])
     return IlluminationMap(
         photon_number=photon_number,
-        photon_flux_Hz=photon_flux_Hz,
+        photon_flux_per_s=photon_flux_per_s,
         photon_energy_J=photon_energy_J,
         exposure_time_s=exposure_time_s,
         mass_attenuation_m2_kg=mass_attenuation_m2_kg,
@@ -126,7 +126,32 @@ class TestIlluminationMap:
 
     def test_photon_fluence_rate_divides_by_exposure_time(self) -> None:
         m = _make_illumination_map(exposure_time_s=0.5)
-        numpy.testing.assert_allclose(m.photon_fluence_rate_Hz_m2, m.photon_fluence_1_m2 / 0.5)
+        numpy.testing.assert_allclose(m.photon_fluence_rate_per_s_m2, m.photon_fluence_1_m2 / 0.5)
+
+    def test_save_npz_writes_the_documented_keys(self, tmp_path: Path) -> None:
+        """The archive is an external interface: these names reach users' own scripts,
+        and nothing in ptychodus reads it back to catch a rename."""
+        m = _make_illumination_map()
+        file_path = tmp_path / 'illumination.npz'
+        m.save_npz(file_path)
+
+        with numpy.load(file_path) as contents:
+            assert set(contents.files) == {
+                'photon_number',
+                'photon_fluence_1_m2',
+                'photon_fluence_rate_per_s_m2',
+                'energy_fluence_J_m2',
+                'energy_fluence_rate_W_m2',
+                'dose_Gy',
+                'dose_rate_Gy_s',
+                'pixel_height_m',
+                'pixel_width_m',
+                'center_x_m',
+                'center_y_m',
+            }
+            numpy.testing.assert_allclose(
+                contents['photon_fluence_rate_per_s_m2'], m.photon_fluence_rate_per_s_m2
+            )
 
     def test_energy_fluence_multiplies_by_photon_energy(self) -> None:
         m = _make_illumination_map(photon_energy_J=1.6e-15)
@@ -266,11 +291,16 @@ class TestComputeIlluminationMap:
         assert m.exposure_time_s == 0.25
         assert m.mass_attenuation_m2_kg == 7.5
         assert m.photon_energy_J == pytest.approx(metadata.probe_energy_J)
-        assert m.photon_flux_Hz == pytest.approx(2.0e9 / 0.25)
+        assert m.photon_flux_per_s == pytest.approx(2.0e9 / 0.25)
         assert m.pixel_geometry == PixelGeometry(width_m=pixel_size_m, height_m=pixel_size_m)
         assert m.center == ObjectCenter(x_m=3.0e-7, y_m=-2.0e-7)
 
-    def test_zero_exposure_time_gives_nan_flux(self) -> None:
+    def test_zero_exposure_time_diverges_the_flux(self) -> None:
+        """A real photon count over a vanishing exposure is unbounded, not unknown.
+
+        The flux comes from compute_product_geometry, so this and the product property
+        table cannot disagree about the degenerate case.
+        """
         metadata = _make_metadata(probe_photon_count=1.0e9, exposure_time_s=0.0)
         product = _make_product(
             object_array=_delta_object(16, 16),
@@ -279,8 +309,20 @@ class TestComputeIlluminationMap:
             metadata=metadata,
         )
         m = compute_illumination_map(product)
-        assert numpy.isnan(m.photon_flux_Hz)
+        assert math.isinf(m.photon_flux_per_s)
         assert m.exposure_time_s == 0.0
+
+    def test_nothing_recorded_at_all_gives_nan_flux(self) -> None:
+        """0/0 is the state of a product whose flux was never measured."""
+        metadata = _make_metadata(probe_photon_count=0.0, exposure_time_s=0.0)
+        product = _make_product(
+            object_array=_delta_object(16, 16),
+            probe_array=_gaussian_probe(8, 8),
+            positions=[ProbePosition(index=0, x_m=0.0, y_m=0.0)],
+            metadata=metadata,
+        )
+        m = compute_illumination_map(product)
+        assert math.isnan(m.photon_flux_per_s)
 
     def test_sums_intensity_across_incoherent_modes(self) -> None:
         """A 2-mode probe is reduced by summing |mode|^2 across the incoherent-mode axis."""

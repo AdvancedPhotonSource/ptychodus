@@ -66,7 +66,7 @@ def _make_item(
         geometry=MagicMock(),
     )
 
-    # Bypass __init__ so we don't have to satisfy every dependency of ProductGeometry.
+    # Bypass __init__ so we don't have to satisfy every dependency of ProductGeometryProvider.
     item = ProductRepositoryItem.__new__(ProductRepositoryItem)
     item._parent = mocks.parent
     item._metadata_item = mocks.metadata_item

@@ -320,7 +320,7 @@ class TestPowerSpectralDensity:
 def _make_illumination_map(photon_number: numpy.ndarray) -> IlluminationMap:
     return IlluminationMap(
         photon_number=photon_number,
-        photon_flux_Hz=1.0e9,
+        photon_flux_per_s=1.0e9,
         photon_energy_J=1.6e-15,
         exposure_time_s=1.0,
         mass_attenuation_m2_kg=1.0,

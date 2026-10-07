@@ -4,12 +4,13 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypeVar
+import math
 
 from scipy.fft import fft2, fftfreq, fftshift, ifft2, ifftshift
 import numpy
 import numpy.typing
 
-from .constants import TWO_PI_J
+from .constants import TWO_PI_J, energy_eV_to_J, energy_eV_to_wavelength_m
 from .typing import ComplexArrayType, RealArrayType
 from .geometry import ImageExtent, PixelGeometry
 
@@ -68,7 +69,7 @@ def compute_far_field_pixel_geometry(
             invented sentinel.
     """
     # Python-float arithmetic throughout: a numpy intermediate would yield inf instead
-    # of the ZeroDivisionError that callers such as ProductGeometry rely on.
+    # of the ZeroDivisionError that callers rely on.
     numerator_m2 = wavelength_m * abs(propagation_distance_m)
     return PixelGeometry(
         width_m=numerator_m2 / (extent.width_px * pixel_geometry.width_m),
@@ -186,6 +187,238 @@ def compute_magnification(detector_distance_m: float, focus_object_distance_m: f
         return 1.0
 
     return abs((detector_distance_m - focus_object_distance_m) / focus_object_distance_m)
+
+
+@dataclass(frozen=True)
+class ProductGeometry:
+    """Quantities derived from a product's beam parameters and detector sampling.
+
+    Produced by :func:`compute_product_geometry`. Every field is a pure function of
+    stored product metadata and the detector geometry, so none of it needs persisting
+    alongside a product -- recomputing is cheaper than keeping a second copy in step.
+
+    Degenerate inputs report the true limit rather than a placeholder, since a product
+    is routinely inspected before a diffraction dataset is bound to it. A quantity whose
+    limit diverges is ``inf``; one whose degenerate form is genuinely indeterminate --
+    ``0/0``, as for an unrecorded photon count over an unrecorded exposure -- is ``nan``.
+    Two fields are deliberate exceptions to that rule for the reasons their own
+    docstrings give: :attr:`object_plane_pixel_geometry` and :attr:`fresnel_number`.
+    """
+
+    probe_wavenumber_per_m: float
+    """Reciprocal wavelength, ``1 / lambda``.
+
+    Zero at zero photon energy. That is the limit rather than a guard: the wavenumber is
+    proportional to the energy, so it vanishes with it.
+    """
+    probe_angular_wavenumber_rad_per_m: float
+    """``2 pi`` times :attr:`probe_wavenumber_per_m`."""
+    probe_photon_flux_per_s: float
+    """Incident photons per second, the photon count over the exposure time.
+
+    Infinite for a nonzero count over a zero exposure. ``nan`` when both are zero, which
+    is the state of a product whose flux has not been recorded -- unmeasured is unknown,
+    not zero.
+    """
+    probe_power_W: float  # noqa: N815
+    """Beam power: the photon energy times :attr:`probe_photon_flux_per_s`.
+
+    Inherits that field's ``inf`` and ``nan``, and is itself ``nan`` for an infinite flux
+    at zero energy, where the product is indeterminate.
+    """
+    object_plane_propagation_distance_m: float
+    """Propagation distance of the equivalent parallel-beam geometry, ``z_d / M``.
+
+    A cone beam magnifying by ``M`` images like a parallel beam propagating this much
+    shorter distance onto pixels this much smaller, which is the pairing
+    :attr:`object_plane_pixel_geometry` applies. Equals the detector distance whenever
+    there is no focusing optic.
+
+    Infinite at zero magnification, which places the detector at the focus. The
+    numerator cannot vanish alongside it, so the quotient genuinely diverges there.
+    """
+    object_plane_pixel_geometry: PixelGeometry
+    """Sample-plane sampling implied by the detector and the declared regime.
+
+    Far field samples the Fraunhofer reciprocal relation; near field is the geometric
+    back-projection of the detector pixels through the cone, which without a focusing
+    optic leaves them unchanged. The regime is taken as declared rather than inferred
+    from the magnification: the two are independent, and a focusing optic constrains
+    neither.
+
+    Magnification-invariant in the far field: the equivalent parallel-beam geometry
+    scales the pixel by the same factor as the distance, so the two cancel.
+
+    **Exception to the limit rule.** A degenerate geometry gives ``PixelGeometry(0, 0)``
+    rather than a divergent pitch, because zero on either axis is the sentinel
+    :attr:`PixelGeometry.is_valid` tests for and callers branch on. An infinite pitch
+    would read as valid and propagate into object geometries built from it.
+    """
+    fresnel_number: float
+    """Full-aperture Fresnel number ``W H / (lambda z)`` at the **object** plane.
+
+    The propagation-regime indicator: much less than one is far field, near one is
+    transitional, much greater than one is near field. The detector-plane aperture
+    number is its reciprocal up to the pixel count -- ``Fr_detector * Fr_object ==
+    width_px * height_px`` exactly -- so reporting the detector plane would read large
+    precisely when the geometry is deeply far field.
+
+    ``z`` is :attr:`object_plane_propagation_distance_m`, so the indicator stays
+    meaningful when a focusing optic magnifies the geometry. Unlike the pitch above
+    this is *not* magnification-invariant, and should not be made so: the object extent
+    is fixed while the equivalent distance shrinks, so a focusing optic really does move
+    the geometry toward near field.
+
+    **Exception to the limit rule.** A degenerate geometry gives ``0.0``. The case is a
+    path-dependent ``0/0``, and along the far-field path it is a genuine limit: the
+    object-plane width is ``lambda z / dx_d``, so ``W^2 / (lambda z) = lambda z / dx_d^2
+    -> 0`` as ``z -> 0``.
+    """
+    detector_numerical_aperture: float
+    """Collection half-angle the detector subtends at the sample.
+
+    The geometric mean over the two axes, ``sqrt((W / 2 z_d) (H / 2 z_d))``, under the
+    small-angle approximation ``sin theta ~ tan theta ~ theta``. Magnification-invariant,
+    by the same cancellation as :attr:`object_plane_pixel_geometry`.
+
+    This is the *collection* aperture. It is not the convergence aperture of a focusing
+    optic, which is independent of it and which the optic models publish themselves as
+    ``get_numerical_aperture``. Nor does it bound the achievable resolution on its own:
+    ptychography reconstructs from the synthetic aperture the two combine into.
+    """
+    depth_of_field_m: float
+    """Single-slice criterion ``lambda / NA^2``, over :attr:`detector_numerical_aperture`.
+
+    The propagation depth across which the object may be treated as one thin slice; a
+    sample thicker than this needs a multislice reconstruction.
+
+    Infinite as the aperture vanishes, which is the limit rather than a guard, and
+    ``nan`` when the photon energy is zero as well, where the ratio is indeterminate.
+    """
+
+
+def compute_product_geometry(
+    *,
+    probe_energy_eV: float,  # noqa: N803
+    probe_photon_count: float,
+    exposure_time_s: float,
+    detector_distance_m: float,
+    focus_object_distance_m: float = 0.0,
+    far_field: bool = True,
+    detector_extent: ImageExtent | None = None,
+    detector_pixel_geometry: PixelGeometry | None = None,
+) -> ProductGeometry:
+    """Derive the beam and sampling quantities implied by a product's metadata.
+
+    Takes the metadata fields individually rather than a product object, so that a
+    caller holding them as settings parameters or as database columns need not
+    assemble one first.
+
+    The detector arguments describe the assembled patterns and are optional: omitting
+    them stands for no bound diffraction dataset, and the fields that need a detector
+    degrade as :class:`ProductGeometry` describes. This function owns that degradation
+    policy -- the primitives it composes keep raising :exc:`ZeroDivisionError` rather
+    than inventing sentinels.
+    """
+    # Degenerate inputs resolve to the true limit: inf where a quotient diverges, nan
+    # where it is 0/0. The two exceptions are called out where they arise below.
+    wavelength_m = energy_eV_to_wavelength_m(probe_energy_eV)
+    extent = ImageExtent(width_px=0, height_px=0) if detector_extent is None else detector_extent
+    pixel_geometry = (
+        PixelGeometry(width_m=0.0, height_m=0.0)
+        if detector_pixel_geometry is None
+        else detector_pixel_geometry
+    )
+
+    try:
+        wavenumber_per_m = 1.0 / wavelength_m
+    except ZeroDivisionError:
+        # Zero energy. The limit, not a guard: the wavenumber is proportional to the
+        # energy, so it vanishes with it.
+        wavenumber_per_m = 0.0
+
+    try:
+        photon_flux_per_s = probe_photon_count / exposure_time_s
+    except ZeroDivisionError:
+        # Indeterminate when nothing was recorded at all, which is the default product.
+        # With a real count the flux genuinely diverges as the exposure vanishes.
+        photon_flux_per_s = (
+            math.nan if probe_photon_count == 0.0 else math.copysign(math.inf, probe_photon_count)
+        )
+
+    magnification = compute_magnification(detector_distance_m, focus_object_distance_m)
+
+    try:
+        propagation_distance_m = detector_distance_m / magnification
+    except ZeroDivisionError:
+        # Zero magnification places the detector at the focus. It requires the focus
+        # distance to equal a nonzero detector distance, so the numerator cannot vanish
+        # alongside the denominator and the quotient diverges.
+        propagation_distance_m = math.copysign(math.inf, detector_distance_m)
+
+    try:
+        if far_field:
+            # Fresnel scaling: a cone beam of magnification M images like a parallel
+            # beam propagating z_d / M onto pixels dx_d / M. Both scale, so M cancels in
+            # lambda z / (N dx) and the lab-frame distance is the one to pass here.
+            # The Fresnel number below is deliberately not invariant -- see its docstring.
+            object_plane_pixel_geometry = compute_far_field_pixel_geometry(
+                pixel_geometry,
+                extent,
+                wavelength_m=wavelength_m,
+                propagation_distance_m=detector_distance_m,
+            )
+        else:
+            object_plane_pixel_geometry = compute_near_field_pixel_geometry(
+                pixel_geometry, magnification=magnification
+            )
+    except ZeroDivisionError:
+        # Exception to the limit rule: zero on either axis is the sentinel is_valid
+        # tests for. See ProductGeometry.object_plane_pixel_geometry.
+        object_plane_pixel_geometry = PixelGeometry(width_m=0.0, height_m=0.0)
+
+    try:
+        fresnel_number = compute_full_aperture_fresnel_number(
+            object_plane_pixel_geometry,
+            extent,
+            wavelength_m=wavelength_m,
+            propagation_distance_m=propagation_distance_m,
+        )
+    except ZeroDivisionError:
+        # Exception to the limit rule: a path-dependent 0/0 that is a genuine limit
+        # along the far-field path. See ProductGeometry.fresnel_number.
+        fresnel_number = 0.0
+
+    two_z_m = 2.0 * detector_distance_m
+    detector_area_m2 = (extent.width_px * pixel_geometry.width_m) * (
+        extent.height_px * pixel_geometry.height_m
+    )
+
+    try:
+        numerical_aperture_sq = detector_area_m2 / (two_z_m * two_z_m)
+    except ZeroDivisionError:
+        # A detector in the sample plane subtends everything, so the aperture diverges;
+        # with no detector bound the area vanishes too and the ratio is indeterminate.
+        numerical_aperture_sq = math.nan if detector_area_m2 == 0.0 else math.inf
+
+    try:
+        depth_of_field_m = wavelength_m / numerical_aperture_sq
+    except ZeroDivisionError:
+        # Diverges as the aperture vanishes, except at zero energy, where the numerator
+        # vanishes with it and the ratio is indeterminate.
+        depth_of_field_m = math.nan if wavelength_m == 0.0 else math.inf
+
+    return ProductGeometry(
+        probe_wavenumber_per_m=wavenumber_per_m,
+        probe_angular_wavenumber_rad_per_m=2.0 * numpy.pi * wavenumber_per_m,
+        probe_photon_flux_per_s=photon_flux_per_s,
+        probe_power_W=energy_eV_to_J(probe_energy_eV) * photon_flux_per_s,
+        object_plane_propagation_distance_m=propagation_distance_m,
+        object_plane_pixel_geometry=object_plane_pixel_geometry,
+        fresnel_number=fresnel_number,
+        detector_numerical_aperture=math.sqrt(numerical_aperture_sq),
+        depth_of_field_m=depth_of_field_m,
+    )
 
 
 @dataclass(frozen=True)

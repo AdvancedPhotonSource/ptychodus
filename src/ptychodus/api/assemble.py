@@ -465,7 +465,9 @@ def allocate_assembled_data(
 
     # All-or-nothing: reserve the counts buffer only when every array reports flux.
     probe_photon_counts: DiffractionPatternCounts | None = None
-    if len(dataset) > 0 and all(array.get_probe_photon_flux_Hz() is not None for array in dataset):
+    if len(dataset) > 0 and all(
+        array.get_probe_photon_flux_per_s() is not None for array in dataset
+    ):
         probe_photon_counts = numpy.zeros(num_patterns_total, dtype=numpy.float64)
 
     return AssembledDiffractionData(
@@ -523,10 +525,10 @@ def _preprocess_patterns(
     patterns = processed_array.get_patterns()
 
     probe_photon_counts: DiffractionPatternCounts | None = None
-    probe_photon_flux_Hz = array.get_probe_photon_flux_Hz()  # noqa: N806
-    if probe_photon_flux_Hz is not None:
+    probe_photon_flux_per_s = array.get_probe_photon_flux_per_s()
+    if probe_photon_flux_per_s is not None:
         if exposure_time_s is not None and exposure_time_s > 0.0:
-            probe_photon_counts = probe_photon_flux_Hz * exposure_time_s
+            probe_photon_counts = probe_photon_flux_per_s * exposure_time_s
         else:
             logger.warning(
                 f"Dropping probe photon flux measurements from '{label}': "

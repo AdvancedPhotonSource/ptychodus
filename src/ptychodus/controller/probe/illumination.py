@@ -36,7 +36,9 @@ class IlluminationParametersController:
             self._view.mass_attenuation_line_edit.set_value(nan)
             return
 
-        self._view.photon_flux_line_edit.set_value(Decimal(repr(illumination_map.photon_flux_Hz)))
+        self._view.photon_flux_line_edit.set_value(
+            Decimal(repr(illumination_map.photon_flux_per_s))
+        )
         self._view.exposure_time_line_edit.set_value(
             Decimal(repr(illumination_map.exposure_time_s))
         )
@@ -87,7 +89,7 @@ class IlluminationQuantityController:
             case self._view.photon_fluence_button:
                 quantity = illumination_map.photon_fluence_1_m2
             case self._view.photon_fluence_rate_button:
-                quantity = illumination_map.photon_fluence_rate_Hz_m2
+                quantity = illumination_map.photon_fluence_rate_per_s_m2
             case self._view.energy_fluence_button:
                 quantity = illumination_map.energy_fluence_J_m2
             case self._view.energy_fluence_rate_button:

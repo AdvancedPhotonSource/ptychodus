@@ -149,47 +149,47 @@ class ProductPropertyTableModel(QAbstractTableModel):
                     case _Col.VALUE:
                         metadata_item = self._product_item.get_metadata_item()
                         geometry = self._product_item.get_geometry()
+                        values = geometry.get_derived_values()
+                        nm_per_m = LengthUnit.NANOMETER.meters_per_unit
 
                         match index.row():
-                            case 0:
+                            case _Row.PROBE_WAVELENGTH_NM:
                                 return f'{LengthUnit.NANOMETER.convert(geometry.probe_wavelength_m):.4g}'
-                            case 1:
-                                return f'{geometry.probe_wavelengths_per_m * LengthUnit.NANOMETER.meters_per_unit:.4g}'
-                            case 2:
-                                return f'{geometry.probe_radians_per_m * LengthUnit.NANOMETER.meters_per_unit:.4g}'
-                            case 3:
-                                return f'{geometry.probe_photons_per_s:.4g}'
-                            case 4:
-                                return f'{geometry.probe_power_W:.4g}'
-                            case 5:
-                                return f'{LengthUnit.NANOMETER.convert(geometry.get_object_plane_pixel_geometry().width_m):.4g}'
-                            case 6:
-                                return f'{LengthUnit.NANOMETER.convert(geometry.get_object_plane_pixel_geometry().height_m):.4g}'
-                            case 7:
+                            case _Row.PROBE_WAVENUMBER_PER_NM:
+                                return f'{values.probe_wavenumber_per_m * nm_per_m:.4g}'
+                            case _Row.PROBE_ANGULAR_WAVENUMBER_RAD_PER_NM:
+                                return f'{values.probe_angular_wavenumber_rad_per_m * nm_per_m:.4g}'
+                            case _Row.PROBE_PHOTON_FLUX_PER_S:
+                                return f'{values.probe_photon_flux_per_s:.4g}'
+                            case _Row.PROBE_POWER_W:
+                                return f'{values.probe_power_W:.4g}'
+                            case _Row.OBJECT_PLANE_PIXEL_WIDTH_NM:
+                                width_m = values.object_plane_pixel_geometry.width_m
+                                return f'{LengthUnit.NANOMETER.convert(width_m):.4g}'
+                            case _Row.OBJECT_PLANE_PIXEL_HEIGHT_NM:
+                                height_m = values.object_plane_pixel_geometry.height_m
+                                return f'{LengthUnit.NANOMETER.convert(height_m):.4g}'
+                            case _Row.EXPOSURE_TIME_S:
                                 return f'{metadata_item.exposure_time_s.get_value():.4g}'
-                            case 8:
+                            case _Row.MASS_ATTENUATION_M2_KG:
                                 return f'{metadata_item.mass_attenuation_m2_kg.get_value():.4g}'
-                            case 9:
+                            case _Row.TOMOGRAPHY_ANGLE_DEG:
                                 return f'{metadata_item.tomography_angle_deg.get_value():.4g}'
-                            case 10:
+                            case _Row.TILT_ANGLE_DEG:
                                 return f'{metadata_item.tilt_angle_deg.get_value():.4g}'
-                            case 11:
+                            case _Row.POLARIZATION:
                                 raw = metadata_item.polarization.get_value()
                                 return raw if raw else '(unset)'
-                            case 12:
-                                # ProductGeometry.fresnel_number already degrades to 0.0,
-                                # which is the correct object-plane limit as z -> 0.
-                                return f'{geometry.fresnel_number:.4g}'
-                            case 13:
-                                try:
-                                    return f'{geometry.detector_numerical_aperture:.4g}'
-                                except ZeroDivisionError:
-                                    return 'inf'
-                            case 14:
-                                try:
-                                    return f'{LengthUnit.NANOMETER.convert(geometry.depth_of_field_m):.4g}'
-                                except ZeroDivisionError:
-                                    return 'inf'
+                            case _Row.FRESNEL_NUMBER:
+                                # Already degrades to 0.0, which is the correct
+                                # object-plane limit as z -> 0.
+                                return f'{values.fresnel_number:.4g}'
+                            case _Row.DETECTOR_NUMERICAL_APERTURE:
+                                return f'{values.detector_numerical_aperture:.4g}'
+                            case _Row.DEPTH_OF_FIELD_NM:
+                                # Diverges as the aperture vanishes, and formats as 'inf'.
+                                depth_m = values.depth_of_field_m
+                                return f'{LengthUnit.NANOMETER.convert(depth_m):.4g}'
                             case _Row.DIFFRACTION_DATASET:
                                 dataset = self._product_item.get_dataset()
                                 return UNBOUND_DATASET if dataset is None else dataset.get_name()

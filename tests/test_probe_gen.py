@@ -596,6 +596,26 @@ class TestFresnelZonePlate:
             # Misspelled on purpose; mypy agreeing the field is unknown is the point.
             FresnelZonePlate(**self._sound(), zoneplate_diameter_m=1.0)  # type: ignore[call-arg]
 
+    def test_numerical_aperture_reduces_to_the_outermost_zone_width(self) -> None:
+        """``D / (2 f)`` collapses to ``lambda / (2 dr_N)``, independent of the diameter."""
+        zone_plate = FresnelZonePlate(**self._sound())
+        wavelength_m = 1.2398e-10
+
+        numerical_aperture = zone_plate.get_numerical_aperture(wavelength_m)
+
+        assert numerical_aperture == pytest.approx(
+            0.5 * wavelength_m / zone_plate.outermost_zone_width_m, rel=1e-12
+        )
+
+    def test_numerical_aperture_is_independent_of_the_diameter(self) -> None:
+        wavelength_m = 1.2398e-10
+        narrow = FresnelZonePlate(**{**self._sound(), 'zone_plate_diameter_m': 90e-6})
+        wide = FresnelZonePlate(**self._sound())
+
+        assert narrow.get_numerical_aperture(wavelength_m) == pytest.approx(
+            wide.get_numerical_aperture(wavelength_m), rel=1e-12
+        )
+
 
 class TestGenerateFresnelZonePlateProbe:
     """The sign of ``focal_length + defocus`` selects the propagation direction.

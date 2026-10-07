@@ -26,7 +26,7 @@ from ptychodus.model.product.object.settings import ObjectSettings
 class _ObservableObjectProvider(ObjectGeometryProvider, Observable):
     """Test double: an Observable + ObjectGeometryProvider. set_geometry()
     mutates the returned geometry and fires notify_observers, mimicking what
-    ProductGeometry.set_detector_extent does in production."""
+    ProductGeometryProvider.set_detector_extent does in production."""
 
     def __init__(self, geometry: ObjectGeometry) -> None:
         Observable.__init__(self)
@@ -83,7 +83,7 @@ def _make_object_geometry(pixel_width_m: float, pixel_height_m: float) -> Object
 def test_rebuild_fires_on_geometry_observer_notification() -> None:
     """When the geometry provider is Observable, ObjectRepositoryItem should
     register itself and re-run rebuild each time notify_observers fires
-    (matches the ProductGeometry.set_detector_extent path in production).
+    (matches the ProductGeometryProvider.set_detector_extent path in production).
     Also verifies the is_valid guard blocks the initial rebuild when the
     provider reports zero-valued pixel dimensions.
     """

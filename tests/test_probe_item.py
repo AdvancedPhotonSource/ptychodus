@@ -135,7 +135,7 @@ class _ObservableProbeProvider(ProbeGeometryProvider, Observable):
     """Test double: an Observable + ProbeGeometryProvider. Only get_probe_geometry
     is exercised by ProbeRepositoryItem's rebuild guard; the other abstract
     properties are stubbed with sensible defaults. set_geometry() mutates and
-    fires notify_observers, mimicking what ProductGeometry.set_detector_extent
+    fires notify_observers, mimicking what ProductGeometryProvider.set_detector_extent
     does in production."""
 
     def __init__(self, geometry: ProbeGeometry) -> None:
@@ -180,7 +180,7 @@ class _ObservableProbeProvider(ProbeGeometryProvider, Observable):
 def test_rebuild_fires_on_geometry_observer_notification() -> None:
     """When the geometry provider is Observable, ProbeRepositoryItem should
     register itself and re-run _rebuild each time notify_observers fires
-    (matches the ProductGeometry.set_detector_extent path in production).
+    (matches the ProductGeometryProvider.set_detector_extent path in production).
     """
     registry = SettingsRegistry()
     settings = ProbeSettings(registry)

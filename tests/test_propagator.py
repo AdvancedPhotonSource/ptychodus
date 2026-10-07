@@ -3,11 +3,14 @@
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
+import math
+
 import numpy
 import numpy.testing
 import pytest
 from scipy.fft import ifftshift
 
+from ptychodus.api.constants import energy_eV_to_J, energy_eV_to_wavelength_m
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.propagate import (
     AngularSpectrumPropagator,
@@ -15,11 +18,13 @@ from ptychodus.api.propagate import (
     FresnelTransferFunctionPropagator,
     FresnelTransformPropagator,
     PropagatedWavefield,
+    ProductGeometry,
     PropagatorParameters,
     choose_propagator,
     compute_far_field_pixel_geometry,
     compute_full_aperture_fresnel_number,
     compute_near_field_pixel_geometry,
+    compute_product_geometry,
     compute_far_field_propagation_distance,
     compute_magnification,
     intensity,
@@ -1638,3 +1643,269 @@ class TestComputeMagnification:
     def test_detector_at_the_focus_is_zero(self) -> None:
         """Degenerate rather than an error; callers degrade on it."""
         assert compute_magnification(1.0, 1.0) == 0.0
+
+
+# ---------------------------------------------------------------------------
+# compute_product_geometry
+# ---------------------------------------------------------------------------
+
+
+_PG_ENERGY_EV = 10000.0
+_PG_PHOTON_COUNT = 1.0e9
+_PG_EXPOSURE_S = 0.1
+_PG_DISTANCE_M = 1.0
+_PG_PITCH_M = 75e-6
+_PG_NUM_PX = 256
+_PG_WAVELENGTH_M = energy_eV_to_wavelength_m(_PG_ENERGY_EV)
+
+
+def _product_geometry(**overrides: object) -> ProductGeometry:
+    """A bound far-field geometry; keyword overrides replace any single input."""
+    kwargs: dict[str, object] = {
+        'probe_energy_eV': _PG_ENERGY_EV,
+        'probe_photon_count': _PG_PHOTON_COUNT,
+        'exposure_time_s': _PG_EXPOSURE_S,
+        'detector_distance_m': _PG_DISTANCE_M,
+        'detector_extent': ImageExtent(width_px=_PG_NUM_PX, height_px=_PG_NUM_PX),
+        'detector_pixel_geometry': PixelGeometry(width_m=_PG_PITCH_M, height_m=_PG_PITCH_M),
+    }
+    kwargs.update(overrides)
+    return compute_product_geometry(**kwargs)  # type: ignore[arg-type]
+
+
+class TestComputeProductGeometryBeam:
+    """The beam quantities depend on metadata alone, so they survive an unbound detector."""
+
+    def test_wavenumber_is_the_reciprocal_wavelength(self) -> None:
+        assert _product_geometry().probe_wavenumber_per_m == pytest.approx(1.0 / _PG_WAVELENGTH_M)
+
+    def test_angular_wavenumber_is_two_pi_over_the_wavelength(self) -> None:
+        """Compared against the wavelength, not against the wavenumber field.
+
+        Asserting ``k_ang == 2 pi k`` would restate how the two are computed and would
+        hold even if both were wrong.
+        """
+        expected = 2.0 * numpy.pi / _PG_WAVELENGTH_M
+
+        assert _product_geometry().probe_angular_wavenumber_rad_per_m == pytest.approx(expected)
+
+    def test_photon_flux_is_the_count_over_the_exposure(self) -> None:
+        expected = _PG_PHOTON_COUNT / _PG_EXPOSURE_S
+
+        assert _product_geometry().probe_photon_flux_per_s == pytest.approx(expected)
+
+    def test_power_is_the_photon_energy_times_the_flux(self) -> None:
+        values = _product_geometry()
+        expected = energy_eV_to_J(_PG_ENERGY_EV) * values.probe_photon_flux_per_s
+
+        assert values.probe_power_W == pytest.approx(expected)
+
+    def test_beam_quantities_survive_an_unbound_detector(self) -> None:
+        """A product is routinely inspected before a diffraction dataset is bound."""
+        values = compute_product_geometry(
+            probe_energy_eV=_PG_ENERGY_EV,
+            probe_photon_count=_PG_PHOTON_COUNT,
+            exposure_time_s=_PG_EXPOSURE_S,
+            detector_distance_m=_PG_DISTANCE_M,
+        )
+
+        assert values.probe_wavenumber_per_m == pytest.approx(1.0 / _PG_WAVELENGTH_M)
+        assert values.probe_photon_flux_per_s == pytest.approx(_PG_PHOTON_COUNT / _PG_EXPOSURE_S)
+
+    def test_zero_energy_takes_the_wavenumber_to_zero(self) -> None:
+        """The limit, not a guard: the wavenumber is proportional to the energy."""
+        values = _product_geometry(probe_energy_eV=0.0)
+
+        assert values.probe_wavenumber_per_m == 0.0
+        assert values.probe_angular_wavenumber_rad_per_m == 0.0
+        assert values.probe_power_W == 0.0
+
+    def test_zero_exposure_diverges_the_flux_and_the_power(self) -> None:
+        """A real photon count over a vanishing exposure is unbounded, not zero."""
+        values = _product_geometry(exposure_time_s=0.0)
+
+        assert values.probe_photon_flux_per_s == math.inf
+        assert values.probe_power_W == math.inf
+
+    def test_nothing_recorded_at_all_is_indeterminate(self) -> None:
+        """Both fields default to 0.0, so 0/0 is the state of a fresh product.
+
+        Unmeasured is unknown rather than zero, and pydantic serialises nan to JSON
+        null, so the web UI renders it as an em dash.
+        """
+        values = _product_geometry(probe_photon_count=0.0, exposure_time_s=0.0)
+
+        assert math.isnan(values.probe_photon_flux_per_s)
+        assert math.isnan(values.probe_power_W)
+
+    def test_infinite_flux_at_zero_energy_is_indeterminate(self) -> None:
+        values = _product_geometry(probe_energy_eV=0.0, exposure_time_s=0.0)
+
+        assert values.probe_photon_flux_per_s == math.inf
+        assert math.isnan(values.probe_power_W)
+
+
+class TestComputeProductGeometryDetector:
+    def test_numerical_aperture_is_the_geometric_mean_of_the_half_angles(self) -> None:
+        """Anisotropic on purpose: on a square detector the geometric and arithmetic
+        means coincide, so a square case cannot tell the two apart."""
+        width_px, height_px, pitch_x_m, pitch_y_m = 256, 128, 75e-6, 50e-6
+        values = _product_geometry(
+            detector_extent=ImageExtent(width_px=width_px, height_px=height_px),
+            detector_pixel_geometry=PixelGeometry(width_m=pitch_x_m, height_m=pitch_y_m),
+        )
+        half_angle_x = width_px * pitch_x_m / (2.0 * _PG_DISTANCE_M)
+        half_angle_y = height_px * pitch_y_m / (2.0 * _PG_DISTANCE_M)
+
+        assert values.detector_numerical_aperture == pytest.approx(
+            numpy.sqrt(half_angle_x * half_angle_y)
+        )
+        assert values.detector_numerical_aperture != pytest.approx(
+            0.5 * (half_angle_x + half_angle_y)
+        )
+
+    def test_depth_of_field_is_the_wavelength_over_the_squared_aperture(self) -> None:
+        values = _product_geometry()
+        expected = _PG_WAVELENGTH_M / values.detector_numerical_aperture**2
+
+        assert values.depth_of_field_m == pytest.approx(expected)
+
+    def test_depth_of_field_diverges_as_the_aperture_vanishes(self) -> None:
+        """Unlike the guards elsewhere, infinity here is the limit, not a sentinel."""
+        values = compute_product_geometry(
+            probe_energy_eV=_PG_ENERGY_EV,
+            probe_photon_count=_PG_PHOTON_COUNT,
+            exposure_time_s=_PG_EXPOSURE_S,
+            detector_distance_m=_PG_DISTANCE_M,
+        )
+
+        assert values.detector_numerical_aperture == 0.0
+        assert values.depth_of_field_m == math.inf
+
+    def test_detector_in_the_sample_plane_subtends_everything(self) -> None:
+        """The other side of the aperture limit: zero distance, not zero extent.
+
+        A detector at the sample collects every angle, so the aperture diverges and the
+        depth of field collapses -- the mirror image of an unbound detector.
+        """
+        values = _product_geometry(detector_distance_m=0.0)
+
+        assert values.detector_numerical_aperture == math.inf
+        assert values.depth_of_field_m == 0.0
+
+    def test_no_detector_and_no_distance_is_indeterminate(self) -> None:
+        values = compute_product_geometry(
+            probe_energy_eV=_PG_ENERGY_EV,
+            probe_photon_count=_PG_PHOTON_COUNT,
+            exposure_time_s=_PG_EXPOSURE_S,
+            detector_distance_m=0.0,
+        )
+
+        assert math.isnan(values.detector_numerical_aperture)
+        assert math.isnan(values.depth_of_field_m)
+
+    def test_depth_of_field_is_indeterminate_at_zero_energy_and_zero_aperture(self) -> None:
+        values = compute_product_geometry(
+            probe_energy_eV=0.0,
+            probe_photon_count=_PG_PHOTON_COUNT,
+            exposure_time_s=_PG_EXPOSURE_S,
+            detector_distance_m=_PG_DISTANCE_M,
+        )
+
+        assert math.isnan(values.depth_of_field_m)
+
+    def test_detector_dependent_fields_degrade_while_unbound(self) -> None:
+        values = compute_product_geometry(
+            probe_energy_eV=_PG_ENERGY_EV,
+            probe_photon_count=_PG_PHOTON_COUNT,
+            exposure_time_s=_PG_EXPOSURE_S,
+            detector_distance_m=_PG_DISTANCE_M,
+        )
+
+        assert values.fresnel_number == 0.0
+        assert values.object_plane_pixel_geometry == PixelGeometry(width_m=0.0, height_m=0.0)
+
+    def test_far_field_object_pixel_is_the_detector_conjugate(self) -> None:
+        expected_m = _PG_WAVELENGTH_M * _PG_DISTANCE_M / (_PG_NUM_PX * _PG_PITCH_M)
+
+        pixel_geometry = _product_geometry().object_plane_pixel_geometry
+
+        assert pixel_geometry.width_m == pytest.approx(expected_m, rel=1e-12)
+
+    def test_near_field_object_pixel_is_the_demagnified_detector_pixel(self) -> None:
+        # Focus 5 mm downstream of a detector 1 m away: M = (1.0 - 0.005) / 0.005 = 199.
+        values = _product_geometry(focus_object_distance_m=5e-3, far_field=False)
+
+        assert values.object_plane_pixel_geometry.width_m == pytest.approx(_PG_PITCH_M / 199.0)
+
+    def test_propagation_distance_is_reduced_by_the_magnification(self) -> None:
+        values = _product_geometry(focus_object_distance_m=5e-3)
+
+        assert values.object_plane_propagation_distance_m == pytest.approx(_PG_DISTANCE_M / 199.0)
+
+    def test_propagation_distance_is_the_detector_distance_without_an_optic(self) -> None:
+        assert _product_geometry().object_plane_propagation_distance_m == _PG_DISTANCE_M
+
+    def test_detector_at_the_focus_degrades_rather_than_dividing_by_zero(self) -> None:
+        """M = 0 places the detector at the focus, where the projection is undefined."""
+        values = _product_geometry(focus_object_distance_m=_PG_DISTANCE_M, far_field=False)
+
+        assert values.object_plane_propagation_distance_m == math.inf
+        # The two documented exceptions to the limit rule: a sentinel the is_valid
+        # protocol depends on, and a path limit that really is zero.
+        assert values.object_plane_pixel_geometry == PixelGeometry(width_m=0.0, height_m=0.0)
+        assert values.fresnel_number == 0.0
+
+    def test_is_frozen(self) -> None:
+        with pytest.raises(FrozenInstanceError):
+            _product_geometry().fresnel_number = 1.0  # type: ignore[misc]
+
+
+class TestComputeProductGeometryMagnificationInvariance:
+    """Regression guard on the lab-frame distance the far-field branch passes.
+
+    By the Fresnel scaling theorem a cone beam of magnification ``M`` images like a
+    parallel beam propagating ``z_d / M`` onto pixels ``dx_d / M``. Both scale, so ``M``
+    cancels in ``lambda z / (N dx)`` and the far-field pitch is invariant -- passing the
+    equivalent distance there instead would divide by ``M`` a second time. The Fresnel
+    number is deliberately *not* invariant, since the object extent is fixed while the
+    equivalent distance shrinks.
+    """
+
+    # Focus 5 mm downstream of a detector 1 m away: M = (1.0 - 0.005) / 0.005 = 199.
+    _FOCUS_M = 5e-3
+    _MAGNIFICATION = 199.0
+
+    def test_far_field_pitch_is_magnification_invariant(self) -> None:
+        without_optic = _product_geometry().object_plane_pixel_geometry
+        with_optic = _product_geometry(
+            focus_object_distance_m=self._FOCUS_M
+        ).object_plane_pixel_geometry
+
+        assert with_optic == without_optic
+
+    def test_far_field_pitch_matches_the_equivalent_parallel_beam(self) -> None:
+        """Computed the long way round, scaling both the distance and the pixel."""
+        equivalent_distance_m = _PG_DISTANCE_M / self._MAGNIFICATION
+        equivalent_pitch_m = _PG_PITCH_M / self._MAGNIFICATION
+        expected_m = _PG_WAVELENGTH_M * equivalent_distance_m / (_PG_NUM_PX * equivalent_pitch_m)
+
+        values = _product_geometry(focus_object_distance_m=self._FOCUS_M)
+
+        assert values.object_plane_pixel_geometry.width_m == pytest.approx(expected_m, rel=1e-12)
+
+    def test_fresnel_number_is_not_magnification_invariant(self) -> None:
+        """A focusing optic really does move the geometry toward near field."""
+        without_optic = _product_geometry().fresnel_number
+        with_optic = _product_geometry(focus_object_distance_m=self._FOCUS_M).fresnel_number
+
+        assert with_optic == pytest.approx(self._MAGNIFICATION * without_optic)
+        assert without_optic < 1.0 < with_optic
+
+    def test_numerical_aperture_is_magnification_invariant(self) -> None:
+        without_optic = _product_geometry().detector_numerical_aperture
+        with_optic = _product_geometry(
+            focus_object_distance_m=self._FOCUS_M
+        ).detector_numerical_aperture
+
+        assert with_optic == without_optic

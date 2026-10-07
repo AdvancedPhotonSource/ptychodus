@@ -1,4 +1,4 @@
-"""Unit tests for ProductGeometry's reciprocal-plane derivations.
+"""Unit tests for ProductGeometryProvider's reciprocal-plane derivations.
 
 ``get_object_plane_pixel_geometry`` and ``fresnel_number`` both describe the sample
 plane, which is conjugate to the detector across the propagation. These pin the plane
@@ -7,13 +7,14 @@ small error but an inversion.
 """
 
 from unittest.mock import MagicMock
+import math
 
 import pytest
 
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.settings import SettingsRegistry
-from ptychodus.model.product.geometry import ProductGeometry
+from ptychodus.model.product.geometry import ProductGeometryProvider
 from ptychodus.model.product.metadata import MetadataRepositoryItem, UniqueNameFactory
 from ptychodus.model.product.settings import ProductSettings
 
@@ -36,7 +37,7 @@ def _make_geometry(
     focus_object_distance_m: float = 0.0,
     far_field: bool = True,
     bind_detector: bool = True,
-) -> ProductGeometry:
+) -> ProductGeometryProvider:
     metadata_item = MetadataRepositoryItem(
         ProductSettings(SettingsRegistry()),
         _NameFactory(),
@@ -45,7 +46,7 @@ def _make_geometry(
         probe_energy_eV=_PROBE_ENERGY_EV,
         far_field=far_field,
     )
-    geometry = ProductGeometry(metadata_item, MagicMock())
+    geometry = ProductGeometryProvider(metadata_item, MagicMock())
 
     if bind_detector:
         geometry.set_detector_extent(ImageExtent(width_px=_NUM_PX, height_px=_NUM_PX))
@@ -97,7 +98,7 @@ class TestFresnelNumber:
         # W_obj * H_obj / (lambda z) with W_obj = lambda z / dx_detector.
         expected = _WAVELENGTH_M * _DETECTOR_DISTANCE_M / _DETECTOR_PITCH_M**2
 
-        fresnel_number = _make_geometry().fresnel_number
+        fresnel_number = _make_geometry().get_derived_values().fresnel_number
 
         assert fresnel_number == pytest.approx(expected, rel=1e-12)
         assert fresnel_number == pytest.approx(0.022041, rel=1e-4)
@@ -111,12 +112,12 @@ class TestFresnelNumber:
         detector_extent_m2 = (_NUM_PX * _DETECTOR_PITCH_M) ** 2
         detector_fresnel_number = detector_extent_m2 / (_WAVELENGTH_M * _DETECTOR_DISTANCE_M)
 
-        product = detector_fresnel_number * geometry.fresnel_number
+        product = detector_fresnel_number * geometry.get_derived_values().fresnel_number
 
         assert product == pytest.approx(_NUM_PX * _NUM_PX, rel=1e-12)
 
     def test_degrades_to_zero_while_no_dataset_is_bound(self) -> None:
-        assert _make_geometry(bind_detector=False).fresnel_number == 0.0
+        assert _make_geometry(bind_detector=False).get_derived_values().fresnel_number == 0.0
 
     def test_degrades_to_zero_at_zero_detector_distance(self) -> None:
         """The correct object-plane limit: ``W_obj^2 / (lambda z) = lambda z / dx_d^2 -> 0``.
@@ -124,7 +125,7 @@ class TestFresnelNumber:
         At the detector plane the same limit diverges, which is why the product editor
         used to need an 'inf' branch here.
         """
-        assert _make_geometry(detector_distance_m=0.0).fresnel_number == 0.0
+        assert _make_geometry(detector_distance_m=0.0).get_derived_values().fresnel_number == 0.0
 
 
 class TestConeBeamGeometry:
@@ -144,18 +145,17 @@ class TestConeBeamGeometry:
     _DIVERGING_FOCUS_M = -5e-3
     _DIVERGING_MAGNIFICATION = 201.0
 
-    def test_no_focusing_optic_leaves_magnification_at_unity(self) -> None:
-        assert _make_geometry().magnification == 1.0
+    # The magnification itself is ProductMetadata.magnification, covered in
+    # tests/test_product.py; these pin how the provider's geometry responds to it.
 
-    def test_converging_beam_magnification(self) -> None:
-        geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M)
-
-        assert geometry.magnification == pytest.approx(self._CONVERGING_MAGNIFICATION)
-
-    def test_diverging_beam_magnification(self) -> None:
+    def test_diverging_beam_propagation_distance(self) -> None:
+        """The sign of the focus coordinate picks the other branch of ``M``."""
         geometry = _make_geometry(focus_object_distance_m=self._DIVERGING_FOCUS_M)
+        expected_m = _DETECTOR_DISTANCE_M / self._DIVERGING_MAGNIFICATION
 
-        assert geometry.magnification == pytest.approx(self._DIVERGING_MAGNIFICATION)
+        derived = geometry.get_derived_values()
+
+        assert derived.object_plane_propagation_distance_m == pytest.approx(expected_m)
 
     def test_object_plane_pixel_is_the_demagnified_detector_pixel(self) -> None:
         geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M, far_field=False)
@@ -182,10 +182,15 @@ class TestConeBeamGeometry:
         geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M)
         expected_m = _DETECTOR_DISTANCE_M / self._CONVERGING_MAGNIFICATION
 
-        assert geometry.object_plane_propagation_distance_m == pytest.approx(expected_m)
+        assert geometry.get_derived_values().object_plane_propagation_distance_m == pytest.approx(
+            expected_m
+        )
 
     def test_propagation_distance_is_the_detector_distance_without_an_optic(self) -> None:
-        assert _make_geometry().object_plane_propagation_distance_m == _DETECTOR_DISTANCE_M
+        assert (
+            _make_geometry().get_derived_values().object_plane_propagation_distance_m
+            == _DETECTOR_DISTANCE_M
+        )
 
     def test_fresnel_number_uses_the_equivalent_parallel_beam_distance(self) -> None:
         geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M, far_field=False)
@@ -193,23 +198,27 @@ class TestConeBeamGeometry:
         width_m = _NUM_PX * _DETECTOR_PITCH_M / magnification
         expected = width_m**2 / (_WAVELENGTH_M * _DETECTOR_DISTANCE_M / magnification)
 
-        assert geometry.fresnel_number == pytest.approx(expected)
+        assert geometry.get_derived_values().fresnel_number == pytest.approx(expected)
 
     def test_fresnel_number_reports_near_field_for_a_magnifying_geometry(self) -> None:
         """The indicator must actually flip regime, not merely change value."""
         geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M, far_field=False)
 
-        assert _make_geometry().fresnel_number < 1.0
-        assert geometry.fresnel_number > 1.0
+        assert _make_geometry().get_derived_values().fresnel_number < 1.0
+        assert geometry.get_derived_values().fresnel_number > 1.0
 
     def test_detector_at_the_focus_degrades_rather_than_dividing_by_zero(self) -> None:
-        """M = 0 is degenerate; follow the class's degrade-to-zero convention."""
+        """M = 0 is degenerate, and the three fields degrade differently by design.
+
+        The equivalent distance takes its true limit and diverges, while the pixel
+        geometry and the Fresnel number are the two documented exceptions: the first is
+        the sentinel ``is_valid`` tests for, the second a path limit that really is zero.
+        """
         geometry = _make_geometry(focus_object_distance_m=_DETECTOR_DISTANCE_M, far_field=False)
 
-        assert geometry.magnification == 0.0
-        assert geometry.object_plane_propagation_distance_m == 0.0
+        assert geometry.get_derived_values().object_plane_propagation_distance_m == math.inf
         assert geometry.get_object_plane_pixel_geometry() == PixelGeometry(0.0, 0.0)
-        assert geometry.fresnel_number == 0.0
+        assert geometry.get_derived_values().fresnel_number == 0.0
 
 
 class TestNearFieldSampling:
@@ -256,8 +265,8 @@ class TestNearFieldSampling:
     def test_parallel_beam_fresnel_number_reports_near_field(self) -> None:
         """Declaring near field on this geometry is self-consistent: 256 x 75 um at
         1 m is deeply near field, where the far-field declaration reads 0.022."""
-        assert _make_geometry(far_field=True).fresnel_number < 1.0
-        assert _make_geometry(far_field=False).fresnel_number > 1.0
+        assert _make_geometry(far_field=True).get_derived_values().fresnel_number < 1.0
+        assert _make_geometry(far_field=False).get_derived_values().fresnel_number > 1.0
 
     def test_flipping_the_regime_notifies_observers(self) -> None:
         """The probe and object rebuild off this notification, so the sampling change

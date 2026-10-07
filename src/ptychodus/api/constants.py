@@ -19,10 +19,13 @@ LIGHT_SPEED_M_PER_S: Final[float] = 299792458
 PLANCK_CONSTANT_J_PER_HZ: Final[float] = 6.62607015e-34
 
 # Unit Enums
-# All physical quantities in api/ are stored in base SI units (m, s, J, rad, Hz) with an
-# explicit unit suffix on the identifier (_m, _s, _J, _rad, _Hz, ...); eV, deg, and px are
-# the only non-SI suffixes allowed by convention. The enums below convert to and from those
-# base units at the boundaries -- file readers on the way in, the GUI on the way out.
+# All physical quantities in api/ are stored in base SI units (m, s, J, rad, ...) with an
+# explicit unit suffix on the identifier (_m, _s, _J, _rad, ...); eV, deg, and px are
+# the only non-SI suffixes allowed by convention. A rate spells its unit out as _per_s
+# rather than _Hz, so that one quantity carries one name wherever it is derived, mapped
+# or measured, and so that the name does not trip the naming lints. The enums below
+# convert to and from those base units at the boundaries -- file readers on the way in,
+# the GUI on the way out.
 
 
 class LengthUnit(Enum):

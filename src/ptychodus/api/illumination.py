@@ -19,6 +19,7 @@ from .object import ObjectCenter
 from .probe import PatchBounds
 from .probe_positions import ProbePosition
 from .product import Product
+from .propagate import compute_product_geometry
 
 
 def _iter_probe_patches(
@@ -51,7 +52,7 @@ class IlluminationMap:
     dose, and intensity quantities."""
 
     photon_number: RealArrayType
-    photon_flux_Hz: float  # noqa: N815
+    photon_flux_per_s: float
     photon_energy_J: float  # noqa: N815
     exposure_time_s: float
     mass_attenuation_m2_kg: float
@@ -63,7 +64,7 @@ class IlluminationMap:
         return self.photon_number / self.pixel_geometry.get_area_m2()
 
     @property
-    def photon_fluence_rate_Hz_m2(self) -> RealArrayType:  # noqa: N802
+    def photon_fluence_rate_per_s_m2(self) -> RealArrayType:
         return self.photon_fluence_1_m2 / self.exposure_time_s
 
     @property
@@ -72,7 +73,7 @@ class IlluminationMap:
 
     @property
     def energy_fluence_rate_W_m2(self) -> RealArrayType:  # noqa: N802
-        return self.photon_fluence_rate_Hz_m2 * self.photon_energy_J
+        return self.photon_fluence_rate_per_s_m2 * self.photon_energy_J
 
     @property
     def dose_Gy(self) -> RealArrayType:  # noqa: N802
@@ -92,7 +93,7 @@ class IlluminationMap:
             allow_pickle=False,
             photon_number=self.photon_number,
             photon_fluence_1_m2=self.photon_fluence_1_m2,
-            photon_fluence_rate_Hz_m2=self.photon_fluence_rate_Hz_m2,
+            photon_fluence_rate_per_s_m2=self.photon_fluence_rate_per_s_m2,
             energy_fluence_J_m2=self.energy_fluence_J_m2,
             energy_fluence_rate_W_m2=self.energy_fluence_rate_W_m2,
             dose_Gy=self.dose_Gy,
@@ -136,16 +137,18 @@ def compute_illumination_map(
         canvas[bounds.y_slice, bounds.x_slice] += patch
 
     exposure_time_s = product.metadata.exposure_time_s
-    photon_flux_Hz = float('nan')  # noqa: N806
-
-    try:
-        photon_flux_Hz = product.metadata.probe_photon_count / exposure_time_s  # noqa: N806
-    except ZeroDivisionError:
-        pass
+    # The flux has one definition, in compute_product_geometry. The detector geometry
+    # it also derives is irrelevant here, so only the distance is supplied.
+    product_geometry = compute_product_geometry(
+        probe_energy_eV=product.metadata.probe_energy_eV,
+        probe_photon_count=product.metadata.probe_photon_count,
+        exposure_time_s=exposure_time_s,
+        detector_distance_m=product.metadata.detector_distance_m,
+    )
 
     return IlluminationMap(
         photon_number=canvas,
-        photon_flux_Hz=photon_flux_Hz,
+        photon_flux_per_s=product_geometry.probe_photon_flux_per_s,
         photon_energy_J=product.metadata.probe_energy_J,
         exposure_time_s=exposure_time_s,
         mass_attenuation_m2_kg=product.metadata.mass_attenuation_m2_kg,

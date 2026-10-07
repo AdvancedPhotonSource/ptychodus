@@ -5,7 +5,7 @@ from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import Product, ProductFileReader
 
 from ..diffraction import AssembledDiffractionDataset
-from .geometry import ProductGeometry
+from .geometry import ProductGeometryProvider
 from .item import ProductRepositoryItem, ProductState
 from .metadata import MetadataRepositoryItem
 from .object import ObjectRepositoryItemFactory
@@ -37,7 +37,7 @@ class ProductRepositoryItemFactory:
 
     @staticmethod
     def _bind_dataset_geometry(
-        geometry: ProductGeometry, dataset: AssembledDiffractionDataset | None
+        geometry: ProductGeometryProvider, dataset: AssembledDiffractionDataset | None
     ) -> None:
         """Push the dataset's processed detector extent and pixel geometry into
         ``geometry`` so probe & object items built next see a valid geometry inside
@@ -86,7 +86,7 @@ class ProductRepositoryItemFactory:
         )
 
         scan_item = self._scan_item_factory.create()
-        geometry = ProductGeometry(metadata_item, scan_item)
+        geometry = ProductGeometryProvider(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create(geometry)
         object_item = self._object_item_factory.create(geometry)
@@ -127,7 +127,7 @@ class ProductRepositoryItemFactory:
         )
 
         scan_item = self._scan_item_factory.create(product.probe_positions)
-        geometry = ProductGeometry(metadata_item, scan_item)
+        geometry = ProductGeometryProvider(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create(geometry, product.probes)
         object_item = self._object_item_factory.create(geometry, product.object_)
@@ -150,7 +150,7 @@ class ProductRepositoryItemFactory:
         loading."""
         metadata_item = MetadataRepositoryItem(self._settings, self._repository, name=name)
         scan_item = self._scan_item_factory.create()
-        geometry = ProductGeometry(metadata_item, scan_item)
+        geometry = ProductGeometryProvider(metadata_item, scan_item)
         probe_item = self._probe_item_factory.create(geometry)
         object_item = self._object_item_factory.create(geometry)
         return ProductRepositoryItem(
@@ -184,7 +184,7 @@ class ProductRepositoryItemFactory:
 
         metadata_item = MetadataRepositoryItem(self._settings, self._repository)
         scan_item = self._scan_item_factory.create_from_settings()
-        geometry = ProductGeometry(metadata_item, scan_item)
+        geometry = ProductGeometryProvider(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create_from_settings(geometry, dataset=dataset)
         object_item = self._object_item_factory.create_from_settings(geometry, dataset=dataset)

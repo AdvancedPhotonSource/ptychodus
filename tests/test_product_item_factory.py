@@ -60,12 +60,12 @@ def _make_factory() -> ProductRepositoryItemFactory:
 def _capture_metadata_kwargs(build: Any) -> dict[str, Any]:
     """Run *build* with the item classes stubbed, returning the metadata kwargs.
 
-    ``ProductGeometry`` and ``ProductRepositoryItem`` are stubbed because both reject
+    ``ProductGeometryProvider`` and ``ProductRepositoryItem`` are stubbed because both reject
     the mocked sub-items -- ``ProductRepositoryItem`` requires real ParameterGroups.
     """
     with (
         patch.object(item_factory_module, 'MetadataRepositoryItem') as metadata_cls,
-        patch.object(item_factory_module, 'ProductGeometry'),
+        patch.object(item_factory_module, 'ProductGeometryProvider'),
         patch.object(item_factory_module, 'ProductRepositoryItem'),
     ):
         build()

@@ -520,7 +520,7 @@ def test_pixel_geometry_is_valid_true_for_strictly_positive() -> None:
 
 
 def test_pixel_geometry_is_valid_false_when_either_dimension_is_zero() -> None:
-    """Zero on either axis is the 'not ready' sentinel returned by ProductGeometry
+    """Zero on either axis is the 'not ready' sentinel returned by ProductGeometryProvider
     before a dataset binds — must be rejected."""
     assert not PixelGeometry(width_m=0.0, height_m=1e-6).is_valid
     assert not PixelGeometry(width_m=1e-6, height_m=0.0).is_valid

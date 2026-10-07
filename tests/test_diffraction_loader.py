@@ -227,7 +227,7 @@ def test_processed_image_extent_reports_pattern_shape() -> None:
     extent = dataset.get_processed_image_extent()
     assert extent == ImageExtent(width_px=patterns_w, height_px=patterns_h)
     assert extent == ImageExtent(width_px=8, height_px=6)
-    # Raw metadata extent is unchanged (40x60), so ProductGeometry must NOT read it.
+    # Raw metadata extent is unchanged (40x60), so ProductGeometryProvider must NOT read it.
     assert dataset.get_metadata().detector_extent == ImageExtent(width_px=60, height_px=40)
 
 
