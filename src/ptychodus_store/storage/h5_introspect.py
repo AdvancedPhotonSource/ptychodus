@@ -6,8 +6,11 @@ from pathlib import Path
 from typing import Any
 
 import h5py
+import numpy
 
+from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import DiffractionFileKeys, ProductFileKeys, load_fluorescence_data
+from ptychodus.api.probe import Probe
 
 
 class IntrospectionError(Exception):
@@ -22,6 +25,14 @@ def _attr(group: h5py.HLObject, key: str, *, cast: type) -> Any:
         return cast(raw)
     except (TypeError, ValueError):
         return None
+
+
+def _dataset_nbytes(item: Any) -> int:
+    """Byte size of an HDF5 dataset from its shape and dtype, without reading it."""
+    if not isinstance(item, h5py.Dataset):
+        return 0
+
+    return int(numpy.prod(item.shape)) * int(item.dtype.itemsize)
 
 
 def introspect_diffraction(path: Path) -> dict[str, Any]:
@@ -49,15 +60,71 @@ def introspect_diffraction(path: Path) -> dict[str, Any]:
             pixel_width = _attr(patterns, DiffractionFileKeys.DETECTOR_PIXEL_WIDTH, cast=float)
             pixel_height = _attr(patterns, DiffractionFileKeys.DETECTOR_PIXEL_HEIGHT, cast=float)
 
+            bad_pixels = f.get(DiffractionFileKeys.BAD_PIXELS)
+            num_bad_pixels: int | None = None
+            if isinstance(bad_pixels, h5py.Dataset):
+                # A 2-D mask, so counting it costs one small read rather than a
+                # pass over the pattern stack.
+                num_bad_pixels = int(numpy.count_nonzero(bad_pixels[()]))
+
             return {
                 'pattern_dtype': pattern_dtype,
                 'pattern_shape': pattern_shape,
                 'num_patterns_total': num_patterns_total,
                 'detector_pixel_width_m': pixel_width,
                 'detector_pixel_height_m': pixel_height,
+                'num_bad_pixels': num_bad_pixels,
+                'nbytes': _dataset_nbytes(patterns)
+                + _dataset_nbytes(f.get(DiffractionFileKeys.INDEXES))
+                + _dataset_nbytes(bad_pixels),
             }
     except (OSError, KeyError) as exc:
         raise IntrospectionError(f'{path}: {exc}') from exc
+
+
+def _probe_mode_relative_power(probe: Any) -> list[float]:
+    """Fraction of the probe's power in each incoherent mode.
+
+    The one place introspection reads array data rather than shapes: the powers are a
+    reduction over the probe, which is megabytes rather than the gigabytes a pattern
+    stack would be. :class:`Probe` owns the normalisation, so this does not restate it.
+    """
+    if not isinstance(probe, h5py.Dataset):
+        return []
+
+    array = probe[()]
+
+    if array.ndim == 4:
+        # (coherent, incoherent, h, w): the relative powers belong to the coherent
+        # mode the viewer shows, which is the first.
+        array = array[0]
+
+    if array.ndim != 3:
+        return []
+
+    # The pixel geometry plays no part in a power ratio; Probe merely requires one.
+    modes = Probe(array=array, pixel_geometry=PixelGeometry(width_m=1.0, height_m=1.0))
+    return [
+        float(modes.get_incoherent_mode_relative_power(i))
+        for i in range(modes.num_incoherent_modes)
+    ]
+
+
+def _scan_path_length_m(h5_file: h5py.File) -> float | None:
+    """Total length of the scan path, summed over consecutive positions."""
+    h5_x = h5_file.get(ProductFileKeys.PROBE_POSITION_X)
+    h5_y = h5_file.get(ProductFileKeys.PROBE_POSITION_Y)
+
+    if not isinstance(h5_x, h5py.Dataset) or not isinstance(h5_y, h5py.Dataset):
+        return None
+
+    x_m = numpy.asarray(h5_x[()], dtype=float)
+    y_m = numpy.asarray(h5_y[()], dtype=float)
+
+    if x_m.size < 2 or x_m.shape != y_m.shape:
+        return 0.0
+
+    return float(numpy.sum(numpy.hypot(numpy.diff(x_m), numpy.diff(y_m))))
 
 
 def introspect_product(path: Path) -> dict[str, Any]:
@@ -127,9 +194,24 @@ def introspect_product(path: Path) -> dict[str, Any]:
             if isinstance(loss_epochs, h5py.Dataset):
                 num_loss_epochs = int(loss_epochs.shape[0])
 
+            layer_spacing_m: list[float] = []
+            h5_layer_spacing = f.get(ProductFileKeys.OBJECT_LAYER_SPACING)
+            if isinstance(h5_layer_spacing, h5py.Dataset):
+                layer_spacing_m = [float(v) for v in h5_layer_spacing[()]]
+
             return {
                 'name': name,
                 'comments': comments,
+                'probe_mode_relative_power': _probe_mode_relative_power(probe),
+                'probe_dtype': str(probe.dtype) if isinstance(probe, h5py.Dataset) else None,
+                'probe_nbytes': _dataset_nbytes(probe),
+                'object_dtype': str(obj.dtype) if isinstance(obj, h5py.Dataset) else None,
+                'object_nbytes': _dataset_nbytes(obj),
+                'object_layer_spacing_m': layer_spacing_m,
+                'scan_length_m': _scan_path_length_m(f),
+                'scan_nbytes': _dataset_nbytes(positions)
+                + _dataset_nbytes(f.get(ProductFileKeys.PROBE_POSITION_X))
+                + _dataset_nbytes(f.get(ProductFileKeys.PROBE_POSITION_Y)),
                 'detector_distance_m': _root_attr(ProductFileKeys.DETECTOR_OBJECT_DISTANCE, float),
                 'focus_object_distance_m': _root_attr(ProductFileKeys.FOCUS_OBJECT_DISTANCE, float),
                 'far_field': _root_attr(ProductFileKeys.FAR_FIELD, bool),
@@ -170,7 +252,13 @@ def introspect_fluorescence(path: Path) -> dict[str, Any]:
         if cps.ndim == 2:
             map_shape = (int(cps.shape[0]), int(cps.shape[1]))
 
+    # Element maps are object-sized rather than detector-sized, so summing them is
+    # cheap -- unlike the diffraction counts, which is why that column is absent.
+    element_counts = [float(numpy.sum(emap.counts_per_second)) for emap in dataset]
+
     return {
         'element_names': element_names,
         'map_shape': map_shape,
+        'element_counts': element_counts,
+        'nbytes': int(sum(emap.counts_per_second.nbytes for emap in dataset)),
     }
