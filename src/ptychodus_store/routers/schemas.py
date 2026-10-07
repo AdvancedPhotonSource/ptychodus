@@ -60,6 +60,8 @@ class DiffractionRead(_RowBase):
     num_patterns_total: int | None
     detector_pixel_width_m: float | None
     detector_pixel_height_m: float | None
+    num_bad_pixels: int | None = None
+    nbytes: int | None = None
 
 
 class ProductRead(_RowBase):
@@ -88,6 +90,27 @@ class ProductRead(_RowBase):
     probe_width_px: int | None
     num_scan_points: int | None
     num_loss_epochs: int | None
+    scan_length_m: float | None = None
+    probe_dtype: str | None = None
+    object_dtype: str | None = None
+    probe_nbytes: int | None = None
+    object_nbytes: int | None = None
+    scan_nbytes: int | None = None
+    probe_mode_relative_power: list[float] = []
+    object_layer_spacing_m: list[float] = []
+
+    # Derived on read from the columns above; never stored, so the formula has one
+    # home in ptychodus.api.propagate. The last three additionally need the detector,
+    # which product.h5 does not record -- they are null unless the manifest's
+    # derived_from names a diffraction dataset this store has indexed.
+    probe_wavenumber_per_m: float | None = None
+    probe_angular_wavenumber_rad_per_m: float | None = None
+    probe_photon_flux_per_s: float | None = None
+    probe_power_W: float | None = None  # noqa: N815
+    object_plane_propagation_distance_m: float | None = None
+    fresnel_number: float | None = None
+    detector_numerical_aperture: float | None = None
+    depth_of_field_m: float | None = None
 
 
 class FluorescenceRead(_RowBase):
@@ -96,8 +119,10 @@ class FluorescenceRead(_RowBase):
     derived_from: list[DerivedFromEdge] = []
 
     element_names: list[str]
+    element_counts: list[float] = []
     map_height_px: int | None
     map_width_px: int | None
+    nbytes: int | None = None
 
 
 ItemT = TypeVar('ItemT', bound=BaseModel)

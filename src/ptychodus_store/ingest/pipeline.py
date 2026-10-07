@@ -89,6 +89,8 @@ def _values_for_diffraction(
         'num_patterns_total': h5.get('num_patterns_total'),
         'detector_pixel_width_m': h5.get('detector_pixel_width_m'),
         'detector_pixel_height_m': h5.get('detector_pixel_height_m'),
+        'num_bad_pixels': h5.get('num_bad_pixels'),
+        'nbytes': h5.get('nbytes'),
     }
 
 
@@ -122,6 +124,14 @@ def _values_for_product(
         'probe_width_px': probe_shape[2],
         'num_scan_points': h5.get('num_scan_points'),
         'num_loss_epochs': h5.get('num_loss_epochs'),
+        'scan_length_m': h5.get('scan_length_m'),
+        'probe_dtype': h5.get('probe_dtype'),
+        'object_dtype': h5.get('object_dtype'),
+        'probe_nbytes': h5.get('probe_nbytes'),
+        'object_nbytes': h5.get('object_nbytes'),
+        'scan_nbytes': h5.get('scan_nbytes'),
+        'probe_mode_relative_power': h5.get('probe_mode_relative_power') or [],
+        'object_layer_spacing_m': h5.get('object_layer_spacing_m') or [],
     }
 
 
@@ -135,8 +145,10 @@ def _values_for_fluorescence(
         'label': m.label,
         'comments': m.comments,
         'element_names': list(h5.get('element_names') or []),
+        'element_counts': list(h5.get('element_counts') or []),
         'map_height_px': map_shape[0] if map_shape else None,
         'map_width_px': map_shape[1] if map_shape else None,
+        'nbytes': h5.get('nbytes'),
     }
 
 

@@ -38,6 +38,8 @@ HDF5_OWNED_KEYS: dict[str, frozenset[str]] = {
             'num_patterns_total',
             'detector_pixel_width_m',
             'detector_pixel_height_m',
+            'num_bad_pixels',
+            'nbytes',
         }
     ),
     ResourceKind.PRODUCT: frozenset(
@@ -60,9 +62,19 @@ HDF5_OWNED_KEYS: dict[str, frozenset[str]] = {
             'probe_shape',
             'num_scan_points',
             'num_loss_epochs',
+            'scan_length_m',
+            'probe_dtype',
+            'object_dtype',
+            'probe_nbytes',
+            'object_nbytes',
+            'scan_nbytes',
+            'probe_mode_relative_power',
+            'object_layer_spacing_m',
         }
     ),
-    ResourceKind.FLUORESCENCE: frozenset({'element_names', 'map_shape'}),
+    ResourceKind.FLUORESCENCE: frozenset(
+        {'element_names', 'map_shape', 'element_counts', 'nbytes'}
+    ),
 }
 
 

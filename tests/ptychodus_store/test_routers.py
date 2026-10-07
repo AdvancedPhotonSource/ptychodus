@@ -179,3 +179,56 @@ async def test_admin_stats(
     assert body['diffraction_count'] == 1
     assert body['product_count'] == 0
     assert body['fluorescence_count'] == 0
+
+
+async def test_derived_quantities_need_only_metadata(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
+):
+    """Five of the nine follow from the product's own columns."""
+    p = seed_product()
+    await _ingest(app_client, db_engine, layout, layout.manifest_path('product', p))
+
+    body = (await app_client.get(f'/api/v1/product/{p}')).json()
+
+    # 9 keV -> 1.3776e-10 m, and 1e6 photons over 0.1 s.
+    assert body['probe_wavenumber_per_m'] == pytest.approx(1.0 / 1.37761e-10, rel=1e-4)
+    assert body['probe_photon_flux_per_s'] == pytest.approx(1.0e7)
+    assert body['object_plane_propagation_distance_m'] == pytest.approx(1.5)
+
+
+async def test_detector_dependent_quantities_need_the_lineage_edge(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
+    seed_product: Callable[..., UUID],
+):
+    """product.h5 records no detector pitch, so these three come through derived_from.
+
+    Without the edge they are null rather than invented -- the store reports what it
+    cannot determine as unknown, and the UI renders that as an em dash.
+    """
+    detector_dependent = ('fresnel_number', 'detector_numerical_aperture', 'depth_of_field_m')
+
+    d = seed_diffraction()
+    linked = seed_product(derived_from=[{'kind': 'diffraction', 'uuid': str(d)}])
+    orphan = seed_product()
+    for m in (
+        layout.manifest_path('diffraction', d),
+        layout.manifest_path('product', linked),
+        layout.manifest_path('product', orphan),
+    ):
+        await _ingest(app_client, db_engine, layout, m)
+
+    with_edge = (await app_client.get(f'/api/v1/product/{linked}')).json()
+    without_edge = (await app_client.get(f'/api/v1/product/{orphan}')).json()
+
+    for field in detector_dependent:
+        assert with_edge[field] is not None, field
+        assert without_edge[field] is None, field
+
+    # The five that need no detector are present either way.
+    assert without_edge['probe_photon_flux_per_s'] == pytest.approx(1.0e7)
