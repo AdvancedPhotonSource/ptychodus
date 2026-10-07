@@ -270,3 +270,31 @@ async def test_mcp_render_fluorescence_missing_element(
     await _ingest(session_provider, layout, layout.manifest_path('fluorescence', f))
     with pytest.raises(ToolError, match='not found'):
         await bound_mcp.call_tool('render_fluorescence_element', {'uuid': str(f), 'name': 'Au'})
+
+
+async def test_mcp_list_tools_accept_every_rest_filter() -> None:
+    """REST and MCP are one surface in two channels, so their filters must match.
+
+    Adding a query parameter to a router without the matching tool argument leaves an
+    agent unable to ask what an HTTP client can, and nothing else catches it: the two
+    are written in separate files and share only the converter.
+    """
+    import inspect
+
+    from ptychodus_store.routers import diffraction, fluorescence, product
+
+    rest_lists = {
+        'list_product': product.list_product,
+        'list_diffraction': diffraction.list_diffraction,
+        'list_fluorescence': fluorescence.list_fluorescence,
+    }
+
+    mcp = create_mcp_server()
+    tools = {tool.name: tool for tool in await mcp.list_tools()}
+
+    for name, rest_fn in rest_lists.items():
+        # `session` is injected by FastAPI and has no agent-facing counterpart.
+        expected = {p for p in inspect.signature(rest_fn).parameters if p != 'session'}
+        actual = set(tools[name].parameters.get('properties', {}))
+
+        assert expected <= actual, f'{name} is missing {sorted(expected - actual)}'

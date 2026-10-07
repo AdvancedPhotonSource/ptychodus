@@ -173,6 +173,8 @@ def create_mcp_server() -> FastMCP:
         derived_from_uuid: str | None = None,
         photon_energy_eV_min: float | None = None,  # noqa: N803
         photon_energy_eV_max: float | None = None,  # noqa: N803
+        tomography_angle_deg_min: float | None = None,
+        tomography_angle_deg_max: float | None = None,
         tilt_angle_deg_min: float | None = None,
         tilt_angle_deg_max: float | None = None,
         polarization: str | None = None,
@@ -189,6 +191,10 @@ def create_mcp_server() -> FastMCP:
                 where.append(Diffraction.photon_energy_eV >= photon_energy_eV_min)
             if photon_energy_eV_max is not None:
                 where.append(Diffraction.photon_energy_eV <= photon_energy_eV_max)
+            if tomography_angle_deg_min is not None:
+                where.append(Diffraction.tomography_angle_deg >= tomography_angle_deg_min)
+            if tomography_angle_deg_max is not None:
+                where.append(Diffraction.tomography_angle_deg <= tomography_angle_deg_max)
             if tilt_angle_deg_min is not None:
                 where.append(Diffraction.tilt_angle_deg >= tilt_angle_deg_min)
             if tilt_angle_deg_max is not None:
@@ -230,12 +236,18 @@ def create_mcp_server() -> FastMCP:
         offset: int = 0,
         derived_from_uuid: str | None = None,
         ingest_state: str | None = None,
+        photon_energy_eV_min: float | None = None,  # noqa: N803
+        photon_energy_eV_max: float | None = None,  # noqa: N803
     ) -> Page[ProductRead]:
         """List reconstruction products."""
         async with _session() as session:
             where = []
             if ingest_state is not None:
                 where.append(Product.ingest_state == ingest_state)
+            if photon_energy_eV_min is not None:
+                where.append(Product.photon_energy_eV >= photon_energy_eV_min)
+            if photon_energy_eV_max is not None:
+                where.append(Product.photon_energy_eV <= photon_energy_eV_max)
             if derived_from_uuid is not None:
                 target = UUID(derived_from_uuid)
                 where.append(
@@ -264,10 +276,13 @@ def create_mcp_server() -> FastMCP:
         offset: int = 0,
         derived_from_uuid: str | None = None,
         element: str | None = None,
+        ingest_state: str | None = None,
     ) -> Page[FluorescenceRead]:
         """List fluorescence datasets."""
         async with _session() as session:
             where = []
+            if ingest_state is not None:
+                where.append(Fluorescence.ingest_state == ingest_state)
             if derived_from_uuid is not None:
                 target = UUID(derived_from_uuid)
                 where.append(
