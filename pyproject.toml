@@ -204,6 +204,7 @@ plugins.md004.style = "dash"     # dash bullets only
 plugins.md029.style = "ordered"  # real incrementing ordered-list numbers
 plugins.md013.enabled = false    # line length — house style is no hard wrapping
 plugins.md014.enabled = false    # `$ ` shell prompts are the house convention
+plugins.md024.siblings_only = true  # same-name headings allowed under different parents
 extensions.front-matter.enabled = true
 
 [tool.pyright]

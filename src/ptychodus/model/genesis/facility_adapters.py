@@ -166,12 +166,6 @@ class ALCFFacilityAdapter(IRIFacilityAdapter):
     def create_job_specification(
         self, action: str, input_directory: Path, output_directory: Path
     ) -> JobSpecification:
-        # installation:
-        #    'module use /soft/modulefiles',
-        #    'module load conda',
-        #    'conda create -n ptychodus python==3.11 pytorch torchvision',
-        #    'conda activate ptychodus',
-        #    'pip install -e ./ptychodus[ptychi] -e ./PtychoPINN',
         commands = [
             'source /etc/bash.bashrc',
             'module use /soft/modulefiles',
@@ -218,11 +212,6 @@ class NERSCFacilityAdapter(IRIFacilityAdapter):
     def create_job_specification(
         self, action: str, input_directory: Path, output_directory: Path
     ) -> JobSpecification:
-        # installation:
-        #    'module load conda',
-        #    'conda create -n ptychodus python==3.11 pytorch torchvision',
-        #    'conda activate ptychodus',
-        #    'pip install -e ./ptychodus[ptychi] -e ./PtychoPINN',
         return JobSpecification(
             executable='ptychodus',
             arguments=['-b', action, '-i', str(input_directory), '-o', str(output_directory)],
@@ -268,11 +257,6 @@ class OLCFFacilityAdapter(IRIFacilityAdapter):
     def create_job_specification(
         self, action: str, input_directory: Path, output_directory: Path
     ) -> JobSpecification:
-        # installation:
-        #    'module load miniforge3',
-        #    'conda create --prefix /ccsopen/proj/csc682/ptychodus-env python==3.11',
-        #    'conda activate /ccsopen/proj/csc682/ptychodus-env',
-        #    'pip install -e ptychodus[ptychi]',
         account = self._settings.account.get_value()
         conda_env = f'/ccsopen/proj/{account}/ptychodus-env'
         return JobSpecification(
