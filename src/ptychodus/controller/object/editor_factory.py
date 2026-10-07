@@ -249,16 +249,6 @@ class ObjectEditorViewControllerFactory:
                 object_builder.extra_padding_y, 'Extra Padding Y:', group=first_layer_group
             )
             dialog_builder.add_decimal_line_edit(
-                object_builder.photon_wavelength_m,
-                'Photon Wavelength [m]:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.propagation_distance_m,
-                'Propagation Distance [m]:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_decimal_line_edit(
                 object_builder.delta_over_beta,
                 'Delta / Beta:',
                 group=first_layer_group,

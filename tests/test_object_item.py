@@ -13,7 +13,7 @@ import logging
 import numpy
 import pytest
 
-from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter, ObjectGeometry, ObjectGeometryProvider
 from ptychodus.api.observer import Observable
 from ptychodus.api.probe_positions import ProbePosition
@@ -36,10 +36,21 @@ class _ObservableObjectProvider(ObjectGeometryProvider, Observable):
         self._geometry = geometry
         self.notify_observers()
 
+    @property
+    def photon_wavelength_m(self) -> float:
+        return 1.0e-10
+
+    @property
+    def object_plane_propagation_distance_m(self) -> float:
+        return 1.0
+
     def get_probe_positions(self) -> Sequence[ProbePosition]:
         return ()
 
     def get_object_geometry(self) -> ObjectGeometry:
+        if self._geometry.pixel_width_m <= 0.0 or self._geometry.pixel_height_m <= 0.0:
+            raise GeometryNotDefinedError('not bound')
+
         return self._geometry
 
 
@@ -56,6 +67,9 @@ class _RecordingObjectBuilder(ObjectBuilder):
         return _RecordingObjectBuilder(self._settings, self._canned)
 
     def _build_raw(self, geometry_provider: ObjectGeometryProvider) -> Object:
+        # See the note in tests/test_probe_item.py: real builders read the geometry
+        # first, so an undetermined one raises before anything is recorded.
+        geometry_provider.get_object_geometry()
         self.build_calls.append(geometry_provider)
         return self._canned
 
@@ -84,7 +98,7 @@ def test_rebuild_fires_on_geometry_observer_notification() -> None:
     """When the geometry provider is Observable, ObjectRepositoryItem should
     register itself and re-run rebuild each time notify_observers fires
     (matches the ProductGeometryProvider.set_detector_extent path in production).
-    Also verifies the is_valid guard blocks the initial rebuild when the
+    Also verifies that an undetermined geometry blocks the initial rebuild when the
     provider reports zero-valued pixel dimensions.
     """
     registry = SettingsRegistry()

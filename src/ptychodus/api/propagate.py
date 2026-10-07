@@ -250,9 +250,9 @@ class ProductGeometry:
     scales the pixel by the same factor as the distance, so the two cancel.
 
     **Exception to the limit rule.** A degenerate geometry gives ``PixelGeometry(0, 0)``
-    rather than a divergent pitch, because zero on either axis is the sentinel
-    :attr:`PixelGeometry.is_valid` tests for and callers branch on. An infinite pitch
-    would read as valid and propagate into object geometries built from it.
+    rather than a divergent pitch. A zero pitch is unmistakably unusable, so a caller
+    deciding whether the sampling is determined can test it; an infinite one would read
+    as an ordinary large number and propagate into whatever is built from it.
     """
     fresnel_number: float
     """Full-aperture Fresnel number ``W H / (lambda z)`` at the **object** plane.
@@ -373,8 +373,7 @@ def compute_product_geometry(
                 pixel_geometry, magnification=magnification
             )
     except ZeroDivisionError:
-        # Exception to the limit rule: zero on either axis is the sentinel is_valid
-        # tests for. See ProductGeometry.object_plane_pixel_geometry.
+        # Exception to the limit rule; see ProductGeometry.object_plane_pixel_geometry.
         object_plane_pixel_geometry = PixelGeometry(width_m=0.0, height_m=0.0)
 
     try:

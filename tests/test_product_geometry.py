@@ -12,7 +12,7 @@ import math
 import pytest
 
 from ptychodus.api.constants import energy_eV_to_wavelength_m
-from ptychodus.api.geometry import ImageExtent, PixelGeometry
+from ptychodus.api.geometry import GeometryNotDefinedError, ImageExtent, PixelGeometry
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.product.geometry import ProductGeometryProvider
 from ptychodus.model.product.metadata import MetadataRepositoryItem, UniqueNameFactory
@@ -77,16 +77,20 @@ class TestObjectPlanePixelGeometry:
     def test_degrades_to_zero_while_no_dataset_is_bound(self) -> None:
         """The detector extent is 0 px until bind_dataset runs; dividing by it must not
         propagate a ZeroDivisionError into the GUI."""
-        pixel_geometry = _make_geometry(bind_detector=False).get_object_plane_pixel_geometry()
-
-        assert pixel_geometry == PixelGeometry(width_m=0.0, height_m=0.0)
-        assert not pixel_geometry.is_valid
+        with pytest.raises(GeometryNotDefinedError):
+            _make_geometry(bind_detector=False).get_object_plane_pixel_geometry()
 
     def test_collapses_at_zero_detector_distance(self) -> None:
-        """``lambda z / (N dx)`` vanishes with z. The plane is degenerate, not undefined."""
-        pixel_geometry = _make_geometry(detector_distance_m=0.0).get_object_plane_pixel_geometry()
+        """``lambda z / (N dx)`` vanishes with z, so there is no sampling to report.
 
-        assert pixel_geometry == PixelGeometry(width_m=0.0, height_m=0.0)
+        The pure function still returns the zero pitch; the provider is what turns a
+        collapsed plane into a raise.
+        """
+        values = _make_geometry(detector_distance_m=0.0).get_derived_values()
+        assert values.object_plane_pixel_geometry == PixelGeometry(width_m=0.0, height_m=0.0)
+
+        with pytest.raises(GeometryNotDefinedError):
+            _make_geometry(detector_distance_m=0.0).get_object_plane_pixel_geometry()
 
 
 class TestFresnelNumber:
@@ -212,13 +216,17 @@ class TestConeBeamGeometry:
 
         The equivalent distance takes its true limit and diverges, while the pixel
         geometry and the Fresnel number are the two documented exceptions: the first is
-        the sentinel ``is_valid`` tests for, the second a path limit that really is zero.
+        the zero pitch the provider reads as undetermined, the second a path limit that
+        really is zero.
         """
         geometry = _make_geometry(focus_object_distance_m=_DETECTOR_DISTANCE_M, far_field=False)
 
         assert geometry.get_derived_values().object_plane_propagation_distance_m == math.inf
-        assert geometry.get_object_plane_pixel_geometry() == PixelGeometry(0.0, 0.0)
+        assert geometry.get_derived_values().object_plane_pixel_geometry == PixelGeometry(0.0, 0.0)
         assert geometry.get_derived_values().fresnel_number == 0.0
+
+        with pytest.raises(GeometryNotDefinedError):
+            geometry.get_object_plane_pixel_geometry()
 
 
 class TestNearFieldSampling:

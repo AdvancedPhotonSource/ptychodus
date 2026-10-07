@@ -4,6 +4,7 @@ import logging
 from PyQt5.QtCore import QModelIndex
 from PyQt5.QtWidgets import QInputDialog
 
+from ptychodus.api.geometry import GeometryNotDefinedError
 from ptychodus.api.observer import Observable, Observer
 
 from ...model.fluorescence import (
@@ -156,7 +157,13 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
             self._image_controller.clear_array()
             return
 
-        pixel_geometry = item.get_product().get_geometry().get_object_plane_pixel_geometry()
+        try:
+            pixel_geometry = item.get_product().get_geometry().get_object_plane_pixel_geometry()
+        except GeometryNotDefinedError:
+            # Nothing to scale the map against until the product's sampling is known.
+            self._image_controller.clear_array()
+            return
+
         self._image_controller.set_array(array, pixel_geometry)
 
     # ------------------------------------------------------------------

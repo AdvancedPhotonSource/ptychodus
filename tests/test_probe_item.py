@@ -12,8 +12,9 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import numpy
+import pytest
 
-from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry
 from ptychodus.api.observer import Observable
 from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider, ProbeSequence
 from ptychodus.api.settings import SettingsRegistry
@@ -39,6 +40,10 @@ class _RecordingBuilder(ProbeSequenceBuilder):
         return _RecordingBuilder(self._settings, self._probe_seq)
 
     def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+        # Every real probe builder reads the geometry first, so an undetermined one
+        # raises out of here before anything is recorded -- which is what the item's
+        # except arm relies on now that it has no pre-flight guard.
+        geometry_provider.get_probe_geometry()
         self.build_calls.append(geometry_provider)
         return self._probe_seq
 
@@ -49,14 +54,30 @@ class _RecordingBuilder(ProbeSequenceBuilder):
 
 
 def _make_provider(pixel_width_m: float, pixel_height_m: float) -> MagicMock:
+    """A provider whose geometry is determined only when both pitches are positive.
+
+    A non-positive pitch raises, as ProductGeometryProvider does, rather than handing
+    back a zero-sized geometry for the caller to inspect.
+    """
     provider = MagicMock(spec=ProbeGeometryProvider)
+    _set_provider_geometry(provider, pixel_width_m, pixel_height_m)
+    return provider
+
+
+def _set_provider_geometry(
+    provider: MagicMock, pixel_width_m: float, pixel_height_m: float
+) -> None:
+    if pixel_width_m <= 0.0 or pixel_height_m <= 0.0:
+        provider.get_probe_geometry.side_effect = GeometryNotDefinedError('not bound')
+        return
+
+    provider.get_probe_geometry.side_effect = None
     provider.get_probe_geometry.return_value = ProbeGeometry(
         width_px=64,
         height_px=64,
         pixel_width_m=pixel_width_m,
         pixel_height_m=pixel_height_m,
     )
-    return provider
 
 
 def _make_probe_seq(pixel_size_m: float) -> ProbeSequence:
@@ -86,6 +107,23 @@ def test_rebuild_skips_when_geometry_not_ready() -> None:
     assert item.get_probes().get_array().size == 0
 
 
+def test_unready_geometry_is_not_logged_as_a_failure(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The except arms are order-sensitive: GeometryNotDefinedError must be caught
+    before the catch-all, or a routine startup state is reported as a rebuild failure
+    with a traceback. Nothing guarantees that ordering but this test."""
+    registry = SettingsRegistry()
+    settings = ProbeSettings(registry)
+    provider = _make_provider(pixel_width_m=0.0, pixel_height_m=0.0)
+    builder = _RecordingBuilder(settings, _make_probe_seq(pixel_size_m=1e-6))
+
+    with caplog.at_level('ERROR'):
+        ProbeRepositoryItem(_make_rng(), provider, settings, builder)
+
+    assert caplog.records == []
+
+
 def test_rebuild_fires_when_geometry_becomes_ready() -> None:
     """Once the provider reports a valid pixel geometry and the item is nudged
     (e.g. via set_builder from a settings change), the builder runs and its
@@ -100,12 +138,7 @@ def test_rebuild_fires_when_geometry_becomes_ready() -> None:
     assert builder.build_calls == []
 
     # Provider becomes ready (dataset would bind in production).
-    provider.get_probe_geometry.return_value = ProbeGeometry(
-        width_px=64,
-        height_px=64,
-        pixel_width_m=2e-6,
-        pixel_height_m=2e-6,
-    )
+    _set_provider_geometry(provider, 2e-6, 2e-6)
     # A settings change would normally re-fire _rebuild via the observer chain;
     # set_builder is the shortest public path that triggers a rebuild.
     replacement = _RecordingBuilder(settings, canned)
@@ -116,9 +149,9 @@ def test_rebuild_fires_when_geometry_becomes_ready() -> None:
 
 
 def test_rebuild_skips_when_only_one_dimension_is_zero() -> None:
-    """The guard uses PixelGeometry.is_valid, which requires BOTH dims positive.
+    """The provider requires BOTH dims positive before the sampling is determined.
     An asymmetric zero (e.g. width provided, height missing) still blocks the
-    rebuild — matches PixelGeometry.is_valid semantics."""
+    rebuild."""
     registry = SettingsRegistry()
     settings = ProbeSettings(registry)
     provider = _make_provider(pixel_width_m=1e-6, pixel_height_m=0.0)
@@ -174,6 +207,9 @@ class _ObservableProbeProvider(ProbeGeometryProvider, Observable):
         return PixelGeometry(width_m=1e-6, height_m=1e-6)
 
     def get_probe_geometry(self) -> ProbeGeometry:
+        if self._geometry.pixel_width_m <= 0.0 or self._geometry.pixel_height_m <= 0.0:
+            raise GeometryNotDefinedError('not bound')
+
         return self._geometry
 
 

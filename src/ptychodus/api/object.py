@@ -165,6 +165,22 @@ class ObjectGeometry:
 class ObjectGeometryProvider(ABC):
     """Interface for classes that provide object geometry."""
 
+    @property
+    @abstractmethod
+    def photon_wavelength_m(self) -> float:
+        pass
+
+    @property
+    @abstractmethod
+    def object_plane_propagation_distance_m(self) -> float:
+        """Propagation distance of the equivalent parallel-beam geometry, ``z_d / M``.
+
+        The distance an object-plane builder should propagate over; it reduces to the
+        detector distance without a focusing optic. Declared here so that a builder
+        reads the experiment's own value rather than carrying a duplicate setting that
+        nothing keeps in step.
+        """
+
     @abstractmethod
     def get_probe_positions(self) -> Sequence[ProbePosition]:
         pass

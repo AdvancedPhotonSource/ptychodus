@@ -61,6 +61,17 @@ def _make_rng() -> numpy.random.Generator:
 
 
 class _StubObjectGeometryProvider(ObjectGeometryProvider):
+    def __init__(self, photon_wavelength_m: float = 1.0e-10) -> None:
+        self._photon_wavelength_m = photon_wavelength_m
+
+    @property
+    def photon_wavelength_m(self) -> float:
+        return self._photon_wavelength_m
+
+    @property
+    def object_plane_propagation_distance_m(self) -> float:
+        return 1.0
+
     def get_probe_positions(self) -> Sequence[ProbePosition]:
         return ()
 
@@ -307,3 +318,55 @@ def test_from_file_builder_leaves_an_object_without_a_pixel_size_alone() -> None
 
     numpy.testing.assert_array_equal(object_.get_array(), source.get_array())
     assert object_.get_pixel_geometry().width_m == pytest.approx(PIXEL_SIZE_M)
+
+
+class TestPaganinReadsTheExperiment:
+    """The wavelength and propagation distance come from the product, not from settings.
+
+    They were builder parameters defaulting to 1.0e-10 m and 1.0 m, with nothing
+    syncing them, so a product at any energy other than 12.4 keV was filtered at the
+    wrong cutoff. The three inputs enter the filter only as a product, so the error was
+    absorbable into a hand-tuned delta/beta and never surfaced.
+    """
+
+    def _build(self, photon_wavelength_m: float) -> numpy.ndarray:
+        from unittest.mock import MagicMock
+
+        from ptychodus.api.assemble import AssembledDiffractionData
+        from ptychodus.model.product.object.paganin import PaganinObjectBuilder
+
+        num_positions = 25
+        patterns = numpy.full((num_positions, 4, 4), 100.0, dtype=numpy.float64)
+        patterns[:, 2, 2] += numpy.arange(num_positions, dtype=numpy.float64)
+        assembled = AssembledDiffractionData(
+            numpy.arange(num_positions, dtype=numpy.intp),
+            patterns,
+            PixelGeometry(width_m=1e-6, height_m=1e-6),
+            numpy.zeros((4, 4), dtype=numpy.bool_),
+        )
+        dataset = MagicMock()
+        dataset.get_assembled_data.return_value = assembled
+
+        builder = PaganinObjectBuilder(_make_settings(), dataset)
+        provider = _StubObjectGeometryProvider(photon_wavelength_m=photon_wavelength_m)
+        # A real 5x5 grid: the STXM step triangulates the positions, so coincident
+        # points degenerate the hull.
+        span_m = EXTENT_PX * PIXEL_SIZE_M / 3.0
+        positions = [
+            ProbePosition(
+                index=row * 5 + col,
+                x_m=(col - 2) * span_m / 4.0,
+                y_m=(row - 2) * span_m / 4.0,
+            )
+            for row in range(5)
+            for col in range(5)
+        ]
+        provider.get_probe_positions = lambda: positions  # type: ignore[method-assign]
+        return builder.build(provider, [0.0]).get_array()
+
+    def test_photon_energy_reaches_the_filter(self) -> None:
+        """Impossible to satisfy before: the builder ignored the product entirely."""
+        at_6_keV = self._build(2.0664e-10)  # noqa: N806
+        at_20_keV = self._build(6.1992e-11)  # noqa: N806
+
+        assert not numpy.allclose(at_6_keV, at_20_keV)

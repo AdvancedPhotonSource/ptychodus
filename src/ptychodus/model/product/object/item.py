@@ -4,6 +4,7 @@ import math
 
 
 from ptychodus.api.constants import format_length
+from ptychodus.api.geometry import GeometryNotDefinedError
 from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.observer import Observable
 from ptychodus.api.parameters import ParameterGroup
@@ -86,12 +87,13 @@ class ObjectRepositoryItem(ParameterGroup):
         self.rebuild()
 
     def rebuild(self, *, recenter: bool = False) -> None:
-        if not self._geometry_provider.get_object_geometry().get_pixel_geometry().is_valid:
-            # Geometry not yet bound; the observer wired in __init__ will re-run
-            # rebuild when the geometry becomes valid.
-            return
         try:
             object_ = self._builder.build(self._geometry_provider, self.layer_spacing_m.get_value())
+        except GeometryNotDefinedError:
+            # Not yet bound; the observer wired in __init__ re-runs this once the
+            # geometry is determined. Must precede the catch-all below, or a routine
+            # startup state would be logged as a failure.
+            return
         except Exception:
             logger.exception('Failed to rebuild object!')
             return
@@ -141,12 +143,10 @@ def _warn_if_pixel_size_disagrees(
     """
     try:
         pixel_geometry = object_.get_pixel_geometry()
+        # GeometryNotDefinedError is a ValueError, so an unbound provider lands here
+        # alongside an object that never recorded its own pixel size.
+        expected = geometry_provider.get_object_geometry().get_pixel_geometry()
     except ValueError:
-        return
-
-    expected = geometry_provider.get_object_geometry().get_pixel_geometry()
-
-    if not expected.is_valid:
         return
 
     if math.isclose(pixel_geometry.width_m, expected.width_m, rel_tol=rel_tol) and math.isclose(

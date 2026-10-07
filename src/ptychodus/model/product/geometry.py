@@ -1,7 +1,8 @@
 from collections.abc import Sequence
+import math
 
 from ptychodus.api.constants import energy_eV_to_wavelength_m
-from ptychodus.api.geometry import ImageExtent, PixelGeometry
+from ptychodus.api.geometry import GeometryNotDefinedError, ImageExtent, PixelGeometry
 from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider, compute_object_geometry
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider
@@ -113,15 +114,34 @@ class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Obs
             return PixelGeometry(width_m=0.0, height_m=0.0)
         return geometry
 
+    @property
+    def object_plane_propagation_distance_m(self) -> float:
+        return self.get_derived_values().object_plane_propagation_distance_m
+
     def get_object_plane_pixel_geometry(self) -> PixelGeometry:
         """Sample-plane sampling implied by the detector and the declared regime.
 
-        See :attr:`ProductGeometry.object_plane_pixel_geometry`. Kept as a method
-        because it is what :class:`ProbeGeometryProvider` consumers reach for, and
-        because :meth:`get_probe_geometry` and :meth:`get_object_geometry` below both
-        need it.
+        See :attr:`ProductGeometry.object_plane_pixel_geometry`.
+
+        Raises:
+            GeometryNotDefinedError: while no diffraction dataset is bound, or where
+                the geometry is degenerate. The pure function degrades to a zero-sized
+                pitch; this adapter reports that as the transient state it is, rather
+                than handing back a value for the caller to inspect.
         """
-        return self.get_derived_values().object_plane_pixel_geometry
+        pixel_geometry = self.get_derived_values().object_plane_pixel_geometry
+        is_determined = all(
+            math.isfinite(length_m) and length_m > 0.0
+            for length_m in (pixel_geometry.width_m, pixel_geometry.height_m)
+        )
+
+        if not is_determined:
+            raise GeometryNotDefinedError(
+                'Object-plane sampling is not determined; no diffraction dataset is '
+                'bound, or the geometry is degenerate.'
+            )
+
+        return pixel_geometry
 
     def get_probe_geometry(self) -> ProbeGeometry:
         extent = self._get_detector_extent()
@@ -138,24 +158,20 @@ class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Obs
 
     def get_object_geometry(self) -> ObjectGeometry:
         probe_geometry = self.get_probe_geometry()
-        pixel_geometry = self.get_object_plane_pixel_geometry()
 
-        if pixel_geometry.is_valid:
-            try:
-                return compute_object_geometry(self.get_probe_positions(), probe_geometry)
-            except ValueError:
-                pass  # Empty scan — fall through to the probe-sized default below.
-
-        # Detector unbound or scan not yet loaded: degrade to a probe-sized canvas at
-        # the origin so downstream UI has valid dimensions to render.
-        return ObjectGeometry(
-            width_px=probe_geometry.width_px if pixel_geometry.is_valid else 0,
-            height_px=probe_geometry.height_px if pixel_geometry.is_valid else 0,
-            pixel_width_m=pixel_geometry.width_m,
-            pixel_height_m=pixel_geometry.height_m,
-            center_x_m=0.0,
-            center_y_m=0.0,
-        )
+        try:
+            return compute_object_geometry(self.get_probe_positions(), probe_geometry)
+        except ValueError:
+            # Empty scan: the sampling is known but no positions place it yet, so fall
+            # back to a probe-sized canvas at the origin rather than raising.
+            return ObjectGeometry(
+                width_px=probe_geometry.width_px,
+                height_px=probe_geometry.height_px,
+                pixel_width_m=probe_geometry.pixel_width_m,
+                pixel_height_m=probe_geometry.pixel_height_m,
+                center_x_m=0.0,
+                center_y_m=0.0,
+            )
 
     def _update(self, observable: Observable) -> None:
         if observable is self._metadata_item:

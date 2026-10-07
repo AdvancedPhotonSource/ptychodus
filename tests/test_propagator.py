@@ -1851,7 +1851,7 @@ class TestComputeProductGeometryDetector:
         values = _product_geometry(focus_object_distance_m=_PG_DISTANCE_M, far_field=False)
 
         assert values.object_plane_propagation_distance_m == math.inf
-        # The two documented exceptions to the limit rule: a sentinel the is_valid
+        # The two documented exceptions to the limit rule: a zero pitch the provider
         # protocol depends on, and a path limit that really is zero.
         assert values.object_plane_pixel_geometry == PixelGeometry(width_m=0.0, height_m=0.0)
         assert values.fresnel_number == 0.0

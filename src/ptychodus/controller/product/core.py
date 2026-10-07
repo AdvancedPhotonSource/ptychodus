@@ -15,6 +15,7 @@ from PyQt5.QtCore import (
 from PyQt5.QtGui import QBrush, QFont
 from PyQt5.QtWidgets import QAbstractItemView, QAction, QInputDialog
 
+from ptychodus.api.geometry import GeometryNotDefinedError
 from ptychodus.api.constants import (
     EnergyUnit,
     LengthUnit,
@@ -165,11 +166,19 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                     case _Column.PIXEL_WIDTH_NM:
                         if pending or failed:
                             return '—'
-                        return f'{LengthUnit.NANOMETER.convert(geometry.get_object_plane_pixel_geometry().width_m):.4g}'
+                        try:
+                            pixel_geometry = geometry.get_object_plane_pixel_geometry()
+                        except GeometryNotDefinedError:
+                            return '—'
+                        return f'{LengthUnit.NANOMETER.convert(pixel_geometry.width_m):.4g}'
                     case _Column.PIXEL_HEIGHT_NM:
                         if pending or failed:
                             return '—'
-                        return f'{LengthUnit.NANOMETER.convert(geometry.get_object_plane_pixel_geometry().height_m):.4g}'
+                        try:
+                            pixel_geometry = geometry.get_object_plane_pixel_geometry()
+                        except GeometryNotDefinedError:
+                            return '—'
+                        return f'{LengthUnit.NANOMETER.convert(pixel_geometry.height_m):.4g}'
                     case _Column.SIZE:
                         if pending or failed:
                             return '—'

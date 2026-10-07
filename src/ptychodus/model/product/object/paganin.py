@@ -22,10 +22,10 @@ class PaganinObjectBuilder(ObjectBuilder):
         self._settings = settings
         self._dataset = dataset
 
-        self.photon_wavelength_m = settings.paganin_photon_wavelength_m.copy()
-        self._add_parameter('photon_wavelength_m', self.photon_wavelength_m)
-        self.propagation_distance_m = settings.paganin_propagation_distance_m.copy()
-        self._add_parameter('propagation_distance_m', self.propagation_distance_m)
+        # The wavelength and propagation distance are the experiment's, read from the
+        # provider at build time; only delta/beta is the specimen's, and unknowable
+        # from the product. They enter the filter as one product, so a stale duplicate
+        # of either would be absorbed invisibly into a hand-tuned delta/beta.
         self.delta_over_beta = settings.paganin_delta_over_beta.copy()
         self._add_parameter('delta_over_beta', self.delta_over_beta)
 
@@ -42,8 +42,8 @@ class PaganinObjectBuilder(ObjectBuilder):
             geometry_provider.get_object_geometry(),
             self._dataset.get_assembled_data(),
             geometry_provider.get_probe_positions(),
-            photon_wavelength_m=self.photon_wavelength_m.get_value(),
-            propagation_distance_m=self.propagation_distance_m.get_value(),
+            photon_wavelength_m=geometry_provider.photon_wavelength_m,
+            propagation_distance_m=geometry_provider.object_plane_propagation_distance_m,
             delta_over_beta=self.delta_over_beta.get_value(),
         )
         return self._pad_object(object_)

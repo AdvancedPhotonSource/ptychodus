@@ -13,6 +13,21 @@ from .typing import ComplexArrayType, RealArrayType
 T = TypeVar('T', int, float, Decimal)
 
 
+class GeometryNotDefinedError(ValueError):
+    """The object-plane sampling a product implies is not determined yet.
+
+    Raised while a product has no diffraction dataset bound, or where the geometry is
+    degenerate enough that the sampling has no value -- a detector at the sample plane,
+    or at the focus of a cone beam. Callers that must degrade catch it; see the rule
+    stated in :mod:`ptychodus.api.propagate`, that a primitive raises rather than
+    inventing a sentinel for the caller to inspect.
+
+    A :exc:`ValueError` so that the ``except ValueError`` already guarding
+    :meth:`Object.get_pixel_geometry`, which signals the same not-set condition,
+    covers this too.
+    """
+
+
 @dataclass(frozen=True)
 class PixelGeometry:
     """Physical dimensions of a single detector or probe pixel in meters."""
@@ -23,10 +38,6 @@ class PixelGeometry:
     @property
     def is_square(self) -> bool:
         return self.width_m == self.height_m
-
-    @property
-    def is_valid(self) -> bool:
-        return self.width_m > 0.0 and self.height_m > 0.0
 
     def get_area_m2(self) -> float:
         return self.width_m * self.height_m

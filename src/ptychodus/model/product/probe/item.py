@@ -3,6 +3,7 @@ import logging
 
 import numpy
 
+from ptychodus.api.geometry import GeometryNotDefinedError
 from ptychodus.api.observer import Observable
 from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.probe import (
@@ -112,12 +113,13 @@ class ProbeRepositoryItem(ParameterGroup):
         self._rebuild()
 
     def _rebuild(self) -> None:
-        if not self._geometry_provider.get_probe_geometry().get_pixel_geometry().is_valid:
-            # Geometry not yet bound; the observer wired in __init__ will re-run
-            # _rebuild when the geometry becomes valid.
-            return
         try:
             probe_seq = self._builder.build(self._geometry_provider)
+        except GeometryNotDefinedError:
+            # Not yet bound; the observer wired in __init__ re-runs this once the
+            # geometry is determined. Must precede the catch-all below, or a routine
+            # startup state would be logged as a failure.
+            return
         except Exception:
             logger.exception('Failed to rebuild probe!')
         else:
