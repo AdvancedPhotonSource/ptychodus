@@ -63,7 +63,7 @@ class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Obs
         change instead of reading a stale snapshot.
         """
         return compute_product_geometry(
-            probe_energy_eV=self._metadata_item.probe_energy_eV.get_value(),
+            photon_energy_eV=self._metadata_item.photon_energy_eV.get_value(),
             probe_photon_count=self._metadata_item.probe_photon_count.get_value(),
             exposure_time_s=self._metadata_item.exposure_time_s.get_value(),
             detector_distance_m=self._metadata_item.detector_distance_m.get_value(),
@@ -78,8 +78,8 @@ class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Obs
         return self._metadata_item.probe_photon_count.get_value()
 
     @property
-    def probe_wavelength_m(self) -> float:
-        return energy_eV_to_wavelength_m(self._metadata_item.probe_energy_eV.get_value())
+    def photon_wavelength_m(self) -> float:
+        return energy_eV_to_wavelength_m(self._metadata_item.photon_energy_eV.get_value())
 
     @property
     def probe_power_W(self) -> float:  # noqa: N802

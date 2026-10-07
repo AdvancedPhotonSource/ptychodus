@@ -643,16 +643,16 @@ def _array_with_flux(
     first_index: int,
     num_patterns: int,
     fill: int,
-    flux_hz: numpy.ndarray | None,
+    flux_per_s: numpy.ndarray | None,
 ) -> SimpleDiffractionArray:
     patterns = numpy.full((num_patterns, 4, 4), fill, dtype=numpy.int32)
     indexes = numpy.arange(first_index, first_index + num_patterns, dtype=numpy.intp)
-    return SimpleDiffractionArray(label, indexes, patterns, probe_photon_flux_per_s=flux_hz)
+    return SimpleDiffractionArray(label, indexes, patterns, probe_photon_flux_per_s=flux_per_s)
 
 
 def test_preprocess_array_converts_flux_Hz_to_counts_using_exposure() -> None:  # noqa: N802
-    flux_hz = numpy.array([1000.0, 2000.0, 500.0], dtype=numpy.float64)
-    array = _array_with_flux('a', 0, 3, 4, flux_hz)
+    flux_per_s = numpy.array([1000.0, 2000.0, 500.0], dtype=numpy.float64)
+    array = _array_with_flux('a', 0, 3, 4, flux_per_s)
     good = numpy.zeros((4, 4), dtype=numpy.bool_)
 
     block = preprocess_array(
@@ -670,8 +670,8 @@ def test_preprocess_array_converts_flux_Hz_to_counts_using_exposure() -> None:  
 def test_preprocess_array_drops_flux_when_exposure_is_missing(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    flux_hz = numpy.array([1000.0, 2000.0], dtype=numpy.float64)
-    array = _array_with_flux('a', 0, 2, 4, flux_hz)
+    flux_per_s = numpy.array([1000.0, 2000.0], dtype=numpy.float64)
+    array = _array_with_flux('a', 0, 2, 4, flux_per_s)
     good = numpy.zeros((4, 4), dtype=numpy.bool_)
 
     with caplog.at_level('WARNING', logger='ptychodus.api.assemble'):
@@ -690,8 +690,8 @@ def test_preprocess_array_drops_flux_when_exposure_is_missing(
 def test_preprocess_array_drops_flux_when_exposure_is_zero(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    flux_hz = numpy.array([1000.0, 2000.0], dtype=numpy.float64)
-    array = _array_with_flux('a', 0, 2, 4, flux_hz)
+    flux_per_s = numpy.array([1000.0, 2000.0], dtype=numpy.float64)
+    array = _array_with_flux('a', 0, 2, 4, flux_per_s)
     good = numpy.zeros((4, 4), dtype=numpy.bool_)
 
     with caplog.at_level('WARNING', logger='ptychodus.api.assemble'):
@@ -716,9 +716,9 @@ def test_counts_filter_keeps_probe_photon_counts_aligned_with_patterns() -> None
             numpy.full((2, 2), 10, dtype=numpy.int32),  # sum = 40 (kept)
         ]
     )
-    flux_hz = numpy.array([100.0, 500.0, 200.0], dtype=numpy.float64)
+    flux_per_s = numpy.array([100.0, 500.0, 200.0], dtype=numpy.float64)
     array = SimpleDiffractionArray(
-        'a', numpy.array([7, 8, 9], dtype=numpy.intp), patterns, probe_photon_flux_per_s=flux_hz
+        'a', numpy.array([7, 8, 9], dtype=numpy.intp), patterns, probe_photon_flux_per_s=flux_per_s
     )
 
     block = preprocess_array(
@@ -735,9 +735,11 @@ def test_counts_filter_keeps_probe_photon_counts_aligned_with_patterns() -> None
 
 
 def test_assemble_dataset_allocates_counts_buffer_only_when_flux_is_available() -> None:
-    flux_hz = numpy.array([10.0, 20.0, 30.0], dtype=numpy.float64)
+    flux_per_s = numpy.array([10.0, 20.0, 30.0], dtype=numpy.float64)
 
-    with_flux = make_dataset([_array_with_flux('a', 0, 3, 4, flux_hz)], (4, 4), exposure_time_s=0.5)
+    with_flux = make_dataset(
+        [_array_with_flux('a', 0, 3, 4, flux_per_s)], (4, 4), exposure_time_s=0.5
+    )
     data = assemble_dataset(with_flux)
 
     assert data.has_measured_probe_photon_counts()
@@ -752,8 +754,8 @@ def test_assemble_dataset_allocates_counts_buffer_only_when_flux_is_available() 
 
 
 def test_assemble_dataset_uses_fallback_when_any_array_lacks_flux() -> None:
-    flux_hz = numpy.array([10.0, 20.0], dtype=numpy.float64)
-    a_with = _array_with_flux('a', 0, 2, 4, flux_hz)
+    flux_per_s = numpy.array([10.0, 20.0], dtype=numpy.float64)
+    a_with = _array_with_flux('a', 0, 2, 4, flux_per_s)
     b_without = _array('b', 2, 2, 5)  # No flux -> no counts buffer reserved.
 
     dataset = make_dataset([a_with, b_without], (4, 4), exposure_time_s=0.5)

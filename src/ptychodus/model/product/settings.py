@@ -21,8 +21,8 @@ class ProductSettings(Observable, Observer):
         self.focus_object_distance_m = self._group.create_real_parameter(
             'FocusObjectDistanceInMeters', 0.0
         )
-        self.probe_energy_eV = self._group.create_real_parameter(
-            'ProbeEnergyInElectronVolts', 10000.0, minimum=0.0
+        self.photon_energy_eV = self._group.create_real_parameter(
+            'PhotonEnergyInElectronVolts', 10000.0, minimum=0.0
         )
         self.probe_photon_count = self._group.create_real_parameter(
             'ProbePhotonCount', 0.0, minimum=0.0
@@ -30,7 +30,7 @@ class ProductSettings(Observable, Observer):
         self.exposure_time_s = self._group.create_real_parameter(
             'ExposureTimeInSeconds', 0.0, minimum=0.0
         )
-        self.mass_attenuation_m2_kg = self._group.create_real_parameter(
+        self.mass_attenuation_m2_per_kg = self._group.create_real_parameter(
             'MassAttenuationSquareMetersPerKilogram', 0.0, minimum=0.0
         )
         self.tomography_angle_deg = self._group.create_real_parameter(

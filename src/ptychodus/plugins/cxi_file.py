@@ -87,7 +87,7 @@ class _P:
     PTYCHODUS: Final[str] = '/entry_1/ptychodus'
     PT_PROBE_PHOTON_COUNT: Final[str] = '/entry_1/ptychodus/probe_photon_count'
     PT_EXPOSURE_TIME: Final[str] = '/entry_1/ptychodus/exposure_time_s'
-    PT_MASS_ATTENUATION: Final[str] = '/entry_1/ptychodus/mass_attenuation_m2_kg'
+    PT_MASS_ATTENUATION: Final[str] = '/entry_1/ptychodus/mass_attenuation_m2_per_kg'
     PT_TOMOGRAPHY_ANGLE: Final[str] = '/entry_1/ptychodus/tomography_angle_deg'
     PT_POSITION_INDEXES: Final[str] = '/entry_1/ptychodus/probe_position_indexes'
     PT_PROBE_PIXEL_WIDTH: Final[str] = '/entry_1/ptychodus/probe_pixel_width_m'
@@ -164,10 +164,10 @@ class CXIDiffractionFileReader(DiffractionFileReader):
             if x_pixel is not None and y_pixel is not None:
                 detector_pixel_geometry = PixelGeometry(float(x_pixel), float(y_pixel))
 
-            probe_energy_eV: float | None = None  # noqa: N806
+            photon_energy_eV: float | None = None  # noqa: N806
             energy_J = _read_scalar(h5_file, _P.SOURCE_ENERGY)  # noqa: N806
             if energy_J is not None:
-                probe_energy_eV = energy_J_to_eV(float(energy_J))  # noqa: N806
+                photon_energy_eV = energy_J_to_eV(float(energy_J))  # noqa: N806
 
             probe_photon_count: int | None = None
             photon_count = _read_scalar(h5_file, _P.PT_PROBE_PHOTON_COUNT)
@@ -195,7 +195,7 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                 detector_distance_m=detector_distance_m,
                 detector_extent=detector_extent,
                 detector_pixel_geometry=detector_pixel_geometry,
-                probe_energy_eV=probe_energy_eV,
+                photon_energy_eV=photon_energy_eV,
                 probe_photon_count=probe_photon_count,
                 exposure_time_s=exposure_time_s,
                 tomography_angle_deg=tomography_angle_deg,
@@ -230,8 +230,8 @@ class CXIDiffractionFileWriter(DiffractionFileWriter):
             source = instrument.create_group('source_1')
             detector = instrument.create_group('detector_1')
 
-            if metadata.probe_energy_eV is not None:
-                source.create_dataset('energy', data=energy_eV_to_J(metadata.probe_energy_eV))
+            if metadata.photon_energy_eV is not None:
+                source.create_dataset('energy', data=energy_eV_to_J(metadata.photon_energy_eV))
 
             if metadata.detector_distance_m is not None:
                 detector.create_dataset('distance', data=metadata.detector_distance_m)
@@ -321,7 +321,7 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
 
             instrument = h5_file.create_group(_P.INSTRUMENT)
             source = instrument.create_group('source_1')
-            source.create_dataset('energy', data=metadata.probe_energy_J)
+            source.create_dataset('energy', data=metadata.photon_energy_J)
             detector = instrument.create_group('detector_1')
             detector.create_dataset('distance', data=metadata.detector_distance_m)
 
@@ -357,10 +357,10 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
         if distance is not None:
             detector_distance_m = float(distance)
 
-        probe_energy_eV = 0.0  # noqa: N806
+        photon_energy_eV = 0.0  # noqa: N806
         energy_J = _read_scalar(h5_file, _P.SOURCE_ENERGY)  # noqa: N806
         if energy_J is not None:
-            probe_energy_eV = energy_J_to_eV(float(energy_J))  # noqa: N806
+            photon_energy_eV = energy_J_to_eV(float(energy_J))  # noqa: N806
 
         probe_photon_count = 0.0
         photon_count = _read_scalar(h5_file, _P.PT_PROBE_PHOTON_COUNT)
@@ -372,10 +372,10 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
         if exposure is not None:
             exposure_time_s = float(exposure)
 
-        mass_attenuation_m2_kg = 0.0
+        mass_attenuation_m2_per_kg = 0.0
         attenuation = _read_scalar(h5_file, _P.PT_MASS_ATTENUATION)
         if attenuation is not None:
-            mass_attenuation_m2_kg = float(attenuation)
+            mass_attenuation_m2_per_kg = float(attenuation)
 
         tomography_angle_deg = 0.0
         angle = _read_scalar(h5_file, _P.PT_TOMOGRAPHY_ANGLE)
@@ -386,10 +386,10 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
             name=name,
             comments=comments,
             detector_distance_m=detector_distance_m,
-            probe_energy_eV=probe_energy_eV,
+            photon_energy_eV=photon_energy_eV,
             probe_photon_count=probe_photon_count,
             exposure_time_s=exposure_time_s,
-            mass_attenuation_m2_kg=mass_attenuation_m2_kg,
+            mass_attenuation_m2_per_kg=mass_attenuation_m2_per_kg,
             tomography_angle_deg=tomography_angle_deg,
         )
 
@@ -607,8 +607,8 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
             h5_file.create_dataset(_P.PT_PROBE_PHOTON_COUNT, data=metadata.probe_photon_count)
         if metadata.exposure_time_s:
             h5_file.create_dataset(_P.PT_EXPOSURE_TIME, data=metadata.exposure_time_s)
-        if metadata.mass_attenuation_m2_kg:
-            h5_file.create_dataset(_P.PT_MASS_ATTENUATION, data=metadata.mass_attenuation_m2_kg)
+        if metadata.mass_attenuation_m2_per_kg:
+            h5_file.create_dataset(_P.PT_MASS_ATTENUATION, data=metadata.mass_attenuation_m2_per_kg)
         h5_file.create_dataset(_P.PT_TOMOGRAPHY_ANGLE, data=metadata.tomography_angle_deg)
 
         loss_epochs = [loss.epoch for loss in losses]

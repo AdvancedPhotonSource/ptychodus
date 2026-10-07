@@ -47,10 +47,10 @@ HDF5_OWNED_KEYS: dict[str, frozenset[str]] = {
             'detector_distance_m',
             'focus_object_distance_m',
             'far_field',
-            'probe_energy_eV',
+            'photon_energy_eV',
             'probe_photon_count',
             'exposure_time_s',
-            'mass_attenuation_m2_kg',
+            'mass_attenuation_m2_per_kg',
             'tomography_angle_deg',
             'tilt_angle_deg',
             'polarization',
@@ -113,7 +113,7 @@ class DiffractionManifest(_ManifestBase):
     campaign_uuid: UUID | None = None
     derived_from: list[DerivedFromRef] = Field(default_factory=list)
     detector_distance_m: float | None = None
-    probe_energy_eV: float | None = None  # noqa: N815
+    photon_energy_eV: float | None = None  # noqa: N815
     probe_photon_count: int | None = None
     exposure_time_s: float | None = None
     tomography_angle_deg: float | None = None

@@ -46,7 +46,7 @@ class CSAXSDiffractionFileReader(DiffractionFileReader):
                         width_m=LengthUnit.MICROMETER.to_meters(float(x_pixel_size_um[()])),
                         height_m=LengthUnit.MICROMETER.to_meters(float(y_pixel_size_um[()])),
                     ),
-                    probe_energy_eV=EnergyUnit.KILOELECTRONVOLT.to_electronvolts(
+                    photon_energy_eV=EnergyUnit.KILOELECTRONVOLT.to_electronvolts(
                         float(energy_keV[()])
                     ),
                     file_path=file_path,

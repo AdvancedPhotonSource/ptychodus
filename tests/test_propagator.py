@@ -1662,7 +1662,7 @@ _PG_WAVELENGTH_M = energy_eV_to_wavelength_m(_PG_ENERGY_EV)
 def _product_geometry(**overrides: object) -> ProductGeometry:
     """A bound far-field geometry; keyword overrides replace any single input."""
     kwargs: dict[str, object] = {
-        'probe_energy_eV': _PG_ENERGY_EV,
+        'photon_energy_eV': _PG_ENERGY_EV,
         'probe_photon_count': _PG_PHOTON_COUNT,
         'exposure_time_s': _PG_EXPOSURE_S,
         'detector_distance_m': _PG_DISTANCE_M,
@@ -1703,7 +1703,7 @@ class TestComputeProductGeometryBeam:
     def test_beam_quantities_survive_an_unbound_detector(self) -> None:
         """A product is routinely inspected before a diffraction dataset is bound."""
         values = compute_product_geometry(
-            probe_energy_eV=_PG_ENERGY_EV,
+            photon_energy_eV=_PG_ENERGY_EV,
             probe_photon_count=_PG_PHOTON_COUNT,
             exposure_time_s=_PG_EXPOSURE_S,
             detector_distance_m=_PG_DISTANCE_M,
@@ -1714,7 +1714,7 @@ class TestComputeProductGeometryBeam:
 
     def test_zero_energy_takes_the_wavenumber_to_zero(self) -> None:
         """The limit, not a guard: the wavenumber is proportional to the energy."""
-        values = _product_geometry(probe_energy_eV=0.0)
+        values = _product_geometry(photon_energy_eV=0.0)
 
         assert values.probe_wavenumber_per_m == 0.0
         assert values.probe_angular_wavenumber_rad_per_m == 0.0
@@ -1739,7 +1739,7 @@ class TestComputeProductGeometryBeam:
         assert math.isnan(values.probe_power_W)
 
     def test_infinite_flux_at_zero_energy_is_indeterminate(self) -> None:
-        values = _product_geometry(probe_energy_eV=0.0, exposure_time_s=0.0)
+        values = _product_geometry(photon_energy_eV=0.0, exposure_time_s=0.0)
 
         assert values.probe_photon_flux_per_s == math.inf
         assert math.isnan(values.probe_power_W)
@@ -1773,7 +1773,7 @@ class TestComputeProductGeometryDetector:
     def test_depth_of_field_diverges_as_the_aperture_vanishes(self) -> None:
         """Unlike the guards elsewhere, infinity here is the limit, not a sentinel."""
         values = compute_product_geometry(
-            probe_energy_eV=_PG_ENERGY_EV,
+            photon_energy_eV=_PG_ENERGY_EV,
             probe_photon_count=_PG_PHOTON_COUNT,
             exposure_time_s=_PG_EXPOSURE_S,
             detector_distance_m=_PG_DISTANCE_M,
@@ -1795,7 +1795,7 @@ class TestComputeProductGeometryDetector:
 
     def test_no_detector_and_no_distance_is_indeterminate(self) -> None:
         values = compute_product_geometry(
-            probe_energy_eV=_PG_ENERGY_EV,
+            photon_energy_eV=_PG_ENERGY_EV,
             probe_photon_count=_PG_PHOTON_COUNT,
             exposure_time_s=_PG_EXPOSURE_S,
             detector_distance_m=0.0,
@@ -1806,7 +1806,7 @@ class TestComputeProductGeometryDetector:
 
     def test_depth_of_field_is_indeterminate_at_zero_energy_and_zero_aperture(self) -> None:
         values = compute_product_geometry(
-            probe_energy_eV=0.0,
+            photon_energy_eV=0.0,
             probe_photon_count=_PG_PHOTON_COUNT,
             exposure_time_s=_PG_EXPOSURE_S,
             detector_distance_m=_PG_DISTANCE_M,
@@ -1816,7 +1816,7 @@ class TestComputeProductGeometryDetector:
 
     def test_detector_dependent_fields_degrade_while_unbound(self) -> None:
         values = compute_product_geometry(
-            probe_energy_eV=_PG_ENERGY_EV,
+            photon_energy_eV=_PG_ENERGY_EV,
             probe_photon_count=_PG_PHOTON_COUNT,
             exposure_time_s=_PG_EXPOSURE_S,
             detector_distance_m=_PG_DISTANCE_M,

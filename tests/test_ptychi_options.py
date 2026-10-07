@@ -76,7 +76,7 @@ PIXEL_M = 1.0e-9
 # pty-chi default (1.0 m, 1e-9 m, inf, 0.0), so a test cannot pass by accident
 # if the helper drops the field it is checking.
 DETECTOR_DISTANCE_M = 2.5
-PROBE_ENERGY_EV = 10_000.0
+PHOTON_ENERGY_EV = 10_000.0
 PROBE_PHOTON_COUNT = 1.25e6
 OBJ_HEIGHT_PX = 32
 OBJ_WIDTH_PX = 40
@@ -112,10 +112,10 @@ def _make_reconstruct_input() -> ReconstructInput:
             name='test',
             comments='',
             detector_distance_m=DETECTOR_DISTANCE_M,
-            probe_energy_eV=PROBE_ENERGY_EV,
+            photon_energy_eV=PHOTON_ENERGY_EV,
             probe_photon_count=PROBE_PHOTON_COUNT,
             exposure_time_s=1.0,
-            mass_attenuation_m2_kg=0.0,
+            mass_attenuation_m2_per_kg=0.0,
             tomography_angle_deg=0.0,
         ),
         probe_positions=positions,
@@ -575,7 +575,7 @@ _PRODUCT_DERIVED_FIELDS = [
         ObjectPosOriginCoordsMethods.SPECIFIED,
     ),
     ('object_options.position_origin_coords', [0.0, 0.0]),
-    ('data_options.wavelength_m', _make_reconstruct_input().product.metadata.probe_wavelength_m),
+    ('data_options.wavelength_m', _make_reconstruct_input().product.metadata.photon_wavelength_m),
     ('data_options.free_space_propagation_distance_m', numpy.inf),
     ('probe_options.power_constraint.probe_power', PROBE_PHOTON_COUNT),
     # None means "inherit the object value": the test product's probe and object

@@ -45,7 +45,7 @@ class DiffractionRead(_RowBase):
     derived_from: list[DerivedFromEdge] = []
 
     detector_distance_m: float | None
-    probe_energy_eV: float | None  # noqa: N815
+    photon_energy_eV: float | None  # noqa: N815
     probe_photon_count: int | None
     exposure_time_s: float | None
     tomography_angle_deg: float | None
@@ -70,10 +70,10 @@ class ProductRead(_RowBase):
     detector_distance_m: float | None
     focus_object_distance_m: float | None
     far_field: bool | None
-    probe_energy_eV: float | None  # noqa: N815
+    photon_energy_eV: float | None  # noqa: N815
     probe_photon_count: int | None
     exposure_time_s: float | None
-    mass_attenuation_m2_kg: float | None
+    mass_attenuation_m2_per_kg: float | None
     tomography_angle_deg: float | None
     tilt_angle_deg: float | None = None
     polarization: Polarization | None = None

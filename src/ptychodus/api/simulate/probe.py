@@ -54,7 +54,7 @@ def rescale_probe_intensity(probe: Probe, new_intensity: float) -> Probe:
 def propagate_probe(
     probe: Probe,
     *,
-    probe_wavelength_m: float,
+    photon_wavelength_m: float,
     propagation_distance_m: float,
 ) -> Probe:
     """Propagate every incoherent mode of a probe by *propagation_distance_m*.
@@ -65,7 +65,7 @@ def propagate_probe(
     """
     pixel_geometry = probe.get_pixel_geometry()
     propagator_parameters = PropagatorParameters(
-        wavelength_m=probe_wavelength_m,
+        wavelength_m=photon_wavelength_m,
         width_px=probe.width_px,
         height_px=probe.height_px,
         pixel_width_m=pixel_geometry.width_m,
@@ -131,7 +131,7 @@ def generate_average_pattern_probe(
     geometry: ProbeGeometry,
     assembled_data: AssembledDiffractionData,
     *,
-    probe_wavelength_m: float,
+    photon_wavelength_m: float,
     detector_distance_m: float,
     far_field: bool = True,
     rtol: float = 1.0e-3,
@@ -173,7 +173,7 @@ def generate_average_pattern_probe(
         implied_geometry = ProbeGeometry.from_far_field(
             detector_pixel_geometry,
             ImageExtent(width_px=width_px, height_px=height_px),
-            wavelength_m=probe_wavelength_m,
+            wavelength_m=photon_wavelength_m,
             distance_m=detector_distance_m,
         )
 
@@ -191,7 +191,7 @@ def generate_average_pattern_probe(
         # Backward propagation, so PropagatorParameters' pitch describes the *output*
         # (upstream) plane -- the sample plane, not the detector.
         propagator_parameters = PropagatorParameters(
-            wavelength_m=probe_wavelength_m,
+            wavelength_m=photon_wavelength_m,
             width_px=width_px,
             height_px=height_px,
             pixel_width_m=probe_pixel_geometry.width_m,
@@ -205,7 +205,7 @@ def generate_average_pattern_probe(
         # angular spectrum returns the field on the grid it was given.
         magnification = detector_pixel_geometry.width_m / probe_pixel_geometry.width_m
         propagator_parameters = PropagatorParameters(
-            wavelength_m=probe_wavelength_m,
+            wavelength_m=photon_wavelength_m,
             width_px=width_px,
             height_px=height_px,
             pixel_width_m=probe_pixel_geometry.width_m,
@@ -266,11 +266,11 @@ def generate_fresnel_zone_plate_probe(
     geometry: ProbeGeometry,
     zone_plate: FresnelZonePlate,
     *,
-    probe_wavelength_m: float,
+    photon_wavelength_m: float,
     defocus_distance_m: float,
 ) -> Probe:
     """Simulate the probe formed by a Fresnel zone plate propagated to a given defocus distance."""
-    focal_length_m = zone_plate.get_focal_length_m(probe_wavelength_m)
+    focal_length_m = zone_plate.get_focal_length_m(photon_wavelength_m)
     propagation_distance_m = focal_length_m + defocus_distance_m
 
     if propagation_distance_m == 0.0:
@@ -283,7 +283,7 @@ def generate_fresnel_zone_plate_probe(
     fzp_pixel_geometry = compute_far_field_pixel_geometry(
         probe_pixel_geometry,
         ImageExtent(width_px=geometry.width_px, height_px=geometry.height_px),
-        wavelength_m=probe_wavelength_m,
+        wavelength_m=photon_wavelength_m,
         propagation_distance_m=propagation_distance_m,
     )
 
@@ -300,7 +300,7 @@ def generate_fresnel_zone_plate_probe(
 
     # transmission function of FZP
     T = numpy.exp(  # noqa: N806
-        -TWO_PI_J / probe_wavelength_m * (XX_FZP**2 + YY_FZP**2) / 2 / focal_length_m
+        -TWO_PI_J / photon_wavelength_m * (XX_FZP**2 + YY_FZP**2) / 2 / focal_length_m
     )
     C = RR_FZP <= zone_plate.zone_plate_diameter_m / 2  # noqa: N806
     H = RR_FZP >= zone_plate.central_beamstop_diameter_m / 2  # noqa: N806
@@ -313,7 +313,7 @@ def generate_fresnel_zone_plate_probe(
         fzp_pixel_geometry if propagation_distance_m > 0.0 else probe_pixel_geometry
     )
     propagator_parameters = PropagatorParameters(
-        wavelength_m=probe_wavelength_m,
+        wavelength_m=photon_wavelength_m,
         width_px=fzp_transmission_function.shape[-1],
         height_px=fzp_transmission_function.shape[-2],
         pixel_width_m=upstream_pixel_geometry.width_m,
@@ -495,7 +495,7 @@ def _compute_figure_error_phase(
     u: RealArrayType,
     modes: Iterable[LegendreMode],
     *,
-    probe_wavelength_m: float,
+    photon_wavelength_m: float,
     grazing_angle_rad: float,
 ) -> RealArrayType:
     """Return the reflected phase imposed by a surface figure error on a grazing mirror.
@@ -509,14 +509,14 @@ def _compute_figure_error_phase(
     for mode in modes:
         height_m = height_m + mode(u)
 
-    return -2.0 * TWO_PI / probe_wavelength_m * height_m * numpy.sin(grazing_angle_rad)
+    return -2.0 * TWO_PI / photon_wavelength_m * height_m * numpy.sin(grazing_angle_rad)
 
 
 def generate_kb_mirror_probe(
     geometry: ProbeGeometry,
     mirrors: KirkpatrickBaezMirrorPair,
     *,
-    probe_wavelength_m: float,
+    photon_wavelength_m: float,
     defocus_distance_m: float = 0.0,
     astigmatism_m: float = 0.0,
     incident_beam_fwhm_x_m: float = 0.0,
@@ -583,7 +583,7 @@ def generate_kb_mirror_probe(
     pupil_pixel_geometry = compute_far_field_pixel_geometry(
         probe_pixel_geometry,
         image_extent,
-        wavelength_m=probe_wavelength_m,
+        wavelength_m=photon_wavelength_m,
         propagation_distance_m=propagation_distance_m,
     )
 
@@ -621,7 +621,7 @@ def generate_kb_mirror_probe(
         half_aperture_y_m=half_aperture_y_m,
         pupil_pixel_geometry=pupil_pixel_geometry,
         probe_pixel_geometry=probe_pixel_geometry,
-        probe_wavelength_m=probe_wavelength_m,
+        photon_wavelength_m=photon_wavelength_m,
         has_figure_error=bool(figure_error_x_modes) or bool(figure_error_y_modes),
         min_pupil_px_for_figure_error=min_pupil_px_for_figure_error,
         min_px_per_focus_fwhm=min_px_per_focus_fwhm,
@@ -646,7 +646,7 @@ def generate_kb_mirror_probe(
 
     phase = (
         -numpy.pi
-        / probe_wavelength_m
+        / photon_wavelength_m
         * (
             numpy.square(XX_PUPIL) / focus_distance_x_m
             + numpy.square(YY_PUPIL) / focus_distance_y_m
@@ -655,13 +655,13 @@ def generate_kb_mirror_probe(
     phase = phase + _compute_figure_error_phase(
         XX_PUPIL / half_aperture_x_m,
         figure_error_x_modes,
-        probe_wavelength_m=probe_wavelength_m,
+        photon_wavelength_m=photon_wavelength_m,
         grazing_angle_rad=mirrors.horizontal.grazing_angle_rad,
     )
     phase = phase + _compute_figure_error_phase(
         YY_PUPIL / half_aperture_y_m,
         figure_error_y_modes,
-        probe_wavelength_m=probe_wavelength_m,
+        photon_wavelength_m=photon_wavelength_m,
         grazing_angle_rad=mirrors.vertical.grazing_angle_rad,
     )
 
@@ -674,7 +674,7 @@ def generate_kb_mirror_probe(
         pupil_pixel_geometry if propagation_distance_m > 0.0 else probe_pixel_geometry
     )
     propagator_parameters = PropagatorParameters(
-        wavelength_m=probe_wavelength_m,
+        wavelength_m=photon_wavelength_m,
         width_px=kb_transmission_function.shape[-1],
         height_px=kb_transmission_function.shape[-2],
         pixel_width_m=upstream_pixel_geometry.width_m,
@@ -697,7 +697,7 @@ def _warn_about_kb_sampling(
     half_aperture_y_m: float,
     pupil_pixel_geometry: PixelGeometry,
     probe_pixel_geometry: PixelGeometry,
-    probe_wavelength_m: float,
+    photon_wavelength_m: float,
     has_figure_error: bool,
     min_pupil_px_for_figure_error: float,
     min_px_per_focus_fwhm: float,
@@ -718,12 +718,12 @@ def _warn_about_kb_sampling(
 
     focus_px_x = (
         _SINC_FWHM_FACTOR
-        * probe_wavelength_m
+        * photon_wavelength_m
         / (2.0 * numerical_aperture_x * probe_pixel_geometry.width_m)
     )
     focus_px_y = (
         _SINC_FWHM_FACTOR
-        * probe_wavelength_m
+        * photon_wavelength_m
         / (2.0 * numerical_aperture_y * probe_pixel_geometry.height_m)
     )
     fewest_focus_px = min(focus_px_x, focus_px_y)

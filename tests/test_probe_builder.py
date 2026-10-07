@@ -92,7 +92,7 @@ class _StubProbeGeometryProvider(ProbeGeometryProvider):
         return self._probe_photon_count
 
     @property
-    def probe_wavelength_m(self) -> float:
+    def photon_wavelength_m(self) -> float:
         return 1.0e-10
 
     @property

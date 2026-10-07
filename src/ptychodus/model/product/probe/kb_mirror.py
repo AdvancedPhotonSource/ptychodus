@@ -97,7 +97,7 @@ class KBMirrorProbeBuilder(ProbeSequenceBuilder):
             generate_kb_mirror_probe(
                 geometry_provider.get_probe_geometry(),
                 mirrors,
-                probe_wavelength_m=geometry_provider.probe_wavelength_m,
+                photon_wavelength_m=geometry_provider.photon_wavelength_m,
                 defocus_distance_m=self.defocus_distance_m.get_value(),
                 astigmatism_m=self.astigmatism_m.get_value(),
             ),

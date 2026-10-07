@@ -54,7 +54,7 @@ def test_new_format_metadata_is_read(reader: PolarDiffractionFileReader, tmp_pat
 
     assert metadata.detector_distance_m == pytest.approx(1.909999745)
     assert metadata.beam_center == BeamCenter(709, 378)
-    assert metadata.probe_energy_eV == pytest.approx(6204.927737383656)
+    assert metadata.photon_energy_eV == pytest.approx(6204.927737383656)
 
 
 def test_detector_pixel_geometry_is_the_eiger_pitch(
@@ -88,7 +88,7 @@ def test_old_format_yields_energy_without_detector_attributes(
 
     metadata = reader.read(master_path).get_metadata()
 
-    assert metadata.probe_energy_eV == pytest.approx(7246.961723347276)
+    assert metadata.photon_energy_eV == pytest.approx(7246.961723347276)
     assert metadata.detector_distance_m is None
     assert metadata.beam_center is None
 
@@ -107,7 +107,7 @@ def test_missing_metadata_loads_with_none(
 
     assert metadata.detector_distance_m is None
     assert metadata.beam_center is None
-    assert metadata.probe_energy_eV is None
+    assert metadata.photon_energy_eV is None
     assert metadata.num_patterns_per_array == [3]
 
 

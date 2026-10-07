@@ -31,7 +31,7 @@ class FoldSliceParameters:
     detector pitch and the pattern width are known.
     """
 
-    probe_wavelength_m: float | None = None
+    photon_wavelength_m: float | None = None
     object_pixel_size_m: float | None = None
     tomography_angle_deg: float | None = None
 
@@ -60,7 +60,7 @@ def read_fold_slice_parameters(file_path: Path) -> FoldSliceParameters:
     """
     with h5py.File(file_path, 'r') as h5_file:
         return FoldSliceParameters(
-            probe_wavelength_m=_read_scalar(h5_file, _WAVELENGTH_PATH),
+            photon_wavelength_m=_read_scalar(h5_file, _WAVELENGTH_PATH),
             object_pixel_size_m=_read_scalar(h5_file, _OBJECT_PIXEL_SIZE_PATH),
             tomography_angle_deg=_read_scalar(h5_file, _TOMOGRAPHY_ANGLE_PATH),
         )

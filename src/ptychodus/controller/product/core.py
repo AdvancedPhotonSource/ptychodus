@@ -53,7 +53,7 @@ class _Column(IntEnum):
     NAME = 0
     DIFFRACTION_DATASET = 1
     DETECTOR_DISTANCE_M = 2
-    PROBE_ENERGY_KEV = 3
+    PHOTON_ENERGY_KEV = 3
     PROBE_PHOTON_COUNT = 4
     PIXEL_WIDTH_NM = 5
     PIXEL_HEIGHT_NM = 6
@@ -65,7 +65,7 @@ _EDITABLE_COLUMNS = frozenset(
         _Column.NAME,
         _Column.DIFFRACTION_DATASET,
         _Column.DETECTOR_DISTANCE_M,
-        _Column.PROBE_ENERGY_KEV,
+        _Column.PHOTON_ENERGY_KEV,
         _Column.PROBE_PHOTON_COUNT,
     }
 )
@@ -95,7 +95,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
             'Name',
             'Diffraction\nDataset',
             'Detector-Object\nDistance [m]',
-            'Probe Energy\n[keV]',
+            'Photon Energy\n[keV]',
             'Probe Photon\nCount',
             'Pixel Width\n[nm]',
             'Pixel Height\n[nm]',
@@ -153,10 +153,10 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                         if pending or failed:
                             return '—'
                         return f'{metadata_item.detector_distance_m.get_value():.4g}'
-                    case _Column.PROBE_ENERGY_KEV:
+                    case _Column.PHOTON_ENERGY_KEV:
                         if pending or failed:
                             return '—'
-                        energy_eV = metadata_item.probe_energy_eV.get_value()  # noqa: N806
+                        energy_eV = metadata_item.photon_energy_eV.get_value()  # noqa: N806
                         return f'{EnergyUnit.KILOELECTRONVOLT.convert(energy_eV):.4g}'
                     case _Column.PROBE_PHOTON_COUNT:
                         if pending or failed:
@@ -238,13 +238,13 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 
                 metadata_item.detector_distance_m.set_value(distance_m)
                 return True
-            elif index.column() == _Column.PROBE_ENERGY_KEV:
+            elif index.column() == _Column.PHOTON_ENERGY_KEV:
                 try:
                     energy_keV = float(value)  # noqa: N806
                 except ValueError:
                     return False
 
-                metadata_item.probe_energy_eV.set_value(
+                metadata_item.photon_energy_eV.set_value(
                     EnergyUnit.KILOELECTRONVOLT.to_electronvolts(energy_keV)
                 )
                 return True

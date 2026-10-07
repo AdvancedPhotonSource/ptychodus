@@ -11,7 +11,7 @@ with ModelCore(Path('settings.ini')) as model:
     product_api = model.workflow_api.create_product(
         'initial_guess',
         detector_distance_m=1.0,
-        probe_energy_eV=10_000.0,
+        photon_energy_eV=10_000.0,
         probe_photon_count=1.0e6,
     )
 
@@ -149,10 +149,10 @@ Use `WorkflowProductAPI.generate_probe(name, parameters)`. All generated probe b
 : Generates a super-Gaussian amplitude profile. Parameters are `annular_radius_m`, `full_width_at_half_maximum_m` (or the builder parameter name `fwhm_m` in the low-level function), and `order_parameter`. `annular_radius_m = 0` gives a Gaussian-like spot; a positive `annular_radius_m` gives a ring or donut-like profile. This is not a propagated zone-plate simulation; it is an analytic amplitude profile.
 
 `fresnel_zone_plate`
-: Simulates a Fresnel zone plate optic and propagates it to the sample plane with the Fresnel-transform propagator. Parameters are `zone_plate_diameter_m`, `outermost_zone_width_m`, `central_beamstop_diameter_m`, and `defocus_distance_m`. The central beamstop creates the donut-like zone-plate aperture. The focal length is computed as `zone_plate_diameter_m * outermost_zone_width_m / probe_wavelength_m` and the propagation distance is `focal_length_m + defocus_distance_m`.
+: Simulates a Fresnel zone plate optic and propagates it to the sample plane with the Fresnel-transform propagator. Parameters are `zone_plate_diameter_m`, `outermost_zone_width_m`, `central_beamstop_diameter_m`, and `defocus_distance_m`. The central beamstop creates the donut-like zone-plate aperture. The focal length is computed as `zone_plate_diameter_m * outermost_zone_width_m / photon_wavelength_m` and the propagation distance is `focal_length_m + defocus_distance_m`.
 
 `kb_mirror`
-: Simulates a Kirkpatrick-Baez mirror pair and propagates it to the sample plane. Each mirror takes an `acceptance_length_m`, a `grazing_angle_rad` and a `focus_distance_m`, from which the projected aperture `L sin(theta)` and the numerical aperture follow; `astigmatism_m` separates the two axis foci along the beam and `defocus_distance_m` moves the sample off the focal plane. Grazing angles are stored in radians rather than the turns the GUI uses elsewhere, because that is the number an optics log records. The pupil window is `probe_wavelength_m * z / probe_pixel_size_m`, so a high-aperture optic needs a fine probe pixel size; an aperture that does not fit is refused rather than silently clipped, since clipping would quietly change the optic.
+: Simulates a Kirkpatrick-Baez mirror pair and propagates it to the sample plane. Each mirror takes an `acceptance_length_m`, a `grazing_angle_rad` and a `focus_distance_m`, from which the projected aperture `L sin(theta)` and the numerical aperture follow; `astigmatism_m` separates the two axis foci along the beam and `defocus_distance_m` moves the sample off the focal plane. Grazing angles are stored in radians rather than the turns the GUI uses elsewhere, because that is the number an optics log records. The pupil window is `photon_wavelength_m * z / probe_pixel_size_m`, so a high-aperture optic needs a fine probe pixel size; an aperture that does not fit is refused rather than silently clipped, since clipping would quietly change the optic.
 
 `average_pattern`
 : Estimates a probe from diffraction data by taking the square root of the mean assembled diffraction pattern and back-propagating it by `detector_distance_m` with the Fresnel-transform propagator. This requires assembled diffraction data to already be available in the model.
@@ -291,7 +291,7 @@ with ModelCore(Path('settings.ini')) as model:
     product_api = model.workflow_api.create_product(
         'generated_multimode_probe',
         detector_distance_m=1.0,
-        probe_energy_eV=10_000.0,
+        photon_energy_eV=10_000.0,
         probe_photon_count=1.0e6,
     )
 
@@ -340,7 +340,7 @@ with ModelCore(Path('settings.ini')) as model:
     product_api = model.workflow_api.create_product(
         'loaded_single_mode_probe',
         detector_distance_m=1.0,
-        probe_energy_eV=10_000.0,
+        photon_energy_eV=10_000.0,
         probe_photon_count=1.0e6,
     )
 
@@ -459,7 +459,7 @@ base_probe = generate_fresnel_zone_plate_probe(
         outermost_zone_width_m=50e-9,
         central_beamstop_diameter_m=60e-6,
     ),
-    probe_wavelength_m=1.239841984e-10,  # 10 keV
+    photon_wavelength_m=1.239841984e-10,  # 10 keV
     defocus_distance_m=0.0,
 )
 base_probe = rescale_probe_intensity(base_probe, 1.0e6)

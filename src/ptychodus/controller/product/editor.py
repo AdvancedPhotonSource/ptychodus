@@ -37,7 +37,7 @@ class _Row(IntEnum):
     a bare name would be a capture pattern that swallows every row.
     """
 
-    PROBE_WAVELENGTH_NM = 0
+    PHOTON_WAVELENGTH_NM = 0
     PROBE_WAVENUMBER_PER_NM = 1
     PROBE_ANGULAR_WAVENUMBER_RAD_PER_NM = 2
     PROBE_PHOTON_FLUX_PER_S = 3
@@ -45,7 +45,7 @@ class _Row(IntEnum):
     OBJECT_PLANE_PIXEL_WIDTH_NM = 5
     OBJECT_PLANE_PIXEL_HEIGHT_NM = 6
     EXPOSURE_TIME_S = 7
-    MASS_ATTENUATION_M2_KG = 8
+    MASS_ATTENUATION_M2_PER_KG = 8
     TOMOGRAPHY_ANGLE_DEG = 9
     TILT_ANGLE_DEG = 10
     POLARIZATION = 11
@@ -76,7 +76,7 @@ class _Col(IntEnum):
 _EDITABLE_ROWS = frozenset(
     {
         _Row.EXPOSURE_TIME_S,
-        _Row.MASS_ATTENUATION_M2_KG,
+        _Row.MASS_ATTENUATION_M2_PER_KG,
         _Row.TOMOGRAPHY_ANGLE_DEG,
         _Row.TILT_ANGLE_DEG,
         _Row.POLARIZATION,
@@ -101,7 +101,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
         self._editable_item_brush = editable_item_brush
         self._header = ['Property', 'Value']
         self._properties = [
-            'Probe Wavelength [nm]',
+            'Photon Wavelength [nm]',
             'Probe Wavenumber [1/nm]',
             'Probe Angular Wavenumber [rad/nm]',
             'Probe Photon Flux [ph/s]',
@@ -153,8 +153,8 @@ class ProductPropertyTableModel(QAbstractTableModel):
                         nm_per_m = LengthUnit.NANOMETER.meters_per_unit
 
                         match index.row():
-                            case _Row.PROBE_WAVELENGTH_NM:
-                                return f'{LengthUnit.NANOMETER.convert(geometry.probe_wavelength_m):.4g}'
+                            case _Row.PHOTON_WAVELENGTH_NM:
+                                return f'{LengthUnit.NANOMETER.convert(geometry.photon_wavelength_m):.4g}'
                             case _Row.PROBE_WAVENUMBER_PER_NM:
                                 return f'{values.probe_wavenumber_per_m * nm_per_m:.4g}'
                             case _Row.PROBE_ANGULAR_WAVENUMBER_RAD_PER_NM:
@@ -171,8 +171,8 @@ class ProductPropertyTableModel(QAbstractTableModel):
                                 return f'{LengthUnit.NANOMETER.convert(height_m):.4g}'
                             case _Row.EXPOSURE_TIME_S:
                                 return f'{metadata_item.exposure_time_s.get_value():.4g}'
-                            case _Row.MASS_ATTENUATION_M2_KG:
-                                return f'{metadata_item.mass_attenuation_m2_kg.get_value():.4g}'
+                            case _Row.MASS_ATTENUATION_M2_PER_KG:
+                                return f'{metadata_item.mass_attenuation_m2_per_kg.get_value():.4g}'
                             case _Row.TOMOGRAPHY_ANGLE_DEG:
                                 return f'{metadata_item.tomography_angle_deg.get_value():.4g}'
                             case _Row.TILT_ANGLE_DEG:
@@ -217,11 +217,11 @@ class ProductPropertyTableModel(QAbstractTableModel):
                     return True
                 case 8:
                     try:
-                        mass_attenuation_m2_kg = float(value)
+                        mass_attenuation_m2_per_kg = float(value)
                     except ValueError:
                         return False
 
-                    metadata_item.mass_attenuation_m2_kg.set_value(mass_attenuation_m2_kg)
+                    metadata_item.mass_attenuation_m2_per_kg.set_value(mass_attenuation_m2_per_kg)
                     return True
                 case 9:
                     try:

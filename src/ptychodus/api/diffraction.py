@@ -225,7 +225,7 @@ class DiffractionMetadata:
     detector_distance_m: float | None = None
     detector_pixel_geometry: PixelGeometry | None = None
     beam_center: BeamCenter | None = None
-    probe_energy_eV: float | None = None  # noqa: N815
+    photon_energy_eV: float | None = None  # noqa: N815
     probe_photon_count: int | None = None
     exposure_time_s: float | None = None
     tomography_angle_deg: float | None = None
@@ -241,7 +241,7 @@ class DiffractionMetadata:
         sz += getsizeof(self.detector_distance_m)
         sz += getsizeof(self.detector_pixel_geometry)
         sz += getsizeof(self.beam_center)
-        sz += getsizeof(self.probe_energy_eV)
+        sz += getsizeof(self.photon_energy_eV)
         sz += getsizeof(self.probe_photon_count)
         sz += getsizeof(self.exposure_time_s)
         sz += getsizeof(self.tomography_angle_deg)

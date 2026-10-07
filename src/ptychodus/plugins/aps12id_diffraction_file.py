@@ -92,7 +92,7 @@ class APS12IDDiffractionFileReader(DiffractionFileReader):
 
             data_shape = h5_data.shape
             data_dtype = h5_data.dtype
-            probe_energy_eV = _read_ndattribute_scalar(h5_file, self.ENERGY_PATH)  # noqa: N806
+            photon_energy_eV = _read_ndattribute_scalar(h5_file, self.ENERGY_PATH)  # noqa: N806
             exposure_time_s = _read_ndattribute_scalar(h5_file, self.EXPOSURE_PATH)
 
         if len(data_shape) == 3:
@@ -105,7 +105,7 @@ class APS12IDDiffractionFileReader(DiffractionFileReader):
                 detector_pixel_geometry=PixelGeometry(
                     width_m=self.DETECTOR_PIXEL_SIZE_M, height_m=self.DETECTOR_PIXEL_SIZE_M
                 ),
-                probe_energy_eV=probe_energy_eV,
+                photon_energy_eV=photon_energy_eV,
                 exposure_time_s=exposure_time_s,
                 file_path=file_path,
             )
@@ -136,7 +136,7 @@ class APS12IDDiffractionFileReader(DiffractionFileReader):
                 detector_pixel_geometry=PixelGeometry(
                     width_m=self.DETECTOR_PIXEL_SIZE_M, height_m=self.DETECTOR_PIXEL_SIZE_M
                 ),
-                probe_energy_eV=probe_energy_eV,
+                photon_energy_eV=photon_energy_eV,
                 exposure_time_s=exposure_time_s,
                 file_path=file_path.parent / file_pattern,
             )

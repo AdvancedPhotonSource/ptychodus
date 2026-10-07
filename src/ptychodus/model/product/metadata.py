@@ -57,10 +57,10 @@ class MetadataRepositoryItem(ParameterGroup):
         name: str = '',
         comments: str = '',
         detector_distance_m: float | None = None,
-        probe_energy_eV: float | None = None,  # noqa: N803
+        photon_energy_eV: float | None = None,  # noqa: N803
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
-        mass_attenuation_m2_kg: float | None = None,
+        mass_attenuation_m2_per_kg: float | None = None,
         tomography_angle_deg: float | None = None,
         focus_object_distance_m: float | None = None,
         tilt_angle_deg: float | None = None,
@@ -89,12 +89,12 @@ class MetadataRepositoryItem(ParameterGroup):
 
         self._add_parameter('focus_object_distance_m', self.focus_object_distance_m)
 
-        self.probe_energy_eV = settings.probe_energy_eV.copy()
+        self.photon_energy_eV = settings.photon_energy_eV.copy()
 
-        if probe_energy_eV is not None:
-            self.probe_energy_eV.set_value(probe_energy_eV)
+        if photon_energy_eV is not None:
+            self.photon_energy_eV.set_value(photon_energy_eV)
 
-        self._add_parameter('probe_energy_eV', self.probe_energy_eV)
+        self._add_parameter('photon_energy_eV', self.photon_energy_eV)
 
         self.probe_photon_count = settings.probe_photon_count.copy()
 
@@ -110,12 +110,12 @@ class MetadataRepositoryItem(ParameterGroup):
 
         self._add_parameter('exposure_time_s', self.exposure_time_s)
 
-        self.mass_attenuation_m2_kg = settings.mass_attenuation_m2_kg.copy()
+        self.mass_attenuation_m2_per_kg = settings.mass_attenuation_m2_per_kg.copy()
 
-        if mass_attenuation_m2_kg is not None:
-            self.mass_attenuation_m2_kg.set_value(mass_attenuation_m2_kg)
+        if mass_attenuation_m2_per_kg is not None:
+            self.mass_attenuation_m2_per_kg.set_value(mass_attenuation_m2_per_kg)
 
-        self._add_parameter('mass_attenuation_m2_kg', self.mass_attenuation_m2_kg)
+        self._add_parameter('mass_attenuation_m2_per_kg', self.mass_attenuation_m2_per_kg)
 
         self.tomography_angle_deg = settings.tomography_angle_deg.copy()
 
@@ -151,10 +151,10 @@ class MetadataRepositoryItem(ParameterGroup):
         self.name.set_value(metadata.name)
         self.comments.set_value(metadata.comments)
         self.detector_distance_m.set_value(metadata.detector_distance_m)
-        self.probe_energy_eV.set_value(metadata.probe_energy_eV)
+        self.photon_energy_eV.set_value(metadata.photon_energy_eV)
         self.probe_photon_count.set_value(metadata.probe_photon_count)
         self.exposure_time_s.set_value(metadata.exposure_time_s)
-        self.mass_attenuation_m2_kg.set_value(metadata.mass_attenuation_m2_kg)
+        self.mass_attenuation_m2_per_kg.set_value(metadata.mass_attenuation_m2_per_kg)
         self.tomography_angle_deg.set_value(metadata.tomography_angle_deg)
         self.focus_object_distance_m.set_value(metadata.focus_object_distance_m)
         self.tilt_angle_deg.set_value(metadata.tilt_angle_deg)
@@ -172,10 +172,10 @@ class MetadataRepositoryItem(ParameterGroup):
             name=self.name.get_value(),
             comments=self.comments.get_value(),
             detector_distance_m=self.detector_distance_m.get_value(),
-            probe_energy_eV=self.probe_energy_eV.get_value(),
+            photon_energy_eV=self.photon_energy_eV.get_value(),
             probe_photon_count=self.probe_photon_count.get_value(),
             exposure_time_s=self.exposure_time_s.get_value(),
-            mass_attenuation_m2_kg=self.mass_attenuation_m2_kg.get_value(),
+            mass_attenuation_m2_per_kg=self.mass_attenuation_m2_per_kg.get_value(),
             tomography_angle_deg=self.tomography_angle_deg.get_value(),
             focus_object_distance_m=self.focus_object_distance_m.get_value(),
             tilt_angle_deg=self.tilt_angle_deg.get_value(),

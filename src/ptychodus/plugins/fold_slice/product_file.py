@@ -67,9 +67,9 @@ class FoldSliceProductFileReader(ProductFileReader):
             wavelength_m = p_struct['lambda']
         except KeyError:
             wavelength_m = None
-            probe_energy_eV = 0.0  # noqa: N806
+            photon_energy_eV = 0.0  # noqa: N806
         else:
-            probe_energy_eV = wavelength_m_to_energy_eV(wavelength_m)  # noqa: N806
+            photon_energy_eV = wavelength_m_to_energy_eV(wavelength_m)  # noqa: N806
 
         try:
             tomography_angle_deg = p_struct['angle']
@@ -98,10 +98,10 @@ class FoldSliceProductFileReader(ProductFileReader):
                 ImageExtent(width_px=probe_array.shape[-1], height_px=probe_array.shape[-2]),
                 wavelength_m,
             ),
-            probe_energy_eV=probe_energy_eV,
+            photon_energy_eV=photon_energy_eV,
             probe_photon_count=0.0,  # not included in file
             exposure_time_s=0.0,  # not included in file
-            mass_attenuation_m2_kg=0.0,  # not included in file
+            mass_attenuation_m2_per_kg=0.0,  # not included in file
             tomography_angle_deg=tomography_angle_deg,
         )
 

@@ -17,7 +17,11 @@ import pytest
 from ptychodus.api.assemble import assemble_dataset
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.io import TrainingDataFileKeys, save_product, save_training_data
+from ptychodus.api.io import (
+    TrainingDataFileKeys,
+    save_product,
+    save_training_data,
+)
 from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
@@ -35,7 +39,7 @@ NUM_MODES = 3
 OBJECT_PX = 40
 OBJECT_PIXEL_SIZE_M = 1.2e-8
 DETECTOR_DISTANCE_M = 2.0
-PROBE_ENERGY_EV = 10000.0
+PHOTON_ENERGY_EV = 10000.0
 # Deliberately off-origin: positions are stored relative to the object center, so
 # a zero-center fixture would hide the one lossy part of the round trip.
 OBJECT_CENTER_X_M = 4.0e-7
@@ -49,10 +53,10 @@ def _make_reconstruct_input(*, with_bad_pixels: bool = True) -> ReconstructInput
         name='fixture',
         comments='round trip',
         detector_distance_m=DETECTOR_DISTANCE_M,
-        probe_energy_eV=PROBE_ENERGY_EV,
+        photon_energy_eV=PHOTON_ENERGY_EV,
         probe_photon_count=1234.0,
         exposure_time_s=0.25,
-        mass_attenuation_m2_kg=0.0,
+        mass_attenuation_m2_per_kg=0.0,
         tomography_angle_deg=0.0,
     )
     positions = ProbePositionSequence(
@@ -131,7 +135,7 @@ class TestTrainingDataRoundTrip:
         path, _ = written
         product = TrainingDataProductFileReader().read(path)
 
-        assert product.metadata.probe_energy_eV == PROBE_ENERGY_EV
+        assert product.metadata.photon_energy_eV == PHOTON_ENERGY_EV
         assert product.metadata.detector_distance_m == DETECTOR_DISTANCE_M
 
     def test_positions_reload_offset_by_the_object_center(
@@ -182,7 +186,7 @@ class TestTrainingDataRoundTrip:
         recovered = compute_far_field_pixel_geometry(
             pitch,
             ImageExtent(width_px=DETECTOR_PX, height_px=DETECTOR_PX),
-            wavelength_m=energy_eV_to_wavelength_m(PROBE_ENERGY_EV),
+            wavelength_m=energy_eV_to_wavelength_m(PHOTON_ENERGY_EV),
             propagation_distance_m=DETECTOR_DISTANCE_M,
         )
 

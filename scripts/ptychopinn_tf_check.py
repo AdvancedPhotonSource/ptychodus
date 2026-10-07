@@ -83,10 +83,10 @@ def _parse_args() -> argparse.Namespace:
         help='Detector distance (meters).',
     )
     parser.add_argument(
-        '--probe-energy-ev',
+        '--photon-energy-ev',
         type=float,
         default=8000.0,
-        help='Probe energy (eV).',
+        help='Photon energy (eV).',
     )
     parser.add_argument(
         '--exposure-time-s',
@@ -174,7 +174,7 @@ def main() -> int:
             input_product_api = model.workflow_api.create_product(
                 name='Run1084_recon3_postPC_shrunk_3',
                 detector_distance_m=args.detector_distance_m,
-                probe_energy_eV=args.probe_energy_ev,
+                photon_energy_eV=args.photon_energy_ev,
                 probe_photon_count=max_total_counts,
                 exposure_time_s=args.exposure_time_s,
                 diffraction=workflow_diffraction_api,

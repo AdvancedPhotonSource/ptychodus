@@ -48,56 +48,52 @@ def _iter_probe_patches(
 
 @dataclass(frozen=True)
 class IlluminationMap:
-    """Per-object-pixel photon count plus the metadata needed to derive fluence,
-    dose, and intensity quantities."""
+    """Per-object-pixel photon count plus the metadata needed to derive fluence and
+    dose quantities."""
 
     photon_number: RealArrayType
     photon_flux_per_s: float
     photon_energy_J: float  # noqa: N815
     exposure_time_s: float
-    mass_attenuation_m2_kg: float
+    mass_attenuation_m2_per_kg: float
     pixel_geometry: PixelGeometry
     center: ObjectCenter
 
     @property
-    def photon_fluence_1_m2(self) -> RealArrayType:
+    def photon_fluence_per_m2(self) -> RealArrayType:
         return self.photon_number / self.pixel_geometry.get_area_m2()
 
     @property
     def photon_fluence_rate_per_s_m2(self) -> RealArrayType:
-        return self.photon_fluence_1_m2 / self.exposure_time_s
+        return self.photon_fluence_per_m2 / self.exposure_time_s
 
     @property
-    def energy_fluence_J_m2(self) -> RealArrayType:  # noqa: N802
-        return self.photon_fluence_1_m2 * self.photon_energy_J
+    def energy_fluence_J_per_m2(self) -> RealArrayType:  # noqa: N802
+        return self.photon_fluence_per_m2 * self.photon_energy_J
 
     @property
-    def energy_fluence_rate_W_m2(self) -> RealArrayType:  # noqa: N802
+    def energy_fluence_rate_W_per_m2(self) -> RealArrayType:  # noqa: N802
         return self.photon_fluence_rate_per_s_m2 * self.photon_energy_J
 
     @property
     def dose_Gy(self) -> RealArrayType:  # noqa: N802
-        return self.energy_fluence_J_m2 * self.mass_attenuation_m2_kg
+        return self.energy_fluence_J_per_m2 * self.mass_attenuation_m2_per_kg
 
     @property
-    def dose_rate_Gy_s(self) -> RealArrayType:  # noqa: N802
-        return self.energy_fluence_rate_W_m2 * self.mass_attenuation_m2_kg
-
-    @property
-    def intensity_W_m2(self) -> RealArrayType:  # noqa: N802
-        return self.energy_fluence_rate_W_m2
+    def dose_rate_Gy_per_s(self) -> RealArrayType:  # noqa: N802
+        return self.energy_fluence_rate_W_per_m2 * self.mass_attenuation_m2_per_kg
 
     def save_npz(self, file_path: Path) -> None:
         numpy.savez_compressed(
             file_path,
             allow_pickle=False,
             photon_number=self.photon_number,
-            photon_fluence_1_m2=self.photon_fluence_1_m2,
+            photon_fluence_per_m2=self.photon_fluence_per_m2,
             photon_fluence_rate_per_s_m2=self.photon_fluence_rate_per_s_m2,
-            energy_fluence_J_m2=self.energy_fluence_J_m2,
-            energy_fluence_rate_W_m2=self.energy_fluence_rate_W_m2,
+            energy_fluence_J_per_m2=self.energy_fluence_J_per_m2,
+            energy_fluence_rate_W_per_m2=self.energy_fluence_rate_W_per_m2,
             dose_Gy=self.dose_Gy,
-            dose_rate_Gy_s=self.dose_rate_Gy_s,
+            dose_rate_Gy_per_s=self.dose_rate_Gy_per_s,
             pixel_height_m=self.pixel_geometry.height_m,
             pixel_width_m=self.pixel_geometry.width_m,
             center_x_m=self.center.x_m,
@@ -112,7 +108,7 @@ def compute_illumination_map(
 ) -> IlluminationMap:
     """Build a per-object-pixel photon-count canvas by summing the subpixel-shifted
     probe intensities at every scan position, packaged with the metadata needed to
-    derive fluence, dose, and intensity quantities.
+    derive fluence and dose quantities.
 
     Pass ``probe_photon_counts_by_index`` (per-scan-index photon counts) to weight
     each scan-point contribution by its true exposure. Weights are normalized to
@@ -140,7 +136,7 @@ def compute_illumination_map(
     # The flux has one definition, in compute_product_geometry. The detector geometry
     # it also derives is irrelevant here, so only the distance is supplied.
     product_geometry = compute_product_geometry(
-        probe_energy_eV=product.metadata.probe_energy_eV,
+        photon_energy_eV=product.metadata.photon_energy_eV,
         probe_photon_count=product.metadata.probe_photon_count,
         exposure_time_s=exposure_time_s,
         detector_distance_m=product.metadata.detector_distance_m,
@@ -149,9 +145,9 @@ def compute_illumination_map(
     return IlluminationMap(
         photon_number=canvas,
         photon_flux_per_s=product_geometry.probe_photon_flux_per_s,
-        photon_energy_J=product.metadata.probe_energy_J,
+        photon_energy_J=product.metadata.photon_energy_J,
         exposure_time_s=exposure_time_s,
-        mass_attenuation_m2_kg=product.metadata.mass_attenuation_m2_kg,
+        mass_attenuation_m2_per_kg=product.metadata.mass_attenuation_m2_per_kg,
         pixel_geometry=object_geometry.get_pixel_geometry(),
         center=object_geometry.get_center(),
     )

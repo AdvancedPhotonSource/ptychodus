@@ -21,9 +21,9 @@ from ptychodus.model.product.settings import ProductSettings
 
 _NUM_PX = 256
 _DETECTOR_PITCH_M = 75e-6
-_PROBE_ENERGY_EV = 10000.0
+_PHOTON_ENERGY_EV = 10000.0
 _DETECTOR_DISTANCE_M = 1.0
-_WAVELENGTH_M = energy_eV_to_wavelength_m(_PROBE_ENERGY_EV)
+_WAVELENGTH_M = energy_eV_to_wavelength_m(_PHOTON_ENERGY_EV)
 
 
 class _NameFactory(UniqueNameFactory):
@@ -43,7 +43,7 @@ def _make_geometry(
         _NameFactory(),
         detector_distance_m=detector_distance_m,
         focus_object_distance_m=focus_object_distance_m,
-        probe_energy_eV=_PROBE_ENERGY_EV,
+        photon_energy_eV=_PHOTON_ENERGY_EV,
         far_field=far_field,
     )
     geometry = ProductGeometryProvider(metadata_item, MagicMock())

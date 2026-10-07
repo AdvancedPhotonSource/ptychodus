@@ -95,7 +95,7 @@ class ISNDiffractionFileReader(DiffractionFileReader):
 
         pattern_dtype = numpy.dtype(numpy.int32)
         detector_extent: ImageExtent | None = None
-        probe_energy_eV: float | None = None  # noqa: N806
+        photon_energy_eV: float | None = None  # noqa: N806
         exposure_time_s: float | None = None
         offset = 0
 
@@ -114,7 +114,7 @@ class ISNDiffractionFileReader(DiffractionFileReader):
 
                     wavelength_angstrom = self._read_scalar(h5_file, self.WAVELENGTH_PATH)
                     if wavelength_angstrom:
-                        probe_energy_eV = HC_EV_ANGSTROM / wavelength_angstrom  # noqa: N806
+                        photon_energy_eV = HC_EV_ANGSTROM / wavelength_angstrom  # noqa: N806
 
                     exposure_time_s = self._read_scalar(h5_file, self.COUNT_TIME_PATH)
 
@@ -136,7 +136,7 @@ class ISNDiffractionFileReader(DiffractionFileReader):
                 width_m=self.DETECTOR_PIXEL_SIZE_M,
                 height_m=self.DETECTOR_PIXEL_SIZE_M,
             ),
-            probe_energy_eV=probe_energy_eV,
+            photon_energy_eV=photon_energy_eV,
             exposure_time_s=exposure_time_s,
             file_path=file_path.parent / file_pattern,
         )

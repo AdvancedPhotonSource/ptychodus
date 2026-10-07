@@ -80,10 +80,10 @@ def _make_product(
             name='test',
             comments='unit test product',
             detector_distance_m=1.5,
-            probe_energy_eV=10_000.0,
+            photon_energy_eV=10_000.0,
             probe_photon_count=1_000,
             exposure_time_s=0.1,
-            mass_attenuation_m2_kg=0.0,
+            mass_attenuation_m2_per_kg=0.0,
             tomography_angle_deg=0.0,
         )
 
@@ -410,10 +410,10 @@ class TestProductRoundTrip:
         assert a.name == b.name
         assert a.comments == b.comments
         assert a.detector_distance_m == pytest.approx(b.detector_distance_m)
-        assert a.probe_energy_eV == pytest.approx(b.probe_energy_eV)
+        assert a.photon_energy_eV == pytest.approx(b.photon_energy_eV)
         assert a.probe_photon_count == pytest.approx(b.probe_photon_count)
         assert a.exposure_time_s == pytest.approx(b.exposure_time_s)
-        assert a.mass_attenuation_m2_kg == pytest.approx(b.mass_attenuation_m2_kg)
+        assert a.mass_attenuation_m2_per_kg == pytest.approx(b.mass_attenuation_m2_per_kg)
         assert a.tomography_angle_deg == pytest.approx(b.tomography_angle_deg)
         assert a.focus_object_distance_m == pytest.approx(b.focus_object_distance_m)
         assert a.tilt_angle_deg == pytest.approx(b.tilt_angle_deg)
@@ -428,6 +428,37 @@ class TestProductRoundTrip:
         loaded = load_product(file)
 
         self._assert_metadata_equal(loaded.metadata, original.metadata)
+
+    def test_reads_the_legacy_photon_energy_attribute(self, tmp_path: Path) -> None:
+        """A product written before the quantity took its X-ray name must still open.
+
+        load_product reads the attribute by direct subscript, so without the fallback
+        every pre-rename file would raise KeyError rather than lose one field.
+        """
+        original = _make_product()
+        file = tmp_path / 'product.h5'
+        save_product(file, original)
+
+        with h5py.File(file, 'r+') as h5_file:
+            energy = h5_file.attrs[ProductFileKeys.PHOTON_ENERGY]
+            del h5_file.attrs[ProductFileKeys.PHOTON_ENERGY]
+            h5_file.attrs['probe_energy_eV'] = energy
+
+        loaded = load_product(file)
+
+        assert loaded.metadata.photon_energy_eV == pytest.approx(original.metadata.photon_energy_eV)
+
+    def test_missing_photon_energy_raises_rather_than_defaulting(self, tmp_path: Path) -> None:
+        """Every wavelength downstream follows from it, so zero is not a safe default."""
+        original = _make_product()
+        file = tmp_path / 'product.h5'
+        save_product(file, original)
+
+        with h5py.File(file, 'r+') as h5_file:
+            del h5_file.attrs[ProductFileKeys.PHOTON_ENERGY]
+
+        with pytest.raises(KeyError, match='photon_energy_eV'):
+            load_product(file)
 
     def test_probe_array_preserved(self, tmp_path: Path) -> None:
         original = _make_product()
@@ -675,7 +706,7 @@ _TRAINING_DATA_KEYS: Final[set[str]] = {
     'object_pixel_width_m',
     'object_pixel_height_m',
     'detector_object_distance_m',
-    'probe_energy_eV',
+    'photon_energy_eV',
 }
 
 _PTYCHOPINN_NPZ_KEYS: Final[set[str]] = {
@@ -1117,13 +1148,13 @@ DISTINCTIVE_METADATA: Final[dict[str, Any]] = {
     'name': 'round-trip product',
     'comments': 'every field set away from its default',
     'detector_distance_m': 2.25,
-    'probe_energy_eV': 8551.0,
+    'photon_energy_eV': 8551.0,
     # Fractional, and deliberately small: an int() cast anywhere in the path truncates
     # it. A realistic count like 1.3e8 would hide the same truncation, because dropping
     # 0.5 from it is a 4e-9 relative change and pytest.approx tolerates 1e-6 by default.
     'probe_photon_count': 1234.5,
     'exposure_time_s': 0.05,
-    'mass_attenuation_m2_kg': 3.75,
+    'mass_attenuation_m2_per_kg': 3.75,
     'tomography_angle_deg': -90.0461,
     'focus_object_distance_m': -2.5e-3,
     'tilt_angle_deg': 61.0,
@@ -1335,7 +1366,7 @@ def test_legacy_npz_without_the_new_keys_still_loads(tmp_path: Path) -> None:
     # `object`, which mypy then matches against every savez parameter.
     legacy_keys: dict[str, Any] = {
         NPZProductFileIO.DETECTOR_OBJECT_DISTANCE: 1.5,
-        NPZProductFileIO.PROBE_ENERGY: 10_000.0,
+        NPZProductFileIO.PHOTON_ENERGY: 10_000.0,
         NPZProductFileIO.PROBE_POSITION_INDEXES: numpy.arange(2),
         NPZProductFileIO.PROBE_POSITION_X: numpy.zeros(2),
         NPZProductFileIO.PROBE_POSITION_Y: numpy.zeros(2),

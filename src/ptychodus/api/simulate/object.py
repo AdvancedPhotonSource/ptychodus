@@ -62,7 +62,7 @@ def generate_paganin_object(
     assembled_data: AssembledDiffractionData,
     probe_positions: Iterable[ProbePosition],
     *,
-    probe_wavelength_m: float,
+    photon_wavelength_m: float,
     propagation_distance_m: float,
     delta_over_beta: float,
     small_value: float = 1.0e-12,
@@ -99,7 +99,7 @@ def generate_paganin_object(
     K2 = numpy.square(KX) + numpy.square(KY)  # noqa: N806
 
     filter_denominator = (
-        1.0 + delta_over_beta * propagation_distance_m * probe_wavelength_m * K2 / (4 * numpy.pi)
+        1.0 + delta_over_beta * propagation_distance_m * photon_wavelength_m * K2 / (4 * numpy.pi)
     )
     filtered = numpy.real(numpy.asarray(ifft2(fft2(intensity_normalized) / filter_denominator)))
     filtered = numpy.clip(filtered, small_value, None)

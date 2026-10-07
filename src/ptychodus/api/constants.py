@@ -21,9 +21,11 @@ PLANCK_CONSTANT_J_PER_HZ: Final[float] = 6.62607015e-34
 # Unit Enums
 # All physical quantities in api/ are stored in base SI units (m, s, J, rad, ...) with an
 # explicit unit suffix on the identifier (_m, _s, _J, _rad, ...); eV, deg, and px are
-# the only non-SI suffixes allowed by convention. A rate spells its unit out as _per_s
-# rather than _Hz, so that one quantity carries one name wherever it is derived, mapped
-# or measured, and so that the name does not trip the naming lints. The enums below
+# the only non-SI suffixes allowed by convention. A compound unit reads
+# <numerator>_per_<denominator>, with multiplied units joined by _ within either part and
+# the numerator omitted when it is dimensionless: m2_per_kg, J_per_m2, rad_per_m, per_s,
+# per_s_m2. A bare _ never means division, and a rate is never spelled _Hz -- so that one
+# quantity carries one name wherever it is derived, mapped or measured. The enums below
 # convert to and from those base units at the boundaries -- file readers on the way in,
 # the GUI on the way out.
 

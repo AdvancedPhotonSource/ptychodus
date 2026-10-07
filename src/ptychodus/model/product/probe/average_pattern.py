@@ -34,7 +34,7 @@ class AveragePatternProbeBuilder(ProbeSequenceBuilder):
             generate_average_pattern_probe(
                 geometry_provider.get_probe_geometry(),
                 self._dataset.get_assembled_data(),
-                probe_wavelength_m=geometry_provider.probe_wavelength_m,
+                photon_wavelength_m=geometry_provider.photon_wavelength_m,
                 detector_distance_m=geometry_provider.detector_distance_m,
                 far_field=geometry_provider.far_field,
             ),

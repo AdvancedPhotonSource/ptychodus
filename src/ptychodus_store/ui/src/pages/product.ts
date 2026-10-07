@@ -30,7 +30,7 @@ export async function mountProduct(root: HTMLElement): Promise<void> {
     [
       { header: 'Name', render: (p) => p.name ?? p.uuid.slice(0, 8) },
       { header: 'Detector-Object\nDistance [m]', render: (p) => fmt(p.detector_distance_m) },
-      { header: 'Probe Energy\n[keV]', render: (p) => fmt(scale(p.probe_energy_eV, 1e-3)) },
+      { header: 'Photon Energy\n[keV]', render: (p) => fmt(scale(p.photon_energy_eV, 1e-3)) },
       { header: 'Probe Photon\nCount', render: (p) => fmt(p.probe_photon_count) },
       { header: 'Pixel Width\n[nm]', render: (p) => fmt(scale(p.object_pixel_width_m, 1e9)) },
       { header: 'Pixel Height\n[nm]', render: (p) => fmt(scale(p.object_pixel_height_m, 1e9)) },
@@ -63,7 +63,7 @@ function showDetail(host: HTMLElement, p: ProductRead): void {
     ['UUID', p.uuid],
     ['State', p.ingest_state],
     ['Detector-Object Distance [m]', fmt(p.detector_distance_m)],
-    ['Probe Energy [keV]', fmt(scale(p.probe_energy_eV, 1e-3))],
+    ['Photon Energy [keV]', fmt(scale(p.photon_energy_eV, 1e-3))],
     ['Probe Photon Count', fmt(p.probe_photon_count)],
     ['Probe Modes', fmt(p.probe_modes)],
     ['Probe Shape [px]', shape(p.probe_height_px, p.probe_width_px)],

@@ -78,7 +78,7 @@ class TrainingDataDiffractionFileReader(DiffractionFileReader):
             detector_distance_m = _read_scalar(
                 h5_file, TrainingDataFileKeys.DETECTOR_OBJECT_DISTANCE
             )
-            probe_energy_eV = _read_scalar(h5_file, TrainingDataFileKeys.PROBE_ENERGY)  # noqa: N806
+            photon_energy_eV = _read_scalar(h5_file, TrainingDataFileKeys.PHOTON_ENERGY)  # noqa: N806
 
         num_patterns, detector_height, detector_width = patterns.shape
         detector_extent = ImageExtent(width_px=detector_width, height_px=detector_height)
@@ -90,7 +90,7 @@ class TrainingDataDiffractionFileReader(DiffractionFileReader):
             detector_pixel_geometry = compute_far_field_pixel_geometry(
                 object_geometry.get_pixel_geometry(),
                 detector_extent,
-                wavelength_m=energy_eV_to_wavelength_m(probe_energy_eV),
+                wavelength_m=energy_eV_to_wavelength_m(photon_energy_eV),
                 propagation_distance_m=detector_distance_m,
             )
         except ZeroDivisionError:
@@ -104,7 +104,7 @@ class TrainingDataDiffractionFileReader(DiffractionFileReader):
             detector_extent=detector_extent,
             detector_distance_m=detector_distance_m,
             detector_pixel_geometry=detector_pixel_geometry,
-            probe_energy_eV=probe_energy_eV,
+            photon_energy_eV=photon_energy_eV,
             file_path=file_path,
         )
 
@@ -133,16 +133,16 @@ class TrainingDataProductFileReader(ProductFileReader):
             detector_distance_m = _read_scalar(
                 h5_file, TrainingDataFileKeys.DETECTOR_OBJECT_DISTANCE
             )
-            probe_energy_eV = _read_scalar(h5_file, TrainingDataFileKeys.PROBE_ENERGY)  # noqa: N806
+            photon_energy_eV = _read_scalar(h5_file, TrainingDataFileKeys.PHOTON_ENERGY)  # noqa: N806
 
         metadata = ProductMetadata(
             name=file_path.stem,
             comments='',
             detector_distance_m=detector_distance_m,
-            probe_energy_eV=probe_energy_eV,
+            photon_energy_eV=photon_energy_eV,
             probe_photon_count=0.0,  # not included in file
             exposure_time_s=0.0,  # not included in file
-            mass_attenuation_m2_kg=0.0,  # not included in file
+            mass_attenuation_m2_per_kg=0.0,  # not included in file
             tomography_angle_deg=0.0,  # not included in file
         )
 

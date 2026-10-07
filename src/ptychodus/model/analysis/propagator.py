@@ -30,7 +30,7 @@ class ProbePropagator:
     def propagate(self, product_index: int) -> PropagatedWavefield:
         item = self._repository[product_index]
         probes = item.get_probe_item().get_probes()
-        wavelength_m = item.get_geometry().probe_wavelength_m
+        wavelength_m = item.get_geometry().photon_wavelength_m
 
         # OPR caveat: propagate only the first coherent mode and discard any
         # per-position weighting. Matches the long-standing behavior; warn so

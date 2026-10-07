@@ -30,19 +30,19 @@ from ptychodus.api.product import Product, ProductMetadata
 
 def _make_metadata(
     *,
-    probe_energy_eV: float = 10000.0,  # noqa: N803
+    photon_energy_eV: float = 10000.0,  # noqa: N803
     probe_photon_count: float = 1.0e9,
     exposure_time_s: float = 0.1,
-    mass_attenuation_m2_kg: float = 5.0,
+    mass_attenuation_m2_per_kg: float = 5.0,
 ) -> ProductMetadata:
     return ProductMetadata(
         name='test',
         comments='',
         detector_distance_m=1.0,
-        probe_energy_eV=probe_energy_eV,
+        photon_energy_eV=photon_energy_eV,
         probe_photon_count=probe_photon_count,
         exposure_time_s=exposure_time_s,
-        mass_attenuation_m2_kg=mass_attenuation_m2_kg,
+        mass_attenuation_m2_per_kg=mass_attenuation_m2_per_kg,
         tomography_angle_deg=0.0,
     )
 
@@ -102,8 +102,8 @@ def _make_illumination_map(
     pixel_size_m: float = 2.0e-7,
     photon_energy_J: float = 1.6e-15,  # noqa: N803
     exposure_time_s: float = 0.5,
-    mass_attenuation_m2_kg: float = 3.0,
-    photon_flux_per_s: float = 1.0e10,  # noqa: N803
+    mass_attenuation_m2_per_kg: float = 3.0,
+    photon_flux_per_s: float = 1.0e10,
 ) -> IlluminationMap:
     if photon_number is None:
         photon_number = numpy.array([[1.0, 2.0], [3.0, 4.0]])
@@ -112,7 +112,7 @@ def _make_illumination_map(
         photon_flux_per_s=photon_flux_per_s,
         photon_energy_J=photon_energy_J,
         exposure_time_s=exposure_time_s,
-        mass_attenuation_m2_kg=mass_attenuation_m2_kg,
+        mass_attenuation_m2_per_kg=mass_attenuation_m2_per_kg,
         pixel_geometry=PixelGeometry(width_m=pixel_size_m, height_m=pixel_size_m),
         center=ObjectCenter(x_m=0.0, y_m=0.0),
     )
@@ -122,11 +122,11 @@ class TestIlluminationMap:
     def test_photon_fluence_divides_by_pixel_area(self) -> None:
         m = _make_illumination_map(pixel_size_m=2.0e-7)  # area = 4e-14 m^2
         expected = m.photon_number / 4.0e-14
-        numpy.testing.assert_allclose(m.photon_fluence_1_m2, expected)
+        numpy.testing.assert_allclose(m.photon_fluence_per_m2, expected)
 
     def test_photon_fluence_rate_divides_by_exposure_time(self) -> None:
         m = _make_illumination_map(exposure_time_s=0.5)
-        numpy.testing.assert_allclose(m.photon_fluence_rate_per_s_m2, m.photon_fluence_1_m2 / 0.5)
+        numpy.testing.assert_allclose(m.photon_fluence_rate_per_s_m2, m.photon_fluence_per_m2 / 0.5)
 
     def test_save_npz_writes_the_documented_keys(self, tmp_path: Path) -> None:
         """The archive is an external interface: these names reach users' own scripts,
@@ -138,12 +138,12 @@ class TestIlluminationMap:
         with numpy.load(file_path) as contents:
             assert set(contents.files) == {
                 'photon_number',
-                'photon_fluence_1_m2',
+                'photon_fluence_per_m2',
                 'photon_fluence_rate_per_s_m2',
-                'energy_fluence_J_m2',
-                'energy_fluence_rate_W_m2',
+                'energy_fluence_J_per_m2',
+                'energy_fluence_rate_W_per_m2',
                 'dose_Gy',
-                'dose_rate_Gy_s',
+                'dose_rate_Gy_per_s',
                 'pixel_height_m',
                 'pixel_width_m',
                 'center_x_m',
@@ -155,19 +155,15 @@ class TestIlluminationMap:
 
     def test_energy_fluence_multiplies_by_photon_energy(self) -> None:
         m = _make_illumination_map(photon_energy_J=1.6e-15)
-        numpy.testing.assert_allclose(m.energy_fluence_J_m2, m.photon_fluence_1_m2 * 1.6e-15)
-
-    def test_energy_fluence_rate_equals_intensity_alias(self) -> None:
-        m = _make_illumination_map()
-        numpy.testing.assert_array_equal(m.intensity_W_m2, m.energy_fluence_rate_W_m2)
+        numpy.testing.assert_allclose(m.energy_fluence_J_per_m2, m.photon_fluence_per_m2 * 1.6e-15)
 
     def test_dose_Gy_equals_energy_fluence_times_mass_attenuation(self) -> None:  # noqa: N802
-        m = _make_illumination_map(mass_attenuation_m2_kg=3.0)
-        numpy.testing.assert_allclose(m.dose_Gy, m.energy_fluence_J_m2 * 3.0)
+        m = _make_illumination_map(mass_attenuation_m2_per_kg=3.0)
+        numpy.testing.assert_allclose(m.dose_Gy, m.energy_fluence_J_per_m2 * 3.0)
 
     def test_dose_rate_consistent_with_dose_over_exposure_time(self) -> None:
         m = _make_illumination_map(exposure_time_s=0.5)
-        numpy.testing.assert_allclose(m.dose_rate_Gy_s, m.dose_Gy / 0.5)
+        numpy.testing.assert_allclose(m.dose_rate_Gy_per_s, m.dose_Gy / 0.5)
 
 
 # ---------------------------------------------------------------------------
@@ -272,10 +268,10 @@ class TestComputeIlluminationMap:
 
     def test_metadata_passthrough(self) -> None:
         metadata = _make_metadata(
-            probe_energy_eV=8000.0,
+            photon_energy_eV=8000.0,
             probe_photon_count=2.0e9,
             exposure_time_s=0.25,
-            mass_attenuation_m2_kg=7.5,
+            mass_attenuation_m2_per_kg=7.5,
         )
         probe = _gaussian_probe(8, 8)
         pixel_size_m = 1.0e-7
@@ -289,8 +285,8 @@ class TestComputeIlluminationMap:
         )
         m = compute_illumination_map(product)
         assert m.exposure_time_s == 0.25
-        assert m.mass_attenuation_m2_kg == 7.5
-        assert m.photon_energy_J == pytest.approx(metadata.probe_energy_J)
+        assert m.mass_attenuation_m2_per_kg == 7.5
+        assert m.photon_energy_J == pytest.approx(metadata.photon_energy_J)
         assert m.photon_flux_per_s == pytest.approx(2.0e9 / 0.25)
         assert m.pixel_geometry == PixelGeometry(width_m=pixel_size_m, height_m=pixel_size_m)
         assert m.center == ObjectCenter(x_m=3.0e-7, y_m=-2.0e-7)

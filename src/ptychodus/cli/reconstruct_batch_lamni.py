@@ -302,13 +302,13 @@ def _reconstruct_one_scan(
         '--detector-distance-m',
         level=logging.DEBUG,
     )
-    probe_energy_eV = resolve_quantity(  # noqa: N806
+    photon_energy_eV = resolve_quantity(  # noqa: N806
         logger,
-        'Probe energy (eV)',
-        args.probe_energy_eV,
-        metadata.probe_energy_eV,
+        'Photon energy (eV)',
+        args.photon_energy_eV,
+        metadata.photon_energy_eV,
         None,
-        '--probe-energy-eV',
+        '--photon-energy-eV',
         level=logging.DEBUG,
     )
     if metadata.detector_pixel_geometry is None:
@@ -366,11 +366,11 @@ def _reconstruct_one_scan(
             [*transform_probe_positions(measured_positions, transform)]
         )
 
-    probe_wavelength_m = energy_eV_to_wavelength_m(probe_energy_eV)
+    photon_wavelength_m = energy_eV_to_wavelength_m(photon_energy_eV)
     probe_geometry = ProbeGeometry.from_far_field(
         assembled_data.get_pixel_geometry(),
         assembled_data.get_image_extent(),
-        wavelength_m=probe_wavelength_m,
+        wavelength_m=photon_wavelength_m,
         distance_m=detector_distance_m,
     )
 
@@ -382,7 +382,7 @@ def _reconstruct_one_scan(
         probe = generate_fresnel_zone_plate_probe(
             probe_geometry,
             zone_plate,
-            probe_wavelength_m=probe_wavelength_m,
+            photon_wavelength_m=photon_wavelength_m,
             defocus_distance_m=args.fzp_defocus_m,
         )
     else:
@@ -422,10 +422,10 @@ def _reconstruct_one_scan(
             name=f'scan{record.scan_no:05d}_{record.label}',
             comments=str(record),
             detector_distance_m=detector_distance_m,
-            probe_energy_eV=probe_energy_eV,
+            photon_energy_eV=photon_energy_eV,
             probe_photon_count=probe_photon_count,
             exposure_time_s=float(metadata.exposure_time_s or 0.0),
-            mass_attenuation_m2_kg=0.0,
+            mass_attenuation_m2_per_kg=0.0,
             tomography_angle_deg=record.encoder_angle_deg,
         ),
         probe_positions=positions,
@@ -568,10 +568,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help='Sample-to-detector distance. Overrides the file.',
     )
     parser.add_argument(
-        '--probe-energy-eV',
+        '--photon-energy-eV',
         type=float,
         default=None,
-        help='Probe energy in electron volts. Overrides the file.',
+        help='Photon energy in electron volts. Overrides the file.',
     )
     parser.add_argument(
         '--min-total-counts',

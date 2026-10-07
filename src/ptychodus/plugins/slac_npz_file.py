@@ -23,7 +23,7 @@ from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 logger = logging.getLogger(__name__)
 
 DEFAULT_DETECTOR_DISTANCE_M = 0.75
-DEFAULT_PROBE_ENERGY_EV = 8000.0
+DEFAULT_PHOTON_ENERGY_EV = 8000.0
 DEFAULT_DETECTOR_PIXEL_SIZE_M = 75e-6
 PIXEL_COORDINATE_THRESHOLD_M = 1e-3
 
@@ -83,9 +83,11 @@ class SLACProductFileReader(ProductFileReader):
             detector_distance_m = _get_scalar(
                 npz_file, 'detector_distance_m', DEFAULT_DETECTOR_DISTANCE_M
             )
-            probe_energy_ev = _get_scalar(npz_file, 'probe_energy_eV', DEFAULT_PROBE_ENERGY_EV)
-            if probe_energy_ev == DEFAULT_PROBE_ENERGY_EV:
-                probe_energy_ev = _get_scalar(npz_file, 'probe_energy_ev', DEFAULT_PROBE_ENERGY_EV)
+            photon_energy_ev = _get_scalar(npz_file, 'photon_energy_eV', DEFAULT_PHOTON_ENERGY_EV)
+            if photon_energy_ev == DEFAULT_PHOTON_ENERGY_EV:
+                photon_energy_ev = _get_scalar(
+                    npz_file, 'probe_energy_ev', DEFAULT_PHOTON_ENERGY_EV
+                )
             detector_pixel_size_m = _get_scalar(
                 npz_file, 'detector_pixel_size_m', DEFAULT_DETECTOR_PIXEL_SIZE_M
             )
@@ -98,7 +100,7 @@ class SLACProductFileReader(ProductFileReader):
             detector_width_m = detector_pixel_size_m * width_px
             pixel_size_m = 0.0
             if detector_width_m > 0.0:
-                pixel_size_m = energy_eV_to_wavelength_m(probe_energy_ev) * detector_distance_m
+                pixel_size_m = energy_eV_to_wavelength_m(photon_energy_ev) * detector_distance_m
                 pixel_size_m /= detector_width_m
 
             if pixel_size_m > 0.0:
@@ -111,10 +113,10 @@ class SLACProductFileReader(ProductFileReader):
             name=file_path.stem,
             comments='',
             detector_distance_m=detector_distance_m,
-            probe_energy_eV=probe_energy_ev,
+            photon_energy_eV=photon_energy_ev,
             probe_photon_count=0.0,  # not included in file
             exposure_time_s=0.0,  # not included in file
-            mass_attenuation_m2_kg=0.0,  # not included in file
+            mass_attenuation_m2_per_kg=0.0,  # not included in file
             tomography_angle_deg=0.0,  # not included in file
         )
 

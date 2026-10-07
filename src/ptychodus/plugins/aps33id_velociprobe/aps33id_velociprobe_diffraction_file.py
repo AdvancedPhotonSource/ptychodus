@@ -260,7 +260,7 @@ class VelociprobeDiffractionFileReader(DiffractionFileReader):
                 detector_specific.x_pixels_in_detector,
                 detector_specific.y_pixels_in_detector,
             )
-            probe_energy_eV = detector_specific.photon_energy_eV  # noqa: N806
+            photon_energy_eV = detector_specific.photon_energy_eV  # noqa: N806
 
             # Taken from the arrays themselves. Dividing the declared total by the
             # nominal per-array length undercounts whenever the two disagree -- a real
@@ -277,7 +277,7 @@ class VelociprobeDiffractionFileReader(DiffractionFileReader):
                 detector_extent=detector_extent,
                 detector_pixel_geometry=detector_pixel_geometry,
                 beam_center=beam_center,
-                probe_energy_eV=probe_energy_eV,
+                photon_energy_eV=photon_energy_eV,
                 file_path=file_path,
             )
             contents_tree = self._tree_builder.build(h5_file)

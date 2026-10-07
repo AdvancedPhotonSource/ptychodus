@@ -72,10 +72,10 @@ def _make_reconstruct_input() -> ReconstructInput:
             name='fixture',
             comments='',
             detector_distance_m=2.0,
-            probe_energy_eV=10000.0,
+            photon_energy_eV=10000.0,
             probe_photon_count=0.0,
             exposure_time_s=0.0,
-            mass_attenuation_m2_kg=0.0,
+            mass_attenuation_m2_per_kg=0.0,
             tomography_angle_deg=0.0,
         ),
         probe_positions=ProbePositionSequence(

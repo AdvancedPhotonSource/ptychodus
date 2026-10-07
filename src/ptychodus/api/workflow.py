@@ -247,10 +247,10 @@ class WorkflowAPI(ABC):
         comments: str = '',
         detector_distance_m: float | None = None,
         focus_object_distance_m: float | None = None,
-        probe_energy_eV: float | None = None,  # noqa: N803
+        photon_energy_eV: float | None = None,  # noqa: N803
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
-        mass_attenuation_m2_kg: float | None = None,
+        mass_attenuation_m2_per_kg: float | None = None,
         tomography_angle_deg: float | None = None,
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,

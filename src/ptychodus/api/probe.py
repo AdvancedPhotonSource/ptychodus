@@ -827,7 +827,7 @@ class ProbeGeometryProvider(ABC):
 
     @property
     @abstractmethod
-    def probe_wavelength_m(self) -> float:
+    def photon_wavelength_m(self) -> float:
         pass
 
     @property

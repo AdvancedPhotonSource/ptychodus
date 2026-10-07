@@ -282,7 +282,7 @@ def align_task_options_with_product(
     )
     _overwrite(object_options, 'position_origin_coords', [0.0, 0.0])
 
-    _overwrite(aligned.data_options, 'wavelength_m', metadata.probe_wavelength_m)
+    _overwrite(aligned.data_options, 'wavelength_m', metadata.photon_wavelength_m)
 
     # Near field: pty-chi propagates in the equivalent parallel-beam geometry, so a
     # cone beam contributes its demagnified distance. Without a focusing optic the

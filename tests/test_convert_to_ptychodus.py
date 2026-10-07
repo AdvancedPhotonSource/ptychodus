@@ -86,10 +86,10 @@ def _make_metadata() -> ProductMetadata:
         name='original',
         comments='unchanged',
         detector_distance_m=0.0,
-        probe_energy_eV=10_000.0,
+        photon_energy_eV=10_000.0,
         probe_photon_count=0.0,
         exposure_time_s=0.0,
-        mass_attenuation_m2_kg=0.0,
+        mass_attenuation_m2_per_kg=0.0,
         tomography_angle_deg=0.0,
     )
 
@@ -139,10 +139,10 @@ def _args(**overrides: object) -> argparse.Namespace:
     namespace = argparse.Namespace(
         product_name=None,
         detector_distance_m=None,
-        probe_energy_eV=None,
+        photon_energy_eV=None,
         probe_photon_count=None,
         exposure_time_s=None,
-        mass_attenuation_m2_kg=None,
+        mass_attenuation_m2_per_kg=None,
         tomography_angle_deg=None,
         override_object=None,
         override_object_type=PLUGIN_NAME,
@@ -174,7 +174,7 @@ def test_product_name_rewrites_only_the_name(registry: PluginRegistry) -> None:
 
     assert converted.metadata.name == 'renamed'
     assert converted.metadata.comments == product.metadata.comments
-    assert converted.metadata.probe_energy_eV == product.metadata.probe_energy_eV
+    assert converted.metadata.photon_energy_eV == product.metadata.photon_energy_eV
     assert converted.object_ is product.object_
     assert converted.probes is product.probes
     assert converted.probe_positions is product.probe_positions
@@ -198,7 +198,7 @@ def test_metadata_arguments_that_were_not_given_leave_the_file_value() -> None:
 
     converted = _apply_metadata_overrides(metadata, _args(detector_distance_m=2.335))
 
-    assert converted.probe_energy_eV == metadata.probe_energy_eV
+    assert converted.photon_energy_eV == metadata.photon_energy_eV
     assert converted.comments == metadata.comments
     assert converted.tomography_angle_deg == metadata.tomography_angle_deg
 
@@ -407,7 +407,7 @@ def _assembled(num_patterns: int = 2) -> AssembledDiffractionData:
 
 def _nxs_parameters() -> FoldSliceParameters:
     return FoldSliceParameters(
-        probe_wavelength_m=NXS_WAVELENGTH_M,
+        photon_wavelength_m=NXS_WAVELENGTH_M,
         object_pixel_size_m=NXS_OBJECT_PIXEL_SIZE_M,
         tomography_angle_deg=17.5,
     )
@@ -416,19 +416,19 @@ def _nxs_parameters() -> FoldSliceParameters:
 def test_the_parameter_file_supplies_the_geometry() -> None:
     geometry = _resolve_built_product_geometry(_args(), _nxs_parameters(), _assembled())
 
-    assert geometry.probe_energy_eV == pytest.approx(8000.0)
+    assert geometry.photon_energy_eV == pytest.approx(8000.0)
     assert geometry.detector_distance_m == pytest.approx(NXS_DETECTOR_DISTANCE_M)
     assert geometry.tomography_angle_deg == pytest.approx(17.5)
 
 
 def test_the_command_line_overrides_the_parameter_file() -> None:
     geometry = _resolve_built_product_geometry(
-        _args(detector_distance_m=1.5, probe_energy_eV=12_000.0, tomography_angle_deg=90.0),
+        _args(detector_distance_m=1.5, photon_energy_eV=12_000.0, tomography_angle_deg=90.0),
         _nxs_parameters(),
         _assembled(),
     )
 
-    assert geometry.probe_energy_eV == pytest.approx(12_000.0)
+    assert geometry.photon_energy_eV == pytest.approx(12_000.0)
     assert geometry.detector_distance_m == pytest.approx(1.5)
     assert geometry.tomography_angle_deg == pytest.approx(90.0)
 
@@ -437,7 +437,7 @@ def test_an_overridden_energy_also_moves_the_derived_distance() -> None:
     # The distance comes out of the same relation the energy enters, so the two cannot be
     # resolved independently: a hand-given energy has to feed the derivation.
     geometry = _resolve_built_product_geometry(
-        _args(probe_energy_eV=16_000.0), _nxs_parameters(), _assembled()
+        _args(photon_energy_eV=16_000.0), _nxs_parameters(), _assembled()
     )
 
     assert geometry.detector_distance_m == pytest.approx(2.0 * NXS_DETECTOR_DISTANCE_M, rel=1e-4)
@@ -449,7 +449,7 @@ def test_a_missing_wavelength_names_the_energy_argument() -> None:
 
 
 def test_a_missing_object_pixel_size_names_the_distance_argument() -> None:
-    parameters = FoldSliceParameters(probe_wavelength_m=NXS_WAVELENGTH_M)
+    parameters = FoldSliceParameters(photon_wavelength_m=NXS_WAVELENGTH_M)
 
     with pytest.raises(ValueError, match='--detector-distance-m'):
         _resolve_built_product_geometry(_args(), parameters, _assembled())
@@ -457,7 +457,7 @@ def test_a_missing_object_pixel_size_names_the_distance_argument() -> None:
 
 def test_an_unrecorded_tomography_angle_is_zero() -> None:
     parameters = FoldSliceParameters(
-        probe_wavelength_m=NXS_WAVELENGTH_M, object_pixel_size_m=NXS_OBJECT_PIXEL_SIZE_M
+        photon_wavelength_m=NXS_WAVELENGTH_M, object_pixel_size_m=NXS_OBJECT_PIXEL_SIZE_M
     )
 
     geometry = _resolve_built_product_geometry(_args(), parameters, _assembled())

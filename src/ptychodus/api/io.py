@@ -211,10 +211,10 @@ class ProductFileKeys(StrEnum):
     COMMENTS = 'comments'
     DETECTOR_OBJECT_DISTANCE = 'detector_object_distance_m'
     FOCUS_OBJECT_DISTANCE = 'focus_object_distance_m'
-    PROBE_ENERGY = 'probe_energy_eV'
+    PHOTON_ENERGY = 'photon_energy_eV'
     PROBE_PHOTON_COUNT = 'probe_photon_count'
     EXPOSURE_TIME = 'exposure_time_s'
-    MASS_ATTENUATION = 'mass_attenuation_m2_kg'
+    MASS_ATTENUATION = 'mass_attenuation_m2_per_kg'
     TOMOGRAPHY_ANGLE = 'tomography_angle_deg'
     TILT_ANGLE = 'tilt_angle_deg'
     POLARIZATION = 'polarization'
@@ -237,6 +237,28 @@ class ProductFileKeys(StrEnum):
     LOSS_VALUES = 'loss_values'
 
 
+def _read_photon_energy_eV(h5_file: h5py.File) -> float:  # noqa: N802
+    """Read the photon energy, accepting the pre-rename attribute name.
+
+    Unlike the other product attributes this one has no sensible default -- every
+    wavelength downstream follows from it -- so a missing value raises rather than
+    silently becoming zero.
+    """
+    # A frozen historical spelling rather than part of the key vocabulary: it is never
+    # written, so it has no place in ProductFileKeys.
+    legacy_key = 'probe_energy_eV'
+
+    for key in (ProductFileKeys.PHOTON_ENERGY, legacy_key):
+        try:
+            return float(h5_file.attrs[key])
+        except KeyError:
+            continue
+
+    raise KeyError(
+        f'Product is missing {ProductFileKeys.PHOTON_ENERGY!s} (and the legacy {legacy_key}).'
+    )
+
+
 def load_product(file: Path) -> Product:
     """Load a data product from an HDF5 file written by :func:`save_product`."""
     point_list: list[ProbePosition] = []
@@ -246,7 +268,7 @@ def load_product(file: Path) -> Product:
         comments = str(h5_file.attrs.get(ProductFileKeys.COMMENTS, ''))
         probe_photon_count = float(h5_file.attrs.get(ProductFileKeys.PROBE_PHOTON_COUNT, 0.0))
         exposure_time_s = float(h5_file.attrs.get(ProductFileKeys.EXPOSURE_TIME, 0.0))
-        mass_attenuation_m2_kg = float(h5_file.attrs.get(ProductFileKeys.MASS_ATTENUATION, 0.0))
+        mass_attenuation_m2_per_kg = float(h5_file.attrs.get(ProductFileKeys.MASS_ATTENUATION, 0.0))
         tomography_angle_deg = float(h5_file.attrs.get(ProductFileKeys.TOMOGRAPHY_ANGLE, 0.0))
         tilt_angle_deg = float(h5_file.attrs.get(ProductFileKeys.TILT_ANGLE, 0.0))
         focus_object_distance_m = float(
@@ -273,10 +295,10 @@ def load_product(file: Path) -> Product:
             name=name,
             comments=comments,
             detector_distance_m=float(h5_file.attrs[ProductFileKeys.DETECTOR_OBJECT_DISTANCE]),
-            probe_energy_eV=float(h5_file.attrs[ProductFileKeys.PROBE_ENERGY]),
+            photon_energy_eV=_read_photon_energy_eV(h5_file),
             probe_photon_count=probe_photon_count,
             exposure_time_s=exposure_time_s,
-            mass_attenuation_m2_kg=mass_attenuation_m2_kg,
+            mass_attenuation_m2_per_kg=mass_attenuation_m2_per_kg,
             tomography_angle_deg=tomography_angle_deg,
             focus_object_distance_m=focus_object_distance_m,
             tilt_angle_deg=tilt_angle_deg,
@@ -423,10 +445,10 @@ def save_product(file: Path, product: Product) -> None:
         h5_file.attrs[ProductFileKeys.NAME] = metadata.name
         h5_file.attrs[ProductFileKeys.COMMENTS] = metadata.comments
         h5_file.attrs[ProductFileKeys.DETECTOR_OBJECT_DISTANCE] = metadata.detector_distance_m
-        h5_file.attrs[ProductFileKeys.PROBE_ENERGY] = metadata.probe_energy_eV
+        h5_file.attrs[ProductFileKeys.PHOTON_ENERGY] = metadata.photon_energy_eV
         h5_file.attrs[ProductFileKeys.PROBE_PHOTON_COUNT] = metadata.probe_photon_count
         h5_file.attrs[ProductFileKeys.EXPOSURE_TIME] = metadata.exposure_time_s
-        h5_file.attrs[ProductFileKeys.MASS_ATTENUATION] = metadata.mass_attenuation_m2_kg
+        h5_file.attrs[ProductFileKeys.MASS_ATTENUATION] = metadata.mass_attenuation_m2_per_kg
         h5_file.attrs[ProductFileKeys.TOMOGRAPHY_ANGLE] = metadata.tomography_angle_deg
         h5_file.attrs[ProductFileKeys.FOCUS_OBJECT_DISTANCE] = metadata.focus_object_distance_m
         h5_file.attrs[ProductFileKeys.TILT_ANGLE] = metadata.tilt_angle_deg
@@ -618,7 +640,7 @@ class TrainingDataFileKeys(StrEnum):
     """HDF5 dataset names for the training data file."""
 
     DETECTOR_OBJECT_DISTANCE = 'detector_object_distance_m'
-    PROBE_ENERGY = 'probe_energy_eV'
+    PHOTON_ENERGY = 'photon_energy_eV'
     PATTERNS = 'patterns'
     BAD_PIXELS = 'bad_pixels'
     PROBE_ARRAY = 'probe'
@@ -706,4 +728,4 @@ def save_training_data(
         h5_file.create_dataset(
             TrainingDataFileKeys.DETECTOR_OBJECT_DISTANCE, data=metadata.detector_distance_m
         )
-        h5_file.create_dataset(TrainingDataFileKeys.PROBE_ENERGY, data=metadata.probe_energy_eV)
+        h5_file.create_dataset(TrainingDataFileKeys.PHOTON_ENERGY, data=metadata.photon_energy_eV)

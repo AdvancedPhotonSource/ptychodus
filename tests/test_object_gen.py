@@ -708,7 +708,7 @@ class TestPaganinObject:
             geometry,
             data,
             positions,
-            probe_wavelength_m=1.0e-10,
+            photon_wavelength_m=1.0e-10,
             propagation_distance_m=1.0,
             delta_over_beta=100.0,
         )
@@ -730,7 +730,7 @@ class TestPaganinObject:
             geometry,
             data,
             positions,
-            probe_wavelength_m=1.0e-10,
+            photon_wavelength_m=1.0e-10,
             propagation_distance_m=1.0,
             delta_over_beta=100.0,
         )
@@ -746,7 +746,7 @@ class TestPaganinObject:
                 geometry,
                 data,
                 positions,
-                probe_wavelength_m=1.0e-10,
+                photon_wavelength_m=1.0e-10,
                 propagation_distance_m=0.0,
                 delta_over_beta=100.0,
             )
@@ -758,7 +758,7 @@ class TestPaganinObject:
                 geometry,
                 data,
                 positions,
-                probe_wavelength_m=1.0e-10,
+                photon_wavelength_m=1.0e-10,
                 propagation_distance_m=1.0,
                 delta_over_beta=-1.0,
             )
@@ -772,7 +772,7 @@ class TestPaganinObject:
                 geometry,
                 data,
                 positions,
-                probe_wavelength_m=1.0e-10,
+                photon_wavelength_m=1.0e-10,
                 propagation_distance_m=1.0,
                 delta_over_beta=100.0,
             )
@@ -785,7 +785,7 @@ class TestPaganinObject:
             geometry,
             data,
             positions,
-            probe_wavelength_m=1.0e-10,
+            photon_wavelength_m=1.0e-10,
             propagation_distance_m=10.0,
             delta_over_beta=500.0,
         )
@@ -814,7 +814,7 @@ class TestPaganinObject:
             geometry,
             data,
             positions,
-            probe_wavelength_m=1.0e-10,
+            photon_wavelength_m=1.0e-10,
             propagation_distance_m=1.0e-14,
             delta_over_beta=delta_over_beta,
         )
@@ -840,7 +840,7 @@ class TestPaganinObject:
             geometry,
             data,
             positions,
-            probe_wavelength_m=1.0e-10,
+            photon_wavelength_m=1.0e-10,
             propagation_distance_m=1.0e-30,
             delta_over_beta=delta_over_beta,
         )

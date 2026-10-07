@@ -140,7 +140,7 @@ class LamNIDiffractionFileReader(DiffractionFileReader):
         num_patterns, detector_height, detector_width = data.shape
 
         beam_center: BeamCenter | None = None
-        probe_energy_eV: float | None = None  # noqa: N806
+        photon_energy_eV: float | None = None  # noqa: N806
 
         center_x_px = _read_attr(data.attrs, 'Center_x_pixel')
         center_y_px = _read_attr(data.attrs, 'Center_y_pixel')
@@ -153,7 +153,7 @@ class LamNIDiffractionFileReader(DiffractionFileReader):
         photon_energy_keV = _read_attr(data.attrs, 'Photon_energy_kev')  # noqa: N806
 
         if photon_energy_keV is not None:
-            probe_energy_eV = EnergyUnit.KILOELECTRONVOLT.to_electronvolts(  # noqa: N806
+            photon_energy_eV = EnergyUnit.KILOELECTRONVOLT.to_electronvolts(  # noqa: N806
                 photon_energy_keV
             )
 
@@ -167,7 +167,7 @@ class LamNIDiffractionFileReader(DiffractionFileReader):
             detector_extent=ImageExtent(detector_width, detector_height),
             detector_pixel_geometry=detector_pixel_geometry,
             beam_center=beam_center,
-            probe_energy_eV=probe_energy_eV,
+            photon_energy_eV=photon_energy_eV,
             exposure_time_s=exposure_time_s,
             file_path=file_path,
         )
@@ -195,7 +195,7 @@ class LamNIDiffractionFileReader(DiffractionFileReader):
             self.DETECTOR_PIXEL_SIZE_M, self.DETECTOR_PIXEL_SIZE_M
         )
         exposure_time_s: float | None = None
-        probe_energy_eV: float | None = None  # noqa: N806
+        photon_energy_eV: float | None = None  # noqa: N806
 
         try:
             distance_raw = float(h5_file['/entry/instrument/detector/detector_distance'][0])
@@ -217,7 +217,7 @@ class LamNIDiffractionFileReader(DiffractionFileReader):
                 width_m=_to_meters(x_pixel_raw, pixel_egu),
                 height_m=_to_meters(y_pixel_raw, pixel_egu),
             )
-            probe_energy_eV = _to_ev(energy_raw, energy_egu)  # noqa: N806
+            photon_energy_eV = _to_ev(energy_raw, energy_egu)  # noqa: N806
             exposure_time_s = exposure_raw
             beam_center = BeamCenter(int(round(beam_center_x)), int(round(beam_center_y)))
 
@@ -228,7 +228,7 @@ class LamNIDiffractionFileReader(DiffractionFileReader):
             detector_extent=ImageExtent(detector_width, detector_height),
             detector_pixel_geometry=detector_pixel_geometry,
             beam_center=beam_center,
-            probe_energy_eV=probe_energy_eV,
+            photon_energy_eV=photon_energy_eV,
             exposure_time_s=exposure_time_s,
             file_path=file_path,
         )

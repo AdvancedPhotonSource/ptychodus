@@ -101,7 +101,7 @@ def test_a_measured_parameter_file_yields_its_geometry(tmp_path: Path) -> None:
         _write(tmp_path / 'measured_para.hdf5', column_vectors=True, with_geometry=True)
     )
 
-    assert parameters.probe_wavelength_m == pytest.approx(WAVELENGTH_M)
+    assert parameters.photon_wavelength_m == pytest.approx(WAVELENGTH_M)
     assert parameters.object_pixel_size_m == pytest.approx(OBJECT_PIXEL_SIZE_M)
     assert parameters.tomography_angle_deg == pytest.approx(TOMOGRAPHY_ANGLE_DEG)
 
@@ -111,7 +111,7 @@ def test_a_simulated_parameter_file_yields_nothing(tmp_path: Path) -> None:
     # would collapse the sample-plane pixel size, so "absent" must stay distinguishable.
     parameters = read_fold_slice_parameters(_write(tmp_path / 'sim_para.hdf5'))
 
-    assert parameters.probe_wavelength_m is None
+    assert parameters.photon_wavelength_m is None
     assert parameters.object_pixel_size_m is None
     assert parameters.tomography_angle_deg is None
 
@@ -125,7 +125,7 @@ def test_an_unexpected_shape_is_ignored_rather_than_fatal(tmp_path: Path) -> Non
 
     parameters = read_fold_slice_parameters(file_path)
 
-    assert parameters.probe_wavelength_m is None
+    assert parameters.photon_wavelength_m is None
     assert parameters.object_pixel_size_m == pytest.approx(OBJECT_PIXEL_SIZE_M)
 
 
@@ -184,7 +184,7 @@ class TestFoldSliceProductFileReader:
         product = reader.read(self._write(tmp_path / 'Niter100.mat'))
 
         assert product.metadata.detector_distance_m == pytest.approx(2.335, rel=1e-5)
-        assert product.metadata.probe_energy_eV == pytest.approx(8000.0, rel=1e-5)
+        assert product.metadata.photon_energy_eV == pytest.approx(8000.0, rel=1e-5)
 
     def test_the_recovered_distance_reproduces_the_object_sampling(self, tmp_path: Path) -> None:
         reader = FoldSliceProductFileReader(detector_pixel_size_m=EIGER_PIXEL_SIZE_M)
@@ -207,7 +207,7 @@ class TestFoldSliceProductFileReader:
         product = reader.read(self._write(tmp_path / 'Niter100.mat'))
 
         assert product.metadata.detector_distance_m == 0.0
-        assert product.metadata.probe_energy_eV == pytest.approx(8000.0, rel=1e-5)
+        assert product.metadata.photon_energy_eV == pytest.approx(8000.0, rel=1e-5)
 
     def test_the_registered_reader_carries_the_eiger_pitch(self, tmp_path: Path) -> None:
         # What the family is actually pointed at: every instrument writing this layout

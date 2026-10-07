@@ -33,16 +33,16 @@ async def list_product(
     offset: int = Query(0, ge=0),
     derived_from_uuid: UUID | None = None,
     ingest_state: IngestState | None = None,
-    probe_energy_eV_min: float | None = Query(None, alias='probe_energy_eV_min'),  # noqa: N803
-    probe_energy_eV_max: float | None = Query(None, alias='probe_energy_eV_max'),  # noqa: N803
+    photon_energy_eV_min: float | None = Query(None, alias='photon_energy_eV_min'),  # noqa: N803
+    photon_energy_eV_max: float | None = Query(None, alias='photon_energy_eV_max'),  # noqa: N803
 ) -> Page[ProductRead]:
     where = []
     if ingest_state is not None:
         where.append(Product.ingest_state == ingest_state)
-    if probe_energy_eV_min is not None:
-        where.append(Product.probe_energy_eV >= probe_energy_eV_min)
-    if probe_energy_eV_max is not None:
-        where.append(Product.probe_energy_eV <= probe_energy_eV_max)
+    if photon_energy_eV_min is not None:
+        where.append(Product.photon_energy_eV >= photon_energy_eV_min)
+    if photon_energy_eV_max is not None:
+        where.append(Product.photon_energy_eV <= photon_energy_eV_max)
     if derived_from_uuid is not None:
         edge_subq = select(DerivationEdge.source_uuid).where(
             DerivationEdge.source_uuid == Product.uuid,

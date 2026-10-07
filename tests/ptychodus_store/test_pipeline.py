@@ -30,7 +30,7 @@ async def test_ingest_diffraction_valid(
     row = await repo.get_row(db_session, Diffraction, uuid)
     assert row is not None
     assert row.ingest_state == IngestState.VALID
-    assert row.probe_energy_eV == 8000.0
+    assert row.photon_energy_eV == 8000.0
     assert row.num_patterns_total == 4
     assert row.pattern_height_px == 8
     assert row.pattern_width_px == 12

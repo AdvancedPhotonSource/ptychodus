@@ -33,7 +33,7 @@ from ptychodus.api.propagate import (
 # Test constants
 # ---------------------------------------------------------------------------
 
-_PROBE_ENERGY_EV = 10_000.0  # 10 keV X-rays
+_PHOTON_ENERGY_EV = 10_000.0  # 10 keV X-rays
 _DETECTOR_DISTANCE_M = 1.0  # 1 m
 _PIXEL_SIZE_M = 75e-9  # 75 nm object/probe pixel
 _PROBE_PX = 16  # 16×16 probe
@@ -50,10 +50,10 @@ def _metadata() -> ProductMetadata:
         name='test',
         comments='',
         detector_distance_m=_DETECTOR_DISTANCE_M,
-        probe_energy_eV=_PROBE_ENERGY_EV,
+        photon_energy_eV=_PHOTON_ENERGY_EV,
         probe_photon_count=1.0,
         exposure_time_s=1.0,
-        mass_attenuation_m2_kg=0.0,
+        mass_attenuation_m2_per_kg=0.0,
         tomography_angle_deg=0.0,
     )
 
@@ -123,7 +123,7 @@ def _far_field_intensity(probe_mode: numpy.ndarray, product: Product) -> numpy.n
     metadata = product.metadata
     probe_geometry = product.probes.get_geometry()
     params = PropagatorParameters(
-        wavelength_m=metadata.probe_wavelength_m,
+        wavelength_m=metadata.photon_wavelength_m,
         width_px=probe_geometry.width_px,
         height_px=probe_geometry.height_px,
         pixel_width_m=probe_geometry.pixel_width_m,
@@ -162,7 +162,7 @@ class TestOutputProperties:
 
         metadata = product.metadata
         probe_geometry = product.probes.get_geometry()
-        lambda_z = metadata.probe_wavelength_m * metadata.detector_distance_m
+        lambda_z = metadata.photon_wavelength_m * metadata.detector_distance_m
         pg = result.get_pixel_geometry()
 
         assert pg.width_m == pytest.approx(lambda_z / probe_geometry.width_m)
@@ -429,7 +429,7 @@ class TestNearField:
         result = generate_diffraction_data(product)
 
         params = PropagatorParameters(
-            wavelength_m=product.metadata.probe_wavelength_m,
+            wavelength_m=product.metadata.photon_wavelength_m,
             width_px=_PROBE_PX,
             height_px=_PROBE_PX,
             pixel_width_m=_PIXEL_SIZE_M,
@@ -453,7 +453,9 @@ class TestNearField:
         result = generate_diffraction_data(product)
 
         far_field_pitch_m = (
-            product.metadata.probe_wavelength_m * _DETECTOR_DISTANCE_M / (_PROBE_PX * _PIXEL_SIZE_M)
+            product.metadata.photon_wavelength_m
+            * _DETECTOR_DISTANCE_M
+            / (_PROBE_PX * _PIXEL_SIZE_M)
         )
         assert result.get_pixel_geometry().width_m == pytest.approx(far_field_pitch_m)
 

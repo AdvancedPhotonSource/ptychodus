@@ -43,7 +43,7 @@ class IlluminationParametersController:
             Decimal(repr(illumination_map.exposure_time_s))
         )
         self._view.mass_attenuation_line_edit.set_value(
-            Decimal(repr(illumination_map.mass_attenuation_m2_kg))
+            Decimal(repr(illumination_map.mass_attenuation_m2_per_kg))
         )
 
 
@@ -87,17 +87,17 @@ class IlluminationQuantityController:
             case self._view.photon_number_button:
                 quantity = illumination_map.photon_number
             case self._view.photon_fluence_button:
-                quantity = illumination_map.photon_fluence_1_m2
+                quantity = illumination_map.photon_fluence_per_m2
             case self._view.photon_fluence_rate_button:
                 quantity = illumination_map.photon_fluence_rate_per_s_m2
             case self._view.energy_fluence_button:
-                quantity = illumination_map.energy_fluence_J_m2
+                quantity = illumination_map.energy_fluence_J_per_m2
             case self._view.energy_fluence_rate_button:
-                quantity = illumination_map.energy_fluence_rate_W_m2
+                quantity = illumination_map.energy_fluence_rate_W_per_m2
             case self._view.dose_button:
                 quantity = illumination_map.dose_Gy
             case self._view.dose_rate_button:
-                quantity = illumination_map.dose_rate_Gy_s
+                quantity = illumination_map.dose_rate_Gy_per_s
 
         if quantity is None:
             self._widget_controller.clear_array()

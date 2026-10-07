@@ -249,8 +249,8 @@ class ObjectEditorViewControllerFactory:
                 object_builder.extra_padding_y, 'Extra Padding Y:', group=first_layer_group
             )
             dialog_builder.add_decimal_line_edit(
-                object_builder.probe_wavelength_m,
-                'Probe Wavelength [m]:',
+                object_builder.photon_wavelength_m,
+                'Photon Wavelength [m]:',
                 group=first_layer_group,
             )
             dialog_builder.add_decimal_line_edit(

@@ -323,7 +323,7 @@ def _make_illumination_map(photon_number: numpy.ndarray) -> IlluminationMap:
         photon_flux_per_s=1.0e9,
         photon_energy_J=1.6e-15,
         exposure_time_s=1.0,
-        mass_attenuation_m2_kg=1.0,
+        mass_attenuation_m2_per_kg=1.0,
         pixel_geometry=PixelGeometry(width_m=1e-6, height_m=1e-6),
         center=ObjectCenter(x_m=0.0, y_m=0.0),
     )
@@ -908,10 +908,10 @@ def _metadata() -> ProductMetadata:
         name='test',
         comments='',
         detector_distance_m=1.0,
-        probe_energy_eV=10_000.0,
+        photon_energy_eV=10_000.0,
         probe_photon_count=1.0,
         exposure_time_s=1.0,
-        mass_attenuation_m2_kg=0.0,
+        mass_attenuation_m2_per_kg=0.0,
         tomography_angle_deg=0.0,
     )
 

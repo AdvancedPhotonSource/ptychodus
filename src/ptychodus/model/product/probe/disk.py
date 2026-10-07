@@ -36,7 +36,7 @@ class DiskProbeBuilder(ProbeSequenceBuilder):
                     geometry_provider.get_probe_geometry(),
                     radius_m=self.diameter_m.get_value() / 2.0,
                 ),
-                probe_wavelength_m=geometry_provider.probe_wavelength_m,
+                photon_wavelength_m=geometry_provider.photon_wavelength_m,
                 propagation_distance_m=self.defocus_distance_m.get_value(),
             ),
             geometry_provider,

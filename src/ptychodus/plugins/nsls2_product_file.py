@@ -21,7 +21,7 @@ class NSLSIIProductFileReader(ProductFileReader):
 
         with h5py.File(file_path, 'r') as h5_file:
             detector_distance_m = LengthUnit.MICROMETER.to_meters(float(h5_file['det_dist'][()]))
-            probe_energy_eV = EnergyUnit.KILOELECTRONVOLT.to_electronvolts(  # noqa: N806
+            photon_energy_eV = EnergyUnit.KILOELECTRONVOLT.to_electronvolts(  # noqa: N806
                 float(h5_file['energy'][()])
             )
 
@@ -29,10 +29,10 @@ class NSLSIIProductFileReader(ProductFileReader):
                 name=file_path.stem,
                 comments='',
                 detector_distance_m=detector_distance_m,
-                probe_energy_eV=probe_energy_eV,
+                photon_energy_eV=photon_energy_eV,
                 probe_photon_count=0.0,  # not included in file
                 exposure_time_s=0.0,  # not included in file
-                mass_attenuation_m2_kg=0.0,  # not included in file
+                mass_attenuation_m2_per_kg=0.0,  # not included in file
                 tomography_angle_deg=0.0,  # not included in file
             )
 

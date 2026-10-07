@@ -237,7 +237,7 @@ def prepare_reconstruct_input(
     pos_x_all = product.probe_positions.get_coordinates_x_m()
     pos_y_all = product.probe_positions.get_coordinates_y_m()
 
-    src_photon_counts = product.probe_positions.get_probe_photon_counts()
+    pos_photon_counts_all = product.probe_positions.get_probe_photon_counts()
 
     pos_keep = numpy.fromiter(
         (index_filter(int(i)) for i in pos_indexes_all),
@@ -247,7 +247,7 @@ def prepare_reconstruct_input(
     pos_indexes = pos_indexes_all[pos_keep]
     pos_x = pos_x_all[pos_keep]
     pos_y = pos_y_all[pos_keep]
-    pos_photon_counts = None if src_photon_counts is None else src_photon_counts[pos_keep]
+    pos_photon_counts = None if pos_photon_counts_all is None else pos_photon_counts_all[pos_keep]
 
     if filtered_pattern_indexes.size == 0 or pos_indexes.size == 0:
         raise ValueError('Index filter eliminated all pattern indexes and/or all position indexes.')
@@ -374,7 +374,7 @@ def warn_if_propagation_regime_disagrees(
         fresnel_number = compute_full_aperture_fresnel_number(
             probe_geometry.get_pixel_geometry(),
             ImageExtent(width_px=probe_geometry.width_px, height_px=probe_geometry.height_px),
-            wavelength_m=metadata.probe_wavelength_m,
+            wavelength_m=metadata.photon_wavelength_m,
             propagation_distance_m=propagation_distance_m,
         )
     except (ValueError, ZeroDivisionError):

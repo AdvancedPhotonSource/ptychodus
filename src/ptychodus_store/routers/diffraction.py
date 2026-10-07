@@ -32,8 +32,8 @@ async def list_diffraction(
     campaign_uuid: UUID | None = None,
     derived_from_uuid: UUID | None = None,
     ingest_state: IngestState | None = None,
-    probe_energy_eV_min: float | None = Query(None, alias='probe_energy_eV_min'),  # noqa: N803
-    probe_energy_eV_max: float | None = Query(None, alias='probe_energy_eV_max'),  # noqa: N803
+    photon_energy_eV_min: float | None = Query(None, alias='photon_energy_eV_min'),  # noqa: N803
+    photon_energy_eV_max: float | None = Query(None, alias='photon_energy_eV_max'),  # noqa: N803
     tomography_angle_deg_min: float | None = None,
     tomography_angle_deg_max: float | None = None,
     tilt_angle_deg_min: float | None = None,
@@ -45,10 +45,10 @@ async def list_diffraction(
         where.append(Diffraction.campaign_uuid == campaign_uuid)
     if ingest_state is not None:
         where.append(Diffraction.ingest_state == ingest_state)
-    if probe_energy_eV_min is not None:
-        where.append(Diffraction.probe_energy_eV >= probe_energy_eV_min)
-    if probe_energy_eV_max is not None:
-        where.append(Diffraction.probe_energy_eV <= probe_energy_eV_max)
+    if photon_energy_eV_min is not None:
+        where.append(Diffraction.photon_energy_eV >= photon_energy_eV_min)
+    if photon_energy_eV_max is not None:
+        where.append(Diffraction.photon_energy_eV <= photon_energy_eV_max)
     if tomography_angle_deg_min is not None:
         where.append(Diffraction.tomography_angle_deg >= tomography_angle_deg_min)
     if tomography_angle_deg_max is not None:

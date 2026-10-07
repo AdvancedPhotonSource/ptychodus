@@ -60,7 +60,7 @@ def generate_diffraction_data(
         propagation_distance_m = metadata.detector_distance_m / magnification
 
     propagator_parameters = PropagatorParameters(
-        wavelength_m=metadata.probe_wavelength_m,
+        wavelength_m=metadata.photon_wavelength_m,
         width_px=probe_geometry.width_px,
         height_px=probe_geometry.height_px,
         pixel_width_m=probe_geometry.pixel_width_m,
@@ -79,7 +79,7 @@ def generate_diffraction_data(
                 width_m=probe_geometry.pixel_width_m, height_m=probe_geometry.pixel_height_m
             ),
             ImageExtent(width_px=probe_geometry.width_px, height_px=probe_geometry.height_px),
-            wavelength_m=metadata.probe_wavelength_m,
+            wavelength_m=metadata.photon_wavelength_m,
             propagation_distance_m=propagation_distance_m,
         )
     else:
@@ -89,7 +89,7 @@ def generate_diffraction_data(
     interlayer_propagators = [
         AngularSpectrumPropagator(
             PropagatorParameters(
-                wavelength_m=metadata.probe_wavelength_m,
+                wavelength_m=metadata.photon_wavelength_m,
                 width_px=probe_geometry.width_px,
                 height_px=probe_geometry.height_px,
                 pixel_width_m=probe_geometry.pixel_width_m,

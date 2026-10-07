@@ -309,7 +309,7 @@ class TestGenerateAveragePatternProbe:
         result = generate_average_pattern_probe(
             geometry,
             _assembled_data(patterns),
-            probe_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
             detector_distance_m=_BACKPROP_DISTANCE_M,
         )
 
@@ -342,7 +342,7 @@ class TestGenerateAveragePatternProbe:
         result = generate_average_pattern_probe(
             geometry,
             _assembled_data(patterns),
-            probe_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
             detector_distance_m=_BACKPROP_DISTANCE_M,
         )
 
@@ -356,7 +356,7 @@ class TestGenerateAveragePatternProbe:
         result = generate_average_pattern_probe(
             geometry,
             _assembled_data(patterns),
-            probe_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
             detector_distance_m=_BACKPROP_DISTANCE_M,
         )
         assert result.get_pixel_geometry() == geometry.get_pixel_geometry()
@@ -370,7 +370,7 @@ class TestGenerateAveragePatternProbe:
             generate_average_pattern_probe(
                 _sample_plane_geometry(),
                 _assembled_data(patterns),
-                probe_wavelength_m=_BACKPROP_WAVELENGTH_M,
+                photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
                 detector_distance_m=0.0,
             )
 
@@ -404,7 +404,7 @@ class TestGenerateAveragePatternProbeNearField:
         result = generate_average_pattern_probe(
             geometry,
             _assembled_data(patterns),
-            probe_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
             detector_distance_m=_BACKPROP_DISTANCE_M,
             far_field=False,
         )
@@ -423,7 +423,7 @@ class TestGenerateAveragePatternProbeNearField:
         generate_average_pattern_probe(
             _near_field_sample_geometry(),
             _assembled_data(patterns),
-            probe_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
             detector_distance_m=_BACKPROP_DISTANCE_M,
             far_field=False,
         )
@@ -438,7 +438,7 @@ class TestGenerateAveragePatternProbeNearField:
         result = generate_average_pattern_probe(
             geometry,
             _assembled_data(patterns),
-            probe_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
             detector_distance_m=_BACKPROP_DISTANCE_M,
             far_field=False,
         )
@@ -466,7 +466,7 @@ class TestGenerateAveragePatternProbeNearField:
             generate_average_pattern_probe(
                 _near_field_sample_geometry(),
                 _assembled_data(patterns),
-                probe_wavelength_m=_BACKPROP_WAVELENGTH_M,
+                photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
                 detector_distance_m=_BACKPROP_DISTANCE_M,
             )
 
@@ -635,7 +635,7 @@ class TestGenerateFresnelZonePlateProbe:
         probe = generate_fresnel_zone_plate_probe(
             geometry,
             _FZP_ZONE_PLATE,
-            probe_wavelength_m=_FZP_WAVELENGTH_M,
+            photon_wavelength_m=_FZP_WAVELENGTH_M,
             defocus_distance_m=defocus_distance_m,
         )
 
@@ -658,7 +658,7 @@ class TestGenerateFresnelZonePlateProbe:
                 generate_fresnel_zone_plate_probe(
                     geometry,
                     _FZP_ZONE_PLATE,
-                    probe_wavelength_m=_FZP_WAVELENGTH_M,
+                    photon_wavelength_m=_FZP_WAVELENGTH_M,
                     defocus_distance_m=defocus_distance_m,
                 ).get_array()[0],
                 defocus_distance_m=defocus_distance_m,
@@ -693,7 +693,7 @@ class TestGenerateFresnelZonePlateProbe:
         probe = generate_fresnel_zone_plate_probe(
             geometry,
             _FZP_ZONE_PLATE,
-            probe_wavelength_m=_FZP_WAVELENGTH_M,
+            photon_wavelength_m=_FZP_WAVELENGTH_M,
             defocus_distance_m=defocus_distance_m,
         )
 
@@ -710,7 +710,7 @@ class TestGenerateFresnelZonePlateProbe:
             generate_fresnel_zone_plate_probe(
                 _fzp_probe_geometry(),
                 _FZP_ZONE_PLATE,
-                probe_wavelength_m=_FZP_WAVELENGTH_M,
+                photon_wavelength_m=_FZP_WAVELENGTH_M,
                 defocus_distance_m=-_FZP_FOCAL_LENGTH_M,
             )
 
@@ -733,7 +733,7 @@ class TestPropagateProbe:
 
     def test_zero_distance_is_an_identity(self) -> None:
         probe = self._probe(1)
-        propagated = propagate_probe(probe, probe_wavelength_m=1e-10, propagation_distance_m=0.0)
+        propagated = propagate_probe(probe, photon_wavelength_m=1e-10, propagation_distance_m=0.0)
 
         numpy.testing.assert_allclose(propagated.get_array(), probe.get_array(), atol=1e-12)
 
@@ -742,7 +742,7 @@ class TestPropagateProbe:
         untouched -- propagating a stack must equal propagating each mode alone."""
         probe = self._probe(3)
         together = propagate_probe(
-            probe, probe_wavelength_m=1e-10, propagation_distance_m=5e-5
+            probe, photon_wavelength_m=1e-10, propagation_distance_m=5e-5
         ).get_array()
 
         for index in range(3):
@@ -751,15 +751,15 @@ class TestPropagateProbe:
                     array=probe.get_array()[index : index + 1],
                     pixel_geometry=probe.get_pixel_geometry(),
                 ),
-                probe_wavelength_m=1e-10,
+                photon_wavelength_m=1e-10,
                 propagation_distance_m=5e-5,
             ).get_array()
             numpy.testing.assert_allclose(together[index], alone[0], atol=1e-12)
 
     def test_propagation_is_reversible(self) -> None:
         probe = self._probe(2)
-        forward = propagate_probe(probe, probe_wavelength_m=1e-10, propagation_distance_m=5e-5)
-        back = propagate_probe(forward, probe_wavelength_m=1e-10, propagation_distance_m=-5e-5)
+        forward = propagate_probe(probe, photon_wavelength_m=1e-10, propagation_distance_m=5e-5)
+        back = propagate_probe(forward, photon_wavelength_m=1e-10, propagation_distance_m=-5e-5)
 
         numpy.testing.assert_allclose(back.get_array(), probe.get_array(), atol=1e-9)
 
@@ -958,7 +958,7 @@ class TestGenerateKbMirrorProbe:
         geometry = _kb_probe_geometry()
 
         probe = generate_kb_mirror_probe(
-            geometry, _kb_mirrors(), probe_wavelength_m=_KB_WAVELENGTH_M
+            geometry, _kb_mirrors(), photon_wavelength_m=_KB_WAVELENGTH_M
         )
 
         assert probe.get_array().shape == (1, _KB_NUM_PX, _KB_NUM_PX)
@@ -981,7 +981,7 @@ class TestGenerateKbMirrorProbe:
         mirrors = _kb_mirrors(numerical_aperture_x, numerical_aperture_y)
 
         probe = generate_kb_mirror_probe(
-            _kb_probe_geometry(), mirrors, probe_wavelength_m=_KB_WAVELENGTH_M
+            _kb_probe_geometry(), mirrors, photon_wavelength_m=_KB_WAVELENGTH_M
         )
 
         cut_x, cut_y = _kb_central_cuts(probe)
@@ -1010,7 +1010,7 @@ class TestGenerateKbMirrorProbe:
             probe = generate_kb_mirror_probe(
                 _kb_probe_geometry(),
                 mirrors,
-                probe_wavelength_m=_KB_WAVELENGTH_M,
+                photon_wavelength_m=_KB_WAVELENGTH_M,
                 defocus_distance_m=float(defocus_distance_m),
                 astigmatism_m=astigmatism_m,
             )
@@ -1036,7 +1036,7 @@ class TestGenerateKbMirrorProbe:
         probe = generate_kb_mirror_probe(
             _kb_probe_geometry(),
             _kb_mirrors(1.5e-3, 1.0e-3),
-            probe_wavelength_m=_KB_WAVELENGTH_M,
+            photon_wavelength_m=_KB_WAVELENGTH_M,
             astigmatism_m=0.004,
         )
 
@@ -1069,7 +1069,7 @@ class TestGenerateKbMirrorProbe:
         probe = generate_kb_mirror_probe(
             _kb_probe_geometry(),
             mirrors,
-            probe_wavelength_m=_KB_WAVELENGTH_M,
+            photon_wavelength_m=_KB_WAVELENGTH_M,
             defocus_distance_m=defocus_distance_m,
         )
         probe_power = intensity(probe.get_array()[0]).sum() * _KB_PROBE_PITCH_M**2
@@ -1083,7 +1083,7 @@ class TestGenerateKbMirrorProbe:
             generate_kb_mirror_probe(
                 _kb_probe_geometry(),
                 mirrors,
-                probe_wavelength_m=_KB_WAVELENGTH_M,
+                photon_wavelength_m=_KB_WAVELENGTH_M,
                 defocus_distance_m=-mirrors.get_reference_distance_m(),
             )
 
@@ -1102,7 +1102,7 @@ class TestGenerateKbMirrorProbe:
 
         with pytest.raises(ValueError, match='does not fit the pupil window'):
             generate_kb_mirror_probe(
-                coarse_geometry, _kb_mirrors(), probe_wavelength_m=_KB_WAVELENGTH_M
+                coarse_geometry, _kb_mirrors(), photon_wavelength_m=_KB_WAVELENGTH_M
             )
 
     def test_rejects_astigmatism_that_places_a_focus_at_the_pupil(self) -> None:
@@ -1112,7 +1112,7 @@ class TestGenerateKbMirrorProbe:
             generate_kb_mirror_probe(
                 _kb_probe_geometry(),
                 mirrors,
-                probe_wavelength_m=_KB_WAVELENGTH_M,
+                photon_wavelength_m=_KB_WAVELENGTH_M,
                 astigmatism_m=2 * mirrors.get_reference_distance_m(),
             )
 
@@ -1131,7 +1131,7 @@ class TestGenerateKbMirrorProbe:
             probe = generate_kb_mirror_probe(
                 _kb_probe_geometry(),
                 mirrors,
-                probe_wavelength_m=_KB_WAVELENGTH_M,
+                photon_wavelength_m=_KB_WAVELENGTH_M,
                 incident_beam_fwhm_x_m=incident_beam_fwhm_m,
             )
             cut = _kb_central_cuts(probe)[0]
@@ -1155,12 +1155,12 @@ class TestGenerateKbMirrorProbe:
         )
 
         uniform = generate_kb_mirror_probe(
-            _kb_probe_geometry(), mirrors, probe_wavelength_m=_KB_WAVELENGTH_M
+            _kb_probe_geometry(), mirrors, photon_wavelength_m=_KB_WAVELENGTH_M
         )
         nearly_uniform = generate_kb_mirror_probe(
             _kb_probe_geometry(),
             mirrors,
-            probe_wavelength_m=_KB_WAVELENGTH_M,
+            photon_wavelength_m=_KB_WAVELENGTH_M,
             incident_beam_fwhm_x_m=1e4 * aperture_m,
             incident_beam_fwhm_y_m=1e4 * aperture_m,
         )
@@ -1175,12 +1175,12 @@ class TestGenerateKbMirrorProbe:
         mirrors = _kb_mirrors()
 
         plain = generate_kb_mirror_probe(
-            geometry, mirrors, probe_wavelength_m=_KB_WAVELENGTH_M
+            geometry, mirrors, photon_wavelength_m=_KB_WAVELENGTH_M
         ).get_array()
         with_piston = generate_kb_mirror_probe(
             geometry,
             mirrors,
-            probe_wavelength_m=_KB_WAVELENGTH_M,
+            photon_wavelength_m=_KB_WAVELENGTH_M,
             figure_error_x=[LegendreMode(coefficient_m=3e-9, order=0)],
         ).get_array()
 
@@ -1213,7 +1213,7 @@ class TestGenerateKbMirrorProbe:
             generate_kb_mirror_probe(
                 geometry,
                 mirrors,
-                probe_wavelength_m=_KB_WAVELENGTH_M,
+                photon_wavelength_m=_KB_WAVELENGTH_M,
                 figure_error_x=[LegendreMode(coefficient_m=coefficient_m, order=2)],
             )
         )
@@ -1221,7 +1221,7 @@ class TestGenerateKbMirrorProbe:
             generate_kb_mirror_probe(
                 geometry,
                 mirrors,
-                probe_wavelength_m=_KB_WAVELENGTH_M,
+                photon_wavelength_m=_KB_WAVELENGTH_M,
                 defocus_distance_m=equivalent_defocus_m,
             )
         )
@@ -1246,7 +1246,7 @@ class TestGenerateKbMirrorProbe:
             probe = generate_kb_mirror_probe(
                 geometry,
                 mirrors,
-                probe_wavelength_m=_KB_WAVELENGTH_M,
+                photon_wavelength_m=_KB_WAVELENGTH_M,
                 figure_error_x=[LegendreMode(coefficient_m=signed_coefficient_m, order=1)],
             )
             return _kb_peak_position_m(_kb_central_cuts(probe)[0])
@@ -1501,7 +1501,7 @@ class TestKbMirrorProbeSamplingWarnings:
             generate_kb_mirror_probe(
                 fine_geometry,
                 _kb_mirrors(),
-                probe_wavelength_m=_KB_WAVELENGTH_M,
+                photon_wavelength_m=_KB_WAVELENGTH_M,
                 figure_error_x=[LegendreMode(coefficient_m=1e-9, order=3)],
             )
 
@@ -1520,7 +1520,7 @@ class TestKbMirrorProbeSamplingWarnings:
 
         with caplog.at_level('WARNING', logger='ptychodus.api.simulate.probe'):
             generate_kb_mirror_probe(
-                fine_geometry, _kb_mirrors(), probe_wavelength_m=_KB_WAVELENGTH_M
+                fine_geometry, _kb_mirrors(), photon_wavelength_m=_KB_WAVELENGTH_M
             )
 
         assert 'figure error' not in caplog.text
@@ -1531,7 +1531,7 @@ class TestKbMirrorProbeSamplingWarnings:
             generate_kb_mirror_probe(
                 _kb_probe_geometry(),
                 _kb_mirrors(1.0e-2, 1.0e-2),
-                probe_wavelength_m=_KB_WAVELENGTH_M,
+                photon_wavelength_m=_KB_WAVELENGTH_M,
             )
 
         assert 'undersampled' in caplog.text
@@ -1541,7 +1541,7 @@ class TestKbMirrorProbeSamplingWarnings:
             generate_kb_mirror_probe(
                 _kb_probe_geometry(),
                 _kb_mirrors(),
-                probe_wavelength_m=_KB_WAVELENGTH_M,
+                photon_wavelength_m=_KB_WAVELENGTH_M,
                 figure_error_x=[LegendreMode(coefficient_m=1e-9, order=3)],
             )
 
@@ -1553,7 +1553,7 @@ class TestKbMirrorProbeSamplingWarnings:
             generate_kb_mirror_probe(
                 _kb_probe_geometry(),
                 _kb_mirrors(),
-                probe_wavelength_m=_KB_WAVELENGTH_M,
+                photon_wavelength_m=_KB_WAVELENGTH_M,
                 figure_error_x=[LegendreMode(coefficient_m=1e-9, order=3)],
                 min_pupil_px_for_figure_error=64.0,
             )
@@ -1566,7 +1566,7 @@ class TestKbMirrorProbeSamplingWarnings:
             generate_kb_mirror_probe(
                 _kb_probe_geometry(),
                 _kb_mirrors(),
-                probe_wavelength_m=_KB_WAVELENGTH_M,
+                photon_wavelength_m=_KB_WAVELENGTH_M,
                 min_px_per_focus_fwhm=16.0,
             )
 
@@ -1578,7 +1578,7 @@ class TestKbMirrorProbeSamplingWarnings:
             generate_kb_mirror_probe(
                 _kb_probe_geometry(),
                 _kb_mirrors(1.0e-2, 1.0e-2),
-                probe_wavelength_m=_KB_WAVELENGTH_M,
+                photon_wavelength_m=_KB_WAVELENGTH_M,
                 figure_error_x=[LegendreMode(coefficient_m=1e-9, order=3)],
                 min_pupil_px_for_figure_error=0.0,
                 min_px_per_focus_fwhm=0.0,

@@ -207,10 +207,10 @@ def _apply_metadata_overrides(
     overrides = {
         'name': args.product_name,
         'detector_distance_m': args.detector_distance_m,
-        'probe_energy_eV': args.probe_energy_eV,
+        'photon_energy_eV': args.photon_energy_eV,
         'probe_photon_count': args.probe_photon_count,
         'exposure_time_s': args.exposure_time_s,
-        'mass_attenuation_m2_kg': args.mass_attenuation_m2_kg,
+        'mass_attenuation_m2_per_kg': args.mass_attenuation_m2_per_kg,
         'tomography_angle_deg': args.tomography_angle_deg,
     }
     given = {key: value for key, value in overrides.items() if value is not None}
@@ -284,7 +284,7 @@ class _BuiltProductGeometry:
     """The three values a built product cannot derive from the patterns and the scan."""
 
     detector_distance_m: float
-    probe_energy_eV: float  # noqa: N815
+    photon_energy_eV: float  # noqa: N815
     tomography_angle_deg: float
 
 
@@ -301,16 +301,16 @@ def _resolve_built_product_geometry(
     that supplies it. Reporting the source is what distinguishes a run that read the
     geometry from one that was told it.
     """
-    probe_energy_eV = args.probe_energy_eV  # noqa: N806
+    photon_energy_eV = args.photon_energy_eV  # noqa: N806
 
-    if probe_energy_eV is not None:
-        logger.info('Probe energy (eV): %g (from --probe-energy-eV)', probe_energy_eV)
-    elif parameters.probe_wavelength_m is not None:
-        probe_energy_eV = wavelength_m_to_energy_eV(parameters.probe_wavelength_m)  # noqa: N806
+    if photon_energy_eV is not None:
+        logger.info('Photon energy (eV): %g (from --photon-energy-eV)', photon_energy_eV)
+    elif parameters.photon_wavelength_m is not None:
+        photon_energy_eV = wavelength_m_to_energy_eV(parameters.photon_wavelength_m)  # noqa: N806
         logger.info(
-            'Probe energy (eV): %g (from the %g m wavelength in the parameter file)',
-            probe_energy_eV,
-            parameters.probe_wavelength_m,
+            'Photon energy (eV): %g (from the %g m wavelength in the parameter file)',
+            photon_energy_eV,
+            parameters.photon_wavelength_m,
         )
     else:
         raise ValueError('The parameter file records no probe wavelength; pass --probe-energy-eV.')
@@ -323,7 +323,7 @@ def _resolve_built_product_geometry(
         detector_distance_m = compute_far_field_propagation_distance(
             assembled_data.get_pixel_geometry(),
             assembled_data.get_image_extent(),
-            wavelength_m=energy_eV_to_wavelength_m(probe_energy_eV),
+            wavelength_m=energy_eV_to_wavelength_m(photon_energy_eV),
             conjugate_pixel_width_m=parameters.object_pixel_size_m,
         )
         logger.info(
@@ -345,7 +345,7 @@ def _resolve_built_product_geometry(
 
     return _BuiltProductGeometry(
         detector_distance_m=detector_distance_m,
-        probe_energy_eV=probe_energy_eV,
+        photon_energy_eV=photon_energy_eV,
         tomography_angle_deg=tomography_angle_deg,
     )
 
@@ -366,7 +366,7 @@ def _build_probe(
     assembled_data: AssembledDiffractionData,
     geometry: _BuiltProductGeometry,
     probe_geometry: ProbeGeometry,
-    probe_wavelength_m: float,
+    photon_wavelength_m: float,
     rng: numpy.random.Generator,
 ) -> ProbeSequence:
     """Supply the initial probe for a built product, from file or from a model."""
@@ -390,7 +390,7 @@ def _build_probe(
         probe = generate_fresnel_zone_plate_probe(
             probe_geometry,
             zone_plate,
-            probe_wavelength_m=probe_wavelength_m,
+            photon_wavelength_m=photon_wavelength_m,
             defocus_distance_m=args.fzp_defocus_m,
         )
     else:
@@ -401,7 +401,7 @@ def _build_probe(
         probe = generate_average_pattern_probe(
             probe_geometry,
             assembled_data,
-            probe_wavelength_m=probe_wavelength_m,
+            photon_wavelength_m=photon_wavelength_m,
             detector_distance_m=geometry.detector_distance_m,
         )
 
@@ -446,18 +446,18 @@ def _build_product(
     already say: the probe grid from the Fraunhofer relation, the object canvas from the
     scan bounding box, the photon count from the brightest pattern.
     """
-    probe_wavelength_m = energy_eV_to_wavelength_m(geometry.probe_energy_eV)
+    photon_wavelength_m = energy_eV_to_wavelength_m(geometry.photon_energy_eV)
     probe_geometry = ProbeGeometry.from_far_field(
         assembled_data.get_pixel_geometry(),
         assembled_data.get_image_extent(),
-        wavelength_m=probe_wavelength_m,
+        wavelength_m=photon_wavelength_m,
         distance_m=geometry.detector_distance_m,
     )
     logger.info('Probe geometry: %s', probe_geometry)
 
     rng = numpy.random.default_rng(args.seed)
     probes = _build_probe(
-        registry, args, assembled_data, geometry, probe_geometry, probe_wavelength_m, rng
+        registry, args, assembled_data, geometry, probe_geometry, photon_wavelength_m, rng
     )
     logger.info('Probe: %s', probes.get_array().shape)
 
@@ -478,11 +478,11 @@ def _build_product(
             name=_built_product_name(args),
             comments=f'Converted from {args.diffraction_input.name}',
             detector_distance_m=geometry.detector_distance_m,
-            probe_energy_eV=geometry.probe_energy_eV,
+            photon_energy_eV=geometry.photon_energy_eV,
             probe_photon_count=probe_photon_count,
             exposure_time_s=0.0 if args.exposure_time_s is None else args.exposure_time_s,
-            mass_attenuation_m2_kg=(
-                0.0 if args.mass_attenuation_m2_kg is None else args.mass_attenuation_m2_kg
+            mass_attenuation_m2_per_kg=(
+                0.0 if args.mass_attenuation_m2_per_kg is None else args.mass_attenuation_m2_per_kg
             ),
             tomography_angle_deg=geometry.tomography_angle_deg,
         ),
@@ -711,11 +711,11 @@ def _create_argument_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        '--probe-energy-eV',
+        '--photon-energy-eV',
         type=float,
         default=None,
         help=(
-            'Probe energy in electron volts. Derived from the fold_slice wavelength when '
+            'Photon energy in electron volts. Derived from the fold_slice wavelength when '
             'the parameter file records one.'
         ),
     )

@@ -43,7 +43,7 @@ class RectangularProbeBuilder(ProbeSequenceBuilder):
                     width_m=self.width_m.get_value(),
                     height_m=self.height_m.get_value(),
                 ),
-                probe_wavelength_m=geometry_provider.probe_wavelength_m,
+                photon_wavelength_m=geometry_provider.photon_wavelength_m,
                 propagation_distance_m=self.defocus_distance_m.get_value(),
             ),
             geometry_provider,

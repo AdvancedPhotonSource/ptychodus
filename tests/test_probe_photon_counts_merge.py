@@ -35,10 +35,10 @@ def _metadata() -> ProductMetadata:
         name='test',
         comments='',
         detector_distance_m=1.0,
-        probe_energy_eV=10_000.0,
+        photon_energy_eV=10_000.0,
         probe_photon_count=1,
         exposure_time_s=1.0,
-        mass_attenuation_m2_kg=0.0,
+        mass_attenuation_m2_per_kg=0.0,
         tomography_angle_deg=0.0,
     )
 

@@ -901,7 +901,7 @@ def main() -> ExitCode:
         probe_array = generate_fresnel_zone_plate_probe(
             probe_geometry,
             zone_plate,
-            probe_wavelength_m=wavelength_m,
+            photon_wavelength_m=wavelength_m,
             defocus_distance_m=params.fzp_defocus_m,
         ).get_array()
     else:
@@ -924,7 +924,7 @@ def main() -> ExitCode:
         logger.info('Propagating the initial probe by %g mm', propagation_mm)
         probe = propagate_probe(
             probe,
-            probe_wavelength_m=wavelength_m,
+            photon_wavelength_m=wavelength_m,
             propagation_distance_m=propagation_mm * 1e-3,
         )
 
@@ -1024,10 +1024,10 @@ def main() -> ExitCode:
             name=f'S{scan_num:04d}',
             comments=f'Reconstructed from {args.params.name}',
             detector_distance_m=detector_distance_m,
-            probe_energy_eV=params.beam_energy_kev * 1.0e3,
+            photon_energy_eV=params.beam_energy_kev * 1.0e3,
             probe_photon_count=float(assembled_data.get_probe_photon_count()),
             exposure_time_s=float(raw_metadata.exposure_time_s or 0.0),
-            mass_attenuation_m2_kg=0.0,
+            mass_attenuation_m2_per_kg=0.0,
             tomography_angle_deg=0.0,
             focus_object_distance_m=focus_object_distance_m,
             far_field=not params.near_field_ptycho,

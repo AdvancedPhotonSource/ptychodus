@@ -69,7 +69,7 @@ class FresnelZonePlateProbeBuilder(ProbeSequenceBuilder):
             generate_fresnel_zone_plate_probe(
                 geometry=geometry_provider.get_probe_geometry(),
                 zone_plate=zone_plate,
-                probe_wavelength_m=geometry_provider.probe_wavelength_m,
+                photon_wavelength_m=geometry_provider.photon_wavelength_m,
                 defocus_distance_m=self.defocus_distance_m.get_value(),
             ),
             geometry_provider,

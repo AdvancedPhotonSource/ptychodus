@@ -95,9 +95,10 @@ def main() -> int:
         required=True,
     )
     parser.add_argument(
-        '--probe-energy-eV',
+        '--photon-energy-eV',
+        '--probe-energy-eV',  # pre-rename spelling, still accepted
         metavar='ENERGY',
-        help='Probe energy in electron volts',
+        help='Photon energy in electron volts',
         type=float,
     )
     parser.add_argument(
@@ -187,7 +188,7 @@ def main() -> int:
             name=args.product_name,
             comments=args.product_comment,
             detector_distance_m=args.detector_distance_m,
-            probe_energy_eV=args.probe_energy_eV,
+            photon_energy_eV=args.photon_energy_eV,
             probe_photon_count=args.probe_photon_count,
             exposure_time_s=args.exposure_time_s,
             tomography_angle_deg=args.tomography_angle_deg,

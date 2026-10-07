@@ -159,7 +159,7 @@ class _ObservableProbeProvider(ProbeGeometryProvider, Observable):
         return 1.0
 
     @property
-    def probe_wavelength_m(self) -> float:
+    def photon_wavelength_m(self) -> float:
         return 1e-10
 
     @property

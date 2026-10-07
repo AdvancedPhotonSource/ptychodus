@@ -592,7 +592,7 @@ class IlluminationQuantityView(QGroupBox):
         super().__init__('Quantity', parent)
         self.photon_number_button = QRadioButton('Photon Number')
         self.photon_fluence_button = QRadioButton('Photon Fluence [1/m\u00b2]')
-        self.photon_fluence_rate_button = QRadioButton('Photon Fluence Rate [Hz/m\u00b2]')
+        self.photon_fluence_rate_button = QRadioButton('Photon Fluence Rate [1/(s m\u00b2)]')
         self.energy_fluence_button = QRadioButton('Energy Fluence [J/m\u00b2]')
         self.energy_fluence_rate_button = QRadioButton('Energy Fluence Rate [W/m\u00b2]')
         self.dose_button = QRadioButton('Dose [Gy]')

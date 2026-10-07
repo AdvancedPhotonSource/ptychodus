@@ -21,10 +21,10 @@ class ProductMetadata:
     name: str
     comments: str
     detector_distance_m: float
-    probe_energy_eV: float  # noqa: N815
+    photon_energy_eV: float  # noqa: N815
     probe_photon_count: float
     exposure_time_s: float
-    mass_attenuation_m2_kg: float
+    mass_attenuation_m2_per_kg: float
     tomography_angle_deg: float
     focus_object_distance_m: float = 0.0
     tilt_angle_deg: float = 0.0
@@ -43,22 +43,22 @@ class ProductMetadata:
         return compute_magnification(self.detector_distance_m, self.focus_object_distance_m)
 
     @property
-    def probe_energy_J(self) -> float:  # noqa: N802
-        return energy_eV_to_J(self.probe_energy_eV)
+    def photon_energy_J(self) -> float:  # noqa: N802
+        return energy_eV_to_J(self.photon_energy_eV)
 
     @property
-    def probe_wavelength_m(self) -> float:
-        return energy_eV_to_wavelength_m(self.probe_energy_eV)
+    def photon_wavelength_m(self) -> float:
+        return energy_eV_to_wavelength_m(self.photon_energy_eV)
 
     @property
     def nbytes(self) -> int:
         sz = getsizeof(self.name)
         sz += getsizeof(self.comments)
         sz += getsizeof(self.detector_distance_m)
-        sz += getsizeof(self.probe_energy_eV)
+        sz += getsizeof(self.photon_energy_eV)
         sz += getsizeof(self.probe_photon_count)
         sz += getsizeof(self.exposure_time_s)
-        sz += getsizeof(self.mass_attenuation_m2_kg)
+        sz += getsizeof(self.mass_attenuation_m2_per_kg)
         sz += getsizeof(self.tomography_angle_deg)
         sz += getsizeof(self.focus_object_distance_m)
         sz += getsizeof(self.tilt_angle_deg)

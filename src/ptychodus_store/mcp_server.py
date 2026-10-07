@@ -171,8 +171,8 @@ def create_mcp_server() -> FastMCP:
         offset: int = 0,
         campaign_uuid: str | None = None,
         derived_from_uuid: str | None = None,
-        probe_energy_eV_min: float | None = None,  # noqa: N803
-        probe_energy_eV_max: float | None = None,  # noqa: N803
+        photon_energy_eV_min: float | None = None,  # noqa: N803
+        photon_energy_eV_max: float | None = None,  # noqa: N803
         tilt_angle_deg_min: float | None = None,
         tilt_angle_deg_max: float | None = None,
         polarization: str | None = None,
@@ -185,10 +185,10 @@ def create_mcp_server() -> FastMCP:
                 where.append(Diffraction.campaign_uuid == UUID(campaign_uuid))
             if ingest_state is not None:
                 where.append(Diffraction.ingest_state == ingest_state)
-            if probe_energy_eV_min is not None:
-                where.append(Diffraction.probe_energy_eV >= probe_energy_eV_min)
-            if probe_energy_eV_max is not None:
-                where.append(Diffraction.probe_energy_eV <= probe_energy_eV_max)
+            if photon_energy_eV_min is not None:
+                where.append(Diffraction.photon_energy_eV >= photon_energy_eV_min)
+            if photon_energy_eV_max is not None:
+                where.append(Diffraction.photon_energy_eV <= photon_energy_eV_max)
             if tilt_angle_deg_min is not None:
                 where.append(Diffraction.tilt_angle_deg >= tilt_angle_deg_min)
             if tilt_angle_deg_max is not None:

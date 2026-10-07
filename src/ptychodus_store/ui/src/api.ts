@@ -23,7 +23,7 @@ export interface DiffractionRead {
   ingest_state: IngestState;
   campaign_uuid: string | null;
   derived_from: DerivedFromEdge[];
-  probe_energy_eV: number | null;
+  photon_energy_eV: number | null;
   probe_photon_count: number | null;
   tomography_angle_deg: number | null;
   tilt_angle_deg: number | null;
@@ -43,7 +43,7 @@ export interface ProductRead {
   name: string | null;
   comments: string | null;
   detector_distance_m: number | null;
-  probe_energy_eV: number | null;
+  photon_energy_eV: number | null;
   probe_photon_count: number | null;
   tomography_angle_deg: number | null;
   tilt_angle_deg: number | null;

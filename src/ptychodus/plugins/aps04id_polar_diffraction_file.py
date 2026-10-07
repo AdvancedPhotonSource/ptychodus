@@ -60,7 +60,7 @@ class PolarDiffractionFileReader(DiffractionFileReader):
             )
         return (uid - int(uid[0]) + 1).astype(numpy.int64)
 
-    def _read_probe_energy_eV(self, h5_file: h5py.File) -> float | None:  # noqa: N802
+    def _read_photon_energy_eV(self, h5_file: h5py.File) -> float | None:  # noqa: N802
         """Read the monochromator energy from the master's baseline stream.
 
         Present in both the old and the new layout, unlike the detector attributes.
@@ -111,7 +111,7 @@ class PolarDiffractionFileReader(DiffractionFileReader):
         with h5py.File(file_path, 'r') as h5_file:
             contents_tree = self._tree_builder.build(h5_file)
             data_link = h5_file.get(self._data_path, getlink=True)
-            probe_energy_eV = self._read_probe_energy_eV(h5_file)  # noqa: N806
+            photon_energy_eV = self._read_photon_energy_eV(h5_file)  # noqa: N806
 
         if not isinstance(data_link, h5py.ExternalLink):
             raise ValueError(
@@ -143,7 +143,7 @@ class PolarDiffractionFileReader(DiffractionFileReader):
                         height_m=self.DETECTOR_PIXEL_SIZE_M,
                     ),
                     beam_center=self._read_beam_center(h5_file),
-                    probe_energy_eV=probe_energy_eV,
+                    photon_energy_eV=photon_energy_eV,
                     file_path=file_path,
                 )
 

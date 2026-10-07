@@ -299,7 +299,7 @@ class ProductGeometry:
 
 def compute_product_geometry(
     *,
-    probe_energy_eV: float,  # noqa: N803
+    photon_energy_eV: float,  # noqa: N803
     probe_photon_count: float,
     exposure_time_s: float,
     detector_distance_m: float,
@@ -322,7 +322,7 @@ def compute_product_geometry(
     """
     # Degenerate inputs resolve to the true limit: inf where a quotient diverges, nan
     # where it is 0/0. The two exceptions are called out where they arise below.
-    wavelength_m = energy_eV_to_wavelength_m(probe_energy_eV)
+    wavelength_m = energy_eV_to_wavelength_m(photon_energy_eV)
     extent = ImageExtent(width_px=0, height_px=0) if detector_extent is None else detector_extent
     pixel_geometry = (
         PixelGeometry(width_m=0.0, height_m=0.0)
@@ -338,11 +338,11 @@ def compute_product_geometry(
         wavenumber_per_m = 0.0
 
     try:
-        photon_flux_per_s = probe_photon_count / exposure_time_s
+        probe_photon_flux_per_s = probe_photon_count / exposure_time_s
     except ZeroDivisionError:
         # Indeterminate when nothing was recorded at all, which is the default product.
         # With a real count the flux genuinely diverges as the exposure vanishes.
-        photon_flux_per_s = (
+        probe_photon_flux_per_s = (
             math.nan if probe_photon_count == 0.0 else math.copysign(math.inf, probe_photon_count)
         )
 
@@ -411,8 +411,8 @@ def compute_product_geometry(
     return ProductGeometry(
         probe_wavenumber_per_m=wavenumber_per_m,
         probe_angular_wavenumber_rad_per_m=2.0 * numpy.pi * wavenumber_per_m,
-        probe_photon_flux_per_s=photon_flux_per_s,
-        probe_power_W=energy_eV_to_J(probe_energy_eV) * photon_flux_per_s,
+        probe_photon_flux_per_s=probe_photon_flux_per_s,
+        probe_power_W=energy_eV_to_J(photon_energy_eV) * probe_photon_flux_per_s,
         object_plane_propagation_distance_m=propagation_distance_m,
         object_plane_pixel_geometry=object_plane_pixel_geometry,
         fresnel_number=fresnel_number,

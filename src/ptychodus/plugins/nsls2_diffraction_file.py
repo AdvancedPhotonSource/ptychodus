@@ -37,7 +37,7 @@ class NSLS2Style1DiffractionFileReader(DiffractionFileReader):
                     num_patterns_per_array=[num_patterns],
                     pattern_dtype=data.dtype,
                     detector_extent=ImageExtent(detector_width, detector_height),
-                    probe_energy_eV=float(h5_file['/scan/energy'][()]),
+                    photon_energy_eV=float(h5_file['/scan/energy'][()]),
                     exposure_time_s=float(h5_file['/scan/exposure_time'][()]),
                     file_path=file_path,
                 )
@@ -67,7 +67,7 @@ class NSLS2Style2DiffractionFileReader(DiffractionFileReader):
 
                 pixel_size_m = LengthUnit.MICROMETER.to_meters(float(h5_file['/ccd_pixel_um'][()]))
                 wavelength_m = LengthUnit.NANOMETER.to_meters(float(h5_file['/lambda_nm'][()]))
-                probe_energy_eV = wavelength_m_to_energy_eV(wavelength_m)  # noqa: N806
+                photon_energy_eV = wavelength_m_to_energy_eV(wavelength_m)  # noqa: N806
 
                 metadata = DiffractionMetadata(
                     num_patterns_per_array=[num_patterns],
@@ -75,7 +75,7 @@ class NSLS2Style2DiffractionFileReader(DiffractionFileReader):
                     detector_distance_m=float(h5_file['z_m'][()]),
                     detector_extent=ImageExtent(detector_width, detector_height),
                     detector_pixel_geometry=PixelGeometry(pixel_size_m, pixel_size_m),
-                    probe_energy_eV=probe_energy_eV,
+                    photon_energy_eV=photon_energy_eV,
                     tomography_angle_deg=float(h5_file['angle'][()]),
                     file_path=file_path,
                 )
