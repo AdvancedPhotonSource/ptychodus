@@ -1,4 +1,4 @@
-import type { RenderedImage } from '../api.js';
+import type { PlotImage, RenderedImage } from '../api.js';
 
 export interface ImagePanel {
   el: HTMLElement;
@@ -6,6 +6,8 @@ export interface ImagePanel {
   setLoading: (label: string) => void;
   setError: (err: Error) => void;
   setImage: (img: RenderedImage, title: string) => void;
+  // A plot carries its own axes, so it has no colorbar or pixel size to caption.
+  setPlot: (img: PlotImage, title: string) => void;
 }
 
 export function createImagePanel(): ImagePanel {
@@ -35,6 +37,13 @@ export function createImagePanel(): ImagePanel {
     setError(err) {
       wrap.replaceChildren(makeMessage('error', err.message));
       caption.textContent = '';
+    },
+    setPlot(img, title) {
+      const el = document.createElement('img');
+      el.src = `data:${img.mime_type};base64,${img.png_base64}`;
+      el.alt = title;
+      wrap.replaceChildren(el);
+      caption.innerHTML = `<div><strong>${escapeHtml(title)}</strong></div>`;
     },
     setImage(img, title) {
       const el = document.createElement('img');

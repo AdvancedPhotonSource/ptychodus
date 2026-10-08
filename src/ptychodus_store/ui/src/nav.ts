@@ -2,16 +2,29 @@ export interface NavEntry {
   route: string;
   label: string;
   icon: string;
+  /** Indented beneath this entry, as ViewCore's add_subview_group does in the GUI. */
+  children?: NavEntry[];
 }
 
 export const NAV: NavEntry[] = [
   { route: 'diffraction', label: 'Diffraction', icon: 'table-cells.svg' },
-  { route: 'product', label: 'Products', icon: 'list.svg' },
-  { route: 'positions', label: 'Positions', icon: 'route.svg' },
-  { route: 'probe', label: 'Probe', icon: 'circle-radiation.svg' },
-  { route: 'object', label: 'Object', icon: 'layer-group.svg' },
+  {
+    route: 'product',
+    label: 'Products',
+    icon: 'list.svg',
+    children: [
+      { route: 'positions', label: 'Positions', icon: 'route.svg' },
+      { route: 'probe', label: 'Probe', icon: 'circle-radiation.svg' },
+      { route: 'object', label: 'Object', icon: 'layer-group.svg' },
+    ],
+  },
   { route: 'fluorescence', label: 'Fluorescence', icon: 'atom.svg' },
 ];
+
+/** Every entry, parents and children alike, in the order the rail presents them. */
+export function flattenNav(entries: NavEntry[] = NAV): NavEntry[] {
+  return entries.flatMap((entry) => [entry, ...flattenNav(entry.children ?? [])]);
+}
 
 interface AboutLink {
   href: string;
@@ -25,7 +38,8 @@ const ABOUT_LINKS: AboutLink[] = [
 
 export function renderNav(root: HTMLElement, current: string, onSelect: (route: string) => void): void {
   root.replaceChildren();
-  for (const entry of NAV) {
+
+  const button = (entry: NavEntry): HTMLButtonElement => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.title = entry.label;
@@ -36,7 +50,20 @@ export function renderNav(root: HTMLElement, current: string, onSelect: (route: 
     img.alt = '';
     btn.appendChild(img);
     btn.addEventListener('click', () => onSelect(entry.route));
-    root.appendChild(btn);
+    return btn;
+  };
+
+  for (const entry of NAV) {
+    root.appendChild(button(entry));
+
+    if (entry.children === undefined) continue;
+
+    // A rail down the left and an indent mark the child group, matching the
+    // _SubviewGroupContainer the desktop nav draws.
+    const group = document.createElement('div');
+    group.className = 'nav-group';
+    for (const child of entry.children) group.appendChild(button(child));
+    root.appendChild(group);
   }
 
   const spacer = document.createElement('div');

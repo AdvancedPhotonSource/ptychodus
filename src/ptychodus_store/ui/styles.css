@@ -69,6 +69,20 @@ body {
 }
 .nav button.active img { filter: invert(100%) brightness(100%); }
 
+/* Child entries of a nav group: a rail down the left and an indent, the same
+   3px/14px the desktop nav uses, with a smaller icon to mark the second level. */
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  border-left: 3px solid var(--border, #3a3a3a);
+  margin-left: 14px;
+}
+
+.nav-group button img {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
 .nav-spacer { flex: 1; }
 
 .nav-about { position: relative; }

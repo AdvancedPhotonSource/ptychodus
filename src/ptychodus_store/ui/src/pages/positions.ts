@@ -19,8 +19,8 @@ export async function mountPositions(root: HTMLElement): Promise<void> {
     setActiveTab('right');
     image.setLoading('probe positions');
     api
-      .productPositionsImage(product.uuid)
-      .then((img) => image.setImage(img, `${labelFor(product)} — positions`))
+      .productPositionsImage([product.uuid])
+      .then((img) => image.setPlot(img, `${labelFor(product)} — positions`))
       .catch((err: Error) => image.setError(err));
   }
 }

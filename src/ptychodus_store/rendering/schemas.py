@@ -25,6 +25,20 @@ class RenderedImage(BaseModel):
     shape_w_px: int = Field(description='Rendered image width in pixels.')
 
 
+class PlotImage(BaseModel):
+    """A rendered plot.
+
+    Distinct from :class:`RenderedImage`, which describes a colormapped array: a plot
+    carries its own axes, so it has neither a color axis nor a physical pixel size.
+    Reporting one would invite a caption to read it as the sampling of the data.
+    """
+
+    png_base64: str = Field(description='Base64-encoded PNG bytes.')
+    mime_type: Literal['image/png'] = 'image/png'
+    shape_h_px: int = Field(description='Rendered image height in pixels.')
+    shape_w_px: int = Field(description='Rendered image width in pixels.')
+
+
 class OptionsRead(BaseModel):
     """Enumeration of valid choices a client may pass to visualization endpoints."""
 

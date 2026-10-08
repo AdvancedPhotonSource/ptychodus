@@ -6,6 +6,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from base64 import b64decode
 from uuid import UUID
 
 from fastmcp import FastMCP
@@ -39,6 +40,7 @@ from ptychodus_store.rendering import (
     product_to_png_bytes,
 )
 from ptychodus_store.rendering.params import InvalidRenderParamError
+from ptychodus_store.rendering.plot import ScanPath, render_scan_paths
 from ptychodus_store.routers._convert import (
     campaign_to_read,
     diffraction_to_read,
@@ -529,6 +531,42 @@ def create_mcp_server() -> FastMCP:
         except RenderParamsError as exc:
             raise ToolError(str(exc)) from exc
         return MCPImage(data=product_to_png_bytes(vp), format='png')
+
+    @mcp.tool()
+    async def render_scan_positions(
+        uuid: list[str],
+        connect_path: bool = True,
+        width_px: int = 640,
+        height_px: int = 640,
+    ) -> MCPImage:
+        """Plot scan paths, one color and legend entry per product.
+
+        Pass several UUIDs to overlay them on shared axes and compare scans.
+        """
+        scans: list[ScanPath] = []
+
+        for raw_uuid in uuid:
+            target = UUID(raw_uuid)
+            await _ensure_row_exists(ResourceKind.PRODUCT, target)
+            path = _resolve_resource_file(ResourceKind.PRODUCT, target, 'product.h5')
+            product = load_product(path)
+            positions = product.probe_positions
+
+            if len(positions) == 0:
+                raise ToolError(f'product {raw_uuid} has no probe positions')
+
+            scans.append(
+                ScanPath(
+                    label=product.metadata.name or raw_uuid[:8],
+                    x_m=[p.x_m for p in positions],
+                    y_m=[p.y_m for p in positions],
+                )
+            )
+
+        plot = render_scan_paths(
+            scans, connect_path=connect_path, width_px=width_px, height_px=height_px
+        )
+        return MCPImage(data=b64decode(plot.png_base64), format='png')
 
     @mcp.tool()
     async def render_fluorescence_element(

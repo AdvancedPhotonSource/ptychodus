@@ -5,7 +5,7 @@ from httpx import AsyncClient
 from pathlib import Path
 from ptychodus_store.storage.layout import StoreLayout
 from sqlalchemy.ext.asyncio import AsyncEngine
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import base64
 from io import BytesIO
@@ -300,3 +300,46 @@ async def test_component_on_real_endpoint_rejected(
         f'/api/v1/diffraction/{d}/patterns/0/image', params={'component': 'amplitude'}
     )
     assert resp.status_code == 400
+
+
+async def test_positions_plot_overlays_several_products(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
+):
+    """The scan plot takes repeated uuid params and draws them on shared axes.
+
+    A plot is not a colormapped array, so it answers with PlotImage: no color axis and
+    no physical pixel size, where the old hand-rolled renderer reported a synthetic
+    'meters per canvas pixel' that meant something different from every other endpoint.
+    """
+    a = seed_product()
+    b = seed_product()
+    for p in (a, b):
+        await _ingest(db_engine, layout, layout.manifest_path('product', p))
+
+    one = await app_client.get('/api/v1/product/positions/image', params={'uuid': str(a)})
+    both = await app_client.get(
+        '/api/v1/product/positions/image', params=[('uuid', str(a)), ('uuid', str(b))]
+    )
+
+    assert one.status_code == 200
+    assert both.status_code == 200
+
+    body = both.json()
+    assert set(body) == {'png_base64', 'mime_type', 'shape_h_px', 'shape_w_px'}
+    assert body['mime_type'] == 'image/png'
+
+    # Two legend entries make a visibly different figure from one.
+    assert body['png_base64'] != one.json()['png_base64']
+
+    image = Image.open(BytesIO(base64.b64decode(body['png_base64'])))
+    assert image.size == (body['shape_w_px'], body['shape_h_px'])
+
+
+async def test_positions_plot_404s_on_an_unknown_product(
+    app_client: AsyncClient,
+) -> None:
+    resp = await app_client.get('/api/v1/product/positions/image', params={'uuid': str(uuid4())})
+    assert resp.status_code == 404
