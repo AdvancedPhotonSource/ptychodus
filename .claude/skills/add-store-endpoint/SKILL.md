@@ -55,6 +55,14 @@ Match the position/style of the existing `app.include_router(...)` calls (health
 
 Add pydantic response models to [src/ptychodus_store/routers/schemas.py](../../src/ptychodus_store/routers/schemas.py) if a new `*Read` shape is needed. Reuse `Page[T]` for paginated list responses.
 
+### 4b. TypeScript client
+
+A field added to a `*Read` model must also be declared on the matching interface in [src/ptychodus_store/ui/src/api.ts](../../src/ptychodus_store/ui/src/api.ts). Nothing links the two — different languages, different directories — and `tsc` compiles happily against a stale interface, so the field is simply unreachable from the browser. `tests/ptychodus_store/test_ts_client_parity.py` fails and names the missing field; it is the only thing that catches this.
+
+Shared bookkeeping belongs on `RowBase`, which the three mirrored interfaces extend. `CampaignRead` and `LineageRead` are deliberately unmirrored: campaigns and lineage are served to agents and scripts but not browsed.
+
+A new render parameter also goes on `RenderParams` and into `renderQuery`, or the viewer ribbon cannot send it.
+
 ### 5. Converters
 
 If your ORM row → pydantic conversion is non-trivial (or needs a session query for related data), add a helper in [src/ptychodus_store/routers/_convert.py](../../src/ptychodus_store/routers/_convert.py) — this is what keeps REST and MCP in sync, because both channels call the same converter.
@@ -99,6 +107,13 @@ curl -sf http://localhost:8000/api/v1/<resource>/<uuid>
 ```
 
 For the MCP tool, `fastmcp inspect http://localhost:8000/mcp` (or invoke via an MCP client) should list the new tool and return matching data.
+
+Two parity tests run with `pytest tests/ptychodus_store/` and will fail before any of that:
+
+- `test_mcp_tools.py::test_mcp_list_tools_accept_every_rest_filter` — a query parameter on a list route needs the same argument on its tool.
+- `test_ts_client_parity.py` — a `*Read` field needs the same name in `api.ts`.
+
+Rebuild the frontend after touching `api.ts`: `cd src/ptychodus_store/ui && tsc`.
 
 ## Do not
 

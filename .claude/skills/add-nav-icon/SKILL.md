@@ -84,6 +84,17 @@ Add one entry to the `NAV` array in [`src/ptychodus_store/ui/src/nav.ts`](../../
 - `route` — page identifier used by the front-end router.
 - `label` — tooltip / text under the button.
 - `icon` — **filename only**; the render code prefixes `/ui/icons/`.
+- `children` — optional nested entries, drawn with a rail and indent.
+
+**The nesting mirrors `ViewCore`.** A panel added to a group there with `add_subview_group` belongs in that parent's `children` here, and one added at the top level belongs at the top level. The two are written in different languages and nothing compares them, so a panel nested on one side and flat on the other is invisible until someone opens both. The current shape:
+
+```text
+Diffraction          Products (children: Positions, Probe, Object)          Fluorescence
+```
+
+Entries present in `ViewCore` but deliberately absent here are the panels that write or dispatch — Settings, Processing, Globus, Genesis, Automation, Agent — and `src/ptychodus_store/README.md` says so. A new panel of that kind needs no `nav.ts` entry; add it to that list instead.
+
+Routing is keyed by `route`, and `main.ts` walks the tree, so a nested entry needs a `PAGES` entry exactly like a top-level one.
 
 No backend router change is needed. FastAPI already serves `src/ptychodus_store/ui/` at `/ui/` via the `StaticFiles` mount in [`src/ptychodus_store/app.py`](../../src/ptychodus_store/app.py), so a new SVG in `ui/icons/` is automatically reachable at `/ui/icons/my-icon.svg`.
 

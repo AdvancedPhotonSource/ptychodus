@@ -17,6 +17,35 @@ export interface Page<T> {
 }
 
 /** Bookkeeping every indexed row carries; see _RowBase in routers/schemas.py. */
+/** Valid choices for the render parameters; enumerated live by the service. */
+export interface VisualizationOptions {
+  colormaps_linear: string[];
+  colormaps_cyclic: string[];
+  transforms: string[];
+  components: string[];
+  color_models: string[];
+}
+
+/** What the viewer ribbon currently asks for. */
+export interface RenderParams {
+  colormap: string;
+  transform: string;
+  component: string | null;
+  color_model: string | null;
+  value_min: number | null;
+  value_max: number | null;
+  clip: boolean;
+}
+
+export function renderQuery(params: Partial<RenderParams>): string {
+  const parts: string[] = [];
+  for (const [key, value] of Object.entries(params)) {
+    if (value === null || value === undefined || value === '') continue;
+    parts.push(`${key}=${encodeURIComponent(String(value))}`);
+  }
+  return parts.join('&');
+}
+
 export interface RowBase {
   uuid: string;
   folder_path: string;
@@ -154,29 +183,24 @@ export const api = {
   listDiffraction: (limit = 200, offset = 0) =>
     get<Page<DiffractionRead>>(`/diffraction?limit=${limit}&offset=${offset}`),
   getDiffraction: (uuid: string) => get<DiffractionRead>(`/diffraction/${uuid}`),
-  diffractionAggregateImage: (uuid: string) =>
-    get<RenderedImage>(`/diffraction/${uuid}/patterns/aggregate/image`),
-  diffractionPatternImage: (uuid: string, index: number) =>
-    get<RenderedImage>(`/diffraction/${uuid}/patterns/${index}/image`),
+  diffractionAggregateImage: (uuid: string, params: Partial<RenderParams> = {}) =>
+    get<RenderedImage>(`/diffraction/${uuid}/patterns/aggregate/image?${renderQuery(params)}`),
+  diffractionPatternImage: (uuid: string, index: number, params: Partial<RenderParams> = {}) =>
+    get<RenderedImage>(`/diffraction/${uuid}/patterns/${index}/image?${renderQuery(params)}`),
   diffractionFileUrl: (uuid: string) => `${API}/diffraction/${uuid}/files/diffraction`,
 
   listProduct: (limit = 200, offset = 0) =>
     get<Page<ProductRead>>(`/product?limit=${limit}&offset=${offset}`),
   getProduct: (uuid: string) => get<ProductRead>(`/product/${uuid}`),
-  productObjectImage: (uuid: string, layer: number, colorModel = 'hsv_value') =>
-    get<RenderedImage>(
-      `/product/${uuid}/object/${layer}/image?color_model=${encodeURIComponent(colorModel)}`
-    ),
+  productObjectImage: (uuid: string, layer: number, params: Partial<RenderParams> = {}) =>
+    get<RenderedImage>(`/product/${uuid}/object/${layer}/image?${renderQuery(params)}`),
   // The per-mode render: a route the service has always had and the UI never called.
-  productProbeImage: (uuid: string, incoherent: number, colorModel = 'hsv_value') =>
+  productProbeImage: (uuid: string, incoherent: number, params: Partial<RenderParams> = {}) =>
     get<RenderedImage>(
-      `/product/${uuid}/probe/image?incoherent=${incoherent}` +
-        `&color_model=${encodeURIComponent(colorModel)}`
+      `/product/${uuid}/probe/image?incoherent=${incoherent}&${renderQuery(params)}`
     ),
-  productProbeModesImage: (uuid: string, colorModel = 'hsv_value') =>
-    get<RenderedImage>(
-      `/product/${uuid}/probe/modes/image?color_model=${encodeURIComponent(colorModel)}`
-    ),
+  productProbeModesImage: (uuid: string, params: Partial<RenderParams> = {}) =>
+    get<RenderedImage>(`/product/${uuid}/probe/modes/image?${renderQuery(params)}`),
   // Takes a list so the Positions page can overlay checked scans on shared axes.
   productPositionsImage: (uuids: string[], connectPath = true) =>
     get<PlotImage>(
@@ -186,15 +210,21 @@ export const api = {
     ),
   productFileUrl: (uuid: string) => `${API}/product/${uuid}/files/product`,
 
+  visualizationOptions: () => get<VisualizationOptions>('/visualization/options'),
   listFluorescence: (limit = 200, offset = 0) =>
     get<Page<FluorescenceRead>>(`/fluorescence?limit=${limit}&offset=${offset}`),
   getFluorescence: (uuid: string) => get<FluorescenceRead>(`/fluorescence/${uuid}`),
   // product_uuid supplies the pixel geometry; without it the service falls back to a
   // 1 um placeholder and the caption's physical size is wrong.
-  fluorescenceElementImage: (uuid: string, name: string, productUuid?: string) =>
+  fluorescenceElementImage: (
+    uuid: string,
+    name: string,
+    productUuid?: string,
+    params: Partial<RenderParams> = {}
+  ) =>
     get<RenderedImage>(
-      `/fluorescence/${uuid}/elements/${encodeURIComponent(name)}/image` +
-        (productUuid === undefined ? '' : `?product_uuid=${encodeURIComponent(productUuid)}`)
+      `/fluorescence/${uuid}/elements/${encodeURIComponent(name)}/image?` +
+        renderQuery({ ...params, ...(productUuid ? { product_uuid: productUuid } : {}) })
     ),
   fluorescenceFileUrl: (uuid: string) => `${API}/fluorescence/${uuid}/files/fluorescence`,
 };

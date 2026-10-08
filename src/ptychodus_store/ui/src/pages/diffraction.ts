@@ -1,4 +1,4 @@
-import { api, type DiffractionRead } from '../api.js';
+import { api, type DiffractionRead, type RenderParams } from '../api.js';
 import { createDownloadBar } from '../components/download_bar.js';
 import { createImagePanel, type ImagePanel } from '../components/image_panel.js';
 import { createTree, type TreeNode } from '../components/tree.js';
@@ -27,6 +27,9 @@ export async function mountDiffraction(root: HTMLElement): Promise<void> {
   right.replaceChildren(downloadHost, image.el);
   image.setEmpty();
 
+  let redraw: ((params: Partial<RenderParams>) => void) | null = null;
+  image.enableControls((params) => redraw?.(params));
+
   let items: DiffractionRead[] = [];
   try {
     items = (await api.listDiffraction()).items;
@@ -40,25 +43,36 @@ export async function mountDiffraction(root: HTMLElement): Promise<void> {
     return;
   }
 
-  tree.setNodes(items.map((d) => datasetNode(d, image, downloadHost, setActiveTab)));
+  tree.setNodes(
+    items.map((d) => datasetNode(d, image, downloadHost, setActiveTab, (fn) => (redraw = fn)))
+  );
 }
 
 function datasetNode(
   d: DiffractionRead,
   image: ImagePanel,
   downloadHost: HTMLElement,
-  setActiveTab: (which: 'left' | 'right') => void
+  setActiveTab: (which: 'left' | 'right') => void,
+  remember: (fn: (params: Partial<RenderParams>) => void) => void
 ): TreeNode {
   const label = d.label || d.uuid.slice(0, 8);
   const total = d.num_patterns_total ?? 0;
 
-  const show = (title: string, fetch: () => Promise<Parameters<ImagePanel['setImage']>[0]>) => {
+  const show = (
+    title: string,
+    fetch: (params: Partial<RenderParams>) => Promise<Parameters<ImagePanel['setImage']>[0]>
+  ) => {
+    const draw = (params: Partial<RenderParams>): void => {
+      image.setLoading(title);
+      fetch(params)
+        .then((img) => image.setImage(img, `${label} — ${title}`))
+        .catch((err: Error) => image.setError(err));
+    };
     setActiveTab('right');
-    image.setLoading(title);
     downloadHost.replaceChildren(createDownloadBar(api.diffractionFileUrl(d.uuid), `${label}.h5`));
-    fetch()
-      .then((img) => image.setImage(img, `${label} — ${title}`))
-      .catch((err: Error) => image.setError(err));
+    // A control change re-fetches whatever is on screen, not the first thing drawn.
+    remember(draw);
+    draw({});
   };
 
   return {
@@ -75,7 +89,7 @@ function datasetNode(
     ],
     // Selecting the dataset itself shows the mean pattern, as the desktop tree does;
     // there is no synthetic "aggregate" child.
-    onSelect: () => show('mean pattern', () => api.diffractionAggregateImage(d.uuid)),
+    onSelect: () => show('mean pattern', (q) => api.diffractionAggregateImage(d.uuid, q)),
     // One node per frame, built only near the viewport: a dataset runs to tens of
     // thousands, which the DOM will not hold.
     windowedChildren: {
@@ -84,7 +98,7 @@ function datasetNode(
         id: `diff:${d.uuid}:${i}`,
         label: `Frame ${i}`,
         cells: ['1', fmt(d.pattern_width_px), fmt(d.pattern_height_px), '—', '—', '—', '—'],
-        onSelect: () => show(`frame ${i}`, () => api.diffractionPatternImage(d.uuid, i)),
+        onSelect: () => show(`frame ${i}`, (q) => api.diffractionPatternImage(d.uuid, i, q)),
       }),
     },
   };

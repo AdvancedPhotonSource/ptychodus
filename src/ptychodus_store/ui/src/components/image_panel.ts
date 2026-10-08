@@ -1,7 +1,14 @@
-import type { PlotImage, RenderedImage } from '../api.js';
+import { api, type PlotImage, type RenderParams, type RenderedImage } from '../api.js';
 
 export interface ImagePanel {
   el: HTMLElement;
+  /**
+   * Show the Colorize and Data Range controls, re-fetching through `refresh`
+   * whenever one changes. Omitted on a page whose output is a plot: a plot carries
+   * its own axes and takes no render parameters, exactly as the desktop panel has
+   * no ribbon there.
+   */
+  enableControls: (refresh: (params: Partial<RenderParams>) => void) => void;
   setEmpty: (message?: string) => void;
   setLoading: (label: string) => void;
   setError: (err: Error) => void;
@@ -14,6 +21,10 @@ export function createImagePanel(): ImagePanel {
   const el = document.createElement('div');
   el.className = 'image-panel';
 
+  const ribbon = document.createElement('div');
+  ribbon.className = 'image-ribbon';
+  ribbon.hidden = true;
+
   const wrap = document.createElement('div');
   wrap.className = 'image-wrap';
   const empty = document.createElement('div');
@@ -22,10 +33,90 @@ export function createImagePanel(): ImagePanel {
   wrap.appendChild(empty);
   const caption = document.createElement('div');
   caption.className = 'caption';
-  el.append(wrap, caption);
+  el.append(ribbon, wrap, caption);
+
+  // Mirrors the desktop ImageRibbon, minus the image tools: the pan, ruler and
+  // line-cut buttons act on a canvas this panel does not have.
+  function enableControls(refresh: (params: Partial<RenderParams>) => void): void {
+    const params: Partial<RenderParams> = {};
+    const apply = (): void => refresh({ ...params });
+
+    const select = (label: string, key: keyof RenderParams, values: string[], blank = false) => {
+      const wrapper = document.createElement('label');
+      wrapper.textContent = label;
+      const el = document.createElement('select');
+      if (blank) el.appendChild(new Option('—', ''));
+      for (const v of values) el.appendChild(new Option(v, v));
+      el.addEventListener('change', () => {
+        (params as Record<string, unknown>)[key] = el.value === '' ? null : el.value;
+        apply();
+      });
+      wrapper.appendChild(el);
+      return wrapper;
+    };
+
+    const number = (label: string, key: 'value_min' | 'value_max') => {
+      const wrapper = document.createElement('label');
+      wrapper.textContent = label;
+      const el = document.createElement('input');
+      el.type = 'number';
+      el.step = 'any';
+      el.addEventListener('change', () => {
+        params[key] = el.value === '' ? null : Number(el.value);
+        apply();
+      });
+      wrapper.appendChild(el);
+      return wrapper;
+    };
+
+    api
+      .visualizationOptions()
+      .then((opts) => {
+        const colorize = group('Colorize');
+        colorize.append(
+          select('colormap', 'colormap', [...opts.colormaps_linear, ...opts.colormaps_cyclic]),
+          select('transform', 'transform', opts.transforms),
+          select('component', 'component', opts.components, true),
+          select('color model', 'color_model', opts.color_models, true)
+        );
+
+        const range = group('Data Range');
+        const auto = document.createElement('button');
+        auto.type = 'button';
+        auto.textContent = 'Auto';
+        auto.addEventListener('click', () => {
+          params.value_min = null;
+          params.value_max = null;
+          for (const input of range.querySelectorAll('input[type=number]')) {
+            (input as HTMLInputElement).value = '';
+          }
+          apply();
+        });
+
+        const clip = document.createElement('label');
+        clip.textContent = 'clip';
+        const clipBox = document.createElement('input');
+        clipBox.type = 'checkbox';
+        clipBox.addEventListener('change', () => {
+          params.clip = clipBox.checked;
+          apply();
+        });
+        clip.appendChild(clipBox);
+
+        range.append(number('min', 'value_min'), number('max', 'value_max'), auto, clip);
+        ribbon.replaceChildren(colorize, range);
+        ribbon.hidden = false;
+      })
+      .catch(() => {
+        // The ribbon is an enhancement; a failed options fetch leaves the default
+        // render in place rather than blanking the panel.
+        ribbon.hidden = true;
+      });
+  }
 
   return {
     el,
+    enableControls,
     setEmpty(msg = 'Select an item to preview.') {
       wrap.replaceChildren(makeMessage('empty', msg));
       caption.textContent = '';
@@ -81,4 +172,13 @@ function escapeHtml(s: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function group(title: string): HTMLElement {
+  const el = document.createElement('fieldset');
+  el.className = 'ribbon-group';
+  const legend = document.createElement('legend');
+  legend.textContent = title;
+  el.appendChild(legend);
+  return el;
 }

@@ -1,4 +1,4 @@
-import { api, type FluorescenceRead } from '../api.js';
+import { api, type FluorescenceRead, type RenderParams } from '../api.js';
 import { createDownloadBar } from '../components/download_bar.js';
 import { createImagePanel, type ImagePanel } from '../components/image_panel.js';
 import { createTree, type TreeNode } from '../components/tree.js';
@@ -15,6 +15,9 @@ export async function mountFluorescence(root: HTMLElement): Promise<void> {
   const image = createImagePanel();
   right.replaceChildren(downloadHost, image.el);
   image.setEmpty();
+
+  let redraw: ((params: Partial<RenderParams>) => void) | null = null;
+  image.enableControls((params) => redraw?.(params));
 
   let items: FluorescenceRead[] = [];
   try {
@@ -39,7 +42,8 @@ export async function mountFluorescence(root: HTMLElement): Promise<void> {
       fmt(f.element_counts.reduce((a, b) => a + b, 0)),
       fmtBytes(f.nbytes),
     ],
-    loadChildren: () => loadElementNodes(f, image, downloadHost, setActiveTab),
+    loadChildren: () =>
+      loadElementNodes(f, image, downloadHost, setActiveTab, (fn) => (redraw = fn)),
   }));
   tree.setNodes(nodes);
 }
@@ -48,7 +52,8 @@ async function loadElementNodes(
   f: FluorescenceRead,
   image: ImagePanel,
   downloadHost: HTMLElement,
-  setActiveTab: (which: 'left' | 'right') => void
+  setActiveTab: (which: 'left' | 'right') => void,
+  remember: (fn: (params: Partial<RenderParams>) => void) => void
 ): Promise<TreeNode[]> {
   const detail = await api.getFluorescence(f.uuid);
   downloadHost.replaceChildren(
@@ -67,12 +72,16 @@ async function loadElementNodes(
     label: name,
     cells: ['—', '—', fmt(detail.element_counts[i]), '—'],
     onSelect: () => {
+      const draw = (params: Partial<RenderParams>): void => {
+        image.setLoading(`element ${name}`);
+        api
+          .fluorescenceElementImage(f.uuid, name, product, params)
+          .then((img) => image.setImage(img, `${detail.label || f.uuid} — ${name}`))
+          .catch((err: Error) => image.setError(err));
+      };
       setActiveTab('right');
-      image.setLoading(`element ${name}`);
-      api
-        .fluorescenceElementImage(f.uuid, name, product)
-        .then((img) => image.setImage(img, `${detail.label || f.uuid} — ${name}`))
-        .catch((err: Error) => image.setError(err));
+      remember(draw);
+      draw({});
     },
   }));
 }

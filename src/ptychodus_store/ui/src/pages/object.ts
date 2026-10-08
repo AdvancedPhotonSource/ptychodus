@@ -1,4 +1,4 @@
-import { api, type ProductRead } from '../api.js';
+import { api, type ProductRead, type RenderParams } from '../api.js';
 import { createImagePanel } from '../components/image_panel.js';
 import { createTree, type TreeNode } from '../components/tree.js';
 import { buildPageLayout } from '../layout.js';
@@ -23,6 +23,9 @@ export async function mountObject(root: HTMLElement): Promise<void> {
   right.replaceChildren(image.el);
   image.setEmpty('Select an object layer.');
 
+  let redraw: ((params: Partial<RenderParams>) => void) | null = null;
+  image.enableControls((params) => redraw?.(params));
+
   const tree = createTree(COLUMNS);
   left.replaceChildren(tree.el);
 
@@ -35,13 +38,17 @@ export async function mountObject(root: HTMLElement): Promise<void> {
   }
 
   const show = (p: ProductRead, layer: number) => {
-    setActiveTab('right');
-    image.setLoading(`object layer ${layer}`);
     const label = p.name ?? p.uuid.slice(0, 8);
-    api
-      .productObjectImage(p.uuid, layer)
-      .then((img) => image.setImage(img, `${label} — object[${layer}]`))
-      .catch((err: Error) => image.setError(err));
+    const draw = (params: Partial<RenderParams>): void => {
+      image.setLoading(`object layer ${layer}`);
+      api
+        .productObjectImage(p.uuid, layer, params)
+        .then((img) => image.setImage(img, `${label} — object[${layer}]`))
+        .catch((err: Error) => image.setError(err));
+    };
+    setActiveTab('right');
+    redraw = draw;
+    draw({});
   };
 
   tree.setNodes(

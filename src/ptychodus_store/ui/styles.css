@@ -374,3 +374,40 @@ body {
 .data-table th.sorted-desc::after { content: ' \2193'; }
 .data-table th { white-space: pre-line; }
 .data-table .check-col { width: 2.5rem; text-align: center; }
+
+/* --- viewer ribbon ---------------------------------------------------- */
+/* Grouped as the desktop ImageRibbon is, minus the image tools: pan, ruler and
+   line-cut act on a canvas this panel does not have. */
+.image-ribbon {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border, #3a3a3a);
+  font-size: 0.85em;
+}
+
+.ribbon-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border, #3a3a3a);
+  border-radius: 4px;
+  padding: 0.2rem 0.5rem 0.3rem;
+  margin: 0;
+}
+
+.ribbon-group legend {
+  padding: 0 0.3rem;
+  color: var(--fg-muted);
+  font-size: 0.9em;
+}
+
+.ribbon-group label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--fg-muted);
+}
+
+.ribbon-group input[type='number'] { width: 7ch; }
