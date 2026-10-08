@@ -167,6 +167,12 @@ export const api = {
     get<RenderedImage>(
       `/product/${uuid}/object/${layer}/image?color_model=${encodeURIComponent(colorModel)}`
     ),
+  // The per-mode render: a route the service has always had and the UI never called.
+  productProbeImage: (uuid: string, incoherent: number, colorModel = 'hsv_value') =>
+    get<RenderedImage>(
+      `/product/${uuid}/probe/image?incoherent=${incoherent}` +
+        `&color_model=${encodeURIComponent(colorModel)}`
+    ),
   productProbeModesImage: (uuid: string, colorModel = 'hsv_value') =>
     get<RenderedImage>(
       `/product/${uuid}/probe/modes/image?color_model=${encodeURIComponent(colorModel)}`
@@ -183,7 +189,12 @@ export const api = {
   listFluorescence: (limit = 200, offset = 0) =>
     get<Page<FluorescenceRead>>(`/fluorescence?limit=${limit}&offset=${offset}`),
   getFluorescence: (uuid: string) => get<FluorescenceRead>(`/fluorescence/${uuid}`),
-  fluorescenceElementImage: (uuid: string, name: string) =>
-    get<RenderedImage>(`/fluorescence/${uuid}/elements/${encodeURIComponent(name)}/image`),
+  // product_uuid supplies the pixel geometry; without it the service falls back to a
+  // 1 um placeholder and the caption's physical size is wrong.
+  fluorescenceElementImage: (uuid: string, name: string, productUuid?: string) =>
+    get<RenderedImage>(
+      `/fluorescence/${uuid}/elements/${encodeURIComponent(name)}/image` +
+        (productUuid === undefined ? '' : `?product_uuid=${encodeURIComponent(productUuid)}`)
+    ),
   fluorescenceFileUrl: (uuid: string) => `${API}/fluorescence/${uuid}/files/fluorescence`,
 };

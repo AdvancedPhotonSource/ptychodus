@@ -2,13 +2,14 @@ import { api, type FluorescenceRead } from '../api.js';
 import { createDownloadBar } from '../components/download_bar.js';
 import { createImagePanel, type ImagePanel } from '../components/image_panel.js';
 import { createTree, type TreeNode } from '../components/tree.js';
+import { fmt, fmtBytes } from '../format.js';
 import { buildPageLayout } from '../layout.js';
 
 export async function mountFluorescence(root: HTMLElement): Promise<void> {
   const { page, left, right, setActiveTab } = buildPageLayout('fluorescence');
   root.replaceChildren(page);
 
-  const tree = createTree();
+  const tree = createTree(['Name', 'Product', 'Elements', 'Counts', 'Size']);
   left.replaceChildren(tree.el);
   const downloadHost = document.createElement('div');
   const image = createImagePanel();
@@ -32,6 +33,12 @@ export async function mountFluorescence(root: HTMLElement): Promise<void> {
   const nodes: TreeNode[] = items.map((f) => ({
     id: `flu:${f.uuid}`,
     label: f.label || f.uuid.slice(0, 8),
+    cells: [
+      productOf(f)?.slice(0, 8) ?? '—',
+      String(f.element_names.length),
+      fmt(f.element_counts.reduce((a, b) => a + b, 0)),
+      fmtBytes(f.nbytes),
+    ],
     loadChildren: () => loadElementNodes(f, image, downloadHost, setActiveTab),
   }));
   tree.setNodes(nodes);
@@ -51,14 +58,19 @@ async function loadElementNodes(
   if (elements.length === 0) {
     return [{ id: `flu:${f.uuid}:none`, label: '(no elements)' }];
   }
-  return elements.map((name) => ({
+  // Without the product the map renders at a 1 um placeholder pitch and the caption
+  // reports a physical size that is simply wrong.
+  const product = productOf(detail);
+
+  return elements.map((name, i) => ({
     id: `flu:${f.uuid}:${name}`,
     label: name,
+    cells: ['—', '—', fmt(detail.element_counts[i]), '—'],
     onSelect: () => {
       setActiveTab('right');
       image.setLoading(`element ${name}`);
       api
-        .fluorescenceElementImage(f.uuid, name)
+        .fluorescenceElementImage(f.uuid, name, product)
         .then((img) => image.setImage(img, `${detail.label || f.uuid} — ${name}`))
         .catch((err: Error) => image.setError(err));
     },
@@ -80,4 +92,9 @@ function emptyBlock(msg: string): HTMLElement {
   el.style.fontStyle = 'italic';
   el.textContent = msg;
   return el;
+}
+
+/** UUID of the product this map derives from, if the manifest records one. */
+function productOf(f: FluorescenceRead): string | undefined {
+  return f.derived_from.find((e) => e.kind === 'product')?.uuid;
 }

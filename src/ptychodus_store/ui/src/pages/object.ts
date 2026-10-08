@@ -1,82 +1,80 @@
 import { api, type ProductRead } from '../api.js';
 import { createImagePanel } from '../components/image_panel.js';
-import { createProductPicker } from '../components/product_picker.js';
+import { createTree, type TreeNode } from '../components/tree.js';
 import { buildPageLayout } from '../layout.js';
+import { fmt, fmtBytes, scale } from '../format.js';
+
+const COLUMNS = [
+  'Name',
+  'Distance [m]',
+  'Data Type',
+  'Width [px]',
+  'Height [px]',
+  'Pixel Width\n[nm]',
+  'Pixel Height\n[nm]',
+  'Size',
+];
 
 export async function mountObject(root: HTMLElement): Promise<void> {
   const { page, left, right, setActiveTab } = buildPageLayout('object');
   root.replaceChildren(page);
 
   const image = createImagePanel();
-  const picker = document.createElement('div');
-  picker.className = 'sub-picker';
-  right.replaceChildren(picker, image.el);
-  image.setEmpty('Select a product to view its reconstructed object.');
+  right.replaceChildren(image.el);
+  image.setEmpty('Select an object layer.');
 
-  let selected: ProductRead | null = null;
-  let layer = 0;
+  const tree = createTree(COLUMNS);
+  left.replaceChildren(tree.el);
 
-  const productPicker = createProductPicker((product) => selectProduct(product));
-  left.replaceChildren(productPicker.el);
-  await productPicker.load();
-
-  function selectProduct(product: ProductRead): void {
-    selected = product;
-    layer = 0;
-    rebuildPicker();
-    render();
+  let items: ProductRead[] = [];
+  try {
+    items = (await api.listProduct()).items;
+  } catch (err) {
+    left.replaceChildren(errorBlock(err as Error));
+    return;
   }
 
-  function rebuildPicker(): void {
-    picker.replaceChildren();
-    if (!selected) return;
-    const layers = selected.object_layers ?? 1;
-    if (layers <= 1) return;
-    picker.appendChild(indexInput(layer, layers - 1, (v) => {
-      layer = v;
-      render();
-    }));
-  }
-
-  function render(): void {
-    if (!selected) return;
+  const show = (p: ProductRead, layer: number) => {
     setActiveTab('right');
-    const clamped = clampInt(layer, 0, (selected.object_layers ?? 1) - 1);
-    image.setLoading(`object layer ${clamped}`);
+    image.setLoading(`object layer ${layer}`);
+    const label = p.name ?? p.uuid.slice(0, 8);
     api
-      .productObjectImage(selected.uuid, clamped)
-      .then((img) => image.setImage(img, `${labelFor(selected!)} — object[${clamped}]`))
+      .productObjectImage(p.uuid, layer)
+      .then((img) => image.setImage(img, `${label} — object[${layer}]`))
       .catch((err: Error) => image.setError(err));
-  }
+  };
+
+  tree.setNodes(
+    items.map((p): TreeNode => {
+      const layers = p.object_layers ?? 0;
+      const common = [
+        p.object_dtype ?? '—',
+        fmt(p.object_width_px),
+        fmt(p.object_height_px),
+        fmt(scale(p.object_pixel_width_m, 1e9)),
+        fmt(scale(p.object_pixel_height_m, 1e9)),
+      ];
+      return {
+        id: `object:${p.uuid}`,
+        label: p.name ?? p.uuid.slice(0, 8),
+        cells: ['—', ...common, fmtBytes(p.object_nbytes)],
+        onSelect: () => show(p, 0),
+        children: Array.from({ length: layers }, (_, i) => ({
+          id: `object:${p.uuid}:${i}`,
+          label: `Layer ${i}`,
+          // N layers have N-1 spacings, so the last layer has no distance to the next.
+          cells: [fmt(p.object_layer_spacing_m[i]), ...common, '—'],
+          onSelect: () => show(p, i),
+        })),
+      };
+    })
+  );
 }
 
-function labelFor(p: ProductRead): string {
-  return p.name ?? p.uuid.slice(0, 8);
-}
-
-function clampInt(v: number, lo: number, hi: number): number {
-  if (hi < lo) return lo;
-  return Math.max(lo, Math.min(hi, v | 0));
-}
-
-function indexInput(value: number, max: number, onChange: (v: number) => void): HTMLElement {
-  const wrap = document.createElement('label');
-  wrap.style.display = 'inline-flex';
-  wrap.style.alignItems = 'center';
-  wrap.style.gap = '0.25rem';
-  const label = document.createElement('span');
-  label.textContent = `layer (0–${max})`;
-  label.style.color = 'var(--fg-muted)';
-  label.style.fontSize = '0.85em';
-  const input = document.createElement('input');
-  input.type = 'number';
-  input.min = '0';
-  input.max = String(max);
-  input.value = String(value);
-  input.addEventListener('change', () => {
-    const v = parseInt(input.value, 10);
-    if (Number.isFinite(v)) onChange(v);
-  });
-  wrap.append(label, input);
-  return wrap;
+function errorBlock(err: Error): HTMLElement {
+  const el = document.createElement('div');
+  el.style.color = '#ff8080';
+  el.style.padding = '1rem';
+  el.textContent = err.message;
+  return el;
 }

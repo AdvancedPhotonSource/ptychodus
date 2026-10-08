@@ -326,3 +326,51 @@ body {
   white-space: pre-wrap;
   font-family: inherit;
 }
+
+/* --- column-bearing tree --------------------------------------------- */
+/* Rows are a grid so the header and every depth share one set of column
+   edges, which nested <ul> indentation alone cannot give. */
+.tree-header,
+.tree summary,
+.tree .leaf {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) repeat(auto-fit, minmax(5rem, max-content));
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.tree-header {
+  font-weight: 600;
+  color: var(--fg-muted);
+  border-bottom: 1px solid var(--border, #3a3a3a);
+  padding: 0.25rem 0.5rem;
+  white-space: pre-line;
+}
+
+.tree-list,
+.tree-list ul {
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+}
+
+.tree-list ul { padding-left: 1rem; }
+
+/* A windowed parent scrolls its own rows; the spacers above and below stand in
+   for the ones not built. */
+.tree-window {
+  overflow-y: auto;
+  position: relative;
+}
+
+.tree .numeric,
+.data-table .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table th.sortable { cursor: pointer; user-select: none; }
+.data-table th.sorted-asc::after { content: ' \2191'; }
+.data-table th.sorted-desc::after { content: ' \2193'; }
+.data-table th { white-space: pre-line; }
+.data-table .check-col { width: 2.5rem; text-align: center; }
