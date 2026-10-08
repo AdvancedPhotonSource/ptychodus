@@ -385,7 +385,7 @@ fi
 
 args=(
     run --rm -i
-    --shm-size=1g
+    --shm-size=2g
     --ulimit host
     --userns=keep-id
     --security-opt label=type:container_runtime_t
