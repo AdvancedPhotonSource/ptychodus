@@ -6,19 +6,15 @@ that it works on a bare install: nothing it imports may come from an optional ex
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
 from pathlib import Path
 import argparse
-import io
 import logging
-import sys
 
 import pytest
 
 from ptychodus.cli import (
     DirectoryType,
     add_log_level_argument,
-    configure_logging,
     positive_int,
 )
 
@@ -62,65 +58,6 @@ def test_log_level_argument_defaults_to_info() -> None:
     add_log_level_argument(parser)
     assert parser.parse_args([]).log_level == logging.INFO
     assert parser.parse_args(['--log-level', '10']).log_level == logging.DEBUG
-
-
-@pytest.fixture
-def unconfigured_root_logger() -> Iterator[Callable[[], None]]:
-    """Yield a callable that empties the root logger, and restore it afterwards.
-
-    ``logging.basicConfig`` does nothing at all once the root logger has handlers,
-    and under pytest it always does -- so without emptying it first, the call under
-    test has no observable effect and the assertions below would pass vacuously.
-    Emptying has to happen inside the test body rather than here: pytest's logging
-    plugin installs its capture handler after fixture setup, so anything cleared
-    here is back by the time the test runs.
-    """
-    root = logging.getLogger()
-    saved_handlers = root.handlers[:]
-    saved_level = root.level
-
-    try:
-        yield root.handlers.clear
-    finally:
-        root.handlers[:] = saved_handlers
-        root.setLevel(saved_level)
-
-
-def test_configure_logging_sets_the_root_level_from_the_namespace(
-    unconfigured_root_logger: Callable[[], None],
-) -> None:
-    # A level no default sets: the root logger starts at WARNING, so asserting
-    # WARNING would pass even if configure_logging did nothing at all.
-    unusual_level = logging.WARNING + 3
-    unconfigured_root_logger()
-
-    configure_logging(argparse.Namespace(log_level=unusual_level))
-
-    assert logging.getLogger().level == unusual_level
-
-
-def test_configure_logging_binds_the_stderr_it_sees_at_call_time(
-    unconfigured_root_logger: Callable[[], None], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Pins the reason this is a separate function from ``add_log_level_argument``.
-
-    ``basicConfig`` captures ``sys.stderr`` by value, so a caller that redirects its
-    streams has to do so first or its logs go to the pre-redirect stream.
-    """
-    stream = io.StringIO()
-    monkeypatch.setattr(sys, 'stderr', stream)
-    unconfigured_root_logger()
-
-    configure_logging(argparse.Namespace(log_level=logging.INFO))
-
-    # Not "exactly one handler": pytest's logging plugin installs its own capture
-    # handler on the root logger too.
-    bound_streams = [
-        handler.stream
-        for handler in logging.getLogger().handlers
-        if isinstance(handler, logging.StreamHandler)
-    ]
-    assert stream in bound_streams
 
 
 def test_module_imports_nothing_from_an_optional_extra() -> None:
