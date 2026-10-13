@@ -296,7 +296,7 @@ def create_mcp_server() -> FastMCP:
                 )
             if element is not None:
                 where.append(
-                    func.instr(func.cast(Fluorescence.element_names, String), f'"{element}"') > 0  # type: ignore[arg-type]
+                    func.instr(func.cast(Fluorescence.element_names, String), f'"{element}"') > 0
                 )
             items, total = await repo.list_rows(
                 session, Fluorescence, limit=limit, offset=offset, where=where

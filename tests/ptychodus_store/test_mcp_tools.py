@@ -283,7 +283,7 @@ async def test_mcp_list_tools_accept_every_rest_filter() -> None:
 
     from ptychodus_store.routers import diffraction, fluorescence, product
 
-    rest_lists = {
+    rest_lists: dict[str, Callable[..., Any]] = {
         'list_product': product.list_product,
         'list_diffraction': diffraction.list_diffraction,
         'list_fluorescence': fluorescence.list_fluorescence,
