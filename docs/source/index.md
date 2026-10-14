@@ -15,6 +15,7 @@
 getting_started
 initial_guesses
 readers
+reconstruction_drivers
 api
 globus
 pvapy

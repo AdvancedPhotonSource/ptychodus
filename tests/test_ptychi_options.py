@@ -20,6 +20,7 @@ from collections.abc import Iterator
 import dataclasses
 import json
 import logging
+import argparse
 import math
 import operator
 from pathlib import Path
@@ -66,7 +67,13 @@ from ptychodus.model.ptychi.algorithms import (  # noqa: E402
     RPIEAlgorithm,
     build_algorithms,
 )
-from ptychodus.cli._reconstruct_common import load_ptychi_options  # noqa: E402
+from ptychodus.cli._reconstruct_common import (  # noqa: E402
+    _DATA_DERIVED_OPTION_FIELDS,
+    add_print_ptychi_options_argument,
+    format_ptychi_options_defaults,
+    load_ptychi_options,
+)
+from ptychodus.model.ptychi.algorithms import task_options_classes  # noqa: E402
 from ptychodus.model.ptychi.task import (  # noqa: E402
     _initial_opr_mode_weights,
     align_task_options_with_product,
@@ -566,6 +573,108 @@ def test_load_ptychi_options_reads_yaml_and_json_alike(tmp_path: Path) -> None:
 
     assert type(from_yaml) is type(from_json) is LSQMLOptions
     assert json.loads(dump_task_options(from_yaml)) == json.loads(dump_task_options(from_json))
+
+
+# --- --print-ptychi-options --------------------------------------------------------
+
+
+def test_printed_defaults_name_the_same_data_derived_fields_as_alignment() -> None:
+    """The printed header's warning list must be the fields alignment actually writes.
+
+    The header tells a reader which values are pointless to edit. That list is written
+    out by hand -- a reader of the file cannot introspect anything -- so this is what
+    keeps it honest against ``_PRODUCT_DERIVED_FIELDS``, which the test above proves is
+    what alignment really sets.
+    """
+    assert set(_DATA_DERIVED_OPTION_FIELDS) == {path for path, _ in _PRODUCT_DERIVED_FIELDS}
+
+
+@pytest.mark.parametrize('algorithm', list(task_options_classes()))
+def test_printed_defaults_round_trip_to_that_algorithm(algorithm: str) -> None:
+    """Printing then loading must give back the algorithm that was asked for.
+
+    This is the loop the flag exists for, and it covers the ``options_class_name``
+    stamp: PIE, ePIE and rPIE serialize identical field sets, so only the stamp keeps
+    them apart.
+    """
+    loaded = load_task_options_from_mapping(
+        yaml.safe_load(format_ptychi_options_defaults(algorithm))
+    )
+
+    assert type(loaded) is task_options_classes()[algorithm]
+
+
+@pytest.mark.parametrize('algorithm', list(task_options_classes()))
+def test_the_printed_header_is_transparent_to_loading(algorithm: str) -> None:
+    """Comments must not change what the file means, or redirecting it would not work."""
+    options = task_options_classes()[algorithm]()
+
+    assert yaml.safe_load(format_ptychi_options_defaults(algorithm)) == yaml.safe_load(
+        dump_task_options_yaml(options)
+    )
+
+
+def test_the_printed_header_is_only_comments() -> None:
+    header = format_ptychi_options_defaults('LSQML').split('\n\n', 1)[0]
+
+    assert all(line.startswith('#') for line in header.splitlines())
+
+
+def test_printing_defaults_needs_no_other_argument() -> None:
+    """The flag has to work on its own, which is the only way anyone would reach for it.
+
+    Every driver carrying it marks its real input required, and argparse rejects a
+    missing required argument before any driver code runs. An action fires during
+    parsing instead; a plain flag read in ``main()`` would fail here.
+    """
+    parser = argparse.ArgumentParser(exit_on_error=False)
+    parser.add_argument('--diffraction-file', required=True)
+    add_print_ptychi_options_argument(parser)
+
+    with pytest.raises(SystemExit) as caught:
+        parser.parse_args(['--print-ptychi-options'])
+
+    assert caught.value.code == 0
+
+
+def test_printing_defaults_writes_to_stdout(capsys: pytest.CaptureFixture[str]) -> None:
+    """Not stderr: the flag is useless if ``cmd --print-ptychi-options > file`` is empty.
+
+    ``parser.exit(message=...)`` would write to stderr, so this pins the stream rather
+    than merely that something was printed.
+    """
+    parser = argparse.ArgumentParser()
+    add_print_ptychi_options_argument(parser)
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(['--print-ptychi-options', 'DM'])
+
+    captured = capsys.readouterr()
+
+    assert captured.err == ''
+    assert yaml.safe_load(captured.out)['options_class_name'] == 'DMOptions'
+
+
+def test_printing_defaults_rejects_an_unknown_algorithm(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    parser = argparse.ArgumentParser()
+    add_print_ptychi_options_argument(parser)
+
+    with pytest.raises(SystemExit) as caught:
+        parser.parse_args(['--print-ptychi-options', 'NotAnAlgorithm'])
+
+    assert caught.value.code != 0
+    assert 'LSQML' in capsys.readouterr().err
+
+
+def test_the_default_printed_algorithm_is_the_driver_fallback() -> None:
+    """Printing with no argument must describe the run you get with no options file."""
+    printed = load_task_options_from_mapping(
+        yaml.safe_load(format_ptychi_options_defaults('LSQML'))
+    )
+
+    assert type(printed) is type(load_ptychi_options(None))
 
 
 def test_load_task_options_rejects_a_non_object_payload() -> None:

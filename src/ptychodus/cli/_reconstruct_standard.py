@@ -65,6 +65,7 @@ from ptychodus.cli import (
     positive_int,
 )
 from ptychodus.cli._reconstruct_common import (
+    add_print_ptychi_options_argument,
     add_ptychi_options_argument,
     install_signal_handlers,
     invalid_count_threshold,
@@ -287,6 +288,7 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
         help='Override the tomography angle in degrees.',
     )
     add_ptychi_options_argument(parser)
+    add_print_ptychi_options_argument(parser)
     parser.add_argument(
         '--dry-run',
         action='store_true',

@@ -75,6 +75,8 @@ from ptychodus.cli._batch_lamni_settings import (
 )
 from ptychodus.cli._reconstruct_common import (
     CancellationToken,
+    add_print_ptychi_options_argument,
+    add_ptychi_options_argument,
     install_signal_handlers,
     invalid_count_threshold,
     load_ptychi_options,
@@ -241,18 +243,8 @@ def _build_parser() -> argparse.ArgumentParser:
         required=True,
         help='YAML settings file: the paths, the scans, and every tuning value.',
     )
-    parser.add_argument(
-        '--ptychi-options',
-        type=Path,
-        default=None,
-        help=(
-            'pty-chi options, YAML or JSON by suffix, as written to '
-            f'{StandardFileLayout.PTYCHI_OPTIONS} by any ptychodus run. Its algorithm '
-            'stamp selects the reconstructor. Defaults to stock LSQML. Hand-written YAML '
-            'must spell scientific notation 1.0e-3 rather than 1e-3, which YAML reads as '
-            'a string.'
-        ),
-    )
+    add_ptychi_options_argument(parser)
+    add_print_ptychi_options_argument(parser)
     parser.add_argument(
         '--dry-run',
         action='store_true',

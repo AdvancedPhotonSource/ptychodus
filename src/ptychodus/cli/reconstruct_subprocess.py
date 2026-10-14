@@ -76,6 +76,7 @@ from ptychodus.api.reconstruct import (
 from ptychodus.cli import DirectoryType, positive_int
 from ptychodus.cli._reconstruct_common import (
     CancellationToken,
+    add_print_ptychi_options_argument,
     add_ptychi_options_argument,
     install_signal_handlers,
     load_ptychi_options,
@@ -293,6 +294,7 @@ def _build_parser() -> argparse.ArgumentParser:
     add_ptychi_options_argument(
         parser, default_note='Defaults to the one in INPUT_DIR, else to stock LSQML.'
     )
+    add_print_ptychi_options_argument(parser)
     parser.add_argument(
         '--index-filter',
         choices=tuple(member.name.lower() for member in PositionIndexFilter),

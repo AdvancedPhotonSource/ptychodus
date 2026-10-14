@@ -28,9 +28,10 @@ import os
 import signal
 import sys
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from types import FrameType
+from typing import Any, Final
 
 import numpy
 import yaml
@@ -49,6 +50,7 @@ from ptychodus.api.io import StandardFileLayout, save_diffraction_data, save_pro
 from ptychodus.api.preprocess.diffraction import FilterValuesStep, estimate_beam_center
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
+from ptychodus.model.ptychi.algorithms import task_options_classes
 from ptychodus.model.ptychi.task import (
     align_task_options_with_product,
     dump_task_options_yaml,
@@ -59,7 +61,9 @@ from ptychodus.model.ptychi.task import (
 
 __all__ = [
     'CancellationToken',
+    'add_print_ptychi_options_argument',
     'add_ptychi_options_argument',
+    'format_ptychi_options_defaults',
     'install_signal_handlers',
     'invalid_count_threshold',
     'is_main_process',
@@ -370,6 +374,115 @@ def add_ptychi_options_argument(
         type=Path,
         default=None,
         help=f'{_PTYCHI_OPTIONS_HELP} {default_note}',
+    )
+
+
+# Written from the data by ``align_task_options_with_product`` at run time, whatever a
+# supplied options file says. Spelled out rather than derived from that function: this
+# exists to warn a person away from tuning a value that will be discarded, and a reader
+# of the printed file cannot introspect anything. A test holds the two in agreement.
+_DATA_DERIVED_OPTION_FIELDS: Final = (
+    'data_options.wavelength_m',
+    'data_options.free_space_propagation_distance_m',
+    'object_options.pixel_size_m',
+    'object_options.pixel_size_aspect_ratio',
+    'object_options.slice_spacings_m',
+    'object_options.determine_position_origin_coords_by',
+    'object_options.position_origin_coords',
+    'probe_options.pixel_size_m',
+    'probe_options.pixel_size_aspect_ratio',
+    'probe_options.power_constraint.probe_power',
+)
+
+_DEFAULT_PRINTED_ALGORITHM: Final = 'LSQML'
+
+
+def format_ptychi_options_defaults(algorithm: str) -> str:
+    """One algorithm's default options as a commented YAML document.
+
+    The body is exactly what a run writes to its options file, so the result can be
+    saved and passed straight back to ``--ptychi-options``. The header is YAML comments,
+    which :func:`yaml.safe_load` discards, so saving it changes nothing on load.
+    """
+    options_cls = task_options_classes()[algorithm]
+    fields = '\n'.join(f'#   {name}' for name in _DATA_DERIVED_OPTION_FIELDS)
+    header = f"""\
+# pty-chi {algorithm} options, at their defaults. Save this, edit it, and pass it back
+# with --ptychi-options.
+#
+# "options_class_name" is the algorithm identity that selects the reconstructor on the
+# way back in. Re-run --print-ptychi-options with a different algorithm rather than
+# editing those stamps by hand.
+#
+# These are written from the data when a reconstruction starts, whatever this file says,
+# so editing them here changes nothing but adds a warning to the log:
+{fields}
+#
+# Defaults are pty-chi's own, for the version installed here. This is a correct skeleton
+# to edit, not a tuned configuration.
+"""
+    return header + '\n' + dump_task_options_yaml(options_cls())
+
+
+class _PrintPtyChiOptionsAction(argparse.Action):
+    """Print one algorithm's default options and exit, during parsing.
+
+    An action rather than a flag the driver checks, for two reasons. Every driver
+    carrying this marks its real input required, and argparse rejects a missing required
+    argument before any driver code runs -- so a flag would make the command unusable on
+    its own, which is the only way anyone would call it. And one driver redirects its
+    standard output into a log file before it does anything, so a print from inside it
+    would land in the log rather than the terminal. Parsing happens before both.
+    """
+
+    def __init__(
+        self,
+        option_strings: Sequence[str],
+        dest: str,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(
+            option_strings,
+            dest,
+            nargs='?',
+            const=_DEFAULT_PRINTED_ALGORITHM,
+            default=argparse.SUPPRESS,
+            choices=tuple(task_options_classes()),
+            **kwargs,
+        )
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: str | Sequence[Any] | None,
+        option_string: str | None = None,
+    ) -> None:
+        algorithm = _DEFAULT_PRINTED_ALGORITHM if values is None else str(values)
+
+        # Explicitly stdout. ``parser.exit(message=...)`` writes to stderr, which would
+        # leave ``--print-ptychi-options > options.yaml`` -- the whole point of the flag
+        # -- producing an empty file. The stock ``version`` action writes to stdout the
+        # same way, for the same reason.
+        parser._print_message(format_ptychi_options_defaults(algorithm), sys.stdout)
+        parser.exit()
+
+
+def add_print_ptychi_options_argument(parser: argparse.ArgumentParser) -> None:
+    """Add ``--print-ptychi-options``, the way to obtain a file for ``--ptychi-options``.
+
+    Bare, it prints the algorithm a driver falls back to when given no options file, so
+    the printed file reproduces the default run rather than describing some other one.
+    """
+    parser.add_argument(
+        '--print-ptychi-options',
+        action=_PrintPtyChiOptionsAction,
+        metavar='ALGORITHM',
+        help=(
+            "Print this algorithm's default pty-chi options as YAML, then exit. "
+            f'Defaults to {_DEFAULT_PRINTED_ALGORITHM}. Redirect to a file, edit it, and '
+            'pass it back with --ptychi-options.'
+        ),
     )
 
 

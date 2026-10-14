@@ -63,6 +63,21 @@ def test_every_profile_builds_a_parser() -> None:
         ), name
 
 
+def test_every_profile_can_print_ptychi_option_defaults() -> None:
+    """All nine beamline commands must offer the flag, and offer it without any input.
+
+    It is how a user obtains the file ``--ptychi-options`` takes, so a driver missing it
+    leaves no way to start one but finishing a reconstruction first.
+    """
+    for name, profile in _profiles().items():
+        parser = rs.build_standard_parser(profile)
+
+        with pytest.raises(SystemExit) as caught:
+            parser.parse_args(['--print-ptychi-options'])
+
+        assert caught.value.code == 0, name
+
+
 def test_instrument_defaults_are_carried_from_the_profile() -> None:
     profiles = _profiles()
 
