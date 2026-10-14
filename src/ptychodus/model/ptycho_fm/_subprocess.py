@@ -13,9 +13,12 @@ Two entry points are exposed:
   a full-object array via ``place_patches_fourier_shift``, and stream back a
   single :class:`ReconstructOutput`.
 - :func:`run_train` -- run one single-device training session (no DDP, no
-  mlflow, no wandb) driven by :class:`ptycho_fm.model.model.PtychoFM` and a
-  minimal train/validate loop that mirrors ``ptycho_fm/train.py`` stripped of
-  its distributed machinery. Emits a :class:`TrainOutput` after each epoch and
+  mlflow, no wandb) driven by the trainable model that ``coupled_decoder_mode``
+  selects -- ``PtychoFM``, ``PtychoFMReIm`` or ``PtychoFMCoupledAmpPh``, which
+  share a ``forward(x, probe, normalization, scale)`` returning the modelled
+  diffraction alongside amplitude and phase -- and a minimal train/validate
+  loop that mirrors ``ptycho_fm/train.py`` stripped of its distributed
+  machinery. Emits a :class:`TrainOutput` after each epoch and
   a final ``TAG_MODEL_SAVED`` with the path of the best checkpoint.
 
 Stitching is done here rather than reused: ptycho_fm's own
@@ -130,8 +133,8 @@ def _make_inference_dataset(
     ``predict_object_patches`` destructures every sample as ``(diffraction,
     amplitude, phase, probe, position, normalization, scale)``. Only the
     diffraction is read for an inference-only model, so the amplitude and phase
-    slots carry empty tensors; the probe is real and is consumed by the models
-    that run the forward physics.
+    slots carry empty tensors. The probe slot carries the genuine complex probe,
+    which the coupled models consume when they run the forward physics.
 
     The class is defined here so ``torch`` stays a child-side import.
     """
@@ -185,8 +188,20 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
     data_config = config['data']
     inference_config = config['inference']
 
+    coupled_decoder_mode = config['model'].get('coupled_decoder_mode')
     model, image_size = resolve_inference_model(config)
-    load_checkpoint(model, payload.model_path, device)
+
+    try:
+        load_checkpoint(model, payload.model_path, device)
+    except RuntimeError as exc:
+        raise ValueError(
+            f'Could not load {payload.model_path} into the model selected by '
+            f'coupled_decoder_mode={coupled_decoder_mode!r}. A .pth holds a bare state '
+            'dict with no mode metadata, so the most common cause is a mode differing '
+            'from the one the checkpoint was trained with. Set Coupled Decoder to that '
+            "mode -- 'none' for a checkpoint trained before the coupled decoders were "
+            'selectable.'
+        ) from exc
 
     parameters = payload.reconstruct_input
 
@@ -213,6 +228,19 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
     probe_array = parameters.product.probes.get_probe_no_opr().get_array()
     if probe_array.ndim != 3:
         raise ValueError(f'Expected probe with shape (N_modes, H, W); got {probe_array.shape}.')
+    if coupled_decoder_mode in ('real_imag', 'amp_phase'):
+        # The zero-pad above resizes the diffraction, not the probe, and the
+        # coupled models multiply an image_size object patch by it. Inference
+        # discards the modelled diffraction, so only this product has to agree.
+        probe_height, probe_width = probe_array.shape[-2:]
+
+        if (probe_height, probe_width) != (image_size, image_size):
+            raise ValueError(
+                f'Probe is {probe_height}x{probe_width}, but the coupled decoder runs the '
+                f'forward physics against {image_size}x{image_size} object patches. Re-crop '
+                'the probe, or load a checkpoint trained without a coupled decoder.'
+            )
+
     max_modes = int(data_config['max_probe_modes'])
     probe_padded = _pad_probe_to_modes(probe_array, max_modes)
     # Samples carry the probe with an OPR axis in front: (OPR, N_modes, H, W).
@@ -321,11 +349,13 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
 def _build_criterion(training_config: dict[str, Any]) -> Any:
     """Instantiate the loss module named in ``training_config['loss_function']``.
 
-    Mirrors the branch at ``ptycho_fm/train.py`` line ~728.
+    Each branch builds the loss ptycho_fm's own trainer selects for the same
+    name, configured from the sub-section that shares that name. Parameters the
+    settings do not expose are left at the constructor defaults.
     """
     import torch.nn as nn
 
-    from ptycho_fm.custom_loss import WeightedLoss
+    from ptycho_fm.custom_loss import ProbeAwareLoss, QDependentLoss, TotalFluxLoss, WeightedLoss
 
     name = training_config['loss_function']
     if name == 'smooth_l1':
@@ -336,10 +366,128 @@ def _build_criterion(training_config: dict[str, Any]) -> Any:
         return nn.L1Loss()
     if name == 'poisson_nll':
         return nn.PoissonNLLLoss(log_input=False, full=False)
+    if name == 'total_flux':
+        return TotalFluxLoss()
     if name == 'weighted':
-        w = training_config['weighted_loss']
-        return WeightedLoss(loss_type=w['loss_type'], threshold=w['threshold'], alpha=w['alpha'])
+        weighted_config = training_config['weighted_loss']
+        return WeightedLoss(
+            loss_type=weighted_config['loss_type'],
+            threshold=weighted_config['threshold'],
+            alpha=weighted_config['alpha'],
+        )
+    if name == 'probe_aware':
+        probe_aware_config = training_config['probe_aware_loss']
+        return ProbeAwareLoss(
+            loss_type=probe_aware_config['loss_type'],
+            threshold=probe_aware_config['threshold'],
+            alpha=probe_aware_config['alpha'],
+            envelope_floor=probe_aware_config['envelope_floor'],
+        )
+    if name == 'q_dependent':
+        q_dependent_config = training_config['q_dependent_loss']
+        return QDependentLoss(
+            loss_type=q_dependent_config['loss_type'],
+            alpha=q_dependent_config['alpha'],
+            q_beta=q_dependent_config['q_beta'],
+            q_floor=q_dependent_config['q_floor'],
+            threshold=q_dependent_config['threshold'],
+            log_error=q_dependent_config['log_error'],
+            normalize_q=q_dependent_config['normalize_q'],
+        )
+    if name == 'combined':
+        raise ValueError(
+            "The 'combined' loss takes a list of weighted loss terms, which has no "
+            'representation in ptychodus settings. Select a single loss function.'
+        )
     raise ValueError(f'Unknown loss function: {name!r}')
+
+
+def _compute_loss(
+    criterion: Any,
+    prediction: Any,
+    target: Any,
+    *,
+    probe: Any,
+    normalization: Any,
+    scale: Any,
+) -> Any:
+    """Apply ``criterion``, supplying the probe far-field envelope when it asks.
+
+    A loss module advertises the need by setting ``uses_probe_envelope``; called
+    with prediction and target alone it would silently compute an unweighted
+    error instead. Every other loss takes the two arguments.
+    """
+    if getattr(criterion, 'uses_probe_envelope', False):
+        return criterion(prediction, target, probe=probe, normalization=normalization, scale=scale)
+
+    return criterion(prediction, target)
+
+
+def _build_training_model(model_config: dict[str, Any]) -> Any:
+    """Construct the trainable model selected by ``coupled_decoder_mode``.
+
+    ``resolve_inference_model`` cannot serve here: for the uncoupled mode it
+    returns the inference-only subclass, whose forward takes the diffraction
+    alone and runs no forward physics. An unrecognized mode raises rather than
+    falling back, so a typo cannot train one architecture that inference then
+    refuses to load.
+    """
+    from ptycho_fm.model.model import PtychoFM, PtychoFMCoupledAmpPh, PtychoFMReIm
+
+    coupled_decoder_mode = model_config.get('coupled_decoder_mode')
+    if coupled_decoder_mode is None:
+        return PtychoFM(config=model_config)
+    if coupled_decoder_mode == 'real_imag':
+        return PtychoFMReIm(config=model_config)
+    if coupled_decoder_mode == 'amp_phase':
+        return PtychoFMCoupledAmpPh(config=model_config)
+    raise ValueError(
+        f'Unknown coupled_decoder_mode: {coupled_decoder_mode!r}. '
+        "Expected None, 'real_imag' or 'amp_phase'."
+    )
+
+
+def _build_param_groups(
+    model: Any, learning_rate: float, *, coupled_decoder_mode: str | None
+) -> list[dict[str, Any]]:
+    """Group the model's parameters for Adam, matching the decoder layout.
+
+    The coupled variants replace the separate amplitude and phase decoders with
+    a single ``coupled_decoder`` and carry a different set of output
+    normalization scalars. Those scalars are frozen, so their group contributes
+    no updates; it is present so the groups span the whole parameter inventory.
+    """
+    if coupled_decoder_mode in ('real_imag', 'amp_phase'):
+        if coupled_decoder_mode == 'real_imag':
+            output_norm_params = [
+                model.real_scale,
+                model.imag_scale,
+                model.real_offset,
+                model.imag_offset,
+            ]
+        else:
+            output_norm_params = [model.amp_scale, model.ph_scale, model.amp_offset]
+
+        return [
+            {'params': model.encoder.parameters(), 'lr': learning_rate, 'name': 'encoder'},
+            {
+                'params': model.coupled_decoder.parameters(),
+                'lr': learning_rate,
+                'name': 'coupled_decoder',
+            },
+            {'params': output_norm_params, 'lr': learning_rate, 'name': 'output_norm_params'},
+        ]
+
+    return [
+        {'params': model.encoder.parameters(), 'lr': learning_rate, 'name': 'encoder'},
+        {'params': model.amp_decoder.parameters(), 'lr': learning_rate, 'name': 'amp_decoder'},
+        {'params': model.ph_decoder.parameters(), 'lr': learning_rate, 'name': 'ph_decoder'},
+        {
+            'params': [model.amp_scale, model.amp_offset, model.ph_scale],
+            'lr': learning_rate,
+            'name': 'output_norm_params',
+        },
+    ]
 
 
 def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
@@ -348,8 +496,8 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
     Single-device, no DDP, no mlflow, no wandb. Builds a CombinedDataset over
     ``payload.input_path`` (a directory of paired ``*_dp.hdf5`` / ``*_para.hdf5``
     files -- ptycho_fm's own training format) and runs a lightweight
-    train/validate loop directly against :class:`PtychoFM`, emitting one
-    :class:`TrainOutput` per epoch. The best checkpoint by validation loss is
+    train/validate loop directly against the model ``coupled_decoder_mode``
+    selects, emitting one :class:`TrainOutput` per epoch. The best checkpoint by validation loss is
     written to ``payload.output_path/best.pth`` and its path streamed back via
     ``TAG_MODEL_SAVED``.
     """
@@ -365,7 +513,6 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
     from torch.utils.data import DataLoader, Subset, random_split
 
     from ptycho_fm.data import CombinedDataset
-    from ptycho_fm.model.model import PtychoFM
 
     device = _select_device()
     config = payload.config
@@ -426,15 +573,13 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
     train_loader = DataLoader(train_subset, shuffle=True, drop_last=False, **loader_kwargs)
     val_loader = DataLoader(val_subset, shuffle=False, drop_last=False, **loader_kwargs)
 
-    model = PtychoFM(config=model_config).to(device)
+    coupled_decoder_mode = model_config.get('coupled_decoder_mode')
+    model = _build_training_model(model_config).to(device)
 
-    lr = float(training_config['learning_rate'])
-    param_groups = [
-        {'params': model.encoder.parameters(), 'lr': lr, 'name': 'encoder'},
-        {'params': model.amp_decoder.parameters(), 'lr': lr, 'name': 'amp_decoder'},
-        {'params': model.ph_decoder.parameters(), 'lr': lr, 'name': 'ph_decoder'},
-    ]
-    optimizer = optim.Adam(param_groups)
+    learning_rate = float(training_config['learning_rate'])
+    optimizer = optim.Adam(
+        _build_param_groups(model, learning_rate, coupled_decoder_mode=coupled_decoder_mode)
+    )
 
     criterion = _build_criterion(training_config)
     is_supervised = training_config['mode'] == 'supervised'
@@ -474,7 +619,14 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
             ph_loss = criterion(pred_ph, ph_patch.to(device))
             return amp_loss + ph_loss
 
-        return criterion(pred_diff, input_diff)
+        return _compute_loss(
+            criterion,
+            pred_diff,
+            input_diff,
+            probe=input_probe,
+            normalization=input_norm,
+            scale=input_scale,
+        )
 
     training_losses: list[LossValue] = []
     validation_losses: list[LossValue] = []

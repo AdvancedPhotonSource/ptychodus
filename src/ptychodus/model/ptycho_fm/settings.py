@@ -10,9 +10,9 @@ class PtychoFMDataSettings(Observable, Observer):
 
         self.scale = self._group.create_real_parameter('scale', 10000.0, minimum=0.0)
         self.default_normalization = self._group.create_real_parameter(
-            'default_normalization', 100000.0, minimum=0.0
+            'default_normalization', 10000.0, minimum=0.0
         )
-        self.cache_object = self._group.create_boolean_parameter('cache_object', True)
+        self.cache_object = self._group.create_boolean_parameter('cache_object', False)
         self.max_probe_modes = self._group.create_integer_parameter(
             'max_probe_modes', 10, minimum=1
         )
@@ -21,7 +21,7 @@ class PtychoFMDataSettings(Observable, Observer):
             'cache_memory_budget_mb', 512, minimum=0
         )
         self.train_split = self._group.create_real_parameter(
-            'train_split', 0.80, minimum=0.0, maximum=1.0
+            'train_split', 0.95, minimum=0.0, maximum=1.0
         )
         self.random_seed = self._group.create_integer_parameter('random_seed', 8)
         # 0 → treat as "use all files" (null in the YAML).
@@ -71,6 +71,13 @@ class PtychoFMModelSettings(Observable, Observer):
         self.decoder_dropout = self._group.create_real_parameter(
             'decoder_dropout', 0.1, minimum=0.0, maximum=1.0
         )
+        # 'none' builds the separate amplitude and phase decoders; the coupled
+        # modes build one shared decoder. The mode is part of the architecture a
+        # checkpoint was trained under, so loading one saved under a different
+        # mode fails on the parameter names.
+        self.coupled_decoder_mode = self._group.create_string_parameter(
+            'coupled_decoder_mode', 'amp_phase'
+        )
 
         self.init_enabled = self._group.create_boolean_parameter('init_enabled', False)
         self.init_method = self._group.create_string_parameter('init_method', 'trunc_normal')
@@ -86,15 +93,51 @@ class PtychoFMTrainingSettings(Observable, Observer):
         self._group = registry.create_group('PtychoFMTraining')
         self._group.add_observer(self)
 
-        self.batch_size = self._group.create_integer_parameter('batch_size', 64, minimum=1)
+        self.batch_size = self._group.create_integer_parameter('batch_size', 128, minimum=1)
         self.learning_rate = self._group.create_real_parameter('learning_rate', 1.0e-5, minimum=0.0)
-        self.epochs = self._group.create_integer_parameter('epochs', 11, minimum=1)
+        self.epochs = self._group.create_integer_parameter('epochs', 2, minimum=1)
         self.loss_function = self._group.create_string_parameter('loss_function', 'weighted')
         self.weighted_loss_type = self._group.create_string_parameter('weighted_loss_type', 'mse')
         self.weighted_loss_threshold = self._group.create_real_parameter(
-            'weighted_loss_threshold', 0.0
+            'weighted_loss_threshold', 1.0e-6
         )
         self.weighted_loss_alpha = self._group.create_real_parameter('weighted_loss_alpha', 1.0)
+
+        self.probe_aware_loss_type = self._group.create_string_parameter(
+            'probe_aware_loss_type', 'mae'
+        )
+        self.probe_aware_loss_threshold = self._group.create_real_parameter(
+            'probe_aware_loss_threshold', 1.0e-6
+        )
+        self.probe_aware_loss_alpha = self._group.create_real_parameter(
+            'probe_aware_loss_alpha', 0.5, minimum=0.0
+        )
+        self.probe_aware_loss_envelope_floor = self._group.create_real_parameter(
+            'probe_aware_loss_envelope_floor', 0.05, minimum=0.0
+        )
+
+        self.q_dependent_loss_type = self._group.create_string_parameter(
+            'q_dependent_loss_type', 'mse'
+        )
+        self.q_dependent_loss_alpha = self._group.create_real_parameter(
+            'q_dependent_loss_alpha', 1.0
+        )
+        self.q_dependent_loss_q_beta = self._group.create_real_parameter(
+            'q_dependent_loss_q_beta', 1.0
+        )
+        self.q_dependent_loss_q_floor = self._group.create_real_parameter(
+            'q_dependent_loss_q_floor', 0.05, minimum=0.0
+        )
+        self.q_dependent_loss_threshold = self._group.create_real_parameter(
+            'q_dependent_loss_threshold', 1.0e-6
+        )
+        self.q_dependent_loss_log_error = self._group.create_boolean_parameter(
+            'q_dependent_loss_log_error', True
+        )
+        self.q_dependent_loss_normalize_q = self._group.create_boolean_parameter(
+            'q_dependent_loss_normalize_q', True
+        )
+
         self.save_epoch_models = self._group.create_boolean_parameter('save_epoch_models', True)
 
     def _update(self, observable: Observable) -> None:

@@ -175,6 +175,17 @@ class PtychoFMViewControllerFactory(ReconstructorViewControllerFactory):
             'Decoder Dropout:',
             group=model_group,
         )
+        builder.add_combo_box(
+            model_settings.coupled_decoder_mode,
+            enumerators.get_coupled_decoder_modes(),
+            'Coupled Decoder:',
+            tool_tip=(
+                "'none' decodes amplitude and phase separately; the coupled modes share one "
+                'decoder and run the forward physics. A checkpoint loads only into the mode '
+                'it was trained with.'
+            ),
+            group=model_group,
+        )
 
         # Init
         builder.add_check_box(
@@ -215,7 +226,7 @@ class PtychoFMViewControllerFactory(ReconstructorViewControllerFactory):
         )
         builder.add_combo_box(
             training_settings.weighted_loss_type,
-            enumerators.get_weighted_loss_types(),
+            enumerators.get_loss_types(),
             'Weighted Loss Type:',
             tool_tip="Only used when loss_function is 'weighted'.",
             group=training_group,
@@ -228,6 +239,72 @@ class PtychoFMViewControllerFactory(ReconstructorViewControllerFactory):
         builder.add_decimal_line_edit(
             training_settings.weighted_loss_alpha,
             'Weighted Loss Alpha:',
+            group=training_group,
+        )
+        builder.add_combo_box(
+            training_settings.probe_aware_loss_type,
+            enumerators.get_loss_types(),
+            'Probe-Aware Loss Type:',
+            tool_tip="Only used when loss_function is 'probe_aware'.",
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.probe_aware_loss_threshold,
+            'Probe-Aware Loss Threshold:',
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.probe_aware_loss_alpha,
+            'Probe-Aware Loss Alpha:',
+            tool_tip='Power applied to the probe far-field envelope in the denominator.',
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.probe_aware_loss_envelope_floor,
+            'Probe-Aware Envelope Floor:',
+            tool_tip='Per-sample floor as a fraction of the mean probe envelope.',
+            group=training_group,
+        )
+        builder.add_combo_box(
+            training_settings.q_dependent_loss_type,
+            enumerators.get_loss_types(),
+            'Q-Dependent Loss Type:',
+            tool_tip="Only used when loss_function is 'q_dependent'.",
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.q_dependent_loss_alpha,
+            'Q-Dependent Loss Alpha:',
+            tool_tip='Focal exponent emphasizing poorly matched pixels; 0 disables it.',
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.q_dependent_loss_q_beta,
+            'Q-Dependent Q Exponent:',
+            tool_tip='Radial exponent emphasizing high-Q pixels; 0 disables Q weighting.',
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.q_dependent_loss_q_floor,
+            'Q-Dependent Q Floor:',
+            tool_tip='Minimum normalized Q, so low-Q pixels are not zero-weighted.',
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.q_dependent_loss_threshold,
+            'Q-Dependent Loss Threshold:',
+            group=training_group,
+        )
+        builder.add_check_box(
+            training_settings.q_dependent_loss_log_error,
+            'Q-Dependent Log Error',
+            tool_tip='Compute the data error on log10 amplitudes.',
+            group=training_group,
+        )
+        builder.add_check_box(
+            training_settings.q_dependent_loss_normalize_q,
+            'Q-Dependent Normalize Q',
+            tool_tip='Normalize the Q weight map to unit mean.',
             group=training_group,
         )
         builder.add_check_box(

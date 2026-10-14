@@ -7,7 +7,9 @@ run manually with PYTHONPATH pointing at the sibling checkout:
         uv run --no-sync python scripts/smoke_ptycho_fm.py [--cpu]
 
 Drives the child entry points directly (no GUI, no subprocess) so failures
-surface as ordinary tracebacks.
+surface as ordinary tracebacks. Covers both training objectives, each
+``coupled_decoder_mode``, the diffraction-space losses and the probe-envelope
+call contract -- everything that needs a real ptycho_fm to prove.
 """
 
 from __future__ import annotations
@@ -30,7 +32,12 @@ from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructInput
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.ptycho_fm._payload import ReconstructPayload, TrainPayload
-from ptychodus.model.ptycho_fm._subprocess import run_reconstruct, run_train
+from ptychodus.model.ptycho_fm._subprocess import (
+    _build_criterion,
+    _compute_loss,
+    run_reconstruct,
+    run_train,
+)
 from ptychodus.model.ptycho_fm.reconstructor import _build_config, build_reconstructor
 from ptychodus.model.ptycho_fm.settings import (
     PtychoFMDataSettings,
@@ -69,6 +76,9 @@ def _settings() -> tuple[Any, Any, Any, Any]:
     model.decoder_base_channels.set_value(8)
     model.decoder_latent_dim.set_value(64)
     model.decoder_num_stages.set_value(NUM_STAGES)
+    # Pinned so the baseline phases cover the uncoupled path; the mode sweep
+    # below is the only place that varies it.
+    model.coupled_decoder_mode.set_value('none')
 
     data.max_probe_modes.set_value(2)
     data.num_workers.set_value(0)
@@ -222,6 +232,128 @@ def run_inference(checkpoint: Path, data: Any, model: Any, training: Any, infere
     )
 
 
+def check_coupled_decoder_modes(data: Any, model: Any, training: Any, inference: Any) -> None:
+    """Train and infer under each decoder mode, and prove the mode is honoured.
+
+    An inference-only model ignores the probe entirely, so a mode that silently
+    collapsed to the uncoupled class would still produce a plausible object.
+    Differing loss traces are what rules that out.
+    """
+    training.loss_function.set_value('mse')
+    original_mode = model.coupled_decoder_mode.get_value()
+    losses_by_mode: dict[str, list[float]] = {}
+
+    for coupled_decoder_mode in ('none', 'real_imag', 'amp_phase'):
+        model.coupled_decoder_mode.set_value(coupled_decoder_mode)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            checkpoint, losses = run_training(
+                'Unsupervised', data, model, training, inference, Path(tmp) / coupled_decoder_mode
+            )
+            losses_by_mode[coupled_decoder_mode] = losses
+            run_inference(checkpoint, data, model, training, inference)
+
+    distinct = {tuple(losses) for losses in losses_by_mode.values()}
+    assert len(distinct) == len(losses_by_mode), (
+        f'decoder modes produced identical losses ({losses_by_mode}); the mode is not honoured'
+    )
+    print('  [ok] the three decoder modes optimize distinct architectures')
+    model.coupled_decoder_mode.set_value(original_mode)
+
+
+def check_mode_mismatch_is_reported(data: Any, model: Any, training: Any, inference: Any) -> None:
+    """A checkpoint loaded under the wrong mode must name the mode, not the keys."""
+    training.loss_function.set_value('mse')
+    original_mode = model.coupled_decoder_mode.get_value()
+    model.coupled_decoder_mode.set_value('amp_phase')
+
+    with tempfile.TemporaryDirectory() as tmp:
+        checkpoint, _ = run_training(
+            'Unsupervised', data, model, training, inference, Path(tmp) / 'mismatch'
+        )
+
+        model.coupled_decoder_mode.set_value('none')
+        payload = ReconstructPayload(
+            name='Unsupervised',
+            config=_build_config('Unsupervised', data, model, training, inference),
+            model_path=checkpoint,
+            reconstruct_input=_reconstruct_input(IMG_SIZE),
+        )
+        q: queue.Queue[Any] = queue.Queue()
+
+        try:
+            run_reconstruct(payload, q)  # type: ignore[arg-type]
+        except ValueError as exc:
+            assert 'coupled_decoder_mode' in str(exc), f'unhelpful message: {exc}'
+            print(f'  [ok] mismatch reported: {str(exc).splitlines()[0][:80]}...')
+        else:
+            raise AssertionError('loading an amp_phase checkpoint as uncoupled did not raise')
+
+    model.coupled_decoder_mode.set_value(original_mode)
+
+
+def check_new_losses(data: Any, model: Any, training: Any, inference: Any) -> None:
+    """Each diffraction-space loss trains to a finite value."""
+    original_mode = model.coupled_decoder_mode.get_value()
+    model.coupled_decoder_mode.set_value('none')
+
+    for loss_function in ('total_flux', 'probe_aware', 'q_dependent'):
+        training.loss_function.set_value(loss_function)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            _, losses = run_training(
+                'Unsupervised', data, model, training, inference, Path(tmp) / loss_function
+            )
+
+        assert all(numpy.isfinite(value) for value in losses), f'{loss_function}: {losses}'
+        print(f'  [ok] {loss_function}: finite losses {losses}')
+
+    training.loss_function.set_value('mse')
+    model.coupled_decoder_mode.set_value(original_mode)
+
+
+def check_probe_envelope_dispatch(data: Any, model: Any, training: Any, inference: Any) -> None:
+    """The probe-aware loss must actually receive the probe.
+
+    Called with prediction and target alone it still returns a number -- a
+    different one -- so only comparing the two call forms catches a regression.
+    """
+    import torch
+
+    training.loss_function.set_value('probe_aware')
+    config = _build_config('Unsupervised', data, model, training, inference)
+    criterion = _build_criterion(config['training'])
+
+    assert getattr(criterion, 'uses_probe_envelope', False), (
+        'ProbeAwareLoss no longer advertises uses_probe_envelope; the dispatch is dead'
+    )
+
+    generator = torch.Generator().manual_seed(0)
+    shape = (2, 1, IMG_SIZE, IMG_SIZE)
+    prediction = torch.rand(shape, generator=generator)
+    target = torch.rand(shape, generator=generator)
+    probe = torch.view_as_real(
+        torch.randn(2, 1, 2, IMG_SIZE, IMG_SIZE, generator=generator, dtype=torch.complex64)
+    )
+    normalization = torch.ones(2)
+    scale = torch.full((2,), 10000.0)
+
+    with_envelope = _compute_loss(
+        criterion, prediction, target, probe=probe, normalization=normalization, scale=scale
+    )
+    without_envelope = criterion(prediction, target)
+
+    assert not torch.isclose(with_envelope, without_envelope), (
+        'the probe envelope changed nothing; _compute_loss is dropping it'
+    )
+    print(
+        f'  [ok] envelope honoured: with={with_envelope.item():.6g}, '
+        f'without={without_envelope.item():.6g}'
+    )
+
+    training.loss_function.set_value('mse')
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument('--cpu', action='store_true', help='hide CUDA devices')
@@ -259,6 +391,18 @@ def main() -> int:
 
         print('3. inference')
         run_inference(supervised_checkpoint, data, model, training, inference)
+
+    print('4. coupled decoder modes')
+    check_coupled_decoder_modes(data, model, training, inference)
+
+    print('5. checkpoint/mode mismatch')
+    check_mode_mismatch_is_reported(data, model, training, inference)
+
+    print('6. diffraction-space losses')
+    check_new_losses(data, model, training, inference)
+
+    print('7. probe-envelope dispatch')
+    check_probe_envelope_dispatch(data, model, training, inference)
 
     print('\nAll smoke checks passed.')
     return 0

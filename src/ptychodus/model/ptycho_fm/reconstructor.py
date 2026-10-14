@@ -22,6 +22,7 @@ from ptychodus.api.reconstruct import ReconstructInput
 
 from ..processing.subprocess_reconstructor import SubprocessReconstructor
 from ._payload import ReconstructPayload, TrainPayload
+from .enums import COUPLED_DECODER_MODES
 from .settings import (
     PtychoFMDataSettings,
     PtychoFMInferenceSettings,
@@ -37,6 +38,11 @@ __all__ = [
 _RECONSTRUCT_ENTRY = 'ptychodus.model.ptycho_fm._subprocess:run_reconstruct'
 _TRAIN_ENTRY = 'ptychodus.model.ptycho_fm._subprocess:run_train'
 
+# Losses evaluated on the detector plane. The supervised objective applies the
+# criterion to object amplitude and phase patches instead, where a probe
+# envelope, a radial detector coordinate and a total photon flux are undefined.
+_DIFFRACTION_SPACE_LOSSES = frozenset({'total_flux', 'probe_aware', 'q_dependent'})
+
 
 def _build_config(
     name: str,
@@ -49,9 +55,16 @@ def _build_config(
 
     Mirrors the top-level shape of ``ptycho_fm/config.yaml``: ``data``,
     ``model`` (with ``encoder`` / ``decoder`` / ``init`` sub-sections) and
-    ``training`` (with ``weighted_loss`` sub-section). The child fills in any
-    missing paths (``data_path`` / model save path) from the training payload
-    at call time.
+    ``training`` (with ``weighted_loss``, ``probe_aware_loss`` and
+    ``q_dependent_loss`` sub-sections). The child fills in any missing paths
+    (``data_path`` / model save path) from the training payload at call time.
+
+    ``coupled_decoder_mode`` selects the model class, so it is part of the
+    architecture a checkpoint was trained under rather than a free parameter:
+    a checkpoint loads only into the mode that produced it.
+
+    Losses are translated, not validated here: this runs on the inference path
+    too, where the training loss is irrelevant.
 
     The ``inference`` section is ptychodus-local: ``ptycho_fm``'s own YAML has
     no such section, and ``pad`` has no home in it at all. Only ``model`` is
@@ -77,8 +90,19 @@ def _build_config(
         'prefetch_factor': data_settings.prefetch_factor.get_value(),
     }
 
+    coupled_decoder_mode = model_settings.coupled_decoder_mode.get_value()
+
+    if coupled_decoder_mode not in COUPLED_DECODER_MODES:
+        raise ValueError(
+            f'Unknown coupled_decoder_mode: {coupled_decoder_mode!r}. '
+            f'Expected one of {sorted(COUPLED_DECODER_MODES)}.'
+        )
+
     model_config: dict[str, Any] = {
         'encoder_type': model_settings.encoder_type.get_value(),
+        # Emitted even when uncoupled: ptycho_fm reads absent and None alike,
+        # and a stable dict shape is what the config-builder test pins.
+        'coupled_decoder_mode': None if coupled_decoder_mode == 'none' else coupled_decoder_mode,
         'encoder': {
             'img_size': model_settings.img_size.get_value(),
             'patch_size': model_settings.patch_size.get_value(),
@@ -116,6 +140,21 @@ def _build_config(
             'threshold': training_settings.weighted_loss_threshold.get_value(),
             'alpha': training_settings.weighted_loss_alpha.get_value(),
         },
+        'probe_aware_loss': {
+            'loss_type': training_settings.probe_aware_loss_type.get_value(),
+            'threshold': training_settings.probe_aware_loss_threshold.get_value(),
+            'alpha': training_settings.probe_aware_loss_alpha.get_value(),
+            'envelope_floor': training_settings.probe_aware_loss_envelope_floor.get_value(),
+        },
+        'q_dependent_loss': {
+            'loss_type': training_settings.q_dependent_loss_type.get_value(),
+            'alpha': training_settings.q_dependent_loss_alpha.get_value(),
+            'q_beta': training_settings.q_dependent_loss_q_beta.get_value(),
+            'q_floor': training_settings.q_dependent_loss_q_floor.get_value(),
+            'threshold': training_settings.q_dependent_loss_threshold.get_value(),
+            'log_error': training_settings.q_dependent_loss_log_error.get_value(),
+            'normalize_q': training_settings.q_dependent_loss_normalize_q.get_value(),
+        },
         'save_epoch_models': training_settings.save_epoch_models.get_value(),
     }
 
@@ -140,6 +179,22 @@ def _verify_spatial_size(shape: tuple[int, ...], img_size: int, what: str) -> No
         raise ValueError(
             f'{what} are {height}x{width}, but PtychoFM requires {img_size}x{img_size} '
             'to match the encoder input. Adjust the pattern crop or the model image size.'
+        )
+
+
+def _verify_loss_supports_mode(name: str, loss_function: str) -> None:
+    """Raise unless ``loss_function`` is meaningful for the training objective.
+
+    The diffraction-space losses do not fail on object patches, they quietly
+    compute something else: a log of a signed phase clamps half the patch to the
+    stability floor, and a probe envelope the caller never supplies degrades to
+    a plain masked error.
+    """
+    if name == 'Supervised' and loss_function in _DIFFRACTION_SPACE_LOSSES:
+        raise ValueError(
+            f'The {loss_function!r} loss compares diffraction amplitudes, but supervised '
+            'training compares the decoded object against the ground truth patch. Select '
+            'an object-space loss, or train unsupervised.'
         )
 
 
@@ -169,6 +224,7 @@ def build_reconstructor(
         )
 
     def build_train_payload(input_path: Path, output_path: Path) -> TrainPayload:
+        _verify_loss_supports_mode(name, training_settings.loss_function.get_value())
         return TrainPayload(
             name=name,
             config=_build_config(

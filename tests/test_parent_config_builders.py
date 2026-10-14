@@ -16,6 +16,9 @@ calls the builders exactly as ``build_*_payload`` does, then asserts:
 
 Each probe runs in its own spawned process so a framework loaded by an earlier
 test cannot mask a failure here.
+
+The module also pins the rejections those builders perform in the parent, which
+need no optional dependency and so run in-process.
 """
 
 from __future__ import annotations
@@ -120,11 +123,31 @@ def _build_ptycho_fm_configs() -> list[Any]:
     training_settings = PtychoFMTrainingSettings(registry)
     inference_settings = PtychoFMInferenceSettings(registry)
 
-    # Both reconstructor names, since the name selects the training objective.
-    return [
-        _build_config(name, data_settings, model_settings, training_settings, inference_settings)
-        for name in ('Unsupervised', 'Supervised')
-    ]
+    # The name selects the training objective, coupled_decoder_mode the model
+    # class, and loss_function which sub-section the child reads back.
+    configs: list[Any] = []
+
+    for name in ('Unsupervised', 'Supervised'):
+        for coupled_decoder_mode in ('none', 'real_imag', 'amp_phase'):
+            model_settings.coupled_decoder_mode.set_value(coupled_decoder_mode)
+
+            for loss_function in ('weighted', 'total_flux', 'probe_aware', 'q_dependent'):
+                if name == 'Supervised' and loss_function != 'weighted':
+                    # Rejected on the train path; covered in-process below.
+                    continue
+
+                training_settings.loss_function.set_value(loss_function)
+                configs.append(
+                    _build_config(
+                        name,
+                        data_settings,
+                        model_settings,
+                        training_settings,
+                        inference_settings,
+                    )
+                )
+
+    return configs
 
 
 _BUILDERS = {
@@ -217,3 +240,69 @@ def test_parent_config_builders_acquire_no_gpu_context(backend: str) -> None:
         )
 
     assert result['count'] > 0, f'{backend} built no configs.'
+
+
+def _ptycho_fm_settings() -> Any:
+    from ptychodus.api.settings import SettingsRegistry
+    from ptychodus.model.ptycho_fm.settings import (
+        PtychoFMDataSettings,
+        PtychoFMInferenceSettings,
+        PtychoFMModelSettings,
+        PtychoFMTrainingSettings,
+    )
+
+    registry = SettingsRegistry()
+    return (
+        PtychoFMDataSettings(registry),
+        PtychoFMModelSettings(registry),
+        PtychoFMTrainingSettings(registry),
+        PtychoFMInferenceSettings(registry),
+    )
+
+
+@pytest.mark.parametrize('loss_function', ['total_flux', 'probe_aware', 'q_dependent'])
+def test_ptycho_fm_rejects_diffraction_losses_when_supervised(loss_function: str) -> None:
+    """Diffraction-space losses are meaningless against an object patch.
+
+    They do not raise on their own -- they compute a different quantity -- so
+    the parent has to turn the combination away before a child is spawned.
+    """
+    from ptychodus.model.ptycho_fm.reconstructor import _verify_loss_supports_mode
+
+    with pytest.raises(ValueError, match=loss_function):
+        _verify_loss_supports_mode('Supervised', loss_function)
+
+    _verify_loss_supports_mode('Unsupervised', loss_function)
+
+
+def test_ptycho_fm_accepts_object_space_loss_when_supervised() -> None:
+    from ptychodus.model.ptycho_fm.reconstructor import _verify_loss_supports_mode
+
+    for name in ('Supervised', 'Unsupervised'):
+        for loss_function in ('mse', 'l1', 'smooth_l1', 'poisson_nll', 'weighted'):
+            _verify_loss_supports_mode(name, loss_function)
+
+
+def test_ptycho_fm_rejects_unknown_coupled_decoder_mode() -> None:
+    from ptychodus.model.ptycho_fm.reconstructor import _build_config
+
+    data, model, training, inference = _ptycho_fm_settings()
+    model.coupled_decoder_mode.set_value('bogus')
+
+    with pytest.raises(ValueError, match='coupled_decoder_mode'):
+        _build_config('Unsupervised', data, model, training, inference)
+
+
+def test_ptycho_fm_maps_uncoupled_mode_to_none() -> None:
+    """'none' is the settings spelling; ptycho_fm reads the key as null."""
+    from ptychodus.model.ptycho_fm.reconstructor import _build_config
+
+    data, model, training, inference = _ptycho_fm_settings()
+
+    model.coupled_decoder_mode.set_value('none')
+    config = _build_config('Unsupervised', data, model, training, inference)
+    assert config['model']['coupled_decoder_mode'] is None
+
+    model.coupled_decoder_mode.set_value('amp_phase')
+    config = _build_config('Unsupervised', data, model, training, inference)
+    assert config['model']['coupled_decoder_mode'] == 'amp_phase'

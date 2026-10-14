@@ -10,6 +10,11 @@ The training mode (``'Unsupervised'`` / ``'Supervised'``) is carried in the
 ``name`` field, matching PtychoPINN's ``model_type`` convention. ptycho_fm
 ``.pth`` files store a bare ``state_dict`` with no mode metadata, so no
 checkpoint-vs-reconstructor mode check is possible today.
+
+The architecture is settings-selected too, via ``coupled_decoder_mode`` in the
+``model`` config section, and for the same reason it cannot be checked against
+a checkpoint. Train-time and infer-time values must agree; a mismatch surfaces
+as a parameter-name error out of ``load_state_dict``.
 """
 
 from __future__ import annotations
