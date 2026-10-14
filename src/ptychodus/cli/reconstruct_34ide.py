@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-"""Reconstruct one APS Atomic ptychography dataset through the ptychodus api.
+"""Reconstruct one APS 34-ID-E Microdiffraction ptychography dataset through the ptychodus api.
 
-Atomic writes one uncompressed EPICS-areaDetector TIFF per scan point into a per-scan
+34-ID-E writes one uncompressed EPICS-areaDetector TIFF per scan point into a per-scan
 directory, beside an EPICS MDA file holding the positions and a JSON list of the
 detector's bad pixels. The TIFF frame counter is not zero padded, so a scan longer than
 999 points rolls from ``_999`` to ``_1000`` partway through and the series is globbed at
@@ -11,7 +11,7 @@ Scope and limitations
 ---------------------
 
 - Positions are piezo driver command voltages, not measured ones. Neither scanned axis
-  records an encoder, so the APS_Atomic position reader scales volts by the driver's
+  records an encoder, so the APS_34IDE position reader scales volts by the driver's
   fixed 10 um/V calibration. Stage drift, creep, hysteresis and nonlinearity are all
   invisible to that conversion; position correction during reconstruction is the only
   thing that can absorb them.
@@ -54,11 +54,11 @@ from ptychodus.cli._reconstruct_standard import (
 )
 
 PROFILE = InstrumentProfile(
-    logger_name='reconstruct_atomic',
-    description='APS Atomic ptychography reconstruction via the ptychodus api.',
-    product_name='atomic-reconstruct',
-    diffraction_reader='APS_Atomic',
-    position_reader='APS_Atomic',
+    logger_name='reconstruct_34ide',
+    description='APS 34-ID-E Microdiffraction ptychography reconstruction via the ptychodus api.',
+    product_name='34ide-reconstruct',
+    diffraction_reader='APS_34IDE',
+    position_reader='APS_34IDE',
     diffraction_file_help='Any member of one scan TIFF series; the rest of the prefix is globbed.',
     position_file_help='EPICS MDA file, normally mda_files/34ide_NNNNNN.mda.',
     fzp_preset_help=(
@@ -68,7 +68,7 @@ PROFILE = InstrumentProfile(
     ),
     default_detector_distance_m=1.04,
     default_detector_pixel_size_m=7.5e-05,
-    default_bad_pixels_reader='APS_Atomic_Bad_Pixels',
+    default_bad_pixels_reader='APS_34IDE_Bad_Pixels',
 )
 
 

@@ -38,7 +38,7 @@ def _profiles() -> dict[str, InstrumentProfile]:
     names = (
         '12ide',
         '2ide',
-        'atomic',
+        '34ide',
         'bnp',
         'isn',
         'lamni',
@@ -90,10 +90,10 @@ def test_instrument_defaults_are_carried_from_the_profile() -> None:
     assert _defaults(profiles['lamni']).fzp_defocus_m == 800e-6
     assert _defaults(profiles['12ide']).fzp_defocus_m == 0.0
 
-    # atomic is the one instrument with its own bad-pixel reader and a pixel-size fallback.
-    assert _defaults(profiles['atomic']).bad_pixels_file_type == 'APS_Atomic_Bad_Pixels'
+    # 34-ID-E is the one instrument with its own bad-pixel reader and a pixel-size fallback.
+    assert _defaults(profiles['34ide']).bad_pixels_file_type == 'APS_34IDE_Bad_Pixels'
     assert _defaults(profiles['12ide']).bad_pixels_file_type == 'NPY_Bad_Pixels'
-    assert profiles['atomic'].default_detector_pixel_size_m == 75e-6
+    assert profiles['34ide'].default_detector_pixel_size_m == 75e-6
 
     # velociprobe is the one instrument whose two readers differ.
     assert profiles['velociprobe'].diffraction_reader == 'APS_Velociprobe'
@@ -128,7 +128,7 @@ def test_pattern_filters_are_offered_only_where_the_profile_asks() -> None:
     assert polar.drop_leading_frames == 0
     assert polar.drop_trailing_frames == 0
 
-    for name in ('12ide', '2ide', 'atomic', 'bnp', 'isn', 'lamni', 'velociprobe'):
+    for name in ('12ide', '2ide', '34ide', 'bnp', 'isn', 'lamni', 'velociprobe'):
         args = _defaults(profiles[name])
         for absent in ('dp_mad_k', 'i0_mad_k', 'drop_leading_frames', 'drop_trailing_frames'):
             assert not hasattr(args, absent), f'{name}.{absent}'

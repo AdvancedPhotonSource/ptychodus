@@ -152,8 +152,8 @@ def register_plugins(registry: PluginRegistry) -> None:
     )
     registry.diffraction_file_readers.register_plugin(
         file_reader,
-        simple_name='APS_Atomic',
-        display_name='APS 34-ID Atomic Files (*.tif *.tiff)',
+        simple_name='APS_34IDE',
+        display_name='APS 34-ID-E Microdiffraction Files (*.tif *.tiff)',
     )
 
 

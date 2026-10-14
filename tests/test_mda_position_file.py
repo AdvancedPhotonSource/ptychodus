@@ -52,7 +52,7 @@ MICROMETER_M = 1e-6
 MILLIMETER_M = 1e-3
 
 MDA_READER_NAMES = frozenset(
-    {'MDA', 'APS_2IDD', 'APS_2IDE', 'APS_Atomic', 'APS_BNP', 'APS_ISN_MDA', 'CNM_APS_HXN'}
+    {'MDA', 'APS_2IDD', 'APS_2IDE', 'APS_34IDE', 'APS_BNP', 'APS_ISN_MDA', 'CNM_APS_HXN'}
 )
 
 

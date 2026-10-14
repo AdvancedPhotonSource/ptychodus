@@ -30,8 +30,8 @@ class APS12IDValidPixelMaskFileReader(BadPixelsFileReader):
         return numpy.logical_not(numpy.asarray(valid, dtype=bool))
 
 
-class AtomicBadPixelsFileReader(BadPixelsFileReader):
-    """Read the bad-pixel list written by the Atomic detector mask editor.
+class APS34IDEBadPixelsFileReader(BadPixelsFileReader):
+    """Read the bad-pixel list written by the 34-ID-E detector mask editor.
 
     The file is JSON holding one "Bad pixels" array of ``{"Pixel": [column, row],
     "Set": int}`` objects, one per masked pixel. Note the axis order: the first
@@ -101,7 +101,7 @@ def register_plugins(registry: PluginRegistry) -> None:
         display_name='APS 12-ID-E Valid Pixel Mask Files (*.h5 *.hdf5)',
     )
     registry.bad_pixels_file_readers.register_plugin(
-        AtomicBadPixelsFileReader(),
-        simple_name='APS_Atomic_Bad_Pixels',
-        display_name='APS 34-ID Atomic Bad Pixel Files (*.json)',
+        APS34IDEBadPixelsFileReader(),
+        simple_name='APS_34IDE_Bad_Pixels',
+        display_name='APS 34-ID-E Microdiffraction Bad Pixel Files (*.json)',
     )
