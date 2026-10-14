@@ -160,13 +160,17 @@ class TestStandardFileLayout:
         assert StandardFileLayout.MODEL_BASENAME == 'model'
 
     def test_ptychi_options_filename(self) -> None:
-        assert StandardFileLayout.PTYCHI_OPTIONS == 'ptychi_options.json'
+        assert StandardFileLayout.PTYCHI_OPTIONS == 'ptychi_options.yaml'
+
+    def test_log_filename(self) -> None:
+        assert StandardFileLayout.LOG == 'ptychodus.log'
 
     def test_path_builds_under_directory(self) -> None:
         assert StandardFileLayout.PRODUCT.path(Path('/x')) == Path('/x/product.h5')
         assert StandardFileLayout.FLUORESCENCE.path(Path('/x')) == Path('/x/fluorescence.h5')
         assert StandardFileLayout.SETTINGS.path(Path('/x')) == Path('/x/settings.ini')
-        assert StandardFileLayout.PTYCHI_OPTIONS.path(Path('/x')) == Path('/x/ptychi_options.json')
+        assert StandardFileLayout.PTYCHI_OPTIONS.path(Path('/x')) == Path('/x/ptychi_options.yaml')
+        assert StandardFileLayout.LOG.path(Path('/x')) == Path('/x/ptychodus.log')
 
     def test_checkpoint_path_inserts_zero_padded_epoch(self) -> None:
         assert StandardFileLayout.PRODUCT.checkpoint_path(Path('/x'), 42) == Path(

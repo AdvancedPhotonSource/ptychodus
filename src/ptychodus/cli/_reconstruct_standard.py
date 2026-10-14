@@ -138,7 +138,7 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
         type=DirectoryType(must_exist=False),
         help=(
             'Destination directory, written in the ptychodus standard layout: '
-            'diffraction.h5, ptychi_options.json, per-epoch product.NNNNNN.h5 '
+            'diffraction.h5, ptychi_options.yaml, per-epoch product.NNNNNN.h5 '
             'checkpoints, and the final product.h5.'
         ),
     )
@@ -594,8 +594,8 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
     Parses the command line, assembles the dataset, builds an initial product and runs
     pty-chi to convergence, writing the standard layout into ``--output-directory``.
 
-    To reconstruct with something other than stock LSQML, pass a pty-chi options JSON with
-    ``--ptychi-options-file``; any ptychodus run writes one to ``ptychi_options.json``, and
+    To reconstruct with something other than stock LSQML, pass a pty-chi options file with
+    ``--ptychi-options``; any ptychodus run writes one to ``ptychi_options.yaml``, and
     its algorithm stamp selects the reconstructor.
     """
     logger = logging.getLogger(profile.logger_name)
@@ -803,7 +803,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         losses=[],
     )
 
-    options = load_ptychi_options(args.ptychi_options_file)
+    options = load_ptychi_options(args.ptychi_options)
     num_epochs = int(options.reconstructor_options.num_epochs)
 
     output_directory = args.output_directory

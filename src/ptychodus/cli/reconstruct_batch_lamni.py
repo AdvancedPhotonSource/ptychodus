@@ -4,98 +4,85 @@
 A laminography tomogram is one scan per projection -- 1440 and up, split into interleaved
 sub-tomograms -- and ``tomography_scannumbers.txt`` is the index that ties each scan number
 to its rotation angle and its place in the tomogram. This driver walks that table and runs
-``reconstruct_lamni``'s per-scan pipeline over the selected projections, so a tomogram is one
-command rather than a thousand.
+a per-scan reconstruction over the selected projections, so a tomogram is one command
+rather than a thousand.
+
+Settings come from a YAML file and nowhere else. A run is therefore reproducible from a
+file that can be archived, and the copy written into every scan's output directory records
+how that scan was reconstructed. The command line carries only the two file names, what to
+log, and whether to stop after planning.
 
 Each scan lands in its own standard-layout directory under
-``<experiment>/analysis/ptychodus/<label>/S<NNNNN>/``: ``diffraction.h5``,
-``ptychi_options.json`` recording the options that actually ran, per-epoch
-``product.NNNNNN.h5`` checkpoints, and the final ``product.h5``. Every product carries its
-own ``tomography_angle_deg``, taken from the encoder column of the scan table, which is what
-lets the resulting stack be fed to a tomographic solver.
+``<output_products_folder>/S<NNNNN>/``: the assembled patterns, the resolved pty-chi
+options, the settings, per-epoch ``product.NNNNNN.h5`` checkpoints, the final
+``product.h5``, a log of everything the scan wrote to its console, and an affine fit of its
+own positions. Every product carries its own ``tomography_angle_deg``, taken from the
+encoder column of the scan table, which is what lets the resulting stack be fed to a
+tomographic solver.
 
-Affine scanner calibration
---------------------------
+Scans run concurrently, one worker process per visible CUDA device, each pinned to its own.
+The job scheduler decides how many that is: ``CUDA_VISIBLE_DEVICES`` is the only control,
+and with no devices visible the run proceeds on the CPU, one scan at a time. Because each
+worker is a separate process that exits when its scan does, GPU memory is reclaimed between
+scans rather than accumulating across a tomogram.
 
-With ``--affine-transform-after N``, the first N projections reconstruct with pty-chi's
-position correction enabled, then their measured and refined positions are fitted jointly by
-:func:`~ptychodus.api.affine.estimate_affine_transform` for one shared linear part. Every
-later projection has position correction switched off and that transform applied to its
-measured positions instead. The per-pair translations the fit reports are deliberately not
-applied: a separate scan has a separate stage origin, so only the linear part carries over.
+Per-scan affine estimate
+------------------------
+
+Every scan whose positions pty-chi refined gets an ``affine_fit.yaml`` fitted from that
+scan alone. A single-scan fit is the noisy one -- the estimator exists to pool several
+scans against one shared linear part -- so these are the per-scan inputs to a calibration
+computed elsewhere, not a calibration apiece. A transform already known can be applied to
+the measured positions before reconstruction instead, through ``positions.affine_matrix``.
 
 Scope and limitations
 ---------------------
 
-- One tomogram per run, selected by label. Projections are reconstructed in scan-number
-  order, which is acquisition order, because both probe chaining and the affine phase depend
-  on it.
-- The crop region is resolved once, from the first selected scan, and reused for every scan.
-  A per-scan beam center would put each projection on a different grid and break the
-  warm-start probe.
-- Repeated acquisitions of one ``(sub-tomogram, projection)`` are all reconstructed. The scan
-  table records a re-run as a further row, and which one supersedes the other is not
+- One tomogram per run, selected by label.
+- The crop region is resolved once, from the first selected scan, and reused for every
+  scan. A per-scan beam center would put each projection on a different grid, and the
+  stack is only a tomogram if the projections share one.
+- Repeated acquisitions of one ``(sub-tomogram, projection)`` are all reconstructed. The
+  scan table records a re-run as a further row, and which one supersedes the other is not
   something the table says.
-- pty-chi runs in this process, once per scan, and GPU memory is not reclaimed between
-  scans. Resume a run that ends early with ``--skip-existing``.
-- No GPU selection. Choose a device with ``CUDA_VISIBLE_DEVICES`` in the environment.
+- A scan number inside the selected range but absent from the table is not reconstructed,
+  because the table is where its rotation angle would have come from.
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import logging
-import math
+import os
+import queue
+import re
 import sys
-from collections import Counter
-from dataclasses import dataclass
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
 from pathlib import Path
 
-import numpy
-
-
-from ptychodus.api.affine import (
-    AffineFitResult,
-    AffineTransform,
-    estimate_affine_transform,
-    transform_probe_positions,
-)
-from ptychodus.api.assemble import assemble_dataset
-from ptychodus.api.constants import energy_eV_to_wavelength_m
-from ptychodus.api.diffraction import BadPixels, CropRegion
 from ptychodus.api.exit_codes import ExitCode
-from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import StandardFileLayout
-from ptychodus.api.object import compute_object_geometry
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.preprocess.diffraction import (
-    DiffractionPrepPipeline,
-    FilterValuesStep,
+from ptychodus.api.preprocess.diffraction import FilterValuesStep
+from ptychodus.cli._batch_lamni_settings import (
+    BatchSettings,
+    load_batch_settings,
+    record_payload,
+    select_label,
+    select_records,
 )
-from ptychodus.api.probe import Probe, ProbeGeometry, ProbeSequence
-from ptychodus.api.probe_positions import ProbePositionSequence
-from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.reconstruct import prepare_reconstruct_input
-from ptychodus.api.simulate.object import generate_uniform_object
-from ptychodus.api.simulate.probe import (
-    generate_coherent_probe_modes,
-    generate_fresnel_zone_plate_probe,
-    generate_incoherent_probe_modes,
-)
-from ptychodus.cli import DirectoryType, positive_int
 from ptychodus.cli._reconstruct_common import (
     CancellationToken,
-    add_ptychi_options_argument,
     install_signal_handlers,
     invalid_count_threshold,
-    is_main_process,
     load_ptychi_options,
     resolve_crop_region,
-    resolve_quantity,
-    run_reconstruction,
-    save_assembled_diffraction,
 )
+from ptychodus.model.processing._subprocess_protocol import ChildError, run_subprocess
+from ptychodus.model.ptychi.device import probe_devices_via_subprocess
+from ptychodus.model.ptychi.task import dump_task_options
 from ptychodus.plugins.aps31id_lamni._scan_table import (
     APS31IDEScanRecord,
     read_aps31ide_scan_table,
@@ -104,547 +91,167 @@ from ptychodus.plugins.aps31id_lamni._scan_table import (
 logger = logging.getLogger('reconstruct_batch_lamni')
 
 DIFFRACTION_READER = 'APS_LamNI'
-POSITION_READER = 'APS_LamNI'
 
-DEFAULT_FZP_PRESET = 'APS_LamNI'
+_WORKER_ENTRY = 'ptychodus.cli._batch_lamni_worker:reconstruct_scan'
 
-# Scans live under eiger_4 in blocks of a thousand.
-_SCAN_BLOCK_SIZE = 1000
+# ``ptychi.list_available_devices()`` reports e.g. 'NVIDIA A100 80GB (cuda:3)'.
+_CUDA_DEVICE_PATTERN = re.compile(r'cuda:(\d+)')
 
 
-@dataclass(frozen=True)
-class _Layout:
-    """The experiment directories this driver reads from and writes to."""
+def visible_cuda_devices() -> list[str]:
+    """The CUDA devices this run may use, as values for ``CUDA_VISIBLE_DEVICES``.
 
-    experiment_root: Path
-    data_dir: Path
+    Probed in a throwaway child, because asking the question in this process would leave a
+    CUDA context behind, and a spawned child of a process holding one is a known source of
+    initialization failures.
 
-    @classmethod
-    def from_argument(cls, directory: Path) -> _Layout:
-        """Accept either the experiment root or the ``data`` directory inside it."""
-        if (directory / 'data' / 'dat-files').is_dir():
-            return cls(experiment_root=directory, data_dir=directory / 'data')
+    The two sides of that mask count differently, which is the whole difficulty here. The
+    probe inherits this process's ``CUDA_VISIBLE_DEVICES``, so the ordinals it reports are
+    positions *within* that mask: under ``CUDA_VISIBLE_DEVICES=1`` it reports one device
+    and calls it ``cuda:0``. But the value a worker sets is read against the physical
+    devices, so handing it that ``0`` would send it to the GPU the scheduler did not give
+    us -- quite possibly one already running someone else's job. The probe's ordinals are
+    therefore indices back into the inherited list, and what each worker is handed is the
+    entry found there. With nothing inherited the two numberings coincide and the ordinal
+    is passed through. Entries are copied verbatim rather than parsed, so a mask written
+    as GPU UUIDs composes the same way.
+    """
+    ordinals: list[int] = list()
 
-        if (directory / 'dat-files').is_dir():
-            return cls(experiment_root=directory.parent, data_dir=directory)
+    for description in probe_devices_via_subprocess():
+        match = _CUDA_DEVICE_PATTERN.search(description)
 
-        raise ValueError(
-            f'{directory} is not a 31-ID-E experiment directory: expected a "dat-files" '
-            'subdirectory either directly inside it or under a "data" subdirectory.'
-        )
+        if match is not None:
+            ordinals.append(int(match.group(1)))
 
-    @property
-    def scan_table_file(self) -> Path:
-        return self.data_dir / 'dat-files' / 'tomography_scannumbers.txt'
+    inherited = [
+        entry.strip()
+        for entry in os.environ.get('CUDA_VISIBLE_DEVICES', '').split(',')
+        if entry.strip()
+    ]
 
-    def position_file(self, scan_no: int) -> Path:
-        return self.data_dir / 'scan_positions' / f'scan_{scan_no:05d}.dat'
+    if not inherited:
+        return [str(ordinal) for ordinal in ordinals]
 
-    def diffraction_file(self, scan_no: int) -> Path:
-        """Locate the one data file of a scan's detector series.
+    return [inherited[ordinal] for ordinal in ordinals if ordinal < len(inherited)]
 
-        The series is written beside a ``*_master_*`` index file that holds no patterns, and
-        the stem differs between acquisition software versions, so the directory is globbed
-        rather than assumed. An ambiguous match is an error: picking one arbitrarily would
-        reconstruct an unpredictable subset.
-        """
-        block_start = (scan_no // _SCAN_BLOCK_SIZE) * _SCAN_BLOCK_SIZE
-        block = f'S{block_start:05d}-{block_start + _SCAN_BLOCK_SIZE - 1:05d}'
-        scan_dir = self.data_dir / 'eiger_4' / block / f'S{scan_no:05d}'
 
-        candidates = sorted(
-            path for path in scan_dir.glob(f'*_{scan_no:05d}_*.h5') if '_master_' not in path.name
-        )
+@dataclass
+class _Tally:
+    """What became of each selected scan, counted across the worker threads."""
 
-        if not candidates:
-            raise FileNotFoundError(f'No diffraction file for scan {scan_no} in {scan_dir}.')
+    lock: threading.Lock = field(default_factory=threading.Lock)
+    succeeded: int = 0
+    skipped: int = 0
+    cancelled: int = 0
+    failed: list[int] = field(default_factory=list)
 
-        if len(candidates) > 1:
-            names = ', '.join(path.name for path in candidates)
-            raise FileNotFoundError(
-                f'Scan {scan_no} has {len(candidates)} candidate diffraction files in '
-                f'{scan_dir}: {names}.'
+
+def _worker_loop(
+    settings: BatchSettings,
+    work: queue.Queue[tuple[int, APS31IDEScanRecord]],
+    device: str,
+    *,
+    settings_text: str,
+    options_json: str | None,
+    read_region: dict[str, tuple[int, int]] | None,
+    num_selected: int,
+    tally: _Tally,
+    cancellation: CancellationToken,
+) -> None:
+    """Take scans off the shared queue until it empties or the run is cancelled.
+
+    One of these runs per device, in a thread. Each spawns a worker process per scan and
+    waits on its events; the thread never does work of its own, so a thread apiece costs
+    nothing against the reconstruction it is waiting for.
+
+    The worker writes every artifact itself, into that scan's own directory, so nothing of
+    substance comes back. The child's log records are dispatched into this process's
+    logging tree by the subprocess protocol, and all that is awaited here is how it ended.
+    """
+    while not cancellation.is_cancelled:
+        try:
+            index, record = work.get_nowait()
+        except queue.Empty:
+            return
+
+        position = f'[{index}/{num_selected}]'
+        device_name = f'cuda:{device}' if device else 'cpu'
+        payload: dict[str, object] = {
+            'cuda_visible_devices': device,
+            'settings_text': settings_text,
+            'ptychi_options_json': options_json,
+            'scan': record_payload(record),
+            'read_region': read_region,
+        }
+
+        logger.info('%s scan %05d: starting on %s', position, record.scan_no, device_name)
+        completed = False
+
+        try:
+            with run_subprocess(_WORKER_ENTRY, payload) as events:
+                for event in events:
+                    if event[0] == 'output':
+                        completed = bool(event[1].get('completed'))
+        except ChildError as exc:
+            with tally.lock:
+                tally.failed.append(record.scan_no)
+
+            logger.error(
+                '%s scan %05d failed: %s\n%s',
+                position,
+                record.scan_no,
+                exc.child_exception_type,
+                exc.child_traceback,
             )
 
-        return candidates[0]
+            if not settings.misc.continue_on_error:
+                cancellation.cancel('a scan failed')
+                return
 
-    def output_directory(self, output_root: Path, record: APS31IDEScanRecord) -> Path:
-        return output_root / record.label / f'S{record.scan_no:05d}'
+            continue
 
-
-def _select_label(records: list[APS31IDEScanRecord], requested: str | None) -> str:
-    """Choose which tomogram to reconstruct, reporting what else the table holds."""
-    counts = Counter(record.label for record in records)
-
-    if not counts:
-        raise ValueError('The scan table holds no parsable rows.')
-
-    summary = ', '.join(f'{label} ({count} scans)' for label, count in counts.most_common())
-
-    if requested is not None:
-        if requested not in counts:
-            raise ValueError(f'No scans labeled "{requested}". The table holds: {summary}.')
+        with tally.lock:
+            if completed:
+                tally.succeeded += 1
+            else:
+                # A worker returns without a final product only when the cancellation it
+                # installed for itself arrived first.
+                tally.cancelled += 1
 
         logger.info(
-            'Label: %s (%d scans). The table also holds: %s', requested, counts[requested], summary
+            '%s scan %05d: %s',
+            position,
+            record.scan_no,
+            'done' if completed else 'cancelled',
         )
-        return requested
-
-    label, count = counts.most_common(1)[0]
-    logger.warning(
-        'No --label given; taking "%s", the largest tomogram in the table (%d scans). '
-        'The table holds: %s',
-        label,
-        count,
-        summary,
-    )
-    return label
-
-
-def _select_records(
-    records: list[APS31IDEScanRecord], args: argparse.Namespace, label: str
-) -> list[APS31IDEScanRecord]:
-    """Filter the table to the requested projections, in acquisition order."""
-    selected = [record for record in records if record.label == label]
-
-    if args.sub_tomogram is not None:
-        selected = [r for r in selected if r.subtomo_no == args.sub_tomogram]
-
-    if args.first_projection is not None:
-        selected = [r for r in selected if r.measurement_id >= args.first_projection]
-
-    if args.last_projection is not None:
-        selected = [r for r in selected if r.measurement_id <= args.last_projection]
-
-    if args.projection_stride > 1:
-        projections = sorted({r.measurement_id for r in selected})
-        kept = set(projections[:: args.projection_stride])
-        selected = [r for r in selected if r.measurement_id in kept]
-
-    # Scan number is acquisition order, which is what probe chaining and the affine phase
-    # both assume; the table itself is already in that order but is not guaranteed to be.
-    selected.sort(key=lambda record: record.scan_no)
-    return selected
-
-
-def _write_affine_fit(file_path: Path, result: AffineFitResult) -> None:
-    """Record the fitted transform beside the tomogram it was fitted from."""
-    components = result.components
-    transform = result.linear_transform
-    payload = {
-        'scale': components.scale,
-        'asymmetry': components.asymmetry,
-        'rotation_deg': math.degrees(components.rotation_rad),
-        'shear_deg': math.degrees(components.shear_rad),
-        'rms_residual_m': result.rms_residual_m,
-        'linear_transform': [
-            [transform.a00, transform.a01, transform.a02],
-            [transform.a10, transform.a11, transform.a12],
-        ],
-        'pairs': [
-            {
-                'translation_x_m': pair.translation_x_m,
-                'translation_y_m': pair.translation_y_m,
-                'num_points': pair.num_points,
-                'num_inliers': pair.num_inliers,
-                'rms_residual_m': pair.rms_residual_m,
-            }
-            for pair in result.pairs
-        ],
-    }
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    file_path.write_text(json.dumps(payload, indent=2))
-
-
-@dataclass(frozen=True)
-class _ScanResult:
-    """What one reconstructed projection contributes to the rest of the run."""
-
-    measured_positions: ProbePositionSequence
-    reconstructed_positions: ProbePositionSequence
-    probes: ProbeSequence
-
-
-def _reconstruct_one_scan(
-    args: argparse.Namespace,
-    layout: _Layout,
-    registry: PluginRegistry,
-    record: APS31IDEScanRecord,
-    output_directory: Path,
-    *,
-    read_region: CropRegion | None,
-    bad_pixels: BadPixels | None,
-    warm_start_probe: Probe | None,
-    transform: AffineTransform | None,
-    cancellation: CancellationToken,
-) -> _ScanResult | None:
-    """Reconstruct one projection into its own standard-layout directory.
-
-    Returns `None` for a scan cancelled before it produced anything, which contributes
-    neither a probe to chain forward nor a position pair to the affine fit.
-    """
-    diffraction_file_path = layout.diffraction_file(record.scan_no)
-    position_file_path = layout.position_file(record.scan_no)
-
-    diffraction_reader = registry.diffraction_file_readers.get_strategy_by_name(DIFFRACTION_READER)
-    position_reader = registry.probe_position_file_readers.get_strategy_by_name(POSITION_READER)
-
-    logger.info('Reading diffraction from %s', diffraction_file_path)
-    raw_dataset = diffraction_reader.read(diffraction_file_path)
-    metadata = raw_dataset.get_metadata()
-
-    detector_distance_m = resolve_quantity(
-        logger,
-        'Detector distance (m)',
-        args.detector_distance_m,
-        metadata.detector_distance_m,
-        None,
-        '--detector-distance-m',
-        level=logging.DEBUG,
-    )
-    photon_energy_eV = resolve_quantity(  # noqa: N806
-        logger,
-        'Photon energy (eV)',
-        args.photon_energy_eV,
-        metadata.photon_energy_eV,
-        None,
-        '--photon-energy-eV',
-        level=logging.DEBUG,
-    )
-    if metadata.detector_pixel_geometry is None:
-        raise ValueError('The diffraction file records no detector pixel size!')
-
-    detector_pixel_size_m = metadata.detector_pixel_geometry.width_m
-    logger.debug('Detector pixel size (m): %g (from the diffraction file)', detector_pixel_size_m)
-    raw_pixel_geometry = PixelGeometry(
-        width_m=detector_pixel_size_m, height_m=detector_pixel_size_m
-    )
-
-    max_valid_count = (
-        invalid_count_threshold(metadata.pattern_dtype)
-        if args.max_valid_count is None
-        else args.max_valid_count
-    )
-    pipeline = (
-        None
-        if max_valid_count is None
-        else DiffractionPrepPipeline(
-            steps=(FilterValuesStep(lower_bound=0, upper_bound=max_valid_count),)
-        )
-    )
-
-    assembled_data = assemble_dataset(
-        raw_dataset,
-        pipeline,
-        bad_pixels=bad_pixels,
-        raw_pixel_geometry=raw_pixel_geometry,
-        read_region=read_region,
-        total_counts_lower_bound=args.min_total_counts,
-    )
-    num_patterns = assembled_data.get_num_patterns()
-    num_raw_patterns = sum(metadata.num_patterns_per_array)
-
-    if num_patterns != num_raw_patterns:
-        logger.warning(
-            'Assembled %d of %d patterns; %d were filtered or failed to load.',
-            num_patterns,
-            num_raw_patterns,
-            num_raw_patterns - num_patterns,
-        )
-
-    save_assembled_diffraction(
-        logger, output_directory, assembled_data, skip=args.no_save_diffraction
-    )
-
-    measured_positions = position_reader.read(position_file_path)
-    logger.info('Read %d probe positions from %s', len(measured_positions), position_file_path)
-
-    if transform is None:
-        positions = measured_positions
-    else:
-        positions = ProbePositionSequence(
-            [*transform_probe_positions(measured_positions, transform)]
-        )
-
-    photon_wavelength_m = energy_eV_to_wavelength_m(photon_energy_eV)
-    probe_geometry = ProbeGeometry.from_far_field(
-        assembled_data.get_pixel_geometry(),
-        assembled_data.get_image_extent(),
-        wavelength_m=photon_wavelength_m,
-        distance_m=detector_distance_m,
-    )
-
-    rng = numpy.random.default_rng(args.seed)
-
-    if warm_start_probe is None:
-        logger.info('Simulating the initial probe from zone plate preset "%s"', args.fzp_preset)
-        zone_plate = registry.fresnel_zone_plates.get_strategy_by_name(args.fzp_preset)
-        probe = generate_fresnel_zone_plate_probe(
-            probe_geometry,
-            zone_plate,
-            photon_wavelength_m=photon_wavelength_m,
-            defocus_distance_m=args.fzp_defocus_m,
-        )
-    else:
-        array = warm_start_probe.get_array()
-
-        # The crop is fixed for the whole run, so a mismatch here means the geometry moved
-        # between projections rather than that the user changed the crop.
-        if array.shape[-2:] != (probe_geometry.height_px, probe_geometry.width_px):
-            raise ValueError(
-                f'Warm-start probe extent {array.shape[-2]}x{array.shape[-1]} does not match '
-                f'the patterns {probe_geometry.height_px}x{probe_geometry.width_px}.'
-            )
-
-        probe = Probe(array=array, pixel_geometry=probe_geometry.get_pixel_geometry())
-
-    if args.num_probe_modes > 1 and probe.get_array().shape[0] < args.num_probe_modes:
-        probe = generate_incoherent_probe_modes(probe, args.num_probe_modes)
-
-    probe_sequence = generate_coherent_probe_modes(
-        rng,
-        probe,
-        num_cmodes=args.num_opr_modes,
-        num_diffraction_patterns=num_patterns,
-    )
-
-    object_geometry = compute_object_geometry(
-        positions, probe_geometry, padding_px=args.object_padding_px
-    )
-
-    # Deviations = 0 gives a flat unit-amplitude, zero-phase field.
-    object_ = generate_uniform_object(object_geometry)
-
-    probe_photon_count = float(assembled_data.get_probe_photon_count())
-
-    product = Product(
-        metadata=ProductMetadata(
-            name=f'scan{record.scan_no:05d}_{record.label}',
-            comments=str(record),
-            detector_distance_m=detector_distance_m,
-            photon_energy_eV=photon_energy_eV,
-            probe_photon_count=probe_photon_count,
-            exposure_time_s=float(metadata.exposure_time_s or 0.0),
-            mass_attenuation_m2_per_kg=0.0,
-            tomography_angle_deg=record.encoder_angle_deg,
-        ),
-        probe_positions=positions,
-        probes=probe_sequence,
-        object_=object_,
-        losses=[],
-    )
-
-    options = load_ptychi_options(args.ptychi_options_file)
-
-    if transform is not None:
-        # The transform now supplies the correction that per-scan refinement was measuring.
-        options.probe_position_options.optimizable = False
-
-    reconstruct_input = prepare_reconstruct_input(assembled_data, product)
-    final_product = run_reconstruction(
-        logger,
-        reconstruct_input,
-        options,
-        output_directory,
-        num_sync_epochs=args.num_sync_epochs,
-        cancellation=cancellation,
-    )
-
-    if final_product is None:
-        return None
-
-    return _ScanResult(
-        # The measured positions as the reconstruction actually saw them: pattern-paired,
-        # so they index-match the refined positions coming back out.
-        measured_positions=reconstruct_input.product.probe_positions,
-        reconstructed_positions=final_product.probe_positions,
-        probes=final_product.probes,
-    )
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             'Reconstruct a range of APS 31-ID-E LamNI projections from one experiment '
-            'directory via the ptychodus api.'
+            'directory, as described by a settings file.'
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        'experiment_directory',
-        type=DirectoryType(must_exist=True),
-        help='Experiment root directory, or the "data" directory inside it.',
+        '--batch-settings',
+        type=Path,
+        required=True,
+        help='YAML settings file: the paths, the scans, and every tuning value.',
     )
     parser.add_argument(
-        '--output-directory',
-        type=DirectoryType(must_exist=False),
-        default=None,
-        help=(
-            'Parent of the per-scan <label>/S<NNNNN>/ output directories. '
-            'Defaults to <experiment>/analysis/ptychodus.'
-        ),
-    )
-    parser.add_argument(
-        '--label',
-        default=None,
-        help='Tomogram to reconstruct. Defaults to the largest one in the scan table.',
-    )
-    parser.add_argument(
-        '--first-projection',
-        type=int,
-        default=None,
-        help='Lowest projection index to reconstruct. Omit for all.',
-    )
-    parser.add_argument(
-        '--last-projection',
-        type=int,
-        default=None,
-        help='Highest projection index to reconstruct. Omit for all.',
-    )
-    parser.add_argument(
-        '--sub-tomogram',
-        type=int,
-        default=None,
-        help='Reconstruct only this sub-tomogram. Omit for all of them.',
-    )
-    parser.add_argument(
-        '--projection-stride',
-        type=positive_int,
-        default=1,
-        help='Reconstruct every Nth distinct projection index.',
-    )
-    add_ptychi_options_argument(parser)
-    parser.add_argument(
-        '--affine-transform-after',
-        type=positive_int,
-        default=None,
-        help=(
-            'Fit one shared affine transform from the first N reconstructions, then disable '
-            'pty-chi position correction and apply it to the measured positions instead.'
-        ),
-    )
-    parser.add_argument(
-        '--no-warm-start-probe',
-        action='store_true',
-        help='Rebuild the probe from the zone-plate model for every scan.',
-    )
-    parser.add_argument(
-        '--skip-existing',
-        action='store_true',
-        help='Skip a scan whose product.h5 already exists, so an interrupted run resumes.',
-    )
-    parser.add_argument(
-        '--continue-on-error',
-        action='store_true',
-        help='Log and continue when a scan fails instead of aborting the run.',
-    )
-    parser.add_argument(
-        '--no-save-diffraction',
-        action='store_true',
-        help='Skip diffraction.h5. The assembled patterns can run to several GB per scan.',
-    )
-    parser.add_argument(
-        '--crop-extent-px',
-        type=positive_int,
-        default=None,
-        help='Square crop side in raw detector pixels, about the beam center. Omit to skip.',
-    )
-    parser.add_argument(
-        '--beam-center-x-px',
-        type=int,
-        default=None,
-        help='Beam center column. File value, then an estimate from the data, otherwise.',
-    )
-    parser.add_argument(
-        '--beam-center-y-px',
-        type=int,
-        default=None,
-        help='Beam center row. File value, then an estimate from the data, otherwise.',
-    )
-    parser.add_argument(
-        '--detector-distance-m',
-        type=float,
-        default=None,
-        help='Sample-to-detector distance. Overrides the file.',
-    )
-    parser.add_argument(
-        '--photon-energy-eV',
-        type=float,
-        default=None,
-        help='Photon energy in electron volts. Overrides the file.',
-    )
-    parser.add_argument(
-        '--min-total-counts',
-        type=int,
-        default=None,
-        help='Drop patterns whose total counts fall below this, with their positions.',
-    )
-    parser.add_argument(
-        '--max-valid-count',
-        type=int,
-        default=None,
-        help=(
-            'Zero pixels at or above this count. Defaults to the pattern dtype maximum, '
-            'which is how Dectris detectors mark invalid pixels.'
-        ),
-    )
-    parser.add_argument(
-        '--bad-pixels-file',
+        '--ptychi-options',
         type=Path,
         default=None,
-        help='Bad-pixel mask covering the full, uncropped detector.',
-    )
-    parser.add_argument(
-        '--bad-pixels-file-type',
-        default='NPY_Bad_Pixels',
-        help='Name of the bad-pixel file reader plugin.',
-    )
-    parser.add_argument(
-        '--probe-file',
-        type=Path,
-        default=None,
-        help='Initial probe for the first scan, normally a product HDF5 from an earlier run.',
-    )
-    parser.add_argument(
-        '--probe-file-type',
-        default='HDF5',
-        help='Name of the probe file reader plugin; HDF5 reads a ptychodus product.',
-    )
-    parser.add_argument(
-        '--fzp-preset',
-        default=DEFAULT_FZP_PRESET,
-        help='FresnelZonePlate plugin preset for the model probe.',
-    )
-    parser.add_argument(
-        '--fzp-defocus-m',
-        type=float,
-        default=800e-6,
-        help='Defocus from the zone-plate focal plane.',
-    )
-    parser.add_argument(
-        '--num-probe-modes',
-        type=positive_int,
-        default=1,
-        help='Incoherent probe modes.',
-    )
-    parser.add_argument(
-        '--num-opr-modes',
-        type=positive_int,
-        default=1,
-        help='Coherent (OPR) probe modes; 1 disables OPR.',
-    )
-    parser.add_argument(
-        '--object-padding-px',
-        type=int,
-        default=64,
-        help='Object-canvas margin added to each side of the scan bounding box.',
-    )
-    parser.add_argument('--seed', type=int, default=0, help='RNG seed for the initial guesses.')
-    parser.add_argument(
-        '--num-sync-epochs',
-        type=positive_int,
-        default=100,
-        help='Epochs between reconstructor sync points and progress logs.',
+        help=(
+            'pty-chi options, YAML or JSON by suffix, as written to '
+            f'{StandardFileLayout.PTYCHI_OPTIONS} by any ptychodus run. Its algorithm '
+            'stamp selects the reconstructor. Defaults to stock LSQML. Hand-written YAML '
+            'must spell scientific notation 1.0e-3 rather than 1e-3, which YAML reads as '
+            'a string.'
+        ),
     )
     parser.add_argument(
         '--dry-run',
@@ -653,262 +260,229 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         '--log-level',
-        default=logging.INFO,
+        default=None,
         type=int,
-        help='Python logging level.',
+        help='Python logging level, overriding misc.log_level in the settings file.',
     )
     return parser
+
+
+def _report_plan(settings: BatchSettings, selected: list[APS31IDEScanRecord]) -> None:
+    for record in selected:
+        try:
+            diffraction_file_path: Path | str = settings.diffraction_file(record.scan_no)
+        except FileNotFoundError as exc:
+            diffraction_file_path = f'MISSING ({exc})'
+
+        position_file_path = settings.position_file(record.scan_no)
+        position_note = '' if position_file_path.is_file() else ' MISSING'
+        logger.info(
+            'scan %05d subtomo %d projection %d angle %+.4f deg\n'
+            '  diffraction: %s\n'
+            '  positions:   %s%s\n'
+            '  output:      %s',
+            record.scan_no,
+            record.subtomo_no,
+            record.measurement_id,
+            record.encoder_angle_deg,
+            diffraction_file_path,
+            position_file_path,
+            position_note,
+            settings.output_directory(record.scan_no),
+        )
+
+
+def _queue_pending_scans(
+    settings: BatchSettings, selected: list[APS31IDEScanRecord], tally: _Tally
+) -> queue.Queue[tuple[int, APS31IDEScanRecord]]:
+    """Enqueue every scan that still needs reconstructing, counting the rest as skipped."""
+    work: queue.Queue[tuple[int, APS31IDEScanRecord]] = queue.Queue()
+
+    for index, record in enumerate(selected, start=1):
+        product_file = StandardFileLayout.PRODUCT.path(settings.output_directory(record.scan_no))
+
+        if not settings.batch.overwrite_existing_products and product_file.is_file():
+            logger.info('scan %05d: skipping, %s already exists', record.scan_no, product_file)
+            tally.skipped += 1
+            continue
+
+        work.put((index, record))
+
+    return work
 
 
 def main() -> ExitCode:
     args = _build_parser().parse_args()
 
+    try:
+        settings = load_batch_settings(args.batch_settings)
+    except (OSError, ValueError) as exc:
+        logging.basicConfig(level=logging.INFO, stream=sys.stderr)
+        logger.error('%s', exc)
+        return ExitCode.USAGE
+
+    log_level = settings.misc.log_level if args.log_level is None else args.log_level
     logging.basicConfig(
-        level=args.log_level,
+        level=log_level,
         stream=sys.stderr,
         format='%(asctime)s %(levelname)s %(name)s: %(message)s',
     )
+
+    settings_text = args.batch_settings.read_text()
 
     # Installed before the first long operation, so a cancel during the file reads is
     # already honored. Nothing earlier than this is interruptible.
     cancellation = install_signal_handlers()
 
-    layout = _Layout.from_argument(args.experiment_directory)
-    output_root = (
-        layout.experiment_root / 'analysis' / 'ptychodus'
-        if args.output_directory is None
-        else args.output_directory
-    )
+    try:
+        scan_table_file = settings.scan_table_file
+    except ValueError as exc:
+        logger.error('%s', exc)
+        return ExitCode.USAGE
 
-    logger.info('Reading the scan table from %s', layout.scan_table_file)
-    records = read_aps31ide_scan_table(layout.scan_table_file)
-    label = _select_label(records, args.label)
-    selected = _select_records(records, args, label)
+    logger.info('Reading the scan table from %s', scan_table_file)
+    records = read_aps31ide_scan_table(scan_table_file)
+    label = select_label(records, settings.batch.label)
+    selected = select_records(records, settings.batch, label)
 
     if not selected:
-        logger.error('No scans matched the requested projection range.')
+        logger.error('No scans matched the requested scan range.')
         return ExitCode.FAILURE
 
     logger.info(
-        'Selected %d scan(s): %d..%d',
+        'Selected %d scan(s): %05d..%05d',
         len(selected),
         selected[0].scan_no,
         selected[-1].scan_no,
     )
 
     if args.dry_run:
-        for record in selected:
-            output_directory = layout.output_directory(output_root, record)
-
-            try:
-                diffraction_file_path: Path | str = layout.diffraction_file(record.scan_no)
-            except FileNotFoundError as exc:
-                diffraction_file_path = f'MISSING ({exc})'
-
-            position_file_path = layout.position_file(record.scan_no)
-            position_note = '' if position_file_path.is_file() else ' MISSING'
-            logger.info(
-                'scan %05d subtomo %d projection %d angle %+.4f deg\n'
-                '  diffraction: %s\n'
-                '  positions:   %s%s\n'
-                '  output:      %s',
-                record.scan_no,
-                record.subtomo_no,
-                record.measurement_id,
-                record.encoder_angle_deg,
-                diffraction_file_path,
-                position_file_path,
-                position_note,
-                output_directory,
-            )
-
+        _report_plan(settings, selected)
         logger.info('Dry run: %d scan(s) planned. Nothing read, nothing written.', len(selected))
         return ExitCode.SUCCESS
 
-    registry = PluginRegistry.load_plugins()
+    options = load_ptychi_options(args.ptychi_options)
 
-    if args.affine_transform_after is not None:
-        # A fit against positions that were never refined returns the identity, which would
-        # look like a successful calibration while correcting nothing.
-        probe_options = load_ptychi_options(args.ptychi_options_file).probe_position_options
-
-        if not probe_options.optimizable:
-            logger.error(
-                '--affine-transform-after needs pty-chi position correction enabled for the '
-                'calibration scans, but the supplied options disable it. The fit would see '
-                'unrefined positions and return the identity transform.'
-            )
-            return ExitCode.FAILURE
-
-    bad_pixels: BadPixels | None = None
-
-    if args.bad_pixels_file is not None:
-        logger.info('Reading bad pixels from %s', args.bad_pixels_file)
-        bad_pixels_reader = registry.bad_pixels_file_readers.get_strategy_by_name(
-            args.bad_pixels_file_type
+    if not options.probe_position_options.optimizable:
+        logger.info(
+            'pty-chi position correction is disabled, so no scan will have refined '
+            'positions to fit a transform from, and none will write affine_fit.yaml.'
         )
-        bad_pixels = bad_pixels_reader.read(args.bad_pixels_file)
+
+    registry = PluginRegistry.load_plugins()
+    bad_pixels = None
+
+    if settings.diffraction.bad_pixels_file is not None:
+        # Read here so a bad path fails the run now rather than once per scan. Each worker
+        # reads the mask itself, which keeps an array of this size off the payload.
+        logger.info('Reading bad pixels from %s', settings.diffraction.bad_pixels_file)
+        bad_pixels = registry.bad_pixels_file_readers.get_strategy_by_name(
+            settings.diffraction.bad_pixels_file_type
+        ).read(settings.diffraction.bad_pixels_file)
+
+    if settings.initial_probe.probe_source == 'file':
+        probe_file = settings.initial_probe.probe_from_file.file_path
+        assert probe_file is not None  # the settings model requires it for "file"
+        logger.info('Checking the initial probe file %s', probe_file)
+        registry.probe_file_readers.get_strategy_by_name(
+            settings.initial_probe.probe_from_file.file_type
+        ).read(probe_file)
 
     # One crop for the whole run, settled from the first selected scan.
     first_dataset = registry.diffraction_file_readers.get_strategy_by_name(DIFFRACTION_READER).read(
-        layout.diffraction_file(selected[0].scan_no)
+        settings.diffraction_file(selected[0].scan_no)
     )
     first_metadata = first_dataset.get_metadata()
     max_valid_count = (
         invalid_count_threshold(first_metadata.pattern_dtype)
-        if args.max_valid_count is None
-        else args.max_valid_count
+        if settings.diffraction.max_valid_count is None
+        else settings.diffraction.max_valid_count
     )
 
-    # The same cut each scan's pipeline applies below, so the frame the beam center is
-    # estimated from matches the frames that will be reconstructed.
+    # The same cut each scan's pipeline applies, so the frame the beam center is estimated
+    # from matches the frames that will be reconstructed.
     value_filter: FilterValuesStep | None = None
 
     if max_valid_count is not None:
         logger.info('Zeroing pixels at or above %d as invalid', max_valid_count)
         value_filter = FilterValuesStep(lower_bound=0, upper_bound=max_valid_count)
 
-    read_region = resolve_crop_region(
+    crop_region = resolve_crop_region(
         logger,
         first_dataset,
-        crop_extent_px=args.crop_extent_px,
-        beam_center_x_px=args.beam_center_x_px,
-        beam_center_y_px=args.beam_center_y_px,
+        crop_extent_px=settings.diffraction.crop_extent_px,
+        beam_center_x_px=settings.diffraction.beam_center_x_px,
+        beam_center_y_px=settings.diffraction.beam_center_y_px,
         bad_pixels=bad_pixels,
         value_filter=value_filter,
         subject='first scan',
     )
-    del first_dataset
+    del first_dataset, bad_pixels
 
-    warm_start_probe: Probe | None = None
+    read_region = (
+        None
+        if crop_region is None
+        else {'x_range': crop_region.x_range, 'y_range': crop_region.y_range}
+    )
 
-    if args.probe_file is not None:
-        logger.info('Reading the initial probe from %s', args.probe_file)
-        probe_reader = registry.probe_file_readers.get_strategy_by_name(args.probe_file_type)
-        warm_start_probe = probe_reader.read(args.probe_file).get_probe_no_opr()
+    tally = _Tally()
+    work = _queue_pending_scans(settings, selected, tally)
+    devices = visible_cuda_devices()
 
-    position_pairs: list[tuple[ProbePositionSequence, ProbePositionSequence]] = []
-    transform: AffineTransform | None = None
-
-    num_succeeded = 0
-    skipped: list[int] = []
-    failed: list[int] = []
-
-    cancelled_after: int | None = None
-
-    for scan_index, record in enumerate(selected, start=1):
-        if cancellation.is_cancelled:
-            cancelled_after = scan_index - 1
-            logger.warning(
-                'Cancelled: stopping before scan %05d, with %d of %d selected scan(s) done.',
-                record.scan_no,
-                scan_index - 1,
-                len(selected),
-            )
-            break
-
-        output_directory = layout.output_directory(output_root, record)
-
-        if args.skip_existing and StandardFileLayout.PRODUCT.path(output_directory).is_file():
-            logger.info(
-                '[%d/%d] scan %05d: skipping, %s already exists',
-                scan_index,
-                len(selected),
-                record.scan_no,
-                StandardFileLayout.PRODUCT.path(output_directory),
-            )
-            skipped.append(record.scan_no)
-            continue
-
+    if devices:
         logger.info(
-            '[%d/%d] scan %05d: subtomo %d, projection %d, angle %+.4f deg',
-            scan_index,
-            len(selected),
-            record.scan_no,
-            record.subtomo_no,
-            record.measurement_id,
-            record.encoder_angle_deg,
+            'Reconstructing %d scan(s) across %d CUDA device(s): %s',
+            work.qsize(),
+            len(devices),
+            ', '.join(f'cuda:{device}' for device in devices),
         )
+    else:
+        # One worker, inheriting an empty CUDA_VISIBLE_DEVICES, so a device this process
+        # could not see is not found by the child either.
+        logger.warning(
+            'No CUDA devices are visible. Reconstructing %d scan(s) one at a time on the '
+            'CPU, which will be very slow. Set CUDA_VISIBLE_DEVICES, or ask the job '
+            'scheduler for GPUs.',
+            work.qsize(),
+        )
+        devices = ['']
 
-        try:
-            result = _reconstruct_one_scan(
-                args,
-                layout,
-                registry,
-                record,
-                output_directory,
+    options_json = None if args.ptychi_options is None else dump_task_options(options)
+
+    with ThreadPoolExecutor(max_workers=len(devices)) as pool:
+        for device in devices:
+            pool.submit(
+                _worker_loop,
+                settings,
+                work,
+                device,
+                settings_text=settings_text,
+                options_json=options_json,
                 read_region=read_region,
-                bad_pixels=bad_pixels,
-                warm_start_probe=warm_start_probe,
-                transform=transform,
+                num_selected=len(selected),
+                tally=tally,
                 cancellation=cancellation,
             )
-        except Exception:
-            if not args.continue_on_error:
-                raise
-
-            logger.exception('Scan %05d failed; continuing.', record.scan_no)
-            failed.append(record.scan_no)
-            continue
-
-        if result is None:
-            # Cancelled before this scan produced anything. It is neither a success nor a
-            # failure, and the loop guard above ends the run on the next pass.
-            cancelled_after = scan_index - 1
-            break
-
-        num_succeeded += 1
-
-        if not args.no_warm_start_probe:
-            warm_start_probe = result.probes.get_probe_no_opr()
-
-        if args.affine_transform_after is not None and transform is None:
-            position_pairs.append((result.measured_positions, result.reconstructed_positions))
-
-            if len(position_pairs) >= args.affine_transform_after:
-                logger.info(
-                    'Fitting one affine transform across %d position pair(s)',
-                    len(position_pairs),
-                )
-                fit = estimate_affine_transform(
-                    position_pairs, rng=numpy.random.default_rng(args.seed)
-                )
-                logger.info('%s', fit)
-
-                # Every rank fits the same transform from the same pairs and carries the
-                # linear part forward below, so only the record of it is confined to one
-                # process.
-                if is_main_process():
-                    affine_fit_file = output_root / label / 'affine_fit.json'
-                    _write_affine_fit(affine_fit_file, fit)
-                    logger.info('Wrote %s', affine_fit_file)
-
-                # Only the linear part carries over. Each scan has its own stage origin, so
-                # the per-pair translations the fit reports describe those scans alone.
-                transform = fit.linear_transform
-                logger.info(
-                    'Position correction is off from here on; measured positions are '
-                    'transformed by the fitted linear part instead.'
-                )
 
     logger.info(
-        'Done: %d reconstructed, %d skipped, %d failed, of %d selected.',
-        num_succeeded,
-        len(skipped),
-        len(failed),
+        'Done: %d reconstructed, %d skipped, %d failed, %d cancelled, of %d selected.',
+        tally.succeeded,
+        tally.skipped,
+        len(tally.failed),
+        tally.cancelled,
         len(selected),
     )
 
-    if failed:
-        logger.error('Failed scans: %s', ', '.join(f'{scan_no:05d}' for scan_no in failed))
+    if tally.failed:
+        logger.error(
+            'Failed scans: %s', ', '.join(f'{scan_no:05d}' for scan_no in sorted(tally.failed))
+        )
 
-    if cancelled_after is not None:
-        # Reported ahead of the failures: the run was stopped, and whichever scans had
-        # already failed is a detail of how far it got, not why it ended.
-        logger.warning('Cancelled after %d of %d selected scan(s).', cancelled_after, len(selected))
+    if cancellation.is_cancelled:
+        logger.warning('Cancelled: %s.', cancellation.reason or 'no reason given')
         return ExitCode.CANCELLED
 
-    return ExitCode.FAILURE if failed else ExitCode.SUCCESS
+    return ExitCode.FAILURE if tally.failed else ExitCode.SUCCESS
 
 
 if __name__ == '__main__':

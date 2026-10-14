@@ -106,17 +106,17 @@ def test_a_finite_loss_is_reported() -> None:
 
 
 def test_the_main_rank_logs_to_the_plain_name(tmp_path: Path) -> None:
-    assert log_file(tmp_path, 0).name == 'reconstruct.log'
+    assert log_file(tmp_path, 0).name == 'ptychodus.log'
 
 
 def test_a_secondary_rank_logs_to_its_own_file(tmp_path: Path) -> None:
     # Every rank logs, and one shared name would have them truncating each other's.
-    assert log_file(tmp_path, 1).name == 'reconstruct.rank01.log'
-    assert log_file(tmp_path, 12).name == 'reconstruct.rank12.log'
+    assert log_file(tmp_path, 1).name == 'ptychodus.rank01.log'
+    assert log_file(tmp_path, 12).name == 'ptychodus.rank12.log'
 
 
 def test_an_explicit_options_file_wins(tmp_path: Path) -> None:
-    staged = tmp_path / 'ptychi_options.json'
+    staged = tmp_path / 'ptychi_options.yaml'
     staged.write_text('{}')
     chosen = tmp_path / 'elsewhere.json'
 
@@ -126,13 +126,13 @@ def test_an_explicit_options_file_wins(tmp_path: Path) -> None:
 def test_the_stdin_sentinel_is_passed_through(tmp_path: Path) -> None:
     # ``-`` is not a path to probe for; resolving it against the input directory would
     # turn an in-memory handoff into a missing file.
-    (tmp_path / 'ptychi_options.json').write_text('{}')
+    (tmp_path / 'ptychi_options.yaml').write_text('{}')
 
     assert resolve_ptychi_options_file(Path('-'), tmp_path) == Path('-')
 
 
 def test_the_staged_options_are_used_when_present(tmp_path: Path) -> None:
-    staged = tmp_path / 'ptychi_options.json'
+    staged = tmp_path / 'ptychi_options.yaml'
     staged.write_text('{}')
 
     assert resolve_ptychi_options_file(None, tmp_path) == staged
@@ -153,7 +153,7 @@ def _args(tmp_path: Path) -> argparse.Namespace:
     return argparse.Namespace(
         input_directory=tmp_path,
         output_directory=tmp_path / 'out',
-        ptychi_options_file=None,
+        ptychi_options=None,
         index_filter='all',
         num_sync_epochs=1,
         mmap_file=None,
@@ -165,7 +165,7 @@ def test_unreadable_options_are_a_usage_error(
 ) -> None:
     # Distinguished from a reconstruction failure so a launcher can tell "you gave me
     # nonsense" from "the reconstruction broke".
-    (tmp_path / 'ptychi_options.json').write_text('not json')
+    (tmp_path / 'ptychi_options.yaml').write_text('not json')
     buffer = io.StringIO()
     stream = EventStream(buffer)
 

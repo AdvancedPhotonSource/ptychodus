@@ -16,6 +16,13 @@ one -- with its own ``options_class_name``, so the payload names the class that
 wrote it and :func:`load_task_options` can pick the right algorithm-specific
 subclass (``DMOptions``, ``LSQMLOptions``, ...) without a side-channel argument.
 
+That JSON is for transport between processes, where nothing reads it. The
+options file a run leaves behind is YAML instead, written by
+:func:`dump_task_options_yaml`, because it is meant to be read and edited.
+Both encode the same ``get_dict()`` payload and both load through
+:func:`load_task_options_from_mapping`, so the class stamp selects the subclass either
+way.
+
 That stamp is what keeps PIE, ePIE and rPIE apart. Their dicts are otherwise
 identical -- ``EPIEReconstructorOptions`` and ``RPIEReconstructorOptions`` add
 no fields over ``PIEReconstructorOptions`` -- so before pty-chi 2.1.0 the three
@@ -38,6 +45,7 @@ from collections.abc import Iterator, Sequence
 from typing import Any
 
 import numpy
+import yaml
 
 import ptychi.api
 from ptychi.api import ObjectPosOriginCoordsMethods
@@ -60,7 +68,9 @@ logger = logging.getLogger(__name__)
 __all__ = [
     'align_task_options_with_product',
     'dump_task_options',
+    'dump_task_options_yaml',
     'load_task_options',
+    'load_task_options_from_mapping',
     'reconstruct_with_ptychi',
 ]
 
@@ -75,8 +85,29 @@ def dump_task_options(options: PtychographyTaskOptions) -> str:
     return json.dumps(options.get_dict())
 
 
-def load_task_options(text: str) -> PtychographyTaskOptions:
-    """Rebuild the options object that :func:`dump_task_options` serialized.
+def dump_task_options_yaml(options: PtychographyTaskOptions) -> str:
+    """Serialize a fully-built options object as the YAML a run leaves behind.
+
+    The same ``get_dict()`` payload :func:`dump_task_options` writes as JSON,
+    including the ``options_class_name`` stamp that identifies the algorithm.
+    ``sort_keys=False`` keeps pty-chi's own field order; alphabetizing would
+    scatter each nested options block's fields for a file meant to be read.
+
+    The payload goes through the JSON encoder on the way, because ``get_dict``
+    hands back live Python objects that ``safe_dump`` will not represent:
+    pty-chi's ``StrEnum`` members, and a tuple of them under
+    ``probe_position_options.affine_transform_constraint``. ``json.dumps``
+    already renders both -- a ``StrEnum`` is a ``str``, a tuple is an array --
+    so decoding its output yields plain scalars, lists and dicts. Normalizing
+    through the wire format rather than teaching a dumper about each type also
+    means the two encodings cannot drift: whatever one writes, so does the
+    other.
+    """
+    return yaml.safe_dump(json.loads(dump_task_options(options)), sort_keys=False)
+
+
+def load_task_options_from_mapping(options_dict: Any) -> PtychographyTaskOptions:
+    """Rebuild an options object from a decoded payload, whatever encoded it.
 
     ``options_class_name`` selects the algorithm-specific subclass.
     ``load_from_dict`` then resolves nested options through that subclass's
@@ -84,10 +115,8 @@ def load_task_options(text: str) -> PtychographyTaskOptions:
     dropped, and ``strict=True`` rejects a payload whose nested stamps disagree
     with the fields they are being loaded into.
     """
-    options_dict = json.loads(text)
-
     if not isinstance(options_dict, dict):
-        raise ValueError(f'Expected a JSON object; got {type(options_dict).__name__}!')
+        raise ValueError(f'Expected a mapping of options; got {type(options_dict).__name__}!')
 
     try:
         options_class_name = options_dict['options_class_name']
@@ -107,6 +136,11 @@ def load_task_options(text: str) -> PtychographyTaskOptions:
     options = options_cls()
     options.load_from_dict(options_dict, strict=True)
     return options
+
+
+def load_task_options(text: str) -> PtychographyTaskOptions:
+    """Rebuild the options object that :func:`dump_task_options` serialized."""
+    return load_task_options_from_mapping(json.loads(text))
 
 
 def _initial_opr_mode_weights(probe: ProbeSequence) -> RealArrayType:

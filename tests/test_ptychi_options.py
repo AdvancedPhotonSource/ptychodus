@@ -22,9 +22,11 @@ import json
 import logging
 import math
 import operator
+from pathlib import Path
 
 import numpy
 import pytest
+import yaml
 
 pytest.importorskip('ptychi')
 
@@ -64,11 +66,14 @@ from ptychodus.model.ptychi.algorithms import (  # noqa: E402
     RPIEAlgorithm,
     build_algorithms,
 )
+from ptychodus.cli._reconstruct_common import load_ptychi_options  # noqa: E402
 from ptychodus.model.ptychi.task import (  # noqa: E402
     _initial_opr_mode_weights,
     align_task_options_with_product,
     dump_task_options,
+    dump_task_options_yaml,
     load_task_options,
+    load_task_options_from_mapping,
 )
 
 PIXEL_M = 1.0e-9
@@ -148,7 +153,7 @@ def _stub_the_device_probe() -> Iterator[None]:
     from ptychodus.model.ptychi import device
 
     with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(device, '_probe_devices_via_subprocess', lambda: ['cpu'])
+        monkeypatch.setattr(device, 'probe_devices_via_subprocess', lambda: ['cpu'])
         yield
 
 
@@ -517,6 +522,52 @@ def test_wire_format_distinguishes_pie_variants() -> None:
     assert stamps == {'PIEOptions', 'EPIEOptions', 'RPIEOptions'}
 
 
+def test_yaml_round_trips_every_algorithm_to_the_same_payload_as_json() -> None:
+    """The options file encoding must carry exactly what the wire format carries.
+
+    ``get_dict`` hands back live pty-chi objects -- ``StrEnum`` members throughout,
+    and a tuple of them under ``probe_position_options.affine_transform_constraint``
+    -- which ``yaml.safe_dump`` refuses to represent even though ``json.dumps``
+    renders both. Every algorithm is covered because a pty-chi release that adds a
+    field of some further unrepresentable type would otherwise fail at the end of a
+    reconstruction, after the expensive part, rather than here.
+    """
+    library = _make_library()
+    product = _make_reconstruct_input().product
+
+    for algorithm in _make_algorithms(library):
+        task_options = algorithm.build_task_options(product)
+        text = dump_task_options_yaml(task_options)
+        loaded = load_task_options_from_mapping(yaml.safe_load(text))
+
+        assert type(loaded) is type(task_options)
+        assert json.loads(dump_task_options(loaded)) == json.loads(dump_task_options(task_options))
+
+
+def test_yaml_options_preserve_pty_chi_field_order() -> None:
+    """A file meant to be read keeps each options block's own field order."""
+    options = LSQMLOptions()
+    text = dump_task_options_yaml(options)
+
+    assert list(yaml.safe_load(text)) == list(json.loads(dump_task_options(options)))
+
+
+def test_load_ptychi_options_reads_yaml_and_json_alike(tmp_path: Path) -> None:
+    """Both encodings of one options object load to the same thing."""
+    options = LSQMLOptions()
+
+    yaml_file = tmp_path / 'options.yaml'
+    yaml_file.write_text(dump_task_options_yaml(options))
+    json_file = tmp_path / 'options.json'
+    json_file.write_text(dump_task_options(options))
+
+    from_yaml = load_ptychi_options(yaml_file)
+    from_json = load_ptychi_options(json_file)
+
+    assert type(from_yaml) is type(from_json) is LSQMLOptions
+    assert json.loads(dump_task_options(from_yaml)) == json.loads(dump_task_options(from_json))
+
+
 def test_load_task_options_rejects_a_non_object_payload() -> None:
     with pytest.raises(ValueError):
         load_task_options('[1, 2, 3]')
@@ -725,7 +776,7 @@ def test_align_writes_the_near_field_distance_from_the_product() -> None:
 
 
 def test_align_overwrites_a_contradicting_caller_distance_and_warns(caplog) -> None:
-    """A ptychi_options.json that hard-codes a distance disagreeing with the product
+    """A ptychi_options.yaml that hard-codes a distance disagreeing with the product
     is corrected, loudly -- the product owns the field outright."""
     parameters = _make_reconstruct_input()
     options = LSQMLOptions()

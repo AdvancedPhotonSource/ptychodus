@@ -14,7 +14,7 @@ Scope and limitations
   names the destination through ``recon_dir_base``, or through the per-instrument
   convention derived from ``data_directory``, and an argument could only override it.
 - That directory is filled in the ptychodus standard layout -- ``diffraction.h5``,
-  ``ptychi_options.json``, per-epoch ``product.NNNNNN.h5`` checkpoints, and the final
+  ``ptychi_options.yaml``, per-epoch ``product.NNNNNN.h5`` checkpoints, and the final
   ``product.h5``. The per-iteration TIFF stacks and plots of the original workflow are
   still not written.
 - One reconstruction only: no batch queue, no multi-scan shared-object mode, no
@@ -40,7 +40,7 @@ Scope and limitations
 - ``init_layer_append_mode`` of ``avg`` inserts the geometric-mean layer, the slab whose
   repetition reproduces the object. PEAR inserted the arithmetic mean of the layers,
   which lets opposing phases cancel and can turn transparent material absorbing.
-- There is deliberately no ``--ptychi-options-file``, which the other drivers accept. The
+- There is deliberately no ``--ptychi-options``, which the other drivers accept. The
   options here are a translation of the parameter file -- near-field propagation, slice
   count, regularization weights and the rest -- so a supplied file would have to either
   lose to those fields or silently discard them, and the parameter file is the input this

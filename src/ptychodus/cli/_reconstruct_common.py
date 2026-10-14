@@ -22,6 +22,7 @@ left the loop alone would hang its peers at their next collective.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import signal
@@ -32,6 +33,7 @@ from pathlib import Path
 from types import FrameType
 
 import numpy
+import yaml
 from ptychi.api import LSQMLOptions
 from ptychi.api.options.task import PtychographyTaskOptions
 
@@ -49,8 +51,9 @@ from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
 from ptychodus.model.ptychi.task import (
     align_task_options_with_product,
-    dump_task_options,
+    dump_task_options_yaml,
     load_task_options,
+    load_task_options_from_mapping,
     reconstruct_with_ptychi,
 )
 
@@ -347,25 +350,48 @@ def invalid_count_threshold(dtype: numpy.dtype) -> int | None:
 
 
 _PTYCHI_OPTIONS_HELP = (
-    'pty-chi options JSON, as written to ptychi_options.json by any ptychodus run. Its '
-    'algorithm stamp selects the reconstructor. "-" reads the JSON from stdin.'
+    f'pty-chi options, as written to {StandardFileLayout.PTYCHI_OPTIONS} by any ptychodus '
+    'run. YAML or JSON, chosen by the suffix; its algorithm stamp selects the '
+    'reconstructor. "-" reads from stdin. Hand-written YAML must spell scientific '
+    'notation 1.0e-3 rather than 1e-3, which YAML reads as a string.'
 )
 
 
 def add_ptychi_options_argument(
     parser: argparse.ArgumentParser, *, default_note: str = 'Defaults to stock LSQML.'
 ) -> None:
-    """Add ``--ptychi-options-file``, so its help text is written once rather than ten times.
+    """Add ``--ptychi-options``, so its help text is written once rather than ten times.
 
     `default_note` completes the help for a driver that resolves a different fallback than
     the stock options :func:`load_ptychi_options` builds from ``None``.
     """
     parser.add_argument(
-        '--ptychi-options-file',
+        '--ptychi-options',
         type=Path,
         default=None,
         help=f'{_PTYCHI_OPTIONS_HELP} {default_note}',
     )
+
+
+_YAML_SUFFIXES = frozenset({'.yaml', '.yml'})
+
+
+def _decode_ptychi_options(text: str, options_file: Path) -> PtychographyTaskOptions:
+    """Decode an options payload, picking the encoding from the file name.
+
+    Stdin carries no suffix, so it is tried as JSON and then as YAML. The order only
+    decides which error surfaces, since YAML parses JSON too.
+    """
+    if options_file.suffix.lower() in _YAML_SUFFIXES:
+        return load_task_options_from_mapping(yaml.safe_load(text))
+
+    if options_file == _STDIN_ARGUMENT:
+        try:
+            return load_task_options_from_mapping(json.loads(text))
+        except json.JSONDecodeError:
+            return load_task_options_from_mapping(yaml.safe_load(text))
+
+    return load_task_options(text)
 
 
 def load_ptychi_options(options_file: Path | None) -> PtychographyTaskOptions:
@@ -374,9 +400,9 @@ def load_ptychi_options(options_file: Path | None) -> PtychographyTaskOptions:
         return LSQMLOptions()
 
     if options_file == _STDIN_ARGUMENT:
-        return load_task_options(sys.stdin.read())
+        return _decode_ptychi_options(sys.stdin.read(), options_file)
 
-    return load_task_options(options_file.read_text())
+    return _decode_ptychi_options(options_file.read_text(), options_file)
 
 
 def save_assembled_diffraction(
@@ -422,7 +448,7 @@ def run_reconstruction(
     artifact depends on the assembled dataset rather than on the reconstruction, so it is
     written by :func:`save_assembled_diffraction` before this runs. Aligns
     `options` against `reconstruct_input.product`, writes the aligned options to
-    `ptychi_options.json`, runs `reconstruct_with_ptychi` to completion writing a
+    `ptychi_options.yaml`, runs `reconstruct_with_ptychi` to completion writing a
     `product.NNNNNN.h5` checkpoint at every sync point, then writes the final `product.h5`.
     Returns the final reconstructed product.
 
@@ -453,7 +479,7 @@ def run_reconstruction(
         # wavelength and the slice spacings the product supplied, which the unaligned object
         # does not.
         logger.info('Writing %s', options_file)
-        options_file.write_text(dump_task_options(task_options))
+        options_file.write_text(dump_task_options_yaml(task_options))
 
     num_epochs = int(task_options.reconstructor_options.num_epochs)
     logger.info(

@@ -74,6 +74,11 @@ class StandardFileLayout(StrEnum):
 
     DIFFRACTION = 'diffraction.h5'
     FLUORESCENCE = 'fluorescence.h5'
+    # Console capture: whatever the run wrote to its standard output and standard
+    # error, including the output of C extensions that a sys.stdout reassignment
+    # would not reach. Named for the application rather than for reconstruction, so
+    # that any activity writing into a workflow directory uses the one name.
+    LOG = 'ptychodus.log'
     # Stem only; the per-backend extension comes from
     # TrainableReconstructor.get_model_file_extension(). The full path is
     # f'{input_directory}/{MODEL_BASENAME}{ext}'.
@@ -83,7 +88,7 @@ class StandardFileLayout(StrEnum):
     # after every value the product supplies has been folded in. Distinct from
     # SETTINGS, which holds the application's own configuration rather than what the
     # reconstruction backend received.
-    PTYCHI_OPTIONS = 'ptychi_options.json'
+    PTYCHI_OPTIONS = 'ptychi_options.yaml'
     SETTINGS = 'settings.ini'
 
     def path(self, directory: Path) -> Path:

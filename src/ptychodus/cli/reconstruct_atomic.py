@@ -32,7 +32,7 @@ Scope and limitations
 - Diffraction from this instrument is compact: most of the signal sits within a few tens
   of pixels of the beam center. Crop with --crop-extent-px rather than reconstructing
   the full frame, and expect the usable radius to bound the resolution.
-- One scan, stock LSQML unless ``--ptychi-options-file`` names something else.
+- One scan, stock LSQML unless ``--ptychi-options`` names something else.
 - Output is a ptychodus product HDF5. Feeding it back as ``--probe-file`` on the next
   scan is the intended warm start.
 - No GPU selection or thread-count side effects. Choose a device with

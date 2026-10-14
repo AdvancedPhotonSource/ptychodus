@@ -116,7 +116,7 @@ def main() -> int:
         str(args.output_directory),
         # The options were built in memory here, so there is no file to point at. Saying
         # so explicitly keeps the handoff visible rather than implied by an empty flag.
-        '--ptychi-options-file',
+        '--ptychi-options',
         '-',
         '--num-sync-epochs',
         str(args.num_sync_epochs),

@@ -49,6 +49,10 @@ from ptychodus.cli._reconstruct_common import (  # noqa: E402
     run_reconstruction,
     save_assembled_diffraction,
 )
+from ptychodus.model.ptychi.task import (  # noqa: E402
+    dump_task_options,
+    dump_task_options_yaml,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -183,7 +187,7 @@ def test_main_process_writes_every_artifact(
 ) -> None:
     _run(monkeypatch, tmp_path, rank=0)
 
-    assert (tmp_path / 'ptychi_options.json').is_file()
+    assert (tmp_path / 'ptychi_options.yaml').is_file()
     assert (tmp_path / 'product.h5').is_file()
     # One checkpoint per sync point: epochs 2 and 4 at a stride of 2.
     assert sorted(p.name for p in tmp_path.glob('product.0*.h5')) == [
@@ -226,7 +230,7 @@ def test_main_process_writes_when_rank_comes_from_the_environment(
 ) -> None:
     _run(monkeypatch, tmp_path, rank=0, rank_variable='RANK')
 
-    assert (tmp_path / 'ptychi_options.json').is_file()
+    assert (tmp_path / 'ptychi_options.yaml').is_file()
     assert (tmp_path / 'product.h5').is_file()
 
 
@@ -246,7 +250,7 @@ def test_srun_main_task_writes_every_artifact(
 ) -> None:
     _run(monkeypatch, tmp_path, rank=0, rank_variable='SLURM_PROCID')
 
-    assert (tmp_path / 'ptychi_options.json').is_file()
+    assert (tmp_path / 'ptychi_options.yaml').is_file()
     assert (tmp_path / 'product.h5').is_file()
 
 
@@ -607,23 +611,38 @@ def test_load_ptychi_options_builds_a_fresh_object_each_time() -> None:
     assert load_ptychi_options(None).reconstructor_options.num_epochs != 11
 
 
-def test_load_ptychi_options_round_trips_a_file(tmp_path: Path) -> None:
+@pytest.mark.parametrize('suffix', ['.yaml', '.yml', '.json'])
+def test_load_ptychi_options_round_trips_a_file(tmp_path: Path, suffix: str) -> None:
+    """The encoding follows the suffix, and either one survives the round trip."""
     options = LSQMLOptions()
     options.reconstructor_options.num_epochs = 7
-    options_file = tmp_path / 'ptychi_options.json'
-    options_file.write_text(_reconstruct_common.dump_task_options(options))
+    options_file = (tmp_path / 'ptychi_options').with_suffix(suffix)
+    dump = dump_task_options if suffix == '.json' else dump_task_options_yaml
+    options_file.write_text(dump(options))
 
     assert load_ptychi_options(options_file).reconstructor_options.num_epochs == 7
 
 
+def test_load_ptychi_options_reads_an_unsuffixed_file_as_json(tmp_path: Path) -> None:
+    """A name carrying no suffix is the JSON the drivers have always accepted."""
+    options = LSQMLOptions()
+    options.reconstructor_options.num_epochs = 3
+    options_file = tmp_path / 'options'
+    options_file.write_text(dump_task_options(options))
+
+    assert load_ptychi_options(options_file).reconstructor_options.num_epochs == 3
+
+
+@pytest.mark.parametrize('dump', [dump_task_options, dump_task_options_yaml])
 def test_load_ptychi_options_reads_stdin_for_a_dash(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, dump: object
 ) -> None:
+    """Stdin has no suffix to go by, so both encodings have to be accepted."""
     import io
 
     options = LSQMLOptions()
     options.reconstructor_options.num_epochs = 5
-    monkeypatch.setattr('sys.stdin', io.StringIO(_reconstruct_common.dump_task_options(options)))
+    monkeypatch.setattr('sys.stdin', io.StringIO(dump(options)))  # type: ignore[operator]
 
     loaded = load_ptychi_options(_reconstruct_common._STDIN_ARGUMENT)
 

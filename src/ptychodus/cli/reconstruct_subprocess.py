@@ -14,9 +14,10 @@ Protocol
 --------
 
 stdin
-    Nothing, unless ``--ptychi-options-file -`` asks for the pty-chi options JSON to be read
-    from it. The ``options_class_name`` that JSON carries is the algorithm identity, so
-    PIE/ePIE/rPIE cannot silently swap for each other on the way through.
+    Nothing, unless ``--ptychi-options -`` asks for the pty-chi options to be read from
+    it, as YAML or JSON. The ``options_class_name`` the payload carries is the
+    algorithm identity, so PIE/ePIE/rPIE cannot silently swap for each other on the
+    way through.
 
 events
     One JSON object per line: ``started``, ``epoch``, ``checkpoint``, ``cancelling``,
@@ -84,7 +85,10 @@ from ptychodus.cli._reconstruct_common import (
 
 logger = logging.getLogger('reconstruct_subprocess')
 
-LOG_BASENAME = 'reconstruct'
+# Stem of StandardFileLayout.LOG, for the per-rank variant below. The shared enum
+# carries the rank-0 name because every activity writing a workflow directory leaves
+# one; the suffixed form belongs here, where a multi-rank launch is possible.
+_LOG_STEM = Path(StandardFileLayout.LOG.value).stem
 
 
 class EventStream:
@@ -134,9 +138,9 @@ def log_file(output_directory: Path, rank: int) -> Path:
     truncating one file, so only the main process gets the plain one.
     """
     if rank == 0:
-        return output_directory / f'{LOG_BASENAME}.log'
+        return StandardFileLayout.LOG.path(output_directory)
 
-    return output_directory / f'{LOG_BASENAME}.rank{rank:02d}.log'
+    return output_directory / f'{_LOG_STEM}.rank{rank:02d}.log'
 
 
 def resolve_ptychi_options_file(options_file: Path | None, input_directory: Path) -> Path | None:
@@ -156,7 +160,7 @@ def resolve_ptychi_options_file(options_file: Path | None, input_directory: Path
 
     logger.warning(
         'No %s in %s; reconstructing with stock LSQML options. '
-        'Pass --ptychi-options-file to choose another algorithm.',
+        'Pass --ptychi-options to choose another algorithm.',
         StandardFileLayout.PTYCHI_OPTIONS.value,
         input_directory,
     )
@@ -185,7 +189,7 @@ def _reconstruct(
 
     try:
         task_options = load_ptychi_options(
-            resolve_ptychi_options_file(args.ptychi_options_file, input_directory)
+            resolve_ptychi_options_file(args.ptychi_options, input_directory)
         )
     except (OSError, TypeError, ValueError) as exc:
         stream.emit_exception(exc)
@@ -272,7 +276,7 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar='INPUT_DIR',
         required=True,
         type=DirectoryType(must_exist=True),
-        help='Directory holding diffraction.h5, product.h5 and optionally ptychi_options.json.',
+        help='Directory holding diffraction.h5, product.h5 and optionally ptychi_options.yaml.',
     )
     parser.add_argument(
         '-o',
@@ -282,7 +286,7 @@ def _build_parser() -> argparse.ArgumentParser:
         type=DirectoryType(must_exist=False),
         help=(
             'Destination directory, written in the ptychodus standard layout: '
-            'ptychi_options.json, per-epoch product.NNNNNN.h5 checkpoints, the final '
+            'ptychi_options.yaml, per-epoch product.NNNNNN.h5 checkpoints, the final '
             'product.h5, and the log.'
         ),
     )
