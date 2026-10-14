@@ -29,6 +29,12 @@
 #                       checkout, matching what a normal pip install would
 #                       derive from git).
 #   CONTAINER_ENGINE    build engine (default: podman; e.g. docker)
+#   BASE_REGISTRY       registry serving the upstream base images (default:
+#                       docker.io). Point it at a mirror for an air-gapped or
+#                       proxied site. Every containers/Dockerfile.* pins its
+#                       registry through this arg rather than relying on the
+#                       host's unqualified-search list, so a build never needs
+#                       a TTY to disambiguate a short name.
 #   PTYCHO_FM_DIST      directory holding the prebuilt ptycho-fm wheel that
 #                       containers/Dockerfile.cuda installs (default:
 #                       ../ptycho-fm/dist beside the checkout). Set it to the
@@ -124,6 +130,8 @@ ENGINE="${CONTAINER_ENGINE:-podman}"
 command -v "$ENGINE" >/dev/null 2>&1 \
     || die "$ENGINE not on PATH (set CONTAINER_ENGINE=docker to use docker)"
 
+BASE_REGISTRY="${BASE_REGISTRY:-docker.io}"
+
 # --- Resolve requested variants ----------------------------------------------
 
 if (( $# == 0 )); then
@@ -147,5 +155,6 @@ for backend in "${variants[@]}"; do
     IFS=' ' read -r -a variant_args <<<"${VARIANT_ARGS[$backend]}"
     "$ENGINE" build "${variant_args[@]}" \
         --build-arg "PTYCHODUS_VERSION=$VERSION" \
+        --build-arg "BASE_REGISTRY=$BASE_REGISTRY" \
         -t "$tag" .
 done

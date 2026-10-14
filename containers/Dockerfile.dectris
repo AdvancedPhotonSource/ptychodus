@@ -12,7 +12,8 @@
 #       ptychodus
 #
 # `docker run ... ptychodus bash` drops into a shell instead of launching the GUI.
-FROM ubuntu:24.04
+ARG BASE_REGISTRY=docker.io
+FROM ${BASE_REGISTRY}/ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
