@@ -17,7 +17,7 @@ Scope is [CLAUDE.md](../../CLAUDE.md) and [.claude/skills/](../../.claude/skills
 - **Prefer claims whose truth survives the most likely change.** "nine of them" dies the next time a beamline is added; "all but `reconstruct_pear.py` and `reconstruct_batch_lamni.py`" does not.
 - **Make rules grep-auditable and embed the audit command in the rule.** A rule carrying its own one-line check can be verified forever; one that cannot is unenforceable. This is the single highest-value habit in the file.
 - **Name roles, not instances.** When a rule needs an exemplar, expect the exemplar to be renamed before the rule changes.
-- **Never surface deliberately undocumented on-disk artifacts** — `tike`, `ptychonn`, `ptycho_fm`, repo-root `.ini` files, `install.sh`, `TODO`.
+- **Never surface deliberately undocumented on-disk artifacts** — `tike`, `ptycho_fm`, repo-root `.ini` files, `install.sh`, `TODO`.
 
 ## Steps
 
@@ -138,7 +138,7 @@ Every referenced repo path must be tracked. This one check subsumes the standing
 grep -o '\]([^)]*)' CLAUDE.md | sed 's/^](//; s/)$//' | sort -u | while read -r p; do
   git ls-files "$p" | grep -q . || echo "UNTRACKED  $p"
 done
-grep -nEi '\b(tike|ptychonn|ptycho_fm|install\.sh)\b' CLAUDE.md
+grep -nEi '\b(tike|ptycho_fm|install\.sh)\b' CLAUDE.md
 ```
 
 `settings.ini` as a `StandardFileLayout` member is an I/O contract, not a repo-root file — not a finding.

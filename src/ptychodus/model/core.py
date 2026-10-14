@@ -34,7 +34,6 @@ from .memory import MemoryPresenter
 from .processing import ProcessingCore
 from .product import PositionsStreamingContext, ProductCore
 from .ptychi import PtyChiReconstructorLibrary
-from .ptychonn import PtychoNNReconstructorLibrary
 from .ptycho_fm import PtychoFMReconstructorLibrary
 from .ptychopinn import PtychoPINNReconstructorLibrary
 from .ptychopinn_torch import PtychoPINNTorchReconstructorLibrary
@@ -139,9 +138,6 @@ class ModelCore:
             self.settings_registry,
             self.is_developer_mode_enabled,
         )
-        self.ptychonn_reconstructor_library = PtychoNNReconstructorLibrary(
-            self.settings_registry, self.is_developer_mode_enabled
-        )
         self.ptychopinn_reconstructor_library = PtychoPINNReconstructorLibrary(
             self.settings_registry, self.is_developer_mode_enabled
         )
@@ -157,7 +153,6 @@ class ModelCore:
             self.product_core.product_api,
             [
                 self.ptychi_reconstructor_library,
-                self.ptychonn_reconstructor_library,
                 self.ptychopinn_reconstructor_library,
                 self.ptychopinn_torch_reconstructor_library,
                 self.ptycho_fm_reconstructor_library,

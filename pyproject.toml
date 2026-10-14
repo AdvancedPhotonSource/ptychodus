@@ -48,13 +48,12 @@ ptychodus-reconstruct-velociprobe = "ptychodus.cli.reconstruct_velociprobe:main"
 ptychodus-system-check = "ptychodus.cli.system_check:main"
 ptychodus-store = "ptychodus_store.cli:main"
 
-# PtychoPINN, PtychoFM and PtychoNN are published on no index, so they cannot
+# PtychoPINN and PtychoFM are published on no index, so they cannot
 # be named here the way ptychi is -- this table ships as the wheel's
 # Requires-Dist. Install them from a checkout, after any sync:
 #
 #     uv pip install --no-deps -e ../PtychoPINN
 #     uv pip install --no-deps -e ../ptycho-fm
-#     uv pip install --no-deps -e ../PtychoNN
 [project.optional-dependencies]
 docs = ["myst-parser", "sphinx", "sphinx-copybutton", "sphinx-rtd-theme"]
 globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]
@@ -171,7 +170,6 @@ module = [
     "ptycho.*",
     "ptycho_torch.*",
     "ptycho_fm.*",
-    "ptychonn.*",
     "ptychozoon.*",
     "pvaccess",
     "pvapy.*",

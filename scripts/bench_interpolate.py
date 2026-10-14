@@ -3,7 +3,7 @@
 
 Times the per-call cost of the gather (``get_patch``), scatter (``add_patch``),
 and stitcher scatter at sizes representative of the VSPI fluorescence enhancer
-and PtychoNN training-data export inner loops.
+and complex-object patch extraction inner loops.
 
 Run this on both ``main`` and the optimization branch to quantify the speedup:
 
@@ -107,13 +107,13 @@ def main() -> None:
     )
 
     print()
-    print('=== PtychoNN-representative: 2048x2048 complex128 object, 128x128 patches ===')
+    print('=== Complex object: 2048x2048 complex128, 128x128 patches ===')
     _bench_case(
         array_shape=(2048, 2048),
         patch_shape=(128, 128),
         n_calls=500,
         dtype=numpy.dtype(numpy.complex128),
-        label='PtychoNN complex',
+        label='complex object',
     )
 
     print()

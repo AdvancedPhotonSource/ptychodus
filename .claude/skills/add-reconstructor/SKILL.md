@@ -90,7 +90,7 @@ In [src/ptychodus/model/core.py](../../src/ptychodus/model/core.py):
 2. Construct it in `ModelCore.__init__` after `settings_registry` is available.
 3. Include it in the list passed to `ProcessingCore(...)`.
 
-Follow the existing pattern for `PtyChiReconstructorLibrary`, `PtychoNNReconstructorLibrary`, `PtychoPINNReconstructorLibrary`, `PtychoPINNTorchReconstructorLibrary`.
+Follow the existing pattern for `PtyChiReconstructorLibrary`, `PtychoPINNReconstructorLibrary`, `PtychoPINNTorchReconstructorLibrary`.
 
 ### 5. Optional-dependency plumbing
 
