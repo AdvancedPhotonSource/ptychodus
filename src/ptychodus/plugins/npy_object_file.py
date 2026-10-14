@@ -9,7 +9,16 @@ from ptychodus.api.plugins import PluginRegistry
 class NPYObjectFileReader(ObjectFileReader):
     def read(self, file_path: Path) -> Object:
         array = numpy.load(file_path)
-        return Object(array=array, pixel_geometry=None, center=None)
+        # A multilayer array needs one spacing per gap or the constructor rejects it. The
+        # file records no depths, so the layers are placed coincident and a caller that
+        # knows the thickness overrides them.
+        layer_spacing_m = [0.0] * (array.shape[0] - 1) if array.ndim == 3 else []
+        return Object(
+            array=array,
+            pixel_geometry=None,
+            center=None,
+            layer_spacing_m=layer_spacing_m,
+        )
 
 
 class NPYObjectFileWriter(ObjectFileWriter):

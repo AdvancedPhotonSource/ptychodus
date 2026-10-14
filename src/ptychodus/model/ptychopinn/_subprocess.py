@@ -22,6 +22,7 @@ from typing import Any
 import numpy
 
 from ptychodus.api.object import Object
+from ptychodus.api.preprocess.diffraction import inpaint_bad_pixels
 from ptychodus.api.product import LossValue, Product
 from ptychodus.api.reconstruct import ReconstructOutput, TrainOutput
 
@@ -39,19 +40,15 @@ def _create_raw_data(parameters: Any) -> Any:
     from ptycho.raw_data import RawData
 
     object_geometry = parameters.product.object_.get_geometry()
-    position_x_px: list[float] = list()
-    position_y_px: list[float] = list()
-
-    for scan_point in parameters.product.probe_positions:
-        object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        position_x_px.append(object_point.coordinate_x_px)
-        position_y_px.append(object_point.coordinate_y_px)
+    positions = parameters.product.probe_positions
 
     return RawData.from_coords_without_pc(
-        xcoords=numpy.array(position_x_px),
-        ycoords=numpy.array(position_y_px),
-        diff3d=parameters.diffraction_patterns,
-        probeGuess=parameters.product.probes.get_probe_no_opr().get_incoherent_mode(0),
+        xcoords=object_geometry.map_probe_positions_to_object_x_px(positions),
+        ycoords=object_geometry.map_probe_positions_to_object_y_px(positions),
+        # Repaired and mode-stacked the same way exported training data is, so
+        # inference sees the preprocessing the model was trained on.
+        diff3d=inpaint_bad_pixels(parameters.diffraction_patterns, parameters.bad_pixels),
+        probeGuess=parameters.product.probes.get_probe_no_opr().get_array(),
         scan_index=numpy.zeros(len(parameters.product.probe_positions), dtype=int),
         objectGuess=parameters.product.object_.get_layer(0),
     )

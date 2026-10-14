@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from bisect import bisect
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from enum import Enum
 from pathlib import Path
 from typing import IO, overload
@@ -104,6 +104,10 @@ class AssembledDiffractionArray(DiffractionArray):
         if read_region is None:
             return patterns
         return read_region.apply_to(patterns)
+
+    def get_num_patterns(self) -> int:
+        # The inherited default counts by reading every pattern; the buffer already knows.
+        return self._data.get_num_patterns()
 
     def get_pattern(self, index: int) -> DiffractionPattern:
         return self._data.get_pattern(index)
@@ -326,6 +330,26 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
         return numpy.average(means, axis=0, weights=weights)
 
+    def get_mean_total_counts(self) -> float:
+        """Mean per-pattern total counts over every assembled pattern.
+
+        Weighted by frames per array, like get_mean_pattern: averaging the
+        per-array means unweighted would misreport any dataset whose arrays hold
+        different numbers of frames. Zero when no patterns are assembled.
+        """
+        total = 0.0
+        num_patterns = 0
+
+        for array in self._array_list:
+            array_num_patterns = array.get_num_patterns()
+            total += array.get_mean_total_counts() * array_num_patterns
+            num_patterns += array_num_patterns
+
+        if num_patterns == 0:
+            return 0.0
+
+        return total / num_patterns
+
     @overload
     def __getitem__(self, index: int) -> AssembledDiffractionArray: ...
 
@@ -336,6 +360,11 @@ class AssembledDiffractionDataset(DiffractionDataset):
         self, index: int | slice
     ) -> AssembledDiffractionArray | Sequence[AssembledDiffractionArray]:
         return self._array_list[index]
+
+    def __iter__(self) -> Iterator[AssembledDiffractionArray]:
+        # Narrows the Sequence[DiffractionArray] mixin: every array this dataset holds
+        # has been assembled, and callers iterating it need the assembled surface.
+        return iter(self._array_list)
 
     def __len__(self) -> int:
         return len(self._array_list)

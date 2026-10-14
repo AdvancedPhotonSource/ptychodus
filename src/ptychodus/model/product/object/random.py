@@ -38,7 +38,7 @@ class RandomObjectBuilder(ObjectBuilder):
             geometry_provider.get_object_geometry(),
             amplitude_mean=self.amplitude_mean.get_value(),
             amplitude_deviation=self.amplitude_deviation.get_value(),
-            phase_mean=0.0,
+            phase_mean_tr=0.0,
             phase_deviation_tr=self.phase_deviation_tr.get_value(),
             blur_deviation_px=self.blur_deviation_px.get_value(),
         )

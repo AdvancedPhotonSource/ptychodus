@@ -6,6 +6,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from base64 import b64decode
 from uuid import UUID
 
 from fastmcp import FastMCP
@@ -39,6 +40,7 @@ from ptychodus_store.rendering import (
     product_to_png_bytes,
 )
 from ptychodus_store.rendering.params import InvalidRenderParamError
+from ptychodus_store.rendering.plot import ScanPath, render_scan_paths
 from ptychodus_store.routers._convert import (
     campaign_to_read,
     diffraction_to_read,
@@ -103,7 +105,7 @@ def _resolve_resource_file(kind: str, uuid: UUID, filename: str) -> Path:
 
 async def _ensure_row_exists(kind: str, uuid: UUID) -> None:
     async with _session() as session:
-        row = await repo.get_row(session, kind, uuid)
+        row = await repo.get_row_by_kind(session, kind, uuid)
         if row is None:
             raise ToolError(f'{kind} {uuid} not found')
 
@@ -149,7 +151,7 @@ def create_mcp_server() -> FastMCP:
             if ingest_state is not None:
                 where.append(Campaign.ingest_state == ingest_state)
             items, total = await repo.list_rows(
-                session, ResourceKind.CAMPAIGN, limit=limit, offset=offset, where=where
+                session, Campaign, limit=limit, offset=offset, where=where
             )
             return Page(
                 items=[campaign_to_read(i) for i in items],
@@ -162,7 +164,7 @@ def create_mcp_server() -> FastMCP:
     async def get_campaign(uuid: str) -> CampaignRead | None:
         """Get a campaign by UUID."""
         async with _session() as session:
-            row = await repo.get_row(session, ResourceKind.CAMPAIGN, UUID(uuid))
+            row = await repo.get_row(session, Campaign, UUID(uuid))
             return campaign_to_read(row) if row is not None else None
 
     @mcp.tool()
@@ -171,8 +173,10 @@ def create_mcp_server() -> FastMCP:
         offset: int = 0,
         campaign_uuid: str | None = None,
         derived_from_uuid: str | None = None,
-        probe_energy_eV_min: float | None = None,  # noqa: N803
-        probe_energy_eV_max: float | None = None,  # noqa: N803
+        photon_energy_eV_min: float | None = None,  # noqa: N803
+        photon_energy_eV_max: float | None = None,  # noqa: N803
+        tomography_angle_deg_min: float | None = None,
+        tomography_angle_deg_max: float | None = None,
         tilt_angle_deg_min: float | None = None,
         tilt_angle_deg_max: float | None = None,
         polarization: str | None = None,
@@ -185,10 +189,14 @@ def create_mcp_server() -> FastMCP:
                 where.append(Diffraction.campaign_uuid == UUID(campaign_uuid))
             if ingest_state is not None:
                 where.append(Diffraction.ingest_state == ingest_state)
-            if probe_energy_eV_min is not None:
-                where.append(Diffraction.probe_energy_eV >= probe_energy_eV_min)
-            if probe_energy_eV_max is not None:
-                where.append(Diffraction.probe_energy_eV <= probe_energy_eV_max)
+            if photon_energy_eV_min is not None:
+                where.append(Diffraction.photon_energy_eV >= photon_energy_eV_min)
+            if photon_energy_eV_max is not None:
+                where.append(Diffraction.photon_energy_eV <= photon_energy_eV_max)
+            if tomography_angle_deg_min is not None:
+                where.append(Diffraction.tomography_angle_deg >= tomography_angle_deg_min)
+            if tomography_angle_deg_max is not None:
+                where.append(Diffraction.tomography_angle_deg <= tomography_angle_deg_max)
             if tilt_angle_deg_min is not None:
                 where.append(Diffraction.tilt_angle_deg >= tilt_angle_deg_min)
             if tilt_angle_deg_max is not None:
@@ -212,17 +220,17 @@ def create_mcp_server() -> FastMCP:
                     )
                 )
             items, total = await repo.list_rows(
-                session, ResourceKind.DIFFRACTION, limit=limit, offset=offset, where=where
+                session, Diffraction, limit=limit, offset=offset, where=where
             )
-            reads = [await diffraction_to_read(session, i) for i in items]  # type: ignore[arg-type]
+            reads = [await diffraction_to_read(session, i) for i in items]
             return Page(items=reads, total=total, limit=limit, offset=offset)
 
     @mcp.tool()
     async def get_diffraction(uuid: str) -> DiffractionRead | None:
         """Get a diffraction dataset by UUID."""
         async with _session() as session:
-            row = await repo.get_row(session, ResourceKind.DIFFRACTION, UUID(uuid))
-            return await diffraction_to_read(session, row) if row is not None else None  # type: ignore[arg-type]
+            row = await repo.get_row(session, Diffraction, UUID(uuid))
+            return await diffraction_to_read(session, row) if row is not None else None
 
     @mcp.tool()
     async def list_product(
@@ -230,12 +238,18 @@ def create_mcp_server() -> FastMCP:
         offset: int = 0,
         derived_from_uuid: str | None = None,
         ingest_state: str | None = None,
+        photon_energy_eV_min: float | None = None,  # noqa: N803
+        photon_energy_eV_max: float | None = None,  # noqa: N803
     ) -> Page[ProductRead]:
         """List reconstruction products."""
         async with _session() as session:
             where = []
             if ingest_state is not None:
                 where.append(Product.ingest_state == ingest_state)
+            if photon_energy_eV_min is not None:
+                where.append(Product.photon_energy_eV >= photon_energy_eV_min)
+            if photon_energy_eV_max is not None:
+                where.append(Product.photon_energy_eV <= photon_energy_eV_max)
             if derived_from_uuid is not None:
                 target = UUID(derived_from_uuid)
                 where.append(
@@ -246,17 +260,17 @@ def create_mcp_server() -> FastMCP:
                     )
                 )
             items, total = await repo.list_rows(
-                session, ResourceKind.PRODUCT, limit=limit, offset=offset, where=where
+                session, Product, limit=limit, offset=offset, where=where
             )
-            reads = [await product_to_read(session, i) for i in items]  # type: ignore[arg-type]
+            reads = [await product_to_read(session, i) for i in items]
             return Page(items=reads, total=total, limit=limit, offset=offset)
 
     @mcp.tool()
     async def get_product(uuid: str) -> ProductRead | None:
         """Get a product by UUID."""
         async with _session() as session:
-            row = await repo.get_row(session, ResourceKind.PRODUCT, UUID(uuid))
-            return await product_to_read(session, row) if row is not None else None  # type: ignore[arg-type]
+            row = await repo.get_row(session, Product, UUID(uuid))
+            return await product_to_read(session, row) if row is not None else None
 
     @mcp.tool()
     async def list_fluorescence(
@@ -264,10 +278,13 @@ def create_mcp_server() -> FastMCP:
         offset: int = 0,
         derived_from_uuid: str | None = None,
         element: str | None = None,
+        ingest_state: str | None = None,
     ) -> Page[FluorescenceRead]:
         """List fluorescence datasets."""
         async with _session() as session:
             where = []
+            if ingest_state is not None:
+                where.append(Fluorescence.ingest_state == ingest_state)
             if derived_from_uuid is not None:
                 target = UUID(derived_from_uuid)
                 where.append(
@@ -279,20 +296,20 @@ def create_mcp_server() -> FastMCP:
                 )
             if element is not None:
                 where.append(
-                    func.instr(func.cast(Fluorescence.element_names, String), f'"{element}"') > 0  # type: ignore[arg-type]
+                    func.instr(func.cast(Fluorescence.element_names, String), f'"{element}"') > 0
                 )
             items, total = await repo.list_rows(
-                session, ResourceKind.FLUORESCENCE, limit=limit, offset=offset, where=where
+                session, Fluorescence, limit=limit, offset=offset, where=where
             )
-            reads = [await fluorescence_to_read(session, i) for i in items]  # type: ignore[arg-type]
+            reads = [await fluorescence_to_read(session, i) for i in items]
             return Page(items=reads, total=total, limit=limit, offset=offset)
 
     @mcp.tool()
     async def get_fluorescence(uuid: str) -> FluorescenceRead | None:
         """Get a fluorescence dataset by UUID."""
         async with _session() as session:
-            row = await repo.get_row(session, ResourceKind.FLUORESCENCE, UUID(uuid))
-            return await fluorescence_to_read(session, row) if row is not None else None  # type: ignore[arg-type]
+            row = await repo.get_row(session, Fluorescence, UUID(uuid))
+            return await fluorescence_to_read(session, row) if row is not None else None
 
     @mcp.tool()
     async def get_lineage(uuid: str) -> LineageRead | None:
@@ -311,7 +328,7 @@ def create_mcp_server() -> FastMCP:
             if resolved is None:
                 return None
             kind, row = resolved
-            node = LineageNode(kind=kind, uuid=target, label=_label_for(row))  # type: ignore[arg-type]
+            node = LineageNode(kind=kind, uuid=target, label=_label_for(row))
             ancestors = await _walk_ancestors(session, target)
             descendants = await _walk_descendants(session, target)
             campaign = await _find_campaign(session, target, ancestors)
@@ -324,7 +341,7 @@ def create_mcp_server() -> FastMCP:
         """Return resource counts and invalid-row count for the store."""
         async with _session() as session:
 
-            async def _count(model):  # type: ignore[no-untyped-def]
+            async def _count(model):
                 return int(
                     (await session.execute(select(func.count()).select_from(model))).scalar_one()
                 )
@@ -514,6 +531,42 @@ def create_mcp_server() -> FastMCP:
         except RenderParamsError as exc:
             raise ToolError(str(exc)) from exc
         return MCPImage(data=product_to_png_bytes(vp), format='png')
+
+    @mcp.tool()
+    async def render_scan_positions(
+        uuid: list[str],
+        connect_path: bool = True,
+        width_px: int = 640,
+        height_px: int = 640,
+    ) -> MCPImage:
+        """Plot scan paths, one color and legend entry per product.
+
+        Pass several UUIDs to overlay them on shared axes and compare scans.
+        """
+        scans: list[ScanPath] = []
+
+        for raw_uuid in uuid:
+            target = UUID(raw_uuid)
+            await _ensure_row_exists(ResourceKind.PRODUCT, target)
+            path = _resolve_resource_file(ResourceKind.PRODUCT, target, 'product.h5')
+            product = load_product(path)
+            positions = product.probe_positions
+
+            if len(positions) == 0:
+                raise ToolError(f'product {raw_uuid} has no probe positions')
+
+            scans.append(
+                ScanPath(
+                    label=product.metadata.name or raw_uuid[:8],
+                    x_m=[p.x_m for p in positions],
+                    y_m=[p.y_m for p in positions],
+                )
+            )
+
+        plot = render_scan_paths(
+            scans, connect_path=connect_path, width_px=width_px, height_px=height_px
+        )
+        return MCPImage(data=b64decode(plot.png_base64), format='png')
 
     @mcp.tool()
     async def render_fluorescence_element(

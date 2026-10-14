@@ -11,8 +11,8 @@ class AffineTransformEstimatorSettings(Observable, Observer):
         self.num_iterations = self._group.create_integer_parameter(
             'NumberOfIterations', 1000, minimum=1
         )
-        self.inlier_threshold = self._group.create_real_parameter(
-            'InlierThreshold', 0.05, minimum=0.0
+        self.inlier_threshold_m = self._group.create_real_parameter(
+            'InlierThresholdInMeters', 1.0e-7, minimum=0.0
         )
         self.min_inliers = self._group.create_integer_parameter('MinimumInliers', 10, minimum=3)
 

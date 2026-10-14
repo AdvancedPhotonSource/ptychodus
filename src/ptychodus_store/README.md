@@ -4,12 +4,16 @@ FastAPI service that indexes on-disk ptychodus artifacts (campaigns, diffraction
 
 - **REST**: `/api/v1/*` — list / get / render endpoints per resource kind
 - **MCP**: `/mcp` — read-only tools mirroring the REST surface
-- **Browser UI**: `/ui/` — six-page shell (Diffraction, Products, Positions, Probe, Object, Fluorescence) served from compiled TypeScript
+- **Browser UI**: `/ui/` — Diffraction, Products (with Positions, Probe and Object nested beneath it) and Fluorescence, served from compiled TypeScript
 - **OpenAPI**: `/openapi.json` and interactive docs at `/docs`
 
 ## Scope of the browser UI
 
-The browser UI is intentionally **read-only** for this release. It browses artifacts already ingested into the storage root, previews them with the same colormap defaults as the PyQt desktop app, and offers `.h5` file downloads from each detail view. Reconstruction, settings editing, dataset ingestion, remote-compute (Globus, Genesis), fluorescence enhancement, and the automation / agent panels are only available in the desktop app (`uv run ptychodus`). Any writes to the storage root happen out of band — via the desktop app, batch runs (`uv run ptychodus -b reconstruct ...`), or the streaming processor.
+The browser UI is intentionally **read-only**. It browses artifacts already ingested into the storage root and offers `.h5` downloads from each detail view.
+
+Within that limit it mirrors the desktop app: the navigation rail carries the same entries in the same nesting, the tables and trees carry the same columns as the PyQt repository views, the product detail panel lists the same derived quantities as the desktop property table, and the viewer offers the same colormap, transform and data-range controls. Two columns are absent because the files cannot supply them — **Builder**, which `product.h5` does not record, and the diffraction **Counts**, which would need a pass over every pattern at ingest.
+
+Panels with no web counterpart are the ones that write or dispatch: Settings, Processing, Globus, Genesis, Automation and Agent, along with every analysis dialog. Those remain desktop-only (`uv run ptychodus`). Campaigns and lineage are the reverse — a store-only grouping with no desktop counterpart, served over REST and MCP for agents and scripts but not browsed. Any writes to the storage root happen out of band: the desktop app, batch runs (`uv run ptychodus -b reconstruct ...`), or the streaming processor.
 
 ## Install
 

@@ -9,12 +9,14 @@ from ptychodus.api.geometry import (
     HermiteMode,
     ImageExtent,
     Interval,
+    LegendreMode,
     Line2D,
     PixelGeometry,
     Point2D,
     ZernikeMode,
 )
-from ptychodus.api.preprocess.probe_positions import AffineTransform
+from ptychodus.api.affine import AffineTransform
+from ptychodus.api.probe_positions import ProbePosition
 
 
 def test_str() -> None:
@@ -138,58 +140,10 @@ def test_indexing() -> None:
     idx = 0
 
     for n in range(10):
-        print('')
-
         for m in range(-n, n + 1, 2):
             idx_calc = (n * (n + 2) + m) // 2
-            print(f'{n=} {m=:+d} {idx=} {idx_calc=}')
             assert idx == idx_calc
             idx += 1
-
-
-def test_pyramid() -> None:
-    import numpy
-    import matplotlib
-
-    matplotlib.use('Agg')
-    import matplotlib.colors
-    import matplotlib.pyplot as plt
-
-    from ptychodus.api.geometry import ZernikeMode
-
-    my_dpi = 300
-    num_pixels = 256
-    max_radial_degree = 6
-
-    Y, X = numpy.mgrid[:num_pixels, :num_pixels]  # noqa: N806
-    X = (X - (num_pixels - 1) / 2) / (num_pixels / 2)  # noqa: N806
-    Y = (Y - (num_pixels - 1) / 2) / (num_pixels / 2)  # noqa: N806
-
-    distance = numpy.hypot(Y, X)
-    angle = numpy.arctan2(Y, X)
-
-    ###
-
-    fig = plt.figure(dpi=my_dpi)
-    fig.patch.set_alpha(0.0)
-    gs = fig.add_gridspec(max_radial_degree + 1, 2 * (max_radial_degree + 1))
-
-    for radial_degree in range(max_radial_degree):
-        for angular_frequency in range(-radial_degree, radial_degree + 1, 2):
-            mode = ZernikeMode(1.0, radial_degree, angular_frequency)
-            Z = mode(distance, angle, undefined_value=numpy.nan)  # noqa: N806
-
-            row = radial_degree
-            col = max_radial_degree + angular_frequency
-
-            ax = fig.add_subplot(gs[row : row + 1, col : col + 2])
-            ax.pcolormesh(X, Y, Z, norm=matplotlib.colors.CenteredNorm(), cmap='seismic')
-            ax.set_aspect('equal')
-            ax.set_title(str(mode))
-            ax.axis('off')
-
-    plt.savefig('zernike_pyramid.png', bbox_inches='tight', dpi=my_dpi)
-    plt.close(fig)
 
 
 # ---------------------------------------------------------------------------
@@ -304,41 +258,89 @@ def test_hermite_three_term_recurrence(n: int) -> None:
     numpy.testing.assert_allclose(expected_lhs, expected_rhs, atol=1e-10)
 
 
-def test_hermite_grid() -> None:
-    import numpy
-    import matplotlib
+# ---------------------------------------------------------------------------
+# LegendreMode
+# ---------------------------------------------------------------------------
 
-    matplotlib.use('Agg')
-    import matplotlib.colors
-    import matplotlib.pyplot as plt
 
-    from ptychodus.api.geometry import HermiteMode
+def test_legendre_str() -> None:
+    assert str(LegendreMode(1.0, 0)) == '1.0$P_{0}(u)$'
+    assert str(LegendreMode(2.5e-09, 3)) == '2.5e-09$P_{3}(u)$'
 
-    my_dpi = 300
-    num_pixels = 256
-    max_order = 5
 
-    Y, X = numpy.mgrid[:num_pixels, :num_pixels]  # noqa: N806
-    X = (X - (num_pixels - 1) / 2) / (num_pixels / 2)  # noqa: N806
-    Y = (Y - (num_pixels - 1) / 2) / (num_pixels / 2)  # noqa: N806
+@pytest.mark.parametrize(
+    'order,expected',
+    [
+        # P_0(u) = 1
+        (0, lambda u: numpy.ones_like(u)),
+        # P_1(u) = u
+        (1, lambda u: u),
+        # P_2(u) = (3u^2 - 1) / 2
+        (2, lambda u: 0.5 * (3.0 * u**2 - 1.0)),
+        # P_3(u) = (5u^3 - 3u) / 2
+        (3, lambda u: 0.5 * (5.0 * u**3 - 3.0 * u)),
+        # P_4(u) = (35u^4 - 30u^2 + 3) / 8
+        (4, lambda u: (35.0 * u**4 - 30.0 * u**2 + 3.0) / 8.0),
+    ],
+)
+def test_legendre_known_values(order: int, expected) -> None:
+    u = numpy.linspace(-1.0, 1.0, 11)
+    mode = LegendreMode(1.0, order)
 
-    fig = plt.figure(dpi=my_dpi)
-    fig.patch.set_alpha(0.0)
-    gs = fig.add_gridspec(max_order + 1, max_order + 1)
+    numpy.testing.assert_allclose(mode(u), expected(u), atol=1e-12)
 
-    for m in range(max_order + 1):
-        for n in range(max_order + 1):
-            mode = HermiteMode(1.0, m, n)
-            Z = mode(X, Y).real  # noqa: N806
 
-            ax = fig.add_subplot(gs[m, n])
-            ax.pcolormesh(X, Y, Z, norm=matplotlib.colors.CenteredNorm(), cmap='seismic')
-            ax.set_aspect('equal')
-            ax.set_title(str(mode))
-            ax.axis('off')
+@pytest.mark.parametrize('order', [0, 1, 2, 5, 9])
+def test_legendre_matches_scipy(order: int) -> None:
+    u = numpy.linspace(-1.0, 1.0, 101)
+    mode = LegendreMode(1.0, order)
 
-    plt.savefig('hermite_grid.png', bbox_inches='tight', dpi=my_dpi)
-    plt.close(fig)
+    numpy.testing.assert_allclose(mode(u), scipy.special.eval_legendre(order, u), atol=1e-12)
+
+
+def test_legendre_coefficient_scaling() -> None:
+    """Output scales linearly with the real height coefficient."""
+    u = numpy.linspace(-1.0, 1.0, 21)
+    unit = LegendreMode(1.0, 3)
+    scaled = LegendreMode(-2.5e-9, 3)
+
+    numpy.testing.assert_allclose(scaled(u), -2.5e-9 * unit(u), atol=1e-18)
+
+
+@pytest.mark.parametrize('m,n', [(0, 0), (1, 1), (2, 2), (0, 2), (1, 4), (3, 5)])
+def test_legendre_orthogonality(m: int, n: int) -> None:
+    """Legendre polynomials integrate to 2 / (2n + 1) against themselves, zero otherwise.
+
+    This is the property that makes the order index meaningful as a figure-error basis.
+    Note it does *not* extend to their derivatives, which are strongly non-orthogonal.
+    """
+    nodes, weights = numpy.polynomial.legendre.leggauss(m + n + 2)
+    integral = numpy.sum(weights * LegendreMode(1.0, m)(nodes) * LegendreMode(1.0, n)(nodes))
+    expected = 2.0 / (2 * n + 1) if m == n else 0.0
+
+    assert integral == pytest.approx(expected, abs=1e-12)
+
+
+def test_legendre_derivatives_are_not_orthogonal() -> None:
+    """Pins the reason a figure-error rms slope cannot be normalized per coefficient.
+
+    If the derivatives were orthogonal, each Legendre order could be scaled independently
+    by 1 / sqrt(n (n + 1)) to hit a target rms slope. They are not: the Gram matrix of the
+    derivatives carries off-diagonal entries as large as its diagonal.
+    """
+    nodes, weights = numpy.polynomial.legendre.leggauss(16)
+
+    def derivative(order: int) -> numpy.ndarray:
+        series = numpy.zeros(order + 1)
+        series[order] = 1.0
+        return numpy.polynomial.legendre.legval(nodes, numpy.polynomial.legendre.legder(series))
+
+    gram = numpy.array(
+        [[numpy.sum(weights * derivative(m) * derivative(n)) for n in range(6)] for m in range(6)]
+    )
+
+    numpy.testing.assert_allclose(numpy.diag(gram), [n * (n + 1) for n in range(6)], atol=1e-10)
+    assert numpy.abs(gram - numpy.diag(numpy.diag(gram))).max() > 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -413,24 +415,27 @@ def test_interval_repr() -> None:
 
 def test_affine_transform_identity() -> None:
     identity = AffineTransform(1.0, 0.0, 0.0, 0.0, 1.0, 0.0)
-    points = numpy.array([[2.0, 3.0], [-1.5, 4.7]])
-    numpy.testing.assert_allclose(identity(points), points)
+    x_m = numpy.array([2.0, -1.5])
+    y_m = numpy.array([3.0, 4.7])
+    out_x, out_y = identity.transform_coordinates(x_m, y_m)
+    numpy.testing.assert_allclose(out_x, x_m)
+    numpy.testing.assert_allclose(out_y, y_m)
 
 
 def test_affine_transform_pure_translation() -> None:
     """a02, a12 contribute the translation."""
     translate = AffineTransform(1.0, 0.0, 4.0, 0.0, 1.0, -2.0)
-    points = numpy.array([[0.0, 0.0], [1.0, 1.0]])
-    expected = numpy.array([[4.0, -2.0], [5.0, -1.0]])
-    numpy.testing.assert_allclose(translate(points), expected)
+    out_x, out_y = translate.transform_coordinates(numpy.array([0.0, 1.0]), numpy.array([0.0, 1.0]))
+    numpy.testing.assert_allclose(out_x, [4.0, 5.0])
+    numpy.testing.assert_allclose(out_y, [-2.0, -1.0])
 
 
 def test_affine_transform_pure_scaling() -> None:
     """Diagonal entries scale x and y independently."""
     scale = AffineTransform(2.0, 0.0, 0.0, 0.0, 3.0, 0.0)
-    points = numpy.array([[1.0, 1.0], [-2.0, 5.0]])
-    expected = numpy.array([[2.0, 3.0], [-4.0, 15.0]])
-    numpy.testing.assert_allclose(scale(points), expected)
+    out_x, out_y = scale.transform_coordinates(numpy.array([1.0, -2.0]), numpy.array([1.0, 5.0]))
+    numpy.testing.assert_allclose(out_x, [2.0, -4.0])
+    numpy.testing.assert_allclose(out_y, [3.0, 15.0])
 
 
 def test_affine_transform_pure_rotation() -> None:
@@ -438,19 +443,39 @@ def test_affine_transform_pure_rotation() -> None:
     cos90 = numpy.cos(numpy.pi / 2)
     sin90 = numpy.sin(numpy.pi / 2)
     rotate = AffineTransform(cos90, -sin90, 0.0, sin90, cos90, 0.0)
-    points = numpy.array([[1.0, 0.0], [0.0, 1.0]])
-    expected = numpy.array([[0.0, 1.0], [-1.0, 0.0]])
-    numpy.testing.assert_allclose(rotate(points), expected, atol=1e-12)
+    out_x, out_y = rotate.transform_coordinates(numpy.array([1.0, 0.0]), numpy.array([0.0, 1.0]))
+    numpy.testing.assert_allclose(out_x, [0.0, -1.0], atol=1e-12)
+    numpy.testing.assert_allclose(out_y, [1.0, 0.0], atol=1e-12)
 
 
 def test_affine_transform_combined_scale_then_translate() -> None:
     """The convention is x' = a00*x + a01*y + a02; verify with a non-trivial mix."""
     transform = AffineTransform(2.0, 0.5, 1.0, -0.5, 3.0, -2.0)
-    # x' = 2*x + 0.5*y + 1
-    # y' = -0.5*x + 3*y - 2
-    points = numpy.array([[4.0, 6.0]])
-    expected = numpy.array([[2 * 4.0 + 0.5 * 6.0 + 1.0, -0.5 * 4.0 + 3.0 * 6.0 - 2.0]])
-    numpy.testing.assert_allclose(transform(points), expected)
+    out_x, out_y = transform.transform_coordinates(numpy.array([4.0]), numpy.array([6.0]))
+    numpy.testing.assert_allclose(out_x, [2 * 4.0 + 0.5 * 6.0 + 1.0])
+    numpy.testing.assert_allclose(out_y, [-0.5 * 4.0 + 3.0 * 6.0 - 2.0])
+
+
+def test_affine_transform_coordinates_matches_scalar_branch() -> None:
+    """The array and scalar paths must agree exactly, not merely to a tolerance."""
+    transform = AffineTransform(2.0, 0.5, 1.0, -0.5, 3.0, -2.0)
+    rng = numpy.random.default_rng(0)
+    x_m = rng.normal(size=16)
+    y_m = rng.normal(size=16)
+
+    out_x, out_y = transform.transform_coordinates(x_m, y_m)
+    scalar = [
+        transform(ProbePosition(index=i, x_m=x, y_m=y)) for i, (x, y) in enumerate(zip(x_m, y_m))
+    ]
+
+    numpy.testing.assert_array_equal(out_x, [p.x_m for p in scalar])
+    numpy.testing.assert_array_equal(out_y, [p.y_m for p in scalar])
+
+
+def test_affine_transform_coordinates_accepts_empty() -> None:
+    transform = AffineTransform(2.0, 0.5, 1.0, -0.5, 3.0, -2.0)
+    out_x, out_y = transform.transform_coordinates(numpy.empty(0), numpy.empty(0))
+    assert out_x.shape == (0,) and out_y.shape == (0,)
 
 
 # ---------------------------------------------------------------------------
@@ -488,30 +513,6 @@ def test_pixel_geometry_equality() -> None:
     """Frozen dataclass equality compares both fields."""
     assert PixelGeometry(1e-6, 1e-6) == PixelGeometry(1e-6, 1e-6)
     assert PixelGeometry(1e-6, 1e-6) != PixelGeometry(1e-6, 2e-6)
-
-
-def test_pixel_geometry_is_valid_true_for_strictly_positive() -> None:
-    assert PixelGeometry(width_m=1e-6, height_m=1e-6).is_valid
-
-
-def test_pixel_geometry_is_valid_false_when_either_dimension_is_zero() -> None:
-    """Zero on either axis is the 'not ready' sentinel returned by ProductGeometry
-    before a dataset binds — must be rejected."""
-    assert not PixelGeometry(width_m=0.0, height_m=1e-6).is_valid
-    assert not PixelGeometry(width_m=1e-6, height_m=0.0).is_valid
-    assert not PixelGeometry(width_m=0.0, height_m=0.0).is_valid
-
-
-def test_pixel_geometry_is_valid_false_for_negative_dimensions() -> None:
-    """Negative pixel sizes are physically meaningless — the predicate treats
-    them the same as zero."""
-    assert not PixelGeometry(width_m=-1e-6, height_m=1e-6).is_valid
-    assert not PixelGeometry(width_m=1e-6, height_m=-1e-6).is_valid
-
-
-# ---------------------------------------------------------------------------
-# ImageExtent
-# ---------------------------------------------------------------------------
 
 
 def test_image_extent_get_shape_is_height_first() -> None:

@@ -7,30 +7,45 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from ptychodus.model.task_manager import BackgroundTask, ForegroundTask, TaskManager
 from ptychodus.model.product.api import ProductAPI
 from ptychodus.model.product.monitor import ProductTaskMonitor
 from ptychodus.model.product.item import ProductState
 
 
-class _StubTaskManager:
-    """Minimal TaskManager stand-in: records enqueued tasks and exposes the standard
-    is_stopping / WAIT_TIME_S attributes ProductAPI reads.
+class _StubTaskManager(TaskManager):
+    """Records enqueued tasks instead of running them.
 
-    Foreground tasks are recorded rather than run: ProductTaskMonitor posts observer
-    notifications through this on every enter/exit of the queued finalize."""
+    Foreground tasks are deliberately not run: ProductTaskMonitor posts observer
+    notifications through this on every enter/exit of the queued finalize, and the
+    tests below assert on what was enqueued.
 
-    is_stopping = False
-    WAIT_TIME_S = 0.01
+    Subclasses the real manager so the recorded signatures stay checked against it;
+    the base constructor only builds two queues and an event, and no worker thread
+    starts until ``start()``.
+    """
 
     def __init__(self) -> None:
-        self.background_tasks: list = []
-        self.foreground_tasks: list = []
+        super().__init__()
+        self.background_tasks: list[BackgroundTask] = []
+        self.foreground_tasks: list[ForegroundTask] = []
 
-    def put_background_task(self, task) -> None:  # noqa: ANN001
+    def put_background_task(self, task: BackgroundTask) -> None:
         self.background_tasks.append(task)
 
-    def put_foreground_task(self, task) -> None:  # noqa: ANN001
+    def put_foreground_task(self, task: ForegroundTask) -> None:
         self.foreground_tasks.append(task)
+
+
+def _run_queued(tm: _StubTaskManager, index: int) -> None:
+    """Run background task `index` and the foreground task it hands back.
+
+    A BackgroundTask returns `ForegroundTask | None`; every task these tests queue
+    returns one, and the assertion says so rather than letting None reach a call.
+    """
+    foreground_task = tm.background_tasks[index]()
+    assert foreground_task is not None
+    foreground_task()
 
 
 def _make_api(
@@ -60,10 +75,10 @@ def _make_api(
         item_factory=item_factory,
         file_reader_chooser=MagicMock(),
         file_writer_chooser=MagicMock(),
-        task_manager=task_manager,  # type: ignore[arg-type]
+        task_manager=task_manager,
         # A real monitor, not a mock: _insert_via_queue uses it as a context manager
         # and reads is_stopping, so the queue path depends on its actual behavior.
-        task_monitor=monitor or ProductTaskMonitor(task_manager),  # type: ignore[arg-type]
+        task_monitor=monitor or ProductTaskMonitor(task_manager),
     )
     return api, repository, item_factory
 
@@ -138,9 +153,7 @@ def test_background_task_finalizes_stub_on_success() -> None:
     dataset = _dataset(in_progress=True)
     api.insert_new_product(dataset=dataset, block=False)
 
-    background_task = tm.background_tasks[0]
-    foreground_task = background_task()
-    foreground_task()
+    _run_queued(tm, 0)
 
     factory.create_from_values.assert_called_once()
     stub.copy_contents_from.assert_called_once_with(real)
@@ -156,9 +169,7 @@ def test_background_task_marks_stub_failed_on_load_error() -> None:
     dataset = _dataset(in_progress=True, error=err)
     api.insert_new_product(dataset=dataset, block=False)
 
-    background_task = tm.background_tasks[0]
-    foreground_task = background_task()
-    foreground_task()
+    _run_queued(tm, 0)
 
     factory.create_from_values.assert_not_called()
     stub.set_state.assert_called_once_with(ProductState.FAILED)
@@ -195,7 +206,7 @@ def test_blocking_call_returns_index_after_wait() -> None:
 
 def test_monitor_is_busy_from_enqueue_until_finalize() -> None:
     tm = _StubTaskManager()
-    monitor = ProductTaskMonitor(tm)  # type: ignore[arg-type]
+    monitor = ProductTaskMonitor(tm)
     stub, real = MagicMock(), MagicMock()
     api, _repo, _factory = _make_api(tm, stub, real, monitor=monitor)
 
@@ -207,14 +218,14 @@ def test_monitor_is_busy_from_enqueue_until_finalize() -> None:
     assert monitor.is_processing
     assert (monitor.get_progress(), monitor.get_progress_goal()) == (0, 1)
 
-    tm.background_tasks[0]()()
+    _run_queued(tm, 0)
 
     assert not monitor.is_processing
 
 
 def test_a_burst_of_queued_products_nests() -> None:
     tm = _StubTaskManager()
-    monitor = ProductTaskMonitor(tm)  # type: ignore[arg-type]
+    monitor = ProductTaskMonitor(tm)
     api, _repo, _factory = _make_api(tm, MagicMock(), MagicMock(), monitor=monitor)
 
     dataset = _dataset(in_progress=True)
@@ -223,26 +234,26 @@ def test_a_burst_of_queued_products_nests() -> None:
 
     assert (monitor.get_progress(), monitor.get_progress_goal()) == (0, 2)
 
-    tm.background_tasks[0]()()
+    _run_queued(tm, 0)
 
     # Still busy: the burst is not drained until every queued product finalizes.
     assert monitor.is_processing
     assert (monitor.get_progress(), monitor.get_progress_goal()) == (1, 2)
 
-    tm.background_tasks[1]()()
+    _run_queued(tm, 1)
 
     assert not monitor.is_processing
 
 
 def test_stop_cancels_a_queued_product() -> None:
     tm = _StubTaskManager()
-    monitor = ProductTaskMonitor(tm)  # type: ignore[arg-type]
+    monitor = ProductTaskMonitor(tm)
     stub = MagicMock()
     api, _repo, factory = _make_api(tm, stub, MagicMock(), monitor=monitor)
 
     api.insert_new_product(dataset=_dataset(in_progress=True), block=False)
     monitor.stop_processing()
-    tm.background_tasks[0]()()
+    _run_queued(tm, 0)
 
     stub.set_state.assert_called_with(ProductState.FAILED)
     factory.create_from_values.assert_not_called()

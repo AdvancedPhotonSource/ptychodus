@@ -12,10 +12,12 @@ import numpy
 
 from .assemble import AssembledDiffractionData
 from .diffraction import BadPixels, DiffractionPatterns
+from .geometry import ImageExtent
 from .object import Object
 from .probe import ProbeSequence
 from .probe_positions import ProbePositionSequence, ProbePosition
 from .product import LossValue, Product
+from .propagate import compute_full_aperture_fresnel_number
 from .typing import RealArrayType
 
 logger = logging.getLogger(__name__)
@@ -231,15 +233,11 @@ def prepare_reconstruct_input(
     filtered_pattern_offsets = numpy.flatnonzero(pattern_keep)
 
     n_positions = len(product.probe_positions)
-    pos_indexes_all = numpy.empty(n_positions, dtype=numpy.intp)
-    pos_x_all = numpy.empty(n_positions, dtype=numpy.float64)
-    pos_y_all = numpy.empty(n_positions, dtype=numpy.float64)
-    for k, position in enumerate(product.probe_positions):
-        pos_indexes_all[k] = position.index
-        pos_x_all[k] = position.x_m
-        pos_y_all[k] = position.y_m
+    pos_indexes_all = product.probe_positions.get_indexes()
+    pos_x_all = product.probe_positions.get_coordinates_x_m()
+    pos_y_all = product.probe_positions.get_coordinates_y_m()
 
-    src_photon_counts = product.probe_positions.get_probe_photon_counts()
+    pos_photon_counts_all = product.probe_positions.get_probe_photon_counts()
 
     pos_keep = numpy.fromiter(
         (index_filter(int(i)) for i in pos_indexes_all),
@@ -249,7 +247,7 @@ def prepare_reconstruct_input(
     pos_indexes = pos_indexes_all[pos_keep]
     pos_x = pos_x_all[pos_keep]
     pos_y = pos_y_all[pos_keep]
-    pos_photon_counts = None if src_photon_counts is None else src_photon_counts[pos_keep]
+    pos_photon_counts = None if pos_photon_counts_all is None else pos_photon_counts_all[pos_keep]
 
     if filtered_pattern_indexes.size == 0 or pos_indexes.size == 0:
         raise ValueError('Index filter eliminated all pattern indexes and/or all position indexes.')
@@ -344,6 +342,62 @@ def prepare_reconstruct_input(
     )
 
     return ReconstructInput(patterns, assembled_data.get_bad_pixels(), product)
+
+
+def warn_if_propagation_regime_disagrees(
+    product: Product,
+    *,
+    far_field_fresnel_number: float = 1.0,
+    near_field_fresnel_number: float = 1.0,
+) -> None:
+    """Warn when a product's declared propagation regime contradicts its own geometry.
+
+    The regime is a declaration, so nothing stops it disagreeing with the geometry it
+    describes -- and the consequence is a reconstruction on the wrong sample-plane
+    sampling, which fails as a bad image rather than as an error. The object-plane
+    Fresnel number is the regime indicator: much less than one is far field, much
+    greater is near field.
+
+    Raising `far_field_fresnel_number` tolerates a more transitional geometry before
+    objecting to a far-field declaration; lowering `near_field_fresnel_number` does the
+    same for a near-field one. Between the two the geometry is transitional and neither
+    declaration is questioned.
+
+    Degenerate geometry -- no probe, zero wavelength, detector at the focus -- is
+    reported by nothing and warns about nothing; this never raises.
+    """
+    metadata = product.metadata
+
+    try:
+        probe_geometry = product.probes.get_geometry()
+        propagation_distance_m = metadata.detector_distance_m / metadata.magnification
+        fresnel_number = compute_full_aperture_fresnel_number(
+            probe_geometry.get_pixel_geometry(),
+            ImageExtent(width_px=probe_geometry.width_px, height_px=probe_geometry.height_px),
+            wavelength_m=metadata.photon_wavelength_m,
+            propagation_distance_m=propagation_distance_m,
+        )
+    except (ValueError, ZeroDivisionError):
+        logger.debug('Product geometry is degenerate; skipping the propagation-regime check.')
+        return
+
+    if metadata.far_field:
+        if fresnel_number > far_field_fresnel_number:
+            logger.warning(
+                'Product "%s" declares far-field propagation, but its object-plane '
+                'Fresnel number is %g, which indicates near field. The sample-plane '
+                'sampling follows the declaration, so verify it before reconstructing.',
+                metadata.name,
+                fresnel_number,
+            )
+    elif fresnel_number < near_field_fresnel_number:
+        logger.warning(
+            'Product "%s" declares near-field propagation, but its object-plane '
+            'Fresnel number is %g, which indicates far field. The sample-plane '
+            'sampling follows the declaration, so verify it before reconstructing.',
+            metadata.name,
+            fresnel_number,
+        )
 
 
 @dataclass(frozen=True)

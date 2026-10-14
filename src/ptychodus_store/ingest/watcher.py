@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class _ManifestEventHandler(FileSystemEventHandler):
     """Collapses bursts of manifest events into a single debounced ingest per path."""
 
-    def __init__(self, on_upsert, on_delete, debounce_window_s: float) -> None:  # type: ignore[no-untyped-def]
+    def __init__(self, on_upsert, on_delete, debounce_window_s: float) -> None:
         super().__init__()
         self._on_upsert = on_upsert
         self._on_delete = on_delete
@@ -55,7 +55,7 @@ class _ManifestEventHandler(FileSystemEventHandler):
             return
         self._schedule_upsert(Path(str(event.src_path)))
 
-    def on_moved(self, event: FileSystemEvent) -> None:  # type: ignore[override]
+    def on_moved(self, event: FileSystemEvent) -> None:
         if event.is_directory:
             return
         src = str(event.src_path)

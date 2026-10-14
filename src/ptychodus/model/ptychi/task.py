@@ -10,21 +10,29 @@ class is deferred to call time so the module itself stays context-free.
 Wire format
 -----------
 
-:func:`dump_task_options` emits a JSON envelope::
-
-    {"reconstructor": "<enum-value>", "options": <options.get_dict()>}
-
-The ``reconstructor`` field carries the pty-chi ``Reconstructors`` enum value
-that :meth:`get_reconstructor_type` returns for these options. Envelope + token
-together let :func:`load_task_options` pick the right algorithm-specific
+:func:`dump_task_options` emits ``options.get_dict()`` as a bare JSON object.
+pty-chi >= 2.1.0 stamps every options dict -- the top-level one and each nested
+one -- with its own ``options_class_name``, so the payload names the class that
+wrote it and :func:`load_task_options` can pick the right algorithm-specific
 subclass (``DMOptions``, ``LSQMLOptions``, ...) without a side-channel argument.
 
-Without the envelope, PIE, ePIE and rPIE would serialize to identical
-dictionaries -- ``EPIEReconstructorOptions`` and ``RPIEReconstructorOptions``
-add no fields over ``PIEReconstructorOptions`` -- and could swap for each other
-silently, running a different algorithm. The envelope closes that hazard: the
-token is what selects the subclass, and it comes from the options object at
-serialization time.
+That JSON is for transport between processes, where nothing reads it. The
+options file a run leaves behind is YAML instead, written by
+:func:`dump_task_options_yaml`, because it is meant to be read and edited.
+Both encode the same ``get_dict()`` payload and both load through
+:func:`load_task_options_from_mapping`, so the class stamp selects the subclass either
+way.
+
+That stamp is what keeps PIE, ePIE and rPIE apart. Their dicts are otherwise
+identical -- ``EPIEReconstructorOptions`` and ``RPIEReconstructorOptions`` add
+no fields over ``PIEReconstructorOptions`` -- so before pty-chi 2.1.0 the three
+could swap for each other silently and run a different algorithm. Ptychodus
+carried its own ``{"reconstructor": ..., "options": ...}`` envelope to close
+that hazard; the upstream class name supersedes it.
+
+:meth:`load_from_dict` is called with ``strict=True``, which checks the stamp
+of every nested options object against the field it is being loaded into, so a
+payload assembled from mismatched parts raises instead of loading quietly.
 """
 
 from __future__ import annotations
@@ -33,30 +41,26 @@ import copy
 import json
 import logging
 import math
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from typing import Any
 
 import numpy
+import yaml
 
-from ptychi.api import (
-    AutodiffPtychographyOptions,
-    BHOptions,
-    DMOptions,
-    EPIEOptions,
-    LSQMLOptions,
-    ObjectPosOriginCoordsMethods,
-    PIEOptions,
-    RAAROptions,
-    RPIEOptions,
-    Reconstructors,
-)
+import ptychi.api
+from ptychi.api import ObjectPosOriginCoordsMethods
 from ptychi.api.options.task import PtychographyTaskOptions
 
+from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectPosition
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import LossValue, Product
-from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
+from ptychodus.api.reconstruct import (
+    ReconstructInput,
+    ReconstructOutput,
+    warn_if_propagation_regime_disagrees,
+)
 from ptychodus.api.typing import RealArrayType
 
 logger = logging.getLogger(__name__)
@@ -64,65 +68,79 @@ logger = logging.getLogger(__name__)
 __all__ = [
     'align_task_options_with_product',
     'dump_task_options',
+    'dump_task_options_yaml',
     'load_task_options',
+    'load_task_options_from_mapping',
     'reconstruct_with_ptychi',
 ]
-
-
-_TASK_OPTIONS_CLS_BY_RECONSTRUCTOR: dict[Reconstructors, type[PtychographyTaskOptions]] = {
-    Reconstructors.DM: DMOptions,
-    Reconstructors.RAAR: RAAROptions,
-    Reconstructors.PIE: PIEOptions,
-    Reconstructors.EPIE: EPIEOptions,
-    Reconstructors.RPIE: RPIEOptions,
-    Reconstructors.LSQML: LSQMLOptions,
-    Reconstructors.AD_PTYCHO: AutodiffPtychographyOptions,
-    Reconstructors.BH: BHOptions,
-}
 
 
 def dump_task_options(options: PtychographyTaskOptions) -> str:
     """Serialize a fully-built options object for transport to a child process.
 
-    The envelope carries the reconstructor token so PIE/ePIE/rPIE (which share
-    a serialized field set) survive the round-trip as the correct subclass.
+    ``get_dict`` stamps the dict with ``options_class_name``, which is what lets
+    PIE/ePIE/rPIE (which share a serialized field set) survive the round-trip as
+    the correct subclass.
     """
-    reconstructor = options.reconstructor_options.get_reconstructor_type()
-    return json.dumps({'reconstructor': reconstructor.value, 'options': options.get_dict()})
+    return json.dumps(options.get_dict())
+
+
+def dump_task_options_yaml(options: PtychographyTaskOptions) -> str:
+    """Serialize a fully-built options object as the YAML a run leaves behind.
+
+    The same ``get_dict()`` payload :func:`dump_task_options` writes as JSON,
+    including the ``options_class_name`` stamp that identifies the algorithm.
+    ``sort_keys=False`` keeps pty-chi's own field order; alphabetizing would
+    scatter each nested options block's fields for a file meant to be read.
+
+    The payload goes through the JSON encoder on the way, because ``get_dict``
+    hands back live Python objects that ``safe_dump`` will not represent:
+    pty-chi's ``StrEnum`` members, and a tuple of them under
+    ``probe_position_options.affine_transform_constraint``. ``json.dumps``
+    already renders both -- a ``StrEnum`` is a ``str``, a tuple is an array --
+    so decoding its output yields plain scalars, lists and dicts. Normalizing
+    through the wire format rather than teaching a dumper about each type also
+    means the two encodings cannot drift: whatever one writes, so does the
+    other.
+    """
+    return yaml.safe_dump(json.loads(dump_task_options(options)), sort_keys=False)
+
+
+def load_task_options_from_mapping(options_dict: Any) -> PtychographyTaskOptions:
+    """Rebuild an options object from a decoded payload, whatever encoded it.
+
+    ``options_class_name`` selects the algorithm-specific subclass.
+    ``load_from_dict`` then resolves nested options through that subclass's
+    declared field annotations, so no algorithm-specific field is silently
+    dropped, and ``strict=True`` rejects a payload whose nested stamps disagree
+    with the fields they are being loaded into.
+    """
+    if not isinstance(options_dict, dict):
+        raise ValueError(f'Expected a mapping of options; got {type(options_dict).__name__}!')
+
+    try:
+        options_class_name = options_dict['options_class_name']
+    except KeyError:
+        raise ValueError('Options are missing "options_class_name"!') from None
+
+    # pty-chi stamps the class name but offers no dict-to-options factory of its
+    # own, so resolve it here. Going through ``ptychi.api``, which exports every
+    # ``PtychographyTaskOptions`` subclass, means a pty-chi release that adds an
+    # algorithm needs no change on this side, and the subclass test rejects both
+    # an unknown name and an arbitrary attribute that happens to match one.
+    options_cls = getattr(ptychi.api, options_class_name, None)
+
+    if not isinstance(options_cls, type) or not issubclass(options_cls, PtychographyTaskOptions):
+        raise ValueError(f'Unknown pty-chi options class "{options_class_name}"!')
+
+    options = options_cls()
+    options.load_from_dict(options_dict, strict=True)
+    return options
 
 
 def load_task_options(text: str) -> PtychographyTaskOptions:
-    """Rebuild the options object that :func:`dump_task_options` serialized.
-
-    The reconstructor token in the envelope selects the algorithm-specific
-    subclass; ``load_from_dict`` then resolves nested options through the
-    subclass's declared field annotations so no algorithm-specific field is
-    silently dropped.
-    """
-    envelope = json.loads(text)
-
-    if not isinstance(envelope, dict):
-        raise ValueError(f'Expected a JSON object envelope; got {type(envelope).__name__}!')
-
-    try:
-        reconstructor = Reconstructors(envelope['reconstructor'])
-    except KeyError as exc:
-        raise ValueError(f'Options envelope is missing "{exc.args[0]}"!') from None
-    except ValueError:
-        raise ValueError(f'Unknown pty-chi reconstructor "{envelope["reconstructor"]}"!') from None
-
-    try:
-        task_options_cls = _TASK_OPTIONS_CLS_BY_RECONSTRUCTOR[reconstructor]
-    except KeyError:
-        raise ValueError(f'Unknown pty-chi reconstructor "{reconstructor}"!') from None
-
-    options_dict = envelope.get('options')
-    if not isinstance(options_dict, dict):
-        raise ValueError('Options envelope "options" field must be a JSON object!')
-
-    options = task_options_cls()
-    options.load_from_dict(options_dict)
-    return options
+    """Rebuild the options object that :func:`dump_task_options` serialized."""
+    return load_task_options_from_mapping(json.loads(text))
 
 
 def _initial_opr_mode_weights(probe: ProbeSequence) -> RealArrayType:
@@ -152,13 +170,11 @@ def _differs(lhs: Any, rhs: Any) -> bool:
     return bool(lhs != rhs)
 
 
-def _overwrite(options: Any, name: str, value: Any, *, unset: bool = False) -> None:
+def _overwrite(options: Any, name: str, value: Any) -> None:
     """Write `value` onto `options.name`, logging what changed.
 
     Warns only when the caller had expressed an intent that disagrees, i.e. the
-    old value was neither pty-chi's default nor the value being written. Pass
-    `unset` for a field whose incoming value is an internal placeholder rather
-    than a caller's intent; it suppresses the warning but not the debug line.
+    old value was neither pty-chi's default nor the value being written.
     """
     options_cls = type(options)
     old = getattr(options, name)
@@ -168,9 +184,6 @@ def _overwrite(options: Any, name: str, value: Any, *, unset: bool = False) -> N
     # below see the stored form and an ndarray does not warn against itself.
     new = getattr(options, name)
     logger.debug('%s.%s: %r -> %r', options_cls.__name__, name, old, new)
-
-    if unset:
-        return
 
     # Defaults come off a throwaway instance rather than ``dataclasses.fields``:
     # pty-chi declares its constrained scalars with ``PydanticField(...)``, whose
@@ -187,6 +200,54 @@ def _overwrite(options: Any, name: str, value: Any, *, unset: bool = False) -> N
             old,
             new,
         )
+
+
+def _align_probe_pixel_geometry(
+    aligned: PtychographyTaskOptions,
+    product: Product,
+    object_geometry: PixelGeometry,
+    rel_tol: float = 1e-9,
+) -> None:
+    """Describe the product's probe sampling on `aligned.probe_options`.
+
+    pty-chi inherits the object value for each probe pixel field left at
+    ``None``, and it decides whether to resample by comparing pixel sizes rather
+    than by testing for ``None``. Writing ``None`` when the two agree therefore
+    both states the intent and keeps the no-resampling fast path.
+
+    Width and aspect ratio are inherited independently upstream, so they are
+    tested independently here.
+
+    Pixel sizes agreeing to within `rel_tol` name the same sampling. A product
+    round-tripped through HDF5 stores the probe and object geometries
+    independently, so an exact comparison would let float noise engage pty-chi's
+    Fourier resampling for what is physically an unresampled grid.
+    """
+    try:
+        probe_geometry = product.probes.get_pixel_geometry()
+    except ValueError:
+        logger.debug('Product carries no probe pixel geometry; probe sampling follows the object.')
+        return
+
+    probe_options = aligned.probe_options
+
+    probe_width_m = probe_geometry.width_m
+    _overwrite(
+        probe_options,
+        'pixel_size_m',
+        None
+        if math.isclose(probe_width_m, object_geometry.width_m, rel_tol=rel_tol)
+        else probe_width_m,
+    )
+
+    probe_aspect_ratio = probe_geometry.get_aspect_ratio()
+    _overwrite(
+        probe_options,
+        'pixel_size_aspect_ratio',
+        None
+        if math.isclose(probe_aspect_ratio, object_geometry.get_aspect_ratio(), rel_tol=rel_tol)
+        else probe_aspect_ratio,
+    )
 
 
 def align_task_options_with_product(
@@ -210,10 +271,16 @@ def align_task_options_with_product(
     the settings alone. The copy is deep: a caller that has attached task arrays
     to the options pays to duplicate them, though no in-ptychodus path does.
 
-    `free_space_propagation_distance_m` is the one field split between a setting
-    and the product. An infinite incoming value means the caller chose far-field
-    propagation and is left alone; anything else is near-field, and the product
-    supplies the distance.
+    `free_space_propagation_distance_m` follows the product's declared propagation
+    regime: infinite for far field, and the demagnified detector distance for near
+    field. A caller-supplied distance that disagrees is overwritten with a warning,
+    as any other product-derived field would be. A product whose declared regime
+    contradicts its own geometry warns separately and is not corrected.
+
+    The probe pixel fields are written from the product's probe pixel geometry
+    by :func:`_align_probe_pixel_geometry`, which leaves them ``None`` -- pty-chi
+    then inherits the object values -- whenever the two samplings agree. A
+    product whose probe carries no pixel geometry leaves them untouched.
 
     Per-field pydantic validation runs on each assignment, so a degenerate
     product (`pixel_size_m` must be > 0, `probe_power` >= 0) raises
@@ -249,21 +316,61 @@ def align_task_options_with_product(
     )
     _overwrite(object_options, 'position_origin_coords', [0.0, 0.0])
 
-    _overwrite(aligned.data_options, 'wavelength_m', metadata.probe_wavelength_m)
+    _overwrite(aligned.data_options, 'wavelength_m', metadata.photon_wavelength_m)
 
-    propagation_distance_m = aligned.data_options.free_space_propagation_distance_m
+    # Near field: pty-chi propagates in the equivalent parallel-beam geometry, so a
+    # cone beam contributes its demagnified distance. Without a focusing optic the
+    # magnification is 1 and this is the detector distance unchanged.
+    _overwrite(
+        aligned.data_options,
+        'free_space_propagation_distance_m',
+        math.inf if metadata.far_field else metadata.detector_distance_m / metadata.magnification,
+    )
 
-    if not math.isinf(propagation_distance_m):
-        _overwrite(
-            aligned.data_options,
-            'free_space_propagation_distance_m',
-            metadata.detector_distance_m,
-            unset=math.isnan(propagation_distance_m),
-        )
+    warn_if_propagation_regime_disagrees(product)
 
     _overwrite(aligned.probe_options.power_constraint, 'probe_power', metadata.probe_photon_count)
 
+    _align_probe_pixel_geometry(aligned, product, object_geometry)
+
     return aligned
+
+
+def _recover_layer_spacing_m(task: Any, object_in: Object) -> Sequence[float]:
+    """Return the slice spacings the task ended with, falling back to the ones it started with.
+
+    pty-chi can optimize slice spacings, but its readback API covers only the object,
+    probe, positions and OPR weights, so the optimized values are reachable only through
+    the task's own object. That is private structure and has churned before, so every
+    failure here degrades to the input spacing rather than propagating: a stale thickness
+    is a cosmetic loss, whereas a wrong-length one would make the Object constructor
+    raise.
+    """
+    num_spacings = object_in.num_layers - 1
+
+    if num_spacings < 1:
+        return list(object_in.layer_spacing_m)
+
+    try:
+        spacing_m = [float(value) for value in task.object.slice_spacings.data.detach().cpu()]
+    except (AttributeError, TypeError, RuntimeError, ValueError) as exc:
+        logger.warning(
+            'Could not read slice spacings back from pty-chi (%s); keeping the input '
+            'spacing. Any slice-spacing optimization is not reflected in the output.',
+            exc,
+        )
+        return list(object_in.layer_spacing_m)
+
+    if len(spacing_m) != num_spacings:
+        logger.warning(
+            'pty-chi returned %d slice spacing(s) for a %d-layer object; keeping the input '
+            'spacing.',
+            len(spacing_m),
+            object_in.num_layers,
+        )
+        return list(object_in.layer_spacing_m)
+
+    return spacing_m
 
 
 def reconstruct_with_ptychi(
@@ -277,10 +384,9 @@ def reconstruct_with_ptychi(
     context."""
     from ptychi.api.task import PtychographyTask
 
-    # The near-field placeholder that PtyChiCommon emits, escaping into a run.
-    # pty-chi neither validates it nor warns -- both of its near-field guards
-    # test `< inf`, which NaN fails -- so the only other symptom would be a NaN
-    # loss on the first epoch.
+    # A hand-built options object that skipped alignment. pty-chi neither validates
+    # NaN nor warns -- both of its near-field guards test `< inf`, which NaN fails --
+    # so the only other symptom would be a NaN loss on the first epoch.
     if math.isnan(task_options.data_options.free_space_propagation_distance_m):
         raise ValueError(
             'free_space_propagation_distance_m is NaN; call '
@@ -294,13 +400,8 @@ def reconstruct_with_ptychi(
 
     # pty-chi stores probe positions in object pixel units; ptychodus stores
     # them in meters. The output path below applies the inverse mapping.
-    position_x_px: list[float] = list()
-    position_y_px: list[float] = list()
-
-    for scan_point in product_in.probe_positions:
-        object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        position_x_px.append(object_point.x_px)
-        position_y_px.append(object_point.y_px)
+    position_x_px = object_geometry.map_probe_positions_to_object_x_px(product_in.probe_positions)
+    position_y_px = object_geometry.map_probe_positions_to_object_y_px(product_in.probe_positions)
 
     # Task data goes in as keyword arguments; passing it through the *Options
     # objects still works but is deprecated and warns per field.
@@ -309,8 +410,8 @@ def reconstruct_with_ptychi(
         diffraction_data=parameters.diffraction_patterns,
         object_data=object_in.get_array(),
         probe_data=product_in.probes.get_array(),
-        probe_position_x_px=numpy.array(position_x_px),
-        probe_position_y_px=numpy.array(position_y_px),
+        probe_position_x_px=position_x_px,
+        probe_position_y_px=position_y_px,
         opr_mode_weights_data=_initial_opr_mode_weights(product_in.probes),
         valid_pixel_mask=numpy.logical_not(parameters.bad_pixels),
     )
@@ -338,7 +439,7 @@ def reconstruct_with_ptychi(
 
             object_out = Object(
                 array=numpy.array(task.get_data_to_cpu('object', as_numpy=True)),
-                layer_spacing_m=object_in.layer_spacing_m,
+                layer_spacing_m=_recover_layer_spacing_m(task, object_in),
                 pixel_geometry=object_in.get_pixel_geometry(),
                 center=object_in.get_center(),
             )

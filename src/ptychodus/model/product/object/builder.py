@@ -4,7 +4,12 @@ from collections.abc import Sequence
 import logging
 
 
-from ptychodus.api.object import Object, ObjectFileReader, ObjectGeometryProvider
+from ptychodus.api.object import (
+    Object,
+    ObjectFileReader,
+    ObjectGeometryProvider,
+    resample_object_to_pixel_size,
+)
 from ptychodus.api.simulate.object import generate_layers, pad_object
 from ptychodus.api.parameters import ParameterGroup
 
@@ -66,30 +71,28 @@ class ObjectBuilder(ParameterGroup):
         object_: Object,
         layer_spacing_m: Sequence[float],
     ) -> Object:
-        """Slice the object into the requested number of layers, never destroying
-        layers it already has.
+        """Slice the object onto the requested depth grid.
 
-        `generate_layers` is only non-destructive when the object has a single
-        layer. Given fewer layers than the input it truncates; given more it keeps
-        layer zero and throws the rest away before splitting. So a multi-layer
-        input whose layer count does not already match the request is left alone
-        -- otherwise a converged multislice result loaded from file would collapse
-        to one layer under the default empty spacing.
+        `generate_layers` resamples the whole stack and preserves the layer product, so
+        reslicing a multislice object is no longer destructive and is done whenever a
+        spacing is asked for.
+
+        An empty spacing is the exception. It is the unset default, and it means one
+        layer, so honoring it literally would collapse a multislice result loaded from
+        file the moment nobody had configured a spacing. Absent a spacing this keeps
+        whatever layers the object arrived with, which also makes one layer
+        unrequestable for an object that has more -- the data model cannot tell "one
+        layer" from "unspecified".
 
         Note the padding is applied earlier, in `_build_raw`, so the order here is
         pad-then-layers rather than the layers-then-pad of the original
-        `_create_object`. The two do not commute, because `generate_layers`
-        unwraps the phase of layer zero and a zero-amplitude border changes that
-        unwrapping. Only generated multislice objects can tell the difference; for
-        the single-layer default `generate_layers` is a no-op.
+        `_create_object`. The two do not commute, because a zero-amplitude border
+        changes the resampled result near the edges.
         """
-        num_layers_requested = 1 + len(layer_spacing_m)
-        num_layers_actual = object_.num_layers
-
-        if num_layers_actual > 1 and num_layers_actual != num_layers_requested:
+        if not layer_spacing_m and object_.num_layers > 1:
             logger.info(
-                f'Object already has {num_layers_actual} layer(s);'
-                f' keeping them rather than re-slicing to {num_layers_requested}.'
+                f'Object has {object_.num_layers} layer(s) and no layer spacing is set;'
+                ' keeping them rather than collapsing to one.'
             )
             return object_
 
@@ -180,6 +183,11 @@ class FromFileObjectBuilder(ObjectBuilder):
     silently ignored here. `_condition_object` keeps whatever layers the file
     already carries.
 
+    A file that records its own pixel size is reconciled to the run's, since an
+    object sampled by another geometry is a misscaled initial guess rather than a
+    warm start. None of the object formats currently record one, so today this
+    only ever fires for a reader that supplies it.
+
     The extra padding is deliberately not applied; see `ObjectBuilder._pad_object`.
     """
 
@@ -221,6 +229,8 @@ class FromFileObjectBuilder(ObjectBuilder):
         try:
             pixel_geometry = object_from_file.get_pixel_geometry()
         except ValueError:
+            # The format records no pixel size, so there is nothing to reconcile and the
+            # array is taken to be sampled the way this run is.
             pixel_geometry = object_geometry.get_pixel_geometry()
 
         try:
@@ -228,9 +238,12 @@ class FromFileObjectBuilder(ObjectBuilder):
         except ValueError:
             center = object_geometry.get_center()
 
-        return Object(
-            object_from_file.get_array(),
-            pixel_geometry,
-            center,
-            object_from_file.layer_spacing_m,
+        return resample_object_to_pixel_size(
+            Object(
+                object_from_file.get_array(),
+                pixel_geometry,
+                center,
+                object_from_file.layer_spacing_m,
+            ),
+            object_geometry.get_pixel_geometry(),
         )

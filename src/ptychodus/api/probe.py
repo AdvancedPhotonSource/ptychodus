@@ -4,18 +4,30 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
+from enum import Enum, auto
 from pathlib import Path
 from typing import overload
+import logging
+import math
 
 import numpy
 import scipy.ndimage
 from scipy.fft import fft2
 
 from .constants import format_length
+from .fourier import fourier_shift_2d
 from .geometry import ImageExtent, PixelGeometry
+from .interpolate import resample_along_axis
 from .preprocess.noise import estimate_noise_floor
-from .propagate import intensity
+from .propagate import (
+    PropagatedWavefield,
+    compute_far_field_pixel_geometry,
+    compute_near_field_pixel_geometry,
+    intensity,
+)
 from .typing import ComplexArrayType, RealArrayType
+
+logger = logging.getLogger(__name__)
 
 
 def compute_shannon_entropy(distribution: RealArrayType, *, normalize: bool = True) -> float:
@@ -53,6 +65,91 @@ def compute_shannon_entropy(distribution: RealArrayType, *, normalize: bool = Tr
         entropy /= numpy.log2(p.size)
 
     return float(entropy)
+
+
+def compute_rms_contrast(image: RealArrayType) -> float:
+    """Root-mean-square contrast ``std(I) / mean(I)`` of a non-negative image.
+
+    Dividing by the mean makes the value independent of the image's overall scaling,
+    so it is comparable between propagation planes and between probes. It attains a
+    maximum where a converging beam is most concentrated, which makes it a focus
+    indicator costing a single pass over the image rather than the median filter and
+    sort that :func:`estimate_probe_size` requires.
+
+    Returns:
+        The RMS contrast, or ``0.0`` when the mean is not positive.
+    """
+    values = numpy.asarray(image, dtype=numpy.float64)
+    mean = values.mean()
+
+    if mean <= 0.0:
+        return 0.0
+
+    return float(values.std() / mean)
+
+
+def compute_amplitude_deviation(wavefield: ComplexArrayType) -> float:
+    """Normalized amplitude dispersion ``std(|psi|) / mean(|psi|)`` of a complex wavefield.
+
+    The amplitude counterpart of :func:`compute_phase_deviation_rad`, normalized by the
+    mean for the same scale-invariance reason as :func:`compute_rms_contrast`.
+
+    Returns:
+        The normalized amplitude deviation, or ``0.0`` when the mean amplitude is not
+        positive.
+    """
+    amplitude = numpy.absolute(numpy.asarray(wavefield))
+    mean = amplitude.mean()
+
+    if mean <= 0.0:
+        return 0.0
+
+    return float(amplitude.std() / mean)
+
+
+def compute_phase_deviation_rad(wavefield: ComplexArrayType) -> float:
+    """Intensity-weighted circular standard deviation of a wavefield's phase, in radians.
+
+    With weights ``w = |psi|^2``, the normalized resultant of the phase distribution is
+    ``R = |sum(w exp(i phi))| / sum(w)``. That simplifies to
+    ``|sum(psi |psi|)| / sum(|psi|^2)``, so it is evaluated without ever taking an
+    angle, and the dispersion reported is ``sqrt(-2 ln R)`` -- the circular analogue of
+    a standard deviation, exactly recovering ``sigma`` for a wrapped-normal phase.
+
+    Being built from a complex weighted sum, the result does not depend on where the
+    branch cut of the phase happens to fall: a wavefield whose phase straddles
+    ``+/-pi`` is measured as tightly clustered, where a plain standard deviation of
+    :func:`numpy.angle` would report it as maximally dispersed. The same reasoning
+    underlies the phase handling in :mod:`ptychodus.api.metrics`.
+
+    Weighting by intensity means dim pixels, whose phase is the least trustworthy part
+    of a reconstruction, contribute in proportion to how much light they carry.
+
+    A flat wavefront gives ``0.0``. The value grows without bound as the phase spreads;
+    for a phase that is uniformly distributed over the circle the resultant is limited
+    only by the sample count, so the reported dispersion grows like ``sqrt(ln N)``.
+
+    Returns:
+        The circular standard deviation in radians; ``0.0`` when the wavefield carries
+        no power, and ``inf`` in the degenerate case of an exactly vanishing resultant.
+    """
+    values = numpy.asarray(wavefield)
+    amplitude = numpy.absolute(values)
+    total_power = numpy.square(amplitude).sum()
+
+    if total_power <= 0.0:
+        return 0.0
+
+    # sum(w exp(i phi)) == sum(|psi|^2 * psi / |psi|) == sum(psi |psi|), which also
+    # leaves zero-amplitude pixels contributing nothing instead of dividing by zero.
+    resultant = float(numpy.absolute(numpy.sum(values * amplitude)) / total_power)
+
+    if resultant <= 0.0:
+        return float('inf')
+
+    # Rounding can push a perfectly coherent sum a hair above one, where the log would
+    # return a small negative and the square root a NaN.
+    return float(numpy.sqrt(-2.0 * numpy.log(min(resultant, 1.0))))
 
 
 @dataclass(frozen=True)
@@ -311,6 +408,264 @@ def estimate_probe_size(
     )
 
 
+class FocusPolarity(Enum):
+    """Whether a focus metric is best at a minimum or a maximum of its z curve."""
+
+    MINIMUM = auto()
+    MAXIMUM = auto()
+
+
+class ProbeFocusMetric(Enum):
+    """Focus metrics sampled along a propagation axis.
+
+    Each member pairs a short display name with the direction in which the metric
+    improves and the SI unit its samples are stored in (``'m'``, ``'rad'``, or the
+    empty string when dimensionless). The name deliberately carries no unit -- callers
+    append one derived from :attr:`si_unit`, converting to whichever display unit suits
+    them, so that a script and a GUI describe the same quantity the same way.
+    """
+
+    FWHM_MAJOR = ('FWHM Major Axis', FocusPolarity.MINIMUM, 'm')
+    FWHM_MINOR = ('FWHM Minor Axis', FocusPolarity.MINIMUM, 'm')
+    RMS_MAJOR = ('RMS Major Axis', FocusPolarity.MINIMUM, 'm')
+    RMS_MINOR = ('RMS Minor Axis', FocusPolarity.MINIMUM, 'm')
+    ENCIRCLED_ENERGY_DIAMETER = ('Encircled Energy Diameter', FocusPolarity.MINIMUM, 'm')
+    PEAK_INTENSITY = ('Peak Intensity', FocusPolarity.MAXIMUM, '')
+    RMS_CONTRAST = ('RMS Contrast', FocusPolarity.MAXIMUM, '')
+    INTENSITY_ENTROPY = ('Intensity Entropy', FocusPolarity.MINIMUM, '')
+    AMPLITUDE_DEVIATION = ('Amplitude Deviation', FocusPolarity.MAXIMUM, '')
+    PHASE_DEVIATION = ('Phase Deviation', FocusPolarity.MINIMUM, 'rad')
+
+    def __init__(self, label: str, polarity: FocusPolarity, si_unit: str) -> None:
+        self.label = label
+        self.polarity = polarity
+        self.si_unit = si_unit
+
+
+@dataclass(frozen=True)
+class ProbeFocusSeries:
+    """One focus metric sampled at every plane of a propagated probe."""
+
+    metric: ProbeFocusMetric
+    """Which metric this curve measures, and how to interpret it."""
+
+    value: RealArrayType
+    """Samples in the SI unit named by ``metric.si_unit``, one per propagation step."""
+
+
+@dataclass(frozen=True)
+class FocalPlane:
+    """Best-focus plane estimated from a single metric curve."""
+
+    coordinate_m: float
+    """Propagation coordinate of the estimated focus, in meters."""
+
+    value: float
+    """The metric's value there, interpolated when :attr:`is_refined` is true."""
+
+    step: int
+    """Index of the sampled plane nearest the focus."""
+
+    is_refined: bool
+    """Whether sub-step interpolation succeeded. When false the estimate is the
+    extremal sample itself, so its precision is the sample spacing."""
+
+
+@dataclass(frozen=True)
+class ProbeFocusCurves:
+    """Focus metrics for a propagated probe, sampled along the propagation axis."""
+
+    coordinate_m: RealArrayType
+    """Propagation coordinates in meters, shape ``(num_steps,)``."""
+
+    series: Sequence[ProbeFocusSeries]
+    """One entry per sampled metric, each the same length as :attr:`coordinate_m`."""
+
+    def get_series(self, metric: ProbeFocusMetric) -> ProbeFocusSeries:
+        """Return the sampled curve for *metric*.
+
+        Raises:
+            KeyError: If *metric* was not sampled.
+        """
+        for series in self.series:
+            if series.metric is metric:
+                return series
+
+        raise KeyError(f'No focus series for {metric}!')
+
+    def get_focal_plane(self, metric: ProbeFocusMetric) -> FocalPlane:
+        """Best-focus plane according to *metric*, via :func:`estimate_focal_plane`.
+
+        Raises:
+            KeyError: If *metric* was not sampled.
+        """
+        series = self.get_series(metric)
+        return estimate_focal_plane(self.coordinate_m, series.value, metric.polarity)
+
+
+def estimate_focal_plane(
+    coordinate_m: RealArrayType, value: RealArrayType, polarity: FocusPolarity
+) -> FocalPlane:
+    """Locate the best-focus plane of a sampled metric curve by parabolic refinement.
+
+    The extremal sample is found according to *polarity*, a parabola is fitted through
+    it and its two neighbors, and the vertex is reported. This resolves the focus to a
+    fraction of the sample spacing, and is exact wherever the curve is locally
+    quadratic -- which these metrics are near their extremum.
+
+    The refinement is abandoned, and the extremal sample returned unchanged with
+    :attr:`FocalPlane.is_refined` false, whenever it cannot be trusted:
+
+    - there are fewer than three samples, or the extremum falls on either end of the
+      curve, so that it is not bracketed;
+    - the parabola is degenerate, meaning a flat or near-flat neighborhood in which the
+      vertex could land anywhere;
+    - the vertex leaves the bracketing interval.
+
+    Args:
+        coordinate_m: Propagation coordinates in meters, evenly spaced and increasing.
+        value: Metric samples, the same shape as *coordinate_m*.
+        polarity: Whether the metric is best at a minimum or a maximum.
+
+    Raises:
+        ValueError: If the two arrays differ in shape, or are empty.
+    """
+    coordinates = numpy.asarray(coordinate_m, dtype=numpy.float64)
+    values = numpy.asarray(value, dtype=numpy.float64)
+
+    if coordinates.shape != values.shape:
+        raise ValueError(
+            f'Coordinate and value arrays must have same shape; '
+            f'got {coordinates.shape} vs {values.shape}!'
+        )
+
+    if values.size == 0:
+        raise ValueError('Cannot locate a focal plane in an empty curve!')
+
+    if polarity is FocusPolarity.MAXIMUM:
+        index = int(numpy.argmax(values))
+    else:
+        index = int(numpy.argmin(values))
+
+    grid_plane = FocalPlane(
+        coordinate_m=float(coordinates[index]),
+        value=float(values[index]),
+        step=index,
+        is_refined=False,
+    )
+
+    if values.size < 3 or index == 0 or index == values.size - 1:
+        return grid_plane
+
+    y_left = values[index - 1]
+    y_here = values[index]
+    y_right = values[index + 1]
+    denominator = y_left - 2.0 * y_here + y_right
+
+    # Scale the flatness tolerance to the curve so that the test means the same thing
+    # whether the samples are nanometer-scale lengths or order-one dimensionless ratios.
+    tolerance = 1e-12 * max(float(numpy.absolute(values).max()), 1.0)
+
+    if numpy.absolute(denominator) <= tolerance:
+        return grid_plane
+
+    offset = 0.5 * (y_left - y_right) / denominator
+
+    if numpy.absolute(offset) > 1.0:
+        return grid_plane
+
+    # Half the span of the bracketing pair, so a locally uneven grid still gives the
+    # right step size without assuming the whole axis is uniform.
+    spacing_m = 0.5 * (coordinates[index + 1] - coordinates[index - 1])
+    focus_m = coordinates[index] + offset * spacing_m
+    # Vertex of the same parabola: y(x*) = y_here - (y_left - y_right) * x* / 4.
+    vertex = y_here - 0.25 * (y_left - y_right) * offset
+
+    return FocalPlane(
+        coordinate_m=float(focus_m),
+        value=float(vertex),
+        step=int(numpy.argmin(numpy.absolute(coordinates - focus_m))),
+        is_refined=True,
+    )
+
+
+def compute_probe_focus_curves(
+    propagated_probe: PropagatedWavefield, *, mode: int = 0
+) -> ProbeFocusCurves:
+    """Sample every :class:`ProbeFocusMetric` at each plane of a propagated probe.
+
+    The result is the input to :func:`estimate_focal_plane`, and is what turns a stack
+    of propagated wavefields into a statement about where the probe comes to focus.
+
+    Two families are measured on different data. The size and intensity metrics use the
+    mode-summed intensity, since that is the physically observable quantity. The
+    amplitude and phase deviations are measured on a single incoherent mode selected by
+    *mode*, because phase is only defined per mode -- summing mutually incoherent modes
+    is meaningful in intensity alone.
+
+    Values are stored raw and in SI units, with no normalization applied, so that a
+    caller comparing curves on one axis controls that choice itself.
+
+    Cost is dominated by :func:`estimate_probe_size`, which median-filters, runs Otsu,
+    and sorts every pixel once per plane; expect this to scale linearly in the step
+    count and to run for seconds over a long sweep. The intensity stack is materialized
+    once here rather than per step, since :attr:`PropagatedWavefield.intensity` rebuilds it
+    on every access and would otherwise make the sweep quadratic.
+
+    Args:
+        propagated_probe: The propagated wavefield stack to measure.
+        mode: Zero-based incoherent mode used for the wavefront metrics.
+
+    Raises:
+        ValueError: If *mode* is not a valid incoherent mode index.
+    """
+    num_modes = propagated_probe.num_incoherent_modes
+
+    if not 0 <= mode < num_modes:
+        raise ValueError(f'Mode index must be in [0, {num_modes}); got {mode}!')
+
+    # Hoisted deliberately -- see the note on cost above.
+    stack = propagated_probe.intensity
+    pixel_geometry = propagated_probe.pixel_geometry
+    num_steps = propagated_probe.num_steps
+
+    coordinate_m = numpy.linspace(
+        propagated_probe.begin_coordinate_m,
+        propagated_probe.end_coordinate_m,
+        num_steps,
+    )
+    samples: dict[ProbeFocusMetric, list[float]] = {metric: [] for metric in ProbeFocusMetric}
+
+    for step in range(num_steps):
+        plane = stack[step]
+        size = estimate_probe_size(plane, pixel_geometry)
+        wavefield = propagated_probe.get_xy_wavefield(step, mode)
+
+        step_values = {
+            ProbeFocusMetric.FWHM_MAJOR: size.fwhm_major_axis_length_m,
+            ProbeFocusMetric.FWHM_MINOR: size.fwhm_minor_axis_length_m,
+            ProbeFocusMetric.RMS_MAJOR: size.rms_major_axis_length_m,
+            ProbeFocusMetric.RMS_MINOR: size.rms_minor_axis_length_m,
+            ProbeFocusMetric.ENCIRCLED_ENERGY_DIAMETER: size.encircled_energy_diameter_m,
+            ProbeFocusMetric.PEAK_INTENSITY: float(plane.max()),
+            ProbeFocusMetric.RMS_CONTRAST: compute_rms_contrast(plane),
+            ProbeFocusMetric.INTENSITY_ENTROPY: compute_shannon_entropy(plane),
+            ProbeFocusMetric.AMPLITUDE_DEVIATION: compute_amplitude_deviation(wavefield),
+            ProbeFocusMetric.PHASE_DEVIATION: compute_phase_deviation_rad(wavefield),
+        }
+
+        for metric, metric_value in step_values.items():
+            samples[metric].append(metric_value)
+
+    return ProbeFocusCurves(
+        coordinate_m=coordinate_m,
+        series=tuple(
+            ProbeFocusSeries(metric=metric, value=numpy.array(values))
+            for metric, values in samples.items()
+        ),
+    )
+
+
 @dataclass(frozen=True)
 class ProbeTransverseCoordinates:
     """2D Cartesian coordinate arrays for the transverse plane of the probe, in meters."""
@@ -362,14 +717,36 @@ class ProbeGeometry:
         distance_m: float,
     ) -> ProbeGeometry:
         """Sample-plane probe geometry from the Fraunhofer relation ``dx_sample = lambda * |z| / (N * dx_detector)``."""
-        width_px = image_extent.width_px
-        height_px = image_extent.height_px
-        numerator_m2 = wavelength_m * abs(distance_m)
+        pixel_geometry = compute_far_field_pixel_geometry(
+            detector_pixel_geometry,
+            image_extent,
+            wavelength_m=wavelength_m,
+            propagation_distance_m=distance_m,
+        )
         return cls(
-            width_px=width_px,
-            height_px=height_px,
-            pixel_width_m=numerator_m2 / (detector_pixel_geometry.width_m * width_px),
-            pixel_height_m=numerator_m2 / (detector_pixel_geometry.height_m * height_px),
+            width_px=image_extent.width_px,
+            height_px=image_extent.height_px,
+            pixel_width_m=pixel_geometry.width_m,
+            pixel_height_m=pixel_geometry.height_m,
+        )
+
+    @classmethod
+    def from_near_field(
+        cls,
+        detector_pixel_geometry: PixelGeometry,
+        image_extent: ImageExtent,
+        *,
+        magnification: float,
+    ) -> ProbeGeometry:
+        """Sample-plane probe geometry from the geometric projection ``dx_sample = dx_detector / M``."""
+        pixel_geometry = compute_near_field_pixel_geometry(
+            detector_pixel_geometry, magnification=magnification
+        )
+        return cls(
+            width_px=image_extent.width_px,
+            height_px=image_extent.height_px,
+            pixel_width_m=pixel_geometry.width_m,
+            pixel_height_m=pixel_geometry.height_m,
         )
 
     @property
@@ -440,12 +817,17 @@ class ProbeGeometryProvider(ABC):
 
     @property
     @abstractmethod
+    def far_field(self) -> bool:
+        """Whether the detector records the Fraunhofer diffraction pattern."""
+
+    @property
+    @abstractmethod
     def probe_photon_count(self) -> float:
         pass
 
     @property
     @abstractmethod
-    def probe_wavelength_m(self) -> float:
+    def photon_wavelength_m(self) -> float:
         pass
 
     @property
@@ -561,6 +943,24 @@ def estimate_probe_entropy(probe: Probe) -> ProbeEntropyMetrics:
     return ProbeEntropyMetrics(
         real_space_intensity_entropy=compute_shannon_entropy(probe.get_intensity()),
         spectral_entropy=compute_shannon_entropy(probe.get_power_spectrum()),
+    )
+
+
+def shift_probe(probe: Probe, *, shift_y_px: float, shift_x_px: float) -> Probe:
+    """Translate every incoherent mode of ``probe`` by ``(shift_y_px, shift_x_px)``.
+
+    The translation is applied as a Fourier phase ramp, matching :func:`shift_object`, so
+    the complex phase survives and the shift is exact for a bandlimited wavefield at
+    subpixel offsets. It is circular: content pushed past one edge reappears at the
+    opposite one, which is inert for a probe whose support sits well inside the frame.
+    A probe carries no world-coordinate center, so no metadata is adjusted.
+    """
+    if shift_y_px == 0.0 and shift_x_px == 0.0:
+        return probe
+
+    return Probe(
+        array=fourier_shift_2d(probe.get_array(), dx=shift_x_px, dy=shift_y_px),
+        pixel_geometry=probe.get_pixel_geometry().copy(),
     )
 
 
@@ -718,6 +1118,494 @@ class ProbeSequence(Sequence[Probe]):
 
     def __repr__(self) -> str:
         return f'{self._array.dtype}{self._array.shape}'
+
+
+@dataclass(frozen=True)
+class OPRModeStatistics:
+    """Across-scan statistics for one coherent (OPR) mode."""
+
+    mean_weight: float
+    """Mean of this mode's weight over all probe positions."""
+
+    weight_deviation: float
+    """Standard deviation of this mode's weight over all probe positions."""
+
+    variance_fraction: float
+    """Share of the across-scan variance attributed to this mode, in ``[0, 1]``.
+
+    This is the mode's own contribution ``var(w[:, c]) * G[c, c]`` divided by the sum of
+    those contributions over every mode, so the fractions sum to one. The cross terms
+    between modes are left out, which makes the split exact for an orthogonal coherent
+    basis and approximate otherwise; :attr:`OPRModeSeries.relative_variation` keeps them
+    and so is exact either way.
+
+    Zero throughout in the degenerate case where no mode's weight varies at all -- a
+    single probe position, or a basis carrying no power -- since there is then no
+    variance to apportion.
+    """
+
+
+@dataclass(frozen=True)
+class OPRModeSeries:
+    """Per-probe-position OPR diagnostics for a probe ensemble.
+
+    Row ``i`` of every per-position array describes probe position ``i`` by row order,
+    which is how a probe ensemble pairs with a sequence of probe positions; it is not
+    the scan index.
+
+    Powers are expressed the way a probe array stores them, as the sum of ``abs(psi)**2``
+    over the pixels of a mode, so they are comparable with
+    :attr:`ptychodus.api.product.ProductMetadata.probe_photon_count` and with each other
+    but not with raw detector counts.
+    """
+
+    opr_weight: RealArrayType
+    """OPR weights, shape ``(num_positions, num_coherent_modes)``."""
+
+    primary_mode_photon_count: RealArrayType
+    """Power in the OPR-composed incoherent mode 0, shape ``(num_positions,)``."""
+
+    deviation_photon_count: RealArrayType
+    """Power in the difference between that mode and its across-scan mean, shape
+    ``(num_positions,)``. This isolates what OPR models: it is zero at every position of
+    an ensemble whose weight rows are all equal."""
+
+    secondary_mode_photon_count: float
+    """Power in incoherent modes 1 and above.
+
+    A probe ensemble composes only incoherent mode 0 from the coherent basis, so the
+    remaining modes are the same at every probe position and their power is one number
+    rather than a series.
+    """
+
+    mode_statistics: Sequence[OPRModeStatistics]
+    """One entry per coherent mode, in mode order."""
+
+    effective_mode_count: int
+    """Coherent modes needed to account for the requested share of the across-scan
+    variance, counting from the largest contributor down.
+
+    The answer to how many coherent modes a reconstruction actually needs. Zero in the
+    degenerate case where the variance is exactly zero; an ensemble whose weight rows
+    agree only to roundoff reports one, alongside a :attr:`relative_variation` that
+    rounds to nothing.
+    """
+
+    @property
+    def num_positions(self) -> int:
+        return self.opr_weight.shape[0]
+
+    @property
+    def num_coherent_modes(self) -> int:
+        return self.opr_weight.shape[1]
+
+    @property
+    def total_photon_count(self) -> RealArrayType:
+        """Whole-probe power per position: the composed mode plus the fixed remainder.
+
+        This differs from :attr:`primary_mode_photon_count` by a constant, so the two
+        curves have the same shape and the constant is the power the unvarying modes
+        carry.
+        """
+        return self.primary_mode_photon_count + self.secondary_mode_photon_count
+
+    @property
+    def relative_variation(self) -> float:
+        """Mean deviation power as a fraction of mean composed-mode power.
+
+        The single number answering whether the OPR basis is doing anything: ``0.0`` for
+        an ensemble that does not vary across the scan, and growing with the share of the
+        illumination that the weights move around. Unlike the per-mode
+        :attr:`OPRModeStatistics.variance_fraction` split, this keeps the cross terms
+        between modes and so is exact for a non-orthogonal basis too.
+
+        Returns ``0.0`` when the probe carries no power.
+        """
+        if self.primary_mode_photon_count.size == 0:
+            return 0.0
+
+        mean_primary = self.primary_mode_photon_count.mean()
+
+        if mean_primary <= 0.0:
+            return 0.0
+
+        return float(self.deviation_photon_count.mean() / mean_primary)
+
+    def save_npz(self, file_path: Path) -> None:
+        numpy.savez_compressed(
+            file_path,
+            allow_pickle=False,
+            opr_weight=self.opr_weight,
+            primary_mode_photon_count=self.primary_mode_photon_count,
+            deviation_photon_count=self.deviation_photon_count,
+            total_photon_count=self.total_photon_count,
+            secondary_mode_photon_count=self.secondary_mode_photon_count,
+            mean_weight=numpy.array([stat.mean_weight for stat in self.mode_statistics]),
+            weight_deviation=numpy.array([stat.weight_deviation for stat in self.mode_statistics]),
+            variance_fraction=numpy.array(
+                [stat.variance_fraction for stat in self.mode_statistics]
+            ),
+            effective_mode_count=self.effective_mode_count,
+            relative_variation=self.relative_variation,
+        )
+
+
+def _evaluate_weight_quadratic_form(weight: RealArrayType, gram: RealArrayType) -> RealArrayType:
+    """Row-wise ``w G w`` over a Hermitian Gram matrix's real part, floored at zero.
+
+    Algebraically each row evaluates a sum of squared magnitudes and so cannot be
+    negative, but routing it through the Gram matrix subtracts large terms: a weight row
+    that nearly annihilates the basis can land a hair below zero by roundoff. A power
+    must not be negative, so the floor applies unconditionally rather than at a
+    caller-chosen tolerance.
+    """
+    value = numpy.einsum('nc,cd,nd->n', weight, gram, weight)
+    return numpy.maximum(value, 0.0)
+
+
+def compute_opr_mode_series(
+    probes: ProbeSequence, *, variance_fraction_threshold: float = 0.95
+) -> OPRModeSeries:
+    """Reduce an OPR probe ensemble to per-position diagnostics.
+
+    A probe ensemble composes incoherent mode 0 at probe position ``i`` as
+    ``sum_c w[i, c] * A[c, 0]`` over the coherent basis ``A`` and leaves every other
+    incoherent mode alone. Each quantity reported here is therefore a quadratic form in
+    the weight row against the Hermitian Gram matrix ``G[c, d] = sum_pixels A[c, 0] *
+    conj(A[d, 0])``, and no per-position probe is ever built: cost scales as
+    ``num_coherent_modes**2`` in both the pixel count and the position count, where
+    materializing the ensemble would scale in the pixel count per position.
+
+    Only the real part of the Gram matrix contributes. The weights are real, so the
+    product ``w[i, c] * w[i, d]`` is symmetric in its two indices while the Gram matrix's
+    anti-Hermitian part is antisymmetric, and that contraction vanishes exactly. The Gram
+    matrix is accumulated in double precision whatever the probe's own dtype, since a
+    single-precision probe would otherwise sum one term per pixel in single precision.
+
+    An ensemble with no OPR weights names a single probe position whose composed mode is
+    the basis's first mode, which is the weight row this reports for it.
+
+    Args:
+        probes: Probe ensemble to measure, with or without an OPR basis.
+        variance_fraction_threshold: Share of the across-scan variance that
+            :attr:`OPRModeSeries.effective_mode_count` must reach. Lowering it reports
+            fewer modes as sufficient; raising it toward one reports more.
+
+    Raises:
+        ValueError: If ``variance_fraction_threshold`` is outside ``(0, 1]``.
+    """
+    if not 0.0 < variance_fraction_threshold <= 1.0:
+        raise ValueError(
+            f'Variance fraction threshold must be in (0, 1]; got {variance_fraction_threshold}!'
+        )
+
+    array = probes.get_array()
+    num_coherent_modes = probes.num_coherent_modes
+    weights = probes.get_opr_weights_or_none()
+
+    if weights is None:
+        # With no weights the composed mode is the basis's first mode unchanged, which
+        # is what a single row of unit weight on that mode reproduces.
+        opr_weight = numpy.eye(1, num_coherent_modes)
+    else:
+        opr_weight = numpy.asarray(weights, dtype=numpy.float64)
+
+    basis = array[:, 0, :, :].reshape(num_coherent_modes, -1).astype(numpy.complex128)
+    gram: RealArrayType = (basis @ basis.conj().T).real
+
+    mean_weight = (
+        opr_weight.mean(axis=0) if opr_weight.size > 0 else numpy.zeros(num_coherent_modes)
+    )
+    primary_mode_photon_count = _evaluate_weight_quadratic_form(opr_weight, gram)
+    deviation_photon_count = _evaluate_weight_quadratic_form(opr_weight - mean_weight, gram)
+
+    secondary_mode_photon_count = float(
+        numpy.sum(numpy.square(numpy.absolute(array[0, 1:, :, :])), dtype=numpy.float64)
+    )
+
+    weight_deviation = (
+        opr_weight.std(axis=0) if opr_weight.size > 0 else numpy.zeros(num_coherent_modes)
+    )
+    mode_contribution = numpy.square(weight_deviation) * numpy.diagonal(gram)
+    total_contribution = mode_contribution.sum()
+
+    if total_contribution > 0.0:
+        variance_fraction = mode_contribution / total_contribution
+        # Count the largest contributors first: the question the count answers is how
+        # many modes are worth keeping, not where they sit in the basis.
+        ranked = numpy.sort(variance_fraction)[::-1]
+        cumulative = numpy.cumsum(ranked)
+        reached = numpy.flatnonzero(cumulative >= variance_fraction_threshold)
+        effective_mode_count = int(reached[0]) + 1 if reached.size > 0 else int(num_coherent_modes)
+    else:
+        variance_fraction = numpy.zeros(num_coherent_modes)
+        effective_mode_count = 0
+
+    return OPRModeSeries(
+        opr_weight=opr_weight,
+        primary_mode_photon_count=primary_mode_photon_count,
+        deviation_photon_count=deviation_photon_count,
+        secondary_mode_photon_count=secondary_mode_photon_count,
+        mode_statistics=tuple(
+            OPRModeStatistics(
+                mean_weight=float(mean_weight[mode]),
+                weight_deviation=float(weight_deviation[mode]),
+                variance_fraction=float(variance_fraction[mode]),
+            )
+            for mode in range(num_coherent_modes)
+        ),
+        effective_mode_count=effective_mode_count,
+    )
+
+
+def _centered_grid_indexes(
+    source_pixel_m: float, source_px: int, target_pixel_m: float, target_px: int
+) -> RealArrayType:
+    """Fractional source indexes sampled by each target pixel of a co-centered grid.
+
+    Centered-pixel convention: the center of a grid sits at index ``(N - 1) / 2``, so the
+    two grids share a center and differ only in pitch and extent.
+    """
+    offsets_px = numpy.arange(target_px) - (target_px - 1) / 2
+    return offsets_px * (target_pixel_m / source_pixel_m) + (source_px - 1) / 2
+
+
+def resample_probe_sequence(
+    probes: ProbeSequence, target_geometry: ProbeGeometry, *, rel_tol: float = 1.0e-9
+) -> ProbeSequence:
+    """Re-express ``probes`` on ``target_geometry``, preserving the integrated power.
+
+    A probe saved by a previous run samples the illumination at that run's pixel size,
+    which the photon energy and the detector distance fix. Reusing it against a different
+    geometry without resampling starts the reconstruction from an illumination of the
+    wrong physical size. This compares the two pitches and, when they disagree,
+    interpolates every coherent and incoherent mode onto the target grid.
+
+    A probe carries no world center, so both grids are centered on their own arrays and
+    the resampling separates into one monotone-cubic pass per axis. Content beyond the
+    source is zero: outside the frame there is no illumination, which is the answer, not
+    a filler. That is what distinguishes this from an object, where the same fill would
+    assert an opaque border.
+
+    Amplitudes scale by ``sqrt(target pixel area / source pixel area)`` so that
+    ``sum(abs(P)**2)`` -- the photon count the probe carries -- comes through unchanged
+    while the field it represents stays the same physical illumination.
+
+    Returns ``probes`` itself when there is nothing to do: no pixel geometry to compare
+    against, an axis too short to interpolate along, or pitches agreeing within
+    ``rel_tol``. Returning the input itself keeps this a true no-op for callers that
+    rebuild on every settings notification, which the interpolator by itself is not.
+
+    Args:
+        probes: Probe ensemble to re-express, typically an initial guess read from a file.
+        target_geometry: Grid implied by the run's detector and illumination geometry.
+        rel_tol: Largest relative pitch difference that still names the same sampling.
+    """
+    try:
+        pixel_geometry = probes.get_pixel_geometry()
+    except ValueError:
+        logger.debug('Probe records no pixel size; taking it to be at the run sampling.')
+        return probes
+
+    width_agrees = math.isclose(
+        pixel_geometry.width_m, target_geometry.pixel_width_m, rel_tol=rel_tol
+    )
+    height_agrees = math.isclose(
+        pixel_geometry.height_m, target_geometry.pixel_height_m, rel_tol=rel_tol
+    )
+
+    if width_agrees and height_agrees:
+        return probes
+
+    if probes.width_px < 2 or probes.height_px < 2:
+        logger.warning(
+            f'Probe is {probes.width_px} x {probes.height_px} px and cannot be resampled to '
+            'the run sampling; leaving it at its own pixel size.'
+        )
+        return probes
+
+    logger.info(
+        'Probe pixel size is %s x %s and the run samples at %s x %s; resampling from '
+        '%d x %d to %d x %d px.',
+        format_length(pixel_geometry.width_m),
+        format_length(pixel_geometry.height_m),
+        format_length(target_geometry.pixel_width_m),
+        format_length(target_geometry.pixel_height_m),
+        probes.width_px,
+        probes.height_px,
+        target_geometry.width_px,
+        target_geometry.height_px,
+    )
+
+    columns = _centered_grid_indexes(
+        pixel_geometry.width_m,
+        probes.width_px,
+        target_geometry.pixel_width_m,
+        target_geometry.width_px,
+    )
+    rows = _centered_grid_indexes(
+        pixel_geometry.height_m,
+        probes.height_px,
+        target_geometry.pixel_height_m,
+        target_geometry.height_px,
+    )
+
+    resampled = probes.get_array()
+
+    for indexes, axis in ((columns, -1), (rows, -2)):
+        real = resample_along_axis(resampled.real, indexes, axis=axis, fill_value=0.0)
+        imaginary = resample_along_axis(resampled.imag, indexes, axis=axis, fill_value=0.0)
+        resampled = real + 1j * imaginary
+
+    source_area_m2 = pixel_geometry.width_m * pixel_geometry.height_m
+    target_area_m2 = target_geometry.pixel_width_m * target_geometry.pixel_height_m
+
+    return ProbeSequence(
+        array=resampled * numpy.sqrt(target_area_m2 / source_area_m2),
+        opr_weights=probes.get_opr_weights_or_none(),
+        pixel_geometry=target_geometry.get_pixel_geometry(),
+    )
+
+
+class OPRWeightPolicy(Enum):
+    """How a loaded probe's OPR weights are reconciled with the current probe positions."""
+
+    KEEP = auto()
+    """Use the weights unchanged, and reject a probe sized for a different scan."""
+
+    AVERAGE = auto()
+    """Give every probe position the mean of the loaded weight rows.
+
+    The coherent-mode basis survives and every position starts from the ensemble average
+    of the scan that solved it, so the reconstruction refines per-position variation from
+    a neutral start rather than from another scan's.
+    """
+
+    REINITIALIZE = auto()
+    """Start the weights over: unit weight on the primary mode, noise on the rest.
+
+    This is the state a fresh OPR run begins from. The loaded coherent modes are kept as
+    a basis while the weights carry nothing from the scan that solved them.
+    """
+
+    COLLAPSE = auto()
+    """Combine the coherent modes under the mean weight row into a single coherent mode.
+
+    The result is the ensemble-average illumination the reconstruction solved for,
+    expressed without an OPR basis.
+    """
+
+    DISCARD = auto()
+    """Keep coherent mode 0 and drop the remaining modes along with the weights."""
+
+
+def _pixel_geometry_or_none(probes: ProbeSequence) -> PixelGeometry | None:
+    """Pixel geometry of ``probes``, or ``None`` when it records none."""
+    try:
+        return probes.get_pixel_geometry()
+    except ValueError:
+        return None
+
+
+def conform_opr_weights(
+    rng: numpy.random.Generator,
+    probes: ProbeSequence,
+    num_positions: int,
+    policy: OPRWeightPolicy,
+    *,
+    small_value: float = 1.0e-6,
+) -> ProbeSequence:
+    """Re-express ``probes`` so its OPR weights describe ``num_positions`` probe positions.
+
+    OPR weights carry one row per probe position, so a probe solved on one scan cannot
+    initialize a reconstruction of another without a decision about what those rows mean
+    there. ``policy`` names that decision; see :class:`OPRWeightPolicy`.
+
+    The transform is unconditional: a probe whose weights already have ``num_positions``
+    rows is still averaged, reinitialized or collapsed when asked. A caller that only
+    wants to resolve a disagreement compares the row count itself and skips the call.
+
+    A probe with no OPR weights and a single coherent mode names no basis to act on and
+    is returned unchanged under every policy. With no weights but several coherent modes,
+    :attr:`OPRWeightPolicy.COLLAPSE` has no mean row to weight by and reduces to
+    :attr:`OPRWeightPolicy.DISCARD`, while :attr:`OPRWeightPolicy.REINITIALIZE` builds the
+    weights the modes lack.
+
+    :attr:`OPRWeightPolicy.COLLAPSE` applies the mean row across every incoherent mode,
+    where :meth:`ProbeSequence.__getitem__` only ever rewrites incoherent mode 0 from the
+    coherent basis.
+
+    Args:
+        rng: Random generator for :attr:`OPRWeightPolicy.REINITIALIZE`; unused otherwise.
+        probes: Probe ensemble to re-express, typically an initial guess read from a file.
+        num_positions: Number of probe positions the result must describe.
+        policy: How the loaded weights carry over.
+        small_value: Scale of the Gaussian noise :attr:`OPRWeightPolicy.REINITIALIZE` puts
+            on the non-primary modes. Larger values let the reconstruction move off the
+            primary mode sooner, at the cost of starting further from the probe the modes
+            were solved for.
+
+    Raises:
+        ValueError: If ``num_positions`` is not positive, or if ``policy`` is
+            :attr:`OPRWeightPolicy.KEEP` and the weights describe a different number of
+            probe positions.
+    """
+    if num_positions < 1:
+        raise ValueError(f'Number of probe positions must be positive; got {num_positions}!')
+
+    array = probes.get_array()
+    weights = probes.get_opr_weights_or_none()
+    num_cmodes = probes.num_coherent_modes
+    pixel_geometry = _pixel_geometry_or_none(probes)
+
+    if weights is None and num_cmodes < 2:
+        # Nothing here names an OPR basis, so there is nothing to reconcile.
+        return probes
+
+    match policy:
+        case OPRWeightPolicy.KEEP:
+            if weights is not None and weights.shape[0] != num_positions:
+                raise ValueError(
+                    'OPR weights describe a different scan!'
+                    f' weight rows={weights.shape[0]}'
+                    f' probe positions={num_positions}'
+                )
+
+            return probes
+        case OPRWeightPolicy.AVERAGE if weights is not None:
+            mean_row = weights.mean(axis=0)
+            return ProbeSequence(
+                array=array,
+                opr_weights=numpy.broadcast_to(mean_row, (num_positions, num_cmodes)).copy(),
+                pixel_geometry=pixel_geometry,
+            )
+        case OPRWeightPolicy.AVERAGE:
+            # Several coherent modes, but no weight rows to average over.
+            return probes
+        case OPRWeightPolicy.REINITIALIZE:
+            reinitialized = small_value * rng.normal(size=(num_positions, num_cmodes))
+            reinitialized[:, 0] = 1.0
+            return ProbeSequence(
+                array=array,
+                opr_weights=reinitialized,
+                pixel_geometry=pixel_geometry,
+            )
+        case OPRWeightPolicy.COLLAPSE if weights is not None:
+            mean_row = weights.mean(axis=0)
+            return ProbeSequence(
+                array=numpy.tensordot(mean_row, array, axes=1).astype(array.dtype),
+                opr_weights=None,
+                pixel_geometry=pixel_geometry,
+            )
+        case _:
+            # DISCARD, and COLLAPSE with no mean row to weight by. Copying rather than
+            # slicing keeps the discarded modes from staying resident behind a view of
+            # the original buffer.
+            return ProbeSequence(
+                array=array[:1].copy(),
+                opr_weights=None,
+                pixel_geometry=pixel_geometry,
+            )
 
 
 class ProbeFileReader(ABC):

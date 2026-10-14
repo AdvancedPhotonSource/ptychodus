@@ -6,6 +6,7 @@ import threading
 
 from ptychodus.api.diffraction import Polarization
 from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.probe import OPRWeightPolicy
 from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter
 
 from ..diffraction import AssembledDiffractionDataset
@@ -237,10 +238,41 @@ class ProbeAPI:
     def get_open_file_filter(self) -> str:
         return self._builder_factory.get_open_file_filter()
 
-    def open_probe(self, index: int, file_path: Path, *, file_type: str | None = None) -> None:
+    def peek_opr_weights(
+        self, file_path: Path, *, file_type: str | None = None
+    ) -> tuple[int, int] | None:
+        """Shape of the OPR weights in a probe file, or ``None`` when it carries none.
+
+        Returns ``(number of weight rows, number of coherent modes)``. The row count is
+        the number of probe positions the file was solved on, which is what a caller
+        compares against this run before choosing how to ingest it.
+
+        The file is read to answer this, and a read error propagates rather than being
+        reported as an absence.
+        """
+        probes = self._builder_factory.read_probe_from_file(
+            file_path,
+            self._settings.file_type.get_value() if file_type is None else file_type,
+        )
+        weights = probes.get_opr_weights_or_none()
+
+        if weights is None:
+            return None
+
+        return int(weights.shape[0]), int(weights.shape[1])
+
+    def open_probe(
+        self,
+        index: int,
+        file_path: Path,
+        *,
+        file_type: str | None = None,
+        opr_weight_policy: OPRWeightPolicy | None = None,
+    ) -> None:
         builder = self._builder_factory.create_probe_from_file(
             file_path,
             self._settings.file_type.get_value() if file_type is None else file_type,
+            opr_weight_policy=opr_weight_policy,
         )
 
         try:
@@ -522,13 +554,15 @@ class ProductAPI:
         *,
         comments: str = '',
         detector_distance_m: float | None = None,
-        probe_energy_eV: float | None = None,  # noqa: N803
+        focus_object_distance_m: float | None = None,
+        photon_energy_eV: float | None = None,  # noqa: N803
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
-        mass_attenuation_m2_kg: float | None = None,
+        mass_attenuation_m2_per_kg: float | None = None,
         tomography_angle_deg: float | None = None,
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
+        far_field: bool | None = None,
         dataset: AssembledDiffractionDataset | None = None,
         block: bool = True,
     ) -> int:
@@ -537,13 +571,15 @@ class ProductAPI:
                 name=name,
                 comments=comments,
                 detector_distance_m=detector_distance_m,
-                probe_energy_eV=probe_energy_eV,
+                focus_object_distance_m=focus_object_distance_m,
+                photon_energy_eV=photon_energy_eV,
                 probe_photon_count=probe_photon_count,
                 exposure_time_s=exposure_time_s,
-                mass_attenuation_m2_kg=mass_attenuation_m2_kg,
+                mass_attenuation_m2_per_kg=mass_attenuation_m2_per_kg,
                 tomography_angle_deg=tomography_angle_deg,
                 tilt_angle_deg=tilt_angle_deg,
                 polarization=polarization,
+                far_field=far_field,
                 dataset=dataset,
             )
 
@@ -553,13 +589,26 @@ class ProductAPI:
         self,
         product: Product,
         *,
+        name: str | None = None,
         dataset: AssembledDiffractionDataset | None = None,
         block: bool = True,
     ) -> int:
-        def build() -> ProductRepositoryItem:
-            return self._item_factory.create_from_product(product, dataset=dataset)
+        """Insert a copy of product, optionally overriding the name it carries.
 
-        return self._insert_via_queue(dataset, build, block=block, stub_name=product.metadata.name)
+        Passing name here rather than renaming the inserted item keeps the repository from
+        ever reserving the product's own name as a transient collision, which would push
+        the intended name onto a counter suffix.
+        """
+
+        def build() -> ProductRepositoryItem:
+            return self._item_factory.create_from_product(product, name=name, dataset=dataset)
+
+        return self._insert_via_queue(
+            dataset,
+            build,
+            block=block,
+            stub_name=product.metadata.name if name is None else name,
+        )
 
     def insert_product_from_settings(
         self,

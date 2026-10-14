@@ -6,11 +6,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from sys import getsizeof
 
-from .constants import ELECTRON_VOLT_J, energy_eV_to_wavelength_m
+from .constants import energy_eV_to_J, energy_eV_to_wavelength_m
 from .diffraction import Polarization
 from .object import Object
 from .probe import Probe, ProbeSequence
 from .probe_positions import ProbePosition, ProbePositionSequence
+from .propagate import compute_magnification
 
 
 @dataclass(frozen=True)
@@ -20,34 +21,49 @@ class ProductMetadata:
     name: str
     comments: str
     detector_distance_m: float
-    probe_energy_eV: float  # noqa: N815
+    photon_energy_eV: float  # noqa: N815
     probe_photon_count: float
     exposure_time_s: float
-    mass_attenuation_m2_kg: float
+    mass_attenuation_m2_per_kg: float
     tomography_angle_deg: float
+    focus_object_distance_m: float = 0.0
     tilt_angle_deg: float = 0.0
     polarization: Polarization | None = None
+    far_field: bool = True
+    """Whether the detector records the Fraunhofer diffraction pattern.
+
+    Independent of :attr:`magnification`: a focusing optic says where the beam waist
+    sits, not which propagation regime the detector samples. Far field with an optic
+    and near field without one are both expressible, and both occur.
+    """
 
     @property
-    def probe_energy_J(self) -> float:  # noqa: N802
-        return self.probe_energy_eV * ELECTRON_VOLT_J
+    def magnification(self) -> float:
+        """See :func:`ptychodus.api.propagate.compute_magnification`."""
+        return compute_magnification(self.detector_distance_m, self.focus_object_distance_m)
 
     @property
-    def probe_wavelength_m(self) -> float:
-        return energy_eV_to_wavelength_m(self.probe_energy_eV)
+    def photon_energy_J(self) -> float:  # noqa: N802
+        return energy_eV_to_J(self.photon_energy_eV)
+
+    @property
+    def photon_wavelength_m(self) -> float:
+        return energy_eV_to_wavelength_m(self.photon_energy_eV)
 
     @property
     def nbytes(self) -> int:
         sz = getsizeof(self.name)
         sz += getsizeof(self.comments)
         sz += getsizeof(self.detector_distance_m)
-        sz += getsizeof(self.probe_energy_eV)
+        sz += getsizeof(self.photon_energy_eV)
         sz += getsizeof(self.probe_photon_count)
         sz += getsizeof(self.exposure_time_s)
-        sz += getsizeof(self.mass_attenuation_m2_kg)
+        sz += getsizeof(self.mass_attenuation_m2_per_kg)
         sz += getsizeof(self.tomography_angle_deg)
+        sz += getsizeof(self.focus_object_distance_m)
         sz += getsizeof(self.tilt_angle_deg)
         sz += getsizeof(self.polarization)
+        sz += getsizeof(self.far_field)
         return sz
 
 

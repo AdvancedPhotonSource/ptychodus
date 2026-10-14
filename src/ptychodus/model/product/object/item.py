@@ -1,7 +1,10 @@
 from __future__ import annotations
 import logging
+import math
 
 
+from ptychodus.api.constants import format_length
+from ptychodus.api.geometry import GeometryNotDefinedError
 from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.observer import Observable
 from ptychodus.api.parameters import ParameterGroup
@@ -84,15 +87,18 @@ class ObjectRepositoryItem(ParameterGroup):
         self.rebuild()
 
     def rebuild(self, *, recenter: bool = False) -> None:
-        if not self._geometry_provider.get_object_geometry().get_pixel_geometry().is_valid:
-            # Geometry not yet bound; the observer wired in __init__ will re-run
-            # rebuild when the geometry becomes valid.
-            return
         try:
             object_ = self._builder.build(self._geometry_provider, self.layer_spacing_m.get_value())
+        except GeometryNotDefinedError:
+            # Not yet bound; the observer wired in __init__ re-runs this once the
+            # geometry is determined. Must precede the catch-all below, or a routine
+            # startup state would be logged as a failure.
+            return
         except Exception:
             logger.exception('Failed to rebuild object!')
             return
+
+        _warn_if_pixel_size_disagrees(object_, self._geometry_provider, self._builder.get_name())
 
         if recenter:
             object_geometry = self._geometry_provider.get_object_geometry()
@@ -115,3 +121,45 @@ class ObjectRepositoryItem(ParameterGroup):
             self.rebuild()
         else:
             super()._update(observable)
+
+
+def _warn_if_pixel_size_disagrees(
+    object_: Object,
+    geometry_provider: ObjectGeometryProvider,
+    builder_name: str,
+    *,
+    rel_tol: float = 1.0e-9,
+) -> None:
+    """Warn when a built object is sampled differently from the geometry it will run against.
+
+    A from-file object is reconciled by its builder, but an object that arrives already
+    conditioned keeps whatever sampling it was saved with: rebinding a product to another
+    dataset, or editing the photon energy or detector distance, moves the run's pixel size
+    out from under it. Resampling here is the wrong remedy -- the same path carries
+    reconstruction output, reassigned on every iteration, and a product read back from
+    file is a finished record rather than an initial guess -- so the disagreement is
+    reported and the array left alone. Output products agree within ``rel_tol``, so this
+    stays silent for them.
+    """
+    try:
+        pixel_geometry = object_.get_pixel_geometry()
+        # GeometryNotDefinedError is a ValueError, so an unbound provider lands here
+        # alongside an object that never recorded its own pixel size.
+        expected = geometry_provider.get_object_geometry().get_pixel_geometry()
+    except ValueError:
+        return
+
+    if math.isclose(pixel_geometry.width_m, expected.width_m, rel_tol=rel_tol) and math.isclose(
+        pixel_geometry.height_m, expected.height_m, rel_tol=rel_tol
+    ):
+        return
+
+    logger.warning(
+        'Object from builder "%s" is sampled at %s x %s but this product samples at '
+        '%s x %s; it will reconstruct at the wrong scale.',
+        builder_name,
+        format_length(pixel_geometry.width_m),
+        format_length(pixel_geometry.height_m),
+        format_length(expected.width_m),
+        format_length(expected.height_m),
+    )

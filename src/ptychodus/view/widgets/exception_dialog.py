@@ -17,7 +17,12 @@ class ExceptionDialog(QMessageBox):
         dialog.setIcon(QMessageBox.Icon.Critical)
         dialog.setText(f'{actor} raised a {exception.__class__.__name__}!')
         dialog.setInformativeText(str(exception))
-        dialog.setDetailedText(traceback.format_exc())
+        # Format the exception's own traceback rather than the one being handled:
+        # errors captured on a background thread are replayed from an observer
+        # callback, where format_exc() would yield the string 'NoneType: None'.
+        dialog.setDetailedText(
+            ''.join(traceback.format_exception(type(exception), exception, exception.__traceback__))
+        )
         _ = dialog.exec()
 
     def event(self, e: QEvent) -> bool:

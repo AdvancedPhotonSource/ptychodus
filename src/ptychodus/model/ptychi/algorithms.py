@@ -22,7 +22,7 @@ import math
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar, Generic, TypeVar
+from typing import Any, ClassVar, Final, Generic, TypeVar
 
 from ptychi.api import (
     AffineDegreesOfFreedom,
@@ -133,6 +133,7 @@ __all__ = [
     'PtyChiAlgorithm',
     'PtyChiCommon',
     'build_algorithms',
+    'task_options_classes',
     'wrap_as_subprocess_reconstructor',
 ]
 
@@ -209,19 +210,13 @@ class PtyChiCommon:
     def data_options(self) -> PtychographyDataOptions:
         """Return the settings-derived data options.
 
-        `free_space_propagation_distance_m` carries only the propagation *mode*:
-        infinite for far field, NaN as a placeholder for near field, whose
-        distance comes from the product. The NaN never escapes -- it lives
-        between this call and the
-        :func:`~ptychodus.model.ptychi.task.align_task_options_with_product`
-        call at the end of ``build_task_options`` -- which matters because
-        ``json.dumps`` emits it as the bare token ``NaN``, invalid strict JSON.
+        `free_space_propagation_distance_m` is left at its pty-chi default: the
+        propagation regime is a property of the experiment, so it is described by
+        the product rather than by a reconstructor setting, and
+        :func:`~ptychodus.model.ptychi.task.align_task_options_with_product` writes
+        it.
         """
-        free_space_propagation_distance_m = (
-            math.inf if self._reconstructor.use_far_field_propagation.get_value() else math.nan
-        )
         return PtychographyDataOptions(
-            free_space_propagation_distance_m=free_space_propagation_distance_m,
             fft_shift=self._reconstructor.fft_shift_diffraction_patterns.get_value(),
             save_data_on_device=self._reconstructor.save_data_on_device.get_value(),
         )
@@ -523,7 +518,7 @@ class PtyChiCommon:
                 cross_correlation_scale=s.cross_correlation_scale.get_value(),
                 cross_correlation_real_space_width=s.cross_correlation_real_space_width.get_value(),
                 cross_correlation_probe_threshold=s.cross_correlation_probe_threshold.get_value(),
-                slice_for_correction=slice_for_correction,  # type: ignore
+                slice_for_correction=slice_for_correction,
                 clip_update_magnitude_by_mad=s.clip_update_magnitude_by_mad.get_value(),
                 update_magnitude_limit=update_magnitude_limit,
             ),
@@ -877,6 +872,34 @@ def wrap_as_subprocess_reconstructor(
     )
 
 
+# Every algorithm, in DISPLAY_NAMES order. Instantiating one needs its settings
+# group, so a caller wanting only the class -- to name an algorithm, or to reach
+# its ``spec`` -- reads this instead of calling build_algorithms.
+_ALGORITHM_CLASSES: Final[tuple[type[PtyChiAlgorithm[Any]], ...]] = (
+    DMAlgorithm,
+    RAARAlgorithm,
+    PIEAlgorithm,
+    EPIEAlgorithm,
+    RPIEAlgorithm,
+    LSQMLAlgorithm,
+    AutodiffAlgorithm,
+    BHAlgorithm,
+)
+
+
+def task_options_classes() -> dict[str, type[PtychographyTaskOptions]]:
+    """Each algorithm's pty-chi task-options class, keyed by display name.
+
+    The options class is what distinguishes one algorithm from another on the
+    wire: it stamps ``options_class_name`` into the serialized payload, which is
+    what :func:`~ptychodus.model.ptychi.task.load_task_options` reads back to
+    choose the subclass. A caller naming an algorithm therefore needs the class,
+    not an instance, and an instance would need settings this has no business
+    constructing.
+    """
+    return {cls.spec.display_name: cls.spec.task_options_cls for cls in _ALGORITHM_CLASSES}
+
+
 def build_algorithms(
     common: PtyChiCommon,
     *,
@@ -905,6 +928,9 @@ def build_algorithms(
         BHAlgorithm(common, bh_settings),
     ]
     # Locks the display names in the _Spec entries above to the ptychi-free
-    # DISPLAY_NAMES tuple that core.py's fallback branch also consumes.
+    # DISPLAY_NAMES tuple that core.py's fallback branch also consumes, and the
+    # list above to _ALGORITHM_CLASSES, so neither can gain an algorithm the
+    # other does not.
     assert tuple(a.spec.display_name for a in algorithms) == DISPLAY_NAMES
+    assert tuple(type(a) for a in algorithms) == _ALGORITHM_CLASSES
     return {a.spec.display_name.casefold(): a for a in algorithms}

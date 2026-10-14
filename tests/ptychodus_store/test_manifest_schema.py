@@ -136,10 +136,10 @@ def test_load_manifest_happy_path(tmp_path: Path) -> None:
             'uuid': str(uuid),
             'created_at': _now(),
             'label': 'foo',
-            'probe_energy_eV': 8000.0,
+            'photon_energy_eV': 8000.0,
         },
     )
     m = load_manifest(path, expected_kind='diffraction', expected_uuid=uuid)
     assert isinstance(m, DiffractionManifest)
     assert m.label == 'foo'
-    assert m.probe_energy_eV == 8000.0
+    assert m.photon_energy_eV == 8000.0

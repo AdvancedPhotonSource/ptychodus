@@ -641,3 +641,16 @@ class ImageView(QWidget):
         self.setLayout(layout)
 
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
+
+
+def box_image_view(title: str, view: ImageView) -> QWidget:
+    """Wrap an image view in a group box with a centered title."""
+    layout = QVBoxLayout()
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.addWidget(view)
+
+    box = QGroupBox(title)
+    box.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+    box.setLayout(layout)
+
+    return box

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from ptychodus_store.db.models import Diffraction
+from ptychodus_store.db.session import SessionProvider
+from ptychodus_store.storage.layout import StoreLayout
+
 import asyncio
 import json
 import shutil
@@ -49,8 +53,8 @@ def _write_diffraction_folder(root: Path, uuid_str: str) -> Path:
     return folder
 
 
-async def test_watcher_picks_up_new_manifest(  # type: ignore[no-untyped-def]
-    tmp_storage_root, layout, session_provider
+async def test_watcher_picks_up_new_manifest(
+    tmp_storage_root: Path, layout: StoreLayout, session_provider: SessionProvider
 ):
     loop = asyncio.get_running_loop()
     watcher = ManifestWatcher(
@@ -67,7 +71,7 @@ async def test_watcher_picks_up_new_manifest(  # type: ignore[no-untyped-def]
 
         async def check():
             async with session_provider.session_factory() as session:
-                return await repo.get_row(session, 'diffraction', uuid)
+                return await repo.get_row(session, Diffraction, uuid)
 
         row = await _wait_until(check, timeout=8.0)
         assert row is not None, 'watcher did not ingest the new manifest in time'
@@ -75,8 +79,8 @@ async def test_watcher_picks_up_new_manifest(  # type: ignore[no-untyped-def]
         watcher.stop()
 
 
-async def test_watcher_handles_manifest_delete(  # type: ignore[no-untyped-def]
-    tmp_storage_root, layout, session_provider
+async def test_watcher_handles_manifest_delete(
+    tmp_storage_root: Path, layout: StoreLayout, session_provider: SessionProvider
 ):
     loop = asyncio.get_running_loop()
     watcher = ManifestWatcher(
@@ -93,7 +97,7 @@ async def test_watcher_handles_manifest_delete(  # type: ignore[no-untyped-def]
 
         async def appeared():
             async with session_provider.session_factory() as session:
-                return await repo.get_row(session, 'diffraction', uuid)
+                return await repo.get_row(session, Diffraction, uuid)
 
         row = await _wait_until(appeared, timeout=8.0)
         assert row is not None
@@ -102,7 +106,7 @@ async def test_watcher_handles_manifest_delete(  # type: ignore[no-untyped-def]
 
         async def gone():
             async with session_provider.session_factory() as session:
-                return (await repo.get_row(session, 'diffraction', uuid)) is None
+                return (await repo.get_row(session, Diffraction, uuid)) is None
 
         assert await _wait_until(gone, timeout=8.0)
     finally:

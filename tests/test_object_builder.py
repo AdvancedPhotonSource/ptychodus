@@ -25,6 +25,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import numpy
+import numpy.testing
 import pytest
 
 from ptychodus.api.geometry import PixelGeometry
@@ -60,6 +61,17 @@ def _make_rng() -> numpy.random.Generator:
 
 
 class _StubObjectGeometryProvider(ObjectGeometryProvider):
+    def __init__(self, photon_wavelength_m: float = 1.0e-10) -> None:
+        self._photon_wavelength_m = photon_wavelength_m
+
+    @property
+    def photon_wavelength_m(self) -> float:
+        return self._photon_wavelength_m
+
+    @property
+    def object_plane_propagation_distance_m(self) -> float:
+        return 1.0
+
     def get_probe_positions(self) -> Sequence[ProbePosition]:
         return ()
 
@@ -138,9 +150,9 @@ def test_from_file_builder_generates_layers() -> None:
 
 
 def test_from_file_builder_keeps_existing_layers(caplog: pytest.LogCaptureFixture) -> None:
-    """The destructive case: generate_layers truncates when asked for fewer layers
-    than it is given, so the default empty spacing would collapse a converged
-    four-layer warm start to one layer."""
+    """An empty spacing is the unset default, not a request for one layer, so it must not
+    collapse a converged four-layer warm start. Reslicing itself is non-destructive now;
+    this guards the ambiguity in the setting, not the arithmetic."""
     settings = _make_settings()
     from_file = _make_object(4)
     builder = _make_from_file_builder(settings, from_file)
@@ -149,7 +161,23 @@ def test_from_file_builder_keeps_existing_layers(caplog: pytest.LogCaptureFixtur
         object_ = builder.build(_StubObjectGeometryProvider(), [])
 
     assert object_.num_layers == 4
-    assert 'keeping them rather than re-slicing to 1' in caplog.text
+    assert 'keeping them rather than collapsing to one' in caplog.text
+
+
+def test_from_file_builder_reslices_a_multislice_object_without_losing_it() -> None:
+    """Reslicing used to be refused because generate_layers kept only layer zero when
+    growing and truncated when shrinking. It now resamples, so an explicit spacing is
+    honored and the projected object survives it."""
+    settings = _make_settings()
+    from_file = _make_object(4)
+    builder = _make_from_file_builder(settings, from_file)
+
+    object_ = builder.build(_StubObjectGeometryProvider(), [LAYER_SPACING_M] * 6)
+
+    assert object_.num_layers == 7
+    numpy.testing.assert_allclose(
+        object_.get_layers_flattened(), from_file.get_layers_flattened(), atol=1.0e-12
+    )
 
 
 def test_from_file_builder_does_not_pad() -> None:
@@ -255,3 +283,90 @@ def test_copy_preserves_padding_parameters(builder_name: str) -> None:
 
     assert duplicate.extra_padding_x.get_value() == 2
     assert duplicate.extra_padding_y.get_value() == 3
+
+
+def test_from_file_builder_resamples_an_object_sampled_at_another_pixel_size() -> None:
+    """A warm start saved by a run at a different pixel size is a misscaled initial
+    guess; reconstructing from it produces a silently wrong result."""
+    settings = _make_settings()
+    coarse = Object(
+        array=_make_object(1).get_array(),
+        pixel_geometry=PixelGeometry(width_m=2.0 * PIXEL_SIZE_M, height_m=2.0 * PIXEL_SIZE_M),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
+    )
+    builder = _make_from_file_builder(settings, coarse)
+
+    object_ = builder.build(_StubObjectGeometryProvider(), [])
+
+    # Half the pitch, twice the pixels, the same physical extent.
+    assert object_.get_pixel_geometry().width_m == pytest.approx(PIXEL_SIZE_M)
+    assert object_.width_px == 2 * EXTENT_PX
+    assert object_.height_px == 2 * EXTENT_PX
+    geometry = object_.get_geometry()
+    assert geometry.width_m == pytest.approx(2.0 * PIXEL_SIZE_M * EXTENT_PX)
+
+
+def test_from_file_builder_leaves_an_object_without_a_pixel_size_alone() -> None:
+    """Every registered object format records no pixel size, so the common path must
+    keep returning the array verbatim."""
+    settings = _make_settings()
+    source = _make_object(1)
+    bare = Object(array=source.get_array(), pixel_geometry=None, center=None)
+    builder = _make_from_file_builder(settings, bare)
+
+    object_ = builder.build(_StubObjectGeometryProvider(), [])
+
+    numpy.testing.assert_array_equal(object_.get_array(), source.get_array())
+    assert object_.get_pixel_geometry().width_m == pytest.approx(PIXEL_SIZE_M)
+
+
+class TestPaganinReadsTheExperiment:
+    """The wavelength and propagation distance come from the product, not from settings.
+
+    They were builder parameters defaulting to 1.0e-10 m and 1.0 m, with nothing
+    syncing them, so a product at any energy other than 12.4 keV was filtered at the
+    wrong cutoff. The three inputs enter the filter only as a product, so the error was
+    absorbable into a hand-tuned delta/beta and never surfaced.
+    """
+
+    def _build(self, photon_wavelength_m: float) -> numpy.ndarray:
+        from unittest.mock import MagicMock
+
+        from ptychodus.api.assemble import AssembledDiffractionData
+        from ptychodus.model.product.object.paganin import PaganinObjectBuilder
+
+        num_positions = 25
+        patterns = numpy.full((num_positions, 4, 4), 100.0, dtype=numpy.float64)
+        patterns[:, 2, 2] += numpy.arange(num_positions, dtype=numpy.float64)
+        assembled = AssembledDiffractionData(
+            numpy.arange(num_positions, dtype=numpy.intp),
+            patterns,
+            PixelGeometry(width_m=1e-6, height_m=1e-6),
+            numpy.zeros((4, 4), dtype=numpy.bool_),
+        )
+        dataset = MagicMock()
+        dataset.get_assembled_data.return_value = assembled
+
+        builder = PaganinObjectBuilder(_make_settings(), dataset)
+        provider = _StubObjectGeometryProvider(photon_wavelength_m=photon_wavelength_m)
+        # A real 5x5 grid: the STXM step triangulates the positions, so coincident
+        # points degenerate the hull.
+        span_m = EXTENT_PX * PIXEL_SIZE_M / 3.0
+        positions = [
+            ProbePosition(
+                index=row * 5 + col,
+                x_m=(col - 2) * span_m / 4.0,
+                y_m=(row - 2) * span_m / 4.0,
+            )
+            for row in range(5)
+            for col in range(5)
+        ]
+        provider.get_probe_positions = lambda: positions  # type: ignore[method-assign]
+        return builder.build(provider, [0.0]).get_array()
+
+    def test_photon_energy_reaches_the_filter(self) -> None:
+        """Impossible to satisfy before: the builder ignored the product entirely."""
+        at_6_keV = self._build(2.0664e-10)  # noqa: N806
+        at_20_keV = self._build(6.1992e-11)  # noqa: N806
+
+        assert not numpy.allclose(at_6_keV, at_20_keV)

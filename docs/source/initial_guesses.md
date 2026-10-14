@@ -11,7 +11,7 @@ with ModelCore(Path('settings.ini')) as model:
     product_api = model.workflow_api.create_product(
         'initial_guess',
         detector_distance_m=1.0,
-        probe_energy_eV=10_000.0,
+        photon_energy_eV=10_000.0,
         probe_photon_count=1.0e6,
     )
 
@@ -77,6 +77,18 @@ Object
 Probe positions
 : Each {py:class}`ptychodus.api.probe_positions.ProbePosition` stores an integer scan index and physical `x`/`y` coordinates in meters. Internally, `ProbePositionSequence` keeps the coordinate array in `(y, x)` order, but the public object properties are named `coordinate_x_m` and `coordinate_y_m`.
 
+## Pixel Size Of A File-Supplied Guess
+
+An object or probe is sampled at the pixel size its own run implied, which the photon energy and the detector distance fix. Reusing one as an initial guess for a run that samples differently means starting from a guess of the wrong physical scale, and nothing downstream reveals it: the reconstruction simply converges to the wrong answer.
+
+Ptychodus therefore reconciles a file-supplied guess to the run's sampling. {py:func}`ptychodus.api.object.resample_object_to_pixel_size` re-expresses an object at the run's pixel size, preserving its physical extent and center and letting the pixel count absorb the difference; {py:func}`ptychodus.api.probe.resample_probe_sequence` re-expresses every probe mode on the run's probe grid, scaling amplitudes so the photon count survives. Both interpolate with a monotone cubic, so no resampled amplitude or phase overshoots the source, and both return the input untouched when the two samplings already agree.
+
+```{note}
+This reconciliation only ever fires for a file format that records its pixel size. None of the registered object or probe formats do — NPY and CSV store a bare array — so a guess loaded from one of those is taken to be sampled the way the current run is, exactly as before.
+```
+
+A product opened from HDF5 or NPZ does carry its pixel size, and that path behaves differently on purpose. Such a product is a finished record rather than an initial guess, and the same path also carries live reconstruction output, so a disagreement is reported as a warning naming both samplings and the array is left alone. The disagreement arises when a product is rebound to another dataset, or when its photon energy or detector distance is edited after loading.
+
 ## Probe Position Generators
 
 Use `WorkflowProductAPI.generate_probe_positions(name, parameters)`.
@@ -137,13 +149,20 @@ Use `WorkflowProductAPI.generate_probe(name, parameters)`. All generated probe b
 : Generates a super-Gaussian amplitude profile. Parameters are `annular_radius_m`, `full_width_at_half_maximum_m` (or the builder parameter name `fwhm_m` in the low-level function), and `order_parameter`. `annular_radius_m = 0` gives a Gaussian-like spot; a positive `annular_radius_m` gives a ring or donut-like profile. This is not a propagated zone-plate simulation; it is an analytic amplitude profile.
 
 `fresnel_zone_plate`
-: Simulates a Fresnel zone plate optic and propagates it to the sample plane with the Fresnel-transform propagator. Parameters are `zone_plate_diameter_m`, `outermost_zone_width_m`, `central_beamstop_diameter_m`, and `defocus_distance_m`. The central beamstop creates the donut-like zone-plate aperture. The focal length is computed as `zone_plate_diameter_m * outermost_zone_width_m / probe_wavelength_m` and the propagation distance is `focal_length_m + defocus_distance_m`.
+: Simulates a Fresnel zone plate optic and propagates it to the sample plane with the Fresnel-transform propagator. Parameters are `zone_plate_diameter_m`, `outermost_zone_width_m`, `central_beamstop_diameter_m`, and `defocus_distance_m`. The central beamstop creates the donut-like zone-plate aperture. The focal length is computed as `zone_plate_diameter_m * outermost_zone_width_m / photon_wavelength_m` and the propagation distance is `focal_length_m + defocus_distance_m`.
+
+`kb_mirror`
+: Simulates a Kirkpatrick-Baez mirror pair and propagates it to the sample plane. Each mirror takes an `acceptance_length_m`, a `grazing_angle_rad` and a `focus_distance_m`, from which the projected aperture `L sin(theta)` and the numerical aperture follow; `astigmatism_m` separates the two axis foci along the beam and `defocus_distance_m` moves the sample off the focal plane. Grazing angles are stored in radians rather than the turns the GUI uses elsewhere, because that is the number an optics log records. The pupil window is `photon_wavelength_m * z / probe_pixel_size_m`, so a high-aperture optic needs a fine probe pixel size; an aperture that does not fit is refused rather than silently clipped, since clipping would quietly change the optic.
 
 `average_pattern`
 : Estimates a probe from diffraction data by taking the square root of the mean assembled diffraction pattern and back-propagating it by `detector_distance_m` with the Fresnel-transform propagator. This requires assembled diffraction data to already be available in the model.
 
 `zernike`
 : Generates a probe as a superposition of Zernike polynomial modes inside a disk with parameter `diameter_m`. Through the builder object, callers can set the Zernike order and individual coefficients before rebuilding. The workflow parameter mapping covers the common builder parameters, but coefficient-level editing is done on the `ZernikeProbeBuilder` object.
+
+### Mirror Presets
+
+Kirkpatrick-Baez mirror pairs register the same way zone plates do, through `registry.kb_mirrors`. None ship yet: a preset states an instrument's measured optics, and those numbers reach a reconstruction, so the presets menu stays empty until real measurements are available and the builder works from its own settings in the meantime.
 
 ### Zone Plate Presets
 
@@ -182,7 +201,23 @@ The incoherent-mode controls are:
 `incoherent_mode_decay_ratio`
 : Relative strength of later modes. The builder converts this to a list of unnormalized mode weights.
 
-The low-level `generate_incoherent_probe_modes` routine preserves any existing modes in the input probe. If more modes are requested than already exist, it creates each additional mode by duplicating the 0-th incoherent mode and applying random separable phase wraps along the horizontal and vertical axes. In other words, the added modes start with the same amplitude structure as the dominant mode, but receive different random linear phase ramps in `x` and `y`. After optional orthogonalization, the modes are rescaled so their intensities follow the requested relative weights and their summed intensity matches the original base-probe intensity.
+The low-level `generate_incoherent_probe_modes` routine takes a mode count and, optionally, an `IncoherentModeStrategy`. A strategy answers only two questions: what shape the new modes take, and how power would divide across a sequence of a given length. Everything else is the same for every strategy and belongs to the routine itself.
+
+What the routine guarantees, whatever strategy is in play:
+
+- Modes the probe already carries are **kept in order, by identity** — not merely their span — and the strategy supplies only the shortfall.
+- Asking for fewer modes than the probe has keeps the strongest.
+- Preserved modes keep the share of the power they arrived with; the new modes divide the share the strategy's profile assigns to their indices. A 90/10 two-mode probe expanded to four at a decay ratio of 0.5 comes out `[0.727, 0.073, 0.133, 0.067]`, so the 9:1 ratio survives.
+- **Total power is unchanged**, expanding or truncating, and a mode dropped as linearly dependent passes its share to the modes that survive rather than leaving the probe dimmer. The number of modes used to represent a beam is a modeling choice; the illumination is not, and a probe read from file is never rescaled afterward.
+- Orthogonalization is modified Gram-Schmidt in mode order, which is what keeps mode `n` paired with mode `n`. `mode_dependence_floor` sets how much of its own length a mode's orthogonal part must retain to be kept.
+
+Which strategy runs is the `IncoherentModeStrategy` setting, one of `MomentPolynomial`, `RandomPhaseRamp` or `GaussianSchell`; an unrecognized value falls back to the first. In the GUI it is a combo box, and the parameters below it change with the selection so that only the ones the chosen strategy reads are shown — the decay profile for the first two, the source size and coherence length for Gaussian-Schell, which predicts its own spectrum and never consults a decay profile.
+
+`ProbeMomentPolynomialStrategy` is the default, and needs no physical parameters at all. It measures the intensity-weighted centroid and variance of the probe it is given — from the incoherent sum of its modes, which is the footprint the illumination actually covers — and uses that width as its own length scale, so one call suits any illumination without being told how the probe was formed. A new mode is the dominant mode times `u**m * v**n`, with `u` and `v` the transverse coordinates centered on the probe and measured in units of its rms width, damped by a Gaussian of that same width so the polynomial does not push the higher orders into the tails. Orders are graded by total degree and skip the constant term. Weights come from `ProbeModeDecayType` and depend on a mode's index rather than its order.
+
+`RandomPhaseRampStrategy` creates each new mode by duplicating the dominant mode and applying random separable phase wraps along the horizontal and vertical axes, so the added modes share the dominant mode's amplitude structure and differ only by a random linear phase ramp in `x` and `y`. It is the only strategy that consumes randomness, and so the only one that takes an `rng`.
+
+`GaussianSchellStrategy` builds the Hermite-Gauss eigenmodes of a Gaussian-Schell source and *predicts* the weights rather than taking them from a decay profile: given a beam size and coherence length per axis, the two-dimensional spectrum is the outer product of two geometric series and the strongest modes are kept. That spectrum describes its own eigenmodes, so on a probe that already carries modes the weights at the preserved indices are approximate.
 
 The weight rules are:
 
@@ -215,6 +250,32 @@ For `num_coherent_modes > 1`:
 - Additional OPR modes are initialized as random complex arrays only in incoherent mode 0. Other incoherent modes in those OPR modes are left zero.
 - The random OPR mode images are normalized by their mean intensity when `normalize_cmodes` is true.
 
+### Reusing an OPR Probe on Another Scan
+
+OPR weights carry one row per probe position, so a probe solved on one scan cannot initialize a reconstruction of another until those rows are resolved. {py:func}`ptychodus.api.probe.conform_opr_weights` does that under a policy named by {py:class}`ptychodus.api.probe.OPRWeightPolicy`:
+
+| Policy | Effect |
+| --- | --- |
+| `KEEP` | Use the weights unchanged. Raises when they describe a different number of probe positions. |
+| `AVERAGE` | Give every probe position the mean of the loaded weight rows, keeping the coherent modes. |
+| `REINITIALIZE` | Keep the coherent modes and start the weights where a fresh OPR run would: `1.0` on the primary mode, small noise on the rest. |
+| `COLLAPSE` | Combine the coherent modes under the mean weight row into a single mode, then drop the OPR basis. |
+| `DISCARD` | Keep coherent mode 0, dropping the remaining modes along with the weights. |
+
+The setting is `OPRWeightPolicy` in the `Probe` group, defaulting to `Average`. It is consulted **only when the row count disagrees** with the run's probe positions, so a warm start whose weights already fit is never altered. The reconciliation happens before the expand-only mode pipeline, which means `DISCARD` together with a larger `num_coherent_modes` discards the stale basis and builds a fresh one sized to the current scan.
+
+Opening a probe file that carries OPR weights in the GUI prompts for the policy, stating both counts, and that choice applies to that one load whether or not the counts agree. `Use as is` is offered only when they do.
+
+```{note}
+`COLLAPSE` applies the mean weight row across every incoherent mode. Indexing a position out of a {py:class}`ptychodus.api.probe.ProbeSequence` instead rewrites only incoherent mode 0 from the coherent basis.
+```
+
+### Inspecting an OPR Probe
+
+{py:func}`ptychodus.api.probe.compute_opr_mode_series` reduces a probe ensemble to per-position diagnostics: the weights, the power in the composed mode, the power in its difference from the across-scan mean, and per-mode statistics. {py:attr}`ptychodus.api.probe.OPRModeSeries.relative_variation` reports the share of the composed mode's power that varies across the scan — near zero means the OPR basis is not modeling anything — and {py:attr}`ptychodus.api.probe.OPRModeSeries.effective_mode_count` reports how many coherent modes account for most of that variation, which is the number to compare against `num_coherent_modes`.
+
+In the GUI this is **Analyze → Coherent (OPR) Modes...** on the probe panel. The dialog plays through the probe positions while plotting the counts and the per-mode weights against scan index, and maps either quantity over the scan grid. Because a few-percent variation is invisible against the composed probe on a fixed color scale, the display selector also offers the deviation from the across-scan mean — where a beam translation reads as a dipole and an intensity drift as a concentric change — and the coherent basis modes themselves. When the diffraction dataset is loaded, the measured per-frame photon counts are overlaid on the predicted curve, which is what distinguishes OPR tracking real flux drift from OPR absorbing noise.
+
 ### Examples
 
 #### Generate a multimode probe from scratch
@@ -230,7 +291,7 @@ with ModelCore(Path('settings.ini')) as model:
     product_api = model.workflow_api.create_product(
         'generated_multimode_probe',
         detector_distance_m=1.0,
-        probe_energy_eV=10_000.0,
+        photon_energy_eV=10_000.0,
         probe_photon_count=1.0e6,
     )
 
@@ -279,7 +340,7 @@ with ModelCore(Path('settings.ini')) as model:
     product_api = model.workflow_api.create_product(
         'loaded_single_mode_probe',
         detector_distance_m=1.0,
-        probe_energy_eV=10_000.0,
+        photon_energy_eV=10_000.0,
         probe_photon_count=1.0e6,
     )
 
@@ -292,9 +353,8 @@ with ModelCore(Path('settings.ini')) as model:
     base_probe = product.probes.get_probe_no_opr()
 
     probe_with_incoherent_modes = generate_incoherent_probe_modes(
-        model.rng,
         base_probe,
-        imode_weights=[1.0, 0.25, 0.1],
+        3,
         orthogonalize=True,
     )
 
@@ -344,10 +404,13 @@ Use `WorkflowProductAPI.generate_object(name, parameters)`. Object geometry is d
 
 ### Multislice Objects
 
-Object builders call `generate_layers` after creating a single-slice object. If `object_layer_spacing_m` is empty, the object remains single-slice. If spacings are supplied, the requested number of slices is `len(object_layer_spacing_m) + 1`. When expanding from one slice to several, Ptychodus distributes the amplitude and unwrapped phase across slices as:
+Object builders call `generate_layers` after creating an object. If `object_layer_spacing_m` is empty, the object keeps the slices it already has -- an unset spacing expresses no preference, so it never collapses a multislice warm start. If spacings are supplied, the requested number of slices is `len(object_layer_spacing_m) + 1` and the object is resliced onto that depth grid.
 
-- amplitude: `abs(object) ** (1 / n_slices)`;
-- phase: `unwrap_phase(object) / n_slices`.
+Reslicing is non-destructive. {py:func}`ptychodus.api.object.resample_object_layers` interpolates the cumulative complex optical path -- the running sum of each layer's complex logarithm -- and takes differences of it, so every input layer contributes, the layers still compose multiplicatively, and `get_layers_flattened()` is preserved to round-off whichever slice count is requested. Working in the logarithm is also what keeps a total phase outside `(-pi, pi]` correct: each layer's own phase is small enough not to wrap, and the sum accumulates past `pi` without ever passing through `numpy.angle`.
+
+Expanding a single slice into several is the degenerate case, since there is no depth axis to resample along. It falls back to {py:func}`ptychodus.api.object.homogenize_object_layers`, which spreads the whole transmission evenly so that each of the `n_slices` layers is the `n_slices`-th root of the original.
+
+The layers are phase screens at depths `0` through the total thickness, so `n_slices` layers leave `n_slices - 1` gaps and `Object.get_total_thickness_m()` -- the sum of those gaps -- is the full thickness. {py:func}`ptychodus.api.object.compute_uniform_layer_spacing_m` builds an even grid on that convention.
 
 ## Low-Level Generator API
 
@@ -396,15 +459,14 @@ base_probe = generate_fresnel_zone_plate_probe(
         outermost_zone_width_m=50e-9,
         central_beamstop_diameter_m=60e-6,
     ),
-    probe_wavelength_m=1.239841984e-10,  # 10 keV
+    photon_wavelength_m=1.239841984e-10,  # 10 keV
     defocus_distance_m=0.0,
 )
 base_probe = rescale_probe_intensity(base_probe, 1.0e6)
 
 probe_with_imodes = generate_incoherent_probe_modes(
-    rng,
     base_probe,
-    imode_weights=[1.0, 0.25, 0.1],
+    3,
     orthogonalize=True,
 )
 probe_sequence = generate_coherent_probe_modes(
@@ -441,6 +503,12 @@ Ptychodus has a Pty-Chi adapter in `ptychodus.model.ptychi`. When using the norm
 - probe initial guess: `product.probes.get_array()`;
 - OPR weights: `product.probes.get_opr_weights()` if available, otherwise a one-dimensional default weight vector with first entry `1.0`;
 - probe positions: physical Ptychodus positions are mapped through the Ptychodus object geometry to object pixel coordinates before being passed to Pty-Chi.
+
+### Probe And Object Sampling
+
+Pty-Chi 2.1.0 and later allow the probe to be sampled differently from the object: `probe_options.pixel_size_m` and `probe_options.pixel_size_aspect_ratio` each fall back to the matching `object_options` value when left at `None`, and Pty-Chi Fourier-rescales the object onto the probe grid whenever the two disagree.
+
+The adapter derives both fields from `product.probes.get_pixel_geometry()`, alongside the object fields it derives from `product.object_.get_pixel_geometry()`. When a probe value matches the object's it is left at `None` — stating the inheritance explicitly and keeping Pty-Chi's no-resampling path — and width and aspect ratio are decided independently, matching how Pty-Chi inherits them. A product whose probe carries no pixel geometry leaves both fields unset.
 
 ### Shape Compatibility
 

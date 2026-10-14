@@ -29,6 +29,10 @@
 #                       checkout, matching what a normal pip install would
 #                       derive from git).
 #   CONTAINER_ENGINE    build engine (default: podman; e.g. docker)
+#   PTYCHO_FM_DIST      directory holding the prebuilt ptycho-fm wheel that
+#                       containers/Dockerfile.cuda installs (default:
+#                       ../ptycho-fm/dist beside the checkout). Set it to the
+#                       empty string to build without the PtychoFM backend.
 #
 # Lint with: shellcheck scripts/podman/build
 
@@ -46,6 +50,11 @@ ROCM_VERSION=7.2.4
 # on Docker Hub as pytorch/pytorch:${PYTORCH_VERSION}-cuda${CUDA_VERSION}-cudnn9-devel.
 # The containers/Dockerfile.cuda default (2.12.0) is not published for
 # CUDA 12.8, so that row overrides.
+#
+# scripts/podman/ptychodus discovers the CUDA variants from the tags this
+# script leaves in podman storage and launches the newest one the host driver
+# supports, so adding a cuda row here is all that is needed to make it
+# selectable -- there is no matching list to update in the launcher.
 declare -A VARIANT_ARGS=(
     [cpu]="-f containers/Dockerfile.cpu"
     [cuda12.8]="-f containers/Dockerfile.cuda --build-arg CUDA_VERSION=12.8 --build-arg PYTORCH_VERSION=2.11.0"
@@ -76,6 +85,26 @@ script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P) \
 repo_root=$(git -C "$script_dir" rev-parse --show-toplevel) \
     || die "$script_dir is not inside a git checkout; run this script from a ptychodus clone"
 cd "$repo_root" || die "cannot enter the ptychodus checkout at $repo_root"
+
+# PtychoFM is published on no package index, and containers/Dockerfile.cuda can
+# only read files inside the build context, so stage the prebuilt wheel into the
+# checkout for the duration of the build and remove it again on the way out. The
+# trap covers the failure and Ctrl-C paths too: a wheel left behind in
+# containers/wheels/ would silently be baked into every later image.
+PTYCHO_FM_DIST="${PTYCHO_FM_DIST-$repo_root/../ptycho-fm/dist}"
+WHEEL_STAGE="$repo_root/containers/wheels"
+
+cleanup_wheel_stage() {
+    rm -rf "$WHEEL_STAGE"
+}
+trap cleanup_wheel_stage EXIT
+
+if [[ -n "$PTYCHO_FM_DIST" ]]; then
+    mkdir -p "$WHEEL_STAGE" \
+        || die "cannot create the wheel staging directory $WHEEL_STAGE"
+    cp "$PTYCHO_FM_DIST"/ptycho_fm-*.whl "$WHEEL_STAGE/" \
+        || die "no ptycho_fm-*.whl in $PTYCHO_FM_DIST (set PTYCHO_FM_DIST= to build without PtychoFM)"
+fi
 
 if [[ -n "${PTYCHODUS_VERSION:-}" ]]; then
     VERSION="$PTYCHODUS_VERSION"

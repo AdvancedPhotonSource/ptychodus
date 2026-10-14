@@ -23,8 +23,10 @@ class MultisliceViewController(ParameterViewController, Observer):
         self._parameter = item.layer_spacing_m
         self._widget = QSpinBox()
         self._widget.setToolTip(
-            'Layers are only ever added, never removed. An object that already has'
-            ' more layers than this keeps the ones it has.'
+            'Reslicing preserves the object: layers are resampled onto the new spacing'
+            ' rather than discarded. Setting this to 1 leaves a multislice object alone,'
+            ' and a reconstruction result is reassigned every iteration so it keeps the'
+            ' layer count it was solved with.'
         )
 
         self._sync_model_to_view()
@@ -245,16 +247,6 @@ class ObjectEditorViewControllerFactory:
             )
             dialog_builder.add_spin_box(
                 object_builder.extra_padding_y, 'Extra Padding Y:', group=first_layer_group
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.probe_wavelength_m,
-                'Probe Wavelength [m]:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.propagation_distance_m,
-                'Propagation Distance [m]:',
-                group=first_layer_group,
             )
             dialog_builder.add_decimal_line_edit(
                 object_builder.delta_over_beta,

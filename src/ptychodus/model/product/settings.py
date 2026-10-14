@@ -16,8 +16,13 @@ class ProductSettings(Observable, Observer):
         self.detector_distance_m = self._group.create_real_parameter(
             'DetectorDistanceInMeters', 1.0, minimum=0.0
         )
-        self.probe_energy_eV = self._group.create_real_parameter(
-            'ProbeEnergyInElectronVolts', 10000.0, minimum=0.0
+        # Signed beamline coordinate, so deliberately unbounded below: a negative
+        # value places the focus upstream of the object. See compute_magnification.
+        self.focus_object_distance_m = self._group.create_real_parameter(
+            'FocusObjectDistanceInMeters', 0.0
+        )
+        self.photon_energy_eV = self._group.create_real_parameter(
+            'PhotonEnergyInElectronVolts', 10000.0, minimum=0.0
         )
         self.probe_photon_count = self._group.create_real_parameter(
             'ProbePhotonCount', 0.0, minimum=0.0
@@ -25,7 +30,7 @@ class ProductSettings(Observable, Observer):
         self.exposure_time_s = self._group.create_real_parameter(
             'ExposureTimeInSeconds', 0.0, minimum=0.0
         )
-        self.mass_attenuation_m2_kg = self._group.create_real_parameter(
+        self.mass_attenuation_m2_per_kg = self._group.create_real_parameter(
             'MassAttenuationSquareMetersPerKilogram', 0.0, minimum=0.0
         )
         self.tomography_angle_deg = self._group.create_real_parameter(
@@ -33,6 +38,7 @@ class ProductSettings(Observable, Observer):
         )
         self.tilt_angle_deg = self._group.create_real_parameter('TiltAngleInDegrees', 0.0)
         self.polarization = self._group.create_string_parameter('Polarization', '')
+        self.far_field = self._group.create_boolean_parameter('FarField', True)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:

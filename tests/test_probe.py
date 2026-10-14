@@ -1,4 +1,4 @@
-"""Unit tests for ptychodus.api.probe.estimate_probe_size."""
+"""Unit tests for ptychodus.api.probe."""
 
 import numpy
 import numpy.testing
@@ -6,15 +6,29 @@ import pytest
 
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.probe import (
+    FocusPolarity,
+    OPRWeightPolicy,
     PatchBounds,
     Probe,
+    ProbeFocusCurves,
+    ProbeFocusMetric,
     ProbeGeometry,
     ProbeSequence,
     ProbeSizeMetrics,
+    compute_amplitude_deviation,
+    compute_opr_mode_series,
+    conform_opr_weights,
+    compute_phase_deviation_rad,
+    compute_probe_focus_curves,
+    compute_rms_contrast,
     compute_shannon_entropy,
+    estimate_focal_plane,
     estimate_probe_entropy,
     estimate_probe_size,
+    resample_probe_sequence,
+    shift_probe,
 )
+from ptychodus.api.propagate import PropagatedWavefield
 
 
 PIXEL_M = 1e-9  # 1 nm per pixel — keeps lengths interpretable as "px == nm"
@@ -352,6 +366,46 @@ class TestProbeGeometryFromFarField:
         assert forward == backward
 
 
+class TestProbeGeometryFromNearField:
+    """The geometric projection dx_sample = dx_detector / M, which at M = 1 is the
+    identity -- the case the far-field relation cannot express."""
+
+    def test_returns_expected_pixel_size_for_square_setup(self) -> None:
+        detector = PixelGeometry(width_m=75e-6, height_m=75e-6)
+
+        geometry = ProbeGeometry.from_near_field(
+            detector, ImageExtent(width_px=256, height_px=256), magnification=200.0
+        )
+
+        assert geometry.width_px == 256
+        assert geometry.height_px == 256
+        numpy.testing.assert_allclose(geometry.pixel_width_m, 75e-6 / 200.0, rtol=1.0e-12)
+        numpy.testing.assert_allclose(geometry.pixel_height_m, 75e-6 / 200.0, rtol=1.0e-12)
+
+    def test_maps_each_axis_independently_for_non_square(self) -> None:
+        detector = PixelGeometry(width_m=50e-6, height_m=100e-6)
+
+        geometry = ProbeGeometry.from_near_field(
+            detector, ImageExtent(width_px=256, height_px=128), magnification=4.0
+        )
+
+        assert geometry.width_px == 256
+        assert geometry.height_px == 128
+        numpy.testing.assert_allclose(geometry.pixel_width_m, 50e-6 / 4.0, rtol=1.0e-12)
+        numpy.testing.assert_allclose(geometry.pixel_height_m, 100e-6 / 4.0, rtol=1.0e-12)
+
+    def test_unity_magnification_returns_the_detector_pitch(self) -> None:
+        """Parallel-beam near field: the object grid is the detector grid."""
+        detector = PixelGeometry(width_m=75e-6, height_m=50e-6)
+
+        geometry = ProbeGeometry.from_near_field(
+            detector, ImageExtent(width_px=64, height_px=64), magnification=1.0
+        )
+
+        numpy.testing.assert_allclose(geometry.pixel_width_m, detector.width_m, rtol=1.0e-12)
+        numpy.testing.assert_allclose(geometry.pixel_height_m, detector.height_m, rtol=1.0e-12)
+
+
 class TestProbeGeometryStr:
     def test_square_pixels_collapse_to_single_value(self) -> None:
         geometry = ProbeGeometry(
@@ -441,3 +495,805 @@ class TestProbeSequenceFromProbe:
         assert sequence.get_opr_weights_or_none() is None
         assert sequence.get_pixel_geometry() == pixel_geometry
         numpy.testing.assert_array_equal(sequence.get_probe_no_opr().get_array(), array)
+
+
+def _gaussian_caustic_stack(
+    coordinate_m: numpy.ndarray,
+    waist_m: float,
+    waist_coordinate_m: float,
+    rayleigh_range_m: float,
+    *,
+    size: int = 48,
+) -> numpy.ndarray:
+    """Build a ``(num_steps, 1, size, size)`` stack holding a Gaussian beam.
+
+    The width follows the caustic ``w(z) = w0 sqrt(1 + ((z - z0) / zR)^2)``, normalized
+    so total power is conserved along z, and each plane carries the matching spherical
+    phase ``-k r^2 / 2R(z)``. Curvature is written as ``1 / R = z / (z^2 + zR^2)``,
+    which stays finite at the waist, where it vanishes and leaves a flat wavefront.
+
+    The phase is what makes this a beam rather than a stack of blurred spots: without
+    it the wavefront metrics have nothing to measure and read zero at every plane.
+    """
+    y_idx, x_idx = numpy.mgrid[:size, :size]
+    dx = (x_idx - (size - 1) / 2.0) * PIXEL_M
+    dy = (y_idx - (size - 1) / 2.0) * PIXEL_M
+    r2 = numpy.square(dx) + numpy.square(dy)
+    # Implied by the waist and Rayleigh range via zR = pi w0^2 / lambda.
+    wavenumber = 2.0 * rayleigh_range_m / numpy.square(waist_m)
+
+    planes = []
+
+    for z_m in coordinate_m:
+        offset_m = z_m - waist_coordinate_m
+        scale = numpy.sqrt(1.0 + (offset_m / rayleigh_range_m) ** 2)
+        width_m = waist_m * scale
+        inverse_radius = offset_m / (numpy.square(offset_m) + numpy.square(rayleigh_range_m))
+        phase = -0.5 * wavenumber * r2 * inverse_radius
+        # Amplitude, not intensity: dividing by the width keeps sum(|psi|^2) constant.
+        envelope = numpy.exp(-r2 / numpy.square(width_m)) / width_m
+        planes.append(envelope * numpy.exp(1j * phase))
+
+    return numpy.asarray(planes, dtype=numpy.complex128)[:, numpy.newaxis]
+
+
+def _caustic_probe(
+    waist_coordinate_m: float,
+    *,
+    num_steps: int = 21,
+    begin_coordinate_m: float = -100.0 * PIXEL_M,
+    end_coordinate_m: float = 100.0 * PIXEL_M,
+) -> PropagatedWavefield:
+    coordinate_m = numpy.linspace(begin_coordinate_m, end_coordinate_m, num_steps)
+    wavefield = _gaussian_caustic_stack(
+        coordinate_m,
+        waist_m=8.0 * PIXEL_M,
+        waist_coordinate_m=waist_coordinate_m,
+        rayleigh_range_m=40.0 * PIXEL_M,
+    )
+    return PropagatedWavefield(
+        wavefield=wavefield,
+        begin_coordinate_m=begin_coordinate_m,
+        end_coordinate_m=end_coordinate_m,
+        pixel_geometry=PIXEL_GEOMETRY,
+    )
+
+
+class TestComputeRmsContrast:
+    def test_constant_image_has_no_contrast(self) -> None:
+        assert compute_rms_contrast(numpy.full((16, 16), 3.5)) == 0.0
+
+    def test_two_level_image_matches_closed_form(self) -> None:
+        """Half zeros and half 2a has mean a and standard deviation a, so a contrast of 1."""
+        image = numpy.concatenate([numpy.zeros(128), numpy.full(128, 7.0)])
+
+        numpy.testing.assert_allclose(compute_rms_contrast(image), 1.0, rtol=1e-12)
+
+    def test_zero_image_returns_zero_rather_than_dividing(self) -> None:
+        assert compute_rms_contrast(numpy.zeros((8, 8))) == 0.0
+
+    def test_invariant_under_rescaling(self) -> None:
+        rng = numpy.random.default_rng(3)
+        image = rng.random((32, 32))
+
+        numpy.testing.assert_allclose(
+            compute_rms_contrast(image), compute_rms_contrast(1e6 * image), rtol=1e-12
+        )
+
+
+class TestComputeAmplitudeDeviation:
+    def test_uniform_amplitude_has_no_deviation(self) -> None:
+        wavefield = numpy.exp(1j * numpy.linspace(0.0, 6.0, 64)).reshape(8, 8)
+
+        numpy.testing.assert_allclose(compute_amplitude_deviation(wavefield), 0.0, atol=1e-12)
+
+    def test_zero_wavefield_returns_zero_rather_than_dividing(self) -> None:
+        assert compute_amplitude_deviation(numpy.zeros((8, 8), dtype=numpy.complex128)) == 0.0
+
+    def test_invariant_under_rescaling(self) -> None:
+        rng = numpy.random.default_rng(4)
+        wavefield = rng.random((16, 16)) + 1j * rng.random((16, 16))
+
+        # astype: numpy's stubs lose complexity through `scalar * complex_array`.
+        numpy.testing.assert_allclose(
+            compute_amplitude_deviation(wavefield),
+            compute_amplitude_deviation((1e6 * wavefield).astype(complex)),
+            rtol=1e-12,
+        )
+
+
+class TestComputePhaseDeviation:
+    def test_flat_wavefront_has_no_deviation(self) -> None:
+        wavefield = numpy.full((16, 16), 2.0 + 0.0j)
+
+        numpy.testing.assert_allclose(compute_phase_deviation_rad(wavefield), 0.0, atol=1e-12)
+
+    def test_recovers_sigma_of_a_wrapped_normal_phase(self) -> None:
+        """For phase ~ N(0, sigma), the resultant is exp(-sigma^2/2), so sqrt(-2 ln R)
+        returns sigma itself."""
+        sigma = 0.3
+        rng = numpy.random.default_rng(5)
+        wavefield = numpy.exp(1j * rng.normal(0.0, sigma, size=1 << 16))
+
+        numpy.testing.assert_allclose(compute_phase_deviation_rad(wavefield), sigma, rtol=0.02)
+
+    def test_is_insensitive_to_the_branch_cut(self) -> None:
+        """Phase tightly clustered about pi straddles the +/-pi wrap. The circular
+        statistic must see a narrow distribution where a plain standard deviation of
+        the angle sees a maximally wide one."""
+        rng = numpy.random.default_rng(6)
+        phase = numpy.pi + rng.normal(0.0, 0.05, size=(64, 64))
+        wavefield = numpy.exp(1j * phase)
+
+        deviation = compute_phase_deviation_rad(wavefield)
+
+        numpy.testing.assert_allclose(deviation, 0.05, rtol=0.1)
+        assert numpy.std(numpy.angle(wavefield)) > 3.0  # what the naive approach reports
+
+    def test_is_dominated_by_the_bright_pixels(self) -> None:
+        """A bright coherent core plus a dim incoherent halo is a low-deviation
+        wavefield, because the weighting is by intensity."""
+        rng = numpy.random.default_rng(7)
+        wavefield = 1e-3 * numpy.exp(2j * numpy.pi * rng.random((32, 32)))
+        wavefield[12:20, 12:20] = 1.0
+
+        assert compute_phase_deviation_rad(wavefield) < 0.01
+
+    def test_scattered_phase_exceeds_clustered_phase(self) -> None:
+        rng = numpy.random.default_rng(8)
+        scattered = numpy.exp(2j * numpy.pi * rng.random((64, 64)))
+        clustered = numpy.exp(1j * rng.normal(0.0, 0.1, size=(64, 64)))
+
+        assert compute_phase_deviation_rad(scattered) > compute_phase_deviation_rad(clustered)
+
+    def test_zero_wavefield_returns_zero(self) -> None:
+        assert compute_phase_deviation_rad(numpy.zeros((8, 8), dtype=numpy.complex128)) == 0.0
+
+
+class TestEstimateFocalPlane:
+    def test_recovers_an_off_grid_parabola_vertex_exactly(self) -> None:
+        """Three-point parabolic interpolation is exact for a parabola, so a vertex
+        placed deliberately between samples comes back to machine precision."""
+        coordinate_m = numpy.linspace(-10.0, 10.0, 11)  # spacing 2.0
+        vertex_m = 1.3
+        value = 3.0 * numpy.square(coordinate_m - vertex_m) + 0.5
+
+        plane = estimate_focal_plane(coordinate_m, value, FocusPolarity.MINIMUM)
+
+        assert plane.is_refined
+        numpy.testing.assert_allclose(plane.coordinate_m, vertex_m, rtol=1e-12)
+        numpy.testing.assert_allclose(plane.value, 0.5, rtol=1e-12)
+        assert plane.step == 6  # the sample nearest 1.3
+
+    def test_maximum_polarity_mirrors_minimum(self) -> None:
+        coordinate_m = numpy.linspace(-10.0, 10.0, 11)
+        vertex_m = 1.3
+        value = 3.0 * numpy.square(coordinate_m - vertex_m) + 0.5
+
+        maximum = estimate_focal_plane(coordinate_m, -value, FocusPolarity.MAXIMUM)
+
+        assert maximum.is_refined
+        numpy.testing.assert_allclose(maximum.coordinate_m, vertex_m, rtol=1e-12)
+
+    def test_extremum_at_either_endpoint_is_not_refined(self) -> None:
+        coordinate_m = numpy.linspace(0.0, 10.0, 11)
+
+        rising = estimate_focal_plane(coordinate_m, coordinate_m, FocusPolarity.MINIMUM)
+        falling = estimate_focal_plane(coordinate_m, -coordinate_m, FocusPolarity.MINIMUM)
+
+        assert not rising.is_refined
+        assert rising.step == 0
+        assert not falling.is_refined
+        assert falling.step == 10
+
+    def test_flat_curve_falls_back_to_the_grid(self) -> None:
+        coordinate_m = numpy.linspace(0.0, 10.0, 11)
+
+        plane = estimate_focal_plane(coordinate_m, numpy.zeros(11), FocusPolarity.MINIMUM)
+
+        assert not plane.is_refined
+
+    def test_short_curves_return_the_extremal_sample(self) -> None:
+        single = estimate_focal_plane(numpy.array([4.0]), numpy.array([7.0]), FocusPolarity.MINIMUM)
+        pair = estimate_focal_plane(
+            numpy.array([0.0, 1.0]), numpy.array([5.0, 2.0]), FocusPolarity.MINIMUM
+        )
+
+        assert not single.is_refined
+        assert single.step == 0
+        numpy.testing.assert_allclose(single.coordinate_m, 4.0, rtol=1e-12)
+        numpy.testing.assert_allclose(single.value, 7.0, rtol=1e-12)
+        assert not pair.is_refined
+        assert pair.step == 1
+        numpy.testing.assert_allclose(pair.coordinate_m, 1.0, rtol=1e-12)
+
+    def test_mismatched_or_empty_inputs_raise(self) -> None:
+        with pytest.raises(ValueError):
+            estimate_focal_plane(numpy.zeros(4), numpy.zeros(5), FocusPolarity.MINIMUM)
+
+        with pytest.raises(ValueError):
+            estimate_focal_plane(numpy.zeros(0), numpy.zeros(0), FocusPolarity.MINIMUM)
+
+
+class TestComputeProbeFocusCurves:
+    def test_every_metric_locates_a_known_off_grid_waist(self) -> None:
+        """All ten metrics measure the same beam, so all ten should agree on where it
+        is narrowest, to within a fraction of the step size."""
+        waist_m = 13.0 * PIXEL_M  # off-grid: the samples are spaced 10 nm apart
+        curves = compute_probe_focus_curves(_caustic_probe(waist_m))
+
+        for series in curves.series:
+            plane = curves.get_focal_plane(series.metric)
+            assert abs(plane.coordinate_m - waist_m) < 10.0 * PIXEL_M, series.metric
+
+    def test_polarity_matches_how_each_metric_behaves_at_focus(self) -> None:
+        """Widths and entropy bottom out at the waist; peak intensity and contrast top
+        out there. A wrong polarity would send the search to the opposite end."""
+        curves = compute_probe_focus_curves(_caustic_probe(0.0))
+        focus_step = curves.series[0].value.argmin()
+
+        for series in curves.series:
+            if series.metric.polarity is FocusPolarity.MINIMUM:
+                assert series.value.argmin() == focus_step, series.metric
+            else:
+                assert series.value.argmax() == focus_step, series.metric
+
+    def test_series_cover_every_metric_and_span_the_requested_range(self) -> None:
+        curves = compute_probe_focus_curves(_caustic_probe(0.0, num_steps=21))
+
+        assert {series.metric for series in curves.series} == set(ProbeFocusMetric)
+        assert curves.coordinate_m.shape == (21,)
+        numpy.testing.assert_allclose(curves.coordinate_m[0], -100.0 * PIXEL_M)
+        numpy.testing.assert_allclose(curves.coordinate_m[-1], 100.0 * PIXEL_M)
+
+        for series in curves.series:
+            assert series.value.shape == (21,), series.metric
+
+    def test_lengths_are_reported_in_meters(self) -> None:
+        """The waist amplitude is exp(-r^2/w^2) with w = 8 px at 1 nm per pixel, so the
+        intensity has sigma = w/2 and the reported 2-sigma width is w itself, 8 nm --
+        a value only plausible if the series is in meters rather than pixels."""
+        curves = compute_probe_focus_curves(_caustic_probe(0.0))
+
+        plane = curves.get_focal_plane(ProbeFocusMetric.RMS_MAJOR)
+
+        assert ProbeFocusMetric.RMS_MAJOR.si_unit == 'm'
+        numpy.testing.assert_allclose(plane.value, 8.0 * PIXEL_M, rtol=0.05)
+
+    def test_get_series_and_get_focal_plane_reject_an_unsampled_metric(self) -> None:
+        curves = compute_probe_focus_curves(_caustic_probe(0.0))
+        pruned = ProbeFocusCurves(
+            coordinate_m=curves.coordinate_m,
+            series=[s for s in curves.series if s.metric is not ProbeFocusMetric.RMS_CONTRAST],
+        )
+
+        with pytest.raises(KeyError):
+            pruned.get_series(ProbeFocusMetric.RMS_CONTRAST)
+
+        with pytest.raises(KeyError):
+            pruned.get_focal_plane(ProbeFocusMetric.RMS_CONTRAST)
+
+    def test_out_of_range_mode_raises(self) -> None:
+        probe = _caustic_probe(0.0)
+
+        with pytest.raises(ValueError):
+            compute_probe_focus_curves(probe, mode=1)
+
+        with pytest.raises(ValueError):
+            compute_probe_focus_curves(probe, mode=-1)
+
+
+class TestShiftProbe:
+    """shift_probe mirrors shift_object: a Fourier phase ramp over the last two axes."""
+
+    @staticmethod
+    def _probe(array: numpy.ndarray) -> Probe:
+        return Probe(array=array.astype(complex), pixel_geometry=PIXEL_GEOMETRY)
+
+    def test_zero_shift_returns_the_same_object(self) -> None:
+        probe = self._probe(numpy.ones((2, 8, 8)))
+
+        assert shift_probe(probe, shift_y_px=0.0, shift_x_px=0.0) is probe
+
+    def test_integer_shift_rolls_the_array(self) -> None:
+        array = numpy.zeros((1, 8, 8), dtype=complex)
+        array[0, 2, 3] = 1.0
+        shifted = shift_probe(self._probe(array), shift_y_px=1.0, shift_x_px=2.0)
+
+        numpy.testing.assert_allclose(
+            shifted.get_array(), numpy.roll(array, (1, 2), axis=(-2, -1)), atol=1e-10
+        )
+
+    def test_subpixel_shift_is_exact_for_a_bandlimited_signal(self) -> None:
+        """The reason for a phase ramp rather than bilinear interpolation."""
+        n = 16
+        x = numpy.arange(n)
+        array = numpy.exp(2j * numpy.pi * x / n)[None, None, :] * numpy.ones((1, n, 1))
+        shifted = shift_probe(self._probe(array), shift_y_px=0.0, shift_x_px=0.5)
+        expected = numpy.exp(2j * numpy.pi * (x - 0.5) / n)[None, None, :] * numpy.ones((1, n, 1))
+
+        numpy.testing.assert_allclose(shifted.get_array(), expected, atol=1e-10)
+
+    def test_every_incoherent_mode_is_shifted(self) -> None:
+        array = numpy.zeros((3, 8, 8), dtype=complex)
+        array[:, 4, 4] = [1.0, 2.0, 3.0]
+        shifted = shift_probe(self._probe(array), shift_y_px=1.0, shift_x_px=2.0)
+
+        numpy.testing.assert_allclose(
+            numpy.abs(shifted.get_array()[:, 5, 6]), [1.0, 2.0, 3.0], atol=1e-10
+        )
+
+    def test_total_intensity_is_conserved(self) -> None:
+        rng = numpy.random.default_rng(4)
+        array = rng.normal(size=(2, 8, 8)) + 1j * rng.normal(size=(2, 8, 8))
+        shifted = shift_probe(self._probe(array), shift_y_px=1.7, shift_x_px=-0.4)
+
+        numpy.testing.assert_allclose(
+            numpy.sum(numpy.abs(shifted.get_array()) ** 2),
+            numpy.sum(numpy.abs(array) ** 2),
+            rtol=1e-10,
+        )
+
+    def test_the_shift_wraps_around(self) -> None:
+        """Documented departure from scipy.ndimage.shift's edge extension."""
+        array = numpy.zeros((1, 8, 8), dtype=complex)
+        array[0, 0, 0] = 1.0
+        shifted = shift_probe(self._probe(array), shift_y_px=-1.0, shift_x_px=0.0)
+
+        numpy.testing.assert_allclose(numpy.abs(shifted.get_array()[0, 7, 0]), 1.0, atol=1e-10)
+
+    def test_pixel_geometry_is_preserved(self) -> None:
+        shifted = shift_probe(self._probe(numpy.ones((1, 8, 8))), shift_y_px=1.0, shift_x_px=1.0)
+
+        assert shifted.get_pixel_geometry().width_m == PIXEL_M
+
+
+# ---------------------------------------------------------------------------
+# resample_probe_sequence
+# ---------------------------------------------------------------------------
+
+
+def _make_gaussian_probe_sequence(
+    pixel_m: float = 2.0e-8, extent_px: int = 32, num_imodes: int = 2
+) -> ProbeSequence:
+    """A smooth, well-sampled illumination that resampling should carry intact."""
+    y, x = numpy.mgrid[:extent_px, :extent_px]
+    center = (extent_px - 1) / 2
+    envelope = numpy.exp(-(((x - center) ** 2 + (y - center) ** 2) / (2.0 * 4.0**2)))
+    mode = envelope * numpy.exp(1j * 0.05 * x)
+    array = numpy.stack([numpy.stack([mode * scale for scale in range(1, num_imodes + 1)])])
+    return ProbeSequence(
+        array=array.astype(complex),
+        opr_weights=None,
+        pixel_geometry=PixelGeometry(width_m=pixel_m, height_m=pixel_m),
+    )
+
+
+def test_resample_probe_sequence_at_the_same_pixel_size_returns_the_input_itself() -> None:
+    probes = _make_gaussian_probe_sequence()
+    target = ProbeGeometry(width_px=32, height_px=32, pixel_width_m=2.0e-8, pixel_height_m=2.0e-8)
+    assert resample_probe_sequence(probes, target) is probes
+
+
+def test_resample_probe_sequence_preserves_the_photon_count() -> None:
+    """The pixel area changes, so the amplitude must absorb it or the probe silently
+    gains or loses photons."""
+    probes = _make_gaussian_probe_sequence()
+    target = ProbeGeometry(width_px=64, height_px=64, pixel_width_m=1.0e-8, pixel_height_m=1.0e-8)
+
+    resampled = resample_probe_sequence(probes, target)
+
+    before = numpy.sum(numpy.abs(probes.get_array()) ** 2)
+    after = numpy.sum(numpy.abs(resampled.get_array()) ** 2)
+    assert after == pytest.approx(before, rel=1.0e-3)
+
+
+def test_resample_probe_sequence_lands_on_the_target_grid() -> None:
+    probes = _make_gaussian_probe_sequence()
+    target = ProbeGeometry(width_px=64, height_px=64, pixel_width_m=1.0e-8, pixel_height_m=1.0e-8)
+
+    resampled = resample_probe_sequence(probes, target)
+
+    assert resampled.get_array().shape == (1, 2, 64, 64)
+    assert resampled.get_pixel_geometry().width_m == pytest.approx(1.0e-8)
+    assert resampled.get_pixel_geometry().height_m == pytest.approx(1.0e-8)
+
+
+def test_resample_probe_sequence_carries_opr_weights_through() -> None:
+    probes = _make_gaussian_probe_sequence()
+    weights = numpy.ones((5, 1))
+    with_weights = ProbeSequence(
+        array=probes.get_array(),
+        opr_weights=weights,
+        pixel_geometry=probes.get_pixel_geometry(),
+    )
+    target = ProbeGeometry(width_px=64, height_px=64, pixel_width_m=1.0e-8, pixel_height_m=1.0e-8)
+
+    resampled = resample_probe_sequence(with_weights, target)
+    resampled_weights = resampled.get_opr_weights_or_none()
+
+    assert resampled_weights is not None
+    numpy.testing.assert_array_equal(resampled_weights, weights)
+
+
+def test_resample_probe_sequence_passes_through_without_a_pixel_geometry() -> None:
+    probes = ProbeSequence(
+        array=_make_gaussian_probe_sequence().get_array(),
+        opr_weights=None,
+        pixel_geometry=None,
+    )
+    target = ProbeGeometry(width_px=64, height_px=64, pixel_width_m=1.0e-8, pixel_height_m=1.0e-8)
+    assert resample_probe_sequence(probes, target) is probes
+
+
+class TestConformOPRWeights:
+    """Reconciling a loaded OPR basis with a scan of a different size.
+
+    OPR weights carry one row per probe position, so a probe solved on one scan is
+    unusable on another until those rows are resolved. Every policy here is checked for
+    the shape it produces and for what it does to the weights, because a wrong shape
+    fails loudly downstream while wrong *values* -- averaging the wrong axis, keeping
+    another scan's per-position variation -- quietly degrade a reconstruction.
+    """
+
+    NUM_SOURCE_POSITIONS = 7
+    NUM_TARGET_POSITIONS = 11
+    NUM_COHERENT_MODES = 3
+    NUM_INCOHERENT_MODES = 2
+
+    def _rng(self) -> numpy.random.Generator:
+        return numpy.random.default_rng(42)
+
+    def _weights(self) -> numpy.ndarray:
+        return self._rng().normal(size=(self.NUM_SOURCE_POSITIONS, self.NUM_COHERENT_MODES))
+
+    def _array(self) -> numpy.ndarray:
+        shape = (self.NUM_COHERENT_MODES, self.NUM_INCOHERENT_MODES, 4, 4)
+        rng = self._rng()
+        return (rng.normal(size=shape) + 1j * rng.normal(size=shape)).astype(numpy.complex64)
+
+    def _sequence(self) -> ProbeSequence:
+        return ProbeSequence(self._array(), self._weights(), PIXEL_GEOMETRY)
+
+    def _conform(self, policy: OPRWeightPolicy, num_positions: int | None = None) -> ProbeSequence:
+        return conform_opr_weights(
+            self._rng(),
+            self._sequence(),
+            self.NUM_TARGET_POSITIONS if num_positions is None else num_positions,
+            policy,
+        )
+
+    @pytest.mark.parametrize(
+        ('policy', 'num_coherent_modes', 'has_weights'),
+        [
+            (OPRWeightPolicy.AVERAGE, NUM_COHERENT_MODES, True),
+            (OPRWeightPolicy.REINITIALIZE, NUM_COHERENT_MODES, True),
+            (OPRWeightPolicy.COLLAPSE, 1, False),
+            (OPRWeightPolicy.DISCARD, 1, False),
+        ],
+    )
+    def test_conformed_shape(
+        self, policy: OPRWeightPolicy, num_coherent_modes: int, has_weights: bool
+    ) -> None:
+        conformed = self._conform(policy)
+        assert conformed.num_coherent_modes == num_coherent_modes
+        assert conformed.num_incoherent_modes == self.NUM_INCOHERENT_MODES
+        weights = conformed.get_opr_weights_or_none()
+
+        if has_weights:
+            assert weights is not None
+            assert weights.shape == (self.NUM_TARGET_POSITIONS, num_coherent_modes)
+            assert len(conformed) == self.NUM_TARGET_POSITIONS
+        else:
+            assert weights is None
+            assert len(conformed) == 1
+
+    def test_conformed_dtype_is_preserved(self) -> None:
+        """Weights are real and the array complex64; the collapse must not promote it."""
+        assert self._conform(OPRWeightPolicy.COLLAPSE).dtype == numpy.complex64
+
+    def test_keep_returns_the_input_when_the_counts_agree(self) -> None:
+        probes = self._sequence()
+        conformed = conform_opr_weights(
+            self._rng(), probes, self.NUM_SOURCE_POSITIONS, OPRWeightPolicy.KEEP
+        )
+        assert conformed is probes
+
+    def test_keep_rejects_a_different_scan_naming_both_counts(self) -> None:
+        with pytest.raises(ValueError) as exc_info:
+            self._conform(OPRWeightPolicy.KEEP)
+
+        message = str(exc_info.value)
+        assert str(self.NUM_SOURCE_POSITIONS) in message
+        assert str(self.NUM_TARGET_POSITIONS) in message
+
+    def test_average_gives_every_position_the_column_mean(self) -> None:
+        conformed = self._conform(OPRWeightPolicy.AVERAGE)
+        numpy.testing.assert_allclose(
+            conformed.get_opr_weights(),
+            numpy.broadcast_to(
+                self._weights().mean(axis=0),
+                (self.NUM_TARGET_POSITIONS, self.NUM_COHERENT_MODES),
+            ),
+        )
+
+    def test_average_keeps_the_coherent_modes_untouched(self) -> None:
+        numpy.testing.assert_array_equal(
+            self._conform(OPRWeightPolicy.AVERAGE).get_array(), self._array()
+        )
+
+    def test_reinitialize_puts_unit_weight_on_the_primary_mode(self) -> None:
+        weights = self._conform(OPRWeightPolicy.REINITIALIZE).get_opr_weights()
+        numpy.testing.assert_array_equal(weights[:, 0], 1.0)
+        # Small but non-zero, so the reconstruction can move off the primary mode.
+        assert 0.0 < numpy.absolute(weights[:, 1:]).max() < 1.0e-5
+
+    def test_reinitialize_is_reproducible_from_a_seeded_generator(self) -> None:
+        numpy.testing.assert_array_equal(
+            self._conform(OPRWeightPolicy.REINITIALIZE).get_opr_weights(),
+            self._conform(OPRWeightPolicy.REINITIALIZE).get_opr_weights(),
+        )
+
+    def test_collapse_combines_the_modes_under_the_mean_row(self) -> None:
+        expected = numpy.tensordot(self._weights().mean(axis=0), self._array(), axes=1)
+        numpy.testing.assert_allclose(
+            self._conform(OPRWeightPolicy.COLLAPSE).get_array()[0],
+            expected.astype(numpy.complex64),
+            rtol=1.0e-6,
+        )
+
+    def test_collapse_applies_the_mean_row_to_every_incoherent_mode(self) -> None:
+        """__getitem__ only ever rewrites incoherent mode 0; collapsing must not."""
+        collapsed = self._conform(OPRWeightPolicy.COLLAPSE).get_array()[0]
+        assert not numpy.allclose(collapsed[1], self._array()[0, 1])
+
+    def test_discard_keeps_the_primary_mode_exactly(self) -> None:
+        numpy.testing.assert_array_equal(
+            self._conform(OPRWeightPolicy.DISCARD).get_array()[0], self._array()[0]
+        )
+
+    def test_discard_does_not_alias_the_source_buffer(self) -> None:
+        probes = self._sequence()
+        conformed = conform_opr_weights(
+            self._rng(), probes, self.NUM_TARGET_POSITIONS, OPRWeightPolicy.DISCARD
+        )
+        conformed.get_array()[:] = 0.0
+        numpy.testing.assert_array_equal(probes.get_array(), self._array())
+
+    @pytest.mark.parametrize('policy', list(OPRWeightPolicy))
+    def test_a_probe_without_an_opr_basis_is_untouched(self, policy: OPRWeightPolicy) -> None:
+        probes = ProbeSequence(self._array()[0], None, PIXEL_GEOMETRY)
+        assert conform_opr_weights(self._rng(), probes, 11, policy) is probes
+
+    def test_several_coherent_modes_without_weights_gain_them_on_reinitialize(self) -> None:
+        probes = ProbeSequence(self._array(), None, PIXEL_GEOMETRY)
+        conformed = conform_opr_weights(self._rng(), probes, 11, OPRWeightPolicy.REINITIALIZE)
+        assert conformed.get_opr_weights().shape == (11, self.NUM_COHERENT_MODES)
+
+    def test_several_coherent_modes_without_weights_collapse_to_the_primary_mode(self) -> None:
+        """With no weights there is no mean row, so COLLAPSE can only do what DISCARD does."""
+        probes = ProbeSequence(self._array(), None, PIXEL_GEOMETRY)
+        conformed = conform_opr_weights(self._rng(), probes, 11, OPRWeightPolicy.COLLAPSE)
+        numpy.testing.assert_array_equal(conformed.get_array()[0], self._array()[0])
+
+    def test_a_probe_without_a_pixel_size_conforms_without_raising(self) -> None:
+        probes = ProbeSequence(self._array(), self._weights(), None)
+        conformed = conform_opr_weights(self._rng(), probes, 11, OPRWeightPolicy.AVERAGE)
+        assert conformed.get_opr_weights_or_none() is not None
+
+    @pytest.mark.parametrize('num_positions', [0, -1])
+    def test_non_positive_position_count_is_rejected(self, num_positions: int) -> None:
+        with pytest.raises(ValueError, match='positive'):
+            self._conform(OPRWeightPolicy.AVERAGE, num_positions)
+
+
+class TestComputeOPRModeSeries:
+    """Per-position OPR diagnostics for a probe ensemble.
+
+    The point of every check here is that the Gram-matrix route agrees with actually
+    building each position's probe. The shortcut exists because materializing an
+    ensemble over a long scan is expensive, so its correctness is the thing that has to
+    be pinned down -- in particular for a non-orthogonal coherent basis, where dropping
+    the off-diagonal terms would still look plausible.
+    """
+
+    NUM_POSITIONS = 7
+    NUM_COHERENT_MODES = 3
+    NUM_INCOHERENT_MODES = 2
+
+    def _probes(
+        self,
+        *,
+        weights: numpy.ndarray | None = None,
+        dtype: numpy.dtype | type = numpy.complex64,
+    ) -> ProbeSequence:
+        rng = numpy.random.default_rng(42)
+        shape = (self.NUM_COHERENT_MODES, self.NUM_INCOHERENT_MODES, 4, 4)
+        # Deliberately not orthogonalized: the off-diagonal Gram terms must be carried.
+        array = (rng.normal(size=shape) + 1j * rng.normal(size=shape)).astype(dtype)
+
+        if weights is None:
+            weights = rng.normal(size=(self.NUM_POSITIONS, self.NUM_COHERENT_MODES))
+
+        return ProbeSequence(array, weights, PixelGeometry(width_m=1e-9, height_m=2e-9))
+
+    def test_total_matches_materialized_probes(self) -> None:
+        probes = self._probes()
+        series = compute_opr_mode_series(probes)
+        expected = numpy.array(
+            [probes[index].get_intensity().sum() for index in range(len(probes))]
+        )
+        numpy.testing.assert_allclose(series.total_photon_count, expected, rtol=1e-6)
+
+    def test_deviation_matches_materialized_probes(self) -> None:
+        probes = self._probes()
+        series = compute_opr_mode_series(probes)
+        composed = numpy.array(
+            [probes[index].get_incoherent_mode(0) for index in range(len(probes))]
+        )
+        mean_mode = composed.mean(axis=0)
+        expected = numpy.array(
+            [numpy.square(numpy.absolute(mode - mean_mode)).sum() for mode in composed]
+        )
+        numpy.testing.assert_allclose(series.deviation_photon_count, expected, rtol=1e-5)
+
+    def test_total_is_primary_plus_secondary(self) -> None:
+        series = compute_opr_mode_series(self._probes())
+        numpy.testing.assert_allclose(
+            series.total_photon_count,
+            series.primary_mode_photon_count + series.secondary_mode_photon_count,
+        )
+
+    def test_shape_accessors(self) -> None:
+        series = compute_opr_mode_series(self._probes())
+        assert series.num_positions == self.NUM_POSITIONS
+        assert series.num_coherent_modes == self.NUM_COHERENT_MODES
+        assert len(series.mode_statistics) == self.NUM_COHERENT_MODES
+
+    def test_variance_fractions_sum_to_one(self) -> None:
+        series = compute_opr_mode_series(self._probes())
+        total = sum(statistics.variance_fraction for statistics in series.mode_statistics)
+        assert total == pytest.approx(1.0)
+
+    def test_mode_statistics_match_the_weights(self) -> None:
+        probes = self._probes()
+        series = compute_opr_mode_series(probes)
+        weights = probes.get_opr_weights()
+
+        for mode, statistics in enumerate(series.mode_statistics):
+            assert statistics.mean_weight == pytest.approx(weights[:, mode].mean())
+            assert statistics.weight_deviation == pytest.approx(weights[:, mode].std())
+
+    def test_without_weights_reports_the_unweighted_probe(self) -> None:
+        """No OPR weights names one position whose composed mode is the basis's first."""
+        probes = ProbeSequence(
+            self._probes().get_array(), None, PixelGeometry(width_m=1e-9, height_m=2e-9)
+        )
+        series = compute_opr_mode_series(probes)
+
+        assert series.num_positions == 1
+        numpy.testing.assert_allclose(series.opr_weight, [[1.0, 0.0, 0.0]])
+        numpy.testing.assert_allclose(
+            series.total_photon_count,
+            [probes.get_probe_no_opr().get_intensity().sum()],
+            rtol=1e-6,
+        )
+        assert series.deviation_photon_count == pytest.approx(0.0)
+        assert series.relative_variation == 0.0
+        assert series.effective_mode_count == 0
+
+    def test_identical_weight_rows_do_not_vary(self) -> None:
+        weights = numpy.broadcast_to(
+            numpy.array([1.0, 0.03, -0.02]), (self.NUM_POSITIONS, self.NUM_COHERENT_MODES)
+        ).copy()
+        series = compute_opr_mode_series(self._probes(weights=weights))
+
+        numpy.testing.assert_allclose(series.deviation_photon_count, 0.0, atol=1e-12)
+        assert series.relative_variation == pytest.approx(0.0, abs=1e-12)
+
+    def test_single_coherent_mode(self) -> None:
+        rng = numpy.random.default_rng(7)
+        shape = (1, 1, 4, 4)
+        array = rng.normal(size=shape) + 1j * rng.normal(size=shape)
+        weights = rng.normal(size=(5, 1))
+        probes = ProbeSequence(array, weights, PixelGeometry(width_m=1e-9, height_m=1e-9))
+        series = compute_opr_mode_series(probes)
+
+        expected = numpy.array([probes[index].get_intensity().sum() for index in range(5)])
+        numpy.testing.assert_allclose(series.total_photon_count, expected)
+        assert series.secondary_mode_photon_count == pytest.approx(0.0)
+
+    def test_null_sentinel_probe_sequence(self) -> None:
+        """The repository holds a zero-sized sequence until a dataset binds."""
+        series = compute_opr_mode_series(ProbeSequence(None, None, None))
+
+        numpy.testing.assert_allclose(series.total_photon_count, [0.0])
+        assert series.relative_variation == 0.0
+        assert series.effective_mode_count == 0
+
+    def test_counts_are_never_negative(self) -> None:
+        """A weight row that nearly annihilates the basis must not report negative power.
+
+        Evaluating the quadratic form subtracts large terms where the direct sum of
+        squared magnitudes cannot go below zero, so the floor has to be applied.
+        """
+        rng = numpy.random.default_rng(3)
+        base = rng.normal(size=(1, 1, 8, 8)) + 1j * rng.normal(size=(1, 1, 8, 8))
+        array = numpy.concatenate([base, base * (1.0 + 1.0e-9)], axis=0)
+        weights = numpy.array([[1.0, -1.0], [1.0, -1.0]])
+        series = compute_opr_mode_series(
+            ProbeSequence(array, weights, PixelGeometry(width_m=1e-9, height_m=1e-9))
+        )
+
+        assert (series.primary_mode_photon_count >= 0.0).all()
+        assert (series.deviation_photon_count >= 0.0).all()
+
+    def test_single_precision_agrees_with_double(self) -> None:
+        """The Gram matrix is accumulated in double precision whatever the probe's dtype."""
+        single = compute_opr_mode_series(self._probes(dtype=numpy.complex64))
+        double = compute_opr_mode_series(self._probes(dtype=numpy.complex128))
+        numpy.testing.assert_allclose(
+            single.total_photon_count, double.total_photon_count, rtol=1e-6
+        )
+
+    @pytest.mark.parametrize('threshold', [0.0, -0.1, 1.5])
+    def test_invalid_variance_threshold_is_rejected(self, threshold: float) -> None:
+        with pytest.raises(ValueError, match='Variance fraction threshold'):
+            compute_opr_mode_series(self._probes(), variance_fraction_threshold=threshold)
+
+    def test_one_dominant_mode_suffices(self) -> None:
+        rng = numpy.random.default_rng(11)
+        weights = 1.0e-9 * rng.normal(size=(self.NUM_POSITIONS, self.NUM_COHERENT_MODES))
+        weights[:, 1] = rng.normal(size=self.NUM_POSITIONS)
+
+        assert compute_opr_mode_series(self._probes(weights=weights)).effective_mode_count == 1
+
+    def test_effective_mode_count_follows_the_threshold(self) -> None:
+        """Raising the threshold past one mode's share pulls the next one in.
+
+        The counting runs over the modes ranked by contribution rather than in basis
+        order, so the thresholds here are built from the ranked fractions themselves.
+        """
+        probes = self._probes()
+        series = compute_opr_mode_series(probes)
+        ranked = sorted(
+            (statistics.variance_fraction for statistics in series.mode_statistics),
+            reverse=True,
+        )
+
+        assert (
+            compute_opr_mode_series(
+                probes, variance_fraction_threshold=0.5 * ranked[0]
+            ).effective_mode_count
+            == 1
+        )
+        assert (
+            compute_opr_mode_series(
+                probes, variance_fraction_threshold=ranked[0] + 0.5 * ranked[1]
+            ).effective_mode_count
+            == 2
+        )
+
+    def test_save_npz_round_trip(self, tmp_path) -> None:  # noqa: ANN001
+        series = compute_opr_mode_series(self._probes())
+        file_path = tmp_path / 'opr.npz'
+        series.save_npz(file_path)
+
+        with numpy.load(file_path) as contents:
+            numpy.testing.assert_allclose(contents['opr_weight'], series.opr_weight)
+            numpy.testing.assert_allclose(
+                contents['primary_mode_photon_count'], series.primary_mode_photon_count
+            )
+            numpy.testing.assert_allclose(
+                contents['deviation_photon_count'], series.deviation_photon_count
+            )
+            numpy.testing.assert_allclose(contents['total_photon_count'], series.total_photon_count)
+            assert contents['secondary_mode_photon_count'] == pytest.approx(
+                series.secondary_mode_photon_count
+            )
+            numpy.testing.assert_allclose(
+                contents['variance_fraction'],
+                [statistics.variance_fraction for statistics in series.mode_statistics],
+            )
+            assert int(contents['effective_mode_count']) == series.effective_mode_count
+            assert contents['relative_variation'] == pytest.approx(series.relative_variation)

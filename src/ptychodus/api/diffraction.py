@@ -156,7 +156,7 @@ class DiffractionArray(ABC):
     def get_num_patterns(self) -> int:
         return self.get_patterns().shape[0]
 
-    def get_probe_photon_flux_Hz(self) -> DiffractionPatternPhotonFluxes | None:  # noqa: N802
+    def get_probe_photon_flux_per_s(self) -> DiffractionPatternPhotonFluxes | None:
         """Per-pattern incident probe photon flux (photons per second).
 
         Beamline readers with hardware flux measurements (ion chamber, BPM,
@@ -175,13 +175,13 @@ class SimpleDiffractionArray(DiffractionArray):
         label: str,
         indexes: DiffractionIndexes,
         patterns: DiffractionPatterns,
-        probe_photon_flux_Hz: DiffractionPatternPhotonFluxes | None = None,  # noqa: N803
+        probe_photon_flux_per_s: DiffractionPatternPhotonFluxes | None = None,
     ) -> None:
         super().__init__()
         self._label = label
         self._indexes = indexes
         self._patterns = patterns
-        self._probe_photon_flux_Hz = probe_photon_flux_Hz
+        self._probe_photon_flux_per_s = probe_photon_flux_per_s
 
     def get_label(self) -> str:
         return self._label
@@ -194,14 +194,14 @@ class SimpleDiffractionArray(DiffractionArray):
             return self._patterns
         return read_region.apply_to(self._patterns)
 
-    def get_probe_photon_flux_Hz(self) -> DiffractionPatternPhotonFluxes | None:  # noqa: N802
-        return self._probe_photon_flux_Hz
+    def get_probe_photon_flux_per_s(self) -> DiffractionPatternPhotonFluxes | None:
+        return self._probe_photon_flux_per_s
 
     @property
     def nbytes(self) -> int:
         sz = self._indexes.nbytes + self._patterns.nbytes
-        if self._probe_photon_flux_Hz is not None:
-            sz += self._probe_photon_flux_Hz.nbytes
+        if self._probe_photon_flux_per_s is not None:
+            sz += self._probe_photon_flux_per_s.nbytes
         return sz
 
 
@@ -225,7 +225,7 @@ class DiffractionMetadata:
     detector_distance_m: float | None = None
     detector_pixel_geometry: PixelGeometry | None = None
     beam_center: BeamCenter | None = None
-    probe_energy_eV: float | None = None  # noqa: N815
+    photon_energy_eV: float | None = None  # noqa: N815
     probe_photon_count: int | None = None
     exposure_time_s: float | None = None
     tomography_angle_deg: float | None = None
@@ -241,7 +241,7 @@ class DiffractionMetadata:
         sz += getsizeof(self.detector_distance_m)
         sz += getsizeof(self.detector_pixel_geometry)
         sz += getsizeof(self.beam_center)
-        sz += getsizeof(self.probe_energy_eV)
+        sz += getsizeof(self.photon_energy_eV)
         sz += getsizeof(self.probe_photon_count)
         sz += getsizeof(self.exposure_time_s)
         sz += getsizeof(self.tomography_angle_deg)

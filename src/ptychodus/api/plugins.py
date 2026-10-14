@@ -29,7 +29,7 @@ from .object import ObjectFileReader, ObjectFileWriter, Object
 from .observer import Observable, Observer
 from .parameters import Parameter, StringParameter
 from .probe import ProbeFileReader, ProbeFileWriter, ProbeSequence
-from .simulate.probe import FresnelZonePlate
+from .simulate.probe import FresnelZonePlate, KirkpatrickBaezMirrorPair
 from .probe_positions import (
     ProbePositionFileReader,
     ProbePositionFileWriter,
@@ -340,6 +340,7 @@ class PluginRegistry:
         self.probe_position_file_readers = PluginChooser[ProbePositionFileReader]()
         self.probe_position_file_writers = PluginChooser[ProbePositionFileWriter]()
         self.fresnel_zone_plates = PluginChooser[FresnelZonePlate]()
+        self.kb_mirrors = PluginChooser[KirkpatrickBaezMirrorPair]()
         self.probe_file_readers = PluginChooser[ProbeFileReader]()
         self.probe_file_writers = PluginChooser[ProbeFileWriter]()
         self.object_file_readers = PluginChooser[ObjectFileReader]()

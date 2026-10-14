@@ -1,8 +1,8 @@
 """Generic, domain-agnostic NumPy array type aliases.
 
-Aliases here name an *element-dtype family* (integer / floating / complex /
-inexact / number) over an unspecified shape and are safe to use anywhere a
-function takes or returns "some real array" without a further contract.
+Aliases here name an *element-dtype family* (boolean / integer / floating /
+complex / inexact / number) over an unspecified shape and are safe to use
+anywhere a function takes or returns "some real array" without a further contract.
 
 Shape- or domain-specific aliases do **not** belong here. When an array has
 a fixed rank and a specific meaning tied to a domain concept — e.g. a single
@@ -17,6 +17,7 @@ from typing import Any, TypeAlias
 import numpy
 import numpy.typing
 
+BooleanArrayType: TypeAlias = numpy.typing.NDArray[numpy.bool_]
 IntegerArrayType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
 RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
 ComplexArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]

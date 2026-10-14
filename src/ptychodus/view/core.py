@@ -4,8 +4,6 @@ import logging
 
 from PyQt5.QtCore import (
     PYQT_VERSION_STR,
-    QEasingCurve,
-    QPropertyAnimation,
     QSize,
     QT_VERSION_STR,
     Qt,
@@ -41,8 +39,15 @@ from .settings import SettingsView
 logger = logging.getLogger(__name__)
 
 
+# A child button matches the panels above it in shape, so the rail down the left of
+# its group, the indent, and the smaller icon are all that mark the two levels apart.
+_CHILD_RAIL_PX = 3
+_CHILD_INDENT_PX = 14
+
 _SUBVIEW_GROUP_STYLE = (
-    '_SubviewGroupContainer { background-color: palette(mid); }'
+    '_SubviewGroupContainer {'
+    f'    border-left: {_CHILD_RAIL_PX}px solid palette(dark);'
+    '}'
     '_SubviewGroupContainer QToolButton { background: transparent; border: none; }'
     '_SubviewGroupContainer QToolButton:hover { background-color: palette(midlight); }'
     '_SubviewGroupContainer QToolButton:checked {'
@@ -51,10 +56,10 @@ _SUBVIEW_GROUP_STYLE = (
     '}'
 )
 
-_EXPAND_COLLAPSE_DURATION_MS = 180
-
 
 class _SubviewGroupContainer(QWidget):
+    """The child buttons of one navigation panel, indented beneath it."""
+
     def __init__(
         self,
         child_actions: tuple[QAction, ...],
@@ -63,10 +68,13 @@ class _SubviewGroupContainer(QWidget):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
+        # A plain QWidget paints no stylesheet border without this, so the rail in
+        # _SUBVIEW_GROUP_STYLE would not be drawn.
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(_SUBVIEW_GROUP_STYLE)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(_CHILD_INDENT_PX, 0, 0, 0)
         layout.setSpacing(0)
 
         self._buttons: dict[QAction, QToolButton] = {}
@@ -78,16 +86,6 @@ class _SubviewGroupContainer(QWidget):
             layout.addWidget(btn)
             self._buttons[action] = btn
 
-        layout.activate()
-        self._cached_natural_height = layout.sizeHint().height()
-
-        self.setMaximumHeight(0)
-        self._expanded = False
-
-        self._animation = QPropertyAnimation(self, b'maximumHeight', self)
-        self._animation.setDuration(_EXPAND_COLLAPSE_DURATION_MS)
-        self._animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
-
     def child_button(self, action: QAction) -> QToolButton | None:
         return self._buttons.get(action)
 
@@ -96,28 +94,11 @@ class _SubviewGroupContainer(QWidget):
         if btn is not None:
             btn.setVisible(visible)
 
-    def set_expanded(self, expanded: bool, *, animated: bool = True) -> None:
-        running = self._animation.state() == QPropertyAnimation.State.Running
-        if expanded == self._expanded and not running:
-            return
-        self._expanded = expanded
-        self._animation.stop()
-        target = self._cached_natural_height if expanded else 0
-        if not animated:
-            self.setMaximumHeight(target)
-            return
-        self._animation.setStartValue(self.maximumHeight())
-        self._animation.setEndValue(target)
-        self._animation.start()
-
 
 @dataclass(frozen=True)
 class NavigationSubviewGroup:
-    parent_action: QAction
     child_actions: tuple[QAction, ...]
     container: _SubviewGroupContainer
-    top_separator: QAction
-    bottom_separator: QAction
 
 
 class NavigationPanel:
@@ -143,27 +124,17 @@ class NavigationPanel:
 
     def add_subview_group(
         self,
-        parent_action: QAction,
         child_actions: tuple[QAction, ...],
         *,
         insert_before: QAction,
         child_icon_size: QSize,
     ) -> NavigationSubviewGroup:
+        """Re-home panels already added by add_panel as children of the panel above."""
         for child in child_actions:
             self.tool_bar.removeAction(child)
-        top_separator = self.tool_bar.insertSeparator(insert_before)
         container = _SubviewGroupContainer(child_actions, icon_size=child_icon_size)
         self.tool_bar.insertWidget(insert_before, container)
-        bottom_separator = self.tool_bar.insertSeparator(insert_before)
-        top_separator.setVisible(False)
-        bottom_separator.setVisible(False)
-        group = NavigationSubviewGroup(
-            parent_action=parent_action,
-            child_actions=child_actions,
-            container=container,
-            top_separator=top_separator,
-            bottom_separator=bottom_separator,
-        )
+        group = NavigationSubviewGroup(child_actions=child_actions, container=container)
         self.subview_groups.append(group)
         return group
 
@@ -185,13 +156,20 @@ class NavigationPanel:
                 if btn is not None:
                     child_buttons.append(btn)
 
-        all_buttons = top_level_buttons + child_buttons
-        if not all_buttons:
+        if not top_level_buttons and not child_buttons:
             return
 
-        target_width = max(btn.sizeHint().width() for btn in all_buttons)
-        for btn in all_buttons:
+        # Children sit behind the rail and one indent in, so they need that much less
+        # width to line their right edges up with the top-level buttons.
+        child_inset = _CHILD_RAIL_PX + _CHILD_INDENT_PX
+        target_width = max(
+            max((btn.sizeHint().width() for btn in top_level_buttons), default=0),
+            max((btn.sizeHint().width() + child_inset for btn in child_buttons), default=0),
+        )
+        for btn in top_level_buttons:
             btn.setFixedWidth(target_width)
+        for btn in child_buttons:
+            btn.setFixedWidth(target_width - child_inset)
         for group in self.subview_groups:
             group.container.setFixedWidth(target_width)
 
@@ -335,8 +313,8 @@ class ViewCore(QMainWindow):
         self.navigation.tool_bar.setIconSize(QSize(32, 32))
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, self.navigation.tool_bar)
 
+        # Children of Products.
         self.navigation.add_subview_group(
-            parent_action=self.product_action,
             child_actions=(
                 self.positions_action,
                 self.probe_action,
@@ -345,8 +323,8 @@ class ViewCore(QMainWindow):
             insert_before=self.processing_action,
             child_icon_size=QSize(24, 24),
         )
+        # Children of Processing.
         self.navigation.add_subview_group(
-            parent_action=self.processing_action,
             child_actions=(self.globus_action, self.genesis_action, self.automation_action),
             insert_before=self.fluorescence_action,
             child_icon_size=QSize(24, 24),

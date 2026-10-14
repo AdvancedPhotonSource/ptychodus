@@ -57,13 +57,15 @@ class MetadataRepositoryItem(ParameterGroup):
         name: str = '',
         comments: str = '',
         detector_distance_m: float | None = None,
-        probe_energy_eV: float | None = None,  # noqa: N803
+        photon_energy_eV: float | None = None,  # noqa: N803
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
-        mass_attenuation_m2_kg: float | None = None,
+        mass_attenuation_m2_per_kg: float | None = None,
         tomography_angle_deg: float | None = None,
+        focus_object_distance_m: float | None = None,
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
+        far_field: bool | None = None,
     ) -> None:
         super().__init__()
         self._settings = settings
@@ -80,12 +82,19 @@ class MetadataRepositoryItem(ParameterGroup):
 
         self._add_parameter('detector_distance_m', self.detector_distance_m)
 
-        self.probe_energy_eV = settings.probe_energy_eV.copy()
+        self.focus_object_distance_m = settings.focus_object_distance_m.copy()
 
-        if probe_energy_eV is not None:
-            self.probe_energy_eV.set_value(probe_energy_eV)
+        if focus_object_distance_m is not None:
+            self.focus_object_distance_m.set_value(focus_object_distance_m)
 
-        self._add_parameter('probe_energy_eV', self.probe_energy_eV)
+        self._add_parameter('focus_object_distance_m', self.focus_object_distance_m)
+
+        self.photon_energy_eV = settings.photon_energy_eV.copy()
+
+        if photon_energy_eV is not None:
+            self.photon_energy_eV.set_value(photon_energy_eV)
+
+        self._add_parameter('photon_energy_eV', self.photon_energy_eV)
 
         self.probe_photon_count = settings.probe_photon_count.copy()
 
@@ -101,12 +110,12 @@ class MetadataRepositoryItem(ParameterGroup):
 
         self._add_parameter('exposure_time_s', self.exposure_time_s)
 
-        self.mass_attenuation_m2_kg = settings.mass_attenuation_m2_kg.copy()
+        self.mass_attenuation_m2_per_kg = settings.mass_attenuation_m2_per_kg.copy()
 
-        if mass_attenuation_m2_kg is not None:
-            self.mass_attenuation_m2_kg.set_value(mass_attenuation_m2_kg)
+        if mass_attenuation_m2_per_kg is not None:
+            self.mass_attenuation_m2_per_kg.set_value(mass_attenuation_m2_per_kg)
 
-        self._add_parameter('mass_attenuation_m2_kg', self.mass_attenuation_m2_kg)
+        self._add_parameter('mass_attenuation_m2_per_kg', self.mass_attenuation_m2_per_kg)
 
         self.tomography_angle_deg = settings.tomography_angle_deg.copy()
 
@@ -131,19 +140,28 @@ class MetadataRepositoryItem(ParameterGroup):
 
         self._add_parameter('polarization', self.polarization)
 
+        self.far_field = settings.far_field.copy()
+
+        if far_field is not None:
+            self.far_field.set_value(far_field)
+
+        self._add_parameter('far_field', self.far_field)
+
     def assign(self, metadata: ProductMetadata) -> None:
         self.name.set_value(metadata.name)
         self.comments.set_value(metadata.comments)
         self.detector_distance_m.set_value(metadata.detector_distance_m)
-        self.probe_energy_eV.set_value(metadata.probe_energy_eV)
+        self.photon_energy_eV.set_value(metadata.photon_energy_eV)
         self.probe_photon_count.set_value(metadata.probe_photon_count)
         self.exposure_time_s.set_value(metadata.exposure_time_s)
-        self.mass_attenuation_m2_kg.set_value(metadata.mass_attenuation_m2_kg)
+        self.mass_attenuation_m2_per_kg.set_value(metadata.mass_attenuation_m2_per_kg)
         self.tomography_angle_deg.set_value(metadata.tomography_angle_deg)
+        self.focus_object_distance_m.set_value(metadata.focus_object_distance_m)
         self.tilt_angle_deg.set_value(metadata.tilt_angle_deg)
         self.polarization.set_value(
             metadata.polarization.value if metadata.polarization is not None else ''
         )
+        self.far_field.set_value(metadata.far_field)
 
     def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
@@ -154,13 +172,15 @@ class MetadataRepositoryItem(ParameterGroup):
             name=self.name.get_value(),
             comments=self.comments.get_value(),
             detector_distance_m=self.detector_distance_m.get_value(),
-            probe_energy_eV=self.probe_energy_eV.get_value(),
+            photon_energy_eV=self.photon_energy_eV.get_value(),
             probe_photon_count=self.probe_photon_count.get_value(),
             exposure_time_s=self.exposure_time_s.get_value(),
-            mass_attenuation_m2_kg=self.mass_attenuation_m2_kg.get_value(),
+            mass_attenuation_m2_per_kg=self.mass_attenuation_m2_per_kg.get_value(),
             tomography_angle_deg=self.tomography_angle_deg.get_value(),
+            focus_object_distance_m=self.focus_object_distance_m.get_value(),
             tilt_angle_deg=self.tilt_angle_deg.get_value(),
             polarization=self._parse_polarization(self.polarization.get_value()),
+            far_field=self.far_field.get_value(),
         )
 
     @staticmethod

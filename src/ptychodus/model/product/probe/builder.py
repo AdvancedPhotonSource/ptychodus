@@ -1,44 +1,34 @@
 from __future__ import annotations
 from abc import abstractmethod
-from collections.abc import Sequence
-from enum import auto, IntEnum
+from collections.abc import Callable, Mapping
 import logging
 
 import numpy
 
 from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.simulate.probe import (
+    GaussianSchellStrategy,
+    IncoherentModeStrategy,
+    ProbeMomentPolynomialStrategy,
+    ProbeModeDecayType,
+    RandomPhaseRampStrategy,
     generate_coherent_probe_modes,
     generate_incoherent_probe_modes,
     rescale_probe_intensity,
 )
 from ptychodus.api.probe import (
+    OPRWeightPolicy,
     Probe,
     ProbeSequence,
     ProbeFileReader,
     ProbeGeometryProvider,
+    conform_opr_weights,
+    resample_probe_sequence,
 )
 
 from .settings import ProbeSettings
 
 logger = logging.getLogger(__name__)
-
-
-class ProbeModeDecayType(IntEnum):
-    NONE = auto()
-    POLYNOMIAL = auto()
-    EXPONENTIAL = auto()
-
-    def get_weights(self, num_modes: int, decay_ratio: float) -> Sequence[float]:
-        match self.value:
-            case ProbeModeDecayType.EXPONENTIAL:
-                b = 1.0 / decay_ratio
-                return [b**-n for n in range(num_modes)]
-            case ProbeModeDecayType.POLYNOMIAL:
-                b = numpy.log(decay_ratio) / numpy.log(2.0)
-                return [(n + 1) ** b for n in range(num_modes)]
-            case _:
-                return [1.0] + [0.0] * (num_modes - 1)
 
 
 class ProbeSequenceBuilder(ParameterGroup):
@@ -62,8 +52,38 @@ class ProbeSequenceBuilder(ParameterGroup):
         self.incoherent_mode_decay_ratio = settings.incoherent_mode_decay_ratio.copy()
         self._add_parameter('incoherent_mode_decay_ratio', self.incoherent_mode_decay_ratio)
 
+        self.incoherent_mode_strategy = settings.incoherent_mode_strategy.copy()
+        self._add_parameter('incoherent_mode_strategy', self.incoherent_mode_strategy)
+
+        self.moment_polynomial_damping_width = settings.moment_polynomial_damping_width.copy()
+        self._add_parameter('moment_polynomial_damping_width', self.moment_polynomial_damping_width)
+
+        self.gaussian_schell_beam_width_m = settings.gaussian_schell_beam_width_m.copy()
+        self._add_parameter('gaussian_schell_beam_width_m', self.gaussian_schell_beam_width_m)
+
+        self.gaussian_schell_beam_height_m = settings.gaussian_schell_beam_height_m.copy()
+        self._add_parameter('gaussian_schell_beam_height_m', self.gaussian_schell_beam_height_m)
+
+        self.gaussian_schell_coherence_width_m = settings.gaussian_schell_coherence_width_m.copy()
+        self._add_parameter(
+            'gaussian_schell_coherence_width_m', self.gaussian_schell_coherence_width_m
+        )
+
+        self.gaussian_schell_coherence_height_m = settings.gaussian_schell_coherence_height_m.copy()
+        self._add_parameter(
+            'gaussian_schell_coherence_height_m', self.gaussian_schell_coherence_height_m
+        )
+
         self.num_coherent_modes = settings.num_coherent_modes.copy()
         self._add_parameter('num_coherent_modes', self.num_coherent_modes)
+
+        self.opr_weight_policy = settings.opr_weight_policy.copy()
+        self._add_parameter('opr_weight_policy', self.opr_weight_policy)
+
+        # Set for a single ingest, by a caller that has already chosen; see
+        # `_conform_opr_weights`. Deliberately not a parameter: a one-off choice
+        # belongs to that ingest, not to the stored settings.
+        self._opr_weight_policy_override: OPRWeightPolicy | None = None
 
     def get_name(self) -> str:
         return self._name.get_value()
@@ -112,7 +132,13 @@ class ProbeSequenceBuilder(ParameterGroup):
         rescaled = rescale_probe_intensity(probe, geometry_provider.probe_photon_count)
         return ProbeSequence.from_probe(rescaled)
 
-    def _get_imode_weights(self) -> Sequence[float]:
+    def _get_imode_decay(self) -> tuple[ProbeModeDecayType, float]:
+        """Resolve the incoherent-mode decay settings, tolerating values the api rejects.
+
+        The settings permit a zero ratio and any string at all, while the api strategies
+        raise on a non-positive ratio; a bad stored value should leave the probe with a
+        single occupied mode, not stop the build.
+        """
         imode_decay_ratio = self.incoherent_mode_decay_ratio.get_value()
         imode_decay_type_text = self.incoherent_mode_decay_type.get_value()
         imode_decay_type = ProbeModeDecayType.NONE
@@ -123,8 +149,110 @@ class ProbeSequenceBuilder(ParameterGroup):
             except KeyError:
                 logger.debug(f'Unknown probe mode decay type "{imode_decay_type_text}"')
 
-        num_imodes = self.num_incoherent_modes.get_value()
-        return imode_decay_type.get_weights(num_imodes, imode_decay_ratio)
+        return imode_decay_type, imode_decay_ratio
+
+    def _create_moment_polynomial_strategy(self) -> IncoherentModeStrategy:
+        decay_type, decay_ratio = self._get_imode_decay()
+        return ProbeMomentPolynomialStrategy(
+            decay_type=decay_type,
+            decay_ratio=decay_ratio,
+            damping_width=self.moment_polynomial_damping_width.get_value(),
+        )
+
+    def _create_random_phase_ramp_strategy(self) -> IncoherentModeStrategy:
+        decay_type, decay_ratio = self._get_imode_decay()
+        return RandomPhaseRampStrategy(self._rng, decay_type=decay_type, decay_ratio=decay_ratio)
+
+    def _create_gaussian_schell_strategy(self) -> IncoherentModeStrategy:
+        beam_size_x_m = self.gaussian_schell_beam_width_m.get_value()
+        coherence_length_x_m = self.gaussian_schell_coherence_width_m.get_value()
+        beam_size_y_m = self.gaussian_schell_beam_height_m.get_value()
+        coherence_length_y_m = self.gaussian_schell_coherence_height_m.get_value()
+        widths = (beam_size_x_m, coherence_length_x_m, beam_size_y_m, coherence_length_y_m)
+
+        # The settings permit zero where the model requires a positive width, and a
+        # source of no size describes nothing to build modes from.
+        if any(width <= 0.0 for width in widths):
+            logger.debug('Gaussian-Schell source has a non-positive width')
+            return self._create_moment_polynomial_strategy()
+
+        return GaussianSchellStrategy(
+            beam_size_x_m=beam_size_x_m,
+            coherence_length_x_m=coherence_length_x_m,
+            beam_size_y_m=beam_size_y_m,
+            coherence_length_y_m=coherence_length_y_m,
+        )
+
+    def _create_imode_strategy(self) -> IncoherentModeStrategy:
+        """Build the strategy the settings name, falling back on anything unrecognized.
+
+        The settings are deliberately looser than the api strategies: the names are free
+        strings and the decay ratio may be zero, both of which the strategies reject. A
+        stored value they would refuse should leave a usable probe, not stop the build.
+        """
+        name = self.incoherent_mode_strategy.get_value()
+        namecf = name.casefold()
+
+        for candidate, factory in _IMODE_STRATEGY_FACTORIES.items():
+            if candidate.casefold() == namecf:
+                return factory(self)
+
+        logger.debug(f'Unknown incoherent mode strategy "{name}"')
+        return next(iter(_IMODE_STRATEGY_FACTORIES.values()))(self)
+
+    def _get_opr_weight_policy(self) -> OPRWeightPolicy:
+        """Resolve the OPR weight policy setting, tolerating a name the api does not know.
+
+        The setting is a free string, as the incoherent-mode settings are, so a stored
+        value with no matching policy should leave a usable probe rather than stop the
+        build.
+        """
+        text = self.opr_weight_policy.get_value()
+
+        try:
+            return OPRWeightPolicy[text.upper()]
+        except KeyError:
+            logger.debug(f'Unknown OPR weight policy "{text}"')
+            return OPRWeightPolicy.AVERAGE
+
+    def _conform_opr_weights(
+        self, probe_seq: ProbeSequence, geometry_provider: ProbeGeometryProvider
+    ) -> ProbeSequence:
+        """Reconcile an ingested probe's OPR weights with this run's probe positions.
+
+        The weights carry one row per probe position, so a probe solved on another scan
+        cannot initialize this one until those rows are resolved. The policy setting
+        names how, and is consulted only when the counts actually disagree -- a warm
+        start whose weights already fit comes through untouched.
+
+        An override supplied for a single ingest takes precedence and applies even when
+        the counts agree, which is what lets a caller ask for a fresh basis on a scan of
+        the same size.
+        """
+        weights = probe_seq.get_opr_weights_or_none()
+
+        if weights is None:
+            return probe_seq
+
+        num_positions = geometry_provider.num_scan_points
+
+        if num_positions < 1:
+            # No probe positions bound yet; the observer chain re-runs the build.
+            return probe_seq
+
+        policy = self._opr_weight_policy_override
+
+        if policy is None:
+            if weights.shape[0] == num_positions:
+                return probe_seq
+
+            policy = self._get_opr_weight_policy()
+
+        logger.info(
+            f'Probe carries OPR weights for {weights.shape[0]} probe position(s)'
+            f' and this run has {num_positions}; applying {policy.name}.'
+        )
+        return conform_opr_weights(self._rng, probe_seq, num_positions, policy)
 
     def _condition_probe(
         self, probe_seq: ProbeSequence, geometry_provider: ProbeGeometryProvider
@@ -144,7 +272,13 @@ class ProbeSequenceBuilder(ParameterGroup):
         here rather than in the ingesting subclasses. Generative builders always
         emit a single coherent, single incoherent mode, which makes every guard
         inert on that path.
+
+        The OPR weights are reconciled first, so a `COLLAPSE` or `DISCARD` policy leaves
+        a single-coherent-mode probe that then goes through the expand-only pipeline
+        below like any other -- which is what lets discarding a stale basis and
+        requesting a new mode count compose into a basis sized to this run.
         """
+        probe_seq = self._conform_opr_weights(probe_seq, geometry_provider)
         num_imodes_requested = self.num_incoherent_modes.get_value()
         num_cmodes_requested = self.num_coherent_modes.get_value()
 
@@ -169,9 +303,9 @@ class ProbeSequenceBuilder(ParameterGroup):
 
         if num_imodes_actual < num_imodes_requested:
             probe = generate_incoherent_probe_modes(
-                self._rng,
                 probe,
-                self._get_imode_weights(),
+                num_imodes_requested,
+                strategy=self._create_imode_strategy(),
                 orthogonalize=self.orthogonalize_incoherent_modes.get_value(),
             )
         elif num_imodes_actual > num_imodes_requested:
@@ -194,6 +328,24 @@ class ProbeSequenceBuilder(ParameterGroup):
         return probe_seq
 
 
+# The single source of truth for the selectable strategies. A chooser offers these keys
+# and the builder resolves against this same mapping, so a name can never be offered
+# without a way to build it, nor a strategy be buildable but never offered.
+_IMODE_STRATEGY_FACTORIES: Mapping[
+    str, Callable[[ProbeSequenceBuilder], IncoherentModeStrategy]
+] = {
+    'MomentPolynomial': ProbeSequenceBuilder._create_moment_polynomial_strategy,
+    'RandomPhaseRamp': ProbeSequenceBuilder._create_random_phase_ramp_strategy,
+    'GaussianSchell': ProbeSequenceBuilder._create_gaussian_schell_strategy,
+}
+
+INCOHERENT_MODE_STRATEGY_NAMES = tuple(_IMODE_STRATEGY_FACTORIES)
+"""Selectable incoherent-mode strategies, in the order a chooser should offer them.
+
+The first entry is what an unrecognized stored name falls back to.
+"""
+
+
 class FromMemoryProbeBuilder(ProbeSequenceBuilder):
     """A probe that has already been conditioned.
 
@@ -212,6 +364,11 @@ class FromMemoryProbeBuilder(ProbeSequenceBuilder):
     The expand-only guards in `_condition_probe` would in fact catch most of this
     on their own, but the bypass is explicit so that the invariant does not depend
     on them.
+
+    Reconciling the OPR weights is the one step that still runs, because a probe
+    copied onto a scan of a different size is unusable until its weight rows are
+    resolved. It runs no generator and is a strict no-op whenever the row count
+    already matches, which it always does for reconstruction output.
     """
 
     def __init__(
@@ -241,10 +398,13 @@ class FromMemoryProbeBuilder(ProbeSequenceBuilder):
             pixel_geometry = probe_geometry.get_pixel_geometry()
 
         # TODO regrid probe as needed based on probe geometry from file/provider
-        return ProbeSequence(
-            self._probe.get_array(),
-            self._probe.get_opr_weights_or_none(),
-            pixel_geometry,
+        return self._conform_opr_weights(
+            ProbeSequence(
+                self._probe.get_array(),
+                self._probe.get_opr_weights_or_none(),
+                pixel_geometry,
+            ),
+            geometry_provider,
         )
 
     def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
@@ -260,6 +420,16 @@ class FromFileProbeBuilder(ProbeSequenceBuilder):
     were silently ignored here. `_condition_probe` is expand-only, so a file that
     already carries more modes, or an OPR basis, keeps what it has.
 
+    A file that records its own pixel size is reconciled to the run's, since a
+    probe sampled by another geometry is an illumination of the wrong physical
+    size. None of the probe formats currently record one, so today this only ever
+    fires for a reader that supplies it.
+
+    An OPR basis read from a product solved on another scan carries weights sized for
+    that scan. `_condition_probe` reconciles them against this run's probe positions
+    before anything else, under the policy setting or under an override passed here for
+    a single ingest.
+
     The photon-count rescale is deliberately not applied; see
     `ProbeSequenceBuilder._rescale_to_photon_count`.
     """
@@ -269,10 +439,16 @@ class FromFileProbeBuilder(ProbeSequenceBuilder):
         rng: numpy.random.Generator,
         settings: ProbeSettings,
         file_reader: ProbeFileReader,
+        *,
+        opr_weight_policy: OPRWeightPolicy | None = None,
     ) -> None:
         super().__init__(rng, settings, 'from_file')
         self._settings = settings
         self._file_reader = file_reader
+
+        if opr_weight_policy is not None:
+            self._opr_weight_policy_override = opr_weight_policy
+            self.opr_weight_policy.set_value(opr_weight_policy.name)
 
         self.file_path = settings.file_path.copy()
         self._add_parameter('file_path', self.file_path)
@@ -281,7 +457,12 @@ class FromFileProbeBuilder(ProbeSequenceBuilder):
         self._add_parameter('file_type', self.file_type)
 
     def copy(self) -> FromFileProbeBuilder:
-        builder = FromFileProbeBuilder(self._rng, self._settings, self._file_reader)
+        builder = FromFileProbeBuilder(
+            self._rng,
+            self._settings,
+            self._file_reader,
+            opr_weight_policy=self._opr_weight_policy_override,
+        )
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
@@ -303,11 +484,15 @@ class FromFileProbeBuilder(ProbeSequenceBuilder):
         try:
             pixel_geometry = probe_from_file.get_pixel_geometry()
         except ValueError:
+            # The format records no pixel size, so there is nothing to reconcile and the
+            # array is taken to be sampled the way this run is.
             pixel_geometry = probe_geometry.get_pixel_geometry()
 
-        # TODO regrid probe as needed based on probe geometry from file/provider
-        return ProbeSequence(
-            probe_from_file.get_array(),
-            probe_from_file.get_opr_weights_or_none(),
-            pixel_geometry,
+        return resample_probe_sequence(
+            ProbeSequence(
+                probe_from_file.get_array(),
+                probe_from_file.get_opr_weights_or_none(),
+                pixel_geometry,
+            ),
+            probe_geometry,
         )

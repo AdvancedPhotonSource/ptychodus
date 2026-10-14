@@ -10,6 +10,7 @@ from ptychodus.api.constants import format_bytes
 from ptychodus.api.typing import RealArrayType
 from ptychodus.api.fluorescence import FluorescenceDataset
 
+from ..naming import create_unique_name
 from ..product import ProductRepository, ProductRepositoryItem, ProductRepositoryObserver
 from ..product.metadata import MetadataRepositoryItem
 from ..product.object import ObjectRepositoryItem
@@ -256,15 +257,7 @@ class FluorescenceRepository(
         return len(self._item_list)
 
     def create_unique_name(self, candidate_name: str) -> str:
-        reserved_names = {item.get_name() for item in self._item_list}
-        name = candidate_name or 'Unnamed'
-        match = 0
-
-        while name in reserved_names:
-            match += 1
-            name = f'{candidate_name}-{match}'
-
-        return name
+        return create_unique_name(candidate_name, {item.get_name() for item in self._item_list})
 
     def _update_indexes(self) -> None:
         for index, item in enumerate(self._item_list):

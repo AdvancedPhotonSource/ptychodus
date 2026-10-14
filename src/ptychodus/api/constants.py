@@ -1,6 +1,7 @@
 """Mathematical and physical constants and unit enums used throughout the API."""
 
 from __future__ import annotations
+import math
 from decimal import Decimal
 from enum import Enum
 from typing import Final
@@ -17,13 +18,16 @@ ELECTRON_VOLT_J: Final[float] = 1.602176634e-19
 LIGHT_SPEED_M_PER_S: Final[float] = 299792458
 PLANCK_CONSTANT_J_PER_HZ: Final[float] = 6.62607015e-34
 
-ONE_KILOELECTRONVOLT_EV: Final[float] = 1000.0
-
 # Unit Enums
-# All physical quantities in api/ are stored in base SI units (m, s, J, rad, Hz) with an
-# explicit unit suffix on the identifier (_m, _s, _J, _rad, _Hz, ...); eV, deg, and px are
-# the only non-SI suffixes allowed by convention. The enums below convert to and from those
-# base units at the boundaries -- file readers on the way in, the GUI on the way out.
+# All physical quantities in api/ are stored in base SI units (m, s, J, rad, ...) with an
+# explicit unit suffix on the identifier (_m, _s, _J, _rad, ...); eV, deg, and px are
+# the only non-SI suffixes allowed by convention. A compound unit reads
+# <numerator>_per_<denominator>, with multiplied units joined by _ within either part and
+# the numerator omitted when it is dimensionless: m2_per_kg, J_per_m2, rad_per_m, per_s,
+# per_s_m2. A bare _ never means division, and a rate is never spelled _Hz -- so that one
+# quantity carries one name wherever it is derived, mapped or measured. The enums below
+# convert to and from those base units at the boundaries -- file readers on the way in,
+# the GUI on the way out.
 
 
 class LengthUnit(Enum):
@@ -129,6 +133,65 @@ class AngleUnit(Enum):
         return angle_turns * self.units_per_turn
 
 
+class EnergyUnit(Enum):
+    """Photon energy units, ordered smallest to largest.
+
+    The member value pairs the unit's power of ten relative to the electron-volt with its
+    display label. The exponent, not the multiplier, is the source of truth:
+    ``electronvolts_per_unit`` is derived from it so the two cannot drift, matching the shape
+    of :class:`LengthUnit` and :class:`ByteUnit`.
+
+    The joule is deliberately not a member. It is not a power of ten of an electron-volt, so
+    admitting it would break that invariant; convert across that boundary with
+    :func:`energy_eV_to_J` and :func:`energy_J_to_eV` instead.
+    """
+
+    ELECTRONVOLT = (0, 'eV')
+    KILOELECTRONVOLT = (3, 'keV')
+    MEGAELECTRONVOLT = (6, 'MeV')
+
+    def __init__(self, power_of_ten: int, label: str) -> None:
+        self.power_of_ten = power_of_ten
+        self.label = label
+        self.electronvolts_per_unit: float = float(f'1e{power_of_ten}')
+
+    @classmethod
+    def from_electronvolts(cls, energy_eV: float) -> EnergyUnit:  # noqa: N803
+        """Largest unit that leaves a magnitude of at least one.
+
+        Ignores sign and clamps to the ends of the ladder. Zero and non-finite energies map
+        to electron-volts. Unlike :meth:`LengthUnit.from_meters`, which lets non-finite
+        values fall through to the meter because the meter happens to sit at the top of its
+        ladder, the guard here has to be explicit: the top of this ladder is the megaelectron-
+        volt, so an unguarded walk would report ``nan`` as MeV.
+        """
+        if energy_eV == 0.0 or not math.isfinite(energy_eV):
+            return cls.ELECTRONVOLT
+
+        magnitude_eV = abs(energy_eV)  # noqa: N806
+        unit = cls.ELECTRONVOLT
+
+        for candidate in cls:
+            if magnitude_eV < candidate.electronvolts_per_unit:
+                break
+
+            unit = candidate
+
+        return unit
+
+    def to_electronvolts(self, energy: float) -> float:
+        """Express an energy given in this unit as electron-volts."""
+        return energy * self.electronvolts_per_unit
+
+    def convert(self, energy_eV: float) -> float:  # noqa: N803
+        """Express an energy in electron-volts in this unit."""
+        return energy_eV / self.electronvolts_per_unit
+
+    def format(self, energy_eV: float) -> str:  # noqa: N803
+        """Render an energy in electron-volts in this unit, e.g. "8.047 keV"."""
+        return f'{self.convert(energy_eV):.4g} {self.label}'
+
+
 # Derived Constants
 HC_EV_ANGSTROM: Final[float] = LengthUnit.ANGSTROM.convert(
     PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S / ELECTRON_VOLT_J
@@ -153,6 +216,16 @@ def wavelength_m_to_energy_eV(wavelength_m: float) -> float:  # noqa: N802
         return hc_Jm / (wavelength_m * ELECTRON_VOLT_J)
     except ZeroDivisionError:
         return 0.0
+
+
+def energy_eV_to_J(energy_eV: float) -> float:  # noqa: N802, N803
+    """Photon energy in joules for a photon energy in electron-volts."""
+    return energy_eV * ELECTRON_VOLT_J
+
+
+def energy_J_to_eV(energy_J: float) -> float:  # noqa: N802, N803
+    """Photon energy in electron-volts for a photon energy in joules."""
+    return energy_J / ELECTRON_VOLT_J
 
 
 def format_length(length_m: float) -> str:

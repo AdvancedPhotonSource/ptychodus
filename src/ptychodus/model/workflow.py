@@ -6,7 +6,7 @@ import logging
 
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.diffraction import CropRegion, Polarization
-from ptychodus.api.preprocess.probe_positions import AffineTransform
+from ptychodus.api.affine import AffineTransform
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import ReconstructInput
 from ptychodus.api.settings import PathPrefixChange, SettingsRegistry
@@ -345,26 +345,30 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         *,
         comments: str = '',
         detector_distance_m: float | None = None,
-        probe_energy_eV: float | None = None,  # noqa: N803
+        focus_object_distance_m: float | None = None,
+        photon_energy_eV: float | None = None,  # noqa: N803
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
-        mass_attenuation_m2_kg: float | None = None,
+        mass_attenuation_m2_per_kg: float | None = None,
         tomography_angle_deg: float | None = None,
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
+        far_field: bool | None = None,
         diffraction: DiffractionWorkflowAPI | None = None,
     ) -> ProductWorkflowAPI:
         product_index = self._product_api.insert_new_product(
             name,
             comments=comments,
             detector_distance_m=detector_distance_m,
-            probe_energy_eV=probe_energy_eV,
+            focus_object_distance_m=focus_object_distance_m,
+            photon_energy_eV=photon_energy_eV,
             probe_photon_count=probe_photon_count,
             exposure_time_s=exposure_time_s,
-            mass_attenuation_m2_kg=mass_attenuation_m2_kg,
+            mass_attenuation_m2_per_kg=mass_attenuation_m2_per_kg,
             tomography_angle_deg=tomography_angle_deg,
             tilt_angle_deg=tilt_angle_deg,
             polarization=polarization,
+            far_field=far_field,
             dataset=self._fetch_dataset(diffraction),
         )
         return self.get_product(product_index)

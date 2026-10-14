@@ -36,10 +36,6 @@ that all three vertices of each simplex cell contribute at every interior
 point regardless of `grid_scale_px`.
 """
 
-import matplotlib
-
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import numpy
 import numpy.testing
 import pytest
@@ -53,8 +49,10 @@ from ptychodus.api.simulate.object import (
     _map_simplex_to_cartesian,
     generate_gaussian_random_field_object,
     generate_paganin_object,
+    generate_random_object,
     generate_siemens_star_object,
     generate_stxm_object,
+    generate_uniform_object,
 )
 from ptychodus.api.probe_positions import ProbePosition
 from ptychodus.api.assemble import AssembledDiffractionData
@@ -598,99 +596,30 @@ class TestSimplexCoordinateMappings:
         assert contrib[0, 0] == pytest.approx(0.0, abs=1e-12)
 
 
-class TestSimplexVisualOutput:
-    """Outputs saved to pytest's tmp_path for manual inspection."""
+def test_autocorrelation_length_increases_with_grid_scale() -> None:
+    """The 1/e autocorrelation crossing must track the grid scale it was generated at.
 
-    def test_single_noise_image(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
-        """Save a grayscale simplex noise image."""
-        scale = 16.0
-        noise = _generate_simplex_noise(_rng(), 256, 256, scale)
-        vmax = float(numpy.abs(noise).max()) or 1.0
+    This is the property that makes `grid_scale` meaningful: a larger scale has to
+    produce a visibly coarser texture, not merely a differently seeded one.
+    """
+    crossings: list[tuple[float, float]] = []
 
-        fig, ax = plt.subplots(figsize=(5, 5))
-        im = ax.imshow(noise, cmap='gray', vmin=-vmax, vmax=vmax, interpolation='nearest')
-        fig.colorbar(im, ax=ax, shrink=0.8)
-        ax.set_title(f'Simplex Noise  scale={scale:.0f} px  std={noise.std():.3f}')
-        ax.axis('off')
-        fig.tight_layout()
-        out = tmp_path / 'simplex_noise_single.png'
-        fig.savefig(out, dpi=100)
-        plt.close(fig)
-        assert out.exists()
+    for scale in (4.0, 8.0, 16.0):
+        noise = _generate_simplex_noise(_rng(0), 256, 256, scale)
+        row = noise.mean(axis=0)
+        row = row - row.mean()
+        n = len(row)
+        acf_full = numpy.fft.irfft(numpy.abs(numpy.fft.rfft(row, n=2 * n)) ** 2)[:n]
+        acf = acf_full / acf_full[0] if acf_full[0] > 0 else acf_full
 
-    def test_multi_scale_comparison(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
-        """Compare simplex noise texture at four grid scales side by side."""
-        scales = [4.0, 8.0, 16.0, 32.0]
-        fig, axes = plt.subplots(1, len(scales), figsize=(16, 4))
-        for ax, scale in zip(axes, scales):
-            noise = _generate_simplex_noise(_rng(0), 128, 128, scale)
-            vmax = float(numpy.abs(noise).max()) or 1.0
-            ax.imshow(noise, cmap='seismic', vmin=-vmax, vmax=vmax, interpolation='nearest')
-            ax.set_title(f'scale={scale:.0f} px\nstd={noise.std():.3f}')
-            ax.axis('off')
-        fig.suptitle('Simplex Noise at Different Grid Scales')
-        fig.tight_layout()
-        out = tmp_path / 'simplex_noise_scales.png'
-        fig.savefig(out, dpi=100)
-        plt.close(fig)
-        assert out.exists()
+        idx = numpy.where(acf < numpy.exp(-1.0))[0]
+        crossings.append((scale, float(idx[0]) if len(idx) else float(n)))
 
-    def test_power_spectrum_plot(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
-        """Plot radial power spectra for several scales; characteristic frequency marked."""
-        scales = [4.0, 8.0, 16.0]
-        fig, ax = plt.subplots(figsize=(7, 4))
-        for scale in scales:
-            noise = _generate_simplex_noise(_rng(0), 256, 256, scale)
-            freqs, power = _radial_power_spectrum(noise)
-            ax.semilogy(freqs, power + 1e-30, label=f'scale={scale:.0f} px')
-            ax.axvline(1.0 / scale, linestyle='--', alpha=0.4, color='gray')
-        ax.set_xlabel('Spatial frequency (cycles/pixel)')
-        ax.set_ylabel('Mean power (log scale)')
-        ax.set_title('Radial Power Spectrum of Simplex Noise\n(dashed lines = 1/scale)')
-        ax.legend()
-        fig.tight_layout()
-        out = tmp_path / 'simplex_noise_spectrum.png'
-        fig.savefig(out, dpi=100)
-        plt.close(fig)
-        assert out.exists()
-
-    def test_autocorrelation_plot(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
-        """Plot 1-D autocorrelation functions; verify 1/e crossing scales with grid_scale."""
-        scales = [4.0, 8.0, 16.0]
-        fig, ax = plt.subplots(figsize=(7, 4))
-        crossings: list[tuple[float, float]] = []
-        for scale in scales:
-            noise = _generate_simplex_noise(_rng(0), 256, 256, scale)
-            row = noise.mean(axis=0)
-            row = row - row.mean()
-            n = len(row)
-            acf_full = numpy.fft.irfft(numpy.abs(numpy.fft.rfft(row, n=2 * n)) ** 2)[:n]
-            acf = acf_full / acf_full[0] if acf_full[0] > 0 else acf_full
-            lags = numpy.arange(n)
-            ax.plot(lags[: n // 2], acf[: n // 2], label=f'scale={scale:.0f} px')
-            idx = numpy.where(acf < numpy.exp(-1.0))[0]
-            crossing = float(idx[0]) if len(idx) else float(n)
-            crossings.append((scale, crossing))
-
-        ax.axhline(numpy.exp(-1.0), linestyle=':', color='black', label='1/e')
-        ax.set_xlabel('Lag (pixels)')
-        ax.set_ylabel('Normalised autocorrelation')
-        ax.set_title('1-D Autocorrelation of Simplex Noise')
-        ax.set_xlim(0, 80)
-        ax.legend()
-        fig.tight_layout()
-        out = tmp_path / 'simplex_noise_autocorrelation.png'
-        fig.savefig(out, dpi=100)
-        plt.close(fig)
-        assert out.exists()
-
-        # Quantitative check embedded in the visual test:
-        # 1/e crossing should increase with scale
-        for (s1, c1), (s2, c2) in zip(crossings[:-1], crossings[1:]):
-            assert c2 > c1, (
-                f'1/e crossing should increase from scale={s1} ({c1:.1f} px) '
-                f'to scale={s2} ({c2:.1f} px).'
-            )
+    for (s1, c1), (s2, c2) in zip(crossings[:-1], crossings[1:]):
+        assert c2 > c1, (
+            f'1/e crossing should increase from scale={s1} ({c1:.1f} px) '
+            f'to scale={s2} ({c2:.1f} px).'
+        )
 
 
 # ===========================================================================
@@ -779,7 +708,7 @@ class TestPaganinObject:
             geometry,
             data,
             positions,
-            probe_wavelength_m=1.0e-10,
+            photon_wavelength_m=1.0e-10,
             propagation_distance_m=1.0,
             delta_over_beta=100.0,
         )
@@ -801,7 +730,7 @@ class TestPaganinObject:
             geometry,
             data,
             positions,
-            probe_wavelength_m=1.0e-10,
+            photon_wavelength_m=1.0e-10,
             propagation_distance_m=1.0,
             delta_over_beta=100.0,
         )
@@ -817,7 +746,7 @@ class TestPaganinObject:
                 geometry,
                 data,
                 positions,
-                probe_wavelength_m=1.0e-10,
+                photon_wavelength_m=1.0e-10,
                 propagation_distance_m=0.0,
                 delta_over_beta=100.0,
             )
@@ -829,7 +758,7 @@ class TestPaganinObject:
                 geometry,
                 data,
                 positions,
-                probe_wavelength_m=1.0e-10,
+                photon_wavelength_m=1.0e-10,
                 propagation_distance_m=1.0,
                 delta_over_beta=-1.0,
             )
@@ -843,7 +772,7 @@ class TestPaganinObject:
                 geometry,
                 data,
                 positions,
-                probe_wavelength_m=1.0e-10,
+                photon_wavelength_m=1.0e-10,
                 propagation_distance_m=1.0,
                 delta_over_beta=100.0,
             )
@@ -856,7 +785,7 @@ class TestPaganinObject:
             geometry,
             data,
             positions,
-            probe_wavelength_m=1.0e-10,
+            photon_wavelength_m=1.0e-10,
             propagation_distance_m=10.0,
             delta_over_beta=500.0,
         )
@@ -885,7 +814,7 @@ class TestPaganinObject:
             geometry,
             data,
             positions,
-            probe_wavelength_m=1.0e-10,
+            photon_wavelength_m=1.0e-10,
             propagation_distance_m=1.0e-14,
             delta_over_beta=delta_over_beta,
         )
@@ -911,7 +840,7 @@ class TestPaganinObject:
             geometry,
             data,
             positions,
-            probe_wavelength_m=1.0e-10,
+            photon_wavelength_m=1.0e-10,
             propagation_distance_m=1.0e-30,
             delta_over_beta=delta_over_beta,
         )
@@ -1109,3 +1038,89 @@ class TestSiemensStarValidation:
             generate_siemens_star_object(
                 _make_geometry(), **_default_star_kwargs(outer_radius_fraction=-0.5)
             )
+
+
+class TestGenerateUniformObject:
+    """The transparent starting guess.
+
+    It replaced four call sites that reached for ``generate_random_object`` with every
+    deviation set to zero, so the equivalence to that call is pinned here: it is what
+    makes the substitution a refactor rather than a change.
+    """
+
+    def test_output_shape_and_dtype(self) -> None:
+        geometry = _make_geometry(width_px=12, height_px=7)
+        array = generate_uniform_object(geometry).get_array()
+
+        assert array.shape == (1, 7, 12)
+        assert numpy.iscomplexobj(array)
+
+    def test_unit_amplitude_and_zero_phase_everywhere(self) -> None:
+        array = generate_uniform_object(_make_geometry()).get_array()
+
+        assert numpy.allclose(numpy.abs(array), 1.0)
+        assert numpy.allclose(numpy.angle(array), 0.0)
+
+    def test_matches_the_random_generator_with_zero_deviations(self) -> None:
+        geometry = _make_geometry(width_px=9, height_px=5)
+        equivalent = generate_random_object(
+            _rng(),
+            geometry,
+            amplitude_mean=1.0,
+            amplitude_deviation=0.0,
+            phase_mean_tr=0.0,
+            phase_deviation_tr=0.0,
+            blur_deviation_px=0.0,
+        )
+
+        assert numpy.array_equal(
+            generate_uniform_object(geometry).get_array(), equivalent.get_array()
+        )
+
+    def test_geometry_metadata_is_preserved(self) -> None:
+        geometry = _make_geometry(
+            width_px=16,
+            height_px=8,
+            pixel_width_m=3e-9,
+            pixel_height_m=5e-9,
+            center_x_m=1e-6,
+            center_y_m=-2e-6,
+        )
+        object_ = generate_uniform_object(geometry)
+
+        assert object_.get_pixel_geometry() == geometry.get_pixel_geometry()
+        assert object_.get_center() == geometry.get_center()
+
+
+class TestRandomObjectPhaseMean:
+    """``phase_mean_tr`` was accepted and ignored until it was wired up.
+
+    Every caller in the tree passed 0.0, so the omission was invisible; these pin the
+    behavior so it stays wired, and pin the units the ``_tr`` suffix claims.
+    """
+
+    @staticmethod
+    def _generate(phase_mean_tr: float, seed: int = 11) -> numpy.ndarray:
+        return generate_random_object(
+            _rng(seed),
+            _make_geometry(width_px=24, height_px=16),
+            amplitude_mean=1.0,
+            amplitude_deviation=0.1,
+            phase_mean_tr=phase_mean_tr,
+            phase_deviation_tr=0.05,
+            blur_deviation_px=0.0,
+        ).get_array()
+
+    def test_a_nonzero_mean_shifts_the_phase(self) -> None:
+        assert not numpy.allclose(self._generate(0.25), self._generate(0.0))
+
+    def test_the_shift_is_exactly_the_requested_number_of_turns(self) -> None:
+        """The array is amplitude * exp(2*pi*j * phase), so a mean of 0.25 is a quarter turn."""
+        ratio = self._generate(0.25) / self._generate(0.0)
+        assert numpy.allclose(ratio, numpy.exp(2.0j * numpy.pi * 0.25))
+
+    def test_a_full_turn_is_indistinguishable_from_none(self) -> None:
+        assert numpy.allclose(self._generate(1.0), self._generate(0.0))
+
+    def test_the_phase_mean_leaves_the_amplitude_alone(self) -> None:
+        assert numpy.allclose(numpy.abs(self._generate(0.3)), numpy.abs(self._generate(0.0)))

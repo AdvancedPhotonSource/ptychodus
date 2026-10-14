@@ -1,0 +1,10 @@
+# scan_no golden_angle encoder_angle measurement_id subtomo_no detector_position label
+188 0.0000 -90.0461 1 1 1 BOREAS_3d_50um
+189 2.0000 -88.0390 2 1 1 BOREAS_3d_50um
+190 4.0000 -86.0365 3 1 1 BOREAS_3d_50um
+368 1.0000 -89.0455 1 2 1 BOREAS_3d_50um
+369 1.0000 -89.0448 1 2 1 BOREAS_3d_50um
+5 0.0000 -90.0211 1 1 1 BOREAS_CoR
+6 15.0000 -75.0310 2 1 1 BOREAS_CoR
+191 6.0000 4 1 1 BOREAS_3d_50um
+192 8.0000 -82.0363 x 1 1 BOREAS_3d_50um

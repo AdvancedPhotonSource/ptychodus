@@ -14,15 +14,15 @@ from ptychodus_store.storage.layout import StoreLayout
 
 
 def get_settings_dep(request: Request) -> Settings:
-    return request.app.state.settings  # type: ignore[no-any-return]
+    return request.app.state.settings
 
 
 def get_layout(request: Request) -> StoreLayout:
-    return request.app.state.layout  # type: ignore[no-any-return]
+    return request.app.state.layout
 
 
 def get_session_provider(request: Request) -> SessionProvider:
-    return request.app.state.session_provider  # type: ignore[no-any-return]
+    return request.app.state.session_provider
 
 
 async def get_session(

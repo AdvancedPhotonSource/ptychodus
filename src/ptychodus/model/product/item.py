@@ -9,7 +9,7 @@ from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.product import LossValue, Product
 
 from ..diffraction import AssembledDiffractionDataset, DiffractionDatasetObserver
-from .geometry import ProductGeometry
+from .geometry import ProductGeometryProvider
 from .metadata import MetadataRepositoryItem, UniqueNameFactory
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
@@ -60,7 +60,7 @@ class ProductRepositoryItem(ParameterGroup):
         parent: ProductRepositoryItemObserver,
         metadata_item: MetadataRepositoryItem,
         probe_positions_item: ProbePositionsRepositoryItem,
-        geometry: ProductGeometry,
+        geometry: ProductGeometryProvider,
         probe_item: ProbeRepositoryItem,
         object_item: ObjectRepositoryItem,
         losses: Sequence[LossValue],
@@ -110,8 +110,14 @@ class ProductRepositoryItem(ParameterGroup):
         preserved (peripheral scan/probe/object repositories continue to observe
         the same subgroup instances they registered at insert time). The item's
         index in the ProductRepository never changes.
+
+        The stub's own name survives the assign. The stub already holds the name the
+        caller asked for, whereas source was built while the stub occupied that name and
+        so carries a counter suffix that exists only to avoid colliding with this stub.
         """
+        name = self.get_name()
         self._metadata_item.assign(source._metadata_item.get_metadata())
+        self.set_name(name)
         # Bind the dataset (and thus the detector extent on the geometry) BEFORE
         # rebuilding probe/object subgroups — their _rebuild() otherwise sees an
         # invalid pixel geometry and silently no-ops, leaving them empty.
@@ -142,7 +148,7 @@ class ProductRepositoryItem(ParameterGroup):
     def get_probe_positions_item(self) -> ProbePositionsRepositoryItem:
         return self._probe_positions_item
 
-    def get_geometry(self) -> ProductGeometry:
+    def get_geometry(self) -> ProductGeometryProvider:
         return self._geometry
 
     def get_probe_item(self) -> ProbeRepositoryItem:

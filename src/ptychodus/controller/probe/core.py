@@ -5,11 +5,19 @@ from PyQt5.QtCore import QModelIndex, QStringListModel
 from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ptychodus.api.observer import SequenceObserver
+from ptychodus.api.probe import OPRWeightPolicy
 
-from ...model.analysis import IlluminationMapper, ProbePropagatorSettings, ProbePropagator
+from ...model.analysis import (
+    IlluminationMapper,
+    OPRModeAnalyzer,
+    ProbeOverlapAnalyzer,
+    ProbePropagatorSettings,
+    ProbePropagator,
+)
 from ...model.product import ProbeAPI, ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem
 from ...model.visualization import VisualizationEngine
+from ...view.probe import OPRWeightPolicyDialog
 from ...view.repository import RepositoryTreeView
 from ...view.widgets import (
     ComboBoxItemDelegate,
@@ -21,6 +29,8 @@ from ..helpers import connect_triggered_signal, create_brush_for_editable_cell
 from ..image import ImageController
 from .editor_factory import ProbeEditorViewControllerFactory
 from .illumination import IlluminationViewController
+from .opr import OPRModeViewController
+from .overlap import ProbeOverlapViewController
 from .propagator import ProbePropagationViewController
 from .tree_model import ProbeTreeModel, try_get_probe
 
@@ -38,6 +48,10 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         propagator_visualization_engine: VisualizationEngine,
         illumination_mapper: IlluminationMapper,
         illumination_visualization_engine: VisualizationEngine,
+        overlap_analyzer: ProbeOverlapAnalyzer,
+        overlap_visualization_engine: VisualizationEngine,
+        opr_mode_analyzer: OPRModeAnalyzer,
+        opr_mode_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
@@ -57,6 +71,17 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             illumination_mapper,
             illumination_visualization_engine,
             file_dialog_factory,
+        )
+        self._overlap_view_controller = ProbeOverlapViewController(
+            overlap_analyzer,
+            overlap_visualization_engine,
+            file_dialog_factory,
+        )
+        self._opr_mode_view_controller = OPRModeViewController(
+            opr_mode_analyzer,
+            opr_mode_visualization_engine,
+            file_dialog_factory,
+            view,
         )
 
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
@@ -109,6 +134,12 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         illumination_action = view.button_box.analyze_menu.addAction('Map Illumination...')
         connect_triggered_signal(illumination_action, self._map_illumination)
 
+        overlap_action = view.button_box.analyze_menu.addAction('Overlap Metrics...')
+        connect_triggered_signal(overlap_action, self._analyze_overlap)
+
+        opr_mode_action = view.button_box.analyze_menu.addAction('Coherent (OPR) Modes...')
+        connect_triggered_signal(opr_mode_action, self._analyze_opr_modes)
+
     def _get_current_item_index(self) -> int:
         model_index = self._view.tree_view.currentIndex()
 
@@ -124,6 +155,22 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         logger.warning('No current index!')
         return -1
 
+    def _prompt_for_opr_weight_policy(
+        self, item_index: int, opr_weights_shape: tuple[int, int]
+    ) -> OPRWeightPolicy | None:
+        """Ask how a loaded probe's OPR weights should carry over; None if the user cancels."""
+        num_weight_rows, num_coherent_modes = opr_weights_shape
+        num_scan_points = self._repository[item_index].get_num_scan_points()
+
+        dialog = OPRWeightPolicyDialog(self._view)
+        dialog.set_counts(num_weight_rows, num_scan_points, num_coherent_modes)
+        dialog.set_policy(OPRWeightPolicy.KEEP)
+
+        if dialog.exec_() != QDialog.DialogCode.Accepted:
+            return None
+
+        return dialog.get_policy()
+
     def _load_current_probe_from_file(self) -> None:
         item_index = self._get_current_item_index()
 
@@ -138,8 +185,33 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         )
 
         if file_path:
+            # Reading here, rather than leaving it to the builder, is what lets the
+            # prompt below know whether there is an OPR basis to ask about -- and it
+            # puts a read failure in front of the user instead of in the log.
             try:
-                self._api.open_probe(item_index, file_path, file_type=name_filter)
+                opr_weights_shape = self._api.peek_opr_weights(file_path, file_type=name_filter)
+            except Exception as err:
+                logger.exception(err)
+                ExceptionDialog.show_exception('File Reader', err)
+                return
+
+            opr_weight_policy: OPRWeightPolicy | None = None
+
+            if opr_weights_shape is not None:
+                opr_weight_policy = self._prompt_for_opr_weight_policy(
+                    item_index, opr_weights_shape
+                )
+
+                if opr_weight_policy is None:
+                    return
+
+            try:
+                self._api.open_probe(
+                    item_index,
+                    file_path,
+                    file_type=name_filter,
+                    opr_weight_policy=opr_weight_policy,
+                )
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.show_exception('File Reader', err)
@@ -212,6 +284,22 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             logger.warning('No current item!')
         else:
             self._illumination_view_controller.map(item_index)
+
+    def _analyze_overlap(self) -> None:
+        item_index = self._get_current_item_index()
+
+        if item_index < 0:
+            logger.warning('No current item!')
+        else:
+            self._overlap_view_controller.analyze(item_index)
+
+    def _analyze_opr_modes(self) -> None:
+        item_index = self._get_current_item_index()
+
+        if item_index < 0:
+            logger.warning('No current item!')
+        else:
+            self._opr_mode_view_controller.launch(item_index)
 
     def _update_view(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()

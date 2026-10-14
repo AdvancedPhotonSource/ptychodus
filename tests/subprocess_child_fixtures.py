@@ -27,6 +27,23 @@ from ptychodus.model.processing.subprocess_reconstructor import (
 logger = logging.getLogger(__name__)
 
 
+def _set_attrs(module: ModuleType, **attrs: Any) -> None:
+    """Attach attributes to a module.
+
+    Via setattr because a ModuleType has no declared attributes, so assigning them
+    directly is an attr-defined error on every line.
+    """
+    for name, value in attrs.items():
+        setattr(module, name, value)
+
+
+def _fake_module(name: str, **attrs: Any) -> ModuleType:
+    """A stand-in module carrying `attrs`, for faking an absent optional package."""
+    module = ModuleType(name)
+    _set_attrs(module, **attrs)
+    return module
+
+
 class GroupingCallCapturedError(Exception):
     pass
 
@@ -43,23 +60,19 @@ def capture_ptychopinn_grouping_call(payload: Any, queue: Any) -> None:
         probeGuess=object(),
         generate_grouped_data=generate_grouped_data,
     )
-    ptycho = ModuleType('ptycho')
-    ptycho.__path__ = []  # type: ignore[attr-defined]
-    config = ModuleType('ptycho.config.config')
-    config.update_legacy_dict = lambda _cfg, _config: None  # type: ignore[attr-defined]
-    components = ModuleType('ptycho.workflows.components')
-    components.load_inference_bundle = lambda _path: (object(), {})  # type: ignore[attr-defined]
-    loader = ModuleType('ptycho.loader')
 
     def stop_after_grouping(*_args: object, **_kwargs: object) -> None:
         raise GroupingCallCapturedError(grouping_call)
 
-    loader.load = stop_after_grouping  # type: ignore[attr-defined]
-    params = ModuleType('ptycho.params')
-    params.cfg = {}  # type: ignore[attr-defined]
-    probe = ModuleType('ptycho.probe')
-    probe.set_probe_guess = lambda *_args: None  # type: ignore[attr-defined]
-    tf_helper = ModuleType('ptycho.tf_helper')
+    ptycho = _fake_module('ptycho', __path__=[])
+    config = _fake_module('ptycho.config.config', update_legacy_dict=lambda _cfg, _config: None)
+    components = _fake_module(
+        'ptycho.workflows.components', load_inference_bundle=lambda _path: (object(), {})
+    )
+    loader = _fake_module('ptycho.loader', load=stop_after_grouping)
+    params = _fake_module('ptycho.params', cfg={})
+    probe = _fake_module('ptycho.probe', set_probe_guess=lambda *_args: None)
+    tf_helper = _fake_module('ptycho.tf_helper')
 
     for name, module in {
         'ptycho': ptycho,
@@ -73,14 +86,12 @@ def capture_ptychopinn_grouping_call(payload: Any, queue: Any) -> None:
         'ptycho.tf_helper': tf_helper,
     }.items():
         sys.modules[name] = module
-    ptycho.loader = loader  # type: ignore[attr-defined]
-    ptycho.params = params  # type: ignore[attr-defined]
-    ptycho.probe = probe  # type: ignore[attr-defined]
-    ptycho.tf_helper = tf_helper  # type: ignore[attr-defined]
+
+    _set_attrs(ptycho, loader=loader, params=params, probe=probe, tf_helper=tf_helper)
 
     from ptychodus.model.ptychopinn import _subprocess
 
-    _subprocess._create_raw_data = lambda _parameters: raw_data
+    _subprocess._create_raw_data = lambda parameters: raw_data
     _subprocess.run_reconstruct(payload, queue)
 
 
@@ -99,6 +110,17 @@ def raise_immediately(payload: Any, queue: Any) -> None:
 
 def hang_forever(payload: Any, queue: Any) -> None:
     """Sleep so the parent must terminate us."""
+    time.sleep(3600.0)
+
+
+def emit_output_then_hang(payload: Any, queue: Any) -> None:
+    """Emit one output, then sleep so the parent must terminate us.
+
+    The output is what lets the parent reach its first ``yield``: a child that
+    only sleeps leaves the parent generator un-started, and closing a generator
+    that never ran executes no cleanup at all.
+    """
+    queue.put((TAG_OUTPUT, pickle.dumps(ReconstructOutput(product=payload['product'], progress=1))))
     time.sleep(3600.0)
 
 

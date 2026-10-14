@@ -110,3 +110,27 @@ def test_open_settings_skips_sections_with_no_registered_group(
         registry.open_settings(file_path)
 
     assert not caplog.records
+
+
+def test_pre_rename_photon_energy_key_warns_and_keeps_the_default(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The photon-energy key was ProbeEnergyInElectronVolts before the X-ray rename.
+
+    No alias was added, so a settings file written under the old spelling loses the
+    value -- the failure this module's warning exists to make visible. Pinned here so
+    the loss stays loud rather than becoming the silent revert it once was.
+    """
+    from ptychodus.model.product.settings import ProductSettings
+
+    registry = SettingsRegistry()
+    settings = ProductSettings(registry)
+    default_eV = settings.photon_energy_eV.get_value()  # noqa: N806
+
+    file_path = _write_settings(tmp_path, '[Products]\nProbeEnergyInElectronVolts = 8500.0\n')
+
+    with caplog.at_level('WARNING', logger=_LOGGER_NAME):
+        registry.open_settings(file_path)
+
+    assert settings.photon_energy_eV.get_value() == default_eV
+    assert any('probeenergyinelectronvolts' in r.message.lower() for r in caplog.records)

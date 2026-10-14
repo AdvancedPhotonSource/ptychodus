@@ -5,8 +5,13 @@ import logging
 import numpy
 
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.probe import ProbeFileReader, ProbeFileWriter, ProbeSequence
-from ptychodus.api.simulate.probe import FresnelZonePlate
+from ptychodus.api.probe import (
+    OPRWeightPolicy,
+    ProbeFileReader,
+    ProbeFileWriter,
+    ProbeSequence,
+)
+from ptychodus.api.simulate.probe import FresnelZonePlate, KirkpatrickBaezMirrorPair
 
 from ...diffraction import AssembledDiffractionDataset
 from .average_pattern import AveragePatternProbeBuilder
@@ -14,6 +19,7 @@ from .builder import FromFileProbeBuilder, ProbeSequenceBuilder
 from .disk import DiskProbeBuilder
 from .fzp import FresnelZonePlateProbeBuilder
 from .hermite import HermiteProbeBuilder
+from .kb_mirror import KBMirrorProbeBuilder
 from .rect import RectangularProbeBuilder
 from .settings import ProbeSettings
 from .super_gaussian import SuperGaussianProbeBuilder
@@ -28,6 +34,7 @@ class ProbeBuilderFactory(Iterable[str]):
         rng: numpy.random.Generator,
         settings: ProbeSettings,
         fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
+        kb_mirror_chooser: PluginChooser[KirkpatrickBaezMirrorPair],
         file_reader_chooser: PluginChooser[ProbeFileReader],
         file_writer_chooser: PluginChooser[ProbeFileWriter],
     ) -> None:
@@ -35,12 +42,14 @@ class ProbeBuilderFactory(Iterable[str]):
         self._rng = rng
         self._settings = settings
         self._fresnel_zone_plate_chooser = fresnel_zone_plate_chooser
+        self._kb_mirror_chooser = kb_mirror_chooser
         self._file_reader_chooser = file_reader_chooser
         self._file_writer_chooser = file_writer_chooser
         self._non_diffraction_builders: Mapping[str, Callable[[], ProbeSequenceBuilder]] = {
             'disk': lambda: DiskProbeBuilder(rng, settings),
             'fresnel_zone_plate': self._create_fresnel_zone_plate_builder,
             'hermite': lambda: HermiteProbeBuilder(rng, settings),
+            'kb_mirror': self._create_kb_mirror_builder,
             'rectangular': lambda: RectangularProbeBuilder(rng, settings),
             'super_gaussian': lambda: SuperGaussianProbeBuilder(rng, settings),
             'zernike': lambda: ZernikeProbeBuilder(rng, settings),
@@ -94,6 +103,9 @@ class ProbeBuilderFactory(Iterable[str]):
             self._rng, self._settings, self._fresnel_zone_plate_chooser
         )
 
+    def _create_kb_mirror_builder(self) -> ProbeSequenceBuilder:
+        return KBMirrorProbeBuilder(self._rng, self._settings, self._kb_mirror_chooser)
+
     def get_open_file_filters(self) -> Iterator[str]:
         for plugin in self._file_reader_chooser:
             yield plugin.display_name
@@ -101,11 +113,33 @@ class ProbeBuilderFactory(Iterable[str]):
     def get_open_file_filter(self) -> str:
         return self._file_reader_chooser.get_current_plugin().display_name
 
-    def create_probe_from_file(self, file_path: Path, file_filter: str) -> ProbeSequenceBuilder:
+    def read_probe_from_file(self, file_path: Path, file_filter: str) -> ProbeSequence:
+        """Read a probe without binding it to a repository item.
+
+        This is the probe the builder from `create_probe_from_file` would ingest, read
+        once so a caller can inspect what the file holds -- an OPR basis, in particular --
+        before deciding how to ingest it. Read errors surface here rather than being
+        swallowed by a rebuild.
+        """
+        self._file_reader_chooser.set_current_plugin(file_filter)
+        file_type = self._file_reader_chooser.get_current_plugin().simple_name
+        logger.debug(f'Reading "{file_path}" as "{file_type}"')
+        file_reader = self._file_reader_chooser.get_current_plugin().strategy
+        return file_reader.read(file_path)
+
+    def create_probe_from_file(
+        self,
+        file_path: Path,
+        file_filter: str,
+        *,
+        opr_weight_policy: OPRWeightPolicy | None = None,
+    ) -> ProbeSequenceBuilder:
         self._file_reader_chooser.set_current_plugin(file_filter)
         file_reader = self._file_reader_chooser.get_current_plugin().strategy
 
-        builder = FromFileProbeBuilder(self._rng, self._settings, file_reader)
+        builder = FromFileProbeBuilder(
+            self._rng, self._settings, file_reader, opr_weight_policy=opr_weight_policy
+        )
         builder.file_path.set_value(file_path)
         builder.file_type.set_value(self._file_reader_chooser.get_current_plugin().simple_name)
         return builder

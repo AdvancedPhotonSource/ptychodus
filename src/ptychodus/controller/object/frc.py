@@ -66,6 +66,7 @@ class FourierRingCorrelationViewController:
 
         frc_axes = self._dialog.frc_axes
         ssnr_axes = self._dialog.ssnr_axes
+        psd_axes = self._dialog.psd_axes
 
         frc_axes.clear()
         frc_axes.set_ylabel('Fourier Ring Correlation')
@@ -76,11 +77,37 @@ class FourierRingCorrelationViewController:
         frc_axes.tick_params(labelbottom=False)
 
         ssnr_axes.clear()
-        ssnr_axes.set_xlabel('Spatial Frequency [1/nm]')
         ssnr_axes.set_ylabel('Spectral SNR')
         ssnr_axes.set_yscale('log')
         ssnr_axes.grid(True, which='both')
         ssnr_axes.plot(freq_per_nm, ssnr_for_log, '.-', linewidth=1.5)
+        ssnr_axes.tick_params(labelbottom=False)
+
+        # The dialog opens comparing a product with itself, where the FRC is
+        # identically one. The power spectra are the informative readout in
+        # that state, so they are always drawn for both selections.
+        psd_axes.clear()
+        psd_axes.set_xlabel('Spatial Frequency [1/nm]')
+        psd_axes.set_ylabel('Power Spectral Density [m²]')
+        psd_axes.set_yscale('log')
+        psd_axes.grid(True, which='both')
+
+        for item_index in dict.fromkeys([current_index1, current_index2]):
+            psd = self._correlator.compute_power_spectrum(item_index)
+            label = self._dialog.product1_combo_box.itemText(item_index)
+            psd_axes.plot(
+                1.0e-9 * psd.spatial_frequency_per_m,
+                numpy.where(
+                    psd.power_spectral_density_m2 > 0.0,
+                    psd.power_spectral_density_m2,
+                    numpy.nan,
+                ),
+                '.-',
+                linewidth=1.5,
+                label=label,
+            )
+
+        psd_axes.legend(loc='best', fontsize='small')
 
         self._dialog.auc_label.setText(_format_scalar(frc.get_area_under_curve()))
         self._dialog.average_ssnr_label.setText(

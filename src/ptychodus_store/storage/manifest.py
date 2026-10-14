@@ -38,6 +38,8 @@ HDF5_OWNED_KEYS: dict[str, frozenset[str]] = {
             'num_patterns_total',
             'detector_pixel_width_m',
             'detector_pixel_height_m',
+            'num_bad_pixels',
+            'nbytes',
         }
     ),
     ResourceKind.PRODUCT: frozenset(
@@ -45,10 +47,12 @@ HDF5_OWNED_KEYS: dict[str, frozenset[str]] = {
             'name',
             'comments',
             'detector_distance_m',
-            'probe_energy_eV',
+            'focus_object_distance_m',
+            'far_field',
+            'photon_energy_eV',
             'probe_photon_count',
             'exposure_time_s',
-            'mass_attenuation_m2_kg',
+            'mass_attenuation_m2_per_kg',
             'tomography_angle_deg',
             'tilt_angle_deg',
             'polarization',
@@ -58,9 +62,19 @@ HDF5_OWNED_KEYS: dict[str, frozenset[str]] = {
             'probe_shape',
             'num_scan_points',
             'num_loss_epochs',
+            'scan_length_m',
+            'probe_dtype',
+            'object_dtype',
+            'probe_nbytes',
+            'object_nbytes',
+            'scan_nbytes',
+            'probe_mode_relative_power',
+            'object_layer_spacing_m',
         }
     ),
-    ResourceKind.FLUORESCENCE: frozenset({'element_names', 'map_shape'}),
+    ResourceKind.FLUORESCENCE: frozenset(
+        {'element_names', 'map_shape', 'element_counts', 'nbytes'}
+    ),
 }
 
 
@@ -111,7 +125,7 @@ class DiffractionManifest(_ManifestBase):
     campaign_uuid: UUID | None = None
     derived_from: list[DerivedFromRef] = Field(default_factory=list)
     detector_distance_m: float | None = None
-    probe_energy_eV: float | None = None  # noqa: N815
+    photon_energy_eV: float | None = None  # noqa: N815
     probe_photon_count: int | None = None
     exposure_time_s: float | None = None
     tomography_angle_deg: float | None = None

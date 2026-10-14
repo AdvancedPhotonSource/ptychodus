@@ -5,7 +5,7 @@ from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import Product, ProductFileReader
 
 from ..diffraction import AssembledDiffractionDataset
-from .geometry import ProductGeometry
+from .geometry import ProductGeometryProvider
 from .item import ProductRepositoryItem, ProductState
 from .metadata import MetadataRepositoryItem
 from .object import ObjectRepositoryItemFactory
@@ -37,7 +37,7 @@ class ProductRepositoryItemFactory:
 
     @staticmethod
     def _bind_dataset_geometry(
-        geometry: ProductGeometry, dataset: AssembledDiffractionDataset | None
+        geometry: ProductGeometryProvider, dataset: AssembledDiffractionDataset | None
     ) -> None:
         """Push the dataset's processed detector extent and pixel geometry into
         ``geometry`` so probe & object items built next see a valid geometry inside
@@ -57,13 +57,15 @@ class ProductRepositoryItemFactory:
         name: str = '',
         comments: str = '',
         detector_distance_m: float | None = None,
-        probe_energy_eV: float | None = None,  # noqa: N803
+        focus_object_distance_m: float | None = None,
+        photon_energy_eV: float | None = None,  # noqa: N803
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
-        mass_attenuation_m2_kg: float | None = None,
+        mass_attenuation_m2_per_kg: float | None = None,
         tomography_angle_deg: float | None = None,
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
+        far_field: bool | None = None,
         dataset: AssembledDiffractionDataset | None = None,
     ) -> ProductRepositoryItem:
         metadata_item = MetadataRepositoryItem(
@@ -72,17 +74,19 @@ class ProductRepositoryItemFactory:
             name=name,
             comments=comments,
             detector_distance_m=detector_distance_m,
-            probe_energy_eV=probe_energy_eV,
+            focus_object_distance_m=focus_object_distance_m,
+            photon_energy_eV=photon_energy_eV,
             probe_photon_count=probe_photon_count,
             exposure_time_s=exposure_time_s,
-            mass_attenuation_m2_kg=mass_attenuation_m2_kg,
+            mass_attenuation_m2_per_kg=mass_attenuation_m2_per_kg,
             tomography_angle_deg=tomography_angle_deg,
             tilt_angle_deg=tilt_angle_deg,
             polarization=polarization,
+            far_field=far_field,
         )
 
         scan_item = self._scan_item_factory.create()
-        geometry = ProductGeometry(metadata_item, scan_item)
+        geometry = ProductGeometryProvider(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create(geometry)
         object_item = self._object_item_factory.create(geometry)
@@ -99,25 +103,31 @@ class ProductRepositoryItemFactory:
         )
 
     def create_from_product(
-        self, product: Product, *, dataset: AssembledDiffractionDataset | None = None
+        self,
+        product: Product,
+        *,
+        name: str | None = None,
+        dataset: AssembledDiffractionDataset | None = None,
     ) -> ProductRepositoryItem:
         metadata_item = MetadataRepositoryItem(
             self._settings,
             self._repository,
-            name=product.metadata.name,
+            name=product.metadata.name if name is None else name,
             comments=product.metadata.comments,
             detector_distance_m=product.metadata.detector_distance_m,
-            probe_energy_eV=product.metadata.probe_energy_eV,
+            focus_object_distance_m=product.metadata.focus_object_distance_m,
+            photon_energy_eV=product.metadata.photon_energy_eV,
             probe_photon_count=product.metadata.probe_photon_count,
             exposure_time_s=product.metadata.exposure_time_s,
-            mass_attenuation_m2_kg=product.metadata.mass_attenuation_m2_kg,
+            mass_attenuation_m2_per_kg=product.metadata.mass_attenuation_m2_per_kg,
             tomography_angle_deg=product.metadata.tomography_angle_deg,
             tilt_angle_deg=product.metadata.tilt_angle_deg,
             polarization=product.metadata.polarization,
+            far_field=product.metadata.far_field,
         )
 
         scan_item = self._scan_item_factory.create(product.probe_positions)
-        geometry = ProductGeometry(metadata_item, scan_item)
+        geometry = ProductGeometryProvider(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create(geometry, product.probes)
         object_item = self._object_item_factory.create(geometry, product.object_)
@@ -140,7 +150,7 @@ class ProductRepositoryItemFactory:
         loading."""
         metadata_item = MetadataRepositoryItem(self._settings, self._repository, name=name)
         scan_item = self._scan_item_factory.create()
-        geometry = ProductGeometry(metadata_item, scan_item)
+        geometry = ProductGeometryProvider(metadata_item, scan_item)
         probe_item = self._probe_item_factory.create(geometry)
         object_item = self._object_item_factory.create(geometry)
         return ProductRepositoryItem(
@@ -174,7 +184,7 @@ class ProductRepositoryItemFactory:
 
         metadata_item = MetadataRepositoryItem(self._settings, self._repository)
         scan_item = self._scan_item_factory.create_from_settings()
-        geometry = ProductGeometry(metadata_item, scan_item)
+        geometry = ProductGeometryProvider(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create_from_settings(geometry, dataset=dataset)
         object_item = self._object_item_factory.create_from_settings(geometry, dataset=dataset)

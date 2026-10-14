@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from itertools import accumulate
 import concurrent.futures
 import logging
+import os
 import threading
 
 import numpy
@@ -44,15 +45,35 @@ __all__ = [
     'compute_assembled_patterns_shape',
     'compute_dataset_total_counts',
     'compute_probe_photon_counts_by_index',
+    'default_max_workers',
     'preprocess_array',
     'summarize_dataset',
 ]
+
+
+def _read_only(array: numpy.ndarray) -> numpy.ndarray:
+    """Return `array` as non-writeable, through a view rather than in place.
+
+    Downgrading the view leaves the base writable, so taking a read-only handle on a
+    buffer does not stop the next scatter from filling it.
+    """
+    view = array[...]
+    view.flags.writeable = False
+    return view
 
 
 def compute_total_counts(
     patterns: DiffractionPatterns, bad_pixels: BadPixels
 ) -> DiffractionPatternCounts:
     """Sum each pattern over the good (non-bad) pixels."""
+    if not bad_pixels.any() and numpy.issubdtype(patterns.dtype, numpy.integer):
+        # Nothing is masked, so this reduces over every pixel and agrees with the masked
+        # form below to the bit -- without the (num_patterns, num_good) copy that boolean
+        # indexing materializes whatever the mask holds. Integers only: the two summation
+        # orders do not agree to the last bit in floating point, and these counts are
+        # compared against a threshold.
+        return numpy.sum(patterns, axis=(-2, -1))
+
     good_pixels = numpy.logical_not(bad_pixels)
     return numpy.sum(patterns[:, good_pixels], axis=-1)
 
@@ -182,18 +203,15 @@ class AssembledDiffractionData:
         assembled_indexes = slice(offset, offset + len(data._indexes))
 
         self._indexes[assembled_indexes] = data._indexes
-        indexes_view = self._indexes[assembled_indexes]
-        indexes_view.flags.writeable = False
+        indexes_view = _read_only(self._indexes[assembled_indexes])
 
         self._patterns[assembled_indexes, :, :] = data._patterns
-        patterns_view = self._patterns[assembled_indexes, :, :]
-        patterns_view.flags.writeable = False
+        patterns_view = _read_only(self._patterns[assembled_indexes, :, :])
 
         probe_photon_counts_view: DiffractionPatternCounts | None = None
         if self._probe_photon_counts is not None and data._probe_photon_counts is not None:
             self._probe_photon_counts[assembled_indexes] = data._probe_photon_counts
-            probe_photon_counts_view = self._probe_photon_counts[assembled_indexes]
-            probe_photon_counts_view.flags.writeable = False
+            probe_photon_counts_view = _read_only(self._probe_photon_counts[assembled_indexes])
 
         return AssembledDiffractionData(
             indexes=indexes_view,
@@ -203,11 +221,51 @@ class AssembledDiffractionData:
             probe_photon_counts=probe_photon_counts_view,
         )
 
+    def _every_slot_assembled(self) -> bool:
+        """Whether every slot holds a pattern, so no slot needs eliding.
+
+        Recomputed rather than cached because :meth:`assemble` writes the index array in
+        place, from a thread pool, and the same slice can be scattered more than once --
+        no cached flag would see either. It costs one pass over the indexes, one number
+        per pattern, against the whole-buffer copy it decides whether to make.
+        """
+        return bool((self._indexes >= 0).all())
+
+    def get_num_patterns(self) -> int:
+        """How many patterns are assembled, counted without materializing them.
+
+        This is what :meth:`get_patterns` returns the length of. The first element of
+        :meth:`get_patterns_shape` is the buffer's capacity instead, which is larger
+        whenever a slot went unfilled.
+        """
+        return int(numpy.count_nonzero(self._indexes >= 0))
+
     def get_indexes(self) -> DiffractionIndexes:
-        return self._indexes[self._indexes >= 0]
+        """Scan indexes of the assembled patterns, in buffer order. Non-writeable.
+
+        See :meth:`get_patterns` for why.
+        """
+        if self._every_slot_assembled():
+            return _read_only(self._indexes)
+
+        return _read_only(self._indexes[self._indexes >= 0])
 
     def get_patterns(self) -> DiffractionPatterns:
-        return self._patterns[self._indexes >= 0]
+        """The assembled patterns, in buffer order. Non-writeable.
+
+        Eliding unassembled slots means boolean indexing, which copies the whole buffer;
+        with nothing to elide the buffer itself is the answer, so this returns a view over
+        live storage whenever it can. Writing through that view would rewrite what every
+        other holder sees -- and, for the memory-mapped buffers
+        :func:`allocate_assembled_data` accepts, what is on disk.
+
+        The gathered copy is marked the same way, so what a caller may do with the result
+        does not depend on how full the buffer happened to be.
+        """
+        if self._every_slot_assembled():
+            return _read_only(self._patterns)
+
+        return _read_only(self._patterns[self._indexes >= 0])
 
     def get_total_counts(self) -> DiffractionPatternCounts:
         return compute_total_counts(self.get_patterns(), self._bad_pixels)
@@ -407,7 +465,9 @@ def allocate_assembled_data(
 
     # All-or-nothing: reserve the counts buffer only when every array reports flux.
     probe_photon_counts: DiffractionPatternCounts | None = None
-    if len(dataset) > 0 and all(array.get_probe_photon_flux_Hz() is not None for array in dataset):
+    if len(dataset) > 0 and all(
+        array.get_probe_photon_flux_per_s() is not None for array in dataset
+    ):
         probe_photon_counts = numpy.zeros(num_patterns_total, dtype=numpy.float64)
 
     return AssembledDiffractionData(
@@ -419,19 +479,25 @@ def allocate_assembled_data(
     )
 
 
-def preprocess_array(
+def _preprocess_patterns(
     array: DiffractionArray,
     pipeline: DiffractionPrepPipeline | None = None,
     *,
     raw_bad_pixels: BadPixels,
     processed_bad_pixels: BadPixels,
-    raw_pixel_geometry: PixelGeometry,
     total_counts_lower_bound: int | None = None,
     total_counts_upper_bound: int | None = None,
     exposure_time_s: float | None = None,
     read_region: CropRegion | None = None,
-) -> AssembledDiffractionData:
-    """Read one array and preprocess it into a dense block of patterns.
+) -> tuple[DiffractionIndexes, DiffractionPatterns, DiffractionPatternCounts | None]:
+    """Read one array and run the preprocessing pipeline over it.
+
+    The geometry-free core of :func:`preprocess_array`: everything that shapes the
+    indexes, patterns, and probe photon counts, with no detector pixel geometry
+    involved. Callers that need an :class:`AssembledDiffractionData` go through
+    :func:`preprocess_array`; callers that keep only per-pattern reductions --
+    :func:`compute_dataset_total_counts` -- use this directly, and so need no
+    pixel geometry to run.
 
     Bad pixels are zeroed *before* the pipeline runs; when `read_region` is set,
     the reader is asked for the crop rectangle directly (HDF5 partial read) and
@@ -459,10 +525,10 @@ def preprocess_array(
     patterns = processed_array.get_patterns()
 
     probe_photon_counts: DiffractionPatternCounts | None = None
-    probe_photon_flux_Hz = array.get_probe_photon_flux_Hz()  # noqa: N806
-    if probe_photon_flux_Hz is not None:
+    probe_photon_flux_per_s = array.get_probe_photon_flux_per_s()
+    if probe_photon_flux_per_s is not None:
         if exposure_time_s is not None and exposure_time_s > 0.0:
-            probe_photon_counts = probe_photon_flux_Hz * exposure_time_s
+            probe_photon_counts = probe_photon_flux_per_s * exposure_time_s
         else:
             logger.warning(
                 f"Dropping probe photon flux measurements from '{label}': "
@@ -508,6 +574,37 @@ def preprocess_array(
             if probe_photon_counts is not None:
                 probe_photon_counts = probe_photon_counts[keep]
 
+    return indexes, patterns, probe_photon_counts
+
+
+def preprocess_array(
+    array: DiffractionArray,
+    pipeline: DiffractionPrepPipeline | None = None,
+    *,
+    raw_bad_pixels: BadPixels,
+    processed_bad_pixels: BadPixels,
+    raw_pixel_geometry: PixelGeometry,
+    total_counts_lower_bound: int | None = None,
+    total_counts_upper_bound: int | None = None,
+    exposure_time_s: float | None = None,
+    read_region: CropRegion | None = None,
+) -> AssembledDiffractionData:
+    """Preprocess one array into a dense block of patterns with its pixel geometry.
+
+    Wraps :func:`_preprocess_patterns` -- which documents the preprocessing
+    itself -- and folds `pipeline` through `raw_pixel_geometry` so the returned
+    block carries the processed geometry matching its patterns.
+    """
+    indexes, patterns, probe_photon_counts = _preprocess_patterns(
+        array,
+        pipeline,
+        raw_bad_pixels=raw_bad_pixels,
+        processed_bad_pixels=processed_bad_pixels,
+        total_counts_lower_bound=total_counts_lower_bound,
+        total_counts_upper_bound=total_counts_upper_bound,
+        exposure_time_s=exposure_time_s,
+        read_region=read_region,
+    )
     pixel_geometry = (
         raw_pixel_geometry
         if pipeline is None
@@ -520,6 +617,36 @@ def preprocess_array(
         bad_pixels=processed_bad_pixels,
         probe_photon_counts=probe_photon_counts,
     )
+
+
+def default_max_workers(
+    *, max_arrays_in_flight: int = 8, local_world_size: int | None = None
+) -> int:
+    """How many arrays to hold in flight at once when the caller names no number.
+
+    Each worker materializes a whole array block, so the pool size sets peak memory, and
+    `max_arrays_in_flight` matters more than the throughput: an unbounded pool admits as
+    many simultaneous blocks as the machine has cores. Raising it trades peak memory for
+    throughput on the numpy half of the work and buys nothing on the read half, because
+    h5py serializes every HDF5 call behind one lock; the preprocessing that follows each
+    read is what scales, and it saturates well before the core count.
+
+    `local_world_size` divides the budget, and defaults to what the launcher reported in
+    ``LOCAL_WORLD_SIZE``. A launcher that runs one process per local GPU shares the
+    node's memory between them, and each would otherwise size itself as though it were
+    alone. A reported value that is empty or not an integer is ignored rather than
+    fatal: it means something in the environment claims a world size it cannot state,
+    and sizing the pool for a node this process has to itself is the better reading.
+    """
+    num_cpus = os.cpu_count() or 1
+
+    if local_world_size is None:
+        try:
+            local_world_size = int(os.environ['LOCAL_WORLD_SIZE'])
+        except (KeyError, ValueError):
+            local_world_size = 1
+
+    return max(1, min(max_arrays_in_flight, num_cpus) // max(1, local_world_size))
 
 
 def _map_arrays(
@@ -535,8 +662,14 @@ def _map_arrays(
 
     A missing array is logged and skipped. Any other per-array exception is
     reported through `on_array_error` and does not abort the remaining arrays.
+
+    `max_workers` of None resolves to :func:`default_max_workers`, which explains what
+    the resulting pool size costs.
     """
     num_arrays = len(dataset)
+
+    if max_workers is None:
+        max_workers = default_max_workers()
 
     def run_work(array_index: int, array: DiffractionArray) -> None:
         try:
@@ -740,6 +873,10 @@ class DiffractionSummary:
     The frame-shaped arrays have bad-pixel positions filled by
     :func:`~ptychodus.api.preprocess.diffraction.inpaint_bad_pixels` so the maps stay smooth for display and
     thresholding. Per-pattern ``total_counts`` sum only the good pixels.
+
+    ``minimum_pattern`` and ``maximum_pattern`` carry the pattern dtype and
+    ``mean_pattern`` is float64, whether or not the dataset had bad pixels and
+    whether or not it had any patterns at all.
     """
 
     minimum_pattern: DiffractionPattern
@@ -830,10 +967,12 @@ def summarize_dataset(
     frames = statistics.get_frames()
 
     if frames is None:
+        # Dtypes match the populated branch below, where the extrema come from
+        # reductions over the patterns and the mean from a float64 accumulator.
         return DiffractionSummary(
-            minimum_pattern=numpy.zeros((height, width), dtype=numpy.float64),
+            minimum_pattern=numpy.zeros((height, width), dtype=metadata.pattern_dtype),
             mean_pattern=numpy.zeros((height, width), dtype=numpy.float64),
-            maximum_pattern=numpy.zeros((height, width), dtype=numpy.float64),
+            maximum_pattern=numpy.zeros((height, width), dtype=metadata.pattern_dtype),
             indexes=indexes[summarized],
             total_counts=total_counts[summarized],
         )
@@ -877,18 +1016,24 @@ def compute_dataset_total_counts(
 ) -> DiffractionTotalCounts:
     """Measure per-pattern total counts as the assembler would see them.
 
-    Runs the same :func:`preprocess_array` path :func:`assemble_dataset` runs --
-    same load-time crop, same pipeline, same processed bad-pixel mask -- but keeps
-    only the per-pattern totals and never applies the total-counts filter, since
-    the point is to measure the distribution the filter bounds will be chosen
-    from. No frame-shaped statistics are accumulated and no assembled buffer is
-    allocated, and when ``read_region`` is set a reader with partial-read support
-    fetches only the crop rectangle, so this is markedly cheaper than
-    :func:`summarize_dataset` over the same dataset.
+    Runs the same :func:`_preprocess_patterns` core that :func:`assemble_dataset`
+    reaches through :func:`preprocess_array` -- same load-time crop, same pipeline,
+    same processed bad-pixel mask -- but keeps only the per-pattern totals and
+    never applies the total-counts filter, since the point is to measure the
+    distribution the filter bounds will be chosen from. No frame-shaped
+    statistics are accumulated and no assembled buffer is allocated, and when
+    ``read_region`` is set a reader with partial-read support fetches only the
+    crop rectangle, so this is markedly cheaper than :func:`summarize_dataset`
+    over the same dataset.
 
     Per-pattern results are written at the offsets metadata reserves and then
     compacted, so they come back in array order whatever the completion order,
     with the slots of skipped and under-filling arrays elided.
+
+    Unlike :func:`assemble_dataset` and :func:`allocate_assembled_data`, this pass
+    needs no detector pixel geometry: it keeps only per-pattern totals and never
+    builds a geometry-bearing block. So it runs against metadata that carries no
+    `detector_pixel_geometry`, which most readers never set.
     """
     metadata = dataset.get_metadata()
     num_patterns_per_array = metadata.num_patterns_per_array
@@ -908,22 +1053,17 @@ def compute_dataset_total_counts(
     indexes = -numpy.ones(num_patterns_total, dtype=numpy.intp)
     total_counts = numpy.zeros(num_patterns_total, dtype=numpy.float64)
 
-    # preprocess_array needs the raw geometry; nothing downstream of here reads
-    # the geometry off the returned block, so the pipeline fold is skipped.
-    block_pixel_geometry = _resolve_pixel_geometry(metadata, None, None)
     offsets = compute_array_offsets(metadata)
 
     def count_array(array_index: int, array: DiffractionArray) -> None:
-        block = preprocess_array(
+        array_indexes, patterns, _ = _preprocess_patterns(
             array,
             pipeline,
             raw_bad_pixels=raw_bad_pixels,
             processed_bad_pixels=processed_bad_pixels,
-            raw_pixel_geometry=block_pixel_geometry,
             exposure_time_s=metadata.exposure_time_s,
             read_region=read_region,
         )
-        array_indexes = block.get_indexes()
         num_patterns = len(array_indexes)
 
         if num_patterns == 0:
@@ -938,8 +1078,9 @@ def compute_dataset_total_counts(
             )
 
         # Reduce before publishing anything, so a read that fails partway leaves
-        # this array's slots untouched rather than half-filled.
-        array_total_counts = block.get_total_counts()
+        # this array's slots untouched rather than half-filled. This is the same
+        # reduction AssembledDiffractionData.get_total_counts delegates to.
+        array_total_counts = compute_total_counts(patterns, processed_bad_pixels)
 
         offset = offsets[array_index]
         stop = offset + num_patterns

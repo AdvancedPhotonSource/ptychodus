@@ -1,0 +1,241 @@
+from pathlib import Path
+from typing import Final
+import logging
+
+import h5py
+import numpy
+
+from ptychodus.api.constants import EnergyUnit
+from ptychodus.api.geometry import ImageExtent, PixelGeometry
+from ptychodus.api.diffraction import (
+    BeamCenter,
+    DiffractionDataset,
+    DiffractionDatasetLayoutNode,
+    DiffractionFileReader,
+    DiffractionMetadata,
+    SimpleDiffractionDataset,
+)
+
+from ptychodus.plugins.h5_diffraction_file import (
+    H5DiffractionPatternArray,
+    H5DiffractionFileTreeBuilder,
+)
+
+logger = logging.getLogger(__name__)
+
+_LEN_TO_M: dict[str, float] = {
+    'm': 1.0,
+    'meter': 1.0,
+    'meters': 1.0,
+    'cm': 1e-2,
+    'centimeter': 1e-2,
+    'centimeters': 1e-2,
+    'mm': 1e-3,
+    'millimeter': 1e-3,
+    'millimeters': 1e-3,
+    'um': 1e-6,
+    'µm': 1e-6,
+    'micron': 1e-6,
+    'microns': 1e-6,
+    'micrometer': 1e-6,
+    'micrometers': 1e-6,
+    'micrometre': 1e-6,
+    'micrometres': 1e-6,
+    'nm': 1e-9,
+    'nanometer': 1e-9,
+    'nanometers': 1e-9,
+}
+
+_E_TO_EV: dict[str, float] = {
+    'ev': 1.0,
+    'electronvolt': 1.0,
+    'electronvolts': 1.0,
+    'kev': 1e3,
+    'kiloelectronvolt': 1e3,
+    'kiloelectronvolts': 1e3,
+    'mev': 1e6,
+    'megaelectronvolt': 1e6,
+    'megaelectronvolts': 1e6,
+}
+
+
+def _read_egu(h5_file: h5py.File, egu_path: str, fallback: str) -> str:
+    if egu_path not in h5_file:
+        logger.warning(f'{egu_path} not present; assuming {fallback!r}')
+        return fallback
+    raw = h5_file[egu_path][()]
+    if isinstance(raw, numpy.ndarray):
+        if raw.size == 0:
+            return fallback
+        raw = raw.flat[0]
+    if isinstance(raw, bytes):
+        raw = raw.decode('utf-8', errors='replace')
+    return str(raw).strip().lower()
+
+
+def _to_meters(value: float, egu: str) -> float:
+    try:
+        return value * _LEN_TO_M[egu]
+    except KeyError:
+        logger.warning(f'Unrecognized length unit {egu!r}; assuming meters')
+        return value
+
+
+def _to_ev(value: float, egu: str) -> float:
+    try:
+        return value * _E_TO_EV[egu]
+    except KeyError:
+        logger.warning(f'Unrecognized energy unit {egu!r}; assuming eV')
+        return value
+
+
+def _read_attr(attrs: h5py.AttributeManager, name: str) -> float | None:
+    """Read one scalar attribute, or None when the file omits it.
+
+    Read per field rather than as a group: these files carry the set only in part --
+    the 2023-1 production files carry none of it, and run_00053 carries Pixel_size and
+    Exposure_time but no beam center -- so an all-or-nothing read would discard values
+    that are present.
+    """
+    try:
+        raw = attrs[name]
+    except KeyError:
+        return None
+
+    return float(numpy.asarray(raw).flat[0])
+
+
+class LamNIDiffractionFileReader(DiffractionFileReader):
+    _LEGACY_DATA_PATH = '/entry/data/eiger_4'
+    _AD_DATA_PATH = '/entry/data/data'
+
+    # Stands in for Pixel_size when a file omits it; the Eiger pitch at this instrument.
+    DETECTOR_PIXEL_SIZE_M: Final[float] = 75e-6
+
+    def __init__(self) -> None:
+        self._tree_builder = H5DiffractionFileTreeBuilder()
+
+    def read(self, file_path: Path) -> DiffractionDataset:
+        with h5py.File(file_path, 'r') as h5_file:
+            contents_tree = self._tree_builder.build(h5_file)
+
+            if self._AD_DATA_PATH in h5_file:
+                return self._read_area_detector(file_path, h5_file, contents_tree)
+            if self._LEGACY_DATA_PATH in h5_file:
+                return self._read_legacy(file_path, h5_file, contents_tree)
+
+            raise KeyError(
+                f'No LamNI diffraction data found in {file_path} '
+                f'(expected {self._AD_DATA_PATH} or {self._LEGACY_DATA_PATH})'
+            )
+
+    def _read_legacy(
+        self, file_path: Path, h5_file: h5py.File, contents_tree: DiffractionDatasetLayoutNode
+    ) -> DiffractionDataset:
+        data = h5_file[self._LEGACY_DATA_PATH]
+
+        if not isinstance(data, h5py.Dataset):
+            raise KeyError(f'{self._LEGACY_DATA_PATH} is not a Dataset!')
+
+        num_patterns, detector_height, detector_width = data.shape
+
+        beam_center: BeamCenter | None = None
+        photon_energy_eV: float | None = None  # noqa: N806
+
+        center_x_px = _read_attr(data.attrs, 'Center_x_pixel')
+        center_y_px = _read_attr(data.attrs, 'Center_y_pixel')
+
+        if center_x_px is not None and center_y_px is not None:
+            beam_center = BeamCenter(int(center_x_px), int(center_y_px))
+
+        detector_distance_m = _read_attr(data.attrs, 'Detector_distance_m')
+        exposure_time_s = _read_attr(data.attrs, 'Exposure_time')
+        photon_energy_keV = _read_attr(data.attrs, 'Photon_energy_kev')  # noqa: N806
+
+        if photon_energy_keV is not None:
+            photon_energy_eV = EnergyUnit.KILOELECTRONVOLT.to_electronvolts(  # noqa: N806
+                photon_energy_keV
+            )
+
+        pixel_size = _read_attr(data.attrs, 'Pixel_size') or self.DETECTOR_PIXEL_SIZE_M
+        detector_pixel_geometry = PixelGeometry(pixel_size, pixel_size)
+
+        metadata = DiffractionMetadata(
+            num_patterns_per_array=[num_patterns],
+            pattern_dtype=data.dtype,
+            detector_distance_m=detector_distance_m,
+            detector_extent=ImageExtent(detector_width, detector_height),
+            detector_pixel_geometry=detector_pixel_geometry,
+            beam_center=beam_center,
+            photon_energy_eV=photon_energy_eV,
+            exposure_time_s=exposure_time_s,
+            file_path=file_path,
+        )
+        array = H5DiffractionPatternArray(
+            label=file_path.stem,
+            indexes=numpy.arange(num_patterns),
+            file_path=file_path,
+            data_path=self._LEGACY_DATA_PATH,
+        )
+        return SimpleDiffractionDataset(metadata, contents_tree, [array])
+
+    def _read_area_detector(
+        self, file_path: Path, h5_file: h5py.File, contents_tree: DiffractionDatasetLayoutNode
+    ) -> DiffractionDataset:
+        data = h5_file[self._AD_DATA_PATH]
+
+        if not isinstance(data, h5py.Dataset):
+            raise KeyError(f'{self._AD_DATA_PATH} is not a Dataset!')
+
+        num_patterns, detector_height, detector_width = data.shape
+
+        beam_center: BeamCenter | None = None
+        detector_distance_m: float | None = None
+        detector_pixel_geometry = PixelGeometry(
+            self.DETECTOR_PIXEL_SIZE_M, self.DETECTOR_PIXEL_SIZE_M
+        )
+        exposure_time_s: float | None = None
+        photon_energy_eV: float | None = None  # noqa: N806
+
+        try:
+            distance_raw = float(h5_file['/entry/instrument/detector/detector_distance'][0])
+            x_pixel_raw = float(h5_file['/entry/instrument/detector/x_pixel_size'][0])
+            y_pixel_raw = float(h5_file['/entry/instrument/detector/y_pixel_size'][0])
+            energy_raw = float(h5_file['/entry/instrument/monochromator/energy'][0])
+            exposure_raw = float(h5_file['/entry/instrument/detector/count_time'][0])
+            beam_center_x = float(h5_file['/entry/instrument/detector/beam_center_x'][0])
+            beam_center_y = float(h5_file['/entry/instrument/detector/beam_center_y'][0])
+        except KeyError:
+            pass
+        else:
+            distance_egu = _read_egu(h5_file, '/entry/metadata_units/Distance_EGU', 'mm')
+            energy_egu = _read_egu(h5_file, '/entry/metadata_units/MonoEnergy_EGU', 'kev')
+            pixel_egu = _read_egu(h5_file, '/entry/metadata_units/PixelSize_EGU', 'um')
+
+            detector_distance_m = _to_meters(distance_raw, distance_egu)
+            detector_pixel_geometry = PixelGeometry(
+                width_m=_to_meters(x_pixel_raw, pixel_egu),
+                height_m=_to_meters(y_pixel_raw, pixel_egu),
+            )
+            photon_energy_eV = _to_ev(energy_raw, energy_egu)  # noqa: N806
+            exposure_time_s = exposure_raw
+            beam_center = BeamCenter(int(round(beam_center_x)), int(round(beam_center_y)))
+
+        metadata = DiffractionMetadata(
+            num_patterns_per_array=[num_patterns],
+            pattern_dtype=data.dtype,
+            detector_distance_m=detector_distance_m,
+            detector_extent=ImageExtent(detector_width, detector_height),
+            detector_pixel_geometry=detector_pixel_geometry,
+            beam_center=beam_center,
+            photon_energy_eV=photon_energy_eV,
+            exposure_time_s=exposure_time_s,
+            file_path=file_path,
+        )
+        array = H5DiffractionPatternArray(
+            label=file_path.stem,
+            indexes=numpy.arange(num_patterns),
+            file_path=file_path,
+            data_path=self._AD_DATA_PATH,
+        )
+        return SimpleDiffractionDataset(metadata, contents_tree, [array])

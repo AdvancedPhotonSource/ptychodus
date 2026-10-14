@@ -11,7 +11,6 @@ from ptychodus_store.db.models import Campaign
 from ptychodus_store.routers._convert import campaign_to_read
 from ptychodus_store.routers.deps import SessionDep
 from ptychodus_store.routers.schemas import CampaignRead, Page
-from ptychodus_store.storage.manifest import ResourceKind
 
 router = APIRouter(prefix='/campaign', tags=['campaign'])
 
@@ -36,15 +35,13 @@ async def list_campaigns(
         # quoted JSON form of the value.
         where.append(func.instr(func.cast(Campaign.tags, String), f'"{tag}"') > 0)
 
-    items, total = await repo.list_rows(
-        session, ResourceKind.CAMPAIGN, limit=limit, offset=offset, where=where
-    )
+    items, total = await repo.list_rows(session, Campaign, limit=limit, offset=offset, where=where)
     return Page(items=[campaign_to_read(i) for i in items], total=total, limit=limit, offset=offset)
 
 
 @router.get('/{uuid}', response_model=CampaignRead)
 async def get_campaign(uuid: UUID, session: SessionDep) -> CampaignRead:
-    row = await repo.get_row(session, ResourceKind.CAMPAIGN, uuid)
+    row = await repo.get_row(session, Campaign, uuid)
     if row is None:
         raise HTTPException(status_code=404, detail=f'campaign {uuid} not found')
     return campaign_to_read(row)

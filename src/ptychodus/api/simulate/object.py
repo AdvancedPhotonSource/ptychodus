@@ -9,11 +9,10 @@ from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 import numpy
 
-from ._phase_unwrap import PhaseUnwrapper
 from ..constants import TWO_PI_J
 from ..interpolate import lerp
 from ..assemble import AssembledDiffractionData
-from ..object import Object, ObjectGeometry
+from ..object import Object, ObjectGeometry, resample_object_layers
 from ..probe_positions import ProbePosition
 from ..typing import IntegerArrayType, RealArrayType
 
@@ -63,7 +62,7 @@ def generate_paganin_object(
     assembled_data: AssembledDiffractionData,
     probe_positions: Iterable[ProbePosition],
     *,
-    probe_wavelength_m: float,
+    photon_wavelength_m: float,
     propagation_distance_m: float,
     delta_over_beta: float,
     small_value: float = 1.0e-12,
@@ -100,7 +99,7 @@ def generate_paganin_object(
     K2 = numpy.square(KX) + numpy.square(KY)  # noqa: N806
 
     filter_denominator = (
-        1.0 + delta_over_beta * propagation_distance_m * probe_wavelength_m * K2 / (4 * numpy.pi)
+        1.0 + delta_over_beta * propagation_distance_m * photon_wavelength_m * K2 / (4 * numpy.pi)
     )
     filtered = numpy.real(numpy.asarray(ifft2(fft2(intensity_normalized) / filter_denominator)))
     filtered = numpy.clip(filtered, small_value, None)
@@ -115,17 +114,37 @@ def generate_paganin_object(
     )
 
 
+def generate_uniform_object(geometry: ObjectGeometry) -> Object:
+    """Generate a transparent object: unit amplitude and zero phase everywhere.
+
+    The starting guess for a reconstruction that asserts nothing about the sample, as
+    distinct from :func:`generate_random_object` with its deviations set to zero -- which
+    computes the same array, but reads as though the result were random.
+    """
+    array = numpy.ones((1, geometry.height_px, geometry.width_px), dtype=complex)
+
+    return Object(
+        array=array,
+        pixel_geometry=geometry.get_pixel_geometry(),
+        center=geometry.get_center(),
+    )
+
+
 def generate_random_object(
     rng: numpy.random.Generator,
     geometry: ObjectGeometry,
     *,
     amplitude_mean: float,
     amplitude_deviation: float,
-    phase_mean: float,
+    phase_mean_tr: float,
     phase_deviation_tr: float,
     blur_deviation_px: float,
 ) -> Object:
-    """Generate a random complex object from Gaussian amplitude and phase distributions, with optional Gaussian blur."""
+    """Generate a random complex object from Gaussian amplitude and phase distributions, with optional Gaussian blur.
+
+    Phase is in turns, as the ``_tr`` suffixes say: the array is
+    ``amplitude * exp(2*pi*j * phase)``, so a `phase_mean_tr` of 0.5 is half a turn.
+    """
     object_shape = (1, geometry.height_px, geometry.width_px)
 
     amplitude = rng.normal(
@@ -134,7 +153,7 @@ def generate_random_object(
         object_shape,
     )
     phase = rng.normal(
-        0.0,
+        phase_mean_tr,
         phase_deviation_tr,
         object_shape,
     )
@@ -509,33 +528,16 @@ def generate_siemens_star_object(
 
 
 def generate_layers(object_: Object, layer_spacing_m: Sequence[float]) -> Object:
-    """Create an object from an existing object with a potentially
-    different number of slices.
+    """Reslice an object onto the depth grid given by *layer_spacing_m*.
 
-    The new slice count is ``1 + len(layer_spacing_m)``. If it is greater
-    than the existing slice count, the first layer is split as
-    ``abs(o) ** (1 / nSlices) * exp(i * unwrapPhase(o) / nSlices)`` and
-    repeated. If it is less, the existing layers are truncated to the new
-    count. If equal, the array is reused as is.
+    The new slice count is ``1 + len(layer_spacing_m)``. Every layer of the input
+    contributes: :func:`resample_object_layers` interpolates the cumulative optical path
+    and preserves the layer product, so growing no longer discards all but the first
+    layer and shrinking no longer drops the trailing ones. An object with a single layer
+    still has its transmission spread evenly over the requested slices, which is the one
+    behaviour the previous implementation got right.
     """
-    num_slices = 1 + len(layer_spacing_m)
-    array = object_.get_array()
-
-    if num_slices < array.shape[0]:
-        array = array[:num_slices]
-    elif num_slices > array.shape[0]:
-        amplitude = numpy.absolute(array[:1]) ** (1.0 / num_slices)
-        amplitude = amplitude.repeat(num_slices, axis=0)
-        phase = PhaseUnwrapper().unwrap(array[0])[numpy.newaxis, ...] / num_slices
-        phase = phase.repeat(num_slices, axis=0)
-        array = amplitude * numpy.exp(1j * phase)
-
-    return Object(
-        array=array.astype('complex'),
-        pixel_geometry=object_.get_pixel_geometry(),
-        center=object_.get_center(),
-        layer_spacing_m=layer_spacing_m,
-    )
+    return resample_object_layers(object_, layer_spacing_m)
 
 
 def pad_object(object_: Object, pad_x: int, pad_y: int) -> Object:

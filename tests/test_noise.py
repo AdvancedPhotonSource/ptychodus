@@ -13,7 +13,6 @@ Behaviors verified:
 import numpy
 import pytest
 
-from ptychodus.api.geometry import Interval
 from ptychodus.api.preprocess.noise import (
     RobustStatistics,
     compute_robust_statistics,
@@ -91,8 +90,3 @@ def test_get_bounds_rejects_outlier_while_keeping_bulk() -> None:
     assert 10.0 in interval
     assert 11.0 in interval
     assert 12.0 in interval
-
-
-def test_get_bounds_returns_interval_of_float() -> None:
-    stats = compute_robust_statistics(numpy.array([1.0, 2.0, 3.0]))
-    assert isinstance(stats.get_bounds(k=2.0), Interval)

@@ -3,7 +3,18 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Index, Integer, String, Uuid, func
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Uuid,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ptychodus_store.db.base import Base, IngestState
@@ -66,7 +77,7 @@ class Diffraction(Base):
 
     # Manifest-supplied
     detector_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
-    probe_energy_eV: Mapped[float | None] = mapped_column(Float, nullable=True)  # noqa: N815
+    photon_energy_eV: Mapped[float | None] = mapped_column(Float, nullable=True)  # noqa: N815
     probe_photon_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     exposure_time_s: Mapped[float | None] = mapped_column(Float, nullable=True)
     tomography_angle_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -82,6 +93,8 @@ class Diffraction(Base):
     num_patterns_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
     detector_pixel_width_m: Mapped[float | None] = mapped_column(Float, nullable=True)
     detector_pixel_height_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    num_bad_pixels: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    nbytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Bookkeeping
     folder_path: Mapped[str] = mapped_column(String, nullable=False)
@@ -98,7 +111,7 @@ class Diffraction(Base):
 
     __table_args__ = (
         Index('ix_diffraction_campaign_uuid', 'campaign_uuid'),
-        Index('ix_diffraction_probe_energy_eV', 'probe_energy_eV'),
+        Index('ix_diffraction_photon_energy_eV', 'photon_energy_eV'),
         Index('ix_diffraction_tomography_angle_deg', 'tomography_angle_deg'),
         Index('ix_diffraction_tilt_angle_deg', 'tilt_angle_deg'),
         Index('ix_diffraction_ingest_state', 'ingest_state'),
@@ -114,10 +127,12 @@ class Product(Base):
     name: Mapped[str | None] = mapped_column(String, nullable=True)
     comments: Mapped[str | None] = mapped_column(String, nullable=True)
     detector_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
-    probe_energy_eV: Mapped[float | None] = mapped_column(Float, nullable=True)  # noqa: N815
+    focus_object_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    far_field: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    photon_energy_eV: Mapped[float | None] = mapped_column(Float, nullable=True)  # noqa: N815
     probe_photon_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     exposure_time_s: Mapped[float | None] = mapped_column(Float, nullable=True)
-    mass_attenuation_m2_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    mass_attenuation_m2_per_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
     tomography_angle_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
     tilt_angle_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
     polarization: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -131,6 +146,18 @@ class Product(Base):
     probe_width_px: Mapped[int | None] = mapped_column(Integer, nullable=True)
     num_scan_points: Mapped[int | None] = mapped_column(Integer, nullable=True)
     num_loss_epochs: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    scan_length_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    probe_dtype: Mapped[str | None] = mapped_column(String, nullable=True)
+    object_dtype: Mapped[str | None] = mapped_column(String, nullable=True)
+    probe_nbytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    object_nbytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    scan_nbytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Per-mode and per-layer, so JSON rather than a column each: the counts vary
+    # per product and nothing queries them.
+    probe_mode_relative_power: Mapped[list[float]] = mapped_column(
+        JSON, default=list, nullable=False
+    )
+    object_layer_spacing_m: Mapped[list[float]] = mapped_column(JSON, default=list, nullable=False)
 
     # Bookkeeping
     folder_path: Mapped[str] = mapped_column(String, nullable=False)
@@ -146,7 +173,7 @@ class Product(Base):
     updated_at: Mapped[datetime] = _updated_ts()
 
     __table_args__ = (
-        Index('ix_product_probe_energy_eV', 'probe_energy_eV'),
+        Index('ix_product_photon_energy_eV', 'photon_energy_eV'),
         Index('ix_product_ingest_state', 'ingest_state'),
     )
 
@@ -160,6 +187,8 @@ class Fluorescence(Base):
 
     # HDF5-derived
     element_names: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    element_counts: Mapped[list[float]] = mapped_column(JSON, default=list, nullable=False)
+    nbytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     map_height_px: Mapped[int | None] = mapped_column(Integer, nullable=True)
     map_width_px: Mapped[int | None] = mapped_column(Integer, nullable=True)
 

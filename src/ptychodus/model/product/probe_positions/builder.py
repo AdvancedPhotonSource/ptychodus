@@ -6,7 +6,7 @@ import logging
 import numpy
 
 from ptychodus.api.parameters import ParameterGroup
-from ptychodus.api.preprocess.probe_positions import AffineTransform, transform_probe_positions
+from ptychodus.api.affine import AffineTransform, transform_probe_positions
 from ptychodus.api.probe_positions import (
     ProbePosition,
     ProbePositionFileReader,
@@ -154,7 +154,11 @@ class ProbePositionsBuilder(ParameterGroup):
         jitter_radius_m = self.jitter_radius_m.get_value()
         rng = self._rng if jitter_radius_m > 0.0 else None
         return ProbePositionSequence(
-            [*transform_probe_positions(trimmed, transform, rng, jitter_radius_m)]
+            [
+                *transform_probe_positions(
+                    trimmed, transform, rng=rng, jitter_radius_m=jitter_radius_m
+                )
+            ]
         )
 
     def _trim_positions(self, positions: Sequence[ProbePosition]) -> Sequence[ProbePosition]:

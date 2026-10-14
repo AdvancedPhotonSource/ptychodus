@@ -122,8 +122,8 @@ def _format_crop_extent(metadata: DiffractionMetadata) -> str:
     return f'{int(extent.width_px)} × {int(extent.height_px)} px'
 
 
-def _format_probe_energy(metadata: DiffractionMetadata) -> str:
-    energy_eV = metadata.probe_energy_eV  # noqa: N806
+def _format_photon_energy(metadata: DiffractionMetadata) -> str:
+    energy_eV = metadata.photon_energy_eV  # noqa: N806
     return '—' if energy_eV is None else f'{energy_eV:.3f} eV'
 
 
@@ -208,10 +208,10 @@ class OpenDatasetWizardMetadataViewController:
                 apply=self._apply_crop_extent,
             ),
             _MetadataRow(
-                name='Probe Energy',
-                is_present=lambda m: m.probe_energy_eV is not None,
-                format_value=_format_probe_energy,
-                apply=self._apply_probe_energy,
+                name='Photon Energy',
+                is_present=lambda m: m.photon_energy_eV is not None,
+                format_value=_format_photon_energy,
+                apply=self._apply_photon_energy,
             ),
             _MetadataRow(
                 name='Probe Photon Count',
@@ -301,12 +301,12 @@ class OpenDatasetWizardMetadataViewController:
         self._diffraction_settings.crop_width_px.set_value(region.width_px)
         self._diffraction_settings.crop_height_px.set_value(region.height_px)
 
-    # --- Probe energy ---
+    # --- Photon energy ---
 
-    def _apply_probe_energy(self, metadata: DiffractionMetadata) -> None:
-        energy_eV = metadata.probe_energy_eV  # noqa: N806
+    def _apply_photon_energy(self, metadata: DiffractionMetadata) -> None:
+        energy_eV = metadata.photon_energy_eV  # noqa: N806
         if energy_eV:
-            self._product_settings.probe_energy_eV.set_value(energy_eV)
+            self._product_settings.photon_energy_eV.set_value(energy_eV)
 
     # --- Probe photon count ---
 

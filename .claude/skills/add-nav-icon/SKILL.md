@@ -56,7 +56,7 @@ Two edits per function: append `-> None` to the signature and `# noqa: N802` to 
 
 ## Step 4 — Wire it into `ViewCore`
 
-Add a call to `self.navigation.add_panel(...)` in [`src/ptychodus/view/core.py`](../../src/ptychodus/view/core.py) `ViewCore.__init__`. Order matters — **the sequence of `add_panel` calls is the source of truth for the left/right stacked-panel indexes** (per CLAUDE.md). Mirror the fluorescence pattern at [`view/core.py:275-280`](../../src/ptychodus/view/core.py#L275-L280):
+Add a call to `self.navigation.add_panel(...)` in [`src/ptychodus/view/core.py`](../../src/ptychodus/view/core.py) `ViewCore.__init__`. Order matters — **the sequence of `add_panel` calls is the source of truth for the left/right stacked-panel indexes** (per CLAUDE.md). Mirror the fluorescence pattern at [`view/core.py:298-305`](../../src/ptychodus/view/core.py#L298-L305):
 
 ```python
 self.my_feature_view = MyFeatureView()
@@ -69,7 +69,7 @@ self.my_feature_action = self.navigation.add_panel(
 )
 ```
 
-If the new panel belongs nested under a parent (Products or Processing today), add its action to the existing `add_subview_group` call at [`view/core.py:336-352`](../../src/ptychodus/view/core.py#L336-L352). Otherwise it renders as a top-level toolbar button.
+If the new panel belongs nested under a parent (Products or Processing today), add its action to the existing `add_subview_group` call at [`view/core.py:325-342`](../../src/ptychodus/view/core.py#L325-L342). Otherwise it renders as a top-level toolbar button.
 
 `ControllerCore` uses stacked-widget indexes matching `ViewCore`'s `add_panel` order — inserting a panel in the middle shifts every downstream index. Prefer appending, or run the app afterward and confirm nothing underneath shifted.
 
@@ -84,6 +84,17 @@ Add one entry to the `NAV` array in [`src/ptychodus_store/ui/src/nav.ts`](../../
 - `route` — page identifier used by the front-end router.
 - `label` — tooltip / text under the button.
 - `icon` — **filename only**; the render code prefixes `/ui/icons/`.
+- `children` — optional nested entries, drawn with a rail and indent.
+
+**The nesting mirrors `ViewCore`.** A panel added to a group there with `add_subview_group` belongs in that parent's `children` here, and one added at the top level belongs at the top level. The two are written in different languages and nothing compares them, so a panel nested on one side and flat on the other is invisible until someone opens both. The current shape:
+
+```text
+Diffraction          Products (children: Positions, Probe, Object)          Fluorescence
+```
+
+Entries present in `ViewCore` but deliberately absent here are the panels that write or dispatch — Settings, Processing, Globus, Genesis, Automation, Agent — and `src/ptychodus_store/README.md` says so. A new panel of that kind needs no `nav.ts` entry; add it to that list instead.
+
+Routing is keyed by `route`, and `main.ts` walks the tree, so a nested entry needs a `PAGES` entry exactly like a top-level one.
 
 No backend router change is needed. FastAPI already serves `src/ptychodus_store/ui/` at `/ui/` via the `StaticFiles` mount in [`src/ptychodus_store/app.py`](../../src/ptychodus_store/app.py), so a new SVG in `ui/icons/` is automatically reachable at `/ui/icons/my-icon.svg`.
 

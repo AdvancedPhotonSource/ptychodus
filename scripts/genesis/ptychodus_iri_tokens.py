@@ -8,6 +8,9 @@ import logging
 
 import httpx
 
+import sys
+
+from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.genesis.core import create_facility_adapters
 from ptychodus.model.genesis.iri import get_iri_tokens_file
@@ -99,7 +102,8 @@ def print_spec(facility: str) -> None:
         adapter = adapters[facility]
     except KeyError:
         known = ', '.join(sorted(adapters))
-        raise SystemExit(f'Unknown facility "{facility}". Known facilities: {known}')
+        print(f'Unknown facility "{facility}". Known facilities: {known}', file=sys.stderr)
+        sys.exit(ExitCode.USAGE)
 
     client = adapter.get_iri_client()
     client.print_openapi_specification()

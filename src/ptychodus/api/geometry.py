@@ -13,6 +13,21 @@ from .typing import ComplexArrayType, RealArrayType
 T = TypeVar('T', int, float, Decimal)
 
 
+class GeometryNotDefinedError(ValueError):
+    """The object-plane sampling a product implies is not determined yet.
+
+    Raised while a product has no diffraction dataset bound, or where the geometry is
+    degenerate enough that the sampling has no value -- a detector at the sample plane,
+    or at the focus of a cone beam. Callers that must degrade catch it; see the rule
+    stated in :mod:`ptychodus.api.propagate`, that a primitive raises rather than
+    inventing a sentinel for the caller to inspect.
+
+    A :exc:`ValueError` so that the ``except ValueError`` already guarding
+    :meth:`Object.get_pixel_geometry`, which signals the same not-set condition,
+    covers this too.
+    """
+
+
 @dataclass(frozen=True)
 class PixelGeometry:
     """Physical dimensions of a single detector or probe pixel in meters."""
@@ -23,10 +38,6 @@ class PixelGeometry:
     @property
     def is_square(self) -> bool:
         return self.width_m == self.height_m
-
-    @property
-    def is_valid(self) -> bool:
-        return self.width_m > 0.0 and self.height_m > 0.0
 
     def get_area_m2(self) -> float:
         return self.width_m * self.height_m
@@ -204,13 +215,37 @@ class HermiteMode:
     order_x: int  # m
     order_y: int  # n
 
-    def _hermite(self, order: int, value: RealArrayType) -> RealArrayType:
-        return scipy.special.eval_hermite(order, value)
-
     def __call__(self, x: RealArrayType, y: RealArrayType) -> ComplexArrayType:
-        hx = self._hermite(self.order_x, x)
-        hy = self._hermite(self.order_y, y)
+        hx = scipy.special.eval_hermite(self.order_x, x)
+        hy = scipy.special.eval_hermite(self.order_y, y)
         return self.coefficient * hx * hy
 
     def __str__(self) -> str:
         return f'{self.coefficient}$H_{{{self.order_x},{self.order_y}}}(x,y)$'
+
+
+@dataclass(frozen=True)
+class LegendreMode:
+    """A single Legendre polynomial term P_n(u) with a real height coefficient and order n.
+
+    Unlike :class:`ZernikeMode` and :class:`HermiteMode`, which carry complex coefficients
+    and are summed into a complex amplitude, this mode describes a *surface height* and so
+    carries a real coefficient in meters. Converting a height to a phase depends on the
+    wavelength and, for a grazing-incidence surface, on the incidence angle; neither is
+    known here, so :meth:`__call__` returns the height and the conversion belongs to
+    whatever applies the mode to a wavefield.
+
+    Legendre polynomials are orthogonal on ``[-1, 1]``, so *u* is the aperture coordinate
+    normalized to that interval. Low orders carry the conventional meanings: 0 is piston,
+    1 is tilt, 2 is defocus, 3 is coma.
+    """
+
+    coefficient_m: float
+    order: int  # n
+
+    def __call__(self, u: RealArrayType) -> RealArrayType:
+        """Return the surface height in meters at normalized aperture coordinate *u*."""
+        return self.coefficient_m * scipy.special.eval_legendre(self.order, u)
+
+    def __str__(self) -> str:
+        return f'{self.coefficient_m}$P_{{{self.order}}}(u)$'

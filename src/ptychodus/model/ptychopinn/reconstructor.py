@@ -206,7 +206,7 @@ def build_reconstructor(
         )
 
     def export_training_data(file_path: Path, parameters: ReconstructInput) -> None:
-        save_ptychopinn_training_data(file_path, parameters, multimodal_probe=False)
+        save_ptychopinn_training_data(file_path, parameters)
 
     return SubprocessReconstructor(
         name=name,

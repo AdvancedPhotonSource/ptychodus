@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+import logging
 from pathlib import Path
 
 import numpy
@@ -20,6 +22,7 @@ from ptychodus.api.reconstruct import (
     PositionIndexFilter,
     ReconstructionAmbiguities,
     prepare_reconstruct_input,
+    warn_if_propagation_regime_disagrees,
 )
 
 
@@ -35,10 +38,10 @@ def _metadata() -> ProductMetadata:
         name='test',
         comments='',
         detector_distance_m=1.0,
-        probe_energy_eV=10_000.0,
+        photon_energy_eV=10_000.0,
         probe_photon_count=1.0,
         exposure_time_s=1.0,
-        mass_attenuation_m2_kg=0.0,
+        mass_attenuation_m2_per_kg=0.0,
         tomography_angle_deg=0.0,
     )
 
@@ -781,7 +784,7 @@ def _product_with_position_indexes(indexes: list[int]) -> Product:
 
 
 def _product_with_position_specs(specs: list[tuple[int, float, float]]) -> Product:
-    """Build a Product from (index, coordinate_x_m, coordinate_y_m) tuples."""
+    """Build a Product from (index, x_m, y_m) tuples."""
     points = [ProbePosition(index=i, x_m=x, y_m=y) for i, x, y in specs]
     return Product(
         metadata=_metadata(),
@@ -1126,3 +1129,100 @@ class TestNullReconstructor:
         target = tmp_path / 'model.bin'
         NullReconstructor('null').save_model(target)
         assert not target.exists()
+
+
+# ---------------------------------------------------------------------------
+# warn_if_propagation_regime_disagrees
+# ---------------------------------------------------------------------------
+
+
+_WARN_LOGGER = 'ptychodus.api.reconstruct'
+
+
+def _product_with_regime(
+    *, far_field: bool, pixel_m: float = PIXEL_M, focus_object_distance_m: float = 0.0
+) -> Product:
+    """A product whose probe pitch sets the object-plane Fresnel number.
+
+    At the shared 1 nm pitch an 8 px probe at 1 m reads Fr ~ 5e-7, deeply far field;
+    at 10 um it reads Fr ~ 52, deeply near field.
+    """
+    product = _make_product()
+    probes = ProbeSequence(
+        array=product.probes.get_array(),
+        opr_weights=None,
+        pixel_geometry=PixelGeometry(width_m=pixel_m, height_m=pixel_m),
+    )
+    return dataclasses.replace(
+        product,
+        probes=probes,
+        metadata=dataclasses.replace(
+            product.metadata,
+            far_field=far_field,
+            focus_object_distance_m=focus_object_distance_m,
+        ),
+    )
+
+
+_NEAR_FIELD_PIXEL_M = 1.0e-5
+
+
+class TestWarnIfPropagationRegimeDisagrees:
+    """The regime is a declaration, so it can contradict the geometry it describes.
+    The consequence is a reconstruction on the wrong sample-plane sampling, which
+    shows up as a bad image rather than an error -- hence the warning.
+    """
+
+    def test_far_field_declaration_on_a_near_field_geometry_warns(self, caplog) -> None:
+        product = _product_with_regime(far_field=True, pixel_m=_NEAR_FIELD_PIXEL_M)
+
+        with caplog.at_level(logging.WARNING, logger=_WARN_LOGGER):
+            warn_if_propagation_regime_disagrees(product)
+
+        assert len(caplog.records) == 1
+        assert 'far-field' in caplog.records[0].getMessage()
+
+    def test_near_field_declaration_on_a_far_field_geometry_warns(self, caplog) -> None:
+        product = _product_with_regime(far_field=False)
+
+        with caplog.at_level(logging.WARNING, logger=_WARN_LOGGER):
+            warn_if_propagation_regime_disagrees(product)
+
+        assert len(caplog.records) == 1
+        assert 'near-field' in caplog.records[0].getMessage()
+
+    def test_a_consistent_far_field_product_is_silent(self, caplog) -> None:
+        with caplog.at_level(logging.WARNING, logger=_WARN_LOGGER):
+            warn_if_propagation_regime_disagrees(_product_with_regime(far_field=True))
+
+        assert caplog.records == []
+
+    def test_a_consistent_near_field_product_is_silent(self, caplog) -> None:
+        """Parallel-beam near field, the configuration the regime field exists for:
+        no focusing optic, magnification exactly one, and nothing to complain about.
+        """
+        product = _product_with_regime(far_field=False, pixel_m=_NEAR_FIELD_PIXEL_M)
+
+        with caplog.at_level(logging.WARNING, logger=_WARN_LOGGER):
+            warn_if_propagation_regime_disagrees(product)
+
+        assert product.metadata.magnification == 1.0
+        assert caplog.records == []
+
+    def test_thresholds_widen_the_tolerated_band(self, caplog) -> None:
+        product = _product_with_regime(far_field=True, pixel_m=_NEAR_FIELD_PIXEL_M)
+
+        with caplog.at_level(logging.WARNING, logger=_WARN_LOGGER):
+            warn_if_propagation_regime_disagrees(product, far_field_fresnel_number=1.0e6)
+
+        assert caplog.records == []
+
+    def test_a_detector_at_the_focus_is_silent_rather_than_raising(self, caplog) -> None:
+        """Degenerate geometry is reported by nothing, so it warns about nothing."""
+        product = _product_with_regime(far_field=False, focus_object_distance_m=1.0)
+
+        with caplog.at_level(logging.WARNING, logger=_WARN_LOGGER):
+            warn_if_propagation_regime_disagrees(product)
+
+        assert product.metadata.magnification == 0.0
+        assert caplog.records == []

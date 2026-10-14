@@ -17,17 +17,17 @@ from ...model.ptychi import (
 )
 from ..parameters import (
     CheckBoxParameterViewController,
-    CheckableGroupBoxParameterViewController,
     ComboBoxParameterViewController,
     DecimalLineEditParameterViewController,
     DecimalSliderParameterViewController,
 )
+from .group_box import PtyChiCheckableGroupBoxViewController
 from .optimizer import PtyChiOptimizationPlanViewController, PtyChiOptimizerParameterViewController
 
 __all__ = ['PtyChiProbeViewController']
 
 
-class PtyChiConstrainProbePowerViewController(CheckableGroupBoxParameterViewController):
+class PtyChiConstrainProbePowerViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         constrain_power: BooleanParameter,
@@ -52,10 +52,10 @@ class PtyChiConstrainProbePowerViewController(CheckableGroupBoxParameterViewCont
         layout = QFormLayout()
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
         layout.addRow(self._scale_object_view_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
-class PtyChiOrthogonalizeIncoherentModesViewController(CheckableGroupBoxParameterViewController):
+class PtyChiOrthogonalizeIncoherentModesViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         orthogonalize_modes: BooleanParameter,
@@ -90,10 +90,10 @@ class PtyChiOrthogonalizeIncoherentModesViewController(CheckableGroupBoxParamete
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
         layout.addRow('Method:', self._method_view_controller.get_widget())
         layout.addRow(self._sort_by_occupancy_view_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
-class PtyChiOrthogonalizeOPRModesViewController(CheckableGroupBoxParameterViewController):
+class PtyChiOrthogonalizeOPRModesViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         orthogonalize_modes: BooleanParameter,
@@ -113,10 +113,10 @@ class PtyChiOrthogonalizeOPRModesViewController(CheckableGroupBoxParameterViewCo
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
-class PtyChiConstrainSupportViewController(CheckableGroupBoxParameterViewController):
+class PtyChiConstrainSupportViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         constrain_support: BooleanParameter,
@@ -150,10 +150,10 @@ class PtyChiConstrainSupportViewController(CheckableGroupBoxParameterViewControl
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
         layout.addRow('Threshold:', self._threshold_view_controller.get_widget())
         layout.addRow('Method:', self._method_view_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
-class PtyChiConstrainCenterViewController(CheckableGroupBoxParameterViewController):
+class PtyChiConstrainCenterViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         constrain_center: BooleanParameter,
@@ -172,7 +172,7 @@ class PtyChiConstrainCenterViewController(CheckableGroupBoxParameterViewControll
         self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
         )
-        self._use_total_intensity_for_com_view_controller = CheckableGroupBoxParameterViewController(
+        self._use_total_intensity_for_com_view_controller = PtyChiCheckableGroupBoxViewController(
             use_total_intensity_for_com,
             'Use Intensity for Mass Centroid',
             tool_tip="Use the total probe intensity for the center-of-mass calculation instead of the dominant shared mode's magnitude.",
@@ -187,10 +187,10 @@ class PtyChiConstrainCenterViewController(CheckableGroupBoxParameterViewControll
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
         layout.addRow(self._use_total_intensity_for_com_view_controller.get_widget())
         layout.addRow(self._center_modes_individually_view_controller.get_widget())
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)
 
 
-class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
+class PtyChiProbeViewController(PtyChiCheckableGroupBoxViewController):
     def __init__(
         self,
         settings: PtyChiProbeSettings,
@@ -313,4 +313,4 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
             )
             layout.addRow('Alpha:', self._alpha.get_widget())
 
-        self.get_widget().setLayout(layout)
+        self.get_widget().set_contents_layout(layout)

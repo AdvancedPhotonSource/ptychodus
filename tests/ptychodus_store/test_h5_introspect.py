@@ -44,10 +44,10 @@ def test_introspect_product(tmp_path: Path) -> None:
         f.attrs['name'] = 'p1'
         f.attrs['comments'] = 'hello'
         f.attrs['detector_object_distance_m'] = 2.0
-        f.attrs['probe_energy_eV'] = 8500.0
+        f.attrs['photon_energy_eV'] = 8500.0
         f.attrs['probe_photon_count'] = 12345
         f.attrs['exposure_time_s'] = 0.05
-        f.attrs['mass_attenuation_m2_kg'] = 0.0
+        f.attrs['mass_attenuation_m2_per_kg'] = 0.0
         f.attrs['tomography_angle_deg'] = 30.0
         f.attrs['tilt_angle_deg'] = 12.5
         f.attrs['polarization'] = 'left_circular'
@@ -63,7 +63,7 @@ def test_introspect_product(tmp_path: Path) -> None:
     result = introspect_product(path)
     assert result['name'] == 'p1'
     assert result['comments'] == 'hello'
-    assert result['probe_energy_eV'] == 8500.0
+    assert result['photon_energy_eV'] == 8500.0
     assert result['object_shape'] == (2, 32, 48)
     assert result['probe_shape'] == (3, 16, 16)
     assert result['num_scan_points'] == 11

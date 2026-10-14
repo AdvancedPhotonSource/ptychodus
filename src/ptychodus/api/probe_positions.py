@@ -10,6 +10,15 @@ from typing import overload
 
 import numpy
 
+from .typing import IntegerArrayType, RealArrayType
+
+
+def _read_only(array: numpy.ndarray) -> numpy.ndarray:
+    """Return a non-writeable view, so a bulk accessor cannot become a back door to mutation."""
+    view = array.view()
+    view.flags.writeable = False
+    return view
+
 
 @dataclass(frozen=True)
 class ProbePosition:
@@ -64,7 +73,7 @@ class ProbePositionSequence(Sequence[ProbePosition]):
                 if point.probe_photon_count is not None:
                     photon_counts.append(point.probe_photon_count)
 
-        self._indexes = numpy.array(indexes)
+        self._indexes = numpy.array(indexes, dtype=numpy.intp)
         self._coordinates_m = numpy.reshape(coordinates_m, (-1, 2))
         # All-or-nothing invariant: either every input point supplies probe_photon_count
         # or none of them do. A mix indicates a reader bug; refuse the input so it surfaces
@@ -101,9 +110,9 @@ class ProbePositionSequence(Sequence[ProbePosition]):
     def __getitem__(self, index: int) -> ProbePosition: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[ProbePosition]: ...
+    def __getitem__(self, index: slice) -> ProbePositionSequence: ...
 
-    def __getitem__(self, index: int | slice) -> ProbePosition | Sequence[ProbePosition]:
+    def __getitem__(self, index: int | slice) -> ProbePosition | ProbePositionSequence:
         if isinstance(index, slice):
             # Slice the backing arrays directly rather than materializing a
             # ProbePosition per element. Basic numpy slicing returns views; that
@@ -129,6 +138,24 @@ class ProbePositionSequence(Sequence[ProbePosition]):
 
     def __len__(self) -> int:
         return self._indexes.size
+
+    def get_indexes(self) -> IntegerArrayType:
+        """Return the scan-index array, read-only and row-aligned with the coordinates.
+
+        Scan indexes are what patterns and positions are paired by; they are not row
+        numbers. Readers may supply values that are non-monotonic, non-contiguous or
+        duplicated -- a fly scan repeats a trigger number across its bursts -- so
+        select on the values rather than assuming ``arange(len(self))``.
+        """
+        return _read_only(self._indexes)
+
+    def get_coordinates_x_m(self) -> RealArrayType:
+        """Return the x coordinates in meters, read-only and row-aligned with the indexes."""
+        return _read_only(self._coordinates_m[:, -1])
+
+    def get_coordinates_y_m(self) -> RealArrayType:
+        """Return the y coordinates in meters, read-only and row-aligned with the indexes."""
+        return _read_only(self._coordinates_m[:, -2])
 
     def get_probe_photon_counts(self) -> numpy.ndarray | None:
         """Return the per-position photon-count array, or ``None`` when the reader did not measure it.

@@ -10,8 +10,8 @@ import h5py
 import numpy
 
 from .assemble import AssembledDiffractionData
-from .diffraction import Polarization
-from .preprocess.diffraction import zero_bad_pixels
+from .diffraction import BadPixels, DiffractionPatterns, Polarization
+from .preprocess.diffraction import inpaint_bad_pixels, zero_bad_pixels
 from .fluorescence import ElementMap, FluorescenceDataset
 from .geometry import PixelGeometry
 from .object import Object, ObjectCenter
@@ -23,6 +23,7 @@ from .reconstruct import ReconstructInput
 __all__ = [
     'FluorescenceFileKeys',
     'StandardFileLayout',
+    'TrainingDataFileKeys',
     'load_diffraction_data',
     'load_fluorescence_data',
     'load_product',
@@ -30,6 +31,7 @@ __all__ = [
     'save_fluorescence_data',
     'save_product',
     'save_ptychopinn_training_data',
+    'save_training_data',
     'sanitize_path_component',
     'resolve_external_link_path',
 ]
@@ -72,21 +74,29 @@ class StandardFileLayout(StrEnum):
 
     DIFFRACTION = 'diffraction.h5'
     FLUORESCENCE = 'fluorescence.h5'
+    # Console capture: whatever the run wrote to its standard output and standard
+    # error, including the output of C extensions that a sys.stdout reassignment
+    # would not reach. Named for the application rather than for reconstruction, so
+    # that any activity writing into a workflow directory uses the one name.
+    LOG = 'ptychodus.log'
     # Stem only; the per-backend extension comes from
     # TrainableReconstructor.get_model_file_extension(). The full path is
     # f'{input_directory}/{MODEL_BASENAME}{ext}'.
     MODEL_BASENAME = 'model'
     PRODUCT = 'product.h5'
+    # Serialized reconstructor options: the resolved task a run was launched with,
+    # after every value the product supplies has been folded in. Distinct from
+    # SETTINGS, which holds the application's own configuration rather than what the
+    # reconstruction backend received.
+    PTYCHI_OPTIONS = 'ptychi_options.yaml'
     SETTINGS = 'settings.ini'
 
     def path(self, directory: Path) -> Path:
         return directory / self.value
 
     def checkpoint_path(self, directory: Path, epoch: int) -> Path:
-        # Convention shared by scripts/ptychodus_reconstruct.py and
-        # model/processing/monitor.py::ReconstructBackgroundTask, which write
-        # per-epoch snapshots beside the final artifact during streaming
-        # reconstructions.
+        # Per-epoch snapshot beside the final artifact, for a streaming reconstruction
+        # that publishes intermediate results.
         p = Path(self.value)
         return directory / f'{p.stem}.{epoch:06d}{p.suffix}'
 
@@ -205,13 +215,15 @@ class ProductFileKeys(StrEnum):
     NAME = 'name'
     COMMENTS = 'comments'
     DETECTOR_OBJECT_DISTANCE = 'detector_object_distance_m'
-    PROBE_ENERGY = 'probe_energy_eV'
+    FOCUS_OBJECT_DISTANCE = 'focus_object_distance_m'
+    PHOTON_ENERGY = 'photon_energy_eV'
     PROBE_PHOTON_COUNT = 'probe_photon_count'
     EXPOSURE_TIME = 'exposure_time_s'
-    MASS_ATTENUATION = 'mass_attenuation_m2_kg'
+    MASS_ATTENUATION = 'mass_attenuation_m2_per_kg'
     TOMOGRAPHY_ANGLE = 'tomography_angle_deg'
     TILT_ANGLE = 'tilt_angle_deg'
     POLARIZATION = 'polarization'
+    FAR_FIELD = 'far_field'
     PROBE_ARRAY = 'probe'
     OPR_WEIGHTS = 'opr_weights'
     PROBE_PIXEL_HEIGHT = 'pixel_height_m'
@@ -230,6 +242,28 @@ class ProductFileKeys(StrEnum):
     LOSS_VALUES = 'loss_values'
 
 
+def _read_photon_energy_eV(h5_file: h5py.File) -> float:  # noqa: N802
+    """Read the photon energy, accepting the pre-rename attribute name.
+
+    Unlike the other product attributes this one has no sensible default -- every
+    wavelength downstream follows from it -- so a missing value raises rather than
+    silently becoming zero.
+    """
+    # A frozen historical spelling rather than part of the key vocabulary: it is never
+    # written, so it has no place in ProductFileKeys.
+    legacy_key = 'probe_energy_eV'
+
+    for key in (ProductFileKeys.PHOTON_ENERGY, legacy_key):
+        try:
+            return float(h5_file.attrs[key])
+        except KeyError:
+            continue
+
+    raise KeyError(
+        f'Product is missing {ProductFileKeys.PHOTON_ENERGY!s} (and the legacy {legacy_key}).'
+    )
+
+
 def load_product(file: Path) -> Product:
     """Load a data product from an HDF5 file written by :func:`save_product`."""
     point_list: list[ProbePosition] = []
@@ -237,11 +271,16 @@ def load_product(file: Path) -> Product:
     with h5py.File(file, 'r') as h5_file:
         name = str(h5_file.attrs.get(ProductFileKeys.NAME, 'Unnamed'))
         comments = str(h5_file.attrs.get(ProductFileKeys.COMMENTS, ''))
-        probe_photon_count = int(h5_file.attrs.get(ProductFileKeys.PROBE_PHOTON_COUNT, 0))
+        probe_photon_count = float(h5_file.attrs.get(ProductFileKeys.PROBE_PHOTON_COUNT, 0.0))
         exposure_time_s = float(h5_file.attrs.get(ProductFileKeys.EXPOSURE_TIME, 0.0))
-        mass_attenuation_m2_kg = float(h5_file.attrs.get(ProductFileKeys.MASS_ATTENUATION, 0.0))
+        mass_attenuation_m2_per_kg = float(h5_file.attrs.get(ProductFileKeys.MASS_ATTENUATION, 0.0))
         tomography_angle_deg = float(h5_file.attrs.get(ProductFileKeys.TOMOGRAPHY_ANGLE, 0.0))
         tilt_angle_deg = float(h5_file.attrs.get(ProductFileKeys.TILT_ANGLE, 0.0))
+        focus_object_distance_m = float(
+            h5_file.attrs.get(ProductFileKeys.FOCUS_OBJECT_DISTANCE, 0.0)
+        )
+        # HDF5 hands back numpy.bool_; cast at the boundary as the floats above do.
+        far_field = bool(h5_file.attrs.get(ProductFileKeys.FAR_FIELD, True))
 
         polarization: Polarization | None = None
         if ProductFileKeys.POLARIZATION in h5_file.attrs:
@@ -261,13 +300,15 @@ def load_product(file: Path) -> Product:
             name=name,
             comments=comments,
             detector_distance_m=float(h5_file.attrs[ProductFileKeys.DETECTOR_OBJECT_DISTANCE]),
-            probe_energy_eV=float(h5_file.attrs[ProductFileKeys.PROBE_ENERGY]),
+            photon_energy_eV=_read_photon_energy_eV(h5_file),
             probe_photon_count=probe_photon_count,
             exposure_time_s=exposure_time_s,
-            mass_attenuation_m2_kg=mass_attenuation_m2_kg,
+            mass_attenuation_m2_per_kg=mass_attenuation_m2_per_kg,
             tomography_angle_deg=tomography_angle_deg,
+            focus_object_distance_m=focus_object_distance_m,
             tilt_angle_deg=tilt_angle_deg,
             polarization=polarization,
+            far_field=far_field,
         )
 
         h5_object = h5_file[ProductFileKeys.OBJECT_ARRAY]
@@ -399,15 +440,9 @@ def load_product(file: Path) -> Product:
 
 def save_product(file: Path, product: Product) -> None:
     """Write a data product to an HDF5 file."""
-    scan_indexes: list[int] = []
-    scan_x_m: list[float] = []
-    scan_y_m: list[float] = []
-
-    for point in product.probe_positions:
-        scan_indexes.append(point.index)
-        scan_x_m.append(point.x_m)
-        scan_y_m.append(point.y_m)
-
+    scan_indexes = product.probe_positions.get_indexes()
+    scan_x_m = product.probe_positions.get_coordinates_x_m()
+    scan_y_m = product.probe_positions.get_coordinates_y_m()
     position_photon_counts = product.probe_positions.get_probe_photon_counts()
 
     with h5py.File(file, 'w') as h5_file:
@@ -415,12 +450,14 @@ def save_product(file: Path, product: Product) -> None:
         h5_file.attrs[ProductFileKeys.NAME] = metadata.name
         h5_file.attrs[ProductFileKeys.COMMENTS] = metadata.comments
         h5_file.attrs[ProductFileKeys.DETECTOR_OBJECT_DISTANCE] = metadata.detector_distance_m
-        h5_file.attrs[ProductFileKeys.PROBE_ENERGY] = metadata.probe_energy_eV
+        h5_file.attrs[ProductFileKeys.PHOTON_ENERGY] = metadata.photon_energy_eV
         h5_file.attrs[ProductFileKeys.PROBE_PHOTON_COUNT] = metadata.probe_photon_count
         h5_file.attrs[ProductFileKeys.EXPOSURE_TIME] = metadata.exposure_time_s
-        h5_file.attrs[ProductFileKeys.MASS_ATTENUATION] = metadata.mass_attenuation_m2_kg
+        h5_file.attrs[ProductFileKeys.MASS_ATTENUATION] = metadata.mass_attenuation_m2_per_kg
         h5_file.attrs[ProductFileKeys.TOMOGRAPHY_ANGLE] = metadata.tomography_angle_deg
+        h5_file.attrs[ProductFileKeys.FOCUS_OBJECT_DISTANCE] = metadata.focus_object_distance_m
         h5_file.attrs[ProductFileKeys.TILT_ANGLE] = metadata.tilt_angle_deg
+        h5_file.attrs[ProductFileKeys.FAR_FIELD] = metadata.far_field
         if metadata.polarization is not None:
             h5_file.attrs[ProductFileKeys.POLARIZATION] = metadata.polarization.value
 
@@ -547,35 +584,48 @@ def save_fluorescence_data(file: Path, dataset: FluorescenceDataset) -> None:
         names_group.create_dataset(names_ds_name, data=channel_names, dtype='S256')
 
 
+def _repair_bad_pixels(
+    parameters: ReconstructInput, *, inpaint: bool
+) -> tuple[DiffractionPatterns, BadPixels]:
+    """Repair the patterns, and return them with the mask saying which pixels were filled.
+
+    An absent mask becomes an all-False one so every training file carries the
+    dataset and a reader needs no optional branch.
+    """
+    patterns = parameters.diffraction_patterns
+    bad_pixels = parameters.bad_pixels
+
+    if bad_pixels is None:
+        bad_pixels = numpy.zeros(patterns.shape[1:], dtype=bool)
+
+    repaired = (
+        inpaint_bad_pixels(patterns, bad_pixels)
+        if inpaint
+        else zero_bad_pixels(patterns, bad_pixels)
+    )
+
+    return repaired, bad_pixels
+
+
 def save_ptychopinn_training_data(
     file_path: Path,
     parameters: ReconstructInput,
     *,
-    multimodal_probe: bool,
+    inpaint_bad_pixels: bool = True,
 ) -> None:
     """Write a ReconstructInput to the NPZ format consumed by PtychoPINN trainers.
 
-    Bad pixels are zeroed in `diff3d` before writing. `multimodal_probe`
-    selects the `probeGuess` shape: True writes the full `(N_modes, H, W)`
-    array (ptycho_torch); False writes only mode 0 as `(H, W)` (legacy
-    ptycho). All scan points are assigned `scan_index=0` (single-object
-    assumption).
+    Bad pixels are filled by biharmonic inpainting, or zeroed when
+    `inpaint_bad_pixels` is False; `diff3d` keeps the source dtype either way, and
+    `bad_pixels` records which positions were filled rather than measured.
+    `probeGuess` is the full `(N_modes, H, W)` mode stack at OPR index zero. All
+    scan points are assigned `scan_index=0` (single-object assumption).
     """
     object_geometry = parameters.product.object_.get_geometry()
-    position_x_px: list[float] = list()
-    position_y_px: list[float] = list()
-
-    for scan_point in parameters.product.probe_positions:
-        object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        position_x_px.append(object_point.x_px)
-        position_y_px.append(object_point.y_px)
-
-    xcoords = numpy.array(position_x_px)
-    ycoords = numpy.array(position_y_px)
-    diff3d = zero_bad_pixels(parameters.diffraction_patterns, parameters.bad_pixels)
-
-    probe = parameters.product.probes.get_probe_no_opr()
-    probe_array = probe.get_array() if multimodal_probe else probe.get_incoherent_mode(0)
+    positions = parameters.product.probe_positions
+    xcoords = object_geometry.map_probe_positions_to_object_x_px(positions)
+    ycoords = object_geometry.map_probe_positions_to_object_y_px(positions)
+    diff3d, bad_pixels = _repair_bad_pixels(parameters, inpaint=inpaint_bad_pixels)
 
     numpy.savez(
         file_path,
@@ -584,7 +634,103 @@ def save_ptychopinn_training_data(
         xcoords_start=xcoords,
         ycoords_start=ycoords,
         diff3d=diff3d,
-        probeGuess=probe_array,
+        bad_pixels=bad_pixels,
+        probeGuess=parameters.product.probes.get_probe_no_opr().get_array(),
         objectGuess=parameters.product.object_.get_layer(0),
         scan_index=numpy.zeros(len(parameters.product.probe_positions), dtype=int),
     )
+
+
+class TrainingDataFileKeys(StrEnum):
+    """HDF5 dataset names for the training data file."""
+
+    DETECTOR_OBJECT_DISTANCE = 'detector_object_distance_m'
+    PHOTON_ENERGY = 'photon_energy_eV'
+    PATTERNS = 'patterns'
+    BAD_PIXELS = 'bad_pixels'
+    PROBE_ARRAY = 'probe'
+    PROBE_POSITION_X_PX = 'probe_position_x_px'
+    PROBE_POSITION_Y_PX = 'probe_position_y_px'
+    OBJECT_ARRAY = 'object'
+    OBJECT_PIXEL_HEIGHT = 'object_pixel_height_m'
+    OBJECT_PIXEL_WIDTH = 'object_pixel_width_m'
+
+
+def save_training_data(
+    file_path: Path,
+    parameters: ReconstructInput,
+    *,
+    inpaint_bad_pixels: bool = True,
+    compression: str = 'lzf',
+) -> None:
+    """Write a ReconstructInput to the ptychodus HDF5 training data format.
+
+    Bad pixels are filled by biharmonic inpainting, or zeroed when
+    `inpaint_bad_pixels` is False; the patterns keep the source dtype either way,
+    and `bad_pixels` records which positions were filled rather than measured. The
+    probe is the full `(N_modes, H, W)` mode stack at OPR index zero, and the
+    object is layer zero.
+
+    The geometry is far field. The detector pixel size is not written because it
+    is recoverable from the object pixel size, the energy and the detector
+    distance, and `focus_object_distance_m` is not written at all -- a product
+    with a focusing optic is logged as a warning, because it would reload as
+    parallel beam.
+
+    Probe positions are written in object pixels about the object array's own
+    center, so the absolute scan origin is not recoverable; scan indexes, OPR
+    weights, object layers past zero and the remaining product metadata are not
+    carried either.
+    """
+    metadata = parameters.product.metadata
+
+    if metadata.focus_object_distance_m != 0.0:
+        logger.warning(
+            'Training data assumes far-field geometry; focus_object_distance_m=%g is lost.',
+            metadata.focus_object_distance_m,
+        )
+
+    object_ = parameters.product.object_
+    object_geometry = object_.get_geometry()
+    positions = parameters.product.probe_positions
+    patterns, bad_pixels = _repair_bad_pixels(parameters, inpaint=inpaint_bad_pixels)
+
+    with h5py.File(file_path, 'w') as h5_file:
+        h5_file.create_dataset(
+            TrainingDataFileKeys.PATTERNS, data=patterns, compression=compression
+        )
+        h5_file.create_dataset(
+            TrainingDataFileKeys.BAD_PIXELS, data=bad_pixels, compression=compression
+        )
+        h5_file.create_dataset(
+            TrainingDataFileKeys.PROBE_ARRAY,
+            data=parameters.product.probes.get_probe_no_opr().get_array(),
+            compression=compression,
+        )
+        h5_file.create_dataset(
+            TrainingDataFileKeys.OBJECT_ARRAY,
+            data=object_.get_layer(0),
+            compression=compression,
+        )
+        h5_file.create_dataset(
+            TrainingDataFileKeys.PROBE_POSITION_X_PX,
+            data=object_geometry.map_probe_positions_to_object_x_px(positions),
+            compression=compression,
+        )
+        h5_file.create_dataset(
+            TrainingDataFileKeys.PROBE_POSITION_Y_PX,
+            data=object_geometry.map_probe_positions_to_object_y_px(positions),
+            compression=compression,
+        )
+
+        # Scalar datasets cannot be chunked, so the compression filter cannot apply.
+        h5_file.create_dataset(
+            TrainingDataFileKeys.OBJECT_PIXEL_WIDTH, data=object_geometry.pixel_width_m
+        )
+        h5_file.create_dataset(
+            TrainingDataFileKeys.OBJECT_PIXEL_HEIGHT, data=object_geometry.pixel_height_m
+        )
+        h5_file.create_dataset(
+            TrainingDataFileKeys.DETECTOR_OBJECT_DISTANCE, data=metadata.detector_distance_m
+        )
+        h5_file.create_dataset(TrainingDataFileKeys.PHOTON_ENERGY, data=metadata.photon_energy_eV)

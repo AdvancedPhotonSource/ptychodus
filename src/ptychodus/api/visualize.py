@@ -20,13 +20,13 @@ from .geometry import Box2D, Interval, Line2D, PixelGeometry
 
 logger = logging.getLogger(__name__)
 
-_LINE_CUT_EPS: Final[float] = 1.0e-6
 
-
-def _intersect_bounding_box(begin: float, end: float, n: int) -> Interval[float]:
+def _intersect_bounding_box(
+    begin: float, end: float, n: int, *, minimum_segment_length_px: float
+) -> Interval[float]:
     length = end - begin
 
-    if abs(length) < _LINE_CUT_EPS:
+    if abs(length) < minimum_segment_length_px:
         return Interval[float](-numpy.inf, numpy.inf)
     else:
         return Interval[float].from_bounds(
@@ -36,7 +36,11 @@ def _intersect_bounding_box(begin: float, end: float, n: int) -> Interval[float]
 
 
 def _intersect_grid_lines(
-    begin: float, end: float, alpha_limits: Interval[float]
+    begin: float,
+    end: float,
+    alpha_limits: Interval[float],
+    *,
+    minimum_segment_length_px: float,
 ) -> Iterator[float]:
     ibegin = int(begin)
     iend = int(end)
@@ -46,7 +50,7 @@ def _intersect_grid_lines(
 
     length = end - begin
 
-    if abs(length) > _LINE_CUT_EPS:
+    if abs(length) > minimum_segment_length_px:
         for idx in range(ibegin, iend + 1):
             alpha = (idx - begin) / length
 
@@ -166,19 +170,49 @@ class VisualizationProduct:
     def get_color_value_range(self) -> Interval[float]:
         return Interval[float](self._color_value_min, self._color_value_max)
 
-    def _clip_to_bounding_box(self, line: Line2D) -> Interval[float]:
-        alpha_x = _intersect_bounding_box(line.begin.x, line.end.x, self._values.shape[-1])
-        alpha_y = _intersect_bounding_box(line.begin.y, line.end.y, self._values.shape[-2])
+    def _clip_to_bounding_box(
+        self, line: Line2D, *, minimum_segment_length_px: float
+    ) -> Interval[float]:
+        alpha_x = _intersect_bounding_box(
+            line.begin.x,
+            line.end.x,
+            self._values.shape[-1],
+            minimum_segment_length_px=minimum_segment_length_px,
+        )
+        alpha_y = _intersect_bounding_box(
+            line.begin.y,
+            line.end.y,
+            self._values.shape[-2],
+            minimum_segment_length_px=minimum_segment_length_px,
+        )
 
         return Interval[float].from_bounds(
             max(0.0, max(alpha_x.lower, alpha_y.lower)),
             min(1.0, min(alpha_x.upper, alpha_y.upper)),
         )
 
-    def _intersect_grid(self, line: Line2D) -> Sequence[float]:
-        alpha_limits = self._clip_to_bounding_box(line)
-        x_intersections = [x for x in _intersect_grid_lines(line.begin.x, line.end.x, alpha_limits)]
-        y_intersections = [x for x in _intersect_grid_lines(line.begin.y, line.end.y, alpha_limits)]
+    def _intersect_grid(self, line: Line2D, *, minimum_segment_length_px: float) -> Sequence[float]:
+        alpha_limits = self._clip_to_bounding_box(
+            line, minimum_segment_length_px=minimum_segment_length_px
+        )
+        x_intersections = [
+            x
+            for x in _intersect_grid_lines(
+                line.begin.x,
+                line.end.x,
+                alpha_limits,
+                minimum_segment_length_px=minimum_segment_length_px,
+            )
+        ]
+        y_intersections = [
+            x
+            for x in _intersect_grid_lines(
+                line.begin.y,
+                line.end.y,
+                alpha_limits,
+                minimum_segment_length_px=minimum_segment_length_px,
+            )
+        ]
 
         alpha = {alpha_limits.lower, alpha_limits.upper}
         alpha = alpha.union(x_intersections)
@@ -199,8 +233,17 @@ class VisualizationProduct:
 
         return f'{x=:.1f} {y=:.1f} {value=:6g}'
 
-    def get_line_cut(self, line: Line2D) -> LineCut:
-        intersections = self._intersect_grid(line)
+    def get_line_cut(self, line: Line2D, *, minimum_segment_length_px: float = 1.0e-6) -> LineCut:
+        """Sample the displayed arrays along *line*, one value per grid cell it crosses.
+
+        ``minimum_segment_length_px`` is the length, in pixels, below which the line's
+        projection onto an axis is treated as degenerate, so that axis contributes no
+        clipping bound and no grid intersections. The default is far below one pixel and
+        exists to keep an axis-aligned line from dividing by its zero-length projection.
+        """
+        intersections = self._intersect_grid(
+            line, minimum_segment_length_px=minimum_segment_length_px
+        )
 
         dx = (line.end.x - line.begin.x) * self._pixel_width_m
         dy = (line.end.y - line.begin.y) * self._pixel_height_m

@@ -45,7 +45,7 @@ class DiffractionRead(_RowBase):
     derived_from: list[DerivedFromEdge] = []
 
     detector_distance_m: float | None
-    probe_energy_eV: float | None  # noqa: N815
+    photon_energy_eV: float | None  # noqa: N815
     probe_photon_count: int | None
     exposure_time_s: float | None
     tomography_angle_deg: float | None
@@ -60,6 +60,8 @@ class DiffractionRead(_RowBase):
     num_patterns_total: int | None
     detector_pixel_width_m: float | None
     detector_pixel_height_m: float | None
+    num_bad_pixels: int | None = None
+    nbytes: int | None = None
 
 
 class ProductRead(_RowBase):
@@ -68,10 +70,12 @@ class ProductRead(_RowBase):
     name: str | None
     comments: str | None
     detector_distance_m: float | None
-    probe_energy_eV: float | None  # noqa: N815
+    focus_object_distance_m: float | None
+    far_field: bool | None
+    photon_energy_eV: float | None  # noqa: N815
     probe_photon_count: int | None
     exposure_time_s: float | None
-    mass_attenuation_m2_kg: float | None
+    mass_attenuation_m2_per_kg: float | None
     tomography_angle_deg: float | None
     tilt_angle_deg: float | None = None
     polarization: Polarization | None = None
@@ -86,6 +90,27 @@ class ProductRead(_RowBase):
     probe_width_px: int | None
     num_scan_points: int | None
     num_loss_epochs: int | None
+    scan_length_m: float | None = None
+    probe_dtype: str | None = None
+    object_dtype: str | None = None
+    probe_nbytes: int | None = None
+    object_nbytes: int | None = None
+    scan_nbytes: int | None = None
+    probe_mode_relative_power: list[float] = []
+    object_layer_spacing_m: list[float] = []
+
+    # Derived on read from the columns above; never stored, so the formula has one
+    # home in ptychodus.api.propagate. The last three additionally need the detector,
+    # which product.h5 does not record -- they are null unless the manifest's
+    # derived_from names a diffraction dataset this store has indexed.
+    probe_wavenumber_per_m: float | None = None
+    probe_angular_wavenumber_rad_per_m: float | None = None
+    probe_photon_flux_per_s: float | None = None
+    probe_power_W: float | None = None  # noqa: N815
+    object_plane_propagation_distance_m: float | None = None
+    fresnel_number: float | None = None
+    detector_numerical_aperture: float | None = None
+    depth_of_field_m: float | None = None
 
 
 class FluorescenceRead(_RowBase):
@@ -94,8 +119,10 @@ class FluorescenceRead(_RowBase):
     derived_from: list[DerivedFromEdge] = []
 
     element_names: list[str]
+    element_counts: list[float] = []
     map_height_px: int | None
     map_width_px: int | None
+    nbytes: int | None = None
 
 
 ItemT = TypeVar('ItemT', bound=BaseModel)
@@ -113,8 +140,14 @@ class ResourceRef(BaseModel):
     uuid: UUID
 
 
+# The four resource kinds, as the literal type the API exposes. Shared so that a
+# helper resolving a kind at run time can hand back something assignable here
+# rather than a bare str.
+ResourceKindLiteral = Literal['campaign', 'diffraction', 'product', 'fluorescence']
+
+
 class LineageNode(BaseModel):
-    kind: Literal['campaign', 'diffraction', 'product', 'fluorescence']
+    kind: ResourceKindLiteral
     uuid: UUID
     label: str = ''
 

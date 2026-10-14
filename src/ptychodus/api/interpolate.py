@@ -4,6 +4,7 @@ from typing import Any, Generic, TypeVar, overload
 
 import numpy.typing
 import numpy
+from scipy.interpolate import PchipInterpolator
 
 from ptychodus.api.typing import InexactArrayType, RealArrayType
 
@@ -11,7 +12,9 @@ __all__ = [
     'BarycentricArrayInterpolator',
     'BarycentricArrayStitcher',
     'lerp',
+    'resample_along_axis',
 ]
+
 
 InexactDType = TypeVar('InexactDType', bound=numpy.inexact[Any])
 
@@ -55,6 +58,28 @@ def lerp(
     return (1.0 - frac) * lower + frac * upper
 
 
+def resample_along_axis(
+    values: RealArrayType, indexes: RealArrayType, *, axis: int, fill_value: float
+) -> RealArrayType:
+    """Interpolate *values* along *axis* at fractional *indexes*, filling outside the source.
+
+    The interpolant is monotone cubic (PCHIP): an unconstrained cubic overshoots, and an
+    overshoot is structure the source does not contain. Everything beyond the source ends
+    up as ``fill_value``, substituted here rather than left as the NaN the interpolator
+    produces, since a NaN would spread along the whole line of any later pass.
+
+    Two of these resample a plane onto an axis-aligned target grid, which separates into
+    one pass per axis because such a grid is a tensor product. Scattered target points --
+    a rotation or a shear -- do not separate and need a different interpolator entirely.
+    Real data only: interpolate the real and imaginary parts of a complex array
+    separately.
+    """
+    interpolated = PchipInterpolator(
+        numpy.arange(float(values.shape[axis])), values, axis=axis, extrapolate=False
+    )(indexes)
+    return numpy.where(numpy.isnan(interpolated), fill_value, interpolated)
+
+
 def _calculate_support_frac(x: float, n: int) -> tuple[slice, float]:
     """Return the integer support slice and sub-pixel fractional offset for a width-n window centered at x.
 
@@ -89,7 +114,7 @@ class BarycentricArrayInterpolator(Generic[InexactDType]):
         patch = numpy.subtract(y_interp[..., :, 1:], y_interp[..., :, :-1])
         patch *= x_frac
         patch += y_interp[..., :, :-1]
-        return patch  # type: ignore
+        return patch
 
     def add_patch(
         self,

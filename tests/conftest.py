@@ -22,15 +22,33 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 _STORE_TEST_DEPS = (
     'aiosqlite',
     'fastapi',
-    'fastmcp',
     'pydantic_settings',
     'pytest_asyncio',
     'sqlalchemy',
 )
 
+
+def _has_fastmcp_server() -> bool:
+    """Whether ``fastmcp`` can actually serve, not merely whether it is importable.
+
+    fastmcp 4.x is a meta-package over ``fastmcp-slim[client,server]``, so
+    ``find_spec('fastmcp')`` succeeds on an install that carries only the client
+    half; even ``fastmcp.server`` imports there. The absence shows up solely as an
+    ImportError raised from the ``FastMCP`` symbol, which is what
+    ``ptychodus_store.mcp_server`` imports -- so the symbol is the only gate that
+    turns that install into a skip rather than a collection error.
+    """
+    try:
+        from fastmcp import FastMCP  # noqa: F401
+    except ImportError:
+        return False
+
+    return True
+
+
 collect_ignore = []
 
-if any(find_spec(name) is None for name in _STORE_TEST_DEPS):
+if any(find_spec(name) is None for name in _STORE_TEST_DEPS) or not _has_fastmcp_server():
     collect_ignore.append('ptychodus_store')
 
 if find_spec('PyQt5') is None:
@@ -39,7 +57,7 @@ if find_spec('PyQt5') is None:
 
 
 @pytest.fixture(scope='session')
-def qapp():  # type: ignore[no-untyped-def]
+def qapp():
     """A single QApplication shared across all Qt tests in the session."""
     from PyQt5.QtWidgets import QApplication
 

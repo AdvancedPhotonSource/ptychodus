@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from sqlalchemy.ext.asyncio import AsyncEngine
+
 import json
 from collections.abc import AsyncIterator, Callable
 from datetime import datetime, timezone
@@ -44,7 +46,7 @@ async def db_engine() -> AsyncIterator:
 
 
 @pytest_asyncio.fixture
-async def session_provider(db_engine) -> AsyncIterator[SessionProvider]:  # type: ignore[no-untyped-def]
+async def session_provider(db_engine: AsyncEngine) -> AsyncIterator[SessionProvider]:
     yield SessionProvider(db_engine)
 
 
@@ -77,10 +79,10 @@ def _write_product_h5(path: Path) -> None:
         f.attrs['name'] = 'test-product'
         f.attrs['comments'] = ''
         f.attrs['detector_object_distance_m'] = 1.5
-        f.attrs['probe_energy_eV'] = 9000.0
+        f.attrs['photon_energy_eV'] = 9000.0
         f.attrs['probe_photon_count'] = 1_000_000
         f.attrs['exposure_time_s'] = 0.1
-        f.attrs['mass_attenuation_m2_kg'] = 0.0
+        f.attrs['mass_attenuation_m2_per_kg'] = 0.0
         f.attrs['tomography_angle_deg'] = 0.0
         obj = f.create_dataset('object', data=np.zeros((1, 16, 16), dtype=np.complex64))
         obj.attrs['pixel_width_m'] = 1e-9
@@ -143,7 +145,7 @@ def seed_diffraction(tmp_storage_root: Path) -> Callable[..., UUID]:
         *,
         campaign_uuid: UUID | None = None,
         derived_from: list[dict] | None = None,
-        probe_energy_eV: float | None = 8000.0,  # noqa: N803
+        photon_energy_eV: float | None = 8000.0,  # noqa: N803
         write_h5: bool = True,
     ) -> UUID:
         uuid = uuid or uuid4()
@@ -156,7 +158,7 @@ def seed_diffraction(tmp_storage_root: Path) -> Callable[..., UUID]:
             'kind': 'diffraction',
             'uuid': str(uuid),
             'created_at': datetime.now(timezone.utc).isoformat(),
-            'probe_energy_eV': probe_energy_eV,
+            'photon_energy_eV': photon_energy_eV,
         }
         if campaign_uuid is not None:
             manifest['campaign_uuid'] = str(campaign_uuid)
@@ -229,7 +231,7 @@ def seed_fluorescence(tmp_storage_root: Path) -> Callable[..., UUID]:
 @pytest_asyncio.fixture
 async def app_client(
     tmp_storage_root: Path,
-    db_engine,  # type: ignore[no-untyped-def]
+    db_engine: AsyncEngine,
 ) -> AsyncIterator[AsyncClient]:
     from fastapi import FastAPI
 
@@ -249,7 +251,7 @@ async def app_client(
     layout = StoreLayout(tmp_storage_root)
     provider = SessionProvider(db_engine)
     bind_session_provider(provider)
-    settings = Settings(  # type: ignore[call-arg]
+    settings = Settings(
         storage_root=tmp_storage_root,
         database_url='sqlite+aiosqlite:///:memory:',
         auto_reconcile_on_startup=False,

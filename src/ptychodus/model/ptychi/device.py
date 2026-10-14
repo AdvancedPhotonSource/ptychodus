@@ -20,10 +20,12 @@ from ..processing._subprocess_protocol import ChildError, run_subprocess
 logger = logging.getLogger(__name__)
 
 
+__all__ = ['PtyChiDeviceRepository', 'probe_devices_via_subprocess']
+
 _PROBE_ENTRY = 'ptychodus.model.ptychi._subprocess:probe_devices'
 
 
-def _probe_devices_via_subprocess() -> list[str]:
+def probe_devices_via_subprocess() -> list[str]:
     """Spawn a child that calls ``ptychi.list_available_devices()`` and return the list.
 
     Any failure -- ptychi not installed, subprocess crash, timeout -- is
@@ -52,7 +54,7 @@ class PtyChiDeviceRepository(Sequence[str]):
             if is_developer_mode_enabled:
                 self._devices.extend(f'gpu:{n}' for n in range(4))
         else:
-            for device in _probe_devices_via_subprocess():
+            for device in probe_devices_via_subprocess():
                 logger.info(device)
                 self._devices.append(device)
 
@@ -76,7 +78,7 @@ class PtyChiDeviceRepository(Sequence[str]):
     def refresh(self) -> None:
         if find_spec('ptychi') is None:
             return
-        self._devices = _probe_devices_via_subprocess()
+        self._devices = probe_devices_via_subprocess()
 
 
 # `_PROBE_PAYLOAD` is None; keeping this alias documents that the entry point

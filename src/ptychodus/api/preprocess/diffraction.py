@@ -10,10 +10,11 @@ that support partial reads (HDF5) only fetch the crop rectangle from disk.
 
 The free functions at the end of the module are helpers used *alongside* the
 pipeline rather than steps within it, and they deliberately stay that way.
-`zero_bad_pixels` runs in raw detector coordinates before the pipeline, and
-`inpaint_bad_pixels` and `estimate_beam_center` take a whole frame at once. A
-step that repaired or dropped frames would also break the index/pattern 1:1
-invariant that `prepare_reconstruct_input` relies on, because
+`zero_bad_pixels` and `inpaint_bad_pixels` are interchangeable bad-pixel
+repairs that run in raw detector coordinates before the pipeline, and
+`estimate_beam_center` takes a whole frame at once. A step that repaired or
+dropped frames would also break the index/pattern 1:1 invariant that
+`prepare_reconstruct_input` relies on, because
 `DiffractionPrepPipeline.__call__` passes the original indexes through
 unchanged.
 """
@@ -21,7 +22,7 @@ unchanged.
 from __future__ import annotations
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Annotated, Literal, TypeAlias
+from typing import Annotated, Literal, TypeAlias, cast, overload
 
 import numpy
 from pydantic import BaseModel, ConfigDict, Field
@@ -340,19 +341,67 @@ def zero_bad_pixels(
     return cleaned
 
 
+@overload
 def inpaint_bad_pixels(
-    pattern: DiffractionPattern, bad_pixels: BadPixels | None
+    data: DiffractionPattern, bad_pixels: BadPixels | None
 ) -> DiffractionPattern:
-    """Return `pattern` with bad-pixel positions filled by biharmonic inpainting.
+    """Return `data` with bad-pixel positions filled by biharmonic inpainting."""
+    ...
+
+
+@overload
+def inpaint_bad_pixels(
+    data: DiffractionPatterns, bad_pixels: BadPixels | None
+) -> DiffractionPatterns:
+    """Return `data` with bad-pixel positions filled by biharmonic inpainting."""
+    ...
+
+
+def inpaint_bad_pixels(
+    data: DiffractionPattern | DiffractionPatterns, bad_pixels: BadPixels | None
+) -> DiffractionPattern | DiffractionPatterns:
+    """Return `data` with bad-pixel positions filled by biharmonic inpainting.
+
+    Takes a single frame or a stack of them and returns the same shape and dtype
+    it was given, so for a pattern stack this is interchangeable with
+    :func:`zero_bad_pixels` -- the two differ in what they put at the bad-pixel
+    positions, nothing else.
 
     Returns the input unchanged when `bad_pixels` is None or all-False so the
-    (expensive) skimage call is skipped. When inpainting runs the result is
-    float64; the input dtype is preserved when it does not.
+    (expensive) skimage call is skipped. A stack shares one mask across all its
+    frames, so the biharmonic system is solved once for the whole stack rather
+    than once per frame; the result is identical either way.
+
+    Integer values are rounded rather than truncated, which would bias every
+    filled pixel low.
     """
     if bad_pixels is None or not numpy.any(bad_pixels):
-        return pattern
+        return data
 
-    return inpaint_biharmonic(pattern.astype(numpy.float64), bad_pixels)
+    match data.ndim:
+        case 2:
+            filled = inpaint_biharmonic(data.astype(numpy.float64), bad_pixels)
+        case 3:
+            stacked = inpaint_biharmonic(
+                numpy.moveaxis(data, 0, -1).astype(numpy.float64),
+                bad_pixels,
+                channel_axis=-1,
+            )
+            filled = numpy.moveaxis(stacked, -1, 0)
+        case _:
+            raise ValueError('Diffraction data must be 2- or 3-dimensional ndarray.')
+
+    dtype = data.dtype
+
+    if numpy.issubdtype(dtype, numpy.integer):
+        # Fills are already confined to the range of each frame's good pixels, so
+        # they are representable; the clip costs one pass and keeps the cast from
+        # wrapping silently if that ever stops being true.
+        # issubdtype does not narrow the pattern dtype union for the checker.
+        iinfo = numpy.iinfo(cast(numpy.dtype[numpy.integer], dtype))
+        filled = numpy.clip(numpy.rint(filled), iinfo.min, iinfo.max)
+
+    return filled.astype(dtype)
 
 
 def estimate_beam_center(

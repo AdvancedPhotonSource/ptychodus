@@ -75,7 +75,7 @@ def _values_for_diffraction(
         'comments': m.comments,
         'campaign_uuid': m.campaign_uuid,
         'detector_distance_m': m.detector_distance_m,
-        'probe_energy_eV': m.probe_energy_eV,
+        'photon_energy_eV': m.photon_energy_eV,
         'probe_photon_count': m.probe_photon_count,
         'exposure_time_s': m.exposure_time_s,
         'tomography_angle_deg': m.tomography_angle_deg,
@@ -89,6 +89,8 @@ def _values_for_diffraction(
         'num_patterns_total': h5.get('num_patterns_total'),
         'detector_pixel_width_m': h5.get('detector_pixel_width_m'),
         'detector_pixel_height_m': h5.get('detector_pixel_height_m'),
+        'num_bad_pixels': h5.get('num_bad_pixels'),
+        'nbytes': h5.get('nbytes'),
     }
 
 
@@ -103,10 +105,12 @@ def _values_for_product(
         'name': h5.get('name'),
         'comments': h5.get('comments'),
         'detector_distance_m': h5.get('detector_distance_m'),
-        'probe_energy_eV': h5.get('probe_energy_eV'),
+        'focus_object_distance_m': h5.get('focus_object_distance_m'),
+        'far_field': h5.get('far_field'),
+        'photon_energy_eV': h5.get('photon_energy_eV'),
         'probe_photon_count': h5.get('probe_photon_count'),
         'exposure_time_s': h5.get('exposure_time_s'),
-        'mass_attenuation_m2_kg': h5.get('mass_attenuation_m2_kg'),
+        'mass_attenuation_m2_per_kg': h5.get('mass_attenuation_m2_per_kg'),
         'tomography_angle_deg': h5.get('tomography_angle_deg'),
         'tilt_angle_deg': h5.get('tilt_angle_deg'),
         'polarization': h5.get('polarization'),
@@ -120,6 +124,14 @@ def _values_for_product(
         'probe_width_px': probe_shape[2],
         'num_scan_points': h5.get('num_scan_points'),
         'num_loss_epochs': h5.get('num_loss_epochs'),
+        'scan_length_m': h5.get('scan_length_m'),
+        'probe_dtype': h5.get('probe_dtype'),
+        'object_dtype': h5.get('object_dtype'),
+        'probe_nbytes': h5.get('probe_nbytes'),
+        'object_nbytes': h5.get('object_nbytes'),
+        'scan_nbytes': h5.get('scan_nbytes'),
+        'probe_mode_relative_power': h5.get('probe_mode_relative_power') or [],
+        'object_layer_spacing_m': h5.get('object_layer_spacing_m') or [],
     }
 
 
@@ -133,8 +145,10 @@ def _values_for_fluorescence(
         'label': m.label,
         'comments': m.comments,
         'element_names': list(h5.get('element_names') or []),
+        'element_counts': list(h5.get('element_counts') or []),
         'map_height_px': map_shape[0] if map_shape else None,
         'map_width_px': map_shape[1] if map_shape else None,
+        'nbytes': h5.get('nbytes'),
     }
 
 
@@ -192,7 +206,7 @@ def _introspect(
 
 async def _reevaluate_orphan(session: AsyncSession, kind: str, uuid: UUID) -> None:
     """Flip VALID↔ORPHANED for one row based on whether its outgoing edges resolve."""
-    row = await repo.get_row(session, kind, uuid)
+    row = await repo.get_row_by_kind(session, kind, uuid)
     if row is None or row.ingest_state in (IngestState.INVALID, IngestState.MISSING_FILES):
         return
     edges = await repo.outgoing_edges(session, uuid)

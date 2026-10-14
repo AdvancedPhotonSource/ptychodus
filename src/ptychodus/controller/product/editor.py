@@ -1,5 +1,5 @@
 from enum import IntEnum
-from typing import Any
+from typing import Any, Final
 import logging
 
 from PyQt5.QtCore import (
@@ -37,7 +37,7 @@ class _Row(IntEnum):
     a bare name would be a capture pattern that swallows every row.
     """
 
-    PROBE_WAVELENGTH_NM = 0
+    PHOTON_WAVELENGTH_NM = 0
     PROBE_WAVENUMBER_PER_NM = 1
     PROBE_ANGULAR_WAVENUMBER_RAD_PER_NM = 2
     PROBE_PHOTON_FLUX_PER_S = 3
@@ -45,7 +45,7 @@ class _Row(IntEnum):
     OBJECT_PLANE_PIXEL_WIDTH_NM = 5
     OBJECT_PLANE_PIXEL_HEIGHT_NM = 6
     EXPOSURE_TIME_S = 7
-    MASS_ATTENUATION_M2_KG = 8
+    MASS_ATTENUATION_M2_PER_KG = 8
     TOMOGRAPHY_ANGLE_DEG = 9
     TILT_ANGLE_DEG = 10
     POLARIZATION = 11
@@ -53,6 +53,13 @@ class _Row(IntEnum):
     DETECTOR_NUMERICAL_APERTURE = 13
     DEPTH_OF_FIELD_NM = 14
     DIFFRACTION_DATASET = 15
+    FOCUS_OBJECT_DISTANCE_MM = 16
+    FAR_FIELD = 17
+
+
+# The regime is a two-state physical property, so the cell reads as a named choice
+# rather than a bare True/False.
+_FAR_FIELD_CHOICES: Final[dict[bool, str]] = {True: 'Far Field', False: 'Near Field'}
 
 
 class _Col(IntEnum):
@@ -69,11 +76,13 @@ class _Col(IntEnum):
 _EDITABLE_ROWS = frozenset(
     {
         _Row.EXPOSURE_TIME_S,
-        _Row.MASS_ATTENUATION_M2_KG,
+        _Row.MASS_ATTENUATION_M2_PER_KG,
         _Row.TOMOGRAPHY_ANGLE_DEG,
         _Row.TILT_ANGLE_DEG,
         _Row.POLARIZATION,
         _Row.DIFFRACTION_DATASET,
+        _Row.FOCUS_OBJECT_DISTANCE_MM,
+        _Row.FAR_FIELD,
     }
 )
 
@@ -92,7 +101,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
         self._editable_item_brush = editable_item_brush
         self._header = ['Property', 'Value']
         self._properties = [
-            'Probe Wavelength [nm]',
+            'Photon Wavelength [nm]',
             'Probe Wavenumber [1/nm]',
             'Probe Angular Wavenumber [rad/nm]',
             'Probe Photon Flux [ph/s]',
@@ -108,6 +117,8 @@ class ProductPropertyTableModel(QAbstractTableModel):
             'Detector Numerical Aperture',
             'Depth of Field [nm]',
             'Diffraction Dataset',
+            'Focus-Object Distance [mm]',
+            'Far Field',
         ]
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
@@ -138,51 +149,55 @@ class ProductPropertyTableModel(QAbstractTableModel):
                     case _Col.VALUE:
                         metadata_item = self._product_item.get_metadata_item()
                         geometry = self._product_item.get_geometry()
+                        values = geometry.get_derived_values()
+                        nm_per_m = LengthUnit.NANOMETER.meters_per_unit
 
                         match index.row():
-                            case 0:
-                                return f'{LengthUnit.NANOMETER.convert(geometry.probe_wavelength_m):.4g}'
-                            case 1:
-                                return f'{geometry.probe_wavelengths_per_m * LengthUnit.NANOMETER.meters_per_unit:.4g}'
-                            case 2:
-                                return f'{geometry.probe_radians_per_m * LengthUnit.NANOMETER.meters_per_unit:.4g}'
-                            case 3:
-                                return f'{geometry.probe_photons_per_s:.4g}'
-                            case 4:
-                                return f'{geometry.probe_power_W:.4g}'
-                            case 5:
-                                return f'{LengthUnit.NANOMETER.convert(geometry.get_object_plane_pixel_geometry().width_m):.4g}'
-                            case 6:
-                                return f'{LengthUnit.NANOMETER.convert(geometry.get_object_plane_pixel_geometry().height_m):.4g}'
-                            case 7:
+                            case _Row.PHOTON_WAVELENGTH_NM:
+                                return f'{LengthUnit.NANOMETER.convert(geometry.photon_wavelength_m):.4g}'
+                            case _Row.PROBE_WAVENUMBER_PER_NM:
+                                return f'{values.probe_wavenumber_per_m * nm_per_m:.4g}'
+                            case _Row.PROBE_ANGULAR_WAVENUMBER_RAD_PER_NM:
+                                return f'{values.probe_angular_wavenumber_rad_per_m * nm_per_m:.4g}'
+                            case _Row.PROBE_PHOTON_FLUX_PER_S:
+                                return f'{values.probe_photon_flux_per_s:.4g}'
+                            case _Row.PROBE_POWER_W:
+                                return f'{values.probe_power_W:.4g}'
+                            case _Row.OBJECT_PLANE_PIXEL_WIDTH_NM:
+                                width_m = values.object_plane_pixel_geometry.width_m
+                                return f'{LengthUnit.NANOMETER.convert(width_m):.4g}'
+                            case _Row.OBJECT_PLANE_PIXEL_HEIGHT_NM:
+                                height_m = values.object_plane_pixel_geometry.height_m
+                                return f'{LengthUnit.NANOMETER.convert(height_m):.4g}'
+                            case _Row.EXPOSURE_TIME_S:
                                 return f'{metadata_item.exposure_time_s.get_value():.4g}'
-                            case 8:
-                                return f'{metadata_item.mass_attenuation_m2_kg.get_value():.4g}'
-                            case 9:
+                            case _Row.MASS_ATTENUATION_M2_PER_KG:
+                                return f'{metadata_item.mass_attenuation_m2_per_kg.get_value():.4g}'
+                            case _Row.TOMOGRAPHY_ANGLE_DEG:
                                 return f'{metadata_item.tomography_angle_deg.get_value():.4g}'
-                            case 10:
+                            case _Row.TILT_ANGLE_DEG:
                                 return f'{metadata_item.tilt_angle_deg.get_value():.4g}'
-                            case 11:
+                            case _Row.POLARIZATION:
                                 raw = metadata_item.polarization.get_value()
                                 return raw if raw else '(unset)'
-                            case 12:
-                                try:
-                                    return f'{geometry.fresnel_number:.4g}'
-                                except ZeroDivisionError:
-                                    return 'inf'
-                            case 13:
-                                try:
-                                    return f'{geometry.detector_numerical_aperture:.4g}'
-                                except ZeroDivisionError:
-                                    return 'inf'
-                            case 14:
-                                try:
-                                    return f'{LengthUnit.NANOMETER.convert(geometry.depth_of_field_m):.4g}'
-                                except ZeroDivisionError:
-                                    return 'inf'
+                            case _Row.FRESNEL_NUMBER:
+                                # Already degrades to 0.0, which is the correct
+                                # object-plane limit as z -> 0.
+                                return f'{values.fresnel_number:.4g}'
+                            case _Row.DETECTOR_NUMERICAL_APERTURE:
+                                return f'{values.detector_numerical_aperture:.4g}'
+                            case _Row.DEPTH_OF_FIELD_NM:
+                                # Diverges as the aperture vanishes, and formats as 'inf'.
+                                depth_m = values.depth_of_field_m
+                                return f'{LengthUnit.NANOMETER.convert(depth_m):.4g}'
                             case _Row.DIFFRACTION_DATASET:
                                 dataset = self._product_item.get_dataset()
                                 return UNBOUND_DATASET if dataset is None else dataset.get_name()
+                            case _Row.FOCUS_OBJECT_DISTANCE_MM:
+                                distance_m = metadata_item.focus_object_distance_m.get_value()
+                                return f'{LengthUnit.MILLIMETER.convert(distance_m):.4g}'
+                            case _Row.FAR_FIELD:
+                                return _FAR_FIELD_CHOICES[metadata_item.far_field.get_value()]
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
                     return self._editable_item_brush
@@ -202,11 +217,11 @@ class ProductPropertyTableModel(QAbstractTableModel):
                     return True
                 case 8:
                     try:
-                        mass_attenuation_m2_kg = float(value)
+                        mass_attenuation_m2_per_kg = float(value)
                     except ValueError:
                         return False
 
-                    metadata_item.mass_attenuation_m2_kg.set_value(mass_attenuation_m2_kg)
+                    metadata_item.mass_attenuation_m2_per_kg.set_value(mass_attenuation_m2_per_kg)
                     return True
                 case 9:
                     try:
@@ -248,6 +263,25 @@ class ProductPropertyTableModel(QAbstractTableModel):
                             return True
 
                     return False
+                case _Row.FOCUS_OBJECT_DISTANCE_MM:
+                    # Signed: negative places the focus upstream of the object.
+                    try:
+                        distance_mm = float(value)
+                    except ValueError:
+                        return False
+
+                    metadata_item.focus_object_distance_m.set_value(
+                        LengthUnit.MILLIMETER.to_meters(distance_mm)
+                    )
+                    return True
+                case _Row.FAR_FIELD:
+                    text = str(value)
+
+                    if text not in _FAR_FIELD_CHOICES.values():
+                        return False
+
+                    metadata_item.far_field.set_value(text == _FAR_FIELD_CHOICES[True])
+                    return True
 
         return False
 
@@ -285,6 +319,13 @@ class _PropertyValueDelegate(QStyledItemDelegate):
         self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex
     ) -> QWidget:
         match self._source_row(index):
+            case _Row.FAR_FIELD:
+                combo = QComboBox(parent)
+
+                for text in _FAR_FIELD_CHOICES.values():
+                    combo.addItem(text, text)
+
+                return combo
             case _Row.POLARIZATION:
                 combo = QComboBox(parent)
                 combo.addItem('(unset)', '')

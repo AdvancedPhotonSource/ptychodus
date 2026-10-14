@@ -24,13 +24,26 @@ Launch each section's command with `run <section-name> <command>`, then `wait`, 
 
 ### Phase B — sequential, environment-mutating
 
-Sync **once**, naming every extra the gate depends on, then run Sections 6, 7, and 9 in order:
+**Check the lock before syncing.** `uv.lock` is gitignored and per-developer, so nothing refreshes it for you and a stale one rewrites the environment the gate is about to test:
+
+```sh
+uv lock --check || uv lock --upgrade
+uv sync --extra docs --extra gui --extra globus --extra ptychi --extra store --dry-run
+```
+
+`--check` answers "is this lock consistent with the manifest", not "is this lock current" — the two come apart. Plain `uv lock` is conservative and keeps any pin that still satisfies the manifest, so a lock can pass `--check` while carrying resolutions inherited from a manifest that no longer exists. Only `--upgrade` re-resolves. Measured here: after the `ptychopinn`/`ptycho-fm` path sources were dropped, a plain `uv lock` still pinned `torch 2.6.0` from the PtychoPINN era; `--upgrade` moved it to `2.14.1`.
+
+Then read the dry-run diff. Sync for real only when it is empty or confined to the extras being added. A torch or CUDA version moving, an editable install reverting to a registry release, or packages being removed all mean the lock is stale — fix that first, because the gate would otherwise report `PASS` for an environment nobody has.
 
 ```sh
 uv sync --extra docs --extra gui --extra globus --extra ptychi --extra store
 ```
 
-Sections 6, 7, and 9 must not overlap — with each other or with Phase A. See "Why the phases" below.
+`ptychi` is the CPU torch extra, which is what this audit wants: no release check needs a GPU, and the CUDA variants (`ptychi-cuda128` and friends) are mutually exclusive with it. Section 5c below validates the extras README names against `pyproject.toml`, so both lists have to move together.
+
+If the developer deliberately runs an editable sibling checkout (pty-chi is the usual one), skip the sync entirely and pass `--no-sync` to every `uv run` below, as the `pre-push` skill does — an exact sync silently swaps that checkout for the published release.
+
+Then run Sections 6, 7, and 9 in order. They must not overlap — with each other or with Phase A. See "Why the phases" below.
 
 ---
 
@@ -208,35 +221,26 @@ for k in sorted(p['project']['optional-dependencies']):
 
 **Suggested fix**: either add the extra to `pyproject.toml` (rare — usually intentional) or remove/rename the extra reference in `README.md`.
 
-**4b. Every `[project.scripts]` entry is documented or referenced.**
+**4b. CLAUDE.md and the skill files — invoke the `curate-claude-md` skill.**
 
-```sh
-uv run python -c "
-import tomllib
-with open('pyproject.toml','rb') as f:
-    p = tomllib.load(f)
-for name in sorted(p['project'].get('scripts', {})):
-    print(name)
-"
-```
+That skill owns every CLAUDE.md check: symbol and `Class.method` existence, dead packages, closed enumerations that lost a member, universal "each X exposes a Y" claims, embedded audit commands whose stated result has drifted, volatile phrasing, config scalars, local-artifact leakage, contradictions within and across `CLAUDE.md` and `.claude/skills/*/SKILL.md`, and the word budget.
 
-For each script name, confirm it appears in `CLAUDE.md` OR `docs/source/getting_started.md`. `PASS` if all are referenced.
+It subsumes what used to be **4b** (every `[project.scripts]` name documented — now checked in both directions, so a command block naming a *deleted* script fails too) and **4c** (the `requires-python` claim).
 
-**Suggested fix**: add a `uv run <script>` example under the "Common Commands" section of CLAUDE.md (project convention — see the existing block).
+`PASS` if it reports clean. Otherwise carry each of its findings into the final report table as its own row.
 
-**4c. Python version claim matches pyproject.**
+**Suggested fix**: take the per-finding fix the skill proposes; it asks before applying each one.
 
-- CLAUDE.md says "Python ≥3.11".
-- Confirm `pyproject.toml` `requires-python` matches. `PASS`/`FAIL` accordingly.
+Do not re-implement these checks here. A second copy is how two documents drift into disagreeing — which is itself one of the things the skill looks for.
 
 ---
 
 ### Section 5 — Installation instructions are fresh
 
-**5a. Dockerfile variants referenced still exist.** Every Dockerfile name mentioned in `docs/source/getting_started.md` and `CLAUDE.md` should be a real file in `containers/`:
+**5a. Dockerfile variants referenced still exist.** Every Dockerfile name mentioned in `docs/source/getting_started.md` should be a real file in `containers/`. CLAUDE.md is covered by §4b — do not scan it twice:
 
 ```sh
-grep -hoE 'Dockerfile\.[a-z]+' docs/source/getting_started.md CLAUDE.md | sort -u | while read f; do
+grep -hoE 'Dockerfile\.[a-z0-9]+' docs/source/getting_started.md | sort -u | while read f; do
     [ -f "containers/$f" ] || echo "MISSING: containers/$f"
 done
 ```
@@ -417,6 +421,7 @@ Three constraints force Phase B to be serial. Do not re-flatten the phases witho
 - **`uv sync` is exact by default.** It uninstalls anything outside the extras named on that one invocation (`--inexact` opts out). A narrow `uv sync --extra docs` therefore strips `gui`, `globus`, `ptychi`, and `store` — which silently narrows Section 7's pytest collection and inflates Section 3's "modules skipped at load" count. That is why the sync is hoisted to the top of Phase B and names every extra at once.
 - **`uv build` and `uv sync` contend on the same project lock.** Section 9 must not overlap Section 6 or the hoisted sync.
 - **Section 9's stale-`build/` guard only means something if nothing else is building.** A concurrent build would create the very directory the guard is checking for.
+- **The lock guard is not ceremony.** `uv.lock` is untracked, so it drifts per machine with nothing to refresh it, and `uv sync` is exact. A stale lock silently narrows or rewrites what Sections 6, 7 and 9 test, and every one of them still reports `PASS` — against an environment the developer does not have. Keep the `uv lock --check` and the `--dry-run` read ahead of the real sync.
 
 Phase A is safe to fan out because every section in it only reads: filesystem scans, an AST walk, a plugin-registry load, and `--version`/`--help` invocations of the entry points.
 

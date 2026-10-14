@@ -261,7 +261,7 @@ def test_estimate_xmcd_end_to_end_with_align_objects_recovers_known_signal() -> 
 def test_estimate_xmcd_end_to_end_with_mismatched_shapes_recovers_known_signal() -> None:
     """Integration: RCP and LCP with different shapes → align_objects trims and aligns.
 
-    Simulates the pty-chi failure mode this fix targets: rounding/padding leaves the
+    Simulates the failure mode this fix targets: rounding/padding leaves the
     two reconstructions with slightly different array shapes. The full
     align_objects → estimate_xmcd chain must trim to a common shape and still
     recover the known structural + magnetic signal on that shared region.

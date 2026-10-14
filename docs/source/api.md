@@ -1,5 +1,14 @@
 # API Reference
 
+## Affine
+
+```{eval-rst}
+.. automodule:: ptychodus.api.affine
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Assemble
 
 ```{eval-rst}
@@ -22,6 +31,15 @@
 
 ```{eval-rst}
 .. automodule:: ptychodus.api.diffraction
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+## Exit Codes
+
+```{eval-rst}
+.. automodule:: ptychodus.api.exit_codes
    :members:
    :undoc-members:
    :show-inheritance:
@@ -132,15 +150,6 @@
 
 ```{eval-rst}
 .. automodule:: ptychodus.api.preprocess.diffraction
-   :members:
-   :undoc-members:
-   :show-inheritance:
-```
-
-### Probe-position preprocessing
-
-```{eval-rst}
-.. automodule:: ptychodus.api.preprocess.probe_positions
    :members:
    :undoc-members:
    :show-inheritance:

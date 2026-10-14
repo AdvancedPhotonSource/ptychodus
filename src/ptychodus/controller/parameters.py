@@ -36,7 +36,7 @@ from ptychodus.api.parameters import (
     UUIDParameter,
 )
 
-from ..view.widgets import DecimalLineEdit, DecimalSlider, PowerTwoSpinBox
+from ..view.widgets import CheckableGroupBox, DecimalLineEdit, DecimalSlider, PowerTwoSpinBox
 from .data import FileDialogFactory
 
 logger = logging.getLogger(__name__)
@@ -49,11 +49,17 @@ class ParameterViewController(ABC):
 
 
 class CheckableGroupBoxParameterViewController(ParameterViewController, Observer):
-    def __init__(self, parameter: BooleanParameter, title: str, *, tool_tip: str = '') -> None:
+    def __init__(
+        self,
+        parameter: BooleanParameter,
+        title: str,
+        *,
+        tool_tip: str = '',
+        collapse_when_unchecked: bool = False,
+    ) -> None:
         super().__init__()
         self._parameter = parameter
-        self._widget = QGroupBox(title)
-        self._widget.setCheckable(True)
+        self._widget = CheckableGroupBox(title, collapse_when_unchecked=collapse_when_unchecked)
 
         if tool_tip:
             self._widget.setToolTip(tool_tip)
@@ -62,7 +68,7 @@ class CheckableGroupBoxParameterViewController(ParameterViewController, Observer
         self._widget.toggled.connect(parameter.set_value)
         parameter.add_observer(self)
 
-    def get_widget(self) -> QWidget:
+    def get_widget(self) -> CheckableGroupBox:
         return self._widget
 
     def __sync_model_to_view(self) -> None:

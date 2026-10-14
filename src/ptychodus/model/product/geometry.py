@@ -1,19 +1,28 @@
 from collections.abc import Sequence
+import math
 
-import numpy
-
-from ptychodus.api.constants import ELECTRON_VOLT_J, energy_eV_to_wavelength_m
-from ptychodus.api.geometry import ImageExtent, PixelGeometry
+from ptychodus.api.constants import energy_eV_to_wavelength_m
+from ptychodus.api.geometry import GeometryNotDefinedError, ImageExtent, PixelGeometry
 from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider, compute_object_geometry
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider
+from ptychodus.api.propagate import ProductGeometry, compute_product_geometry
 from ptychodus.api.probe_positions import ProbePosition
 
 from .metadata import MetadataRepositoryItem
 from .probe_positions import ProbePositionsRepositoryItem
 
 
-class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable, Observer):
+class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Observable, Observer):
+    """Live product geometry: the bound metadata, scan and detector, as a provider.
+
+    Adapts a product under edit to the two geometry-provider interfaces, tracking
+    changes to the metadata and scan it was built from. The derived quantities
+    themselves are the frozen :class:`ProductGeometry` returned by
+    :meth:`get_derived_values`; this class only supplies its inputs and republishes
+    the handful of them the provider interfaces require.
+    """
+
     def __init__(
         self,
         metadata_item: MetadataRepositoryItem,
@@ -47,38 +56,35 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         self._detector_pixel_geometry = geometry
         self.notify_observers()
 
+    def get_derived_values(self) -> ProductGeometry:
+        """Beam and sampling quantities implied by the current metadata and detector.
+
+        Recomputed per call rather than cached: it is a dozen float operations, and
+        this class is :class:`Observable` precisely so that holders refresh after a
+        change instead of reading a stale snapshot.
+        """
+        return compute_product_geometry(
+            photon_energy_eV=self._metadata_item.photon_energy_eV.get_value(),
+            probe_photon_count=self._metadata_item.probe_photon_count.get_value(),
+            exposure_time_s=self._metadata_item.exposure_time_s.get_value(),
+            detector_distance_m=self._metadata_item.detector_distance_m.get_value(),
+            focus_object_distance_m=self._metadata_item.focus_object_distance_m.get_value(),
+            far_field=self._metadata_item.far_field.get_value(),
+            detector_extent=self._detector_extent,
+            detector_pixel_geometry=self._detector_pixel_geometry,
+        )
+
     @property
     def probe_photon_count(self) -> float:
         return self._metadata_item.probe_photon_count.get_value()
 
     @property
-    def probe_energy_J(self) -> float:  # noqa: N802
-        return self._metadata_item.probe_energy_eV.get_value() * ELECTRON_VOLT_J
-
-    @property
-    def probe_wavelength_m(self) -> float:
-        return energy_eV_to_wavelength_m(self._metadata_item.probe_energy_eV.get_value())
-
-    @property
-    def probe_wavelengths_per_m(self) -> float:
-        """wavenumber"""
-        return 1.0 / self.probe_wavelength_m
-
-    @property
-    def probe_radians_per_m(self) -> float:
-        """angular wavenumber"""
-        return 2.0 * numpy.pi / self.probe_wavelength_m
-
-    @property
-    def probe_photons_per_s(self) -> float:
-        try:
-            return self.probe_photon_count / self._metadata_item.exposure_time_s.get_value()
-        except ZeroDivisionError:
-            return 0.0
+    def photon_wavelength_m(self) -> float:
+        return energy_eV_to_wavelength_m(self._metadata_item.photon_energy_eV.get_value())
 
     @property
     def probe_power_W(self) -> float:  # noqa: N802
-        return self.probe_energy_J * self.probe_photons_per_s
+        return self.get_derived_values().probe_power_W
 
     @property
     def num_scan_points(self) -> int:
@@ -89,8 +95,8 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         return self._metadata_item.detector_distance_m.get_value()
 
     @property
-    def _lambda_z_m2(self) -> float:
-        return self.probe_wavelength_m * self.detector_distance_m
+    def far_field(self) -> bool:
+        return self._metadata_item.far_field.get_value()
 
     def _get_detector_extent(self) -> ImageExtent:
         # No dataset bound yet: degrade to a zero-sized extent so downstream
@@ -108,49 +114,34 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
             return PixelGeometry(width_m=0.0, height_m=0.0)
         return geometry
 
+    @property
+    def object_plane_propagation_distance_m(self) -> float:
+        return self.get_derived_values().object_plane_propagation_distance_m
+
     def get_object_plane_pixel_geometry(self) -> PixelGeometry:
-        extent = self._get_detector_extent()
-        detector_pixel_geometry = self.get_detector_pixel_geometry()
-        lambda_z = self._lambda_z_m2
-        try:
-            return PixelGeometry(
-                width_m=lambda_z / (extent.width_px * detector_pixel_geometry.width_m),
-                height_m=lambda_z / (extent.height_px * detector_pixel_geometry.height_m),
+        """Sample-plane sampling implied by the detector and the declared regime.
+
+        See :attr:`ProductGeometry.object_plane_pixel_geometry`.
+
+        Raises:
+            GeometryNotDefinedError: while no diffraction dataset is bound, or where
+                the geometry is degenerate. The pure function degrades to a zero-sized
+                pitch; this adapter reports that as the transient state it is, rather
+                than handing back a value for the caller to inspect.
+        """
+        pixel_geometry = self.get_derived_values().object_plane_pixel_geometry
+        is_determined = all(
+            math.isfinite(length_m) and length_m > 0.0
+            for length_m in (pixel_geometry.width_m, pixel_geometry.height_m)
+        )
+
+        if not is_determined:
+            raise GeometryNotDefinedError(
+                'Object-plane sampling is not determined; no diffraction dataset is '
+                'bound, or the geometry is degenerate.'
             )
-        except ZeroDivisionError:
-            return PixelGeometry(width_m=0.0, height_m=0.0)
 
-    @property
-    def fresnel_number(self) -> float:
-        extent = self._get_detector_extent()
-        pixel_geometry = self.get_detector_pixel_geometry()
-        width_m = extent.width_px * pixel_geometry.width_m
-        height_m = extent.height_px * pixel_geometry.height_m
-        area_m2 = width_m * height_m
-        try:
-            return area_m2 / self._lambda_z_m2
-        except ZeroDivisionError:
-            return 0.0
-
-    @property
-    def _detector_numerical_aperture_sq(self) -> float:
-        extent = self._get_detector_extent()
-        pixel_geometry = self.get_detector_pixel_geometry()
-        try:
-            two_z_m = 2 * self.detector_distance_m
-            NA_x = (extent.width_px * pixel_geometry.width_m) / two_z_m  # noqa: N806
-            NA_y = (extent.height_px * pixel_geometry.height_m) / two_z_m  # noqa: N806
-        except ZeroDivisionError:
-            return 0.0
-        return NA_x * NA_y
-
-    @property
-    def detector_numerical_aperture(self) -> float:
-        return numpy.sqrt(self._detector_numerical_aperture_sq)
-
-    @property
-    def depth_of_field_m(self) -> float:
-        return self.probe_wavelength_m / self._detector_numerical_aperture_sq
+        return pixel_geometry
 
     def get_probe_geometry(self) -> ProbeGeometry:
         extent = self._get_detector_extent()
@@ -162,39 +153,25 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
             pixel_height_m=pixel_geometry.height_m,
         )
 
-    def is_probe_geometry_valid(self, geometry: ProbeGeometry) -> bool:
-        expected = self.get_probe_geometry()
-        if not geometry.get_pixel_geometry().is_valid:
-            return False
-        return geometry.width_m == expected.width_m and geometry.height_m == expected.height_m
-
     def get_probe_positions(self) -> Sequence[ProbePosition]:
         return self._scan_item.get_probe_positions()
 
     def get_object_geometry(self) -> ObjectGeometry:
         probe_geometry = self.get_probe_geometry()
-        pixel_geometry = self.get_object_plane_pixel_geometry()
 
-        if pixel_geometry.is_valid:
-            try:
-                return compute_object_geometry(self.get_probe_positions(), probe_geometry)
-            except ValueError:
-                pass  # Empty scan — fall through to the probe-sized default below.
-
-        # Detector unbound or scan not yet loaded: degrade to a probe-sized canvas at
-        # the origin so downstream UI has valid dimensions to render.
-        return ObjectGeometry(
-            width_px=probe_geometry.width_px if pixel_geometry.is_valid else 0,
-            height_px=probe_geometry.height_px if pixel_geometry.is_valid else 0,
-            pixel_width_m=pixel_geometry.width_m,
-            pixel_height_m=pixel_geometry.height_m,
-            center_x_m=0.0,
-            center_y_m=0.0,
-        )
-
-    def is_object_geometry_valid(self, geometry: ObjectGeometry) -> bool:
-        expected_geometry = self.get_object_geometry()
-        return geometry.get_pixel_geometry().is_valid and geometry.contains(expected_geometry)
+        try:
+            return compute_object_geometry(self.get_probe_positions(), probe_geometry)
+        except ValueError:
+            # Empty scan: the sampling is known but no positions place it yet, so fall
+            # back to a probe-sized canvas at the origin rather than raising.
+            return ObjectGeometry(
+                width_px=probe_geometry.width_px,
+                height_px=probe_geometry.height_px,
+                pixel_width_m=probe_geometry.pixel_width_m,
+                pixel_height_m=probe_geometry.pixel_height_m,
+                center_x_m=0.0,
+                center_y_m=0.0,
+            )
 
     def _update(self, observable: Observable) -> None:
         if observable is self._metadata_item:

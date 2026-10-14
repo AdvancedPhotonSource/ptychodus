@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Final, Self
 import logging
 
 from ptychodus.api.assemble import (
@@ -11,7 +14,7 @@ from ptychodus.api.assemble import (
 from ptychodus.api.diffraction import BadPixels, CropRegion, DiffractionDataset
 from ptychodus.api.preprocess.diffraction import DiffractionPrepPipeline, DiffractionPrepPlan
 
-from ..task_manager import TaskManager
+from ..task_manager import ForegroundTaskManager, TaskManager
 from ..task_monitor import TaskProgressMonitor
 from .api import DiffractionAPI
 from .prep_pipeline import PrepPipelineBuilder
@@ -35,7 +38,38 @@ class DiffractionSummaryTaskMonitor(TaskProgressMonitor):
     Marker subclass so :class:`~ptychodus.controller.task_status.TaskStatusController`
     and the wizard's summary controller bind to the right monitor without
     depending on the underlying :class:`TaskManager`.
+
+    Also carries the label of the pass that is running, so an error replayed to
+    observers long after the fact is attributed to the pass that actually failed.
+    Both passes deliberately share one monitor -- that is how each disables the
+    other's button through ``is_processing`` -- so the label cannot be fixed at
+    construction; :meth:`run_as` binds it for the scope of one run instead, and
+    the ``__enter__`` that adopts it is the same one that clears the previous
+    error, so label and error cannot describe different runs.
     """
+
+    def __init__(self, foreground_task_manager: ForegroundTaskManager) -> None:
+        super().__init__(foreground_task_manager)
+        self._actor = SummarizeBackgroundTask.ACTOR
+
+    @property
+    def actor(self) -> str:
+        """Label of the most recent run, naming the error it left behind."""
+        return self._actor
+
+    @contextmanager
+    def run_as(self, actor: str) -> Iterator[Self]:
+        """Enter the monitor for a run labelled ``actor``.
+
+        The write needs no lock of its own: the background executor is a single
+        worker thread, so runs never overlap, and the label reaches observers by
+        the same foreground-queued notification that publishes a result (see
+        :meth:`DiffractionSummaryService._publish`).
+        """
+        self._actor = actor
+
+        with self:
+            yield self
 
 
 class SummarizeBackgroundTask:
@@ -48,6 +82,8 @@ class SummarizeBackgroundTask:
     failed run leaves the service's previous summary untouched.
     """
 
+    ACTOR: Final[str] = 'Compute Summary'
+
     def __init__(
         self,
         service: DiffractionSummaryService,
@@ -59,8 +95,7 @@ class SummarizeBackgroundTask:
         self._bad_pixels = bad_pixels
 
     def __call__(self) -> None:
-        monitor = self._service.task_monitor
-        with monitor:
+        with self._service.task_monitor.run_as(self.ACTOR) as monitor:
             summary = summarize_dataset(
                 self._source,
                 bad_pixels=self._bad_pixels,
@@ -82,6 +117,8 @@ class TotalCountsBackgroundTask:
     measured or mislabel the result it publishes.
     """
 
+    ACTOR: Final[str] = 'Refresh Counts'
+
     def __init__(
         self,
         service: DiffractionSummaryService,
@@ -99,8 +136,7 @@ class TotalCountsBackgroundTask:
         self._cache_key = cache_key
 
     def __call__(self) -> None:
-        monitor = self._service.task_monitor
-        with monitor:
+        with self._service.task_monitor.run_as(self.ACTOR) as monitor:
             total_counts = compute_dataset_total_counts(
                 self._source,
                 self._pipeline,
