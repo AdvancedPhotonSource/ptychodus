@@ -271,31 +271,25 @@ class OPRModeViewController:
 
     # ------------------------------------------------------------------ probe fields
 
-    def _get_basis(self) -> ComplexArrayType:
-        if self._probes is None:
-            raise ValueError('No probe ensemble!')
-
-        return self._probes.get_array()[:, 0, :, :]
-
     def _get_field(self, index: int) -> ComplexArrayType:
         """Complex field the image pane shows for probe position ``index``."""
         series = self._series
+        probes = self._probes
 
-        if series is None:
+        if series is None or probes is None:
             raise ValueError('No OPR mode series!')
 
-        basis = self._get_basis()
         display_view = self._dialog.display_view
 
         if display_view.basis_button.isChecked():
-            return basis[self._mode_spin_box.value() - 1]
+            return probes.get_opr_basis()[self._mode_spin_box.value() - 1]
 
         weight = series.opr_weight[index, :]
 
         if display_view.deviation_button.isChecked():
-            weight = weight - series.opr_weight.mean(axis=0)
+            weight = weight - series.get_mean_weight()
 
-        return numpy.tensordot(weight, basis, axes=1)
+        return probes.compose_opr_field(weight)
 
     def _lock_display_range(self) -> None:
         """Fix the color axis over the whole scan so playback does not flicker.

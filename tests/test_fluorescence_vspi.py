@@ -1,5 +1,4 @@
-"""Characterization tests for the VSPI linear operator in
-ptychodus.model.fluorescence.vspi.
+"""Characterization tests for the VSPI linear operator in ptychodus.api.fluorescence.
 
 The operator is the forward and adjoint model of probe-weighted fluorescence
 imaging: each scan position integrates the object against that position's
@@ -18,8 +17,8 @@ from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
+from ptychodus.api.fluorescence import VSPILinearOperator
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.model.fluorescence.vspi import VSPILinearOperator
 
 _PIXEL_SIZE_M = 1.0e-7
 _CANVAS_PX = 24

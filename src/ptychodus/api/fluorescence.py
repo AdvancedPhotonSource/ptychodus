@@ -7,8 +7,67 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import overload
 
+from scipy.sparse.linalg import LinearOperator
+import numpy
+
 from .typing import RealArrayType
+from .interpolate import BarycentricArrayInterpolator
 from .product import Product
+
+
+class VSPILinearOperator(LinearOperator):
+    def __init__(self, product: Product) -> None:
+        """
+        M: number of XRF positions
+        N: number of ptychography object pixels
+        P: number of XRF channels
+
+        A[M,N] * X[N,P] = B[M,P]
+        """
+        object_geometry = product.object_.get_geometry()
+        M = len(product.probe_positions)  # noqa: N806
+        N = object_geometry.height_px * object_geometry.width_px  # noqa: N806
+        super().__init__(float, (M, N))
+        self._product = product
+
+    def _matvec(self, x: RealArrayType) -> RealArrayType:  # noqa: N803
+        object_geometry = self._product.object_.get_geometry()
+        object_array = x.reshape((object_geometry.height_px, object_geometry.width_px))
+        AX = numpy.zeros(len(self._product.probe_positions))  # noqa: N806
+        interpolator = BarycentricArrayInterpolator(object_array)
+
+        for index, (scan_point, probe) in enumerate(self._product.iter_position_probes()):
+            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
+            probe_intensity = probe.get_intensity()
+            psf = probe_intensity / probe_intensity.sum()
+            patch = interpolator.get_patch(
+                object_point.x_px,
+                object_point.y_px,
+                psf.shape[-1],
+                psf.shape[-2],
+            )
+            AX[index] = numpy.sum(psf * patch)
+
+        return AX
+
+    def _rmatvec(self, x: RealArrayType) -> RealArrayType:  # noqa: N803
+        object_geometry = self._product.object_.get_geometry()
+        object_array = numpy.zeros((object_geometry.height_px, object_geometry.width_px))
+        interpolator = BarycentricArrayInterpolator(object_array)
+
+        for index, (scan_point, probe) in enumerate(self._product.iter_position_probes()):
+            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
+            probe_intensity = probe.get_intensity()
+            psf = probe_intensity / probe_intensity.sum()
+            interpolator.add_patch(
+                object_point.x_px,
+                object_point.y_px,
+                x[index] * psf,
+            )
+
+        HX = object_array.flatten()  # noqa: N806
+
+        return HX
 
 
 @dataclass(frozen=True)

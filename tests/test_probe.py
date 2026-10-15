@@ -1293,3 +1293,56 @@ class TestProbeEnsembleGetProbe:
 
         assert not numpy.allclose(composed[0], composed[1])
         assert not numpy.allclose(composed[1], composed[2])
+
+
+class TestProbeEnsembleOPRBasis:
+    """The coherent basis and the mixing a weight row performs on it."""
+
+    def _ensemble(self, weights: numpy.ndarray) -> ProbeEnsemble:
+        array = numpy.arange(2 * 1 * 4 * 4, dtype=numpy.complex128).reshape(2, 1, 4, 4)
+        return ProbeEnsemble(array, weights, PIXEL_GEOMETRY)
+
+    def test_basis_is_the_coherent_stack_at_incoherent_mode_zero(self) -> None:
+        ensemble = self._ensemble(numpy.ones((3, 2)))
+
+        basis = ensemble.get_opr_basis()
+
+        assert basis.shape == (2, 4, 4)
+        numpy.testing.assert_array_equal(basis, ensemble.get_array()[:, 0, :, :])
+
+    def test_composing_a_stored_row_reproduces_get_probe(self) -> None:
+        """The equivalence that lets a caller stop hand-rolling the mix: composing
+        position i's own weight row gives exactly what get_probe(i) composes."""
+        weights = numpy.array([[1.0, 0.3], [0.4, 1.2], [0.7, 0.9]])
+        ensemble = self._ensemble(weights)
+
+        for index in range(3):
+            numpy.testing.assert_array_equal(
+                ensemble.compose_opr_field(weights[index, :]),
+                ensemble.get_probe(index).get_incoherent_mode(0),
+            )
+
+    def test_composing_a_deviation_is_the_difference_of_two_fields(self) -> None:
+        """A weight vector that is not a stored row is the point of the method."""
+        weights = numpy.array([[1.0, 0.3], [0.4, 1.2], [0.7, 0.9]])
+        ensemble = self._ensemble(weights)
+        mean = weights.mean(axis=0)
+
+        numpy.testing.assert_allclose(
+            ensemble.compose_opr_field(weights[0, :] - mean),
+            ensemble.compose_opr_field(weights[0, :]) - ensemble.compose_opr_field(mean),
+            atol=1e-12,
+        )
+
+
+def test_opr_mode_series_mean_weight_matches_the_row_mean() -> None:
+    """get_mean_weight reads the per-mode statistics; it must equal the plain mean
+    over weight rows, which is what consumers would otherwise recompute."""
+    rng = numpy.random.default_rng(4)
+    array = rng.standard_normal((3, 2, 8, 8)) + 1j * rng.standard_normal((3, 2, 8, 8))
+    weights = rng.standard_normal((7, 3))
+    series = compute_opr_mode_series(ProbeEnsemble(array, weights, PIXEL_GEOMETRY))
+
+    numpy.testing.assert_allclose(
+        series.get_mean_weight(), series.opr_weight.mean(axis=0), rtol=0.0, atol=0.0
+    )

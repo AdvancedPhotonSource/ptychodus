@@ -1123,6 +1123,24 @@ class ProbeEnsemble:
 
         return Probe(array, self.get_pixel_geometry())
 
+    def get_opr_basis(self) -> ComplexArrayType:
+        """Coherent modes at incoherent index 0, shape ``(num_coherent_modes, h, w)``.
+
+        This is the basis the OPR weights mix. It is the whole stack regardless of
+        whether weights are present; an ensemble without them simply never mixes it.
+        """
+        return self._array[:, 0, :, :]
+
+    def compose_opr_field(self, weights: RealArrayType) -> ComplexArrayType:
+        """Mix the coherent basis by ``weights`` into one complex field.
+
+        :meth:`get_probe` composes a position's dominant incoherent mode from that
+        position's weight row. Passing a row here gives the same field, and passing
+        anything else gives the field that weighting would produce -- a deviation
+        from the across-scan mean, for instance, which is not a stored row.
+        """
+        return numpy.tensordot(weights, self.get_opr_basis(), axes=1)
+
     def get_probe_no_opr(self) -> Probe:
         array = self._array[0, :, :, :].copy()
         return Probe(array, self.get_pixel_geometry())
@@ -1252,6 +1270,10 @@ class OPRModeSeries:
 
         return float(self.deviation_photon_count.mean() / mean_primary)
 
+    def get_mean_weight(self) -> RealArrayType:
+        """Across-scan mean of each coherent mode's weight, shape ``(num_modes,)``."""
+        return numpy.array([stat.mean_weight for stat in self.mode_statistics])
+
     def save_npz(self, file_path: Path) -> None:
         numpy.savez_compressed(
             file_path,
@@ -1261,7 +1283,7 @@ class OPRModeSeries:
             deviation_photon_count=self.deviation_photon_count,
             total_photon_count=self.total_photon_count,
             secondary_mode_photon_count=self.secondary_mode_photon_count,
-            mean_weight=numpy.array([stat.mean_weight for stat in self.mode_statistics]),
+            mean_weight=self.get_mean_weight(),
             weight_deviation=numpy.array([stat.weight_deviation for stat in self.mode_statistics]),
             variance_fraction=numpy.array(
                 [stat.variance_fraction for stat in self.mode_statistics]
