@@ -1,0 +1,126 @@
+"""Unit tests for building live settings parameters from a declared model."""
+
+from __future__ import annotations
+
+from enum import StrEnum
+from pathlib import Path
+
+from pydantic import BaseModel, Field
+import pytest
+
+from ptychodus.api.parameters import (
+    BooleanParameter,
+    IntegerParameter,
+    PathParameter,
+    RealParameter,
+    StringParameter,
+)
+from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.processing.flatten import FlatteningPolicy
+from ptychodus.model.processing.generate import (
+    UnsupportedParameterError,
+    build_parameter_group,
+)
+
+
+class Mode(StrEnum):
+    FAST = 'fast'
+    EXACT = 'exact'
+
+
+class Declared(BaseModel):
+    enabled: bool = True
+    count: int = Field(4, ge=1, le=16)
+    rate: float = Field(0.5, ge=0.0)
+    label: str = 'untitled'
+    mode: Mode = Mode.FAST
+    output: Path = Path('/path/to/out')
+    stop: int | None = -1
+
+
+class Unsupported(BaseModel):
+    weights: dict[str, float] = Field(default_factory=dict)
+
+
+@pytest.fixture
+def built() -> dict[str, object]:
+    registry = SettingsRegistry()
+    return dict(build_parameter_group(registry, 'Declared', Declared, FlatteningPolicy()))
+
+
+class TestParameterKinds:
+    def test_each_declared_type_becomes_its_matching_parameter(
+        self, built: dict[str, object]
+    ) -> None:
+        assert isinstance(built['Enabled'], BooleanParameter)
+        assert isinstance(built['Count'], IntegerParameter)
+        assert isinstance(built['Rate'], RealParameter)
+        assert isinstance(built['Label'], StringParameter)
+        assert isinstance(built['Output'], PathParameter)
+
+    def test_bool_is_not_mistaken_for_int(self, built: dict[str, object]) -> None:
+        """bool subclasses int, so the order the kinds are tested in matters."""
+        assert not isinstance(built['Enabled'], IntegerParameter)
+
+    def test_declared_bounds_reach_the_live_parameter(self, built: dict[str, object]) -> None:
+        count = built['Count']
+        assert isinstance(count, IntegerParameter)
+        assert count.get_minimum() == 1
+        assert count.get_maximum() == 16
+
+    def test_a_zero_lower_bound_survives(self, built: dict[str, object]) -> None:
+        """ge=0.0 is falsy and the commonest bound here, so it is easily dropped."""
+        rate = built['Rate']
+        assert isinstance(rate, RealParameter)
+        assert rate.get_minimum() == 0.0
+
+    def test_optional_annotations_use_their_inner_type(self, built: dict[str, object]) -> None:
+        assert isinstance(built['Stop'], IntegerParameter)
+
+
+class TestEnums:
+    def test_enum_persists_by_member_name_by_default(self, built: dict[str, object]) -> None:
+        mode = built['Mode']
+        assert isinstance(mode, StringParameter)
+        assert mode.get_value() == 'FAST'
+
+    def test_enum_persists_by_value_under_a_verbatim_policy(self) -> None:
+        registry = SettingsRegistry()
+        built = build_parameter_group(
+            registry, 'Declared', Declared, FlatteningPolicy(enum_by_name=False)
+        )
+        assert built['Mode'].get_value() == 'fast'
+
+
+class TestRegistryIntegration:
+    def test_the_group_is_registered_under_its_name(self) -> None:
+        registry = SettingsRegistry()
+        build_parameter_group(registry, 'Declared', Declared, FlatteningPolicy())
+        assert 'Declared' in set(registry)
+
+    def test_parameters_are_live_and_observable(self) -> None:
+        registry = SettingsRegistry()
+        built = build_parameter_group(registry, 'Declared', Declared, FlatteningPolicy())
+        count = built['Count']
+        count.set_value(9)
+        assert registry['Declared'].parameters()['Count'].get_value_as_string() == '9'
+
+    def test_bounds_clamp_a_value_loaded_from_file(self) -> None:
+        registry = SettingsRegistry()
+        built = build_parameter_group(registry, 'Declared', Declared, FlatteningPolicy())
+        built['Count'].set_value_from_string('999')
+        assert built['Count'].get_value() == 16
+
+
+class TestUnrepresentableFields:
+    def test_an_unsupported_type_is_rejected_by_name(self) -> None:
+        registry = SettingsRegistry()
+        with pytest.raises(UnsupportedParameterError, match='weights'):
+            build_parameter_group(registry, 'Unsupported', Unsupported, FlatteningPolicy())
+
+    def test_a_structural_field_without_an_adapter_is_rejected(self) -> None:
+        """Described but not created would be an invisibly missing setting."""
+        registry = SettingsRegistry()
+        policy = FlatteningPolicy(structural={'count': ('Min', 'Max')})
+        with pytest.raises(UnsupportedParameterError, match='value adapter'):
+            build_parameter_group(registry, 'Declared', Declared, policy)
