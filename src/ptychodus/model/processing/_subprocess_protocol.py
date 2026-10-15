@@ -201,7 +201,7 @@ def run_subprocess(
 
     Usage::
 
-        with run_subprocess('ptychodus.model.ptychi._child:run_reconstruct', payload) as events:
+        with run_subprocess('your.package.child_module:entry_function', payload) as events:
             for event in events:
                 tag = event[0]
                 ...
