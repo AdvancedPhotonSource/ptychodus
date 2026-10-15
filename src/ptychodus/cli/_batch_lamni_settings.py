@@ -10,6 +10,11 @@ something archivable, and the file is the *only* source: a tuning value that is 
 cannot be set. That is what lets the copy written beside each scan's output stand as the
 record of how that scan was reconstructed.
 
+A run driven from Python starts from a :class:`BatchSettings` object and has no file text
+to pass on. :func:`dump_batch_settings` renders one, so such a run archives a canonical
+spelling of the settings that were actually used -- every default written out, and no
+comments -- rather than bytes nobody typed.
+
 Unknown keys are rejected rather than ignored. This file has no writer but a person, so a
 key that does not resolve is a typo, and silently running with a different value than the
 one that was typed is the failure worth preventing.
@@ -28,7 +33,19 @@ from ptychodus.api.affine import AffineTransform
 from ptychodus.plugins.aps31id_lamni._scan_table import APS31IDEScanRecord
 
 __all__ = [
+    'Batch',
     'BatchSettings',
+    'Diffraction',
+    'InitialObject',
+    'InitialProbe',
+    'MetadataOverrides',
+    'Misc',
+    'ObjectFromFile',
+    'Paths',
+    'Positions',
+    'ProbeFromFile',
+    'SimulatedProbe',
+    'dump_batch_settings',
     'load_batch_settings',
     'load_batch_settings_from_text',
     'select_label',
@@ -273,6 +290,18 @@ def load_batch_settings_from_text(text: str, source: str = '<text>') -> BatchSet
 def load_batch_settings(file_path: Path) -> BatchSettings:
     """Read and validate the settings file."""
     return load_batch_settings_from_text(file_path.read_text(), str(file_path))
+
+
+def dump_batch_settings(settings: BatchSettings) -> str:
+    """Render settings as the YAML text a worker rebuilds from and a run archives.
+
+    The inverse of :func:`load_batch_settings_from_text`, for a run whose settings were
+    built rather than read: there is no file text to carry, so one is written from the
+    object. ``mode='json'`` renders the ``Path`` fields as strings, which is what
+    ``safe_dump`` can represent and what loading turns back into paths; ``sort_keys=False``
+    keeps the sections in the order they are declared, for a file meant to be read.
+    """
+    return yaml.safe_dump(settings.model_dump(mode='json'), sort_keys=False)
 
 
 def select_label(records: list[APS31IDEScanRecord], requested: str | None) -> str:

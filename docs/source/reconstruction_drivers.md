@@ -182,6 +182,89 @@ Scans run concurrently, one worker per visible CUDA device, so the job scheduler
 degree of parallelism through `CUDA_VISIBLE_DEVICES`. A scan whose `product.h5` already exists
 is skipped, which is how an interrupted run resumes — re-run the same command.
 
+### Driving it from Python
+
+The command is a shim over a function that takes the same two things as objects: a
+`BatchSettings` and a pty-chi `PtychographyTaskOptions`. A script that already holds those — one
+sweeping a reconstruction parameter over a projection range, or building the settings from an
+experiment database rather than a YAML file — calls it directly instead of writing a temporary
+file and launching a subprocess.
+
+```python
+from ptychi.api import LSQMLOptions
+
+from ptychodus.cli.reconstruct_batch_lamni import (
+    Batch,
+    BatchSettings,
+    Diffraction,
+    Paths,
+    plan_batch_lamni,
+    reconstruct_batch_lamni,
+)
+
+settings = BatchSettings(
+    paths=Paths(
+        experiment_folder='/data/31ide/31ide_2025-06-30/',
+        output_products_folder='/data/31ide/31ide_2025-06-30/analysis/batch_1/',
+    ),
+    batch=Batch(label='sample_A', scan_start=1000, scan_end=1010),
+    diffraction=Diffraction(crop_extent_px=128),
+)
+
+for record in plan_batch_lamni(settings):  # the dry run, in code: no data is read
+    print(record.scan_no, record.encoder_angle_deg)
+
+options = LSQMLOptions()
+options.reconstructor_options.num_epochs = 200
+
+result = reconstruct_batch_lamni(settings, options)
+print(result.succeeded, result.skipped, result.failed)
+```
+
+The sections are the blocks of the YAML file, one class each, and every one of them is
+importable from the same module. An omitted section takes the same defaults the file does, so
+only `paths` is required.
+
+Most runs start from a file that already exists, which makes a sweep two lines:
+
+```python
+from pathlib import Path
+
+from ptychodus.cli.reconstruct_batch_lamni import load_batch_settings, reconstruct_batch_lamni
+
+settings = load_batch_settings(Path('batch.yaml'))
+
+for padding_px in (256, 512, 1024):
+    settings.initial_object.object_padding_px = padding_px
+    settings.paths.output_products_folder = Path(f'/tmp/sweep/pad{padding_px}')
+    reconstruct_batch_lamni(settings)
+```
+
+The call blocks until the batch finishes and writes exactly what the command writes: one
+standard-layout directory per scan, each with its own `batch_settings.yaml`. That archived copy
+is rendered from the settings object the run was given — every default written out, and no
+comments — because an object is all a Python caller has. The command passes its file's text
+through instead, so a run from a file archives the file; a caller that wants the same can pass
+the text as `settings_text`.
+
+A scan that fails is reported rather than raised, because a tomogram with a projection missing
+is a result its owner has to judge: `BatchResult` carries the scan numbers that succeeded, were
+skipped, failed, or were cancelled, and `result.exit_code` is the status the console command
+would have exited with. Anything that goes wrong before the first scan starts — an experiment
+directory that is not there, a scan range that selects nothing, a crop that runs off the
+detector — raises instead, since it describes every scan equally.
+
+```{note}
+The fan-out spawns one child process per scan, and a child spawned from a process that already
+holds a CUDA context fails to initialize. Do not run torch on a GPU in the same interpreter
+first: this is the same constraint that makes ptychodus enumerate devices in a throwaway child.
+```
+
+Neither function configures logging — nothing is printed until the caller sets logging up, for
+example with `logging.basicConfig(level=logging.INFO)` — and neither installs signal handlers.
+To make a run interruptible, pass a `CancellationToken`; it stops the batch at the first scan
+boundary after the request and leaves the scans already written in place.
+
 ## Reconstructing a prepared directory
 
 `ptychodus-reconstruct-subprocess` runs one reconstruction over a directory that already holds

@@ -12,24 +12,31 @@ beamline data. What is covered is everything that decides *what* a run would do.
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pytest
 
 pytest.importorskip('ptychi')
 
+from ptychodus.api.exit_codes import ExitCode  # noqa: E402
 from ptychodus.api.object import compute_uniform_layer_spacing_m  # noqa: E402
 from ptychodus.cli import reconstruct_batch_lamni  # noqa: E402
 from ptychodus.cli._batch_lamni_settings import (  # noqa: E402
     Batch,
     BatchSettings,
+    Paths,
+    dump_batch_settings,
     load_batch_settings,
     load_batch_settings_from_text,
     record_payload,
     select_label,
     select_records,
 )
+from ptychodus.cli.reconstruct_batch_lamni import BatchResult, plan_batch_lamni  # noqa: E402
 from ptychodus.plugins.aps31id_lamni._scan_table import APS31IDEScanRecord  # noqa: E402
+
+_SCAN_TABLE = Path(__file__).parent / 'data' / 'lamni' / 'tomography_scannumbers.txt'
 
 _MINIMAL = """
 paths:
@@ -337,3 +344,144 @@ def test_device_ordinals_compose_with_an_inherited_mask(
     monkeypatch.setattr(reconstruct_batch_lamni, 'probe_devices_via_subprocess', lambda: probed)
 
     assert reconstruct_batch_lamni.visible_cuda_devices() == expected
+
+
+# --- the Python API --------------------------------------------------------------------
+#
+# A caller that already holds a BatchSettings drives the same batch the command does. What
+# is pinned here is everything that decides *what* such a run would do: the selection it
+# resolves, the settings text it archives when there is no file to copy, and the account it
+# returns. The fan-out itself still needs GPUs and real data.
+
+
+def _experiment(
+    tmp_path: Path, *, scan_start: int | None = None, scan_end: int | None = None
+) -> BatchSettings:
+    """Settings over a tmp experiment tree holding the real scan table."""
+    dat_files = tmp_path / 'experiment' / 'data' / 'dat-files'
+    dat_files.mkdir(parents=True)
+    shutil.copy(_SCAN_TABLE, dat_files / 'tomography_scannumbers.txt')
+
+    return BatchSettings(
+        paths=Paths(
+            experiment_folder=tmp_path / 'experiment',
+            output_products_folder=tmp_path / 'out',
+        ),
+        batch=Batch(label='BOREAS_3d_50um', scan_start=scan_start, scan_end=scan_end),
+    )
+
+
+def test_the_plan_selects_one_tomogram_in_acquisition_order(tmp_path: Path) -> None:
+    selected = plan_batch_lamni(_experiment(tmp_path))
+
+    assert [record.scan_no for record in selected] == [188, 189, 190, 368, 369]
+
+
+def test_the_plan_honors_the_scan_range(tmp_path: Path) -> None:
+    selected = plan_batch_lamni(_experiment(tmp_path, scan_start=189, scan_end=368))
+
+    assert [record.scan_no for record in selected] == [189, 190, 368]
+
+
+def test_the_plan_carries_the_rotation_angle_each_product_is_stamped_with(
+    tmp_path: Path,
+) -> None:
+    selected = plan_batch_lamni(_experiment(tmp_path, scan_start=188, scan_end=188))
+
+    assert selected[0].encoder_angle_deg == pytest.approx(-90.0461)
+
+
+def test_an_empty_selection_is_an_error_rather_than_an_empty_run(tmp_path: Path) -> None:
+    with pytest.raises(ValueError):
+        plan_batch_lamni(_experiment(tmp_path, scan_start=9000))
+
+
+def test_a_folder_that_is_not_an_experiment_directory_is_an_error(tmp_path: Path) -> None:
+    settings = BatchSettings(
+        paths=Paths(experiment_folder=tmp_path, output_products_folder=tmp_path / 'out')
+    )
+
+    with pytest.raises(ValueError):
+        plan_batch_lamni(settings)
+
+
+# --- the archived settings -------------------------------------------------------------
+
+
+def test_dumped_settings_reload_unchanged() -> None:
+    """A run built from an object archives a rendering of it, and workers rebuild from it.
+
+    Both copies would otherwise describe a different run than the one that happened.
+    """
+    settings = _settings()
+
+    assert load_batch_settings_from_text(dump_batch_settings(settings)) == settings
+
+
+def test_dumped_settings_reload_unchanged_with_every_section_set() -> None:
+    settings = _settings(
+        """
+batch:
+  label: sample_A
+  scan_start: 1000
+  scan_end: 2400
+  exclude_scans: [1140]
+  overwrite_existing_products: true
+initial_probe:
+  probe_source: file
+  probe_from_file:
+    file_path: /probe.h5
+  num_probe_modes: 4
+initial_object:
+  num_slices: 3
+  object_thickness_m: 1.5e-06
+positions:
+  affine_matrix: [[1.0, 0.0, 3.0], [0.0, 1.0, -4.0]]
+metadata_overrides:
+  detector_distance_m: 1.92
+  probe_energy_eV: 8800.0
+diffraction:
+  crop_extent_px: 128
+  bad_pixels_file: /mask.npy
+misc:
+  num_sync_epochs: 10
+  continue_on_error: true
+"""
+    )
+
+    assert load_batch_settings_from_text(dump_batch_settings(settings)) == settings
+
+
+# --- the result ------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ('failed', 'reason', 'expected'),
+    [
+        ((), None, ExitCode.SUCCESS),
+        ((1042,), None, ExitCode.FAILURE),
+        ((), 'SIGINT', ExitCode.CANCELLED),
+        # A cancellation the first failure requested still reports as cancelled, because
+        # the scans after it were never attempted.
+        ((1042,), 'a scan failed', ExitCode.CANCELLED),
+    ],
+)
+def test_the_exit_code_reports_cancellation_ahead_of_failure(
+    failed: tuple[int, ...], reason: str | None, expected: ExitCode
+) -> None:
+    result = BatchResult(
+        selected=(1042,),
+        succeeded=(),
+        skipped=(),
+        failed=failed,
+        cancelled=(),
+        cancellation_reason=reason,
+    )
+
+    assert result.exit_code == expected
+
+
+def test_every_exported_name_resolves() -> None:
+    """``__all__`` is the surface a caller imports; a rename has to be deliberate."""
+    for name in reconstruct_batch_lamni.__all__:
+        assert hasattr(reconstruct_batch_lamni, name), name

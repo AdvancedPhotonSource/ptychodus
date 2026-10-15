@@ -26,6 +26,22 @@ and with no devices visible the run proceeds on the CPU, one scan at a time. Bec
 worker is a separate process that exits when its scan does, GPU memory is reclaimed between
 scans rather than accumulating across a tomogram.
 
+Driving it from Python
+----------------------
+
+:func:`main` is a shim over :func:`reconstruct_batch_lamni`, which takes the settings and
+the pty-chi options as objects. A caller that already holds a :class:`BatchSettings` --
+built in a script, or loaded from a file and modified -- runs a batch without going through
+a file and a subprocess, and reads what became of each scan off the returned
+:class:`BatchResult` rather than off an exit code. :func:`plan_batch_lamni` resolves the
+selection by itself, which is a dry run in code.
+
+Neither function configures logging or installs signal handlers: both belong to whoever
+owns the process, and a caller that wants its run interruptible passes in its own
+:class:`~ptychodus.cli._reconstruct_common.CancellationToken`. The fan-out spawns a child
+per scan, so the calling process must not already hold a CUDA context -- the same
+constraint that makes device enumeration happen in a throwaway child.
+
 Per-scan affine estimate
 ------------------------
 
@@ -58,17 +74,32 @@ import queue
 import re
 import sys
 import threading
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from ptychi.api.options.task import PtychographyTaskOptions
 
 from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import FilterValuesStep
 from ptychodus.cli._batch_lamni_settings import (
+    Batch,
     BatchSettings,
+    Diffraction,
+    InitialObject,
+    InitialProbe,
+    MetadataOverrides,
+    Misc,
+    ObjectFromFile,
+    Paths,
+    Positions,
+    ProbeFromFile,
+    SimulatedProbe,
+    dump_batch_settings,
     load_batch_settings,
+    load_batch_settings_from_text,
     record_payload,
     select_label,
     select_records,
@@ -89,6 +120,32 @@ from ptychodus.plugins.aps31id_lamni._scan_table import (
     APS31IDEScanRecord,
     read_aps31ide_scan_table,
 )
+
+# The settings sections are re-exported, so building a run in Python needs one import
+# rather than a reach into the module the three processes happen to share.
+__all__ = [
+    'Batch',
+    'BatchResult',
+    'BatchSettings',
+    'Diffraction',
+    'InitialObject',
+    'InitialProbe',
+    'MetadataOverrides',
+    'Misc',
+    'ObjectFromFile',
+    'Paths',
+    'Positions',
+    'ProbeFromFile',
+    'SimulatedProbe',
+    'dump_batch_settings',
+    'load_batch_settings',
+    'load_batch_settings_from_text',
+    'main',
+    'plan_batch_lamni',
+    'reconstruct_batch_lamni',
+    'report_plan',
+    'visible_cuda_devices',
+]
 
 logger = logging.getLogger('reconstruct_batch_lamni')
 
@@ -138,14 +195,43 @@ def visible_cuda_devices() -> list[str]:
     return [inherited[ordinal] for ordinal in ordinals if ordinal < len(inherited)]
 
 
+@dataclass(frozen=True)
+class BatchResult:
+    """What became of every scan a run selected.
+
+    Scan numbers rather than counts, because a caller driving the batch from Python is the
+    one deciding what a partial tomogram means, and that decision needs to know which
+    projections are missing from it. Every selected scan appears in exactly one of the four
+    outcome fields.
+
+    `cancellation_reason` is None unless the run stopped early, so it is also how a caller
+    tells an empty `failed` that means success from one that means the run never got there.
+    """
+
+    selected: tuple[int, ...]
+    succeeded: tuple[int, ...]
+    skipped: tuple[int, ...]
+    failed: tuple[int, ...]
+    cancelled: tuple[int, ...]
+    cancellation_reason: str | None = None
+
+    @property
+    def exit_code(self) -> ExitCode:
+        """The status the console command exits with for this result."""
+        if self.cancellation_reason is not None:
+            return ExitCode.CANCELLED
+
+        return ExitCode.FAILURE if self.failed else ExitCode.SUCCESS
+
+
 @dataclass
 class _Tally:
-    """What became of each selected scan, counted across the worker threads."""
+    """What became of each selected scan, gathered across the worker threads."""
 
     lock: threading.Lock = field(default_factory=threading.Lock)
-    succeeded: int = 0
-    skipped: int = 0
-    cancelled: int = 0
+    succeeded: list[int] = field(default_factory=list)
+    skipped: list[int] = field(default_factory=list)
+    cancelled: list[int] = field(default_factory=list)
     failed: list[int] = field(default_factory=list)
 
 
@@ -215,11 +301,11 @@ def _worker_loop(
 
         with tally.lock:
             if completed:
-                tally.succeeded += 1
+                tally.succeeded.append(record.scan_no)
             else:
                 # A worker returns without a final product only when the cancellation it
                 # installed for itself arrived first.
-                tally.cancelled += 1
+                tally.cancelled.append(record.scan_no)
 
         logger.info(
             '%s scan %05d: %s',
@@ -259,7 +345,34 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _report_plan(settings: BatchSettings, selected: list[APS31IDEScanRecord]) -> None:
+def plan_batch_lamni(settings: BatchSettings) -> list[APS31IDEScanRecord]:
+    """The scans a run over `settings` would reconstruct, in acquisition order.
+
+    Reads the scan table and nothing else, so this is the whole of what a dry run resolves
+    and it touches no detector data. Raises `ValueError` when the settings name no 31-ID-E
+    experiment directory, when the requested label is absent from the table, or when the
+    scan range selects nothing.
+    """
+    scan_table_file = settings.scan_table_file
+    logger.info('Reading the scan table from %s', scan_table_file)
+    records = read_aps31ide_scan_table(scan_table_file)
+    label = select_label(records, settings.batch.label)
+    selected = select_records(records, settings.batch, label)
+
+    if not selected:
+        raise ValueError('No scans matched the requested scan range.')
+
+    logger.info(
+        'Selected %d scan(s): %05d..%05d',
+        len(selected),
+        selected[0].scan_no,
+        selected[-1].scan_no,
+    )
+    return selected
+
+
+def report_plan(settings: BatchSettings, selected: list[APS31IDEScanRecord]) -> None:
+    """Log each selected scan with the files it would read and the directory it would write."""
     for record in selected:
         try:
             diffraction_file_path: Path | str = settings.diffraction_file(record.scan_no)
@@ -295,7 +408,7 @@ def _queue_pending_scans(
 
         if not settings.batch.overwrite_existing_products and product_file.is_file():
             logger.info('scan %05d: skipping, %s already exists', record.scan_no, product_file)
-            tally.skipped += 1
+            tally.skipped.append(record.scan_no)
             continue
 
         work.put((index, record))
@@ -303,63 +416,53 @@ def _queue_pending_scans(
     return work
 
 
-def main() -> ExitCode:
-    args = _build_parser().parse_args()
+def reconstruct_batch_lamni(
+    settings: BatchSettings,
+    options: PtychographyTaskOptions | None = None,
+    *,
+    settings_text: str | None = None,
+    cancellation: CancellationToken | None = None,
+) -> BatchResult:
+    """Reconstruct every scan `settings` selects, and report what became of each.
 
-    try:
-        settings = load_batch_settings(args.batch_settings)
-    except (OSError, ValueError) as exc:
-        logging.basicConfig(level=logging.INFO, stream=sys.stderr)
-        logger.error('%s', exc)
-        return ExitCode.USAGE
+    Blocks until the batch finishes. Each scan is reconstructed in a child process of its
+    own and writes its own standard-layout directory, so nothing of a reconstruction comes
+    back here; what is returned is the account of which scans got one.
 
-    log_level = settings.misc.log_level if args.log_level is None else args.log_level
-    logging.basicConfig(
-        level=log_level,
-        stream=sys.stderr,
-        format='%(asctime)s %(levelname)s %(name)s: %(message)s',
-    )
+    A scan that fails is counted rather than raised, because a tomogram with a projection
+    missing is a result its owner has to judge. Everything that goes wrong *before* any
+    scan starts -- an experiment directory this machine cannot see, an empty selection, an
+    unreadable bad-pixel mask or initial probe, a crop that runs off the detector -- raises
+    instead, since it describes every scan equally.
 
-    settings_text = args.batch_settings.read_text()
+    `options` defaults to stock LSQML, resolved in each worker rather than here, which is
+    what ``--ptychi-options`` does when it is not given. An options object is serialized
+    once and rebuilt in every worker, so per-scan edits cannot leak between scans.
 
-    # Installed before the first long operation, so a cancel during the file reads is
-    # already honored. Nothing earlier than this is interruptible.
-    cancellation = install_signal_handlers()
+    `settings_text` is the YAML copied into each scan's output directory and rebuilt from
+    in each worker. It defaults to a rendering of `settings`; a caller that loaded a file
+    passes its text instead, so the archived copy keeps the comments and spelling of the
+    file someone wrote.
 
-    try:
-        scan_table_file = settings.scan_table_file
-    except ValueError as exc:
-        logger.error('%s', exc)
-        return ExitCode.USAGE
+    `cancellation` stops the run at the first scan boundary after the request, leaving the
+    scans already written in place. One is created if none is given, so an uninterruptible
+    run needs no argument; installing the signal handlers that set it belongs to whoever
+    owns the process.
+    """
+    selected = plan_batch_lamni(settings)
+    resolved_options = load_ptychi_options(None) if options is None else options
 
-    logger.info('Reading the scan table from %s', scan_table_file)
-    records = read_aps31ide_scan_table(scan_table_file)
-    label = select_label(records, settings.batch.label)
-    selected = select_records(records, settings.batch, label)
-
-    if not selected:
-        logger.error('No scans matched the requested scan range.')
-        return ExitCode.FAILURE
-
-    logger.info(
-        'Selected %d scan(s): %05d..%05d',
-        len(selected),
-        selected[0].scan_no,
-        selected[-1].scan_no,
-    )
-
-    if args.dry_run:
-        _report_plan(settings, selected)
-        logger.info('Dry run: %d scan(s) planned. Nothing read, nothing written.', len(selected))
-        return ExitCode.SUCCESS
-
-    options = load_ptychi_options(args.ptychi_options)
-
-    if not options.probe_position_options.optimizable:
+    if not resolved_options.probe_position_options.optimizable:
         logger.info(
             'pty-chi position correction is disabled, so no scan will have refined '
             'positions to fit a transform from, and none will write affine_fit.yaml.'
         )
+
+    if cancellation is None:
+        cancellation = CancellationToken()
+
+    if settings_text is None:
+        settings_text = dump_batch_settings(settings)
 
     registry = PluginRegistry.load_plugins()
     bad_pixels = None
@@ -439,29 +542,42 @@ def main() -> ExitCode:
         )
         devices = ['']
 
-    options_json = None if args.ptychi_options is None else dump_task_options(options)
+    options_json = None if options is None else dump_task_options(options)
+    futures: list[Future[None]] = list()
 
     with ThreadPoolExecutor(max_workers=len(devices)) as pool:
         for device in devices:
-            pool.submit(
-                _worker_loop,
-                settings,
-                work,
-                device,
-                settings_text=settings_text,
-                options_json=options_json,
-                read_region=read_region,
-                num_selected=len(selected),
-                tally=tally,
-                cancellation=cancellation,
+            futures.append(
+                pool.submit(
+                    _worker_loop,
+                    settings,
+                    work,
+                    device,
+                    settings_text=settings_text,
+                    options_json=options_json,
+                    read_region=read_region,
+                    num_selected=len(selected),
+                    tally=tally,
+                    cancellation=cancellation,
+                )
             )
+
+    for future in futures:
+        exception = future.exception()
+
+        if exception is not None:
+            # A scan that fails raises ChildError, which the loop handles and counts. An
+            # exception that reaches here is therefore a fault in this process, and the
+            # executor would otherwise swallow it and leave the summary below reporting a
+            # clean run over scans nothing ever attempted.
+            raise RuntimeError('A worker thread failed; the batch is incomplete.') from exception
 
     logger.info(
         'Done: %d reconstructed, %d skipped, %d failed, %d cancelled, of %d selected.',
-        tally.succeeded,
-        tally.skipped,
+        len(tally.succeeded),
+        len(tally.skipped),
         len(tally.failed),
-        tally.cancelled,
+        len(tally.cancelled),
         len(selected),
     )
 
@@ -470,11 +586,75 @@ def main() -> ExitCode:
             'Failed scans: %s', ', '.join(f'{scan_no:05d}' for scan_no in sorted(tally.failed))
         )
 
-    if cancellation.is_cancelled:
-        logger.warning('Cancelled: %s.', cancellation.reason or 'no reason given')
-        return ExitCode.CANCELLED
+    cancellation_reason = None
 
-    return ExitCode.FAILURE if tally.failed else ExitCode.SUCCESS
+    if cancellation.is_cancelled:
+        cancellation_reason = cancellation.reason or 'no reason given'
+        logger.warning('Cancelled: %s.', cancellation_reason)
+
+    return BatchResult(
+        selected=tuple(record.scan_no for record in selected),
+        succeeded=tuple(sorted(tally.succeeded)),
+        skipped=tuple(sorted(tally.skipped)),
+        failed=tuple(sorted(tally.failed)),
+        cancelled=tuple(sorted(tally.cancelled)),
+        cancellation_reason=cancellation_reason,
+    )
+
+
+def main() -> ExitCode:
+    args = _build_parser().parse_args()
+
+    try:
+        settings = load_batch_settings(args.batch_settings)
+    except (OSError, ValueError) as exc:
+        logging.basicConfig(level=logging.INFO, stream=sys.stderr)
+        logger.error('%s', exc)
+        return ExitCode.USAGE
+
+    log_level = settings.misc.log_level if args.log_level is None else args.log_level
+    logging.basicConfig(
+        level=log_level,
+        stream=sys.stderr,
+        format='%(asctime)s %(levelname)s %(name)s: %(message)s',
+    )
+
+    settings_text = args.batch_settings.read_text()
+
+    # Installed before the first long operation, so a cancel during the file reads is
+    # already honored. Nothing earlier than this is interruptible.
+    cancellation = install_signal_handlers()
+
+    if args.dry_run:
+        try:
+            selected = plan_batch_lamni(settings)
+        except (OSError, ValueError) as exc:
+            logger.error('%s', exc)
+            return ExitCode.USAGE
+
+        report_plan(settings, selected)
+        logger.info('Dry run: %d scan(s) planned. Nothing read, nothing written.', len(selected))
+        return ExitCode.SUCCESS
+
+    # None rather than the stock options this would build from None: the workers resolve
+    # that default themselves, so nothing is serialized for a run that asked for nothing.
+    options = None if args.ptychi_options is None else load_ptychi_options(args.ptychi_options)
+
+    try:
+        result = reconstruct_batch_lamni(
+            settings,
+            options,
+            settings_text=settings_text,
+            cancellation=cancellation,
+        )
+    except (OSError, ValueError) as exc:
+        # Everything the run resolves before the first scan starts, reported as the one
+        # line it is rather than as a traceback: each of these says the settings cannot be
+        # carried out, and none of them has attempted any work.
+        logger.error('%s', exc)
+        return ExitCode.USAGE
+
+    return result.exit_code
 
 
 if __name__ == '__main__':
