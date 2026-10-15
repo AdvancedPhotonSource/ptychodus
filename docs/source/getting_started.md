@@ -282,7 +282,7 @@ The `ptychodus-store` web UI is compiled TypeScript that is not tracked in git. 
 
 ### Build and verify
 
-1. Build the sdist and wheel into `./dist/`. `--no-sources` is required: `[tool.uv.sources]` points `ptychopinn` at a local checkout, which must not leak into the published metadata.
+1. Build the sdist and wheel into `./dist/`. `--no-sources` is required: `[tool.uv.sources]` pins `torch` and `torchvision` to a specific index, which must not leak into the published metadata.
 
    ```sh
    $ PTYCHODUS_STORE_REQUIRE_UI_BUILD=1 uv build --no-sources

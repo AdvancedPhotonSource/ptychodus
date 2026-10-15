@@ -36,7 +36,6 @@ from .product import PositionsStreamingContext, ProductCore
 from .ptychi import PtyChiReconstructorLibrary
 from .ptycho_fm import PtychoFMReconstructorLibrary
 from .ptychopinn import PtychoPINNReconstructorLibrary
-from .ptychopinn_torch import PtychoPINNTorchReconstructorLibrary
 from .task_manager import TaskManager
 from .visualization import VisualizationEngine
 from .workflow import ConcreteWorkflowAPI
@@ -141,9 +140,6 @@ class ModelCore:
         self.ptychopinn_reconstructor_library = PtychoPINNReconstructorLibrary(
             self.settings_registry, self.is_developer_mode_enabled
         )
-        self.ptychopinn_torch_reconstructor_library = PtychoPINNTorchReconstructorLibrary(
-            self.settings_registry, self.is_developer_mode_enabled
-        )
         self.ptycho_fm_reconstructor_library = PtychoFMReconstructorLibrary(
             self.settings_registry, self.is_developer_mode_enabled
         )
@@ -154,7 +150,6 @@ class ModelCore:
             [
                 self.ptychi_reconstructor_library,
                 self.ptychopinn_reconstructor_library,
-                self.ptychopinn_torch_reconstructor_library,
                 self.ptycho_fm_reconstructor_library,
             ],
         )

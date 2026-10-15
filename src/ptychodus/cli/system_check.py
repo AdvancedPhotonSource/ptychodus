@@ -66,7 +66,7 @@ def check_nvrtc_builtins(torch_module) -> None:
         print(f'  No bundled copy found under {site_packages}/nvidia/')
         print('  Fix: install a CUDA runtime matching the version above, or reinstall torch.')
 
-    print('  Symptom if unfixed: ptychopinn_torch DDP (ddp_spawn) training fails with')
+    print('  Symptom if unfixed: ptychopinn training fails on the first CUDA kernel with')
     print(f'    nvrtc: error: failed to open {soname}')
 
 

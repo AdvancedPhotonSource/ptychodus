@@ -16,7 +16,7 @@ Create `src/ptychodus/model/<backend>/` with:
 - `__init__.py` — re-exports the `*ReconstructorLibrary` class only.
 - `core.py` — the `*ReconstructorLibrary` class.
 - `settings.py` — one or more `*Settings` classes (see the `add-core` skill for the settings pattern).
-- `reconstructor.py` (or several) — the actual `Reconstructor` / `TrainableReconstructor` implementations, importing the backend package at module top so a missing dep produces a clean `ModuleNotFoundError`.
+- `reconstructor.py` (or several) — the actual `Reconstructor` / `TrainableReconstructor` implementations. `core.py` imports this module only after its `find_spec` probe has confirmed the backend is installed.
 
 ### 2. Library class
 
@@ -25,9 +25,11 @@ Model on [src/ptychodus/model/ptychopinn/core.py](../../src/ptychodus/model/ptyc
 ```python
 from collections.abc import Iterator
 from importlib.metadata import PackageNotFoundError, version
+from importlib.util import find_spec
+from typing import Final
 import logging
 
-from ptychodus.api.reconstructor import (
+from ptychodus.api.reconstruct import (
     NullReconstructor, Reconstructor, ReconstructorLibrary, TrainableReconstructor,
 )
 from ptychodus.api.settings import SettingsRegistry
@@ -35,6 +37,13 @@ from ptychodus.api.settings import SettingsRegistry
 from .settings import <Backend>Settings
 
 logger = logging.getLogger(__name__)
+
+_MODES: Final[tuple[str, ...]] = ('Algorithm1', 'Algorithm2')
+
+
+def _<backend>_available() -> bool:
+    """Return True iff the backend is importable, without importing it."""
+    return all(find_spec(mod) is not None for mod in ('<backend_package>',))
 
 
 class <Backend>ReconstructorLibrary(ReconstructorLibrary):
@@ -45,21 +54,25 @@ class <Backend>ReconstructorLibrary(ReconstructorLibrary):
         self.settings = <Backend>Settings(settings_registry)
         self._reconstructors: list[Reconstructor] = []  # or list[TrainableReconstructor]
 
-        try:
-            from .reconstructor import <Backend>Reconstructor
-        except ModuleNotFoundError:
+        if not _<backend>_available():
             logger.info('<Backend> not found.')
+
             if is_developer_mode_enabled:
-                for name in ('Algorithm1', 'Algorithm2'):
-                    self._reconstructors.append(NullReconstructor(name))
-        else:
-            try:
-                pkg_version = version('<backend_package>')
-            except PackageNotFoundError:
-                pkg_version = 'unknown'
-            logger.info(f'<Backend> {pkg_version}')
-            # Instantiate real reconstructors here.
-            self._reconstructors.append(<Backend>Reconstructor('Algorithm1', self.settings))
+                for mode in _MODES:
+                    self._reconstructors.append(NullReconstructor(mode))
+            return
+
+        try:
+            pkg_version = version('<backend_package>')
+        except PackageNotFoundError:
+            pkg_version = 'unknown'
+        logger.info(f'<Backend> {pkg_version}')
+
+        # Imported only now, so a missing backend never reaches an import.
+        from .reconstructor import build_reconstructor
+
+        for mode in _MODES:
+            self._reconstructors.append(build_reconstructor(mode, self.settings))
 
     @property
     def name(self) -> str:
@@ -71,9 +84,10 @@ class <Backend>ReconstructorLibrary(ReconstructorLibrary):
 
 Key rules:
 
-- **The `try / except ModuleNotFoundError` for the backend import goes inside `__init__`**, gating the concrete reconstructor construction. Never make the top-level `core.py` fail on a missing backend.
+- **Detect the backend with `find_spec`, not by catching `ModuleNotFoundError` around the import.** A probe cannot be satisfied by a half-installed package, and it keeps the backend out of `sys.modules` entirely — which `tests/test_no_gpu_context.py` enforces for any backend that would otherwise pull in a GPU framework at composition-root time.
+- **Share one tuple of mode names** between the real reconstructors and the developer-mode stubs, so the GUI advertises the same names either way.
 - **In developer mode**, populate `NullReconstructor` stubs so the GUI still shows the algorithm names for testing. Outside developer mode, leave the list empty when the backend is missing.
-- **Add `<backend_package>` as an optional extra** in `pyproject.toml` under `[project.optional-dependencies]`.
+- **Add `<backend_package>` as an optional extra** in `pyproject.toml` under `[project.optional-dependencies]`, unless it is published on no index — see the comment above `[project.optional-dependencies]` for backends installed from a checkout instead.
 
 ### 3. Implement the reconstructor
 
@@ -90,7 +104,7 @@ In [src/ptychodus/model/core.py](../../src/ptychodus/model/core.py):
 2. Construct it in `ModelCore.__init__` after `settings_registry` is available.
 3. Include it in the list passed to `ProcessingCore(...)`.
 
-Follow the existing pattern for `PtyChiReconstructorLibrary`, `PtychoPINNReconstructorLibrary`, `PtychoPINNTorchReconstructorLibrary`.
+Follow the existing pattern for `PtyChiReconstructorLibrary`, `PtychoPINNReconstructorLibrary`, `PtychoFMReconstructorLibrary`.
 
 ### 5. Optional-dependency plumbing
 

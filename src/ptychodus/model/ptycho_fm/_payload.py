@@ -7,9 +7,8 @@ by the factory. Dicts are picklable and pull in no framework, so the parent
 never touches torch just to build a payload.
 
 The training mode (``'Unsupervised'`` / ``'Supervised'``) is carried in the
-``name`` field, matching PtychoPINN's ``model_type`` convention. ptycho_fm
-``.pth`` files store a bare ``state_dict`` with no mode metadata, so no
-checkpoint-vs-reconstructor mode check is possible today.
+``name`` field. ptycho_fm ``.pth`` files store a bare ``state_dict`` with no
+mode metadata, so no checkpoint-vs-reconstructor mode check is possible today.
 
 The architecture is settings-selected too, via ``coupled_decoder_mode`` in the
 ``model`` config section, and for the same reason it cannot be checked against

@@ -24,8 +24,15 @@ logger = logging.getLogger(__name__)
 
 
 def _ptycho_fm_available() -> bool:
-    """Return True iff ptycho_fm and torch are importable, without importing them."""
-    return all(find_spec(mod) is not None for mod in ('ptycho_fm', 'torch'))
+    """Return True iff every package the child imports is present, without importing them.
+
+    ``ptychi`` is in the list because the child borrows
+    ``ptychi.image_proc.place_patches_fourier_shift`` to stitch predicted
+    patches. Only the reconstruct path needs it, but a reconstructor that can
+    train and not reconstruct is not worth advertising, so a missing pty-chi
+    disables the backend here rather than failing inside a spawned child.
+    """
+    return all(find_spec(mod) is not None for mod in ('ptycho_fm', 'torch', 'ptychi'))
 
 
 class PtychoFMReconstructorLibrary(ReconstructorLibrary):

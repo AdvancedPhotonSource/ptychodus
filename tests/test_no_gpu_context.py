@@ -53,20 +53,19 @@ CONTEXT_CAPABLE_MODULES = (
 # context, or they are child-side backend packages the composition roots have
 # no reason to touch.
 #
-# ``ptycho`` and ``ptycho_torch`` are a softer case than ``cupy``. Their config
-# subpackages -- ``ptycho.config.config`` and ``ptycho_torch.config_params`` --
-# are deliberately reachable from the parent AT CALL TIME, because the parent
-# builds the backend config objects it ships to the child (see
-# ``ptychopinn/_payload.py`` and ``ptychopinn_torch/_payload.py``). Neither
-# acquires a GPU context: the former pulls no heavy modules at all, the latter
-# pulls torch, which is allowed above. Both imports live inside the payload
-# builders, so they do not run until the first reconstruct/train call and this
-# import-time probe never sees them. Keep it that way -- hoisting either to
-# module scope in a ``reconstructor.py`` is what this list is here to catch.
+# These used to be a softer case than ``cupy``: the parent reached a backend's
+# config subpackage AT CALL TIME to build the config objects it shipped to the
+# child, so the ban held only at import time. It no longer does. Every backend
+# is now configured from a mapping of plain scalars assembled from settings, so
+# no parent-side code path imports a backend at all and the ban is absolute.
+# ``tests/test_parent_config_builders.py`` pins the call-time half of that,
+# asserting the settings builders import no backend even when one is installed;
+# this probe pins the import-time half. Hoisting a backend import to module
+# scope in a ``reconstructor.py`` is what this list is here to catch.
 CHILD_ONLY_MODULES = (
     'cupy',  # links and initialises the CUDA runtime at import; no non-invasive probe
     'ptycho',  # ptychopinn TensorFlow package; raw_data/probe/tf_helper pull TensorFlow
-    'ptycho_torch',  # ptychopinn_torch backend; child-side entry point only
+    'ptycho_torch',  # ptychopinn backend; child-side entry point only
     'ptycho_fm',  # ptycho_fm backend; child-side entry point only
 )
 

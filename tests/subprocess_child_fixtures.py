@@ -13,6 +13,7 @@ import logging
 import pickle
 import sys
 import time
+from collections.abc import Mapping
 from types import ModuleType, SimpleNamespace
 from typing import Any
 
@@ -44,55 +45,104 @@ def _fake_module(name: str, **attrs: Any) -> ModuleType:
     return module
 
 
-class GroupingCallCapturedError(Exception):
-    pass
+class ChildCallCapturedError(Exception):
+    """Carries what a stubbed backend call received, back across the spawn."""
 
 
-def capture_ptychopinn_grouping_call(payload: Any, queue: Any) -> None:
-    """Run the real child entry point with fake optional PtychoPINN modules."""
-    grouping_call: dict[str, int] = {}
+def _install_fake_ptycho_torch(**module_attrs: Any) -> None:
+    """Put a minimal fake ``ptycho_torch`` (and ``torch``) on ``sys.modules``.
 
-    def generate_grouped_data(n: int, *, nsamples: int, gridsize: int, **kwargs: int) -> object:
-        grouping_call.update(N=n, K=kwargs['K'], nsamples=nsamples, gridsize=gridsize)
-        return object()
+    ``module_attrs`` maps a dotted submodule name, with dots replaced by
+    underscores, to the attributes that submodule should carry.
+    """
+    package = _fake_module('ptycho_torch', __path__=[])
+    modules: dict[str, ModuleType] = {
+        'ptycho_torch': package,
+        'ptycho_torch.workflows': _fake_module('ptycho_torch.workflows', __path__=[]),
+        # _resolve_device asks torch whether a device is present; say no, so the
+        # fixture resolves to CPU without a real runtime.
+        'torch': _fake_module('torch', cuda=SimpleNamespace(is_available=lambda: False)),
+    }
 
-    raw_data = SimpleNamespace(
-        probeGuess=object(),
-        generate_grouped_data=generate_grouped_data,
+    for dotted, attrs in module_attrs.items():
+        name = dotted.replace('_DOT_', '.')
+        modules[name] = _fake_module(name, **attrs)
+
+    sys.modules.update(modules)
+
+
+def capture_ptychopinn_reconstruct_call(payload: Any, queue: Any) -> None:
+    """Run the real child inference entry point against a stubbed backend."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class FakeInferenceConfig:
+        patch_weighting: str = 'probe'
+        batch_size: int = 1
+
+    loaded_model = SimpleNamespace(
+        model_config=SimpleNamespace(mode='Unsupervised'),
+        inference_config=FakeInferenceConfig(),
+        data_config=object(),
+        training_config=object(),
     )
 
-    def stop_after_grouping(*_args: object, **_kwargs: object) -> None:
-        raise GroupingCallCapturedError(grouping_call)
+    def reconstruct_from_arrays(model: Any, arrays: Any, **kwargs: Any) -> None:
+        runtime_params = kwargs['runtime_params']
+        raise ChildCallCapturedError(
+            {
+                'array_keys': sorted(arrays),
+                'device': kwargs['device'],
+                'num_workers': kwargs['num_workers'],
+                'patch_weighting': runtime_params.inference_config.patch_weighting,
+                'batch_size': runtime_params.inference_config.batch_size,
+            }
+        )
 
-    ptycho = _fake_module('ptycho', __path__=[])
-    config = _fake_module('ptycho.config.config', update_legacy_dict=lambda _cfg, _config: None)
-    components = _fake_module(
-        'ptycho.workflows.components', load_inference_bundle=lambda _path: (object(), {})
+    _install_fake_ptycho_torch(
+        ptycho_torch_DOT_inference={
+            'ReconstructionRuntimeParams': SimpleNamespace,
+            'reconstruct_from_arrays': reconstruct_from_arrays,
+        },
+        ptycho_torch_DOT_workflows_DOT_bundle_io={
+            'load_inference_bundle_torch': lambda _dir: (loaded_model, {}),
+        },
     )
-    loader = _fake_module('ptycho.loader', load=stop_after_grouping)
-    params = _fake_module('ptycho.params', cfg={})
-    probe = _fake_module('ptycho.probe', set_probe_guess=lambda *_args: None)
-    tf_helper = _fake_module('ptycho.tf_helper')
-
-    for name, module in {
-        'ptycho': ptycho,
-        'ptycho.config': ModuleType('ptycho.config'),
-        'ptycho.config.config': config,
-        'ptycho.workflows': ModuleType('ptycho.workflows'),
-        'ptycho.workflows.components': components,
-        'ptycho.loader': loader,
-        'ptycho.params': params,
-        'ptycho.probe': probe,
-        'ptycho.tf_helper': tf_helper,
-    }.items():
-        sys.modules[name] = module
-
-    _set_attrs(ptycho, loader=loader, params=params, probe=probe, tf_helper=tf_helper)
 
     from ptychodus.model.ptychopinn import _subprocess
 
-    _subprocess._create_raw_data = lambda parameters: raw_data
     _subprocess.run_reconstruct(payload, queue)
+
+
+def capture_ptychopinn_train_call(payload: Any, queue: Any) -> None:
+    """Run the real child training entry point against a stubbed backend."""
+
+    class FakeExecutionRequest:
+        def __init__(self, values: Any, explicit_fields: Any) -> None:
+            self.values = dict(values)
+            self.explicit_fields = set(explicit_fields)
+
+    def train(dataset: Any, output_dir: Any, settings: Any, **kwargs: Any) -> None:
+        execution_config = kwargs['execution_config']
+        raise ChildCallCapturedError(
+            {
+                'dataset_name': str(dataset.name),
+                'settings_is_mapping': isinstance(settings, Mapping),
+                'has_nphotons': 'nphotons' in settings,
+                'mode': settings.get('mode'),
+                'execution_values': execution_config.values,
+                'explicit_fields': sorted(execution_config.explicit_fields),
+            }
+        )
+
+    _install_fake_ptycho_torch(
+        ptycho_torch_DOT_execution_request={'ExecutionRequest': FakeExecutionRequest},
+        ptycho_torch_DOT_train={'train': train},
+    )
+
+    from ptychodus.model.ptychopinn import _subprocess
+
+    _subprocess.run_train(payload, queue)
 
 
 def yield_n_outputs(payload: Any, queue: Any) -> None:

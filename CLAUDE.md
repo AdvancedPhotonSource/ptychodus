@@ -57,7 +57,7 @@ Settings flow through `api/parameters.py::Parameter[T]` and `ParameterGroup`. Ea
 
 ### Reconstructor libraries
 
-Each backend under `model/` (`ptychi/`, `ptychopinn/`, and others) exposes a `*ReconstructorLibrary`. Backends whose deps aren't installed must fail cleanly *at import inside their own `__init__.py`* — the `*ReconstructorLibrary` surface stays stable so `ModelCore` can always construct and pass it to `ProcessingCore`. Reconstructors yield `ReconstructOutput` per iteration so the GUI can stream progress.
+Each backend under `model/` (`ptychi/`, `ptychopinn/`, and others) exposes a `*ReconstructorLibrary`. A backend whose deps aren't installed detects that with a `find_spec` probe in its `core.py` and exposes no reconstructors — the `*ReconstructorLibrary` surface stays stable so `ModelCore` can always construct and pass it to `ProcessingCore`, and the backend's own package never imports its dependency at module scope. Reconstructors yield `ReconstructOutput` per iteration so the GUI can stream progress.
 
 ### Remote compute
 

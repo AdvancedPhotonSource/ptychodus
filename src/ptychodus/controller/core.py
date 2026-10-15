@@ -28,7 +28,6 @@ from .task_status import TaskStatusController
 from .ptycho_fm import PtychoFMViewControllerFactory
 from .ptychi import PtyChiViewControllerFactory
 from .ptychopinn import PtychoPINNViewControllerFactory
-from .ptychopinn_torch import PtychoPINNTorchViewControllerFactory
 from .settings import SettingsController
 
 
@@ -51,10 +50,7 @@ class ControllerCore:
             model.ptychi_reconstructor_library
         )
         self._ptychopinn_view_controller_factory = PtychoPINNViewControllerFactory(
-            model.ptychopinn_reconstructor_library, self._file_dialog_factory
-        )
-        self._ptychopinn_torch_view_controller_factory = PtychoPINNTorchViewControllerFactory(
-            model.ptychopinn_torch_reconstructor_library,
+            model.ptychopinn_reconstructor_library,
             self._file_dialog_factory,
         )
         self._ptycho_fm_view_controller_factory = PtychoFMViewControllerFactory(
@@ -208,7 +204,6 @@ class ControllerCore:
             self._file_dialog_factory,
             [
                 self._ptychi_view_controller_factory,
-                self._ptychopinn_torch_view_controller_factory,
                 self._ptychopinn_view_controller_factory,
                 self._ptycho_fm_view_controller_factory,
             ],

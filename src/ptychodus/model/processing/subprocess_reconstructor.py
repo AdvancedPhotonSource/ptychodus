@@ -18,8 +18,8 @@ Trainable-model lifecycle
 ``load_model_from_file`` on the parent-side adapter records the path only --
 the fresh inference child does the real load per call. ``save_model`` copies
 or archives the loaded-from path to the destination (using a backend-supplied
-callback so ptychopinn's zip-a-bundle-dir semantic and ptychopinn_torch's
-copy-the-.ckpt semantic can share the same adapter). ``export_training_data``
+callback, so that backends persisting a single file and backends persisting a
+whole bundle directory can share the same adapter). ``export_training_data``
 runs in the parent (all current implementations are pure-numpy and touch no
 GPU framework).
 """

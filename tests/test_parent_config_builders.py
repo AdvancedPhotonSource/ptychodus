@@ -1,18 +1,19 @@
 """Discipline gate for the parent-side backend config builders.
 
-``ptychopinn`` and ``ptychopinn_torch`` build their backend config objects in
-the parent so the child receives finished objects and does nothing but GPU
-work. That means the parent reaches ``ptycho.config.config`` /
-``ptycho_torch.config_params`` at call time -- which
-``tests/test_no_gpu_context.py`` cannot observe, because its probe only imports
-the composition roots and never dispatches a reconstruction.
+Each backend translates ptychodus settings into backend inputs in the parent
+so the child receives something finished and does nothing but GPU work. That
+translation happens at call time, which ``tests/test_no_gpu_context.py`` cannot
+observe: its probe only imports the composition roots and never dispatches a
+reconstruction.
 
 This module closes that gap. For each installed backend it spawns a probe that
 calls the builders exactly as ``build_*_payload`` does, then asserts:
 
-1. the configs construct and survive the pickle round-trip the spawn transport
-   requires, and
-2. no GPU context was acquired in the process that built them.
+1. the inputs build and survive the pickle round-trip the spawn transport
+   requires,
+2. no GPU context was acquired in the process that built them, and
+3. no backend module was imported at all, where the builder claims not to need
+   one.
 
 Each probe runs in its own spawned process so a framework loaded by an earlier
 test cannot mask a failure here.
@@ -26,6 +27,7 @@ from __future__ import annotations
 from importlib.util import find_spec
 from typing import Any
 import multiprocessing
+import pathlib
 import sys
 import textwrap
 
@@ -61,50 +63,27 @@ def _gpu_context_offenders() -> list[str]:
     return offenders
 
 
-def _build_ptychopinn_configs() -> list[Any]:
+def _build_ptychopinn_settings() -> list[Any]:
     from ptychodus.api.settings import SettingsRegistry
-    from ptychodus.model.ptychopinn.reconstructor import (
-        _build_inference_config,
-        _build_training_config,
-    )
+    from ptychodus.model.ptychopinn.reconstructor import _build_settings
     from ptychodus.model.ptychopinn.settings import (
+        PtychoPINNDataSettings,
+        PtychoPINNInferenceSettings,
         PtychoPINNModelSettings,
         PtychoPINNTrainingSettings,
     )
 
     registry = SettingsRegistry()
-    model_settings = PtychoPINNModelSettings(registry)
-    training_settings = PtychoPINNTrainingSettings(registry)
 
     return [
-        _build_inference_config(
-            model_settings, 'PINN', model_size=64, is_developer_mode_enabled=False
-        ),
-        _build_training_config(model_settings, training_settings, 'PINN'),
-    ]
-
-
-def _build_ptychopinn_torch_configs() -> list[Any]:
-    from ptychodus.api.settings import SettingsRegistry
-    from ptychodus.model.ptychopinn_torch.reconstructor import _build_configs
-    from ptychodus.model.ptychopinn_torch.settings import (
-        PtychoPINNTorchDataSettings,
-        PtychoPINNTorchInferenceSettings,
-        PtychoPINNTorchModelSettings,
-        PtychoPINNTorchTrainingSettings,
-    )
-
-    registry = SettingsRegistry()
-
-    return list(
-        _build_configs(
+        _build_settings(
             'Unsupervised',
-            PtychoPINNTorchDataSettings(registry),
-            PtychoPINNTorchModelSettings(registry),
-            PtychoPINNTorchTrainingSettings(registry),
-            PtychoPINNTorchInferenceSettings(registry),
+            PtychoPINNDataSettings(registry),
+            PtychoPINNModelSettings(registry),
+            PtychoPINNTrainingSettings(registry),
+            PtychoPINNInferenceSettings(registry),
         )
-    )
+    ]
 
 
 def _build_ptycho_fm_configs() -> list[Any]:
@@ -151,18 +130,20 @@ def _build_ptycho_fm_configs() -> list[Any]:
 
 
 _BUILDERS = {
-    'ptychopinn': _build_ptychopinn_configs,
-    'ptychopinn_torch': _build_ptychopinn_torch_configs,
+    'ptychopinn': _build_ptychopinn_settings,
     'ptycho_fm': _build_ptycho_fm_configs,
 }
 
+# Both builders are pure-Python dict factories that import no backend, so these
+# probes run everywhere. An entry here would mean a builder that cannot.
 _REQUIRED_MODULES: dict[str, tuple[str, ...]] = {
-    'ptychopinn': ('ptycho',),
-    'ptychopinn_torch': ('ptycho_torch',),
-    # ptycho_fm's _build_config is a pure-Python dict factory; it does not
-    # import ptycho_fm or torch, so this test can run everywhere.
+    'ptychopinn': (),
     'ptycho_fm': (),
 }
+
+# Modules a builder must not pull in. Checked in the spawned probe, where no
+# earlier test can have imported them first.
+_FORBIDDEN_MODULES: tuple[str, ...] = ('ptycho', 'ptycho_torch', 'torch', 'tensorflow')
 
 
 def _probe(backend: str, result_queue: multiprocessing.Queue[dict[str, Any] | str]) -> None:
@@ -183,6 +164,8 @@ def _probe(backend: str, result_queue: multiprocessing.Queue[dict[str, Any] | st
         result['types'] = [type(config).__name__ for config in round_tripped]
     except BaseException as exc:  # noqa: BLE001
         result['build_error'] = f'{type(exc).__name__}: {exc}'
+
+    result['imported'] = sorted(name for name in _FORBIDDEN_MODULES if name in sys.modules)
 
     try:
         result['context'] = _gpu_context_offenders()
@@ -226,6 +209,12 @@ def test_parent_config_builders_acquire_no_gpu_context(backend: str) -> None:
         queried the runtime. See the invariant note in
         ptychodus.model.processing._subprocess_protocol.
         """
+    )
+
+    assert result['imported'] == [], (
+        f'Building {backend} inputs parent-side imported {result["imported"]}. '
+        'These builders translate settings into plain Python values and must not '
+        'reach the backend to do it; the child owns every backend import.'
     )
 
     if result['build_error'] is not None:
@@ -306,3 +295,168 @@ def test_ptycho_fm_maps_uncoupled_mode_to_none() -> None:
     model.coupled_decoder_mode.set_value('amp_phase')
     config = _build_config('Unsupervised', data, model, training, inference)
     assert config['model']['coupled_decoder_mode'] == 'amp_phase'
+
+
+def _ptychopinn_settings() -> Any:
+    from ptychodus.api.settings import SettingsRegistry
+    from ptychodus.model.ptychopinn.settings import (
+        PtychoPINNDataSettings,
+        PtychoPINNInferenceSettings,
+        PtychoPINNModelSettings,
+        PtychoPINNTrainingSettings,
+    )
+
+    registry = SettingsRegistry()
+    return (
+        PtychoPINNDataSettings(registry),
+        PtychoPINNModelSettings(registry),
+        PtychoPINNTrainingSettings(registry),
+        PtychoPINNInferenceSettings(registry),
+    )
+
+
+def _build_ptychopinn_settings_mapping(**overrides: Any) -> dict[str, Any]:
+    from ptychodus.model.ptychopinn.reconstructor import _build_settings
+
+    data, model, training, inference = _ptychopinn_settings()
+
+    for name, value in overrides.items():
+        for settings in (data, model, training, inference):
+            parameter = getattr(settings, name, None)
+            if parameter is not None:
+                parameter.set_value(value)
+                break
+        else:
+            raise AssertionError(f'no PtychoPINN setting named {name!r}')
+
+    return _build_settings('Unsupervised', data, model, training, inference)
+
+
+def test_ptychopinn_settings_omit_nphotons() -> None:
+    """Supplying nphotons would rescale already-counted data.
+
+    Ptychodus exports photon counts and declares them as counts, so the source
+    and the bundle target agree and nothing is converted. Naming nphotons marks
+    the photon count as explicitly chosen, which turns the export back into
+    amplitude evidence and silently rescales it.
+    """
+    assert 'nphotons' not in _build_ptychopinn_settings_mapping()
+
+
+def test_ptychopinn_settings_omit_derived_loss_fields() -> None:
+    """loss_function and nll are derived from torch_loss_mode, not supplied."""
+    settings = _build_ptychopinn_settings_mapping()
+
+    assert settings['torch_loss_mode'] == 'poisson'
+    assert 'loss_function' not in settings
+    assert 'nll' not in settings
+
+
+def test_ptychopinn_settings_map_loss_function_to_torch_loss_mode() -> None:
+    assert _build_ptychopinn_settings_mapping(loss_function='MAE')['torch_loss_mode'] == 'mae'
+
+
+def test_ptychopinn_settings_express_object_policy_as_a_pair() -> None:
+    """object_big is the deprecated spelling; the canonical form is two fields."""
+    big = _build_ptychopinn_settings_mapping(object_big=True)
+    assert (big['object_layout'], big['training_canvas']) == (
+        'grouped_patches',
+        'relative_overlap',
+    )
+
+    small = _build_ptychopinn_settings_mapping(object_big=False)
+    assert (small['object_layout'], small['training_canvas']) == (
+        'single_patch',
+        'independent',
+    )
+
+    assert 'object_big' not in big
+    assert 'object_big' not in small
+
+
+def test_ptychopinn_settings_raise_neighbor_count_to_the_group_size() -> None:
+    """A group of C members needs at least C-1 neighbors, or grouping raises."""
+    settings = _build_ptychopinn_settings_mapping(gridsize=3, neighbor_count=4)
+    assert settings['neighbor_count'] == 8
+
+    # A request already large enough is left alone.
+    assert _build_ptychopinn_settings_mapping(gridsize=2, neighbor_count=6)['neighbor_count'] == 6
+
+
+def test_ptychopinn_settings_map_no_auxiliary_loss_to_absent() -> None:
+    settings = _build_ptychopinn_settings_mapping()
+    assert settings['amp_loss'] is None
+    assert settings['phase_loss'] is None
+
+    settings = _build_ptychopinn_settings_mapping(auxiliary_amplitude_loss='Total_Variation')
+    assert settings['amp_loss'] == 'Total_Variation'
+
+
+def test_ptychopinn_settings_disable_gradient_clipping_with_none() -> None:
+    """Zero is the settings spelling for "off"; the backend reads it as null."""
+    assert _build_ptychopinn_settings_mapping(gradient_clip_val=0.0)['gradient_clip_val'] is None
+    assert _build_ptychopinn_settings_mapping(gradient_clip_val=1.5)['gradient_clip_val'] == 1.5
+
+
+def _accepted_override_names() -> set[str]:
+    """Read the backend's accepted override names out of its source.
+
+    Parsed rather than imported: importing ``ptycho_torch`` would pull torch
+    into this process, which is exactly what the rest of this module exists to
+    prevent.
+    """
+    import ast
+    import re
+
+    # Resolve the package directory from the top-level spec only. Asking for
+    # the dotted submodule would import ``ptycho_torch`` to find it.
+    spec = find_spec('ptycho_torch')
+    if spec is None or not spec.submodule_search_locations:
+        pytest.skip('ptycho_torch is not installed')
+
+    package_dir = pathlib.Path(next(iter(spec.submodule_search_locations)))
+    module_path = package_dir / 'config_resolution.py'
+    if not module_path.is_file():
+        pytest.skip('installed ptycho_torch has no config_resolution module')
+
+    source = module_path.read_text()
+    accepted: set[str] = set()
+
+    # (owner, (field, field, ...)) pairs, plus the separate training frozenset.
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.Tuple) or len(node.elts) != 2:
+            continue
+        owner, fields = node.elts
+        if (
+            isinstance(owner, ast.Constant)
+            and isinstance(owner.value, str)
+            and isinstance(fields, ast.Tuple)
+        ):
+            accepted |= {
+                element.value
+                for element in fields.elts
+                if isinstance(element, ast.Constant) and isinstance(element.value, str)
+            }
+
+    match = re.search(r'TRAINING_OWNER_FIELDS = frozenset\(\s*\{(.*?)\}\s*\)', source, re.DOTALL)
+    if match:
+        accepted |= set(re.findall(r'"([^"]+)"', match.group(1)))
+
+    assert accepted, 'could not read any override names from the installed backend'
+    return accepted
+
+
+def test_ptychopinn_settings_are_all_accepted_override_names() -> None:
+    """Every emitted name must be one the backend resolves.
+
+    An unrecognized name is rejected rather than ignored, so a vocabulary
+    rename upstream turns into a failed training run. This catches that at test
+    time instead.
+    """
+    emitted = set(_build_ptychopinn_settings_mapping())
+    unknown = sorted(emitted - _accepted_override_names())
+
+    assert unknown == [], (
+        f'These settings names are not accepted by the installed backend: {unknown}. '
+        'Check the generated settings table in its configuration reference.'
+    )

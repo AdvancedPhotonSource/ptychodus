@@ -1,18 +1,20 @@
+from __future__ import annotations
 from collections.abc import Iterator
 from importlib.metadata import PackageNotFoundError, version
 from importlib.util import find_spec
 import logging
+from typing import Final
 
-from ptychodus.api.reconstruct import (
+from ...api.reconstruct import (
     NullReconstructor,
     Reconstructor,
     ReconstructorLibrary,
     TrainableReconstructor,
 )
-from ptychodus.api.settings import SettingsRegistry
-
+from ...api.settings import SettingsRegistry
 from .enums import PtychoPINNEnumerators
 from .settings import (
+    PtychoPINNDataSettings,
     PtychoPINNInferenceSettings,
     PtychoPINNModelSettings,
     PtychoPINNTrainingSettings,
@@ -20,10 +22,14 @@ from .settings import (
 
 logger = logging.getLogger(__name__)
 
+# Reconstructor names, also the backend's ``mode`` values. Shared so the
+# developer-mode placeholders advertise the same names as the real thing.
+_MODES: Final[tuple[str, ...]] = ('Unsupervised', 'Supervised')
+
 
 def _ptychopinn_available() -> bool:
-    """Return True iff the ``ptycho`` package is importable, without importing it."""
-    return find_spec('ptycho') is not None
+    """Return True iff ptycho_torch and lightning are importable, without importing them."""
+    return all(find_spec(mod) is not None for mod in ('ptycho_torch', 'lightning'))
 
 
 class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
@@ -31,6 +37,7 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
         self, settings_registry: SettingsRegistry, is_developer_mode_enabled: bool
     ) -> None:
         super().__init__('ptychopinn')
+        self.data_settings = PtychoPINNDataSettings(settings_registry)
         self.model_settings = PtychoPINNModelSettings(settings_registry)
         self.training_settings = PtychoPINNTrainingSettings(settings_registry)
         self.inference_settings = PtychoPINNInferenceSettings(settings_registry)
@@ -41,30 +48,30 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
             logger.info('PtychoPINN not found.')
 
             if is_developer_mode_enabled:
-                for reconstructor in ('PINN', 'Supervised'):
+                for reconstructor in _MODES:
                     self._reconstructors.append(NullReconstructor(reconstructor))
             return
 
+        # find_spec succeeded above, but the metadata query still hits importlib
+        # metadata (not the module itself), so no torch/lightning import happens.
         try:
             ptychopinn_version = version('ptychopinn')
         except PackageNotFoundError:
-            try:
-                ptychopinn_version = version('ptycho')
-            except PackageNotFoundError:
-                ptychopinn_version = 'unknown'
-
+            ptychopinn_version = 'unknown'
         logger.info(f'PtychoPINN {ptychopinn_version}')
 
+        # Import the parent-side factory lazily so that this module's import
+        # cost stays small even in headless mode.
         from .reconstructor import build_reconstructor
 
-        for mode in ('PINN', 'Supervised'):
+        for mode in _MODES:
             self._reconstructors.append(
                 build_reconstructor(
                     mode,
+                    self.data_settings,
                     self.model_settings,
                     self.inference_settings,
                     self.training_settings,
-                    is_developer_mode_enabled=is_developer_mode_enabled,
                 )
             )
 

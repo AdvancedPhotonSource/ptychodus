@@ -723,6 +723,8 @@ _PTYCHOPINN_NPZ_KEYS: Final[set[str]] = {
     'probeGuess',
     'objectGuess',
     'scan_index',
+    'scale_contract_version',
+    'measurement_domain',
 }
 
 
@@ -955,6 +957,22 @@ class TestSavePtychopinnTrainingData:
                 numpy.testing.assert_array_equal(
                     npz_file[npz_key], h5_file[h5_key][()], err_msg=f'{npz_key} != {h5_key}'
                 )
+
+    def test_declares_patterns_as_photon_counts(self, tmp_path: Path) -> None:
+        """The archive says which scaling it is in, rather than leaving it guessed.
+
+        A reader compares this pair against the scaling its model was trained
+        under and converts or rejects accordingly. An undeclared archive is
+        instead interpreted from context, so the declaration is what keeps an
+        already-counted export from being rescaled as amplitude.
+        """
+        parameters = _make_reconstruct_input()
+        path = tmp_path / 'training.npz'
+        save_ptychopinn_training_data(path, parameters)
+
+        with numpy.load(path) as npz_file:
+            assert str(npz_file['scale_contract_version']) == 'ci_intensity_v2'
+            assert str(npz_file['measurement_domain']) == 'count_intensity'
 
 
 class TestSanitizePathComponent:

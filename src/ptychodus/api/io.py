@@ -620,6 +620,14 @@ def save_ptychopinn_training_data(
     `bad_pixels` records which positions were filled rather than measured.
     `probeGuess` is the full `(N_modes, H, W)` mode stack at OPR index zero. All
     scan points are assigned `scan_index=0` (single-object assumption).
+
+    The archive declares its measurement domain as photon counts, which is what
+    a detector reports and what this function passes through unscaled. A reader
+    compares that declaration against the scaling its model was trained under
+    and converts or rejects accordingly, so an undeclared archive would instead
+    be guessed at. Revisit the declaration if a preprocessing step is ever
+    added that normalizes or square-roots the patterns, because it would make
+    the pair below untrue rather than merely imprecise.
     """
     object_geometry = parameters.product.object_.get_geometry()
     positions = parameters.product.probe_positions
@@ -638,6 +646,8 @@ def save_ptychopinn_training_data(
         probeGuess=parameters.product.probes.get_probe_no_opr().get_array(),
         objectGuess=parameters.product.object_.get_layer(0),
         scan_index=numpy.zeros(len(parameters.product.probe_positions), dtype=int),
+        scale_contract_version='ci_intensity_v2',
+        measurement_domain='count_intensity',
     )
 
 
