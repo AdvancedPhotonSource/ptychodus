@@ -17,8 +17,8 @@ from skimage.metrics import (
 
 from .typing import ComplexArrayType, IntegerArrayType, RealArrayType
 from .diffraction import BadPixels, DiffractionPatterns
-from .fourier import fourier_shift_2d
 from .illumination import IlluminationMap
+from .patch import accumulate_probe_intensity
 from .simulate.diffraction import generate_diffraction_data
 from .geometry import PixelGeometry
 from .object import (
@@ -1296,23 +1296,13 @@ def compute_reconstruction_residuals(
     per_frame_denominator = numpy.einsum('nhw,hw->n', meas_amp, valid_f)  # (N,)
 
     object_geometry = product.object_.get_geometry()
-    probe_geometry = product.probes.get_geometry()
-    numerator_splat = numpy.zeros((object_geometry.height_px, object_geometry.width_px))
-    denominator_splat = numpy.zeros_like(numerator_splat)
-
-    for num_i, den_i, (scan_point, probe) in zip(
-        per_frame_numerator, per_frame_denominator, product.iter_position_probes()
-    ):
-        object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        bounds = probe_geometry.resolve_patch_bounds(object_point.x_px, object_point.y_px)
-
-        shifted_modes = fourier_shift_2d(probe.get_array(), dx=bounds.dx, dy=bounds.dy)
-        intensity = numpy.sum(numpy.abs(shifted_modes) ** 2, axis=0)
-        total = intensity.sum()
-        patch = intensity / total if total > 0.0 else intensity
-
-        numerator_splat[bounds.y_slice, bounds.x_slice] += num_i * patch
-        denominator_splat[bounds.y_slice, bounds.x_slice] += den_i * patch
+    # Both splats spread the same normalized probe intensity and differ only in the
+    # per-frame scale, so they accumulate together in one pass.
+    numerator_splat, denominator_splat = accumulate_probe_intensity(
+        product,
+        weights=numpy.stack([per_frame_numerator, per_frame_denominator]),
+        normalize=True,
+    )
 
     real_space_error_map = numpy.full_like(numerator_splat, numpy.nan)
     numpy.divide(

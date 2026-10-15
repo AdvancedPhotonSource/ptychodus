@@ -135,6 +135,15 @@
    :show-inheritance:
 ```
 
+## Patch
+
+```{eval-rst}
+.. automodule:: ptychodus.api.patch
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Plugins
 
 ```{eval-rst}

@@ -2,7 +2,7 @@
 from a ptychography product by summing subpixel-shifted probe intensities."""
 
 from __future__ import annotations
-from collections.abc import Iterator, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 import math
@@ -13,37 +13,11 @@ import scipy.signal
 from scipy.spatial import KDTree
 
 from .typing import RealArrayType
-from .fourier import fourier_shift_2d
 from .geometry import PixelGeometry
 from .object import ObjectCenter
-from .probe import PatchBounds
-from .probe_positions import ProbePosition
+from .patch import accumulate_probe_intensity, iter_probe_patches
 from .product import Product
 from .propagate import compute_product_geometry
-
-
-def _iter_probe_patches(
-    product: Product,
-) -> Iterator[tuple[ProbePosition, PatchBounds, RealArrayType]]:
-    """Yield the object-canvas placement and intensity patch of every scan position.
-
-    Each patch is the incoherent-mode intensity sum of that position's probe,
-    Fourier-shifted by the residual subpixel offset so that it lands on the object
-    pixel grid. The patch bounds are *not* clipped to the canvas: a scan position
-    whose footprint falls outside the object array yields out-of-range slices, and
-    assigning through them raises rather than silently truncating.
-    """
-    object_geometry = product.object_.get_geometry()
-    probe_geometry = product.probes.get_geometry()
-
-    for scan_point, probe in product.iter_position_probes():
-        object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        bounds = probe_geometry.resolve_patch_bounds(object_point.x_px, object_point.y_px)
-
-        shifted_modes = fourier_shift_2d(probe.get_array(), dx=bounds.dx, dy=bounds.dy)
-        patch = numpy.sum(numpy.abs(shifted_modes) ** 2, axis=0)
-
-        yield scan_point, bounds, patch
 
 
 @dataclass(frozen=True)
@@ -118,19 +92,20 @@ def compute_illumination_map(
     prior behavior.
     """
     object_geometry = product.object_.get_geometry()
-    canvas = numpy.zeros((object_geometry.height_px, object_geometry.width_px))
+    weights: RealArrayType | None = None
 
-    mean_counts: float | None = None
     if probe_photon_counts_by_index:
         mean_counts = float(numpy.mean(list(probe_photon_counts_by_index.values())))
 
-    for scan_point, bounds, patch in _iter_probe_patches(product):
-        if mean_counts is not None and mean_counts > 0.0:
-            assert probe_photon_counts_by_index is not None
-            counts = probe_photon_counts_by_index.get(scan_point.index, mean_counts)
-            patch = patch * (counts / mean_counts)
+        if mean_counts > 0.0:
+            weights = numpy.array(
+                [
+                    probe_photon_counts_by_index.get(position.index, mean_counts) / mean_counts
+                    for position in product.probe_positions
+                ]
+            )
 
-        canvas[bounds.y_slice, bounds.x_slice] += patch
+    canvas = accumulate_probe_intensity(product, weights=weights)
 
     exposure_time_s = product.metadata.exposure_time_s
     # The flux has one definition, in compute_product_geometry. The detector geometry
@@ -390,7 +365,11 @@ def compute_probe_overlap(
     footprint_area_px = numpy.zeros(num_positions)
     footprint_power = numpy.zeros(num_positions)
 
-    for index, (_, bounds, patch) in enumerate(_iter_probe_patches(product)):
+    # The per-position footprint scalars below are what keep this a per-position pass
+    # rather than a single accumulation.
+    for index, probe_patch in enumerate(iter_probe_patches(product)):
+        patch = probe_patch.get_intensity()
+        bounds = probe_patch.bounds
         patch_squared = numpy.square(patch)
         canvas[bounds.y_slice, bounds.x_slice] += patch
         canvas_squared[bounds.y_slice, bounds.x_slice] += patch_squared

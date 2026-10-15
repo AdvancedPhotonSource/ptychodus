@@ -3,8 +3,8 @@
 import numpy
 
 from ..diffraction import BadPixels, DiffractionIndexes, DiffractionPatterns
-from ..fourier import fourier_shift_2d
 from ..geometry import ImageExtent, PixelGeometry
+from ..patch import iter_probe_patches
 from ..assemble import AssembledDiffractionData
 from ..product import Product
 from ..propagate import (
@@ -114,11 +114,8 @@ def generate_diffraction_data(
     )
     bad_pixels: BadPixels = numpy.full((probe_geometry.height_px, probe_geometry.width_px), False)
 
-    object_geometry = object_.get_geometry()
-
-    for index, (probe_position, probe) in enumerate(product.iter_position_probes()):
-        object_position = object_geometry.map_coordinates_probe_to_object(probe_position)
-        bounds = probe_geometry.resolve_patch_bounds(object_position.x_px, object_position.y_px)
+    for index, probe_patch in enumerate(iter_probe_patches(product)):
+        bounds = probe_patch.bounds
 
         # Extract patches from all layers at the same integer position
         object_patches = [
@@ -126,9 +123,7 @@ def generate_diffraction_data(
             for ilayer in range(object_.num_layers)
         ]
 
-        shifted_modes = fourier_shift_2d(probe.get_array(), dx=bounds.dx, dy=bounds.dy)
-
-        for wavefield in shifted_modes:
+        for wavefield in probe_patch.modes:
             # Multislice: apply each layer then propagate to the next; last layer has no propagation
             for object_patch, interlayer_propagator in zip(object_patches, interlayer_propagators):
                 wavefield = wavefield * object_patch
@@ -138,7 +133,7 @@ def generate_diffraction_data(
             wavefield = propagator.propagate(wavefield)
             patterns[index] += numpy.square(numpy.abs(wavefield))
 
-        indexes[index] = object_position.index
+        indexes[index] = probe_patch.position.index
 
     if rng is not None:
         # NOTE: object and probe scaling influence how much noise is added

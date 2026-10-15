@@ -3,7 +3,6 @@ import pytest
 
 from ptychodus.api.interpolate import (
     BarycentricArrayInterpolator,
-    BarycentricArrayStitcher,
     lerp,
 )
 
@@ -86,31 +85,117 @@ def test_barycentric_add_patch_accumulates() -> None:
     assert array.sum() == pytest.approx(2 * patch.sum())
 
 
-def test_barycentric_stitcher_no_lower_returns_upper_unchanged() -> None:
-    upper = numpy.zeros((8, 8), dtype=float)
-    stitcher = BarycentricArrayStitcher(upper=upper)
-    stitcher.add_patch(center_x=3.5, center_y=3.5, value=numpy.ones((3, 3)))
+def test_get_patch_raises_when_the_window_runs_off_the_low_edge() -> None:
+    interp = BarycentricArrayInterpolator(numpy.zeros((20, 20)))
 
-    stitched = stitcher.stitch()
-
-    assert stitched is upper
-    assert stitched.sum() == pytest.approx(9.0)
+    with pytest.raises(ValueError, match='window centered at'):
+        interp.get_patch(center_x=1.0, center_y=10.0, width=6, height=6)
 
 
-def test_barycentric_stitcher_normalizes_by_weights() -> None:
-    """With weight tracking, overlapping patches average rather than sum."""
-    upper = numpy.zeros((8, 8), dtype=float)
-    lower = numpy.zeros((8, 8), dtype=float)
-    stitcher = BarycentricArrayStitcher(upper=upper, lower=lower)
+def test_get_patch_raises_when_the_window_runs_off_the_high_edge() -> None:
+    interp = BarycentricArrayInterpolator(numpy.zeros((20, 20)))
 
-    value = 2.0 * numpy.ones((3, 3), dtype=float)
-    weight = numpy.ones((3, 3), dtype=float)
-    stitcher.add_patch(center_x=3.5, center_y=3.5, value=value, weight=weight)
-    stitcher.add_patch(center_x=3.5, center_y=3.5, value=value, weight=weight)
+    with pytest.raises(ValueError, match='window centered at'):
+        interp.get_patch(center_x=17.0, center_y=10.0, width=6, height=6)
 
-    stitched = stitcher.stitch()
 
-    # Everywhere the weight is > 0, the normalized value must equal 2.0
-    covered = lower > 0
-    numpy.testing.assert_allclose(stitched[covered], 2.0, atol=1e-12)
-    numpy.testing.assert_array_equal(stitched[~covered], 0.0)
+def test_get_patch_does_not_wrap_a_negative_lower_bound() -> None:
+    """A negative support start is a valid Python slice, so an unchecked window
+    reads from the far end of the axis instead of failing."""
+    array = numpy.arange(20 * 20, dtype=float).reshape(20, 20)
+    interp = BarycentricArrayInterpolator(array)
+
+    with pytest.raises(ValueError):
+        interp.get_patch(center_x=1.0, center_y=1.0, width=6, height=6)
+
+
+def test_zero_offset_at_the_high_edge_returns_a_full_size_patch() -> None:
+    """A zero-offset window needs only ``n`` samples, so it fits flush against the
+    far edge where an ``n + 1`` support would not."""
+    array = numpy.arange(20 * 20, dtype=float).reshape(20, 20)
+    interp = BarycentricArrayInterpolator(array)
+
+    patch = interp.get_patch(center_x=16.5, center_y=16.5, width=6, height=6)
+
+    assert patch.shape == (6, 6)
+    numpy.testing.assert_array_equal(patch, array[14:20, 14:20])
+
+
+@pytest.mark.parametrize('center', [2.5 - 1.0e-15, 2.5 + 1.0e-15])
+def test_near_integer_offset_is_snapped_at_the_low_edge(center: float) -> None:
+    """An exactly-integer coordinate reaches the interpolator a few ULP away from
+    one. Flush against an edge, keeping that residue would demand a sample outside
+    the array."""
+    array = numpy.arange(20 * 20, dtype=float).reshape(20, 20)
+    interp = BarycentricArrayInterpolator(array)
+
+    patch = interp.get_patch(center_x=center, center_y=center, width=6, height=6)
+
+    numpy.testing.assert_allclose(patch, array[0:6, 0:6], atol=1e-9)
+
+
+def test_near_integer_offset_is_snapped_at_the_high_edge() -> None:
+    array = numpy.arange(20 * 20, dtype=float).reshape(20, 20)
+    interp = BarycentricArrayInterpolator(array)
+
+    patch = interp.get_patch(center_x=16.5 + 1.0e-15, center_y=16.5, width=6, height=6)
+
+    numpy.testing.assert_allclose(patch, array[14:20, 14:20], atol=1e-9)
+
+
+def test_add_patch_is_transpose_of_get_patch_at_a_zero_offset() -> None:
+    """The adjoint identity on the branch a fractional center never reaches."""
+    rng = numpy.random.default_rng(7)
+    a = rng.standard_normal((16, 20))
+    b = rng.standard_normal((5, 6))
+
+    # width 6 and height 5 put both offsets at zero for these centers.
+    center_x, center_y = 9.5, 8.0
+
+    forward = BarycentricArrayInterpolator(a)
+    lhs = float(numpy.sum(forward.get_patch(center_x, center_y, b.shape[-1], b.shape[-2]) * b))
+
+    scatter_target = numpy.zeros_like(a)
+    BarycentricArrayInterpolator(scatter_target).add_patch(center_x, center_y, b)
+    rhs = float(numpy.sum(a * scatter_target))
+
+    assert lhs == pytest.approx(rhs, rel=1e-12, abs=1e-12)
+
+
+def test_add_patch_is_transpose_of_get_patch_for_complex_arrays() -> None:
+    """The adjoint identity on the dtype the object canvas actually uses.
+
+    The scatter weights are real, so the operator has real matrix entries and the
+    identity holds on the conjugate inner product without a sign flip: both the
+    real and the imaginary part carry over.
+    """
+    rng = numpy.random.default_rng(11)
+    a = rng.standard_normal((16, 20)) + 1j * rng.standard_normal((16, 20))
+    b = rng.standard_normal((5, 6)) + 1j * rng.standard_normal((5, 6))
+
+    center_x, center_y = 9.3, 7.8
+
+    forward = BarycentricArrayInterpolator(a)
+    lhs = complex(
+        numpy.sum(forward.get_patch(center_x, center_y, b.shape[-1], b.shape[-2]) * b.conj())
+    )
+
+    scatter_target = numpy.zeros_like(a)
+    BarycentricArrayInterpolator(scatter_target).add_patch(center_x, center_y, b)
+    rhs = complex(numpy.sum(a * scatter_target.conj()))
+
+    assert lhs.real == pytest.approx(rhs.real, rel=1e-12, abs=1e-12)
+    assert lhs.imag == pytest.approx(rhs.imag, rel=1e-12, abs=1e-12)
+
+
+def test_get_patch_preserves_a_leading_axis() -> None:
+    """Layer and mode axes ride along; the window applies to the last two."""
+    rng = numpy.random.default_rng(13)
+    stack = rng.standard_normal((3, 20, 20))
+
+    patch = BarycentricArrayInterpolator(stack).get_patch(9.3, 7.8, 6, 5)
+
+    assert patch.shape == (3, 5, 6)
+    for layer in range(stack.shape[0]):
+        expected = BarycentricArrayInterpolator(stack[layer]).get_patch(9.3, 7.8, 6, 5)
+        numpy.testing.assert_allclose(patch[layer], expected, atol=1e-12)

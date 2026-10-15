@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""Micro-benchmark for BarycentricArrayInterpolator / BarycentricArrayStitcher.
+"""Micro-benchmark for BarycentricArrayInterpolator.
 
-Times the per-call cost of the gather (``get_patch``), scatter (``add_patch``),
-and stitcher scatter at sizes representative of the VSPI fluorescence enhancer
-and complex-object patch extraction inner loops.
+Times the per-call cost of the gather (``get_patch``) and scatter (``add_patch``)
+at sizes representative of the VSPI fluorescence enhancer and complex-object
+patch extraction inner loops.
 
 Run this on both ``main`` and the optimization branch to quantify the speedup:
 
@@ -18,10 +18,7 @@ import time
 
 import numpy
 
-from ptychodus.api.interpolate import (
-    BarycentricArrayInterpolator,
-    BarycentricArrayStitcher,
-)
+from ptychodus.api.interpolate import BarycentricArrayInterpolator
 
 
 def _time(label: str, n_calls: int, fn):
@@ -79,21 +76,6 @@ def _bench_case(
         interp.add_patch(centers_x[i], centers_y[i], patches_real)
 
     _time('add_patch', n_calls, do_add_patch)
-
-    if not numpy.issubdtype(dtype, numpy.complexfloating):
-        return  # Stitcher-with-weights case exercised via complex path below
-
-    upper = numpy.zeros(array_shape, dtype=dtype)
-    lower = numpy.zeros(array_shape, dtype=numpy.float64)
-    stitcher = BarycentricArrayStitcher(upper=upper, lower=lower)
-    weight = rng.standard_normal(patch_full_shape).astype(numpy.float64, copy=False) ** 2
-
-    def do_stitcher_add() -> None:
-        i = counter[0] % n_calls
-        counter[0] += 1
-        stitcher.add_patch(centers_x[i], centers_y[i], patches_real, weight=weight)
-
-    _time('Stitcher.add_patch (weighted)', n_calls, do_stitcher_add)
 
 
 def main() -> None:
