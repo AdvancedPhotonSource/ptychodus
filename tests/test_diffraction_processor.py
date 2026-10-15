@@ -105,6 +105,45 @@ def test_binning_apply_mask_logical_and() -> None:
     assert out[1, 1] == True
 
 
+def test_binning_apply_drops_the_trailing_partial_block() -> None:
+    """An extent the bin size does not divide leaves a partial block at the far edge.
+
+    It is discarded rather than refused, which is the contract apply_to_extent has
+    always advertised with its floor division.
+    """
+    data = numpy.arange(5 * 5, dtype=numpy.uint16).reshape(1, 5, 5)
+
+    out = BinningStep(bin_size_x=2, bin_size_y=2).apply(data)
+
+    assert out.shape == (1, 2, 2)
+    # Row 4 and column 4 take no part; each output cell is the sum of its 2x2 block.
+    expected = numpy.array(
+        [[[0 + 1 + 5 + 6, 2 + 3 + 7 + 8], [10 + 11 + 15 + 16, 12 + 13 + 17 + 18]]]
+    )
+    numpy.testing.assert_array_equal(out, expected)
+
+
+def test_binning_apply_shape_agrees_with_apply_to_extent() -> None:
+    """The two halves of the step must report the same output size, divisible or not."""
+    step = BinningStep(bin_size_x=2, bin_size_y=4)
+
+    for height, width in ((12, 8), (9, 12), (13, 7), (5, 5)):
+        out = step.apply(numpy.ones((1, height, width), dtype=numpy.uint16))
+        extent = step.apply_to_extent(ImageExtent(width, height))
+        assert out.shape[-2:] == (extent.height_px, extent.width_px)
+
+
+def test_binning_apply_mask_drops_the_trailing_partial_block() -> None:
+    """A mask bins by logical AND; the discarded edge must not influence the result."""
+    data = numpy.ones((5, 5), dtype=bool)
+    data[4, 4] = False  # in the dropped row and column only
+
+    out = BinningStep(bin_size_x=2, bin_size_y=2).apply(data)
+
+    assert out.shape == (2, 2)
+    assert out.all()
+
+
 def test_binning_rejects_zero_bin_size() -> None:
     with pytest.raises(ValueError):
         BinningStep(bin_size_x=0, bin_size_y=1)
@@ -732,4 +771,56 @@ def test_get_plan_is_quiet_when_crop_region_fits(
         plan = PrepPipelineBuilder(diff).get_plan(detector_extent)
 
     assert plan.read_region == CropRegion(x_range=(476, 604), y_range=(195, 323))
+    assert not caplog.records
+
+
+def test_get_plan_accepts_a_bin_size_that_does_not_divide_the_crop(
+    settings: tuple[DiffractionSettings, DetectorSettings],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A non-divisible bin size is a trim, not a misconfiguration.
+
+    It used to raise, which aborted a batch run with an uncaught traceback and left
+    the streaming path silently dropping every frame. The partial block is discarded
+    and the loss is reported once per plan instead.
+    """
+    diff, _ = settings
+    diff.crop_enabled.set_value(True)
+    diff.crop_width_px.set_value(54)
+    diff.crop_height_px.set_value(54)
+    diff.beam_center_x_px.set_value(64)
+    diff.beam_center_y_px.set_value(64)
+    diff.binning_enabled.set_value(True)
+    diff.bin_size_x.set_value(4)
+    diff.bin_size_y.set_value(4)
+
+    detector_extent = ImageExtent(width_px=128, height_px=128)
+
+    with caplog.at_level('WARNING', logger='ptychodus.model.diffraction.prep_pipeline'):
+        plan = PrepPipelineBuilder(diff).get_plan(detector_extent)
+
+    binning = next(step for step in plan.pipeline.steps if isinstance(step, BinningStep))
+    assert (binning.bin_size_x, binning.bin_size_y) == (4, 4)
+    assert len(caplog.records) == 1
+    assert '2 column(s)' in caplog.records[0].message
+    assert '2 row(s)' in caplog.records[0].message
+
+
+def test_get_plan_is_quiet_when_the_bin_size_divides_the_crop(
+    settings: tuple[DiffractionSettings, DetectorSettings],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    diff, _ = settings
+    diff.crop_enabled.set_value(True)
+    diff.crop_width_px.set_value(64)
+    diff.crop_height_px.set_value(64)
+    diff.beam_center_x_px.set_value(64)
+    diff.beam_center_y_px.set_value(64)
+    diff.binning_enabled.set_value(True)
+    diff.bin_size_x.set_value(4)
+    diff.bin_size_y.set_value(4)
+
+    with caplog.at_level('WARNING', logger='ptychodus.model.diffraction.prep_pipeline'):
+        PrepPipelineBuilder(diff).get_plan(ImageExtent(width_px=128, height_px=128))
+
     assert not caplog.records

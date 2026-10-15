@@ -371,15 +371,7 @@ class SummaryPanelViewController(Observer):
             # Settings edits while collapsed cost nothing; _on_toggled refreshes.
             return
 
-        try:
-            plan = self._pipeline_builder.get_plan(self._extent_source.get_extent())
-        except ValueError:
-            # Transient while the user types a bin size that does not divide the
-            # crop extent. Binning is not previewed, but get_plan still validates
-            # it. Hold the last good frame -- a modal dialog per keystroke would
-            # make the spin boxes unusable.
-            logger.debug('Skipping preview refresh; incomplete prep plan.', exc_info=True)
-            return
+        plan = self._pipeline_builder.get_plan(self._extent_source.get_extent())
 
         frame = self._raw_mean_pattern
         step = next((s for s in plan.pipeline.steps if isinstance(s, FilterValuesStep)), None)

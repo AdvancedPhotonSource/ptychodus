@@ -224,8 +224,7 @@ class DiffractionSummaryService:
         try:
             key = self._build_total_counts_key(dataset_index)
         except ValueError:
-            # An incomplete plan (e.g. a bin size that does not divide the crop)
-            # cannot match anything that was measured.
+            # No dataset at that index, so there is nothing a cached pass could match.
             return True
 
         return key != self._last_total_counts_key

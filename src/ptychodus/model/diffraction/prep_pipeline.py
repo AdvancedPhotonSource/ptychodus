@@ -112,10 +112,18 @@ class PrepPipelineBuilder:
                 pre_h = None
             bin_x = _clamp_size(s.bin_size_x.get_value(), pre_w)
             bin_y = _clamp_size(s.bin_size_y.get_value(), pre_h)
-            if pre_w is not None and pre_h is not None and (pre_w % bin_x or pre_h % bin_y):
-                raise ValueError(
-                    f'Invalid binning size! (input=({pre_w}, {pre_h}), bin=({bin_x}, {bin_y}))'
-                )
+            if pre_w is not None and pre_h is not None:
+                dropped_x = pre_w % bin_x
+                dropped_y = pre_h % bin_y
+
+                # Reported once per plan rather than once per frame, and only where
+                # something is actually discarded.
+                if dropped_x or dropped_y:
+                    logger.warning(
+                        f'Binning {pre_w}x{pre_h} by ({bin_x}, {bin_y}) leaves a partial'
+                        f' block; discarding {dropped_x} column(s) and {dropped_y} row(s)'
+                        ' at the far edge.'
+                    )
             steps.append(BinningStep(bin_size_x=bin_x, bin_size_y=bin_y))
 
         # Upsample / padding / flips / transpose: no clamping needed.

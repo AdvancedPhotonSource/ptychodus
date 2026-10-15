@@ -105,7 +105,12 @@ class FilterValuesStep(DiffractionPrepStep):
 
 
 class BinningStep(DiffractionPrepStep):
-    """Reduce each `bin_size_y × bin_size_x` block. Sum for patterns; logical-AND for masks."""
+    """Reduce each `bin_size_y × bin_size_x` block. Sum for patterns; logical-AND for masks.
+
+    An extent the bin size does not divide leaves a partial block at the far edge, which
+    is discarded: the output holds `extent // bin_size` whole blocks, which is what
+    :meth:`apply_to_extent` reports and what a caller sizing a buffer from it allocates.
+    """
 
     type: Literal['binning'] = 'binning'
     bin_size_x: int = Field(gt=0)
@@ -114,8 +119,12 @@ class BinningStep(DiffractionPrepStep):
     def apply(self, data: numpy.ndarray) -> numpy.ndarray:
         binned_height = data.shape[-2] // self.bin_size_y
         binned_width = data.shape[-1] // self.bin_size_x
+        # Drop the trailing partial block so the reshape below is exact.
+        whole_blocks = data[
+            ..., : binned_height * self.bin_size_y, : binned_width * self.bin_size_x
+        ]
         shape = data.shape[:-2] + (binned_height, self.bin_size_y, binned_width, self.bin_size_x)
-        reshaped = data.reshape(shape)
+        reshaped = whole_blocks.reshape(shape)
         if _is_mask(data):
             return numpy.logical_and.reduce(reshaped, axis=(-3, -1), keepdims=False)
         return numpy.sum(
