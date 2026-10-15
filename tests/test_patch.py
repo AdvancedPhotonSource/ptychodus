@@ -11,7 +11,7 @@ from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.interpolate import BarycentricArrayInterpolator
 from ptychodus.api.object import Object, ObjectCenter, compute_object_geometry
 from ptychodus.api.patch import accumulate_probe_intensity, iter_probe_patches
-from ptychodus.api.probe import ProbeGeometry, ProbeSequence
+from ptychodus.api.probe import ProbeGeometry, ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 
@@ -63,7 +63,7 @@ def _make_product(
     return Product(
         metadata=_metadata(),
         probe_positions=ProbePositionSequence(positions),
-        probes=ProbeSequence(
+        probes=ProbeEnsemble(
             array=_probe_array(num_modes), opr_weights=None, pixel_geometry=pixel_geometry
         ),
         object_=Object(
@@ -147,7 +147,7 @@ def test_canonical_canvas_admits_every_position() -> None:
     product = Product(
         metadata=_metadata(),
         probe_positions=ProbePositionSequence(positions),
-        probes=ProbeSequence(array=_probe_array(), opr_weights=None, pixel_geometry=pixel_geometry),
+        probes=ProbeEnsemble(array=_probe_array(), opr_weights=None, pixel_geometry=pixel_geometry),
         object_=Object(
             array=numpy.ones((geometry.height_px, geometry.width_px), dtype=complex),
             pixel_geometry=pixel_geometry,
@@ -242,7 +242,7 @@ def _make_opr_product(num_positions: int, opr_weights: numpy.ndarray) -> Product
     return Product(
         metadata=_metadata(),
         probe_positions=ProbePositionSequence(positions),
-        probes=ProbeSequence(array=array, opr_weights=opr_weights, pixel_geometry=pixel_geometry),
+        probes=ProbeEnsemble(array=array, opr_weights=opr_weights, pixel_geometry=pixel_geometry),
         object_=Object(
             array=numpy.ones((canvas_px, canvas_px), dtype=complex),
             pixel_geometry=pixel_geometry,
@@ -281,10 +281,11 @@ def test_accumulate_normalizes_each_position_separately_under_opr() -> None:
     numpy.testing.assert_array_equal(accumulate_probe_intensity(product, normalize=True), expected)
 
 
-def test_fewer_opr_weight_rows_than_positions_is_an_index_error() -> None:
-    """Pins today's behavior: the shortfall surfaces as a bare IndexError from the
-    probe sequence rather than as a diagnostic about the product."""
+def test_fewer_opr_weight_rows_than_positions_is_rejected() -> None:
+    """The shortfall is a disagreement between the probe and the scan, so it is
+    reported as one -- naming both counts -- rather than surfacing as an array
+    index error from inside the probe ensemble."""
     weights = numpy.array([[1.0, 0.2], [0.4, 1.3]])
 
-    with pytest.raises(IndexError):
+    with pytest.raises(ValueError, match=r'2 probe position\(s\).*has 4'):
         list(iter_probe_patches(_make_opr_product(4, weights)))

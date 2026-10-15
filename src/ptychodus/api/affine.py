@@ -16,7 +16,7 @@ from skimage.measure import ransac
 
 from .geometry import PixelGeometry
 from .object import Object, ObjectGeometry, compute_object_geometry
-from .probe import ProbeGeometry, ProbeSequence
+from .probe import ProbeGeometry, ProbeEnsemble
 from .probe_positions import ProbePosition, ProbePositionSequence
 from .product import Product
 from .typing import BooleanArrayType, ComplexArrayType, IntegerArrayType, RealArrayType
@@ -847,7 +847,7 @@ def transform_product(
         product,
         metadata=replace(metadata, detector_distance_m=detector_distance_m),
         probe_positions=corrected_positions,
-        probes=ProbeSequence(
+        probes=ProbeEnsemble(
             array=probes.get_array(),
             opr_weights=probes.get_opr_weights_or_none(),
             pixel_geometry=corrected_probe_pixel_geometry,

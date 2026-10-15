@@ -28,7 +28,7 @@ from ...model.product.probe import (
     KBMirrorProbeBuilder,
     ProbeModeDecayType,
     ProbeRepositoryItem,
-    ProbeSequenceBuilder,
+    ProbeEnsembleBuilder,
     RectangularProbeBuilder,
     SuperGaussianProbeBuilder,
     ZernikeProbeBuilder,
@@ -316,7 +316,7 @@ class IncoherentModeStrategyViewController(ParameterViewController, Observer):
     knob that does nothing.
     """
 
-    def __init__(self, probe_builder: ProbeSequenceBuilder) -> None:
+    def __init__(self, probe_builder: ProbeEnsembleBuilder) -> None:
         super().__init__()
         self._strategy = probe_builder.incoherent_mode_strategy
         self._widget = QStackedWidget()
@@ -473,7 +473,7 @@ class ProbeMetricsViewController(ParameterViewController, Observer):
 class ProbeEditorViewControllerFactory:
     def _append_primary_mode(
         self,
-        probe_builder: ProbeSequenceBuilder,
+        probe_builder: ProbeEnsembleBuilder,
         dialog_builder: ParameterViewBuilder,
     ) -> bool:
         primary_mode_group = 'Primary Mode'
@@ -554,7 +554,7 @@ class ProbeEditorViewControllerFactory:
 
     def _append_additional_modes(
         self,
-        probe_builder: ProbeSequenceBuilder,
+        probe_builder: ProbeEnsembleBuilder,
         dialog_builder: ParameterViewBuilder,
     ) -> None:
         expand_only_tool_tip = (

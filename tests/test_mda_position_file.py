@@ -33,7 +33,7 @@ from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePositionParseError, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import prepare_reconstruct_input
@@ -828,7 +828,7 @@ def _pair(mda_path: Path, series_path: Path) -> list[tuple[float, float]]:
             tomography_angle_deg=0.0,
         ),
         probe_positions=ProbePositionSequence(list(positions)),
-        probes=ProbeSequence(
+        probes=ProbeEnsemble(
             array=numpy.zeros((1, 1, 2, 2), dtype=numpy.complex128),
             opr_weights=None,
             pixel_geometry=pixel_geometry,

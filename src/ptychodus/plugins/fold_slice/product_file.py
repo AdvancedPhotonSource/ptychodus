@@ -7,7 +7,7 @@ import scipy.io
 from ptychodus.api.constants import wavelength_m_to_energy_eV
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.product import Product, ProductFileReader, ProductMetadata
 from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 from ptychodus.api.propagate import compute_far_field_propagation_distance
@@ -116,7 +116,7 @@ class FoldSliceProductFileReader(ProductFileReader):
             )
             point_list.append(point)
 
-        probe = ProbeSequence(
+        probe = ProbeEnsemble(
             array=probe_array,
             opr_weights=None,  # TODO OPR, if available
             pixel_geometry=pixel_geometry,

@@ -2,7 +2,7 @@ import logging
 
 import numpy.random
 
-from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
+from ptychodus.api.probe import ProbeEnsemble, ProbeGeometryProvider
 
 from ...diffraction import AssembledDiffractionDataset
 from .builder import FromMemoryProbeBuilder
@@ -51,7 +51,7 @@ class ProbeRepositoryItemFactory:
             )
 
     def create(
-        self, geometry_provider: ProbeGeometryProvider, probe: ProbeSequence | None = None
+        self, geometry_provider: ProbeGeometryProvider, probe: ProbeEnsemble | None = None
     ) -> ProbeRepositoryItem:
         if probe is None:
             builder = self._builder_factory.create_default()

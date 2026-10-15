@@ -16,9 +16,9 @@ import pytest
 
 from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry
 from ptychodus.api.observer import Observable
-from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider, ProbeSequence
+from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider, ProbeEnsemble
 from ptychodus.api.settings import SettingsRegistry
-from ptychodus.model.product.probe.builder import ProbeSequenceBuilder
+from ptychodus.model.product.probe.builder import ProbeEnsembleBuilder
 from ptychodus.model.product.probe.item import ProbeRepositoryItem
 from ptychodus.model.product.probe.settings import ProbeSettings
 
@@ -27,10 +27,10 @@ def _make_rng() -> numpy.random.Generator:
     return numpy.random.default_rng(42)
 
 
-class _RecordingBuilder(ProbeSequenceBuilder):
+class _RecordingBuilder(ProbeEnsembleBuilder):
     """Minimal builder that records build() invocations without touching numpy math."""
 
-    def __init__(self, settings: ProbeSettings, probe_seq: ProbeSequence) -> None:
+    def __init__(self, settings: ProbeSettings, probe_seq: ProbeEnsemble) -> None:
         super().__init__(_make_rng(), settings, 'recording')
         self._settings = settings
         self._probe_seq = probe_seq
@@ -39,7 +39,7 @@ class _RecordingBuilder(ProbeSequenceBuilder):
     def copy(self) -> _RecordingBuilder:
         return _RecordingBuilder(self._settings, self._probe_seq)
 
-    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
         # Every real probe builder reads the geometry first, so an undetermined one
         # raises out of here before anything is recorded -- which is what the item's
         # except arm relies on now that it has no pre-flight guard.
@@ -47,7 +47,7 @@ class _RecordingBuilder(ProbeSequenceBuilder):
         self.build_calls.append(geometry_provider)
         return self._probe_seq
 
-    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
         # These tests exercise _rebuild's geometry guard, not the conditioning
         # pipeline, so bypass it and hand back the canned sequence by identity.
         return self._build_raw(geometry_provider)
@@ -80,9 +80,9 @@ def _set_provider_geometry(
     )
 
 
-def _make_probe_seq(pixel_size_m: float) -> ProbeSequence:
+def _make_probe_seq(pixel_size_m: float) -> ProbeEnsemble:
     array = numpy.zeros((1, 4, 4), dtype=numpy.complex64)
-    return ProbeSequence(
+    return ProbeEnsemble(
         array=array,
         opr_weights=None,
         pixel_geometry=PixelGeometry(width_m=pixel_size_m, height_m=pixel_size_m),
@@ -91,7 +91,7 @@ def _make_probe_seq(pixel_size_m: float) -> ProbeSequence:
 
 def test_rebuild_skips_when_geometry_not_ready() -> None:
     """Pre-dataset startup: pixel dimensions are zero. Builder must NOT be called;
-    the initial null ProbeSequence stays in place; no exception escapes."""
+    the initial null ProbeEnsemble stays in place; no exception escapes."""
     registry = SettingsRegistry()
     settings = ProbeSettings(registry)
     provider = _make_provider(pixel_width_m=0.0, pixel_height_m=0.0)
@@ -127,7 +127,7 @@ def test_unready_geometry_is_not_logged_as_a_failure(
 def test_rebuild_fires_when_geometry_becomes_ready() -> None:
     """Once the provider reports a valid pixel geometry and the item is nudged
     (e.g. via set_builder from a settings change), the builder runs and its
-    ProbeSequence replaces the null sentinel."""
+    ProbeEnsemble replaces the null sentinel."""
     registry = SettingsRegistry()
     settings = ProbeSettings(registry)
     provider = _make_provider(pixel_width_m=0.0, pixel_height_m=0.0)

@@ -13,7 +13,7 @@ from ptychodus.api.probe import (
     ProbeFocusCurves,
     ProbeFocusMetric,
     ProbeGeometry,
-    ProbeSequence,
+    ProbeEnsemble,
     ProbeSizeMetrics,
     compute_amplitude_deviation,
     compute_opr_mode_series,
@@ -25,7 +25,7 @@ from ptychodus.api.probe import (
     estimate_focal_plane,
     estimate_probe_entropy,
     estimate_probe_size,
-    resample_probe_sequence,
+    resample_probe_ensemble,
     shift_probe,
 )
 from ptychodus.api.propagate import PropagatedWavefield
@@ -248,67 +248,6 @@ class TestEstimateProbeEntropy:
         assert narrow.spectral_entropy > broad.spectral_entropy
 
 
-class TestProbeSequenceSlicing:
-    """Regression tests for ProbeSequence.__getitem__.
-
-    The slice path used to build its indices from
-    ``range(index.start, index.stop, index.step)``, so every slice with an
-    implicit bound raised TypeError. Only a fully-specified positive-step slice
-    such as ``seq[0:2:1]`` worked.
-    """
-
-    def _sequence(self, num_positions: int = 5) -> ProbeSequence:
-        """Two coherent modes over *num_positions* scan positions, so len() > 1."""
-        array = numpy.arange(2 * 1 * 4 * 4, dtype=numpy.complex128).reshape(2, 1, 4, 4)
-        opr_weights = numpy.arange(num_positions * 2, dtype=float).reshape(num_positions, 2)
-        return ProbeSequence(array, opr_weights, PIXEL_GEOMETRY)
-
-    @pytest.mark.parametrize(
-        ('index', 'expected_length'),
-        [
-            (slice(None, 2), 2),
-            (slice(1, 3), 2),
-            (slice(None), 5),
-            (slice(None, None, 2), 3),
-            (slice(-2, None), 2),
-            (slice(None, 99), 5),
-        ],
-    )
-    def test_slice_returns_expected_number_of_probes(
-        self, index: slice, expected_length: int
-    ) -> None:
-        probes = self._sequence()[index]
-        assert len(probes) == expected_length
-        assert all(isinstance(probe, Probe) for probe in probes)
-
-    def test_empty_slice_returns_empty_list(self) -> None:
-        assert len(self._sequence()[3:1]) == 0
-
-    def test_negative_step_reverses(self) -> None:
-        sequence = self._sequence()
-        reversed_probes = sequence[::-1]
-        assert len(reversed_probes) == 5
-
-        for offset, probe in enumerate(reversed_probes):
-            expected = sequence[4 - offset]
-            numpy.testing.assert_array_equal(probe.get_array(), expected.get_array())
-
-    def test_slice_agrees_with_integer_indexing(self) -> None:
-        sequence = self._sequence()
-
-        for offset, probe in enumerate(sequence[1:4]):
-            expected = sequence[1 + offset]
-            numpy.testing.assert_array_equal(probe.get_array(), expected.get_array())
-
-    def test_slice_without_opr_weights(self) -> None:
-        """__len__ reports 1 when there are no OPR weights, so [:] yields one probe."""
-        array = numpy.ones((1, 1, 4, 4), dtype=numpy.complex128)
-        sequence = ProbeSequence(array, None, PIXEL_GEOMETRY)
-
-        assert len(sequence) == 1
-        assert len(sequence[:]) == 1
-
-
 class TestProbeGeometryFromFarField:
     """The Fraunhofer sample-plane relation dx_sample = lambda * |z| / (N * dx_detector)."""
 
@@ -478,7 +417,7 @@ class TestProbeGeometryResolvePatchBounds:
         numpy.testing.assert_allclose(bounds.dy, -0.6, atol=1.0e-12)
 
 
-class TestProbeSequenceFromProbe:
+class TestProbeEnsembleFromProbe:
     def test_wraps_probe_as_length_1_sequence_with_matching_array_and_geometry(self) -> None:
         rng = numpy.random.default_rng(0)
         pixel_geometry = PixelGeometry(width_m=1e-9, height_m=2e-9)
@@ -487,9 +426,9 @@ class TestProbeSequenceFromProbe:
         )
         probe = Probe(array=array, pixel_geometry=pixel_geometry)
 
-        sequence = ProbeSequence.from_probe(probe)
+        sequence = ProbeEnsemble.from_probe(probe)
 
-        assert len(sequence) == 1
+        assert sequence.num_opr_positions is None
         assert sequence.num_coherent_modes == 1
         assert sequence.num_incoherent_modes == 3
         assert sequence.get_opr_weights_or_none() is None
@@ -849,81 +788,81 @@ class TestShiftProbe:
 
 
 # ---------------------------------------------------------------------------
-# resample_probe_sequence
+# resample_probe_ensemble
 # ---------------------------------------------------------------------------
 
 
-def _make_gaussian_probe_sequence(
+def _make_gaussian_probe_ensemble(
     pixel_m: float = 2.0e-8, extent_px: int = 32, num_imodes: int = 2
-) -> ProbeSequence:
+) -> ProbeEnsemble:
     """A smooth, well-sampled illumination that resampling should carry intact."""
     y, x = numpy.mgrid[:extent_px, :extent_px]
     center = (extent_px - 1) / 2
     envelope = numpy.exp(-(((x - center) ** 2 + (y - center) ** 2) / (2.0 * 4.0**2)))
     mode = envelope * numpy.exp(1j * 0.05 * x)
     array = numpy.stack([numpy.stack([mode * scale for scale in range(1, num_imodes + 1)])])
-    return ProbeSequence(
+    return ProbeEnsemble(
         array=array.astype(complex),
         opr_weights=None,
         pixel_geometry=PixelGeometry(width_m=pixel_m, height_m=pixel_m),
     )
 
 
-def test_resample_probe_sequence_at_the_same_pixel_size_returns_the_input_itself() -> None:
-    probes = _make_gaussian_probe_sequence()
+def test_resample_probe_ensemble_at_the_same_pixel_size_returns_the_input_itself() -> None:
+    probes = _make_gaussian_probe_ensemble()
     target = ProbeGeometry(width_px=32, height_px=32, pixel_width_m=2.0e-8, pixel_height_m=2.0e-8)
-    assert resample_probe_sequence(probes, target) is probes
+    assert resample_probe_ensemble(probes, target) is probes
 
 
-def test_resample_probe_sequence_preserves_the_photon_count() -> None:
+def test_resample_probe_ensemble_preserves_the_photon_count() -> None:
     """The pixel area changes, so the amplitude must absorb it or the probe silently
     gains or loses photons."""
-    probes = _make_gaussian_probe_sequence()
+    probes = _make_gaussian_probe_ensemble()
     target = ProbeGeometry(width_px=64, height_px=64, pixel_width_m=1.0e-8, pixel_height_m=1.0e-8)
 
-    resampled = resample_probe_sequence(probes, target)
+    resampled = resample_probe_ensemble(probes, target)
 
     before = numpy.sum(numpy.abs(probes.get_array()) ** 2)
     after = numpy.sum(numpy.abs(resampled.get_array()) ** 2)
     assert after == pytest.approx(before, rel=1.0e-3)
 
 
-def test_resample_probe_sequence_lands_on_the_target_grid() -> None:
-    probes = _make_gaussian_probe_sequence()
+def test_resample_probe_ensemble_lands_on_the_target_grid() -> None:
+    probes = _make_gaussian_probe_ensemble()
     target = ProbeGeometry(width_px=64, height_px=64, pixel_width_m=1.0e-8, pixel_height_m=1.0e-8)
 
-    resampled = resample_probe_sequence(probes, target)
+    resampled = resample_probe_ensemble(probes, target)
 
     assert resampled.get_array().shape == (1, 2, 64, 64)
     assert resampled.get_pixel_geometry().width_m == pytest.approx(1.0e-8)
     assert resampled.get_pixel_geometry().height_m == pytest.approx(1.0e-8)
 
 
-def test_resample_probe_sequence_carries_opr_weights_through() -> None:
-    probes = _make_gaussian_probe_sequence()
+def test_resample_probe_ensemble_carries_opr_weights_through() -> None:
+    probes = _make_gaussian_probe_ensemble()
     weights = numpy.ones((5, 1))
-    with_weights = ProbeSequence(
+    with_weights = ProbeEnsemble(
         array=probes.get_array(),
         opr_weights=weights,
         pixel_geometry=probes.get_pixel_geometry(),
     )
     target = ProbeGeometry(width_px=64, height_px=64, pixel_width_m=1.0e-8, pixel_height_m=1.0e-8)
 
-    resampled = resample_probe_sequence(with_weights, target)
+    resampled = resample_probe_ensemble(with_weights, target)
     resampled_weights = resampled.get_opr_weights_or_none()
 
     assert resampled_weights is not None
     numpy.testing.assert_array_equal(resampled_weights, weights)
 
 
-def test_resample_probe_sequence_passes_through_without_a_pixel_geometry() -> None:
-    probes = ProbeSequence(
-        array=_make_gaussian_probe_sequence().get_array(),
+def test_resample_probe_ensemble_passes_through_without_a_pixel_geometry() -> None:
+    probes = ProbeEnsemble(
+        array=_make_gaussian_probe_ensemble().get_array(),
         opr_weights=None,
         pixel_geometry=None,
     )
     target = ProbeGeometry(width_px=64, height_px=64, pixel_width_m=1.0e-8, pixel_height_m=1.0e-8)
-    assert resample_probe_sequence(probes, target) is probes
+    assert resample_probe_ensemble(probes, target) is probes
 
 
 class TestConformOPRWeights:
@@ -952,10 +891,10 @@ class TestConformOPRWeights:
         rng = self._rng()
         return (rng.normal(size=shape) + 1j * rng.normal(size=shape)).astype(numpy.complex64)
 
-    def _sequence(self) -> ProbeSequence:
-        return ProbeSequence(self._array(), self._weights(), PIXEL_GEOMETRY)
+    def _sequence(self) -> ProbeEnsemble:
+        return ProbeEnsemble(self._array(), self._weights(), PIXEL_GEOMETRY)
 
-    def _conform(self, policy: OPRWeightPolicy, num_positions: int | None = None) -> ProbeSequence:
+    def _conform(self, policy: OPRWeightPolicy, num_positions: int | None = None) -> ProbeEnsemble:
         return conform_opr_weights(
             self._rng(),
             self._sequence(),
@@ -983,10 +922,10 @@ class TestConformOPRWeights:
         if has_weights:
             assert weights is not None
             assert weights.shape == (self.NUM_TARGET_POSITIONS, num_coherent_modes)
-            assert len(conformed) == self.NUM_TARGET_POSITIONS
+            assert conformed.num_opr_positions == self.NUM_TARGET_POSITIONS
         else:
             assert weights is None
-            assert len(conformed) == 1
+            assert conformed.num_opr_positions is None
 
     def test_conformed_dtype_is_preserved(self) -> None:
         """Weights are real and the array complex64; the collapse must not promote it."""
@@ -1062,22 +1001,22 @@ class TestConformOPRWeights:
 
     @pytest.mark.parametrize('policy', list(OPRWeightPolicy))
     def test_a_probe_without_an_opr_basis_is_untouched(self, policy: OPRWeightPolicy) -> None:
-        probes = ProbeSequence(self._array()[0], None, PIXEL_GEOMETRY)
+        probes = ProbeEnsemble(self._array()[0], None, PIXEL_GEOMETRY)
         assert conform_opr_weights(self._rng(), probes, 11, policy) is probes
 
     def test_several_coherent_modes_without_weights_gain_them_on_reinitialize(self) -> None:
-        probes = ProbeSequence(self._array(), None, PIXEL_GEOMETRY)
+        probes = ProbeEnsemble(self._array(), None, PIXEL_GEOMETRY)
         conformed = conform_opr_weights(self._rng(), probes, 11, OPRWeightPolicy.REINITIALIZE)
         assert conformed.get_opr_weights().shape == (11, self.NUM_COHERENT_MODES)
 
     def test_several_coherent_modes_without_weights_collapse_to_the_primary_mode(self) -> None:
         """With no weights there is no mean row, so COLLAPSE can only do what DISCARD does."""
-        probes = ProbeSequence(self._array(), None, PIXEL_GEOMETRY)
+        probes = ProbeEnsemble(self._array(), None, PIXEL_GEOMETRY)
         conformed = conform_opr_weights(self._rng(), probes, 11, OPRWeightPolicy.COLLAPSE)
         numpy.testing.assert_array_equal(conformed.get_array()[0], self._array()[0])
 
     def test_a_probe_without_a_pixel_size_conforms_without_raising(self) -> None:
-        probes = ProbeSequence(self._array(), self._weights(), None)
+        probes = ProbeEnsemble(self._array(), self._weights(), None)
         conformed = conform_opr_weights(self._rng(), probes, 11, OPRWeightPolicy.AVERAGE)
         assert conformed.get_opr_weights_or_none() is not None
 
@@ -1106,7 +1045,7 @@ class TestComputeOPRModeSeries:
         *,
         weights: numpy.ndarray | None = None,
         dtype: numpy.dtype | type = numpy.complex64,
-    ) -> ProbeSequence:
+    ) -> ProbeEnsemble:
         rng = numpy.random.default_rng(42)
         shape = (self.NUM_COHERENT_MODES, self.NUM_INCOHERENT_MODES, 4, 4)
         # Deliberately not orthogonalized: the off-diagonal Gram terms must be carried.
@@ -1115,21 +1054,25 @@ class TestComputeOPRModeSeries:
         if weights is None:
             weights = rng.normal(size=(self.NUM_POSITIONS, self.NUM_COHERENT_MODES))
 
-        return ProbeSequence(array, weights, PixelGeometry(width_m=1e-9, height_m=2e-9))
+        return ProbeEnsemble(array, weights, PixelGeometry(width_m=1e-9, height_m=2e-9))
 
     def test_total_matches_materialized_probes(self) -> None:
         probes = self._probes()
         series = compute_opr_mode_series(probes)
+        num_positions = probes.num_opr_positions
+        assert num_positions is not None
         expected = numpy.array(
-            [probes[index].get_intensity().sum() for index in range(len(probes))]
+            [probes.get_probe(index).get_intensity().sum() for index in range(num_positions)]
         )
         numpy.testing.assert_allclose(series.total_photon_count, expected, rtol=1e-6)
 
     def test_deviation_matches_materialized_probes(self) -> None:
         probes = self._probes()
         series = compute_opr_mode_series(probes)
+        num_positions = probes.num_opr_positions
+        assert num_positions is not None
         composed = numpy.array(
-            [probes[index].get_incoherent_mode(0) for index in range(len(probes))]
+            [probes.get_probe(index).get_incoherent_mode(0) for index in range(num_positions)]
         )
         mean_mode = composed.mean(axis=0)
         expected = numpy.array(
@@ -1166,7 +1109,7 @@ class TestComputeOPRModeSeries:
 
     def test_without_weights_reports_the_unweighted_probe(self) -> None:
         """No OPR weights names one position whose composed mode is the basis's first."""
-        probes = ProbeSequence(
+        probes = ProbeEnsemble(
             self._probes().get_array(), None, PixelGeometry(width_m=1e-9, height_m=2e-9)
         )
         series = compute_opr_mode_series(probes)
@@ -1196,16 +1139,18 @@ class TestComputeOPRModeSeries:
         shape = (1, 1, 4, 4)
         array = rng.normal(size=shape) + 1j * rng.normal(size=shape)
         weights = rng.normal(size=(5, 1))
-        probes = ProbeSequence(array, weights, PixelGeometry(width_m=1e-9, height_m=1e-9))
+        probes = ProbeEnsemble(array, weights, PixelGeometry(width_m=1e-9, height_m=1e-9))
         series = compute_opr_mode_series(probes)
 
-        expected = numpy.array([probes[index].get_intensity().sum() for index in range(5)])
+        expected = numpy.array(
+            [probes.get_probe(index).get_intensity().sum() for index in range(5)]
+        )
         numpy.testing.assert_allclose(series.total_photon_count, expected)
         assert series.secondary_mode_photon_count == pytest.approx(0.0)
 
-    def test_null_sentinel_probe_sequence(self) -> None:
+    def test_null_sentinel_probe_ensemble(self) -> None:
         """The repository holds a zero-sized sequence until a dataset binds."""
-        series = compute_opr_mode_series(ProbeSequence(None, None, None))
+        series = compute_opr_mode_series(ProbeEnsemble(None, None, None))
 
         numpy.testing.assert_allclose(series.total_photon_count, [0.0])
         assert series.relative_variation == 0.0
@@ -1222,7 +1167,7 @@ class TestComputeOPRModeSeries:
         array = numpy.concatenate([base, base * (1.0 + 1.0e-9)], axis=0)
         weights = numpy.array([[1.0, -1.0], [1.0, -1.0]])
         series = compute_opr_mode_series(
-            ProbeSequence(array, weights, PixelGeometry(width_m=1e-9, height_m=1e-9))
+            ProbeEnsemble(array, weights, PixelGeometry(width_m=1e-9, height_m=1e-9))
         )
 
         assert (series.primary_mode_photon_count >= 0.0).all()
@@ -1297,3 +1242,54 @@ class TestComputeOPRModeSeries:
             )
             assert int(contents['effective_mode_count']) == series.effective_mode_count
             assert contents['relative_variation'] == pytest.approx(series.relative_variation)
+
+
+class TestProbeEnsembleGetProbe:
+    """A probe ensemble is addressed by scan position, not as a Python sequence.
+
+    Without OPR weights one probe describes the whole scan, so every position index is
+    valid and there is no element count to report; with them the index selects a weight
+    row and the valid range is that row count.
+    """
+
+    def _ensemble(self, num_positions: int | None) -> ProbeEnsemble:
+        array = numpy.arange(2 * 1 * 4 * 4, dtype=numpy.complex128).reshape(2, 1, 4, 4)
+        weights = (
+            None
+            if num_positions is None
+            else numpy.arange(num_positions * 2, dtype=float).reshape(num_positions, 2)
+        )
+        return ProbeEnsemble(array, weights, PIXEL_GEOMETRY)
+
+    def test_without_opr_weights_every_position_yields_the_same_probe(self) -> None:
+        ensemble = self._ensemble(None)
+
+        assert ensemble.num_opr_positions is None
+        numpy.testing.assert_array_equal(
+            ensemble.get_probe(0).get_array(), ensemble.get_probe(999).get_array()
+        )
+
+    def test_with_opr_weights_the_count_is_the_row_count(self) -> None:
+        assert self._ensemble(3).num_opr_positions == 3
+
+    def test_position_beyond_the_opr_rows_is_refused(self) -> None:
+        with pytest.raises(IndexError, match='describing 3 position'):
+            self._ensemble(3).get_probe(3)
+
+    def test_negative_position_is_refused(self) -> None:
+        """A position index is a non-negative ordinal, so it does not count from the
+        end the way a sequence index would."""
+        with pytest.raises(IndexError, match='negative'):
+            self._ensemble(3).get_probe(-1)
+
+    def test_negative_position_is_refused_without_opr_weights(self) -> None:
+        with pytest.raises(IndexError, match='negative'):
+            self._ensemble(None).get_probe(-1)
+
+    def test_distinct_positions_compose_distinct_probes(self) -> None:
+        ensemble = self._ensemble(3)
+
+        composed = [ensemble.get_probe(index).get_incoherent_mode(0) for index in range(3)]
+
+        assert not numpy.allclose(composed[0], composed[1])
+        assert not numpy.allclose(composed[1], composed[2])

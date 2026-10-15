@@ -7,7 +7,7 @@ from ptychodus.api.constants import EnergyUnit, LengthUnit
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.product import LossValue, Product, ProductFileReader, ProductMetadata
 from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 
@@ -50,7 +50,7 @@ class NSLSIIProductFileReader(ProductFileReader):
                 point_list.append(point)
 
             probe_array = h5_file['prb'][()].astype(complex)
-            probes = ProbeSequence(
+            probes = ProbeEnsemble(
                 array=probe_array, opr_weights=None, pixel_geometry=pixel_geometry
             )
 

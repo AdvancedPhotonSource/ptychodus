@@ -9,13 +9,13 @@ from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.probe import (
     ProbeEntropyMetrics,
     ProbeGeometryProvider,
-    ProbeSequence,
+    ProbeEnsemble,
     ProbeSizeMetrics,
     estimate_probe_entropy,
     estimate_probe_size,
 )
 
-from .builder import FromMemoryProbeBuilder, ProbeSequenceBuilder
+from .builder import FromMemoryProbeBuilder, ProbeEnsembleBuilder
 from .settings import ProbeSettings
 
 logger = logging.getLogger(__name__)
@@ -27,14 +27,14 @@ class ProbeRepositoryItem(ParameterGroup):
         rng: numpy.random.Generator,
         geometry_provider: ProbeGeometryProvider,
         settings: ProbeSettings,
-        builder: ProbeSequenceBuilder,
+        builder: ProbeEnsembleBuilder,
     ) -> None:
         super().__init__()
         self._rng = rng
         self._geometry_provider = geometry_provider
         self._settings = settings
         self._builder = builder
-        self._probe_seq = ProbeSequence(array=None, opr_weights=None, pixel_geometry=None)
+        self._probe_seq = ProbeEnsemble(array=None, opr_weights=None, pixel_geometry=None)
 
         self._add_group('builder', builder, observe=True)
         if isinstance(geometry_provider, Observable):
@@ -45,7 +45,7 @@ class ProbeRepositoryItem(ParameterGroup):
         self.set_builder(item.get_builder().copy())
         self._rebuild()
 
-    def assign(self, probe: ProbeSequence) -> None:
+    def assign(self, probe: ProbeEnsemble) -> None:
         builder = FromMemoryProbeBuilder(self._rng, self._settings, probe)
         self.set_builder(builder)
 
@@ -55,7 +55,7 @@ class ProbeRepositoryItem(ParameterGroup):
 
         self._builder.sync_to_settings()
 
-    def get_probes(self) -> ProbeSequence:
+    def get_probes(self) -> ProbeEnsemble:
         return self._probe_seq
 
     def get_num_scan_points(self) -> int:
@@ -100,10 +100,10 @@ class ProbeRepositoryItem(ParameterGroup):
             logger.exception('Failed to estimate probe entropy!')
             return None
 
-    def get_builder(self) -> ProbeSequenceBuilder:
+    def get_builder(self) -> ProbeEnsembleBuilder:
         return self._builder
 
-    def set_builder(self, builder: ProbeSequenceBuilder) -> None:
+    def set_builder(self, builder: ProbeEnsembleBuilder) -> None:
         group = 'builder'
         self._remove_group(group)
         self._builder.remove_observer(self)

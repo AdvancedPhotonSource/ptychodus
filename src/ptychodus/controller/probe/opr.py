@@ -20,7 +20,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ptychodus.api.probe import OPRModeSeries, ProbeSequence
+from ptychodus.api.probe import OPRModeSeries, ProbeEnsemble
 from ptychodus.api.typing import ComplexArrayType, IntegerArrayType, RealArrayType
 
 from ...model.analysis import OPRModeAnalyzer
@@ -122,7 +122,7 @@ class OPRModeViewController:
 
         self._product_index = -1
         self._series: OPRModeSeries | None = None
-        self._probes: ProbeSequence | None = None
+        self._probes: ProbeEnsemble | None = None
         self._measured_photon_count: RealArrayType | None = None
         self._num_positions = 0
         self._was_playing_before_drag = False

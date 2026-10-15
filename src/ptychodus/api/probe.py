@@ -6,7 +6,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
-from typing import overload
 import logging
 import math
 
@@ -964,10 +963,14 @@ def shift_probe(probe: Probe, *, shift_y_px: float, shift_x_px: float) -> Probe:
     )
 
 
-class ProbeSequence(Sequence[Probe]):
+class ProbeEnsemble:
     """Position-dependent probe ensemble stored as a (coherent, incoherent, height, width) array.
 
-    Supports optional OPR (orthogonal probe relaxation) weights for per-position probe variation.
+    Supports optional OPR (orthogonal probe relaxation) weights for per-position probe
+    variation. Deliberately not a sequence: without OPR weights a single probe describes
+    every scan position, so there is no element count to report and no index that is out
+    of range. :meth:`get_probe` names what an index means instead, and
+    :attr:`num_opr_positions` answers how many positions the weights describe.
     """
 
     def __init__(
@@ -1016,16 +1019,16 @@ class ProbeSequence(Sequence[Probe]):
         self._pixel_geometry = pixel_geometry
 
     @classmethod
-    def from_probe(cls, probe: Probe) -> ProbeSequence:
-        """Wrap a single :class:`Probe` as a length-1 sequence with no OPR basis."""
+    def from_probe(cls, probe: Probe) -> ProbeEnsemble:
+        """Wrap a single :class:`Probe` as an ensemble with no OPR basis."""
         return cls(
             array=probe.get_array(),
             opr_weights=None,
             pixel_geometry=probe.get_pixel_geometry(),
         )
 
-    def copy(self) -> ProbeSequence:
-        return ProbeSequence(
+    def copy(self) -> ProbeEnsemble:
+        return ProbeEnsemble(
             self._array.copy(),
             None if self._opr_weights is None else self._opr_weights.copy(),
             None if self._pixel_geometry is None else self._pixel_geometry.copy(),
@@ -1078,23 +1081,44 @@ class ProbeSequence(Sequence[Probe]):
     def width_px(self) -> int:
         return self._array.shape[3]
 
-    @overload
-    def __getitem__(self, index: int) -> Probe: ...
+    @property
+    def num_opr_positions(self) -> int | None:
+        """Probe positions the OPR weights describe.
 
-    @overload
-    def __getitem__(self, index: slice) -> Sequence[Probe]: ...
+        ``None`` when there are no weights, which is not zero positions but every
+        position: one probe then describes the whole scan.
+        """
+        return None if self._opr_weights is None else self._opr_weights.shape[0]
 
-    def __getitem__(self, index: int | slice) -> Probe | Sequence[Probe]:
-        if isinstance(index, slice):
-            # slice.indices normalizes implicit bounds, negative indexes, and
-            # out-of-range values against the sequence length.
-            return [self[idx] for idx in range(*index.indices(len(self)))]
+    def get_probe(self, position_index: int) -> Probe:
+        """Return the probe at scan position ``position_index``.
+
+        Without OPR weights one probe describes the whole scan and every position
+        yields it. With them the index selects a weight row, which is why the valid
+        range is the row count rather than anything about the scan.
+
+        Raises:
+            IndexError: when ``position_index`` is negative, or when OPR weights are
+                present and it falls outside them. A position index is a non-negative
+                ordinal rather than a Python sequence index, so a negative value is
+                refused instead of counting from the end.
+        """
+        if position_index < 0:
+            raise IndexError(f'Probe position index {position_index} is negative!')
+
+        num_opr_positions = self.num_opr_positions
+
+        if num_opr_positions is not None and position_index >= num_opr_positions:
+            raise IndexError(
+                f'Probe position index {position_index} is out of range for OPR weights'
+                f' describing {num_opr_positions} position(s)!'
+            )
 
         array = self._array[0, :, :, :].copy()
 
         if self._opr_weights is not None:
             array[0, :, :] = numpy.tensordot(
-                self._opr_weights[index, :], self._array[:, 0, :, :], axes=1
+                self._opr_weights[position_index, :], self._array[:, 0, :, :], axes=1
             )
 
         return Probe(array, self.get_pixel_geometry())
@@ -1112,9 +1136,6 @@ class ProbeSequence(Sequence[Probe]):
             pixel_width_m=pixel_geometry.width_m,
             pixel_height_m=pixel_geometry.height_m,
         )
-
-    def __len__(self) -> int:
-        return 1 if self._opr_weights is None else self._opr_weights.shape[0]
 
     def __repr__(self) -> str:
         return f'{self._array.dtype}{self._array.shape}'
@@ -1264,7 +1285,7 @@ def _evaluate_weight_quadratic_form(weight: RealArrayType, gram: RealArrayType) 
 
 
 def compute_opr_mode_series(
-    probes: ProbeSequence, *, variance_fraction_threshold: float = 0.95
+    probes: ProbeEnsemble, *, variance_fraction_threshold: float = 0.95
 ) -> OPRModeSeries:
     """Reduce an OPR probe ensemble to per-position diagnostics.
 
@@ -1370,9 +1391,9 @@ def _centered_grid_indexes(
     return offsets_px * (target_pixel_m / source_pixel_m) + (source_px - 1) / 2
 
 
-def resample_probe_sequence(
-    probes: ProbeSequence, target_geometry: ProbeGeometry, *, rel_tol: float = 1.0e-9
-) -> ProbeSequence:
+def resample_probe_ensemble(
+    probes: ProbeEnsemble, target_geometry: ProbeGeometry, *, rel_tol: float = 1.0e-9
+) -> ProbeEnsemble:
     """Re-express ``probes`` on ``target_geometry``, preserving the integrated power.
 
     A probe saved by a previous run samples the illumination at that run's pixel size,
@@ -1460,7 +1481,7 @@ def resample_probe_sequence(
     source_area_m2 = pixel_geometry.width_m * pixel_geometry.height_m
     target_area_m2 = target_geometry.pixel_width_m * target_geometry.pixel_height_m
 
-    return ProbeSequence(
+    return ProbeEnsemble(
         array=resampled * numpy.sqrt(target_area_m2 / source_area_m2),
         opr_weights=probes.get_opr_weights_or_none(),
         pixel_geometry=target_geometry.get_pixel_geometry(),
@@ -1499,7 +1520,7 @@ class OPRWeightPolicy(Enum):
     """Keep coherent mode 0 and drop the remaining modes along with the weights."""
 
 
-def _pixel_geometry_or_none(probes: ProbeSequence) -> PixelGeometry | None:
+def _pixel_geometry_or_none(probes: ProbeEnsemble) -> PixelGeometry | None:
     """Pixel geometry of ``probes``, or ``None`` when it records none."""
     try:
         return probes.get_pixel_geometry()
@@ -1509,12 +1530,12 @@ def _pixel_geometry_or_none(probes: ProbeSequence) -> PixelGeometry | None:
 
 def conform_opr_weights(
     rng: numpy.random.Generator,
-    probes: ProbeSequence,
+    probes: ProbeEnsemble,
     num_positions: int,
     policy: OPRWeightPolicy,
     *,
     small_value: float = 1.0e-6,
-) -> ProbeSequence:
+) -> ProbeEnsemble:
     """Re-express ``probes`` so its OPR weights describe ``num_positions`` probe positions.
 
     OPR weights carry one row per probe position, so a probe solved on one scan cannot
@@ -1532,7 +1553,7 @@ def conform_opr_weights(
     weights the modes lack.
 
     :attr:`OPRWeightPolicy.COLLAPSE` applies the mean row across every incoherent mode,
-    where :meth:`ProbeSequence.__getitem__` only ever rewrites incoherent mode 0 from the
+    where :meth:`ProbeEnsemble.get_probe` only ever rewrites incoherent mode 0 from the
     coherent basis.
 
     Args:
@@ -1574,7 +1595,7 @@ def conform_opr_weights(
             return probes
         case OPRWeightPolicy.AVERAGE if weights is not None:
             mean_row = weights.mean(axis=0)
-            return ProbeSequence(
+            return ProbeEnsemble(
                 array=array,
                 opr_weights=numpy.broadcast_to(mean_row, (num_positions, num_cmodes)).copy(),
                 pixel_geometry=pixel_geometry,
@@ -1585,14 +1606,14 @@ def conform_opr_weights(
         case OPRWeightPolicy.REINITIALIZE:
             reinitialized = small_value * rng.normal(size=(num_positions, num_cmodes))
             reinitialized[:, 0] = 1.0
-            return ProbeSequence(
+            return ProbeEnsemble(
                 array=array,
                 opr_weights=reinitialized,
                 pixel_geometry=pixel_geometry,
             )
         case OPRWeightPolicy.COLLAPSE if weights is not None:
             mean_row = weights.mean(axis=0)
-            return ProbeSequence(
+            return ProbeEnsemble(
                 array=numpy.tensordot(mean_row, array, axes=1).astype(array.dtype),
                 opr_weights=None,
                 pixel_geometry=pixel_geometry,
@@ -1601,7 +1622,7 @@ def conform_opr_weights(
             # DISCARD, and COLLAPSE with no mean row to weight by. Copying rather than
             # slicing keeps the discarded modes from staying resident behind a view of
             # the original buffer.
-            return ProbeSequence(
+            return ProbeEnsemble(
                 array=array[:1].copy(),
                 opr_weights=None,
                 pixel_geometry=pixel_geometry,
@@ -1612,7 +1633,7 @@ class ProbeFileReader(ABC):
     """Plugin interface for reading probe sequences."""
 
     @abstractmethod
-    def read(self, file_path: Path) -> ProbeSequence:
+    def read(self, file_path: Path) -> ProbeEnsemble:
         """Read a probe sequence from file."""
         pass
 
@@ -1621,6 +1642,6 @@ class ProbeFileWriter(ABC):
     """Plugin interface for writing probe sequences."""
 
     @abstractmethod
-    def write(self, file_path: Path, probes: ProbeSequence) -> None:
+    def write(self, file_path: Path, probes: ProbeEnsemble) -> None:
         """Write a probe sequence to file."""
         pass

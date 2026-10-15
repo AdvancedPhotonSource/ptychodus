@@ -336,7 +336,7 @@ def compute_probe_overlap(
     weakly constrained points that a global average hides.
 
     The pairwise numerator is sampled from the autocorrelation of the representative
-    probe returned by :meth:`ProbeSequence.get_probe_no_opr`, which keeps the cost at
+    probe returned by :meth:`ProbeEnsemble.get_probe_no_opr`, which keeps the cost at
     ``O(N log N)`` instead of ``O(N^2)``; orthogonal-probe-relaxation variation between
     positions therefore affects the exact per-position normalization but not the shared
     numerator. Treat the pairwise numbers as a scan-geometry diagnostic rather than a

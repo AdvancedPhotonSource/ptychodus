@@ -47,7 +47,7 @@ from ptychodus.api.preprocess.diffraction import (
     FilterValuesStep,
 )
 from ptychodus.api.preprocess.noise import compute_robust_statistics
-from ptychodus.api.probe import Probe, ProbeGeometry, ProbeSequence
+from ptychodus.api.probe import Probe, ProbeGeometry, ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import prepare_reconstruct_input
@@ -763,13 +763,13 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
     if args.num_probe_modes > 1:
         probe = generate_incoherent_probe_modes(probe, args.num_probe_modes)
 
-    probe_sequence: ProbeSequence = generate_coherent_probe_modes(
+    probe_ensemble: ProbeEnsemble = generate_coherent_probe_modes(
         rng,
         probe,
         num_cmodes=args.num_opr_modes,
         num_diffraction_patterns=num_patterns,
     )
-    logger.info('Probe: %s', probe_sequence.get_array().shape)
+    logger.info('Probe: %s', probe_ensemble.get_array().shape)
 
     object_geometry = compute_object_geometry(
         positions, probe_geometry, padding_px=args.object_padding_px
@@ -800,7 +800,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             ),
         ),
         probe_positions=positions,
-        probes=probe_sequence,
+        probes=probe_ensemble,
         object_=object_,
         losses=[],
     )
@@ -821,7 +821,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             'Dry run: %d patterns, %d epochs, probe %s, object %s.',
             num_patterns,
             num_epochs,
-            probe_sequence.get_array().shape,
+            probe_ensemble.get_array().shape,
             object_.get_array().shape,
         )
         logger.info('Would write %s', product_file)

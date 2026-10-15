@@ -30,7 +30,7 @@ from ptychodus.api.io import (
 from ptychodus.api.preprocess.diffraction import zero_bad_pixels
 from ptychodus.api.reconstruct import ReconstructInput
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import LossValue, Product, ProductMetadata
 from ptychodus.api.assemble import AssembledDiffractionData
@@ -106,7 +106,7 @@ def _make_product(
     opr_weights: numpy.ndarray | None = None
     if with_opr:
         opr_weights = rng.standard_normal((num_positions, num_coherent)).astype(numpy.float64)
-    probe = ProbeSequence(
+    probe = ProbeEnsemble(
         array=probe_array,
         opr_weights=opr_weights,
         pixel_geometry=PixelGeometry(width_m=10e-9, height_m=10e-9),

@@ -9,7 +9,7 @@ import pytest
 from ptychodus.api.affine import estimate_affine_transform, transform_product
 from ptychodus.api.affine import AffineTransform, AffineTransformComponents
 from ptychodus.api.object import Object, ObjectGeometry, compute_object_geometry
-from ptychodus.api.probe import ProbeGeometry, ProbeSequence
+from ptychodus.api.probe import ProbeGeometry, ProbeEnsemble
 from ptychodus.api.typing import ComplexArrayType, RealArrayType
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
@@ -867,7 +867,7 @@ def _make_product(
             focus_object_distance_m=focus_object_distance_m,
         ),
         probe_positions=positions,
-        probes=ProbeSequence(
+        probes=ProbeEnsemble(
             array=numpy.zeros((1, 1, 8, 8), dtype=complex),
             opr_weights=None,
             pixel_geometry=probe_geometry.get_pixel_geometry(),

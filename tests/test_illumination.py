@@ -18,7 +18,7 @@ from ptychodus.api.illumination import (
     compute_probe_overlap,
 )
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 
@@ -66,7 +66,7 @@ def _make_product(
         pixel_geometry=pixel_geometry,
         center=ObjectCenter(x_m=object_center[0], y_m=object_center[1]),
     )
-    probes = ProbeSequence(
+    probes = ProbeEnsemble(
         array=probe_array.astype(complex),
         opr_weights=opr_weights,
         pixel_geometry=pixel_geometry,

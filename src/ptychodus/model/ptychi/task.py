@@ -53,7 +53,7 @@ from ptychi.api.options.task import PtychographyTaskOptions
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectPosition
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import LossValue, Product
 from ptychodus.api.reconstruct import (
@@ -143,7 +143,7 @@ def load_task_options(text: str) -> PtychographyTaskOptions:
     return load_task_options_from_mapping(json.loads(text))
 
 
-def _initial_opr_mode_weights(probe: ProbeSequence) -> RealArrayType:
+def _initial_opr_mode_weights(probe: ProbeEnsemble) -> RealArrayType:
     """Return the probe's OPR weights, or all weight on the primary mode."""
     try:
         return probe.get_opr_weights()
@@ -443,7 +443,7 @@ def reconstruct_with_ptychi(
                 pixel_geometry=object_in.get_pixel_geometry(),
                 center=object_in.get_center(),
             )
-            probe_out = ProbeSequence(
+            probe_out = ProbeEnsemble(
                 array=numpy.array(task.get_data_to_cpu('probe', as_numpy=True)),
                 opr_weights=numpy.array(task.get_data_to_cpu('opr_mode_weights', as_numpy=True)),
                 pixel_geometry=product_in.probes.get_pixel_geometry(),

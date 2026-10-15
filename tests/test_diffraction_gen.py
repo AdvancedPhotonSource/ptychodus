@@ -19,7 +19,7 @@ import pytest
 from ptychodus.api.simulate.diffraction import generate_diffraction_data
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.propagate import (
@@ -62,8 +62,8 @@ def _pixel_geometry() -> PixelGeometry:
     return PixelGeometry(width_m=_PIXEL_SIZE_M, height_m=_PIXEL_SIZE_M)
 
 
-def _make_probe_seq(array: numpy.ndarray) -> ProbeSequence:
-    return ProbeSequence(array=array, opr_weights=None, pixel_geometry=_pixel_geometry())
+def _make_probe_seq(array: numpy.ndarray) -> ProbeEnsemble:
+    return ProbeEnsemble(array=array, opr_weights=None, pixel_geometry=_pixel_geometry())
 
 
 def _random_probe(rng: numpy.random.Generator, num_modes: int = 1) -> numpy.ndarray:
@@ -333,7 +333,7 @@ class TestMultiPositionWithoutOpr:
             ProbePosition(index=1, x_m=0.0, y_m=0.0),
             ProbePosition(index=2, x_m=+8 * _PIXEL_SIZE_M, y_m=0.0),
         ]
-        # _make_probe_seq constructs a ProbeSequence with opr_weights=None.
+        # _make_probe_seq constructs a ProbeEnsemble with opr_weights=None.
         product = _make_product(positions, probe, _flat_object())
 
         result = generate_diffraction_data(product)

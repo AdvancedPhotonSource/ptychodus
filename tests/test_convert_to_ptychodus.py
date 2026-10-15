@@ -23,7 +23,7 @@ from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter, ObjectFileReader
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import ProbeFileReader, ProbeSequence
+from ptychodus.api.probe import ProbeFileReader, ProbeEnsemble
 from ptychodus.api.probe_positions import (
     ProbePosition,
     ProbePositionFileReader,
@@ -63,8 +63,8 @@ def _make_object(value: complex, *, with_geometry: bool = True) -> Object:
     )
 
 
-def _make_probes(value: complex, *, with_geometry: bool = True) -> ProbeSequence:
-    return ProbeSequence(
+def _make_probes(value: complex, *, with_geometry: bool = True) -> ProbeEnsemble:
+    return ProbeEnsemble(
         array=numpy.full((1, 1, PROBE_HEIGHT_PX, PROBE_WIDTH_PX), value, dtype=numpy.complex128),
         opr_weights=None,
         pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=PIXEL_M) if with_geometry else None,
@@ -110,7 +110,7 @@ class _StubObjectFileReader(ObjectFileReader):
 
 
 class _StubProbeFileReader(ProbeFileReader):
-    def read(self, file_path: Path) -> ProbeSequence:
+    def read(self, file_path: Path) -> ProbeEnsemble:
         return _make_probes(3.0 + 0.0j, with_geometry=False)
 
 
@@ -324,7 +324,7 @@ def test_a_probe_override_inherits_the_geometry_it_lacks() -> None:
 
 
 def test_a_probe_override_keeps_its_opr_weights() -> None:
-    override = ProbeSequence(
+    override = ProbeEnsemble(
         array=numpy.full(
             (2, 1, PROBE_HEIGHT_PX, PROBE_WIDTH_PX), 3.0 + 0.0j, dtype=numpy.complex128
         ),

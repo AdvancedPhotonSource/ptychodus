@@ -6,10 +6,11 @@ from dataclasses import replace
 
 import numpy
 import numpy.testing
+import pytest
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.propagate import compute_magnification
@@ -40,7 +41,7 @@ def _make_product(
         pixel_geometry=pixel_geometry,
         center=ObjectCenter(x_m=0.0, y_m=0.0),
     )
-    probes = ProbeSequence(
+    probes = ProbeEnsemble(
         array=probe_array.astype(complex),
         opr_weights=opr_weights,
         pixel_geometry=pixel_geometry,
@@ -92,6 +93,35 @@ class TestIterPositionProbes:
         numpy.testing.assert_allclose(pairs[0][1].get_array()[0], 1.0)
         numpy.testing.assert_allclose(pairs[1][1].get_array()[0], 2.0)
         numpy.testing.assert_allclose(pairs[2][1].get_array()[0], 1.5)
+
+    def test_rejects_opr_weights_describing_fewer_positions(self) -> None:
+        """The probe was solved on a shorter scan, so later positions have no weight
+        row to take. That is a disagreement between the two, named as one."""
+        positions = [ProbePosition(index=i, x_m=float(i), y_m=0.0) for i in range(4)]
+        product = _make_product(
+            positions=positions,
+            probe_array=numpy.ones((4, 4), dtype=complex),
+            opr_weights=numpy.ones((2, 1), dtype=float),
+        )
+
+        with pytest.raises(ValueError, match=r'2 probe position\(s\).*has 4'):
+            list(product.iter_position_probes())
+
+    def test_allows_opr_weights_describing_more_positions(self) -> None:
+        """A scan that is a prefix of the one that solved the probe still pairs row
+        for row; the surplus rows are simply unused."""
+        positions = [ProbePosition(index=i, x_m=float(i), y_m=0.0) for i in range(2)]
+        probe = numpy.stack(
+            [numpy.full((1, 4, 4), 1.0), numpy.full((1, 4, 4), 2.0)], axis=0
+        ).astype(complex)
+        opr_weights = numpy.array([[1.0, 0.0], [0.0, 1.0], [0.5, 0.5]], dtype=float)
+        product = _make_product(positions=positions, probe_array=probe, opr_weights=opr_weights)
+
+        pairs = list(product.iter_position_probes())
+
+        assert len(pairs) == 2
+        numpy.testing.assert_allclose(pairs[0][1].get_array()[0], 1.0)
+        numpy.testing.assert_allclose(pairs[1][1].get_array()[0], 2.0)
 
     def test_yields_position_objects_with_correct_fields(self) -> None:
         positions = [

@@ -26,7 +26,7 @@ import numpy
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructInput
@@ -128,7 +128,7 @@ def _product(pattern_size: int) -> Product:
     return Product(
         metadata=metadata,
         probe_positions=ProbePositionSequence(positions),
-        probes=ProbeSequence(array=probe_array, opr_weights=None, pixel_geometry=pixel_geometry),
+        probes=ProbeEnsemble(array=probe_array, opr_weights=None, pixel_geometry=pixel_geometry),
         object_=Object(
             array=object_array,
             layer_spacing_m=[],

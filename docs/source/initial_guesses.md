@@ -53,7 +53,7 @@ The product contains four main pieces of initial data:
 
 - metadata: detector distance, probe energy, photon count, exposure time, etc.;
 - probe positions: a {py:class}`ptychodus.api.probe_positions.ProbePositionSequence`;
-- probe: a {py:class}`ptychodus.api.probe.ProbeSequence`;
+- probe: a {py:class}`ptychodus.api.probe.ProbeEnsemble`;
 - object: a {py:class}`ptychodus.api.object.Object`.
 
 The workflow methods select generator builders by name. Passing no name uses the current settings. Passing a name plus a parameter mapping creates a builder for that product and immediately rebuilds the corresponding data.
@@ -66,10 +66,10 @@ Probe
 : A single {py:class}`ptychodus.api.probe.Probe` stores its array as `(n_incoherent_modes, height, width)`. A two-dimensional complex input is promoted to `(1, height, width)`.
 
 Probe sequence
-: {py:class}`ptychodus.api.probe.ProbeSequence` stores its array as `(n_coherent_modes, n_incoherent_modes, height, width)`. The first dimension is the OPR/coherent-mode dimension. The second dimension is the mutually incoherent probe-mode dimension. A two-dimensional complex input is promoted to `(1, 1, height, width)`; a three-dimensional input is promoted to `(1, n_incoherent_modes, height, width)`.
+: {py:class}`ptychodus.api.probe.ProbeEnsemble` stores its array as `(n_coherent_modes, n_incoherent_modes, height, width)`. The first dimension is the OPR/coherent-mode dimension. The second dimension is the mutually incoherent probe-mode dimension. A two-dimensional complex input is promoted to `(1, 1, height, width)`; a three-dimensional input is promoted to `(1, n_incoherent_modes, height, width)`.
 
 OPR weights
-: If OPR/coherent modes are active, `ProbeSequence` may also carry `opr_weights` with shape `(n_scan_points, n_coherent_modes)`. When a scan point is indexed from a `ProbeSequence`, Ptychodus forms the position-specific dominant incoherent mode as the weighted sum of the coherent/OPR modes and then returns a regular `Probe`.
+: If OPR/coherent modes are active, `ProbeEnsemble` may also carry `opr_weights` with shape `(n_scan_points, n_coherent_modes)`. Asking a `ProbeEnsemble` for the probe at a scan position forms the position-specific dominant incoherent mode as the weighted sum of the coherent/OPR modes and returns a regular `Probe`. Without `opr_weights` one probe describes every position, which is why a `ProbeEnsemble` is addressed by position rather than being a sequence with a length.
 
 Object
 : {py:class}`ptychodus.api.object.Object` stores its complex transmission array as `(n_layers, height, width)`. A two-dimensional complex input is promoted to `(1, height, width)`. For multislice objects, the `layer_spacing_m` sequence must contain `n_layers - 1` spacings.
@@ -81,7 +81,7 @@ Probe positions
 
 An object or probe is sampled at the pixel size its own run implied, which the photon energy and the detector distance fix. Reusing one as an initial guess for a run that samples differently means starting from a guess of the wrong physical scale, and nothing downstream reveals it: the reconstruction simply converges to the wrong answer.
 
-Ptychodus therefore reconciles a file-supplied guess to the run's sampling. {py:func}`ptychodus.api.object.resample_object_to_pixel_size` re-expresses an object at the run's pixel size, preserving its physical extent and center and letting the pixel count absorb the difference; {py:func}`ptychodus.api.probe.resample_probe_sequence` re-expresses every probe mode on the run's probe grid, scaling amplitudes so the photon count survives. Both interpolate with a monotone cubic, so no resampled amplitude or phase overshoots the source, and both return the input untouched when the two samplings already agree.
+Ptychodus therefore reconciles a file-supplied guess to the run's sampling. {py:func}`ptychodus.api.object.resample_object_to_pixel_size` re-expresses an object at the run's pixel size, preserving its physical extent and center and letting the pixel count absorb the difference; {py:func}`ptychodus.api.probe.resample_probe_ensemble` re-expresses every probe mode on the run's probe grid, scaling amplitudes so the photon count survives. Both interpolate with a monotone cubic, so no resampled amplitude or phase overshoots the source, and both return the input untouched when the two samplings already agree.
 
 ```{note}
 This reconciliation only ever fires for a file format that records its pixel size. None of the registered object or probe formats do — NPY and CSV store a bare array — so a guess loaded from one of those is taken to be sampled the way the current run is, exactly as before.
@@ -178,19 +178,19 @@ The GUI builder exposes these as presets. Programmatic workflow use can pass the
 
 ## Probe Mode Generation
 
-Every generated probe type uses the shared `ProbeSequenceBuilder._build_probe_modes` path:
+Every generated probe type uses the shared `ProbeEnsembleBuilder._build_probe_modes` path:
 
 1. Generate one base {py:class}`ptychodus.api.probe.Probe`.
 2. Expand to `num_incoherent_modes` with {py:func}`ptychodus.api.simulate.probe.generate_incoherent_probe_modes`.
 3. Expand to `num_coherent_modes` OPR modes with {py:func}`ptychodus.api.simulate.probe.generate_coherent_probe_modes`.
-4. Store the final result as a `ProbeSequence` with array shape `(num_coherent_modes, num_incoherent_modes, height, width)`.
+4. Store the final result as a `ProbeEnsemble` with array shape `(num_coherent_modes, num_incoherent_modes, height, width)`.
 
 ### Incoherent Modes
 
 The incoherent-mode controls are:
 
 `num_incoherent_modes`
-: Number of mutually incoherent modes to store in axis 1 of the final `ProbeSequence`.
+: Number of mutually incoherent modes to store in axis 1 of the final `ProbeEnsemble`.
 
 `orthogonalize_incoherent_modes`
 : If true and more than one incoherent mode is requested, the generated modes are orthogonalized with `scipy.linalg.orth`.
@@ -234,10 +234,10 @@ Because the weights are normalized before intensity rescaling, only their relati
 
 ### OPR / Coherent Modes
 
-Ptychodus uses the term `coherent modes` for the leading `ProbeSequence` dimension. In the reconstruction context this is the OPR mode dimension. The control is:
+Ptychodus uses the term `coherent modes` for the leading `ProbeEnsemble` dimension. In the reconstruction context this is the OPR mode dimension. The control is:
 
 `num_coherent_modes`
-: Number of OPR/coherent modes to store in axis 0 of the final `ProbeSequence`.
+: Number of OPR/coherent modes to store in axis 0 of the final `ProbeEnsemble`.
 
 For `num_coherent_modes == 1`, no OPR weights are stored and the probe sequence length is one.
 
@@ -267,7 +267,7 @@ The setting is `OPRWeightPolicy` in the `Probe` group, defaulting to `Average`. 
 Opening a probe file that carries OPR weights in the GUI prompts for the policy, stating both counts, and that choice applies to that one load whether or not the counts agree. `Use as is` is offered only when they do.
 
 ```{note}
-`COLLAPSE` applies the mean weight row across every incoherent mode. Indexing a position out of a {py:class}`ptychodus.api.probe.ProbeSequence` instead rewrites only incoherent mode 0 from the coherent basis.
+`COLLAPSE` applies the mean weight row across every incoherent mode. Asking a {py:class}`ptychodus.api.probe.ProbeEnsemble` for the probe at a position instead rewrites only incoherent mode 0 from the coherent basis.
 ```
 
 ### Inspecting an OPR Probe
@@ -324,7 +324,7 @@ The same mode parameters work with other generated probe types such as `disk`, `
 
 #### Add incoherent and OPR modes to an existing single-mode probe
 
-The workflow API can load an existing probe with `load_probe()`, but the current high-level `generate_probe()` call replaces the probe with a named generator rather than augmenting the loaded probe in place. To augment an already loaded single-mode probe, use the low-level mode-expansion routines on the loaded `ProbeSequence` and then register the updated product back with the workflow API.
+The workflow API can load an existing probe with `load_probe()`, but the current high-level `generate_probe()` call replaces the probe with a named generator rather than augmenting the loaded probe in place. To augment an already loaded single-mode probe, use the low-level mode-expansion routines on the loaded `ProbeEnsemble` and then register the updated product back with the workflow API.
 
 ```python
 from pathlib import Path
@@ -348,7 +348,7 @@ with ModelCore(Path('settings.ini')) as model:
 
     product = product_api.get_product()
 
-    # Collapse any OPR handling in the loaded ProbeSequence and start from
+    # Collapse any OPR handling in the loaded ProbeEnsemble and start from
     # the first coherent/OPR mode as a regular Probe.
     base_probe = product.probes.get_probe_no_opr()
 
@@ -358,7 +358,7 @@ with ModelCore(Path('settings.ini')) as model:
         orthogonalize=True,
     )
 
-    expanded_probe_sequence = generate_coherent_probe_modes(
+    expanded_probe_ensemble = generate_coherent_probe_modes(
         model.rng,
         probe_with_incoherent_modes,
         num_cmodes=2,
@@ -368,7 +368,7 @@ with ModelCore(Path('settings.ini')) as model:
     expanded_product = Product(
         metadata=product.metadata,
         probe_positions=product.probe_positions,
-        probes=expanded_probe_sequence,
+        probes=expanded_probe_ensemble,
         object_=product.object_,
         losses=product.losses,
     )
@@ -381,7 +381,7 @@ with ModelCore(Path('settings.ini')) as model:
     )
 ```
 
-This replaces the probe with a new `ProbeSequence` whose shape is `(2, 3, height, width)` and whose OPR weights have shape `(n_scan_points, 2)`.
+This replaces the probe with a new `ProbeEnsemble` whose shape is `(2, 3, height, width)` and whose OPR weights have shape `(n_scan_points, 2)`.
 
 ## Object Generators
 
@@ -469,7 +469,7 @@ probe_with_imodes = generate_incoherent_probe_modes(
     3,
     orthogonalize=True,
 )
-probe_sequence = generate_coherent_probe_modes(
+probe_ensemble = generate_coherent_probe_modes(
     rng,
     probe_with_imodes,
     num_cmodes=2,
@@ -517,7 +517,7 @@ Pty-Chi's documented probe convention is `(n_opr_modes, n_modes, height, width)`
 - `n_opr_modes` is the OPR/eigenmode dimension;
 - `n_modes` is the mutually incoherent probe-mode dimension.
 
-This matches Ptychodus `ProbeSequence.get_array()`:
+This matches Ptychodus `ProbeEnsemble.get_array()`:
 
 - Ptychodus `num_coherent_modes` maps to Pty-Chi `n_opr_modes`;
 - Ptychodus `num_incoherent_modes` maps to Pty-Chi `n_modes`.
@@ -535,7 +535,7 @@ Pty-Chi accepts OPR weights as either:
 
 Ptychodus generated OPR weights use `(n_scan_points, n_coherent_modes)` when `num_coherent_modes > 1`. This is directly compatible with Pty-Chi.
 
-If the probe has more than one OPR mode, Pty-Chi requires initial OPR weights. Ptychodus satisfies this when the OPR modes were generated by `generate_coherent_probe_modes`. If a custom `ProbeSequence` is created manually with multiple leading modes, provide matching `opr_weights`.
+If the probe has more than one OPR mode, Pty-Chi requires initial OPR weights. Ptychodus satisfies this when the OPR modes were generated by `generate_coherent_probe_modes`. If a custom `ProbeEnsemble` is created manually with multiple leading modes, provide matching `opr_weights`.
 
 ### Positions and Object Origin
 

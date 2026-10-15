@@ -16,7 +16,7 @@ from ptychodus.api.diffraction import (
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.product import LossValue, Product, ProductFileReader, ProductMetadata
 from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 
@@ -131,7 +131,7 @@ class SLACProductFileReader(ProductFileReader):
         return Product(
             metadata=metadata,
             probe_positions=ProbePositionSequence(point_list),
-            probes=ProbeSequence(array=probe_array, opr_weights=None, pixel_geometry=None),
+            probes=ProbeEnsemble(array=probe_array, opr_weights=None, pixel_geometry=None),
             object_=Object(
                 array=object_array,
                 pixel_geometry=None,

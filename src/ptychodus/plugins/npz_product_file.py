@@ -22,7 +22,7 @@ from ptychodus.api.diffraction import Polarization
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.product import (
     Product,
     ProductFileReader,
@@ -163,7 +163,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
                     npz_file, self.PROBE_PIXEL_HEIGHT, object_pixel_geometry.height_m
                 ),
             )
-            probe = ProbeSequence(
+            probe = ProbeEnsemble(
                 array=npz_file[self.PROBE_ARRAY],
                 opr_weights=_read_array(npz_file, self.OPR_WEIGHTS),
                 pixel_geometry=probe_pixel_geometry,

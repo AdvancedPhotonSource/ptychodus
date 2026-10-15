@@ -23,7 +23,7 @@ from ptychodus.api.io import (
     save_training_data,
 )
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.propagate import compute_far_field_pixel_geometry
@@ -66,7 +66,7 @@ def _make_reconstruct_input(*, with_bad_pixels: bool = True) -> ReconstructInput
 
     # Two OPR coherent modes, so taking index zero is an observable choice.
     probe_shape = (2, NUM_MODES, DETECTOR_PX, DETECTOR_PX)
-    probes = ProbeSequence(
+    probes = ProbeEnsemble(
         array=rng.standard_normal(probe_shape) + 1j * rng.standard_normal(probe_shape),
         opr_weights=rng.standard_normal((NUM_POSITIONS, 2)),
         pixel_geometry=pixel_geometry,

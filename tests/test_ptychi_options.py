@@ -34,7 +34,7 @@ pytest.importorskip('ptychi')
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.parameters import IntegerParameter, RealParameter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructInput
@@ -108,7 +108,7 @@ def _make_reconstruct_input() -> ReconstructInput:
         center=ObjectCenter(x_m=0.0, y_m=0.0),
         layer_spacing_m=[],
     )
-    probes = ProbeSequence(
+    probes = ProbeEnsemble(
         array=(
             rng.standard_normal((1, 1, PROBE_HEIGHT_PX, PROBE_WIDTH_PX))
             + 1j * rng.standard_normal((1, 1, PROBE_HEIGHT_PX, PROBE_WIDTH_PX))
@@ -310,10 +310,10 @@ def test_built_options_carry_no_task_data() -> None:
         assert options.opr_mode_weight_options.initial_weights is None
 
 
-def _make_probes(num_coherent_modes: int, opr_weights: numpy.ndarray | None) -> ProbeSequence:
+def _make_probes(num_coherent_modes: int, opr_weights: numpy.ndarray | None) -> ProbeEnsemble:
     rng = numpy.random.default_rng(1)
     shape = (num_coherent_modes, 1, PROBE_HEIGHT_PX, PROBE_WIDTH_PX)
-    return ProbeSequence(
+    return ProbeEnsemble(
         array=(rng.standard_normal(shape) + 1j * rng.standard_normal(shape)).astype(
             numpy.complex128
         ),
@@ -995,7 +995,7 @@ def test_align_reads_a_differing_probe_pixel_geometry() -> None:
     """
     parameters = _make_reconstruct_input()
     probes = parameters.product.probes
-    resampled = ProbeSequence(
+    resampled = ProbeEnsemble(
         array=probes.get_array(),
         opr_weights=None,
         pixel_geometry=PixelGeometry(width_m=2.0 * PIXEL_M, height_m=4.0 * PIXEL_M),
@@ -1015,7 +1015,7 @@ def test_align_inherits_probe_pixel_width_when_only_the_aspect_ratio_differs() -
     """pty-chi inherits each omitted probe field independently, so we write them so."""
     parameters = _make_reconstruct_input()
     probes = parameters.product.probes
-    tall = ProbeSequence(
+    tall = ProbeEnsemble(
         array=probes.get_array(),
         opr_weights=None,
         pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=2.0 * PIXEL_M),
@@ -1031,12 +1031,12 @@ def test_align_inherits_probe_pixel_width_when_only_the_aspect_ratio_differs() -
 def test_align_tolerates_a_probe_without_pixel_geometry() -> None:
     """A probe that cannot report its sampling must not make alignment raise.
 
-    ``ProbeSequence.get_pixel_geometry`` raises when unset, and such a product
+    ``ProbeEnsemble.get_pixel_geometry`` raises when unset, and such a product
     reconstructed fine before the probe fields existed; it must still align.
     """
     parameters = _make_reconstruct_input()
     probes = parameters.product.probes
-    ungeometried = ProbeSequence(
+    ungeometried = ProbeEnsemble(
         array=probes.get_array(),
         opr_weights=None,
         pixel_geometry=None,

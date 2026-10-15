@@ -9,13 +9,13 @@ from ptychodus.api.probe import (
     OPRWeightPolicy,
     ProbeFileReader,
     ProbeFileWriter,
-    ProbeSequence,
+    ProbeEnsemble,
 )
 from ptychodus.api.simulate.probe import FresnelZonePlate, KirkpatrickBaezMirrorPair
 
 from ...diffraction import AssembledDiffractionDataset
 from .average_pattern import AveragePatternProbeBuilder
-from .builder import FromFileProbeBuilder, ProbeSequenceBuilder
+from .builder import FromFileProbeBuilder, ProbeEnsembleBuilder
 from .disk import DiskProbeBuilder
 from .fzp import FresnelZonePlateProbeBuilder
 from .hermite import HermiteProbeBuilder
@@ -45,7 +45,7 @@ class ProbeBuilderFactory(Iterable[str]):
         self._kb_mirror_chooser = kb_mirror_chooser
         self._file_reader_chooser = file_reader_chooser
         self._file_writer_chooser = file_writer_chooser
-        self._non_diffraction_builders: Mapping[str, Callable[[], ProbeSequenceBuilder]] = {
+        self._non_diffraction_builders: Mapping[str, Callable[[], ProbeEnsembleBuilder]] = {
             'disk': lambda: DiskProbeBuilder(rng, settings),
             'fresnel_zone_plate': self._create_fresnel_zone_plate_builder,
             'hermite': lambda: HermiteProbeBuilder(rng, settings),
@@ -55,7 +55,7 @@ class ProbeBuilderFactory(Iterable[str]):
             'zernike': lambda: ZernikeProbeBuilder(rng, settings),
         }
         self._diffraction_builders: Mapping[
-            str, Callable[[AssembledDiffractionDataset], ProbeSequenceBuilder]
+            str, Callable[[AssembledDiffractionDataset], ProbeEnsembleBuilder]
         ] = {
             'average_pattern': lambda dataset: AveragePatternProbeBuilder(rng, settings, dataset),
         }
@@ -66,7 +66,7 @@ class ProbeBuilderFactory(Iterable[str]):
 
     def create(
         self, name: str, *, dataset: AssembledDiffractionDataset | None = None
-    ) -> ProbeSequenceBuilder:
+    ) -> ProbeEnsembleBuilder:
         diffraction_factory = self._diffraction_builders.get(name)
         if diffraction_factory is not None:
             if dataset is None:
@@ -81,12 +81,12 @@ class ProbeBuilderFactory(Iterable[str]):
             raise KeyError(f'Unknown probe builder "{name}"!') from exc
         return factory()
 
-    def create_default(self) -> ProbeSequenceBuilder:
+    def create_default(self) -> ProbeEnsembleBuilder:
         return next(iter(self._non_diffraction_builders.values()))()
 
     def create_from_settings(
         self, *, dataset: AssembledDiffractionDataset | None = None
-    ) -> ProbeSequenceBuilder:
+    ) -> ProbeEnsembleBuilder:
         name = self._settings.builder.get_value()
         name_repaired = name.casefold()
 
@@ -98,12 +98,12 @@ class ProbeBuilderFactory(Iterable[str]):
 
         return self.create(name_repaired, dataset=dataset)
 
-    def _create_fresnel_zone_plate_builder(self) -> ProbeSequenceBuilder:
+    def _create_fresnel_zone_plate_builder(self) -> ProbeEnsembleBuilder:
         return FresnelZonePlateProbeBuilder(
             self._rng, self._settings, self._fresnel_zone_plate_chooser
         )
 
-    def _create_kb_mirror_builder(self) -> ProbeSequenceBuilder:
+    def _create_kb_mirror_builder(self) -> ProbeEnsembleBuilder:
         return KBMirrorProbeBuilder(self._rng, self._settings, self._kb_mirror_chooser)
 
     def get_open_file_filters(self) -> Iterator[str]:
@@ -113,7 +113,7 @@ class ProbeBuilderFactory(Iterable[str]):
     def get_open_file_filter(self) -> str:
         return self._file_reader_chooser.get_current_plugin().display_name
 
-    def read_probe_from_file(self, file_path: Path, file_filter: str) -> ProbeSequence:
+    def read_probe_from_file(self, file_path: Path, file_filter: str) -> ProbeEnsemble:
         """Read a probe without binding it to a repository item.
 
         This is the probe the builder from `create_probe_from_file` would ingest, read
@@ -133,7 +133,7 @@ class ProbeBuilderFactory(Iterable[str]):
         file_filter: str,
         *,
         opr_weight_policy: OPRWeightPolicy | None = None,
-    ) -> ProbeSequenceBuilder:
+    ) -> ProbeEnsembleBuilder:
         self._file_reader_chooser.set_current_plugin(file_filter)
         file_reader = self._file_reader_chooser.get_current_plugin().strategy
 
@@ -151,7 +151,7 @@ class ProbeBuilderFactory(Iterable[str]):
     def get_save_file_filter(self) -> str:
         return self._file_writer_chooser.get_current_plugin().display_name
 
-    def save_probe(self, file_path: Path, file_filter: str, probe: ProbeSequence) -> None:
+    def save_probe(self, file_path: Path, file_filter: str, probe: ProbeEnsemble) -> None:
         self._file_writer_chooser.set_current_plugin(file_filter)
         file_type = self._file_writer_chooser.get_current_plugin().simple_name
         logger.debug(f'Writing "{file_path}" as "{file_type}"')

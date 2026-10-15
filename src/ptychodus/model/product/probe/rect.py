@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
+from ptychodus.api.probe import ProbeEnsemble, ProbeGeometryProvider
 from ptychodus.api.simulate.probe import (
     propagate_probe,
     generate_rectangular_probe,
 )
 
-from .builder import ProbeSequenceBuilder
+from .builder import ProbeEnsembleBuilder
 from .settings import ProbeSettings
 
 
-class RectangularProbeBuilder(ProbeSequenceBuilder):
+class RectangularProbeBuilder(ProbeEnsembleBuilder):
     def __init__(self, rng: numpy.random.Generator, settings: ProbeSettings) -> None:
         super().__init__(rng, settings, 'rectangular')
         self._settings = settings
@@ -35,7 +35,7 @@ class RectangularProbeBuilder(ProbeSequenceBuilder):
 
         return builder
 
-    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
         return self._rescale_to_photon_count(
             propagate_probe(
                 generate_rectangular_probe(

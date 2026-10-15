@@ -15,7 +15,7 @@ from .preprocess.diffraction import inpaint_bad_pixels, zero_bad_pixels
 from .fluorescence import ElementMap, FluorescenceDataset
 from .geometry import PixelGeometry
 from .object import Object, ObjectCenter
-from .probe import ProbeSequence
+from .probe import ProbeEnsemble
 from .probe_positions import ProbePositionSequence, ProbePosition
 from .product import LossValue, Product, ProductMetadata
 from .reconstruct import ReconstructInput
@@ -370,7 +370,7 @@ def load_product(file: Path) -> Product:
             else:
                 raise ValueError('OPR weights is not a dataset!')
 
-        probe = ProbeSequence(
+        probe = ProbeEnsemble(
             array=h5_probe[()],
             opr_weights=opr_weights,
             pixel_geometry=probe_pixel_geometry,

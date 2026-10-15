@@ -4,17 +4,17 @@ from collections.abc import Iterator
 import numpy
 
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
+from ptychodus.api.probe import ProbeEnsemble, ProbeGeometryProvider
 from ptychodus.api.simulate.probe import (
     FresnelZonePlate,
     generate_fresnel_zone_plate_probe,
 )
 
-from .builder import ProbeSequenceBuilder
+from .builder import ProbeEnsembleBuilder
 from .settings import ProbeSettings
 
 
-class FresnelZonePlateProbeBuilder(ProbeSequenceBuilder):
+class FresnelZonePlateProbeBuilder(ProbeEnsembleBuilder):
     def __init__(
         self,
         rng: numpy.random.Generator,
@@ -59,7 +59,7 @@ class FresnelZonePlateProbeBuilder(ProbeSequenceBuilder):
         self.outermost_zone_width_m.set_value(fzp.outermost_zone_width_m)
         self.central_beamstop_diameter_m.set_value(fzp.central_beamstop_diameter_m)
 
-    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
         zone_plate = FresnelZonePlate(
             zone_plate_diameter_m=self.zone_plate_diameter_m.get_value(),
             outermost_zone_width_m=self.outermost_zone_width_m.get_value(),

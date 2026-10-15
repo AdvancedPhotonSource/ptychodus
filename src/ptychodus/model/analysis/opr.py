@@ -7,7 +7,7 @@ from ptychodus.api.assemble import compute_probe_photon_counts_by_index
 from ptychodus.api.probe import (
     OPRModeSeries,
     OPRModeStatistics,
-    ProbeSequence,
+    ProbeEnsemble,
     compute_opr_mode_series,
 )
 from ptychodus.api.probe_positions import ProbePositionSequence
@@ -34,7 +34,7 @@ class OPRModeAnalyzer:
     def get_product_name(self, product_index: int) -> str:
         return self._repository[product_index].get_name()
 
-    def get_probes(self, product_index: int) -> ProbeSequence:
+    def get_probes(self, product_index: int) -> ProbeEnsemble:
         return self._repository[product_index].get_probe_item().get_probes()
 
     def get_probe_positions(self, product_index: int) -> ProbePositionSequence:
@@ -72,11 +72,13 @@ class OPRModeAnalyzer:
         probes = item.get_probe_item().get_probes()
         num_positions = len(item.get_probe_positions_item().get_probe_positions())
 
-        if len(probes) != num_positions:
+        num_opr_positions = probes.num_opr_positions
+
+        if num_opr_positions is not None and num_opr_positions != num_positions:
             logger.warning(
                 'OPR weights describe %d probe position(s) but the product has %d; '
                 'per-position quantities can only be paired over the shorter of the two.',
-                len(probes),
+                num_opr_positions,
                 num_positions,
             )
 

@@ -35,7 +35,7 @@ from ptychodus.api.object import (
 )
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import DiffractionPrepPipeline, FilterValuesStep
-from ptychodus.api.probe import ProbeGeometry, ProbeSequence, resample_probe_sequence
+from ptychodus.api.probe import ProbeGeometry, ProbeEnsemble, resample_probe_ensemble
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import prepare_reconstruct_input
@@ -155,7 +155,7 @@ def _build_initial_probe(
     photon_wavelength_m: float,
     num_patterns: int,
     rng: numpy.random.Generator,
-) -> ProbeSequence:
+) -> ProbeEnsemble:
     """The starting probe: the zone-plate model, or one file shared by every scan."""
     initial = settings.initial_probe
 
@@ -163,7 +163,7 @@ def _build_initial_probe(
         preset = initial.simulated_probe.fzp_preset
         logger.info('Simulating the initial probe from zone plate preset "%s"', preset)
         zone_plate = registry.fresnel_zone_plates.get_strategy_by_name(preset)
-        probes = ProbeSequence(
+        probes = ProbeEnsemble(
             array=generate_fresnel_zone_plate_probe(
                 probe_geometry,
                 zone_plate,
@@ -183,7 +183,7 @@ def _build_initial_probe(
         # probe pitch follows the wavelength and detector distance, and both are resolved
         # per scan. A no-op whenever they agree, and it is what lets a warm start come
         # from a reconstruction done at a different resolution.
-        probes = resample_probe_sequence(reader.read(file_path), probe_geometry)
+        probes = resample_probe_ensemble(reader.read(file_path), probe_geometry)
 
     probe = probes.get_probe_no_opr()
 
@@ -378,7 +378,7 @@ def reconstruct_one_scan(
     )
 
     rng = numpy.random.default_rng(settings.misc.seed)
-    probe_sequence = _build_initial_probe(
+    probe_ensemble = _build_initial_probe(
         settings,
         registry,
         probe_geometry,
@@ -412,7 +412,7 @@ def reconstruct_one_scan(
             tomography_angle_deg=tomography_angle_deg,
         ),
         probe_positions=positions,
-        probes=probe_sequence,
+        probes=probe_ensemble,
         object_=object_,
         losses=[],
     )

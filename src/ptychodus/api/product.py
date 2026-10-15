@@ -9,7 +9,7 @@ from sys import getsizeof
 from .constants import energy_eV_to_J, energy_eV_to_wavelength_m
 from .diffraction import Polarization
 from .object import Object
-from .probe import Probe, ProbeSequence
+from .probe import Probe, ProbeEnsemble
 from .probe_positions import ProbePosition, ProbePositionSequence
 from .propagate import compute_magnification
 
@@ -81,7 +81,7 @@ class Product:
 
     metadata: ProductMetadata
     probe_positions: ProbePositionSequence
-    probes: ProbeSequence
+    probes: ProbeEnsemble
     object_: Object
     losses: Sequence[LossValue]
 
@@ -94,9 +94,29 @@ class Product:
         return sz
 
     def iter_position_probes(self) -> Iterator[tuple[ProbePosition, Probe]]:
-        """Yield ``(scan_position, probe)`` pairs for every scan position."""
+        """Yield ``(scan_position, probe)`` pairs for every scan position.
+
+        Without OPR weights one probe describes the whole scan and is yielded at every
+        position. With them each position takes its own weight row, and weights carrying
+        more rows than the scan has positions are left unused -- a scan that is a prefix
+        of the one that solved the probe still pairs row for row.
+
+        Raises:
+            ValueError: when the OPR weights describe fewer positions than the scan
+                holds, which leaves later positions with no row to take. Reconcile the
+                weights with an OPR weight policy before pairing them with this scan.
+        """
+        num_positions = len(self.probe_positions)
+        num_opr_positions = self.probes.num_opr_positions
+
+        if num_opr_positions is not None and num_opr_positions < num_positions:
+            raise ValueError(
+                f'Probe carries OPR weights for {num_opr_positions} probe position(s)'
+                f' but the product has {num_positions}!'
+            )
+
         for index, position in enumerate(self.probe_positions):
-            yield position, self.probes[index]
+            yield position, self.probes.get_probe(index)
 
 
 class ProductFileReader(ABC):

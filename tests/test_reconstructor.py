@@ -12,7 +12,7 @@ import pytest
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.assemble import AssembledDiffractionData
@@ -61,13 +61,13 @@ def _make_object(num_layers: int = 1, *, seed: int = 0) -> Object:
 
 def _make_probes(
     *, num_coherent_modes: int = 1, num_incoherent_modes: int = 1, seed: int = 1
-) -> ProbeSequence:
+) -> ProbeEnsemble:
     rng = numpy.random.default_rng(seed)
     shape = (num_coherent_modes, num_incoherent_modes, PROBE_HEIGHT_PX, PROBE_WIDTH_PX)
     real = rng.standard_normal(shape)
     imag = rng.standard_normal(shape)
     array = (real + 1j * imag).astype(numpy.complex128)
-    return ProbeSequence(
+    return ProbeEnsemble(
         array=array,
         opr_weights=None,
         pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=PIXEL_M),
@@ -335,7 +335,7 @@ class TestStandardizeProductOPRPassthrough:
             + 1j * rng.standard_normal((2, 1, PROBE_HEIGHT_PX, PROBE_WIDTH_PX))
         ).astype(numpy.complex128)
         weights = rng.standard_normal((5, 2)).astype(numpy.float64)
-        probes = ProbeSequence(
+        probes = ProbeEnsemble(
             array=array,
             opr_weights=weights,
             pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=PIXEL_M),
@@ -1148,7 +1148,7 @@ def _product_with_regime(
     at 10 um it reads Fr ~ 52, deeply near field.
     """
     product = _make_product()
-    probes = ProbeSequence(
+    probes = ProbeEnsemble(
         array=product.probes.get_array(),
         opr_weights=None,
         pixel_geometry=PixelGeometry(width_m=pixel_m, height_m=pixel_m),

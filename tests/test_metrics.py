@@ -30,7 +30,7 @@ from ptychodus.api.metrics import (
     compute_structural_similarity,
 )
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructionAmbiguities
@@ -935,11 +935,11 @@ def _make_object(
     )
 
 
-def _make_probes() -> ProbeSequence:
+def _make_probes() -> ProbeEnsemble:
     rng = numpy.random.default_rng(1)
     shape = (1, 1, _PROBE_HEIGHT_PX, _PROBE_WIDTH_PX)
     array = (rng.standard_normal(shape) + 1j * rng.standard_normal(shape)).astype(numpy.complex128)
-    return ProbeSequence(
+    return ProbeEnsemble(
         array=array,
         opr_weights=None,
         pixel_geometry=PixelGeometry(width_m=_PIXEL_M, height_m=_PIXEL_M),

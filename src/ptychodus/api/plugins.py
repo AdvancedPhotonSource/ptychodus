@@ -28,7 +28,7 @@ from .fluorescence import (
 from .object import ObjectFileReader, ObjectFileWriter, Object
 from .observer import Observable, Observer
 from .parameters import Parameter, StringParameter
-from .probe import ProbeFileReader, ProbeFileWriter, ProbeSequence
+from .probe import ProbeFileReader, ProbeFileWriter, ProbeEnsemble
 from .simulate.probe import FresnelZonePlate, KirkpatrickBaezMirrorPair
 from .probe_positions import (
     ProbePositionFileReader,
@@ -68,7 +68,7 @@ class ProductProbeFileReader(ProbeFileReader):
         super().__init__()
         self._reader = reader
 
-    def read(self, file_path: Path) -> ProbeSequence:
+    def read(self, file_path: Path) -> ProbeEnsemble:
         product = self._reader.read(file_path)
         return product.probes
 

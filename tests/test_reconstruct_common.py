@@ -31,7 +31,7 @@ from ptychodus.api.diffraction import BeamCenter, CropRegion
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.preprocess.diffraction import FilterValuesStep
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
@@ -87,7 +87,7 @@ def _make_reconstruct_input() -> ReconstructInput:
         center=ObjectCenter(x_m=0.0, y_m=0.0),
         layer_spacing_m=[],
     )
-    probes = ProbeSequence(
+    probes = ProbeEnsemble(
         array=(
             rng.standard_normal((1, 1, PROBE_HEIGHT_PX, PROBE_WIDTH_PX))
             + 1j * rng.standard_normal((1, 1, PROBE_HEIGHT_PX, PROBE_WIDTH_PX))

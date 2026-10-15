@@ -19,7 +19,7 @@ import pytest
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
@@ -57,7 +57,7 @@ def _minimal_product() -> Product:
     return Product(
         metadata=metadata,
         probe_positions=ProbePositionSequence([]),
-        probes=ProbeSequence(
+        probes=ProbeEnsemble(
             array=numpy.zeros((1, 1, 4, 4), dtype=numpy.complex64),
             opr_weights=None,
             pixel_geometry=pixel_geometry,

@@ -35,7 +35,7 @@ from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.io import TrainingDataFileKeys
 from ptychodus.api.object import Object, ObjectGeometry, ObjectPosition
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductFileReader, ProductMetadata
 from ptychodus.api.propagate import compute_far_field_pixel_geometry
@@ -158,7 +158,7 @@ class TrainingDataProductFileReader(ProductFileReader):
         return Product(
             metadata=metadata,
             probe_positions=ProbePositionSequence(point_list),
-            probes=ProbeSequence(
+            probes=ProbeEnsemble(
                 array=probe_array,
                 opr_weights=None,  # not included in file
                 pixel_geometry=pixel_geometry,

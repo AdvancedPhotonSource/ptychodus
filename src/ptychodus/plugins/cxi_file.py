@@ -28,7 +28,7 @@ from ptychodus.api.diffraction import (
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import (
     LossValue,
@@ -393,7 +393,7 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
             tomography_angle_deg=tomography_angle_deg,
         )
 
-    def _read_probe(self, h5_file: h5py.File) -> ProbeSequence:
+    def _read_probe(self, h5_file: h5py.File) -> ProbeEnsemble:
         if _P.PROBE_IMAGE_DATA in h5_file:
             probe_path = _P.PROBE_IMAGE_DATA
             image_group_path = _P.PROBE_IMAGE
@@ -429,7 +429,7 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
         if _P.PT_OPR_WEIGHTS in h5_file:
             opr_weights = h5_file[_P.PT_OPR_WEIGHTS][()]
 
-        return ProbeSequence(array=array, opr_weights=opr_weights, pixel_geometry=pixel_geometry)
+        return ProbeEnsemble(array=array, opr_weights=opr_weights, pixel_geometry=pixel_geometry)
 
     def _read_object(self, h5_file: h5py.File) -> Object:
         if _P.OBJECT_IMAGE_DATA not in h5_file:
@@ -527,7 +527,7 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
     # -- write helpers --------------------------------------------------------------
 
     def _write_probe_image(
-        self, h5_file: h5py.File, probe: ProbeSequence, pixel_geometry: PixelGeometry
+        self, h5_file: h5py.File, probe: ProbeEnsemble, pixel_geometry: PixelGeometry
     ) -> None:
         image = h5_file.create_group(_P.PROBE_IMAGE)
         data = image.create_dataset('data', data=probe.get_array())
@@ -572,7 +572,7 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
         self,
         h5_file: h5py.File,
         metadata: ProductMetadata,
-        probe: ProbeSequence,
+        probe: ProbeEnsemble,
         probe_pixel_geometry: PixelGeometry,
         object_: Object,
         object_geometry: Any,

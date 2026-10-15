@@ -102,7 +102,7 @@ from ptychodus.api.preprocess.diffraction import (
     VerticalFlipStep,
 )
 from ptychodus.api.affine import AffineTransform, transform_probe_positions
-from ptychodus.api.probe import Probe, ProbeGeometry, ProbeSequence, shift_probe
+from ptychodus.api.probe import Probe, ProbeGeometry, ProbeEnsemble, shift_probe
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.propagate import (
@@ -299,7 +299,7 @@ def _batch_size(params: PearParameters, num_patterns: int) -> int:
 
 
 def _output_directory(
-    params: PearParameters, options: LSQMLOptions, probe: ProbeSequence, pattern_width_px: int
+    params: PearParameters, options: LSQMLOptions, probe: ProbeEnsemble, pattern_width_px: int
 ) -> Path:
     """Build the settings-encoding output directory name.
 
@@ -907,7 +907,7 @@ def main() -> ExitCode:
     else:
         logger.info('Reading the initial probe from %s', probe_file)
         probe_reader = registry.probe_file_readers.get_strategy_by_name(params.init_probe_file_type)
-        probe_array = probe_reader.read(probe_file)[0].get_array()
+        probe_array = probe_reader.read(probe_file).get_probe_no_opr().get_array()
 
     probe_array = _set_num_incoherent_modes(probe_array, num_incoherent_modes)
     probe = Probe(array=probe_array, pixel_geometry=probe_geometry.get_pixel_geometry())
@@ -928,7 +928,7 @@ def main() -> ExitCode:
             propagation_distance_m=propagation_mm * 1e-3,
         )
 
-    probe_sequence = generate_coherent_probe_modes(
+    probe_ensemble = generate_coherent_probe_modes(
         rng,
         probe,
         num_cmodes=max(1, params.number_opr_modes + 1),
@@ -1033,7 +1033,7 @@ def main() -> ExitCode:
             far_field=not params.near_field_ptycho,
         ),
         probe_positions=positions,
-        probes=probe_sequence,
+        probes=probe_ensemble,
         object_=object_,
         losses=[],
     )
@@ -1043,7 +1043,7 @@ def main() -> ExitCode:
     # The parameter file already names where a run belongs -- `recon_dir_base`, or the
     # per-instrument convention derived from `data_directory` -- so there is no output
     # argument to supersede it. That directory becomes the standard-layout root.
-    output_directory = _output_directory(params, options, probe_sequence, image_extent.width_px)
+    output_directory = _output_directory(params, options, probe_ensemble, image_extent.width_px)
     diffraction_file = StandardFileLayout.DIFFRACTION.path(output_directory)
     options_file = StandardFileLayout.PTYCHI_OPTIONS.path(output_directory)
     product_file = StandardFileLayout.PRODUCT.path(output_directory)
@@ -1069,7 +1069,7 @@ def main() -> ExitCode:
             options.reconstructor_options.batch_size,
             options.reconstructor_options.batching_mode.name,
             options.reconstructor_options.noise_model.name,
-            probe_sequence.get_array().shape,
+            probe_ensemble.get_array().shape,
             object_.get_array().shape,
         )
         logger.info('Nothing written: stopping before the reconstruction.')

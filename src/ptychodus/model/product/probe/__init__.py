@@ -4,7 +4,7 @@ from .builder import (
     FromFileProbeBuilder,
     FromMemoryProbeBuilder,
     ProbeModeDecayType,
-    ProbeSequenceBuilder,
+    ProbeEnsembleBuilder,
 )
 from .builder_factory import ProbeBuilderFactory
 from .disk import DiskProbeBuilder
@@ -31,7 +31,7 @@ __all__ = [
     'ProbeModeDecayType',
     'ProbeRepositoryItem',
     'ProbeRepositoryItemFactory',
-    'ProbeSequenceBuilder',
+    'ProbeEnsembleBuilder',
     'ProbeSettings',
     'RectangularProbeBuilder',
     'SuperGaussianProbeBuilder',

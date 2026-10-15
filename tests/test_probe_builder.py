@@ -7,7 +7,7 @@ ptychodus.api.simulate.probe are not safe to re-apply: generate_incoherent_probe
 re-orthogonalizes and renormalizes every mode to the decay profile, and
 generate_coherent_probe_modes fills its output with fresh Gaussian noise, keeps
 only coherent mode zero of its input, and regenerates the OPR weights from
-scratch. The guards in ProbeSequenceBuilder._condition_probe are what stop a
+scratch. The guards in ProbeEnsembleBuilder._condition_probe are what stop a
 converged OPR basis being replaced with noise.
 
 Second, FromMemoryProbeBuilder must never condition. It holds a probe that is
@@ -34,14 +34,14 @@ from ptychodus.api.probe import (
     ProbeFileReader,
     ProbeGeometry,
     ProbeGeometryProvider,
-    ProbeSequence,
+    ProbeEnsemble,
 )
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.product.probe.builder import (
     FromFileProbeBuilder,
     FromMemoryProbeBuilder,
-    ProbeSequenceBuilder,
+    ProbeEnsembleBuilder,
 )
 from ptychodus.model.product.probe import INCOHERENT_MODE_STRATEGY_NAMES
 from ptychodus.model.product.probe.disk import DiskProbeBuilder
@@ -121,7 +121,7 @@ def _make_probe_seq(
     *,
     with_opr_weights: bool = False,
     num_positions: int = NUM_SCAN_POINTS,
-) -> ProbeSequence:
+) -> ProbeEnsemble:
     """A deterministic, non-degenerate probe of the requested mode structure.
 
     ``num_positions`` sizes the OPR weights, so passing something other than
@@ -137,7 +137,7 @@ def _make_probe_seq(
         opr_weights = rng.normal(size=(num_positions, num_cmodes))
         opr_weights[:, 0] = 1.0
 
-    return ProbeSequence(
+    return ProbeEnsemble(
         array=array,
         opr_weights=opr_weights,
         pixel_geometry=PixelGeometry(width_m=PIXEL_SIZE_M, height_m=PIXEL_SIZE_M),
@@ -145,16 +145,16 @@ def _make_probe_seq(
 
 
 class _StubProbeFileReader(ProbeFileReader):
-    def __init__(self, probe_seq: ProbeSequence) -> None:
+    def __init__(self, probe_seq: ProbeEnsemble) -> None:
         self._probe_seq = probe_seq
 
-    def read(self, file_path: Path) -> ProbeSequence:
+    def read(self, file_path: Path) -> ProbeEnsemble:
         return self._probe_seq
 
 
 def _make_from_file_builder(
     settings: ProbeSettings,
-    probe_seq: ProbeSequence,
+    probe_seq: ProbeEnsemble,
     *,
     opr_weight_policy: OPRWeightPolicy | None = None,
 ) -> FromFileProbeBuilder:
@@ -166,7 +166,7 @@ def _make_from_file_builder(
     )
 
 
-def _total_intensity(probe_seq: ProbeSequence) -> float:
+def _total_intensity(probe_seq: ProbeEnsemble) -> float:
     return float(numpy.sum(numpy.abs(probe_seq.get_array()) ** 2))
 
 
@@ -340,7 +340,7 @@ def test_copy_preserves_mode_parameters(builder_name: str) -> None:
     """copy() iterates parameters() generically and now also has to carry the rng
     hoisted into the base, so the copy must still build."""
     settings = _make_settings()
-    builder: ProbeSequenceBuilder
+    builder: ProbeEnsembleBuilder
 
     if builder_name == 'disk':
         builder = DiskProbeBuilder(_make_rng(), settings)
@@ -367,7 +367,7 @@ def test_from_file_builder_resamples_a_probe_sampled_at_another_pixel_size() -> 
     physical size; this is the regrid the builder's TODO used to defer."""
     settings = _make_settings()
     source = _make_probe_seq(1, 1)
-    coarse = ProbeSequence(
+    coarse = ProbeEnsemble(
         array=source.get_array(),
         opr_weights=None,
         pixel_geometry=PixelGeometry(width_m=2.0 * PIXEL_SIZE_M, height_m=2.0 * PIXEL_SIZE_M),
@@ -389,7 +389,7 @@ def test_from_file_builder_leaves_a_probe_without_a_pixel_size_alone() -> None:
     returning the array verbatim."""
     settings = _make_settings()
     source = _make_probe_seq(1, 1)
-    bare = ProbeSequence(array=source.get_array(), opr_weights=None, pixel_geometry=None)
+    bare = ProbeEnsemble(array=source.get_array(), opr_weights=None, pixel_geometry=None)
     builder = _make_from_file_builder(settings, bare)
 
     probe_seq = builder.build(_StubProbeGeometryProvider())
@@ -457,7 +457,7 @@ class TestIncoherentModeDecaySettings:
 
 
 class TestKBMirrorProbeBuilder:
-    def _build(self, settings: ProbeSettings) -> ProbeSequence:
+    def _build(self, settings: ProbeSettings) -> ProbeEnsemble:
         builder = KBMirrorProbeBuilder(_make_rng(), settings, PluginChooser())
         return builder.build(_StubProbeGeometryProvider(pixel_size_m=KB_PIXEL_SIZE_M))
 
@@ -577,7 +577,7 @@ OTHER_SCAN_POSITIONS = NUM_SCAN_POINTS + 4
 """A probe-position count that is deliberately not this run's."""
 
 
-def _opr_from_another_scan(num_cmodes: int = 3, num_imodes: int = 2) -> ProbeSequence:
+def _opr_from_another_scan(num_cmodes: int = 3, num_imodes: int = 2) -> ProbeEnsemble:
     return _make_probe_seq(
         num_cmodes, num_imodes, with_opr_weights=True, num_positions=OTHER_SCAN_POSITIONS
     )
@@ -601,7 +601,7 @@ def test_from_file_builder_conforms_opr_weights_from_another_scan(
 
     weights = probe_seq.get_opr_weights()
     assert weights.shape == (NUM_SCAN_POINTS, 3)
-    assert len(probe_seq) == NUM_SCAN_POINTS
+    assert probe_seq.num_opr_positions == NUM_SCAN_POINTS
     # The default is AVERAGE, so every position starts from the same row.
     numpy.testing.assert_allclose(
         weights,

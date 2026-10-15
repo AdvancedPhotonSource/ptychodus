@@ -14,7 +14,7 @@ from .assemble import AssembledDiffractionData
 from .diffraction import BadPixels, DiffractionPatterns
 from .geometry import ImageExtent
 from .object import Object
-from .probe import ProbeSequence
+from .probe import ProbeEnsemble
 from .probe_positions import ProbePositionSequence, ProbePosition
 from .product import LossValue, Product
 from .propagate import compute_full_aperture_fresnel_number
@@ -502,7 +502,7 @@ class ReconstructionAmbiguities:
             1j * (self.phase_offset_rad + probe_ramp)
         )
         opr_weights = probes.get_opr_weights_or_none()
-        standardized_probes = ProbeSequence(
+        standardized_probes = ProbeEnsemble(
             array=(probe_array * probe_correction).astype(probe_array.dtype),
             opr_weights=None if opr_weights is None else opr_weights.copy(),
             pixel_geometry=probes.get_pixel_geometry().copy(),

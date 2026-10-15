@@ -16,7 +16,7 @@ from scipy.sparse.linalg import lsmr
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.model.fluorescence.vspi import VSPILinearOperator
@@ -60,7 +60,7 @@ def _make_product(positions_px: list[tuple[float, float]]) -> Product:
             tomography_angle_deg=0.0,
         ),
         probe_positions=ProbePositionSequence(positions),
-        probes=ProbeSequence(
+        probes=ProbeEnsemble(
             array=probe_array[numpy.newaxis, :, :],
             opr_weights=None,
             pixel_geometry=pixel_geometry,
@@ -94,7 +94,7 @@ def test_matvec_matches_hand_computed_psf_weighted_sum() -> None:
     rng = numpy.random.default_rng(1234)
     canvas = rng.standard_normal((_CANVAS_PX, _CANVAS_PX))
 
-    probe_intensity = product.probes[0].get_intensity()
+    probe_intensity = product.probes.get_probe(0).get_intensity()
     psf = probe_intensity / probe_intensity.sum()
     half = (_PROBE_PX - 1) / 2
 
@@ -196,7 +196,7 @@ def _make_opr_product(opr_weights: numpy.ndarray) -> Product:
             tomography_angle_deg=0.0,
         ),
         probe_positions=ProbePositionSequence(positions),
-        probes=ProbeSequence(
+        probes=ProbeEnsemble(
             array=array[:, numpy.newaxis, :, :],
             opr_weights=opr_weights,
             pixel_geometry=pixel_geometry,
@@ -233,6 +233,6 @@ def test_psf_varies_per_position_under_opr() -> None:
     weights = numpy.array([[1.0, 0.2], [0.4, 1.3], [0.9, 0.7]])
     product = _make_opr_product(weights)
 
-    powers = [float(product.probes[index].get_intensity().sum()) for index in range(3)]
+    powers = [float(product.probes.get_probe(index).get_intensity().sum()) for index in range(3)]
 
     assert len(set(numpy.round(powers, 9))) == 3

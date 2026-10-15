@@ -37,7 +37,7 @@ class ProbePropagator:
         # users with OPR reconstructions are not silently misled.
         if probes.get_opr_weights_or_none() is not None:
             logger.warning(
-                'ProbeSequence has OPR weights; propagation uses only the first coherent mode '
+                'ProbeEnsemble has OPR weights; propagation uses only the first coherent mode '
                 'and discards per-position variation.'
             )
 

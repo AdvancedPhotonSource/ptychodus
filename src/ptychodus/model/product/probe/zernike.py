@@ -4,16 +4,16 @@ import logging
 import numpy
 
 from ptychodus.api.geometry import ZernikeMode
-from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
+from ptychodus.api.probe import ProbeEnsemble, ProbeGeometryProvider
 from ptychodus.api.simulate.probe import generate_zernike_probe
 
-from .builder import ProbeSequenceBuilder
+from .builder import ProbeEnsembleBuilder
 from .settings import ProbeSettings
 
 logger = logging.getLogger(__name__)
 
 
-class ZernikeProbeBuilder(ProbeSequenceBuilder):
+class ZernikeProbeBuilder(ProbeEnsembleBuilder):
     def __init__(self, rng: numpy.random.Generator, settings: ProbeSettings) -> None:
         super().__init__(rng, settings, 'zernike')
         self._settings = settings
@@ -66,7 +66,7 @@ class ZernikeProbeBuilder(ProbeSequenceBuilder):
     def __len__(self) -> int:
         return len(self._polynomial)
 
-    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
         return self._rescale_to_photon_count(
             generate_zernike_probe(
                 geometry_provider.get_probe_geometry(),

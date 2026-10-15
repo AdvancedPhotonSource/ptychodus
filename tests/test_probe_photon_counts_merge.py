@@ -20,7 +20,7 @@ from ptychodus.api.assemble import (
 )
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import prepare_reconstruct_input
@@ -75,7 +75,7 @@ def _make_product(specs: list[tuple[int, float, float, float | None]]) -> Produc
     positions = ProbePositionSequence(points)
 
     probe_array = numpy.zeros((1, 1, 4, 4), dtype=numpy.complex128)
-    probes = ProbeSequence(array=probe_array, opr_weights=None, pixel_geometry=_pixel())
+    probes = ProbeEnsemble(array=probe_array, opr_weights=None, pixel_geometry=_pixel())
 
     obj_array = numpy.zeros((1, 16, 16), dtype=numpy.complex128)
     object_ = Object(

@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
+from ptychodus.api.probe import ProbeEnsemble, ProbeGeometryProvider
 from ptychodus.api.simulate.probe import generate_average_pattern_probe
 
 from ...diffraction import AssembledDiffractionDataset
-from .builder import ProbeSequenceBuilder
+from .builder import ProbeEnsembleBuilder
 from .settings import ProbeSettings
 
 
-class AveragePatternProbeBuilder(ProbeSequenceBuilder):
+class AveragePatternProbeBuilder(ProbeEnsembleBuilder):
     def __init__(
         self,
         rng: numpy.random.Generator,
@@ -29,7 +29,7 @@ class AveragePatternProbeBuilder(ProbeSequenceBuilder):
 
         return builder
 
-    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
         return self._rescale_to_photon_count(
             generate_average_pattern_probe(
                 geometry_provider.get_probe_geometry(),

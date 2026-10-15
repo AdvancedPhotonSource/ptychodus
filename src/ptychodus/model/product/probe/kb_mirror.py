@@ -4,18 +4,18 @@ from collections.abc import Iterator
 import numpy
 
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
+from ptychodus.api.probe import ProbeEnsemble, ProbeGeometryProvider
 from ptychodus.api.simulate.probe import (
     KirkpatrickBaezMirror,
     KirkpatrickBaezMirrorPair,
     generate_kb_mirror_probe,
 )
 
-from .builder import ProbeSequenceBuilder
+from .builder import ProbeEnsembleBuilder
 from .settings import ProbeSettings
 
 
-class KBMirrorProbeBuilder(ProbeSequenceBuilder):
+class KBMirrorProbeBuilder(ProbeEnsembleBuilder):
     """Build a probe from a Kirkpatrick-Baez mirror pair.
 
     The source distance each mirror dataclass accepts is left out: it feeds only a focal
@@ -80,7 +80,7 @@ class KBMirrorProbeBuilder(ProbeSequenceBuilder):
         self.vertical_grazing_angle_rad.set_value(mirrors.vertical.grazing_angle_rad)
         self.vertical_focus_distance_m.set_value(mirrors.vertical.focus_distance_m)
 
-    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
         mirrors = KirkpatrickBaezMirrorPair(
             horizontal=KirkpatrickBaezMirror(
                 acceptance_length_m=self.horizontal_acceptance_length_m.get_value(),

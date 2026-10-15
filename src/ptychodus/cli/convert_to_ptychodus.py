@@ -55,7 +55,7 @@ from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import save_diffraction_data
 from ptychodus.api.object import Object, ObjectCenter, ObjectGeometry, compute_object_geometry
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import Probe, ProbeGeometry, ProbeSequence
+from ptychodus.api.probe import Probe, ProbeGeometry, ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.propagate import compute_far_field_propagation_distance
@@ -254,8 +254,8 @@ def _object_center(object_: Object) -> ObjectCenter | None:
 
 
 def _inherit_probe_geometry(
-    override: ProbeSequence, *, pixel_geometry: PixelGeometry | None
-) -> ProbeSequence:
+    override: ProbeEnsemble, *, pixel_geometry: PixelGeometry | None
+) -> ProbeEnsemble:
     """Give a probe read from file the sampling it does not record itself.
 
     The counterpart of :func:`_inherit_object_geometry`; no probe format records a pixel
@@ -263,7 +263,7 @@ def _inherit_probe_geometry(
     """
     override_pixel_geometry = _probe_pixel_geometry(override)
 
-    return ProbeSequence(
+    return ProbeEnsemble(
         array=override.get_array(),
         opr_weights=override.get_opr_weights_or_none(),
         pixel_geometry=(
@@ -272,7 +272,7 @@ def _inherit_probe_geometry(
     )
 
 
-def _probe_pixel_geometry(probes: ProbeSequence) -> PixelGeometry | None:
+def _probe_pixel_geometry(probes: ProbeEnsemble) -> PixelGeometry | None:
     try:
         return probes.get_pixel_geometry()
     except ValueError:
@@ -368,7 +368,7 @@ def _build_probe(
     probe_geometry: ProbeGeometry,
     photon_wavelength_m: float,
     rng: numpy.random.Generator,
-) -> ProbeSequence:
+) -> ProbeEnsemble:
     """Supply the initial probe for a built product, from file or from a model."""
     if args.override_probe is not None:
         logger.info('Reading probe from %s as %s', args.override_probe, args.override_probe_type)

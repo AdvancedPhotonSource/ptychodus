@@ -18,7 +18,7 @@ import pytest
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.preprocess.diffraction import inpaint_bad_pixels
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructInput
@@ -58,7 +58,7 @@ def _make_reconstruct_input() -> ReconstructInput:
         probe_positions=ProbePositionSequence(
             [ProbePosition(i, i * 1.0e-8, i * 2.0e-8) for i in range(NUM_POSITIONS)]
         ),
-        probes=ProbeSequence(
+        probes=ProbeEnsemble(
             array=rng.standard_normal(probe_shape) + 1j * rng.standard_normal(probe_shape),
             opr_weights=rng.standard_normal((NUM_POSITIONS, 2)),
             pixel_geometry=pixel_geometry,

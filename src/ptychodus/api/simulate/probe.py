@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from ..constants import TWO_PI, TWO_PI_J
 from ..typing import ComplexArrayType, RealArrayType
 from ..geometry import HermiteMode, ImageExtent, LegendreMode, PixelGeometry, ZernikeMode
-from ..probe import Probe, ProbeGeometry, ProbeSequence, ProbeTransverseCoordinates
+from ..probe import Probe, ProbeGeometry, ProbeEnsemble, ProbeTransverseCoordinates
 from ..propagate import (
     AngularSpectrumPropagator,
     FresnelTransformPropagator,
@@ -1313,8 +1313,8 @@ def generate_coherent_probe_modes(
     num_diffraction_patterns: int,
     small_value: float = 1.0e-6,
     normalize_cmodes: bool = True,
-) -> ProbeSequence:
-    """Build an OPR ProbeSequence with *num_cmodes* coherent modes and random per-scan weights."""
+) -> ProbeEnsemble:
+    """Build an OPR ProbeEnsemble with *num_cmodes* coherent modes and random per-scan weights."""
     opr_weights: RealArrayType | None = None
 
     if num_cmodes > 1:
@@ -1336,7 +1336,7 @@ def generate_coherent_probe_modes(
 
     array_out[0, :, :, :] = array_in[:, :, :]
 
-    return ProbeSequence(
+    return ProbeEnsemble(
         array=array_out,
         opr_weights=opr_weights,
         pixel_geometry=probe.get_pixel_geometry(),
