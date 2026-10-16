@@ -12,7 +12,11 @@ from pydantic.dataclasses import dataclass as pydantic_dataclass
 import pytest
 
 from ptychodus.model.processing.flatten import (
+    BoolEnum,
     FlatteningPolicy,
+    OptionalGate,
+    OptionalRange,
+    Sentinel,
     flatten_options,
     render_value,
     to_pascal_case,
@@ -113,16 +117,31 @@ class TestFlattening:
         )
         assert 'IsOptimizable' in _keys(policy)
 
-    def test_structural_field_expands_into_several_keys(self) -> None:
-        policy = FlatteningPolicy(hidden=_ONLY_SCALARS, structural={'step_size': ('Min', 'Max')})
+    def test_an_optional_gate_expands_into_a_switch_and_a_value(self) -> None:
+        policy = FlatteningPolicy(
+            hidden=_ONLY_SCALARS,
+            structural={'step_size': OptionalGate('EnableStep', 'StepSize')},
+        )
         keys = _keys(policy)
-        assert 'Min' in keys and 'Max' in keys
+        assert 'EnableStep' in keys and 'StepSize' in keys
 
-    def test_structural_keys_record_their_role_and_share_one_source(self) -> None:
-        policy = FlatteningPolicy(hidden=_ONLY_SCALARS, structural={'step_size': ('Min', 'Max')})
+    def test_adapted_keys_record_their_role_and_share_one_source(self) -> None:
+        policy = FlatteningPolicy(
+            hidden=_ONLY_SCALARS,
+            structural={'step_size': OptionalGate('EnableStep', 'StepSize')},
+        )
         produced = [p for p in flatten_options(Options(), policy) if p.structural_role]
-        assert [p.structural_role for p in produced] == ['Min', 'Max']
+        assert [p.structural_role for p in produced] == ['EnableStep', 'StepSize']
         assert {p.path for p in produced} == {'step_size'}
+
+    def test_an_adapted_key_takes_its_type_from_the_adapter(self) -> None:
+        """The switch is a bool even though the field it gates is a float."""
+        policy = FlatteningPolicy(
+            hidden=_ONLY_SCALARS,
+            structural={'step_size': OptionalGate('EnableStep', 'StepSize')},
+        )
+        gate = next(p for p in flatten_options(Options(), policy) if p.ini_key == 'EnableStep')
+        assert gate.annotation is bool
 
     def test_hiding_a_nested_model_hides_its_whole_subtree(self) -> None:
         keys = _keys(FlatteningPolicy(hidden=frozenset({'l1_norm'})))
@@ -242,11 +261,11 @@ class TestAgainstRealPtyChiOptions:
                 ),
             },
             structural={
-                'hard_limits_magnitude_phase.abs_lim': ('EnableAbs', 'AbsMin', 'AbsMax'),
-                'hard_limits_magnitude_phase.phase_lim': (
-                    'EnablePhase',
-                    'PhaseMinDeg',
-                    'PhaseMaxDeg',
+                'hard_limits_magnitude_phase.abs_lim': OptionalRange(
+                    'EnableAbs', 'AbsMin', 'AbsMax'
+                ),
+                'hard_limits_magnitude_phase.phase_lim': OptionalRange(
+                    'EnablePhase', 'PhaseMinDeg', 'PhaseMaxDeg'
                 ),
             },
         )
@@ -260,3 +279,41 @@ class TestAgainstRealPtyChiOptions:
             .split('\n[')[0]
         )
         assert produced == set(re.findall(r'^(\w+) = ', section, re.M))
+
+
+class TestStructuralAdapters:
+    """The shapes ptychodus persists that are not the declared field itself."""
+
+    def test_optional_gate_round_trips_a_value(self) -> None:
+        adapter = OptionalGate('On', 'Value')
+        assert adapter.decode(adapter.encode(2.5)) == 2.5
+
+    def test_optional_gate_round_trips_absence(self) -> None:
+        adapter = OptionalGate('On', 'Value')
+        encoded = adapter.encode(None)
+        assert encoded['On'] is False
+        assert adapter.decode(encoded) is None
+
+    def test_an_inverted_gate_reads_absence_as_on(self) -> None:
+        """The 'Auto...' factors are absent upstream precisely when automatic."""
+        adapter = OptionalGate('Auto', 'Value', inverted=True)
+        assert adapter.encode(None)['Auto'] is True
+        assert adapter.decode(adapter.encode(None)) is None
+        assert adapter.decode(adapter.encode(0.3)) == 0.3
+
+    def test_sentinel_round_trips_both_states(self) -> None:
+        adapter = Sentinel('Stop', sentinel=-1)
+        assert adapter.encode(None)['Stop'] == -1
+        assert adapter.decode(adapter.encode(None)) is None
+        assert adapter.decode(adapter.encode(7)) == 7
+
+    def test_bool_enum_round_trips_both_members(self) -> None:
+        adapter = BoolEnum('UseDouble', when_true='f64', when_false='f32')
+        assert adapter.encode('f64')['UseDouble'] is True
+        assert adapter.decode(adapter.encode('f64')) == 'f64'
+        assert adapter.decode(adapter.encode('f32')) == 'f32'
+
+    def test_optional_range_round_trips_both_states(self) -> None:
+        adapter = OptionalRange('On', 'Min', 'Max')
+        assert adapter.decode(adapter.encode(None)) is None
+        assert adapter.decode(adapter.encode((0.1, 0.9))) == (0.1, 0.9)

@@ -21,17 +21,145 @@ snake_case field names of the libraries they wrap.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Final
 
 __all__ = [
+    'BoolEnum',
     'FlatParameter',
     'FlatteningPolicy',
+    'OptionalGate',
+    'OptionalRange',
+    'Sentinel',
+    'StructuralAdapter',
     'flatten_options',
     'render_value',
 ]
+
+
+class StructuralAdapter(ABC):
+    """Bridges one declared field and the key or keys ptychodus persists it as.
+
+    Most fields persist as themselves. A few do not: an optional value becomes a
+    switch and a value, an enum becomes a boolean, an absent value becomes a
+    sentinel. Each such shape is a named kind implemented once here rather than a
+    pair of functions written out per field.
+    """
+
+    @property
+    @abstractmethod
+    def fields(self) -> Mapping[str, type]:
+        """Key suffix to the type the live parameter behind it should hold."""
+
+    @abstractmethod
+    def encode(self, value: Any) -> Mapping[str, Any]:
+        """Split a declared value into a value per key suffix."""
+
+    @abstractmethod
+    def decode(self, values: Mapping[str, Any]) -> Any:
+        """Rebuild the declared value from the values now held under each suffix."""
+
+
+@dataclass(frozen=True)
+class OptionalGate(StructuralAdapter):
+    """An optional value persisted as a switch plus a value.
+
+    ``None`` upstream means off, or automatic. Persisting it as a bare value
+    would make the off state indistinguishable from a real one, so ptychodus
+    keeps a boolean beside it and remembers the value the switch was last set to.
+    """
+
+    gate: str
+    value: str
+    value_type: type = float
+    fallback: Any = 0.0
+    # True when the switch being on is what makes the value absent upstream, as
+    # for the 'Auto...' factors where setting one disables the automatic choice.
+    inverted: bool = False
+
+    @property
+    def fields(self) -> Mapping[str, type]:
+        return {self.gate: bool, self.value: self.value_type}
+
+    def encode(self, value: Any) -> Mapping[str, Any]:
+        present = value is not None
+        return {
+            self.gate: (not present) if self.inverted else present,
+            self.value: self.fallback if value is None else value,
+        }
+
+    def decode(self, values: Mapping[str, Any]) -> Any:
+        on = bool(values[self.gate])
+        present = (not on) if self.inverted else on
+        return values[self.value] if present else None
+
+
+@dataclass(frozen=True)
+class OptionalRange(StructuralAdapter):
+    """An optional pair of bounds persisted as a switch plus a low and a high key."""
+
+    gate: str
+    minimum: str
+    maximum: str
+    value_type: type = float
+    fallback: tuple[Any, Any] = (0.0, 0.0)
+
+    @property
+    def fields(self) -> Mapping[str, type]:
+        return {self.gate: bool, self.minimum: self.value_type, self.maximum: self.value_type}
+
+    def encode(self, value: Any) -> Mapping[str, Any]:
+        low, high = self.fallback if value is None else (value[0], value[1])
+        return {self.gate: value is not None, self.minimum: low, self.maximum: high}
+
+    def decode(self, values: Mapping[str, Any]) -> Any:
+        if not values[self.gate]:
+            return None
+
+        return (values[self.minimum], values[self.maximum])
+
+
+@dataclass(frozen=True)
+class Sentinel(StructuralAdapter):
+    """An optional value persisted as a single key, with one value meaning None."""
+
+    key: str
+    value_type: type = int
+    sentinel: Any = -1
+
+    @property
+    def fields(self) -> Mapping[str, type]:
+        return {self.key: self.value_type}
+
+    def encode(self, value: Any) -> Mapping[str, Any]:
+        return {self.key: self.sentinel if value is None else value}
+
+    def decode(self, values: Mapping[str, Any]) -> Any:
+        held = values[self.key]
+        return None if held == self.sentinel else held
+
+
+@dataclass(frozen=True)
+class BoolEnum(StructuralAdapter):
+    """An enum persisted as a boolean, where ptychodus exposes only two members."""
+
+    key: str
+    when_true: Any = None
+    when_false: Any = None
+
+    @property
+    def fields(self) -> Mapping[str, type]:
+        return {self.key: bool}
+
+    def encode(self, value: Any) -> Mapping[str, Any]:
+        return {self.key: value == self.when_true}
+
+    def decode(self, values: Mapping[str, Any]) -> Any:
+        return self.when_true if values[self.key] else self.when_false
+
 
 # Suffixes ptychodus spells out in persisted keys, longest first so that a
 # compound suffix is not shadowed by a shorter one that also matches.
@@ -121,8 +249,8 @@ class FlatteningPolicy:
     prefixes: Mapping[str, str] = field(default_factory=dict)
     # Dotted path of a leaf -> its persisted name, where the rules miss.
     renames: Mapping[str, str] = field(default_factory=dict)
-    # Dotted path of a leaf -> the several key suffixes it expands into.
-    structural: Mapping[str, Sequence[str]] = field(default_factory=dict)
+    # Dotted path of a leaf -> the adapter bridging it and the keys it persists as.
+    structural: Mapping[str, StructuralAdapter] = field(default_factory=dict)
     # Leaf names that merely switch their group on, and so take the bare prefix.
     collapse_onto_prefix: frozenset[str] = frozenset({'enabled', 'optimizable'})
     # ptychodus persists pty-chi enums by member name; the backends it owns
@@ -175,12 +303,23 @@ def _walk(options: Any, policy: FlatteningPolicy, *, path: str, prefix: str) -> 
             continue
 
         try:
-            roles = policy.structural[child_path]
+            adapter = policy.structural[child_path]
         except KeyError:
             key = prefix + policy.render_name(child_path, name)
             flat.append(_leaf(key, child_path, info, value))
         else:
-            flat.extend(_leaf(prefix + role, child_path, info, value, role=role) for role in roles)
+            encoded = adapter.encode(value)
+            flat.extend(
+                _leaf(
+                    prefix + suffix,
+                    child_path,
+                    info,
+                    encoded[suffix],
+                    role=suffix,
+                    annotation=annotation,
+                )
+                for suffix, annotation in adapter.fields.items()
+            )
 
     return flat
 
@@ -209,12 +348,20 @@ def _bounds(info: Any) -> tuple[Any, Any]:
     return minimum, maximum
 
 
-def _leaf(key: str, path: str, info: Any, value: Any, *, role: str = '') -> FlatParameter:
+def _leaf(
+    key: str,
+    path: str,
+    info: Any,
+    value: Any,
+    *,
+    role: str = '',
+    annotation: Any = None,
+) -> FlatParameter:
     minimum, maximum = _bounds(info)
     return FlatParameter(
         ini_key=key,
         path=path,
-        annotation=info.annotation,
+        annotation=info.annotation if annotation is None else annotation,
         default=value,
         label=info.title or '',
         tool_tip=info.description or '',

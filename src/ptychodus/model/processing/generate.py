@@ -104,19 +104,19 @@ def populate_parameter_group(
     parameters: dict[str, Parameter[Any]] = {}
 
     for flat in flatten_options(options, policy):
-        if flat.structural_role:
-            # One declared field standing for several keys needs an adapter that
-            # knows the field's shape, which only the backend does. Until one is
-            # supplied the keys are described but not created, so that a missing
-            # adapter is visible here rather than as a silently absent setting.
-            raise UnsupportedParameterError(
-                f'"{flat.path}" expands into several keys and needs a value adapter; '
-                f'none was supplied for role "{flat.structural_role}".'
-            )
-
         parameters[flat.ini_key] = _create(group, flat, policy)
 
     return parameters
+
+
+def _assign(root: Any, path: str, value: Any) -> None:
+    *ancestors, leaf = path.split('.')
+    owner = root
+
+    for name in ancestors:
+        owner = getattr(owner, name)
+
+    setattr(owner, leaf, value)
 
 
 def _restore_value(flat: FlatParameter, value: Any, policy: FlatteningPolicy) -> Any:
@@ -142,25 +142,24 @@ def apply_options(
     several settings groups, and they are applied to parts of a single object
     that must be copied only once.
     """
-    for flat in flatten_options(target, policy):
-        if flat.structural_role:
-            raise UnsupportedParameterError(
-                f'"{flat.path}" expands into several keys and needs a value adapter; '
-                f'none was supplied for role "{flat.structural_role}".'
-            )
+    adapted: dict[str, dict[str, Any]] = {}
 
+    for flat in flatten_options(target, policy):
         try:
             parameter = parameters[flat.ini_key]
         except KeyError:
             continue
 
-        *ancestors, leaf = flat.path.split('.')
-        owner = target
+        if flat.structural_role:
+            # Collected rather than assigned: the declared value is a function of
+            # every key the adapter owns, so none can be written on its own.
+            adapted.setdefault(flat.path, {})[flat.structural_role] = parameter.get_value()
+            continue
 
-        for name in ancestors:
-            owner = getattr(owner, name)
+        _assign(target, flat.path, _restore_value(flat, parameter.get_value(), policy))
 
-        setattr(owner, leaf, _restore_value(flat, parameter.get_value(), policy))
+    for path, values in adapted.items():
+        _assign(target, path, policy.structural[path].decode(values))
 
 
 def restore_options(

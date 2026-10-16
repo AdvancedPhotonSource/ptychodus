@@ -19,7 +19,7 @@ from ptychodus.api.parameters import (
     StringParameter,
 )
 from ptychodus.api.settings import SettingsRegistry
-from ptychodus.model.processing.flatten import FlatteningPolicy
+from ptychodus.model.processing.flatten import FlatteningPolicy, Sentinel
 from ptychodus.model.processing.generate import (
     UnsupportedParameterError,
     populate_parameter_group,
@@ -150,12 +150,15 @@ class TestUnrepresentableFields:
                 registry.create_group('Unsupported'), Unsupported(), FlatteningPolicy()
             )
 
-    def test_a_structural_field_without_an_adapter_is_rejected(self) -> None:
-        """Described but not created would be an invisibly missing setting."""
+    def test_an_adapted_field_round_trips_through_its_keys(self) -> None:
+        """A declared value is a function of every key its adapter owns."""
         registry = SettingsRegistry()
-        policy = FlatteningPolicy(structural={'count': ('Min', 'Max')})
-        with pytest.raises(UnsupportedParameterError, match='value adapter'):
-            populate_parameter_group(registry.create_group('Declared'), Declared(), policy)
+        policy = FlatteningPolicy(structural={'stop': Sentinel('Stop', sentinel=-1)})
+        parameters = populate_parameter_group(registry.create_group('Declared'), Declared(), policy)
+        parameters['Stop'].set_value(-1)
+        assert restore_options(Declared(), parameters, policy).stop is None
+        parameters['Stop'].set_value(12)
+        assert restore_options(Declared(), parameters, policy).stop == 12
 
 
 class TestRestoringOptions:
