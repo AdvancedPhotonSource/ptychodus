@@ -38,12 +38,16 @@ class <Feature>Settings(Observable, Observer):
             'NumberOfIterations', 1000, minimum=1
         )
         # create_real_parameter, create_boolean_parameter, create_string_parameter,
-        # create_path_parameter — see api/parametric.py for the full menu.
+        # create_path_parameter — see api/parameters.py for the full menu.
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:
             self.notify_observers()
 ```
+
+**Two idioms exist; this is the one to use.** A hand-written `*Settings` class, which builds its own group and names its own keys, backs every subsystem except the reconstructor backends. Those are migrating to the other idiom: the backend returns a nested pydantic object from `Reconstructor.get_default_options()` describing what it accepts, and `model/processing/` generates the live parameters, the INI keys and the display text from it. That path is reached only through `ProcessingParameterStore`, so a new `*Core` cannot use it — write the class above.
+
+What the new idiom is worth copying for is its discipline: a parameter states its bounds and its display text where it is declared, not in the controller that renders it. A hand-written class can do the first half today by passing `minimum=` and `maximum=`, and should.
 
 Preserve unit suffixes on physical quantities (e.g. `probe_energy_eV`, `pixel_width_m`) — CLAUDE.md notes these are accepted via `# noqa: N815` and reviewers expect them.
 

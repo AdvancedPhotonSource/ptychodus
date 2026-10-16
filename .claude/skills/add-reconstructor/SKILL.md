@@ -16,6 +16,12 @@ Create `src/ptychodus/model/<backend>/` with:
 - `__init__.py` — re-exports the `*ReconstructorLibrary` class only.
 - `core.py` — the `*ReconstructorLibrary` class.
 - `settings.py` — one or more `*Settings` classes (see the `add-core` skill for the settings pattern).
+  **Being replaced.** A backend is moving toward declaring what it accepts as a nested pydantic
+  object returned from `get_default_options()`, with `model/processing/` generating the settings
+  from it; see `model/ptychopinn/options.py` for a declaration ptychodus owns and
+  `model/processing/_ptycho_fm_sections.py` for an overlay on an upstream one. Until the backends
+  are switched over, write the `*Settings` class — but keep bounds and display text out of the
+  controller, because that is the half the migration cannot do for you.
 - `reconstructor.py` (or several) — the actual `Reconstructor` / `TrainableReconstructor` implementations. `core.py` imports this module only after its `find_spec` probe has confirmed the backend is installed.
 
 ### 2. Library class
