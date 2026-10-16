@@ -32,6 +32,7 @@ __all__ = [
     'compose_key',
     'fields_of',
     'FlatParameter',
+    'Label',
     'FlatteningPolicy',
     'OptionalGate',
     'OptionalRange',
@@ -223,6 +224,21 @@ def fields_of(model: type) -> Mapping[str, Any]:
 
 
 @dataclass(frozen=True)
+class Label:
+    """Display text for one field, where its declaration cannot carry it.
+
+    A model ptychodus owns states its own text through ``pydantic.Field``. An
+    upstream declaration cannot be annotated -- pty-chi's 749 option fields
+    carry no title or description at all -- so ptychodus supplies the text
+    beside the naming rules instead, and this is the only reason it lives in a
+    module otherwise concerned with persistence.
+    """
+
+    text: str = ''
+    tool_tip: str = ''
+
+
+@dataclass(frozen=True)
 class FlatParameter:
     """One persisted key, and where in the declared model its value comes from.
 
@@ -266,6 +282,9 @@ class FlatteningPolicy:
     prefixes: Mapping[str, str] = field(default_factory=dict)
     # Dotted path of a leaf -> its persisted name, where the rules miss.
     renames: Mapping[str, str] = field(default_factory=dict)
+    # Dotted path of a leaf, or an adapter's key suffix -> its display text.
+    # Consulted ahead of the declaration, which for an upstream model has none.
+    labels: Mapping[str, Label] = field(default_factory=dict)
     # Dotted path of a leaf -> the adapter bridging it and the keys it persists as.
     structural: Mapping[str, StructuralAdapter] = field(default_factory=dict)
     # Leaf names that merely switch their group on, and so take the bare prefix.
@@ -316,14 +335,14 @@ def _walk(options: Any, policy: FlatteningPolicy, *, path: str, prefix: str) -> 
             continue
 
         if prefix and name in policy.collapse_onto_prefix:
-            flat.append(_leaf(prefix, child_path, info, value))
+            flat.append(_leaf(prefix, child_path, info, value, policy=policy))
             continue
 
         try:
             adapter = policy.structural[child_path]
         except KeyError:
             key = compose_key(prefix, policy.render_name(child_path, name))
-            flat.append(_leaf(key, child_path, info, value))
+            flat.append(_leaf(key, child_path, info, value, policy=policy))
         else:
             encoded = adapter.encode(value)
             flat.extend(
@@ -334,6 +353,7 @@ def _walk(options: Any, policy: FlatteningPolicy, *, path: str, prefix: str) -> 
                     encoded[suffix],
                     role=suffix,
                     annotation=annotation,
+                    policy=policy,
                 )
                 for suffix, annotation in adapter.fields.items()
             )
@@ -371,17 +391,21 @@ def _leaf(
     info: Any,
     value: Any,
     *,
+    policy: FlatteningPolicy,
     role: str = '',
     annotation: Any = None,
 ) -> FlatParameter:
     minimum, maximum = _bounds(info)
+    # An adapter splits one field into several keys, which need separate text, so
+    # its suffix is looked up before the field's own path.
+    declared = policy.labels.get(role) or policy.labels.get(path) or Label()
     return FlatParameter(
         ini_key=key,
         path=path,
         annotation=info.annotation if annotation is None else annotation,
         default=value,
-        label=info.title or '',
-        tool_tip=info.description or '',
+        label=declared.text or info.title or '',
+        tool_tip=declared.tool_tip or info.description or '',
         minimum=minimum,
         maximum=maximum,
         structural_role=role,

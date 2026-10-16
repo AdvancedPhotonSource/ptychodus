@@ -14,6 +14,7 @@ import pytest
 from ptychodus.model.processing.flatten import (
     BoolEnum,
     FlatteningPolicy,
+    Label,
     OptionalGate,
     OptionalRange,
     Sentinel,
@@ -335,3 +336,40 @@ class TestAbsoluteKeys:
     def test_unmarked_names_are_still_prefixed(self) -> None:
         policy = FlatteningPolicy(hidden=_ONLY_L1, prefixes={'l1_norm': 'ConstrainL1Norm'})
         assert 'ConstrainL1NormWeight' in _keys(policy)
+
+
+class TestLabels:
+    """An upstream declaration cannot carry display text, so the policy supplies it."""
+
+    def test_the_policy_supplies_text_a_declaration_lacks(self) -> None:
+        policy = FlatteningPolicy(
+            hidden=_ONLY_SCALARS,
+            labels={'period_x_m': Label('Period X:', 'Grid artifact period.')},
+        )
+        period = next(p for p in flatten_options(Options(), policy) if p.path == 'period_x_m')
+        assert period.label == 'Period X:'
+        assert period.tool_tip == 'Grid artifact period.'
+
+    def test_the_policy_wins_over_the_declaration(self) -> None:
+        """A model ptychodus owns may still need different wording in the panel."""
+        policy = FlatteningPolicy(
+            hidden=_ONLY_SCALARS, labels={'step_size': Label('Learning Rate:')}
+        )
+        step = next(p for p in flatten_options(Options(), policy) if p.path == 'step_size')
+        assert step.label == 'Learning Rate:'
+        # Untouched text still falls back to what the declaration states.
+        assert step.tool_tip == 'Learning rate.'
+
+    def test_each_adapted_key_can_be_labelled_separately(self) -> None:
+        """One field becomes several keys, and a switch is not named like its value."""
+        policy = FlatteningPolicy(
+            hidden=_ONLY_SCALARS,
+            structural={'step_size': OptionalGate('EnableStep', 'StepSize')},
+            labels={
+                'EnableStep': Label('Limit Step Size'),
+                'StepSize': Label('Step Size Limit:'),
+            },
+        )
+        produced = {p.ini_key: p.label for p in flatten_options(Options(), policy)}
+        assert produced['EnableStep'] == 'Limit Step Size'
+        assert produced['StepSize'] == 'Step Size Limit:'
