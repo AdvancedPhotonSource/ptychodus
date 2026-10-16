@@ -67,26 +67,37 @@ CHILD_ONLY_MODULES = (
     'ptycho',  # ptychopinn TensorFlow package; raw_data/probe/tf_helper pull TensorFlow
     'ptycho_torch',  # ptychopinn backend; child-side entry point only
     'ptycho_fm',  # ptycho_fm backend; child-side entry point only
+    'ptychozoon',  # fluorescence backend; vspi_enhance pulls CuPy
 )
 
-# ``ptychozoon.data_structures`` and ``ptychozoon.settings`` are CPU-only --
-# they pull in only numpy, dataclasses, enum, and typing. The parent-side
-# fluorescence factory imports them so it can construct the ptychozoon
-# payload directly instead of duplicating its fields. Any *other*
-# ``ptychozoon.*`` module (notably ``vspi_enhance``) pulls in CuPy and is a
-# regression if it lands in the parent's ``sys.modules``.
-ALLOWED_PTYCHOZOON_MODULES = frozenset(
+# The exceptions, named in full. Each is a configuration or data-structure
+# submodule the parent reaches so it can build the payload it ships to the
+# child, rather than duplicating the fields:
+#
+# - ``ptychozoon.data_structures`` and ``ptychozoon.settings`` pull in only
+#   numpy, dataclasses, enum and typing.
+# - ``ptycho_fm.config`` is pydantic schema and nothing else, which is what
+#   lets ptychodus declare PtychoFM's parameters from upstream's own model
+#   instead of restating them. ``tests/test_ptycho_fm_sections.py`` measures
+#   that cost; this list permits it.
+#
+# Any other submodule of either package is a regression if it lands in the
+# parent's ``sys.modules``.
+ALLOWED_CHILD_SUBMODULES = frozenset(
     {
         'ptychozoon',
         'ptychozoon.data_structures',
         'ptychozoon.settings',
+        'ptycho_fm',
+        'ptycho_fm.config',
     }
 )
 
 
 def _is_child_only(module_name: str) -> bool:
-    if module_name == 'ptychozoon' or module_name.startswith('ptychozoon.'):
-        return module_name not in ALLOWED_PTYCHOZOON_MODULES
+    if module_name in ALLOWED_CHILD_SUBMODULES:
+        return False
+
     return any(module_name == m or module_name.startswith(m + '.') for m in CHILD_ONLY_MODULES)
 
 

@@ -22,7 +22,7 @@ snake_case field names of the libraries they wrap.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Final
@@ -255,6 +255,9 @@ class FlatParameter:
     tool_tip: str = ''
     minimum: Any = None
     maximum: Any = None
+    # The values a choice field accepts. Empty unless the policy supplies them:
+    # a field typed as an enum already carries its members in its annotation.
+    choices: Sequence[str] = ()
     # Set when several keys share one declared field, naming this key's role.
     # The value adapter is the backend's, since only it knows the field's shape.
     structural_role: str = ''
@@ -285,6 +288,10 @@ class FlatteningPolicy:
     # Dotted path of a leaf, or an adapter's key suffix -> its display text.
     # Consulted ahead of the declaration, which for an upstream model has none.
     labels: Mapping[str, Label] = field(default_factory=dict)
+    # Dotted path of a leaf, or an adapter's key suffix -> the values it accepts.
+    # Only for a declaration that spells a choice as a bare string, as PtychoFM
+    # does throughout; pty-chi types its own with real enums and needs no entry.
+    choices: Mapping[str, Sequence[str]] = field(default_factory=dict)
     # Dotted path of a leaf -> the adapter bridging it and the keys it persists as.
     structural: Mapping[str, StructuralAdapter] = field(default_factory=dict)
     # Leaf names that merely switch their group on, and so take the bare prefix.
@@ -399,6 +406,7 @@ def _leaf(
     # An adapter splits one field into several keys, which need separate text, so
     # its suffix is looked up before the field's own path.
     declared = policy.labels.get(role) or policy.labels.get(path) or Label()
+    choices = policy.choices.get(role) or policy.choices.get(path) or ()
     return FlatParameter(
         ini_key=key,
         path=path,
@@ -408,6 +416,7 @@ def _leaf(
         tool_tip=declared.tool_tip or info.description or '',
         minimum=minimum,
         maximum=maximum,
+        choices=choices,
         structural_role=role,
     )
 
