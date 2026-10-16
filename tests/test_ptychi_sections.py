@@ -19,6 +19,7 @@ import pytest
 
 pytest.importorskip('ptychi')
 
+from ptychodus.model.processing import _ptychi_sections  # noqa: E402
 from ptychodus.model.processing._ptychi_sections import sections_for  # noqa: E402
 from ptychodus.model.processing.flatten import flatten_options  # noqa: E402
 from ptychodus.model.ptychi.algorithms import task_options_classes  # noqa: E402
@@ -117,3 +118,31 @@ def test_plan_keys_are_left_to_the_composite_that_draws_them(algorithm: str) -> 
         for flat in flatten_options(_resolve(options, section.root_path), section.policy):
             if flat.ini_key.endswith(_PLAN_SUFFIXES):
                 assert not flat.label, flat.ini_key
+
+
+def test_no_table_entry_names_a_field_no_branch_declares() -> None:
+    """A dead entry is silent: its text simply never reaches a key.
+
+    Two survived the port from the panels because pty-chi names the field `rho`
+    on each branch while the panels called them probe rho and probe position
+    rho, and the per-branch tables already carried the right text.
+    """
+    consulted: set[str] = set()
+
+    for algorithm in ALGORITHMS:
+        options = task_options_classes()[algorithm]()
+
+        for section in sections_for(algorithm, options):
+            for flat in flatten_options(_resolve(options, section.root_path), section.policy):
+                consulted.add(flat.path)
+
+                if flat.structural_role:
+                    consulted.add(flat.structural_role)
+
+    declared: set[str] = set()
+
+    for name, table in vars(_ptychi_sections).items():
+        if name.endswith('_LABELS') and isinstance(table, dict):
+            declared |= set(table)
+
+    assert declared - consulted == set()

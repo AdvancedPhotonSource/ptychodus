@@ -569,14 +569,6 @@ _ALGORITHM_LABELS: Mapping[str, Label] = {
     'chunk_length': Label('Chunk Length:'),
     'beta': Label('Beta:'),
     'method': Label('BH Method:'),
-    'probe_rho': Label(
-        'BH Probe Rho:',
-        'Scaling factor for the probe relative to the object (~1 near-field, 0.1 far-field).',
-    ),
-    'probe_position_rho': Label(
-        'BH Probe Position Rho:',
-        'Scaling factor for probe positions relative to the object (~0.1 near-field, 1 far-field).',
-    ),
     'noise_model': Label('Noise Model:', 'Noise model to use'),
     'gaussian_noise_std': Label(
         'Gaussian Noise Deviation:',
