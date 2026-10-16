@@ -35,28 +35,37 @@ def _hide_all_but(model: type, prefix: str, *exposed: str) -> set[str]:
 
 _DATA_OVERLAYS: Mapping[str, Overlay] = {
     'scale': Overlay(
-        'Diffraction Scale:', 'Scale factor applied to diffraction intensities before sqrt.'
+        'Diffraction Scale:',
+        'Scale factor applied to diffraction intensities before sqrt.',
+        minimum=0.0,
     ),
-    'default_normalization': Overlay('Default Normalization:'),
+    'default_normalization': Overlay('Default Normalization:', minimum=0.0),
     'cache_object': Overlay('Cache Object In Memory'),
     'max_probe_modes': Overlay(
-        'Max Probe Modes:', 'Probes are zero-padded to this many mixed-state modes.'
+        'Max Probe Modes:',
+        'Probes are zero-padded to this many mixed-state modes.',
+        minimum=1,
     ),
     'max_OPR_modes': Overlay(
         'Max OPR Modes:',
         'Probes are zero-padded to this many orthogonal probe relaxation modes.',
+        minimum=1,
     ),
     'cache_memory_budget_mb': Overlay(
         'Array Cache Budget (MiB):',
         'Per-worker budget for cached object and probe arrays; 0 disables caching.',
+        minimum=0,
     ),
     'train_split': Overlay(
-        'Train Split:', 'Fraction of dataset used for training; remainder is validation.'
+        'Train Split:',
+        'Fraction of dataset used for training; remainder is validation.',
+        minimum=0.0,
+        maximum=1.0,
     ),
     'random_seed': Overlay('Random Seed:'),
-    'max_files': Overlay('Max Files (0 = no cap):'),
-    'num_workers': Overlay('Dataloader Workers:'),
-    'prefetch_factor': Overlay('Prefetch Factor:'),
+    'max_files': Overlay('Max Files (0 = no cap):', minimum=0),
+    'num_workers': Overlay('Dataloader Workers:', minimum=0),
+    'prefetch_factor': Overlay('Prefetch Factor:', minimum=0),
 }
 
 
@@ -107,23 +116,23 @@ _MODEL_OVERLAYS: Mapping[str, Overlay] = {
         'it was trained with.',
         choices=_COUPLED_DECODER_MODES,
     ),
-    'encoder.img_size': Overlay('Image Size:'),
-    'encoder.patch_size': Overlay('Patch Size:'),
-    'encoder.embed_dim': Overlay('Embed Dimension:'),
-    'encoder.depth': Overlay('Depth:'),
-    'encoder.num_heads': Overlay('Attention Heads:'),
-    'encoder.mlp_ratio': Overlay('MLP Ratio:'),
+    'encoder.img_size': Overlay('Image Size:', minimum=32),
+    'encoder.patch_size': Overlay('Patch Size:', minimum=1),
+    'encoder.embed_dim': Overlay('Embed Dimension:', minimum=1),
+    'encoder.depth': Overlay('Depth:', minimum=1),
+    'encoder.num_heads': Overlay('Attention Heads:', minimum=1),
+    'encoder.mlp_ratio': Overlay('MLP Ratio:', minimum=0.0),
     'encoder.use_cls_token': Overlay('Use CLS Token'),
-    'encoder.dropout': Overlay('Dropout:'),
-    'encoder.attn_dropout': Overlay('Attention Dropout:'),
+    'encoder.dropout': Overlay('Dropout:', minimum=0.0, maximum=1.0),
+    'encoder.attn_dropout': Overlay('Attention Dropout:', minimum=0.0, maximum=1.0),
     'encoder.timm_model_name': Overlay(
         'TIMM Model Name:', "Only used when encoder_type is 'pretrained'."
     ),
-    'decoder.base_channels': Overlay('Decoder Base Channels:'),
-    'decoder.latent_dim': Overlay('Decoder Latent Dim:'),
-    'decoder.num_stages': Overlay('Decoder Upsample Stages:'),
+    'decoder.base_channels': Overlay('Decoder Base Channels:', minimum=1),
+    'decoder.latent_dim': Overlay('Decoder Latent Dim:', minimum=1),
+    'decoder.num_stages': Overlay('Decoder Upsample Stages:', minimum=1),
     'decoder.use_batchnorm': Overlay('Decoder Batch Norm'),
-    'decoder.dropout': Overlay('Decoder Dropout:'),
+    'decoder.dropout': Overlay('Decoder Dropout:', minimum=0.0, maximum=1.0),
     'init.enabled': Overlay('Custom Weight Init'),
     'init.method': Overlay('Init Method:', choices=('trunc_normal', 'kaiming')),
 }
@@ -201,9 +210,9 @@ _LOSS_FUNCTIONS: Sequence[str] = (
 _LOSS_TYPES: Sequence[str] = ('mse', 'mae')
 
 _TRAINING_OVERLAYS: Mapping[str, Overlay] = {
-    'batch_size': Overlay('Batch Size:'),
-    'learning_rate': Overlay('Learning Rate:'),
-    'epochs': Overlay('Epochs:'),
+    'batch_size': Overlay('Batch Size:', minimum=1),
+    'learning_rate': Overlay('Learning Rate:', minimum=0.0),
+    'epochs': Overlay('Epochs:', minimum=1),
     'loss_function': Overlay('Loss Function:', choices=_LOSS_FUNCTIONS),
     'weighted_loss.loss_type': Overlay(
         'Weighted Loss Type:', "Only used when loss_function is 'weighted'.", choices=_LOSS_TYPES
@@ -219,9 +228,12 @@ _TRAINING_OVERLAYS: Mapping[str, Overlay] = {
     'probe_aware_loss.alpha': Overlay(
         'Probe-Aware Loss Alpha:',
         'Power applied to the probe far-field envelope in the denominator.',
+        minimum=0.0,
     ),
     'probe_aware_loss.envelope_floor': Overlay(
-        'Probe-Aware Envelope Floor:', 'Per-sample floor as a fraction of the mean probe envelope.'
+        'Probe-Aware Envelope Floor:',
+        'Per-sample floor as a fraction of the mean probe envelope.',
+        minimum=0.0,
     ),
     'q_dependent_loss.loss_type': Overlay(
         'Q-Dependent Loss Type:',
@@ -237,7 +249,9 @@ _TRAINING_OVERLAYS: Mapping[str, Overlay] = {
         'Radial exponent emphasizing high-Q pixels; 0 disables Q weighting.',
     ),
     'q_dependent_loss.q_floor': Overlay(
-        'Q-Dependent Q Floor:', 'Minimum normalized Q, so low-Q pixels are not zero-weighted.'
+        'Q-Dependent Q Floor:',
+        'Minimum normalized Q, so low-Q pixels are not zero-weighted.',
+        minimum=0.0,
     ),
     'q_dependent_loss.threshold': Overlay('Q-Dependent Loss Threshold:'),
     'q_dependent_loss.log_error': Overlay(

@@ -19,9 +19,12 @@ import pytest
 
 pytest.importorskip('ptychi')
 
+from ptychodus.api.parameters import IntegerParameter, RealParameter  # noqa: E402
+from ptychodus.api.settings import SettingsRegistry  # noqa: E402
 from ptychodus.model.processing import _ptychi_sections  # noqa: E402
 from ptychodus.model.processing._ptychi_sections import sections_for  # noqa: E402
 from ptychodus.model.processing.flatten import flatten_options  # noqa: E402
+from ptychodus.model.ptychi import settings as ptychi_settings  # noqa: E402
 from ptychodus.model.ptychi.algorithms import task_options_classes  # noqa: E402
 
 # Not derived from the declaration: NumSyncEpochs chunks the epoch loop for
@@ -146,3 +149,57 @@ def test_no_overlay_entry_names_a_field_no_branch_declares() -> None:
             declared |= set(table)
 
     assert declared - consulted == set()
+
+
+def _settings_bounds() -> dict[tuple[str, str], tuple[Any, Any]]:
+    """The bounds the hand-written settings classes carry, read off live parameters.
+
+    The oracle for bounds, as settings_defaults.ini is the oracle for keys and
+    defaults: an INI records values, not the ranges they are held to, so the
+    fixture cannot carry these. Read from constructed parameters rather than
+    parsed out of the source, which costs nothing because the settings classes
+    import no part of pty-chi. Retires with the classes it reads.
+    """
+    registry = SettingsRegistry()
+
+    for name, cls in vars(ptychi_settings).items():
+        if isinstance(cls, type) and name.endswith('Settings'):
+            cls(registry)
+
+    bounds: dict[tuple[str, str], tuple[Any, Any]] = {}
+
+    for group_name in registry:
+        for key, parameter in registry[group_name].parameters().items():
+            if not isinstance(parameter, IntegerParameter | RealParameter):
+                continue
+
+            minimum = parameter.get_minimum()
+            maximum = parameter.get_maximum()
+
+            if minimum is not None or maximum is not None:
+                bounds[group_name, key] = (minimum, maximum)
+
+    return bounds
+
+
+def test_every_bound_the_settings_classes_carry_survives_generation() -> None:
+    """A bound lost here is a range the GUI cannot build a slider or spin box from.
+
+    Asserted one way only. Upstream annotates bounds the settings classes never
+    had, and those are a gain; a bound that moved, or went missing, is not.
+    """
+    produced: dict[tuple[str, str], Any] = {}
+
+    for algorithm in ALGORITHMS:
+        options = task_options_classes()[algorithm]()
+
+        for section in sections_for(algorithm, options):
+            for flat in flatten_options(_resolve(options, section.root_path), section.policy):
+                produced.setdefault((section.group_name, flat.ini_key), flat)
+
+    for (group, key), expected in sorted(_settings_bounds().items()):
+        if key in PTYCHODUS_OWNED:
+            continue
+
+        flat = produced[group, key]
+        assert (flat.minimum, flat.maximum) == expected, f'{group}/{key}'

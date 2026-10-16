@@ -27,6 +27,7 @@ import pytest
 
 pytest.importorskip('ptycho_fm')
 
+from ptychodus.api.parameters import IntegerParameter, RealParameter  # noqa: E402
 from ptychodus.api.settings import SettingsRegistry  # noqa: E402
 from ptychodus.model.processing._ptycho_fm_sections import sections  # noqa: E402
 from ptychodus.model.processing.flatten import flatten_options, render_value  # noqa: E402
@@ -36,6 +37,7 @@ from ptychodus.model.processing.generate import (  # noqa: E402
     restore_options,
 )
 from ptychodus.model.processing.parameter_store import OptionsSection  # noqa: E402
+from ptychodus.model.ptycho_fm import settings as ptycho_fm_settings  # noqa: E402
 from ptychodus.model.ptycho_fm.enums import PtychoFMEnumerators  # noqa: E402
 from ptychodus.model.ptycho_fm.options import default_options  # noqa: E402
 
@@ -253,3 +255,53 @@ def test_reading_the_declaration_costs_two_modules() -> None:
         check=True,
     )
     assert json.loads(probe.stdout) == ['ptycho_fm', 'ptycho_fm.config']
+
+
+def _settings_bounds() -> dict[tuple[str, str], tuple[Any, Any]]:
+    """The bounds the hand-written settings classes carry, read off live parameters.
+
+    The oracle for bounds, as settings_defaults.ini is the oracle for keys and
+    defaults: an INI records values, not the ranges they are held to. Read from
+    constructed parameters rather than parsed out of the source, which costs
+    nothing because the settings classes import no part of PtychoFM. Retires
+    with the classes it reads.
+    """
+    registry = SettingsRegistry()
+
+    for name, cls in vars(ptycho_fm_settings).items():
+        if isinstance(cls, type) and name.endswith('Settings'):
+            cls(registry)
+
+    bounds: dict[tuple[str, str], tuple[Any, Any]] = {}
+
+    for group_name in registry:
+        for key, parameter in registry[group_name].parameters().items():
+            if not isinstance(parameter, IntegerParameter | RealParameter):
+                continue
+
+            minimum = parameter.get_minimum()
+            maximum = parameter.get_maximum()
+
+            if minimum is not None or maximum is not None:
+                bounds[group_name, key] = (minimum, maximum)
+
+    return bounds
+
+
+def test_every_bound_the_settings_classes_carry_survives_generation() -> None:
+    """A bound lost here is a range the GUI cannot build a slider or spin box from.
+
+    Upstream annotates none of its 165 fields, so every one of these comes from
+    the policy -- except the inference branch, which is ptychodus's own and
+    states its bounds inline.
+    """
+    options = default_options()
+    produced = {
+        (section.group_name, flat.ini_key): flat
+        for section in sections()
+        for flat in flatten_options(getattr(options, section.root_path), section.policy)
+    }
+
+    for (group, key), expected in sorted(_settings_bounds().items()):
+        flat = produced[group, key]
+        assert (flat.minimum, flat.maximum) == expected, f'{group}/{key}'

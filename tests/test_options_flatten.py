@@ -373,8 +373,8 @@ class TestAbsoluteKeys:
         assert 'ConstrainL1NormWeight' in _keys(policy)
 
 
-class TestLabels:
-    """An upstream declaration cannot carry display text, so the policy supplies it."""
+class TestOverlays:
+    """An upstream declaration carries none of this, so the policy supplies it."""
 
     def test_the_policy_supplies_text_a_declaration_lacks(self) -> None:
         policy = FlatteningPolicy(

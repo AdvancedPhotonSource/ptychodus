@@ -91,7 +91,7 @@ _OPR_BRANCHES = ('smoothing',)
 _OBJECT_OVERLAYS: Mapping[str, Overlay] = {
     'optimizable': Overlay('Optimize Object', 'Whether the object is optimizable'),
     'optimizer': Overlay('Optimizer:'),
-    'step_size': Overlay('Step Size:', 'Optimizer step size (learning rate).'),
+    'step_size': Overlay('Step Size:', 'Optimizer step size (learning rate).', minimum=0.0),
     'patch_interpolation_method': Overlay(
         'Patch Interpolator:',
         'Interpolation method used for extracting and updating patches of the object',
@@ -105,19 +105,19 @@ _OBJECT_OVERLAYS: Mapping[str, Overlay] = {
     ),
     'slice_spacing_options.optimizer': Overlay('Optimizer:'),
     'slice_spacing_options.step_size': Overlay(
-        'Step Size:', 'Optimizer step size (learning rate).'
+        'Step Size:', 'Optimizer step size (learning rate).', minimum=0.0
     ),
     'l1_norm_constraint.enabled': Overlay(
         'Constrain L\u2081 Norm', 'Whether to constrain the L\u2081 norm'
     ),
     'l1_norm_constraint.weight': Overlay(
-        'Weight:', 'Weight of the L\u2081 norm constraint (0 or less disables it).'
+        'Weight:', 'Weight of the L\u2081 norm constraint (0 or less disables it).', minimum=0.0
     ),
     'l2_norm_constraint.enabled': Overlay(
         'Constrain L\u2082 Norm', 'Whether to constrain the L\u2082 norm'
     ),
     'l2_norm_constraint.weight': Overlay(
-        'Weight:', 'Weight of the L\u2082 norm constraint (0 or less disables it).'
+        'Weight:', 'Weight of the L\u2082 norm constraint (0 or less disables it).', minimum=0.0
     ),
     'smoothness_constraint.enabled': Overlay(
         'Constrain Smoothness',
@@ -131,7 +131,7 @@ _OBJECT_OVERLAYS: Mapping[str, Overlay] = {
         'Constrain Total Variation', 'Whether to constrain the total variation'
     ),
     'total_variation.weight': Overlay(
-        'Weight:', 'Weight of the total variation constraint (0 or less disables it).'
+        'Weight:', 'Weight of the total variation constraint (0 or less disables it).', minimum=0.0
     ),
     'remove_grid_artifacts.enabled': Overlay(
         'Remove Grid Artifacts',
@@ -158,6 +158,7 @@ _OBJECT_OVERLAYS: Mapping[str, Overlay] = {
         'Weight:',
         'Weight of the cross-slice smoothing regularization for multislice objects '
         '(0 disables it).',
+        minimum=0.0,
     ),
     'multislice_regularization.unwrap_phase': Overlay(
         'Unwrap Phase',
@@ -178,8 +179,8 @@ _OBJECT_OVERLAYS: Mapping[str, Overlay] = {
         'Whether to apply hard magnitude/phase limits to the object',
     ),
     'EnableAbs': Overlay('Limit Magnitude', 'Whether to apply magnitude limits'),
-    'AbsMin': Overlay('Magnitude Min:', 'Minimum magnitude value'),
-    'AbsMax': Overlay('Magnitude Max:', 'Maximum magnitude value'),
+    'AbsMin': Overlay('Magnitude Min:', 'Minimum magnitude value', minimum=0.0),
+    'AbsMax': Overlay('Magnitude Max:', 'Maximum magnitude value', minimum=0.0),
     'EnablePhase': Overlay('Limit Phase', 'Whether to apply phase limits'),
     'PhaseMinDeg': Overlay('Phase Min [deg]:', 'Minimum phase value in degrees'),
     'PhaseMaxDeg': Overlay('Phase Max [deg]:', 'Maximum phase value in degrees'),
@@ -236,7 +237,7 @@ def _object_policy(extras: set[str]) -> FlatteningPolicy:
 _PROBE_OVERLAYS: Mapping[str, Overlay] = {
     'optimizable': Overlay('Optimize Probe', 'Whether the probe is optimizable'),
     'optimizer': Overlay('Optimizer:'),
-    'step_size': Overlay('Step Size:', 'Optimizer step size (learning rate).'),
+    'step_size': Overlay('Step Size:', 'Optimizer step size (learning rate).', minimum=0.0),
     'eigenmode_update_relaxation': Overlay(
         'Relax Eigenmode Update:', 'Separate step size (relaxation) for the eigenmode update.'
     ),
@@ -331,7 +332,7 @@ _POSITION_OVERLAYS: Mapping[str, Overlay] = {
         'Optimize Probe Positions', 'Whether the probe positions are optimizable'
     ),
     'optimizer': Overlay('Optimizer:'),
-    'step_size': Overlay('Step Size:', 'Optimizer step size (learning rate).'),
+    'step_size': Overlay('Step Size:', 'Optimizer step size (learning rate).', minimum=0.0),
     'constrain_position_mean': Overlay(
         'Constrain Centroid',
         'Whether to subtract the mean from positions after updating positions',
@@ -351,7 +352,9 @@ _POSITION_OVERLAYS: Mapping[str, Overlay] = {
         'Real Space Width:', 'Width of the cross-correlation in real-space'
     ),
     'correction_options.cross_correlation_probe_threshold': Overlay(
-        'Probe Threshold:', 'Probe intensity threshold used to calculate the probe mask'
+        'Probe Threshold:',
+        'Probe intensity threshold used to calculate the probe mask',
+        maximum=1.0,
     ),
     'correction_options.clip_update_magnitude_by_mad': Overlay(
         'Clip Update Magnitude by MAD',
@@ -376,7 +379,7 @@ _POSITION_OVERLAYS: Mapping[str, Overlay] = {
         'Fit an affine transform from the initial to the current positions and penalize '
         'positions that deviate from it.',
     ),
-    'affine_transform_constraint.degrees_of_freedom': Overlay('Degrees of Freedom:'),
+    'affine_transform_constraint.degrees_of_freedom': Overlay('Degrees of Freedom:', minimum=0),
     'affine_transform_constraint.position_weight_update_interval': Overlay(
         'Weight Update Interval:', 'Number of epochs between position weight updates.'
     ),
@@ -448,7 +451,7 @@ _OPR_OVERLAYS: Mapping[str, Overlay] = {
         'Orthogonal Probe Relaxation', 'Master switch for optimizing OPR mode weights.'
     ),
     'optimizer': Overlay('Optimizer:'),
-    'step_size': Overlay('Step Size:', 'Optimizer step size (learning rate).'),
+    'step_size': Overlay('Step Size:', 'Optimizer step size (learning rate).', minimum=0.0),
     'optimize_eigenmode_weights': Overlay(
         'Optimize Eigenmode Weights',
         'Whether to optimize eigenmode weights (i.e., the weights of the second and '
@@ -474,7 +477,9 @@ _OPR_OVERLAYS: Mapping[str, Overlay] = {
         'Method for smoothing OPR mode weights (MEDIAN filter or POLYNOMIAL fit).',
     ),
     'smoothing.polynomial_degree': Overlay(
-        'Polynomial Degree:', 'Degree of the polynomial used for smoothing OPR mode weights'
+        'Polynomial Degree:',
+        'Degree of the polynomial used for smoothing OPR mode weights',
+        maximum=10,
     ),
 }
 
@@ -514,6 +519,7 @@ _RECONSTRUCTOR_OVERLAYS: Mapping[str, Overlay] = {
     'compact_mode_update_clustering': Overlay(
         'Update Clustering:',
         'Number of epochs between cluster updates in COMPACT batching mode (0 disables).',
+        minimum=0,
     ),
     'use_double_precision_for_fft': Overlay(
         'FFT Precision:',
@@ -541,7 +547,9 @@ _RECONSTRUCTOR_OVERLAYS: Mapping[str, Overlay] = {
         'vectorized code. This reduces the speed, but also lowers memory usage',
     ),
     'PadForShift': Overlay(
-        'Pad For Shift:', 'Number of pixels to pad arrays (with border values) before shifting'
+        'Pad For Shift:',
+        'Number of pixels to pad arrays (with border values) before shifting',
+        minimum=0,
     ),
     'EnableDiffractionPatternBlur': Overlay(
         'Blur Diffraction Patterns',
@@ -550,6 +558,7 @@ _RECONSTRUCTOR_OVERLAYS: Mapping[str, Overlay] = {
     'DiffractionPatternBlurSigma': Overlay(
         'Sigma:',
         'Sigma (in pixels) of the Gaussian kernel used to blur simulated diffraction patterns.',
+        minimum=0.0,
     ),
 }
 
@@ -624,7 +633,7 @@ _ALGORITHM_OVERLAYS: Mapping[str, Overlay] = {
         'Maximum object amplitude; larger values are clamped to this limit.',
     ),
     'inertia': Overlay('Inertia:', 'Inertia of the object update; should be between 0 and 1.'),
-    'alpha': Overlay('Alpha:'),
+    'alpha': Overlay('Alpha:', maximum=1.0),
     'optimal_step_size_scaler': Overlay(
         'Optimal Step Size Scaler:',
         'Scaler applied to the solved optimal step size for the object update.',
