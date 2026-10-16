@@ -113,7 +113,7 @@ from ptychodus.cli._reconstruct_common import (
     load_ptychi_options,
     resolve_crop_region,
 )
-from ptychodus.model.processing._subprocess_protocol import ChildError, run_subprocess
+from ptychodus.api.spawn import ChildError, run_subprocess
 from ptychodus.model.ptychi.device import probe_devices_via_subprocess
 from ptychodus.model.ptychi.task import dump_task_options
 from ptychodus.plugins.aps31id_lamni._scan_table import (

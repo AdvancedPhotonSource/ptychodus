@@ -1,12 +1,21 @@
-"""Reconstructor interfaces, I/O data containers, and product standardization."""
+"""Reconstructor interfaces, I/O data containers, and product standardization.
+
+Also home to :class:`SubprocessReconstructor`, the adapter that runs a backend
+in a spawned child so the parent process never acquires a GPU context. It sits
+beside the interface it implements because it implements the whole of it, and
+the only thing it adds is where the work happens.
+"""
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass, field, fields
 from enum import auto, Enum
 from pathlib import Path
+from typing import Any
 import logging
+import pickle
+import shutil
 
 import numpy
 from pydantic import BaseModel
@@ -19,6 +28,7 @@ from .probe import ProbeEnsemble
 from .probe_positions import ProbePositionSequence, ProbePosition
 from .product import LossValue, Product
 from .propagate import compute_full_aperture_fresnel_number
+from .spawn import run_subprocess
 from .typing import RealArrayType
 
 logger = logging.getLogger(__name__)
@@ -185,6 +195,198 @@ class NullReconstructor(TrainableReconstructor):
         self, input_directory: Path, output_directory: Path, *, options: BaseModel
     ) -> Iterator[TrainOutput]:
         yield from ()
+
+
+# Tags emitted by child entry points and consumed by this adapter.
+TAG_OUTPUT = 'output'  # payload = pickle.dumps(ReconstructOutput)
+TAG_TRAIN_OUTPUT = 'train_output'  # payload = pickle.dumps(TrainOutput)
+TAG_MODEL_SAVED = 'model_saved'  # payload = str path where child wrote checkpoint
+TAG_SETTINGS_SYNC = 'settings_sync'  # payload = {group_name: {param_name: value_str}}
+
+
+# Type aliases for the callbacks each backend supplies.
+BuildReconstructPayload = Callable[[ReconstructInput, 'Path | None'], Any]
+"""(reconstruct_input, loaded_model_path_or_none) -> pickled payload for the child."""
+
+BuildTrainPayload = Callable[[Path, Path], Any]
+"""(input_dir, output_dir) -> pickled payload for the child."""
+
+ExportTrainingData = Callable[[Path, ReconstructInput], None]
+"""(file_path, reconstruct_input) -> None. Runs parent-side; must not touch GPU."""
+
+SaveModel = Callable[[Path, Path], None]
+"""(source_path_loaded_by_child, destination_path) -> None. Runs parent-side."""
+
+ApplySettingsSync = Callable[[dict[str, dict[str, str]]], None]
+"""Optional handler for ('settings_sync', dict) messages the child emits."""
+
+
+class SubprocessReconstructor(TrainableReconstructor):
+    """Parent-side adapter that runs any reconstructor in a fresh subprocess.
+
+    Wraps any backend reachable as a child-side entry point, so a caller can
+    dispatch to it without importing a GPU framework. When ``is_trainable`` is
+    False the trainable methods raise :class:`NotImplementedError`, so the
+    object is still a single kind that needs no special-casing in a list.
+
+    The parent-side object holds no GPU state. It stores:
+    - the child entry-point strings (dotted module paths),
+    - backend-supplied callbacks that build payloads and export training data,
+    - the loaded-model path (as recorded by ``load_model`` /
+      remembered from the last ``train`` call).
+
+    Each ``reconstruct()`` / ``train()`` call spawns exactly one child; the
+    child dies before the call returns, and the iterator yields the same
+    per-iteration output an in-process backend would.
+
+    **Trainable-model lifecycle.** ``load_model`` records the path and nothing
+    else -- the fresh inference child does the real load, once per call.
+    ``save_model`` copies or archives that path to the destination through a
+    backend-supplied callback, so a backend persisting one file and a backend
+    persisting a whole bundle directory share this adapter unchanged.
+    ``export_training_data`` runs in the parent, which is safe only because
+    every implementation of it is pure numpy.
+    """
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        reconstruct_entry_point: str,
+        progress_goal_fn: Callable[[], int],
+        build_reconstruct_payload: BuildReconstructPayload,
+        is_trainable: bool = False,
+        train_entry_point: str | None = None,
+        build_train_payload: BuildTrainPayload | None = None,
+        model_file_filter: str = '',
+        model_file_extension: str = '',
+        training_data_file_filter: str = '',
+        export_training_data: ExportTrainingData | None = None,
+        save_model: SaveModel | None = None,
+        apply_settings_sync: ApplySettingsSync | None = None,
+        terminate_grace_sec: float = 10.0,
+    ) -> None:
+        super().__init__()
+        self._name = name
+        self._reconstruct_entry_point = reconstruct_entry_point
+        self._progress_goal_fn = progress_goal_fn
+        self._build_reconstruct_payload = build_reconstruct_payload
+        self._is_trainable = is_trainable
+        self._train_entry_point = train_entry_point
+        self._build_train_payload = build_train_payload
+        self._model_file_filter = model_file_filter
+        self._model_file_extension = model_file_extension
+        self._training_data_file_filter = training_data_file_filter
+        self._export_training_data = export_training_data
+        self._save_model_fn = save_model
+        self._apply_settings_sync = apply_settings_sync
+        self._terminate_grace_sec = terminate_grace_sec
+
+        self._loaded_model_path: Path | None = None
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def is_trainable(self) -> bool:
+        return self._is_trainable
+
+    def get_progress_goal(self) -> int:
+        return self._progress_goal_fn()
+
+    def reconstruct(
+        self, input_: ReconstructInput, *, options: BaseModel
+    ) -> Iterator[ReconstructOutput]:
+        # options is accepted but not yet consulted: each backend still reads the
+        # settings objects it holds, until its parameters are declared.
+        payload = self._build_reconstruct_payload(input_, self._loaded_model_path)
+
+        with run_subprocess(
+            self._reconstruct_entry_point,
+            payload,
+            terminate_grace_sec=self._terminate_grace_sec,
+        ) as events:
+            for event in events:
+                tag = event[0]
+                if tag == TAG_OUTPUT:
+                    yield pickle.loads(event[1])
+                elif tag == TAG_SETTINGS_SYNC:
+                    if self._apply_settings_sync is not None:
+                        try:
+                            self._apply_settings_sync(event[1])
+                        except Exception:
+                            logger.exception('Failed to apply settings sync from subprocess.')
+                else:
+                    logger.debug(
+                        f'{self._name}: dropping unrecognized subprocess message tag {tag!r}'
+                    )
+
+    def is_model_loaded(self) -> bool:
+        return self._loaded_model_path is not None
+
+    def get_model_file_filter(self) -> str:
+        return self._model_file_filter
+
+    def load_model(self, file_path: Path) -> None:
+        # Parent-side: just remember the path. The child does the actual load
+        # (which touches GPU frameworks) per reconstruct/train call.
+        self._loaded_model_path = file_path
+
+    def get_model_file_extension(self) -> str:
+        return self._model_file_extension
+
+    def save_model(self, file_path: Path) -> None:
+        if self._loaded_model_path is None:
+            raise RuntimeError(
+                f'Cannot save {self._name} model: no model has been loaded or trained.'
+            )
+        if self._save_model_fn is not None:
+            self._save_model_fn(self._loaded_model_path, file_path)
+        else:
+            shutil.copyfile(self._loaded_model_path, file_path)
+
+    def get_training_data_file_filter(self) -> str:
+        return self._training_data_file_filter
+
+    def export_training_data(
+        self, file_path: Path, input_: ReconstructInput, *, options: BaseModel
+    ) -> None:
+        if self._export_training_data is None:
+            raise NotImplementedError(f'{self._name} does not support exporting training data.')
+        self._export_training_data(file_path, input_)
+
+    def train(
+        self, input_directory: Path, output_directory: Path, *, options: BaseModel
+    ) -> Iterator[TrainOutput]:
+        if not self._is_trainable:
+            raise NotImplementedError(f'{self._name} does not support training.')
+        if self._train_entry_point is None or self._build_train_payload is None:
+            raise NotImplementedError(f'{self._name} does not support training.')
+
+        payload = self._build_train_payload(input_directory, output_directory)
+
+        with run_subprocess(
+            self._train_entry_point,
+            payload,
+            terminate_grace_sec=self._terminate_grace_sec,
+        ) as events:
+            for event in events:
+                tag = event[0]
+                if tag == TAG_TRAIN_OUTPUT:
+                    yield pickle.loads(event[1])
+                elif tag == TAG_MODEL_SAVED:
+                    self._loaded_model_path = Path(event[1])
+                elif tag == TAG_SETTINGS_SYNC:
+                    if self._apply_settings_sync is not None:
+                        try:
+                            self._apply_settings_sync(event[1])
+                        except Exception:
+                            logger.exception('Failed to apply settings sync from subprocess.')
+                else:
+                    logger.debug(
+                        f'{self._name}: dropping unrecognized subprocess message tag {tag!r}'
+                    )
 
 
 class ReconstructorLibrary(Iterable[Reconstructor], ABC):

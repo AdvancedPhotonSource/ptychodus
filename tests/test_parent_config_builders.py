@@ -207,7 +207,7 @@ def test_parent_config_builders_acquire_no_gpu_context(backend: str) -> None:
         picklable configs it ships to the child, but not to acquire a context
         doing it. Something in the builder placed a tensor on a device or
         queried the runtime. See the invariant note in
-        ptychodus.model.processing._subprocess_protocol.
+        ptychodus.api.spawn.
         """
     )
 

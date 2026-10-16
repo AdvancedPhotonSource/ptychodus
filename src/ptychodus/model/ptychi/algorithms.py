@@ -108,9 +108,8 @@ from ptychi.api.options.base import (
 from ptychi.api.options.task import PtychographyTaskOptions
 
 from ptychodus.api.product import Product
-from ptychodus.api.reconstruct import ReconstructInput
+from ptychodus.api.reconstruct import ReconstructInput, SubprocessReconstructor
 
-from ..processing.subprocess_reconstructor import SubprocessReconstructor
 from ._names import DISPLAY_NAMES
 from ._payload import PtyChiPayload
 from .affine import PtyChiAffineDegreesOfFreedom, PtyChiAffineDegreesOfFreedomBitField

@@ -24,7 +24,7 @@ from ptychodus.api.fluorescence import (
 )
 from ptychodus.api.product import Product
 
-from ..processing._subprocess_protocol import run_subprocess
+from ...api.spawn import run_subprocess
 from ._payload import PtychozoonPayload
 from .settings import FluorescenceSettings
 

@@ -13,7 +13,7 @@ child that dies at end-of-call.
 pulls torch in for its type annotations so the parent can build the picklable
 ``PtychographyTaskOptions`` the child needs, and no CUDA runtime is
 initialised by that. See the invariant note at the top of
-``ptychodus.model.processing._subprocess_protocol`` for the canonical
+``ptychodus.api.spawn`` for the canonical
 statement.
 
 So this module checks two things, in one spawned probe process that imports
@@ -144,8 +144,7 @@ def _check_in_subprocess(result_queue: multiprocessing.Queue[dict[str, list[str]
         # Import the top-level package plus the main composition roots.
         import ptychodus  # noqa: F401
         import ptychodus.model.core  # noqa: F401
-        import ptychodus.model.processing.subprocess_reconstructor  # noqa: F401
-        import ptychodus.model.processing._subprocess_protocol  # noqa: F401
+        import ptychodus.api.spawn  # noqa: F401
 
         context_offenders, notes = _gpu_context_offenders()
         result_queue.put(
@@ -209,6 +208,6 @@ def test_parent_holds_no_gpu_context(probe_result: dict[str, list[str]]) -> None
         constructed a PtychographyTask/Trainer, or otherwise initialised the
         runtime. Move that work into a child entry point dispatched through
         SubprocessReconstructor (see
-        ptychodus.model.processing._subprocess_protocol).
+        ptychodus.api.spawn).
         """
     )

@@ -22,8 +22,8 @@ from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructInput
-from ptychodus.model.processing._subprocess_protocol import ChildError
-from ptychodus.model.processing.subprocess_reconstructor import SubprocessReconstructor
+from ptychodus.api.spawn import ChildError
+from ptychodus.api.reconstruct import SubprocessReconstructor
 from ptychodus.model.ptychopinn._payload import ReconstructPayload, TrainPayload
 from ptychodus.model.ptychopinn._subprocess import _build_arrays, _read_epoch_losses
 

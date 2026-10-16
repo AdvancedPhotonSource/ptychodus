@@ -1,4 +1,4 @@
-"""Shared machinery for running GPU-touching code in transient spawned subprocesses.
+"""Run GPU-touching code in a transient spawned subprocess.
 
 The parent-side ptychodus process must NEVER acquire a GPU context (no
 ``torch.cuda.*`` / ``tf.config.experimental.*`` calls, no tensor-on-GPU

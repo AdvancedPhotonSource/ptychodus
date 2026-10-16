@@ -15,7 +15,7 @@ from typing import Any, overload
 import logging
 import pickle
 
-from ..processing._subprocess_protocol import ChildError, run_subprocess
+from ...api.spawn import ChildError, run_subprocess
 
 logger = logging.getLogger(__name__)
 

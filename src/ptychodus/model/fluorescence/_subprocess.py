@@ -9,7 +9,7 @@ The payload carries fully constructed ``ptychozoon`` objects (see
 :mod:`._payload`); this file just hands them to the enhancement algorithm and
 streams checkpoint results back. Log forwarding and error marshaling are
 handled by the shared subprocess protocol in
-:mod:`ptychodus.model.processing._subprocess_protocol`.
+:mod:`ptychodus.api.spawn`.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ def run_vspi_enhancement(payload: PtychozoonPayload, result_queue: Queue[Any]) -
     """Run ptychozoon VSPI enhancement and stream checkpoint results over a queue.
 
     Intended as the ``entry_point`` for
-    :func:`ptychodus.model.processing._subprocess_protocol.run_subprocess`.
+    :func:`ptychodus.api.spawn.run_subprocess`.
     Puts ``('result', iteration, [(name, cps), ...])`` tuples per checkpoint.
     """
     from ptychozoon.vspi_enhance import VSPIFluorescenceEnhancingAlgorithm

@@ -20,7 +20,7 @@ import pickle
 from multiprocessing.queues import Queue
 from typing import Any
 
-from ..processing.subprocess_reconstructor import TAG_OUTPUT
+from ...api.reconstruct import TAG_OUTPUT
 from ._payload import PtyChiPayload
 from .task import reconstruct_with_ptychi
 

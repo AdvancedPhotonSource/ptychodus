@@ -41,12 +41,12 @@ import numpy
 from ptychodus.api.preprocess.diffraction import zero_bad_pixels
 from ptychodus.api.object import Object
 from ptychodus.api.product import LossValue, Product
-from ptychodus.api.reconstruct import ReconstructOutput, TrainOutput
-
-from ..processing.subprocess_reconstructor import (
+from ptychodus.api.reconstruct import (
     TAG_MODEL_SAVED,
     TAG_OUTPUT,
     TAG_TRAIN_OUTPUT,
+    ReconstructOutput,
+    TrainOutput,
 )
 from ._payload import ReconstructPayload, TrainPayload
 

@@ -16,9 +16,8 @@ from pathlib import Path
 from typing import Any, Final
 
 from ptychodus.api.io import save_ptychopinn_training_data
-from ptychodus.api.reconstruct import ReconstructInput
+from ptychodus.api.reconstruct import ReconstructInput, SubprocessReconstructor
 
-from ..processing.subprocess_reconstructor import SubprocessReconstructor
 from ._payload import ReconstructPayload, TrainPayload
 from .settings import (
     PtychoPINNDataSettings,

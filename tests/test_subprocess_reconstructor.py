@@ -22,12 +22,13 @@ from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
-from ptychodus.model.processing import _subprocess_protocol
-from ptychodus.model.processing._subprocess_protocol import ChildError
-from ptychodus.model.processing.subprocess_reconstructor import (
+from ptychodus.api import spawn
+from ptychodus.api.reconstruct import (
+    ReconstructInput,
+    ReconstructOutput,
     SubprocessReconstructor,
 )
+from ptychodus.api.spawn import ChildError
 
 
 # The spawned child resolves the fixtures module by dotted path against the
@@ -158,9 +159,7 @@ def test_hanging_child_is_terminated_on_iterator_close(monkeypatch: pytest.Monke
         return {'product': product}
 
     recorded = _ProcessRecordingContext(multiprocessing.get_context('spawn'))
-    monkeypatch.setattr(
-        _subprocess_protocol.multiprocessing, 'get_context', lambda method: recorded
-    )
+    monkeypatch.setattr(spawn.multiprocessing, 'get_context', lambda method: recorded)
 
     adapter = SubprocessReconstructor(
         name='FAKE',

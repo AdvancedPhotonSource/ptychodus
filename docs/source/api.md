@@ -227,6 +227,15 @@
    :show-inheritance:
 ```
 
+## Spawn
+
+```{eval-rst}
+.. automodule:: ptychodus.api.spawn
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Simulate
 
 ### Diffraction simulation

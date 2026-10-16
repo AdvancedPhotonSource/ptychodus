@@ -18,9 +18,8 @@ import h5py
 import numpy
 
 from ptychodus.api.preprocess.diffraction import zero_bad_pixels
-from ptychodus.api.reconstruct import ReconstructInput
+from ptychodus.api.reconstruct import ReconstructInput, SubprocessReconstructor
 
-from ..processing.subprocess_reconstructor import SubprocessReconstructor
 from ._payload import ReconstructPayload, TrainPayload
 from .enums import COUPLED_DECODER_MODES
 from .settings import (

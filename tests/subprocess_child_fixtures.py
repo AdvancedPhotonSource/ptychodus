@@ -18,7 +18,7 @@ from types import ModuleType, SimpleNamespace
 from typing import Any
 
 from ptychodus.api.reconstruct import ReconstructOutput, TrainOutput
-from ptychodus.model.processing.subprocess_reconstructor import (
+from ptychodus.api.reconstruct import (
     TAG_MODEL_SAVED,
     TAG_OUTPUT,
     TAG_SETTINGS_SYNC,
