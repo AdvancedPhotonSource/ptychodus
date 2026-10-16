@@ -9,6 +9,7 @@ from pathlib import Path
 import logging
 
 import numpy
+from pydantic import BaseModel
 
 from .assemble import AssembledDiffractionData
 from .diffraction import BadPixels, DiffractionPatterns
@@ -21,6 +22,16 @@ from .propagate import compute_full_aperture_fresnel_number
 from .typing import RealArrayType
 
 logger = logging.getLogger(__name__)
+
+
+class NoOptions(BaseModel):
+    """Declared by a reconstructor that does not yet describe its options.
+
+    A reconstructor states what it accepts by returning a pydantic object from
+    :meth:`Reconstructor.get_default_options`. Until a backend declares one it keeps
+    reading whatever configuration it already holds, and this stands in so that
+    callers can build the ``options`` argument uniformly.
+    """
 
 
 @dataclass(frozen=True)
@@ -53,8 +64,26 @@ class Reconstructor(ABC):
     def get_progress_goal(self) -> int:
         pass
 
+    def get_default_options(self) -> BaseModel:
+        """Return this reconstructor's options, populated with their defaults.
+
+        A description, not live state: plain pydantic carrying values, types,
+        ranges, enums and nesting. A caller edits a copy and passes it back as
+        ``options``; the settings layer generates live parameters from it, and
+        its type is what an incoming ``options`` is validated against.
+
+        An instance rather than the class, because a field declared with a
+        ``default_factory`` reports its class-level default as undefined. Only
+        an instance carries the value such a field actually starts at.
+
+        Override when the backend declares its options.
+        """
+        return NoOptions()
+
     @abstractmethod
-    def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
+    def reconstruct(
+        self, input_: ReconstructInput, *, options: BaseModel
+    ) -> Iterator[ReconstructOutput]:
         pass
 
 
@@ -80,7 +109,7 @@ class TrainableReconstructor(Reconstructor):
         pass
 
     @abstractmethod
-    def load_model_from_file(self, file_path: Path) -> None:
+    def load_model(self, file_path: Path) -> None:
         pass
 
     @abstractmethod
@@ -98,11 +127,16 @@ class TrainableReconstructor(Reconstructor):
         pass
 
     @abstractmethod
-    def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
+    def export_training_data(
+        self, file_path: Path, input_: ReconstructInput, *, options: BaseModel
+    ) -> None:
         pass
 
     @abstractmethod
-    def train(self, input_path: Path, output_path: Path) -> Iterator[TrainOutput]:
+    def train(
+        self, input_directory: Path, output_directory: Path, *, options: BaseModel
+    ) -> Iterator[TrainOutput]:
+        """Train from a StandardFileLayout in *input_directory*, writing to *output_directory*."""
         pass
 
 
@@ -119,7 +153,9 @@ class NullReconstructor(TrainableReconstructor):
     def get_progress_goal(self) -> int:
         return 0
 
-    def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
+    def reconstruct(
+        self, input_: ReconstructInput, *, options: BaseModel
+    ) -> Iterator[ReconstructOutput]:
         yield from ()
 
     def is_model_loaded(self) -> bool:
@@ -128,7 +164,7 @@ class NullReconstructor(TrainableReconstructor):
     def get_model_file_filter(self) -> str:
         return ''
 
-    def load_model_from_file(self, file_path: Path) -> None:
+    def load_model(self, file_path: Path) -> None:
         pass
 
     def get_model_file_extension(self) -> str:
@@ -140,10 +176,14 @@ class NullReconstructor(TrainableReconstructor):
     def get_training_data_file_filter(self) -> str:
         return ''
 
-    def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
+    def export_training_data(
+        self, file_path: Path, input_: ReconstructInput, *, options: BaseModel
+    ) -> None:
         pass
 
-    def train(self, input_path: Path, output_path: Path) -> Iterator[TrainOutput]:
+    def train(
+        self, input_directory: Path, output_directory: Path, *, options: BaseModel
+    ) -> Iterator[TrainOutput]:
         yield from ()
 
 

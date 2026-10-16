@@ -143,6 +143,9 @@ url = "https://download.pytorch.org/whl/cu132"
 explicit = true
 
 [tool.mypy]
+# Teaches mypy that Field(default, ...) supplies a default; without it every
+# field declared that way reads as required and every bare construction errors.
+plugins = ["pydantic.mypy"]
 # The unpackaged scripts/ tree has same-named modules in sibling directories
 # (three genesis submit_job.py), as does tests/ (two conftest.py). Deriving module
 # names from the repo root keeps them distinct without adding __init__.py to trees

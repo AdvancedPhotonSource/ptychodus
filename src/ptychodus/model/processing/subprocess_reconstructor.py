@@ -15,7 +15,7 @@ they did in the in-process version.
 Trainable-model lifecycle
 -------------------------
 
-``load_model_from_file`` on the parent-side adapter records the path only --
+``load_model`` on the parent-side adapter records the path only --
 the fresh inference child does the real load per call. ``save_model`` copies
 or archives the loaded-from path to the destination (using a backend-supplied
 callback, so that backends persisting a single file and backends persisting a
@@ -32,6 +32,8 @@ import shutil
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
+
+from pydantic import BaseModel
 
 from ptychodus.api.reconstruct import (
     ReconstructInput,
@@ -84,7 +86,7 @@ class SubprocessReconstructor(TrainableReconstructor):
     The parent-side object holds no GPU state. It stores:
     - the child entry-point strings (dotted module paths),
     - backend-supplied callbacks that build payloads and export training data,
-    - the loaded-model path (as recorded by ``load_model_from_file`` /
+    - the loaded-model path (as recorded by ``load_model`` /
       remembered from the last ``train`` call).
 
     Each ``reconstruct()`` / ``train()`` call spawns exactly one child; the
@@ -138,8 +140,12 @@ class SubprocessReconstructor(TrainableReconstructor):
     def get_progress_goal(self) -> int:
         return self._progress_goal_fn()
 
-    def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
-        payload = self._build_reconstruct_payload(parameters, self._loaded_model_path)
+    def reconstruct(
+        self, input_: ReconstructInput, *, options: BaseModel
+    ) -> Iterator[ReconstructOutput]:
+        # options is accepted but not yet consulted: each backend still reads the
+        # settings objects it holds, until its parameters are declared.
+        payload = self._build_reconstruct_payload(input_, self._loaded_model_path)
 
         with run_subprocess(
             self._reconstruct_entry_point,
@@ -167,7 +173,7 @@ class SubprocessReconstructor(TrainableReconstructor):
     def get_model_file_filter(self) -> str:
         return self._model_file_filter
 
-    def load_model_from_file(self, file_path: Path) -> None:
+    def load_model(self, file_path: Path) -> None:
         # Parent-side: just remember the path. The child does the actual load
         # (which touches GPU frameworks) per reconstruct/train call.
         self._loaded_model_path = file_path
@@ -188,18 +194,22 @@ class SubprocessReconstructor(TrainableReconstructor):
     def get_training_data_file_filter(self) -> str:
         return self._training_data_file_filter
 
-    def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
+    def export_training_data(
+        self, file_path: Path, input_: ReconstructInput, *, options: BaseModel
+    ) -> None:
         if self._export_training_data is None:
             raise NotImplementedError(f'{self._name} does not support exporting training data.')
-        self._export_training_data(file_path, parameters)
+        self._export_training_data(file_path, input_)
 
-    def train(self, input_path: Path, output_path: Path) -> Iterator[TrainOutput]:
+    def train(
+        self, input_directory: Path, output_directory: Path, *, options: BaseModel
+    ) -> Iterator[TrainOutput]:
         if not self._is_trainable:
             raise NotImplementedError(f'{self._name} does not support training.')
         if self._train_entry_point is None or self._build_train_payload is None:
             raise NotImplementedError(f'{self._name} does not support training.')
 
-        payload = self._build_train_payload(input_path, output_path)
+        payload = self._build_train_payload(input_directory, output_directory)
 
         with run_subprocess(
             self._train_entry_point,

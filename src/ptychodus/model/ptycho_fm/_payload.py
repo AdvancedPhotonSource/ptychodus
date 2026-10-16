@@ -42,7 +42,7 @@ class ReconstructPayload:
     config: dict[str, Any]
 
     # Path to the .pth weights file recorded by
-    # SubprocessReconstructor.load_model_from_file() parent-side. Required for
+    # SubprocessReconstructor.load_model() parent-side. Required for
     # inference; the child raises RuntimeError if None.
     model_path: Path | None
 

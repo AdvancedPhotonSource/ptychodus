@@ -273,7 +273,7 @@ class ProcessingController(Observer):
             return
 
         try:
-            self._processing_api.load_model_from_file(file_path)
+            self._processing_api.load_model(file_path)
         except Exception as exc:
             logger.exception(exc)
             ExceptionDialog.show_exception('Load Model', exc)

@@ -261,7 +261,7 @@ class ModelCore:
             model_path = input_directory / f'{StandardFileLayout.MODEL_BASENAME}{ext}'
 
             if model_path.is_file():
-                processing_api.load_model_from_file(model_path)
+                processing_api.load_model(model_path)
             else:
                 logger.info(
                     f'No model file found at {model_path}; '

@@ -196,7 +196,7 @@ class GenesisExecutor:
         if self._processing_api.is_reconstructor_trainable():
             ext = self._processing_api.get_model_file_extension()
             model_path = dir_structure.input_directory / f'{StandardFileLayout.MODEL_BASENAME}{ext}'
-            self._processing_api.save_model_to_file(model_path)
+            self._processing_api.save_model(model_path)
 
         self._run_flow('reconstruct', dir_structure)
 

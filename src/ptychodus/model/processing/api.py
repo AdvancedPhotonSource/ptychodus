@@ -3,6 +3,8 @@ from pathlib import Path
 import logging
 import time
 
+from pydantic import BaseModel
+
 from ptychodus.api.reconstruct import (
     NullReconstructor,
     PositionIndexFilter,
@@ -119,6 +121,31 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
             self.set_value(self._parameter.get_value())
 
 
+def build_options(reconstructor: Reconstructor) -> BaseModel:
+    """Return the options to run *reconstructor* with.
+
+    Its declared defaults for now. This is the seam the parameter store replaces
+    once it can supply the values a user has edited, which is why a backend that
+    has declared nothing keeps reading whatever settings it already owns.
+    """
+    return reconstructor.get_default_options()
+
+
+def validate_options(reconstructor: Reconstructor, options: BaseModel) -> None:
+    """Reject options that are not of the type *reconstructor* declared.
+
+    ``options`` is typed as the base model, so nothing but this check ties a
+    reconstructor to the options it asked for.
+    """
+    declared = type(reconstructor.get_default_options())
+
+    if not isinstance(options, declared):
+        raise TypeError(
+            f'{reconstructor.name} declares {declared.__name__} '
+            f'but received {type(options).__name__}.'
+        )
+
+
 class ProcessingAPI:
     def __init__(
         self,
@@ -188,12 +215,16 @@ class ProcessingAPI:
             product_index=output_product_index,
             index_filter=index_filter,
         )
+        reconstructor = self._algorithm_parameter.get_current_reconstructor()
+        options = build_options(reconstructor)
+        validate_options(reconstructor, options)
         background_task = ReconstructBackgroundTask(
             self._task_monitor,
-            self._algorithm_parameter.get_current_reconstructor(),
+            reconstructor,
             reconstruct_input,
             output_product_item,
             output_product_file,
+            options,
         )
         snapshot = self._task_monitor.get_completed_runs()
         self._task_manager.put_background_task(background_task)
@@ -227,20 +258,20 @@ class ProcessingAPI:
 
         return output_product_index_odd, output_product_index_even
 
-    def load_model_from_file(self, file_path: Path, algorithm: str | None = None) -> None:
+    def load_model(self, file_path: Path, algorithm: str | None = None) -> None:
         self.set_reconstructor_if_provided(algorithm)
         reconstructor = self._algorithm_parameter.get_current_reconstructor()
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Opening model...')
             tic = time.perf_counter()
-            reconstructor.load_model_from_file(file_path)
+            reconstructor.load_model(file_path)
             toc = time.perf_counter()
             logger.info(f'Open time {toc - tic:.4f} seconds.')
         else:
             logger.warning('Algorithm is not trainable!')
 
-    def save_model_to_file(self, file_path: Path, algorithm: str | None = None) -> None:
+    def save_model(self, file_path: Path, algorithm: str | None = None) -> None:
         self.set_reconstructor_if_provided(algorithm)
         reconstructor = self._algorithm_parameter.get_current_reconstructor()
 
@@ -272,7 +303,9 @@ class ProcessingAPI:
 
             logger.info('Exporting...')
             tic = time.perf_counter()
-            trainer.export_training_data(file_path, reconstruct_input)
+            options = build_options(trainer)
+            validate_options(trainer, options)
+            trainer.export_training_data(file_path, reconstruct_input, options=options)
             toc = time.perf_counter()
             logger.info(f'Export time {toc - tic:.4f} seconds.')
         else:
@@ -280,8 +313,8 @@ class ProcessingAPI:
 
     def train(
         self,
-        input_path: Path,
-        output_path: Path,
+        input_directory: Path,
+        output_directory: Path,
         *,
         product_index: int,
         algorithm: str | None = None,
@@ -292,12 +325,15 @@ class ProcessingAPI:
 
         if isinstance(trainer, TrainableReconstructor):
             reconstruct_input = self.get_reconstruct_input(product_index=product_index)
+            options = build_options(trainer)
+            validate_options(trainer, options)
             background_task = TrainBackgroundTask(
                 self._task_monitor,
                 trainer,
                 reconstruct_input,
-                input_path,
-                output_path,
+                input_directory,
+                output_directory,
+                options,
             )
             snapshot = self._task_monitor.get_completed_runs()
             self._task_manager.put_background_task(background_task)

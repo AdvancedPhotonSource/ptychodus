@@ -30,6 +30,7 @@ class Mode(StrEnum):
 
 class Declared(BaseModel):
     enabled: bool = True
+    built: float = Field(default_factory=lambda: 0.25)
     count: int = Field(4, ge=1, le=16)
     rate: float = Field(0.5, ge=0.0)
     label: str = 'untitled'
@@ -45,7 +46,7 @@ class Unsupported(BaseModel):
 @pytest.fixture
 def built() -> dict[str, object]:
     registry = SettingsRegistry()
-    return dict(build_parameter_group(registry, 'Declared', Declared, FlatteningPolicy()))
+    return dict(build_parameter_group(registry, 'Declared', Declared(), FlatteningPolicy()))
 
 
 class TestParameterKinds:
@@ -77,6 +78,17 @@ class TestParameterKinds:
     def test_optional_annotations_use_their_inner_type(self, built: dict[str, object]) -> None:
         assert isinstance(built['Stop'], IntegerParameter)
 
+    def test_a_default_factory_value_is_resolved(self, built: dict[str, object]) -> None:
+        """The reason the declaration is passed as an instance.
+
+        A field built by a factory reports its class-level default as undefined,
+        so reading defaults off the class would store that sentinel instead of
+        the value the field actually starts at.
+        """
+        value = built['Built']
+        assert isinstance(value, RealParameter)
+        assert value.get_value() == 0.25
+
 
 class TestEnums:
     def test_enum_persists_by_member_name_by_default(self, built: dict[str, object]) -> None:
@@ -87,7 +99,7 @@ class TestEnums:
     def test_enum_persists_by_value_under_a_verbatim_policy(self) -> None:
         registry = SettingsRegistry()
         built = build_parameter_group(
-            registry, 'Declared', Declared, FlatteningPolicy(enum_by_name=False)
+            registry, 'Declared', Declared(), FlatteningPolicy(enum_by_name=False)
         )
         assert built['Mode'].get_value() == 'fast'
 
@@ -95,19 +107,19 @@ class TestEnums:
 class TestRegistryIntegration:
     def test_the_group_is_registered_under_its_name(self) -> None:
         registry = SettingsRegistry()
-        build_parameter_group(registry, 'Declared', Declared, FlatteningPolicy())
+        build_parameter_group(registry, 'Declared', Declared(), FlatteningPolicy())
         assert 'Declared' in set(registry)
 
     def test_parameters_are_live_and_observable(self) -> None:
         registry = SettingsRegistry()
-        built = build_parameter_group(registry, 'Declared', Declared, FlatteningPolicy())
+        built = build_parameter_group(registry, 'Declared', Declared(), FlatteningPolicy())
         count = built['Count']
         count.set_value(9)
         assert registry['Declared'].parameters()['Count'].get_value_as_string() == '9'
 
     def test_bounds_clamp_a_value_loaded_from_file(self) -> None:
         registry = SettingsRegistry()
-        built = build_parameter_group(registry, 'Declared', Declared, FlatteningPolicy())
+        built = build_parameter_group(registry, 'Declared', Declared(), FlatteningPolicy())
         built['Count'].set_value_from_string('999')
         assert built['Count'].get_value() == 16
 
@@ -116,11 +128,11 @@ class TestUnrepresentableFields:
     def test_an_unsupported_type_is_rejected_by_name(self) -> None:
         registry = SettingsRegistry()
         with pytest.raises(UnsupportedParameterError, match='weights'):
-            build_parameter_group(registry, 'Unsupported', Unsupported, FlatteningPolicy())
+            build_parameter_group(registry, 'Unsupported', Unsupported(), FlatteningPolicy())
 
     def test_a_structural_field_without_an_adapter_is_rejected(self) -> None:
         """Described but not created would be an invisibly missing setting."""
         registry = SettingsRegistry()
         policy = FlatteningPolicy(structural={'count': ('Min', 'Max')})
         with pytest.raises(UnsupportedParameterError, match='value adapter'):
-            build_parameter_group(registry, 'Declared', Declared, policy)
+            build_parameter_group(registry, 'Declared', Declared(), policy)

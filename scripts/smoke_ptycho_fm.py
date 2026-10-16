@@ -32,6 +32,7 @@ from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructInput
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.ptycho_fm._payload import ReconstructPayload, TrainPayload
+from ptychodus.model.processing.api import build_options
 from ptychodus.model.ptycho_fm._subprocess import (
     _build_criterion,
     _compute_loss,
@@ -163,13 +164,17 @@ def check_export_validation(data: Any, model: Any, training: Any, inference: Any
     with tempfile.TemporaryDirectory() as tmp:
         stem = Path(tmp) / 'scan'
         try:
-            reconstructor.export_training_data(stem, _reconstruct_input(IMG_SIZE // 2))
+            reconstructor.export_training_data(
+                stem, _reconstruct_input(IMG_SIZE // 2), options=build_options(reconstructor)
+            )
         except ValueError as exc:
             print(f'  [ok] export rejected undersized patterns: {exc}')
         else:
             raise AssertionError('export_training_data accepted a wrongly-sized product')
 
-        reconstructor.export_training_data(stem, _reconstruct_input(IMG_SIZE))
+        reconstructor.export_training_data(
+            stem, _reconstruct_input(IMG_SIZE), options=build_options(reconstructor)
+        )
         produced = sorted(p.name for p in Path(tmp).iterdir())
         assert produced == ['scan_dp.hdf5', 'scan_para.hdf5'], produced
         print(f'  [ok] export wrote {produced}')
@@ -181,7 +186,9 @@ def run_training(
     reconstructor = build_reconstructor(mode, data, model, inference, training)
     in_dir = out_dir / 'input'
     in_dir.mkdir(parents=True, exist_ok=True)
-    reconstructor.export_training_data(in_dir / 'scan', _reconstruct_input(IMG_SIZE))
+    reconstructor.export_training_data(
+        in_dir / 'scan', _reconstruct_input(IMG_SIZE), options=build_options(reconstructor)
+    )
 
     model_dir = out_dir / 'output'
     payload = TrainPayload(

@@ -18,6 +18,7 @@ import numpy
 import pytest
 
 from ptychodus.api.geometry import PixelGeometry
+from ptychodus.model.processing.api import build_options
 from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePositionSequence
@@ -94,7 +95,9 @@ def test_reconstruct_streams_all_outputs_in_order() -> None:
         build_reconstruct_payload=build_payload,
     )
 
-    outputs = list(adapter.reconstruct(_minimal_reconstruct_input()))
+    outputs = list(
+        adapter.reconstruct(_minimal_reconstruct_input(), options=build_options(adapter))
+    )
 
     assert len(outputs) == 3
     assert [o.progress for o in outputs] == [1, 2, 3]
@@ -112,7 +115,7 @@ def test_child_exception_propagates_as_child_error() -> None:
     )
 
     with pytest.raises(ChildError) as excinfo:
-        list(adapter.reconstruct(_minimal_reconstruct_input()))
+        list(adapter.reconstruct(_minimal_reconstruct_input(), options=build_options(adapter)))
 
     assert excinfo.value.child_exception_type == 'ValueError'
     # The original exception is picklable, so the parent got it back.
@@ -170,7 +173,8 @@ def test_hanging_child_is_terminated_on_iterator_close(monkeypatch: pytest.Monke
     # generator suspended inside the context manager -- closing a generator that
     # was never advanced runs no cleanup, so this step is what arms the test.
     iterator = cast(
-        Generator[ReconstructOutput, None, None], adapter.reconstruct(_minimal_reconstruct_input())
+        Generator[ReconstructOutput, None, None],
+        adapter.reconstruct(_minimal_reconstruct_input(), options=build_options(adapter)),
     )
     next(iterator)
 
@@ -198,7 +202,9 @@ def test_child_log_is_forwarded_to_parent_logger(caplog: pytest.LogCaptureFixtur
     )
 
     with caplog.at_level(logging.WARNING, logger=FIXTURES_MODULE):
-        outputs = list(adapter.reconstruct(_minimal_reconstruct_input()))
+        outputs = list(
+            adapter.reconstruct(_minimal_reconstruct_input(), options=build_options(adapter))
+        )
 
     assert len(outputs) == 1
     assert any('hello from the child' in rec.message for rec in caplog.records)
@@ -219,7 +225,9 @@ def test_settings_sync_message_invokes_callback() -> None:
         apply_settings_sync=seen.append,
     )
 
-    outputs = list(adapter.reconstruct(_minimal_reconstruct_input()))
+    outputs = list(
+        adapter.reconstruct(_minimal_reconstruct_input(), options=build_options(adapter))
+    )
 
     assert len(outputs) == 1
     assert seen == [{'GroupA': {'p': '42'}}]
@@ -248,7 +256,7 @@ def test_train_records_model_saved_path(tmp_path: Path) -> None:
 
     assert not adapter.is_model_loaded()
 
-    outputs = list(adapter.train(tmp_path, tmp_path))
+    outputs = list(adapter.train(tmp_path, tmp_path, options=build_options(adapter)))
 
     assert len(outputs) == 1
     assert outputs[0].progress == 1
@@ -269,7 +277,7 @@ def test_non_trainable_train_raises() -> None:
     )
 
     with pytest.raises(NotImplementedError):
-        list(adapter.train(Path('/tmp'), Path('/tmp')))
+        list(adapter.train(Path('/tmp'), Path('/tmp'), options=build_options(adapter)))
 
 
 def test_save_without_load_or_train_raises() -> None:

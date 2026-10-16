@@ -1,4 +1,4 @@
-"""Build live, observable settings parameters from a declared parameter model.
+"""Build live, observable settings parameters from a declared options model.
 
 A reconstructor declares what it accepts as plain pydantic. That declaration is a
 description: it has no identity, nothing observes it, and nothing persists it.
@@ -22,7 +22,7 @@ import logging
 from ptychodus.api.parameters import Parameter, ParameterGroup
 from ptychodus.api.settings import SettingsRegistry
 
-from .flatten import FlatParameter, FlatteningPolicy, flatten_model, render_value
+from .flatten import FlatParameter, FlatteningPolicy, flatten_options, render_value
 
 __all__ = [
     'UnsupportedParameterError',
@@ -87,9 +87,12 @@ def _create(group: ParameterGroup, flat: FlatParameter, policy: FlatteningPolicy
 
 
 def build_parameter_group(
-    registry: SettingsRegistry, group_name: str, model: type, policy: FlatteningPolicy
+    registry: SettingsRegistry,
+    group_name: str,
+    options: Any,
+    policy: FlatteningPolicy,
 ) -> Mapping[str, Parameter[Any]]:
-    """Create *group_name* in *registry* from *model*, returning its live parameters.
+    """Create *group_name* in *registry* from *options*, returning its live parameters.
 
     Keyed by persisted name, so a caller holding the flattened description can
     pair each declared path with the handle that now backs it.
@@ -97,7 +100,7 @@ def build_parameter_group(
     group = registry.create_group(group_name)
     parameters: dict[str, Parameter[Any]] = {}
 
-    for flat in flatten_model(model, policy):
+    for flat in flatten_options(options, policy):
         if flat.structural_role:
             # One declared field standing for several keys needs an adapter that
             # knows the field's shape, which only the backend does. Until one is

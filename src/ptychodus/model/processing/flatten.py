@@ -1,8 +1,8 @@
-"""Project a nested parameter model onto the flat INI layout the Qt GUI binds to.
+"""Project a nested options model onto the flat INI layout the Qt GUI binds to.
 
 **This module is transitional.** ptychodus persists one flat section of prefixed
 scalar keys per settings group because Qt controllers bind to a flat
-``ParameterGroup``. A declared parameter model is nested instead, mirroring the
+``ParameterGroup``. A declared options model is nested instead, mirroring the
 structure the backend actually accepts. Until the Qt panels retire, something has
 to collapse one onto the other, and that something lives here rather than in the
 plugin -- so a backend never names an INI key, and so this file can be deleted
@@ -29,7 +29,7 @@ from typing import Any, Final
 __all__ = [
     'FlatParameter',
     'FlatteningPolicy',
-    'flatten_model',
+    'flatten_options',
     'render_value',
 ]
 
@@ -61,9 +61,13 @@ def _join_words(name: str) -> str:
     return ''.join(word[:1].upper() + word[1:] for word in name.split('_'))
 
 
-def _is_model(annotation: Any) -> bool:
-    """Return True for a pydantic model or pydantic dataclass, which nest alike."""
-    return hasattr(annotation, '__pydantic_fields__')
+def _is_nested(value: Any) -> bool:
+    """Return True for a nested pydantic object, whether model or dataclass.
+
+    Tested on the value rather than the annotation, so an optional nesting left
+    unset is treated as a leaf instead of being walked into.
+    """
+    return hasattr(value, '__pydantic_fields__')
 
 
 def _fields_of(model: type) -> Mapping[str, Any]:
@@ -140,38 +144,43 @@ class FlatteningPolicy:
             return name if self.verbatim else to_pascal_case(name)
 
 
-def flatten_model(model: type, policy: FlatteningPolicy) -> list[FlatParameter]:
-    """Return the persisted keys for *model*, in declaration order."""
-    return list(_walk(model, policy, path='', prefix=''))
+def flatten_options(options: Any, policy: FlatteningPolicy) -> list[FlatParameter]:
+    """Return the persisted keys for *options*, in declaration order.
+
+    Takes a populated object rather than its class: a field declared with a
+    ``default_factory`` reports its class-level default as undefined, so only an
+    instance carries the value the generated parameter should start at.
+    """
+    return list(_walk(options, policy, path='', prefix=''))
 
 
-def _walk(model: type, policy: FlatteningPolicy, *, path: str, prefix: str) -> list[FlatParameter]:
+def _walk(options: Any, policy: FlatteningPolicy, *, path: str, prefix: str) -> list[FlatParameter]:
     flat: list[FlatParameter] = []
 
-    for name, info in _fields_of(model).items():
+    for name, info in _fields_of(type(options)).items():
         child_path = f'{path}.{name}' if path else name
 
         if policy.is_hidden(child_path):
             continue
 
-        annotation = info.annotation
+        value = getattr(options, name)
 
-        if _is_model(annotation):
+        if _is_nested(value):
             segment = policy.prefixes.get(child_path, policy.render_name(child_path, name))
-            flat.extend(_walk(annotation, policy, path=child_path, prefix=prefix + segment))
+            flat.extend(_walk(value, policy, path=child_path, prefix=prefix + segment))
             continue
 
         if prefix and name in policy.collapse_onto_prefix:
-            flat.append(_leaf(prefix, child_path, info))
+            flat.append(_leaf(prefix, child_path, info, value))
             continue
 
         try:
             roles = policy.structural[child_path]
         except KeyError:
             key = prefix + policy.render_name(child_path, name)
-            flat.append(_leaf(key, child_path, info))
+            flat.append(_leaf(key, child_path, info, value))
         else:
-            flat.extend(_leaf(prefix + role, child_path, info, role=role) for role in roles)
+            flat.extend(_leaf(prefix + role, child_path, info, value, role=role) for role in roles)
 
     return flat
 
@@ -200,13 +209,13 @@ def _bounds(info: Any) -> tuple[Any, Any]:
     return minimum, maximum
 
 
-def _leaf(key: str, path: str, info: Any, *, role: str = '') -> FlatParameter:
+def _leaf(key: str, path: str, info: Any, value: Any, *, role: str = '') -> FlatParameter:
     minimum, maximum = _bounds(info)
     return FlatParameter(
         ini_key=key,
         path=path,
         annotation=info.annotation,
-        default=info.default,
+        default=value,
         label=info.title or '',
         tool_tip=info.description or '',
         minimum=minimum,

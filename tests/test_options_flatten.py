@@ -1,4 +1,4 @@
-"""Unit tests for projecting a nested parameter model onto the flat INI layout."""
+"""Unit tests for projecting a nested options declaration onto the flat INI layout."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import pytest
 
 from ptychodus.model.processing.flatten import (
     FlatteningPolicy,
-    flatten_model,
+    flatten_options,
     render_value,
     to_pascal_case,
 )
@@ -63,7 +63,7 @@ _ONLY_L1 = frozenset({'plan'})
 
 
 def _keys(policy: FlatteningPolicy) -> list[str]:
-    return [p.ini_key for p in flatten_model(Options, policy)]
+    return [p.ini_key for p in flatten_options(Options(), policy)]
 
 
 class TestNamingRules:
@@ -120,7 +120,7 @@ class TestFlattening:
 
     def test_structural_keys_record_their_role_and_share_one_source(self) -> None:
         policy = FlatteningPolicy(hidden=_ONLY_SCALARS, structural={'step_size': ('Min', 'Max')})
-        produced = [p for p in flatten_model(Options, policy) if p.structural_role]
+        produced = [p for p in flatten_options(Options(), policy) if p.structural_role]
         assert [p.structural_role for p in produced] == ['Min', 'Max']
         assert {p.path for p in produced} == {'step_size'}
 
@@ -141,7 +141,7 @@ class TestFlattening:
         class local to a function, which leaves the nesting undetected and
         flattens the whole object as though it were a scalar.
         """
-        flat = flatten_model(OuterDataclass, FlatteningPolicy())
+        flat = flatten_options(OuterDataclass(), FlatteningPolicy())
         # The prefix comes from the field name, not the nested class's name.
         assert [p.ini_key for p in flat] == ['InnerWeight']
 
@@ -152,7 +152,7 @@ class TestDeclaredMetadata:
     def _step_size(self) -> object:
         return next(
             p
-            for p in flatten_model(Options, FlatteningPolicy(hidden=_ONLY_SCALARS))
+            for p in flatten_options(Options(), FlatteningPolicy(hidden=_ONLY_SCALARS))
             if p.path == 'step_size'
         )
 
@@ -169,7 +169,7 @@ class TestDeclaredMetadata:
     def test_an_unannotated_field_carries_no_metadata(self) -> None:
         period = next(
             p
-            for p in flatten_model(Options, FlatteningPolicy(hidden=_ONLY_SCALARS))
+            for p in flatten_options(Options(), FlatteningPolicy(hidden=_ONLY_SCALARS))
             if p.path == 'period_x_m'
         )
         assert period.minimum is None and period.label == ''
@@ -251,7 +251,7 @@ class TestAgainstRealPtyChiOptions:
             },
         )
 
-        produced = {p.ini_key for p in flatten_model(ObjectOptions, policy)}
+        produced = {p.ini_key for p in flatten_options(ObjectOptions(), policy)}
 
         section = (
             (Path(__file__).parent / 'data' / 'settings_defaults.ini')
