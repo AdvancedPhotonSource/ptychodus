@@ -21,6 +21,7 @@ from ptychodus.api.parameters import Parameter, StringParameter
 from ..naming import split_name_counter
 from ..product import ProductAPI
 from ..task_manager import TaskManager
+from .parameter_store import ProcessingParameterStore
 from .monitor import (
     ProcessingTaskMonitor,
     ReconstructBackgroundTask,
@@ -121,16 +122,6 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
             self.set_value(self._parameter.get_value())
 
 
-def build_options(reconstructor: Reconstructor) -> BaseModel:
-    """Return the options to run *reconstructor* with.
-
-    Its declared defaults for now. This is the seam the parameter store replaces
-    once it can supply the values a user has edited, which is why a backend that
-    has declared nothing keeps reading whatever settings it already owns.
-    """
-    return reconstructor.get_default_options()
-
-
 def validate_options(reconstructor: Reconstructor, options: BaseModel) -> None:
     """Reject options that are not of the type *reconstructor* declared.
 
@@ -153,11 +144,23 @@ class ProcessingAPI:
         product_api: ProductAPI,
         algorithm: ProcessingAlgorithmParameter,
         task_monitor: ProcessingTaskMonitor,
+        parameter_store: ProcessingParameterStore,
     ) -> None:
         self._task_manager = task_manager
         self._product_api = product_api
         self._algorithm_parameter = algorithm
         self._task_monitor = task_monitor
+        self._parameter_store = parameter_store
+
+    def _options_for(self, reconstructor: Reconstructor) -> BaseModel:
+        """Return the options to run *reconstructor* with, as currently edited.
+
+        The store is keyed the same way the algorithm selection is, so the values
+        served are the ones behind the panel the user was just looking at.
+        """
+        options = self._parameter_store.get_options(self._algorithm_parameter.get_value())
+        validate_options(reconstructor, options)
+        return options
 
     @property
     def task_monitor(self) -> ProcessingTaskMonitor:
@@ -216,8 +219,7 @@ class ProcessingAPI:
             index_filter=index_filter,
         )
         reconstructor = self._algorithm_parameter.get_current_reconstructor()
-        options = build_options(reconstructor)
-        validate_options(reconstructor, options)
+        options = self._options_for(reconstructor)
         background_task = ReconstructBackgroundTask(
             self._task_monitor,
             reconstructor,
@@ -303,8 +305,7 @@ class ProcessingAPI:
 
             logger.info('Exporting...')
             tic = time.perf_counter()
-            options = build_options(trainer)
-            validate_options(trainer, options)
+            options = self._options_for(trainer)
             trainer.export_training_data(file_path, reconstruct_input, options=options)
             toc = time.perf_counter()
             logger.info(f'Export time {toc - tic:.4f} seconds.')
@@ -325,8 +326,7 @@ class ProcessingAPI:
 
         if isinstance(trainer, TrainableReconstructor):
             reconstruct_input = self.get_reconstruct_input(product_index=product_index)
-            options = build_options(trainer)
-            validate_options(trainer, options)
+            options = self._options_for(trainer)
             background_task = TrainBackgroundTask(
                 self._task_monitor,
                 trainer,

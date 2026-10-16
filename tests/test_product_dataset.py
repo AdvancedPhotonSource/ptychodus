@@ -144,7 +144,7 @@ def test_fetch_dataset_returns_none_without_handle() -> None:
 def _make_processing_api(item: MagicMock) -> ProcessingAPI:
     product_api = MagicMock()
     product_api.get_item.return_value = item
-    return ProcessingAPI(MagicMock(), product_api, MagicMock(), MagicMock())
+    return ProcessingAPI(MagicMock(), product_api, MagicMock(), MagicMock(), MagicMock())
 
 
 def test_get_reconstruct_input_raises_without_dataset() -> None:

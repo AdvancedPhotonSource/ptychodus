@@ -15,6 +15,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from enum import Enum
 from pathlib import Path
+import copy
 from types import UnionType
 from typing import Any, Union, get_args, get_origin
 import logging
@@ -27,6 +28,8 @@ from .flatten import FlatParameter, FlatteningPolicy, flatten_options, render_va
 __all__ = [
     'UnsupportedParameterError',
     'build_parameter_group',
+    'apply_options',
+    'restore_options',
 ]
 
 logger = logging.getLogger(__name__)
@@ -114,3 +117,64 @@ def build_parameter_group(
         parameters[flat.ini_key] = _create(group, flat, policy)
 
     return parameters
+
+
+def _restore_value(flat: FlatParameter, value: Any, policy: FlatteningPolicy) -> Any:
+    """Turn a live parameter's value back into what the declaration expects.
+
+    Only enums need turning back: they persist as a string, and which string
+    depends on the policy that wrote them.
+    """
+    annotation = _unwrap_optional(flat.annotation)
+
+    if isinstance(annotation, type) and issubclass(annotation, Enum):
+        return annotation[value] if policy.enum_by_name else annotation(value)
+
+    return value
+
+
+def apply_options(
+    target: Any, parameters: Mapping[str, Parameter[Any]], policy: FlatteningPolicy
+) -> None:
+    """Write the values held in *parameters* into *target*, in place.
+
+    Separate from :func:`restore_options` because one declaration can back
+    several settings groups, and they are applied to parts of a single object
+    that must be copied only once.
+    """
+    for flat in flatten_options(target, policy):
+        if flat.structural_role:
+            raise UnsupportedParameterError(
+                f'"{flat.path}" expands into several keys and needs a value adapter; '
+                f'none was supplied for role "{flat.structural_role}".'
+            )
+
+        try:
+            parameter = parameters[flat.ini_key]
+        except KeyError:
+            continue
+
+        *ancestors, leaf = flat.path.split('.')
+        owner = target
+
+        for name in ancestors:
+            owner = getattr(owner, name)
+
+        setattr(owner, leaf, _restore_value(flat, parameter.get_value(), policy))
+
+
+def restore_options(
+    defaults: Any, parameters: Mapping[str, Parameter[Any]], policy: FlatteningPolicy
+) -> Any:
+    """Return a copy of *defaults* carrying the values now held in *parameters*.
+
+    The inverse of :func:`build_parameter_group`. The declared object is what a
+    reconstructor is handed, so edits made against the flat live parameters have
+    to be written back into its nested shape before the call.
+
+    A copy, because the defaults are the store's record of where each field
+    started and must survive being read repeatedly.
+    """
+    restored = copy.deepcopy(defaults)
+    apply_options(restored, parameters, policy)
+    return restored

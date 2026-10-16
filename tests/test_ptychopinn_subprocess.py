@@ -25,7 +25,6 @@ from ptychodus.api.reconstruct import ReconstructInput
 from ptychodus.model.processing._subprocess_protocol import ChildError
 from ptychodus.model.processing.subprocess_reconstructor import SubprocessReconstructor
 from ptychodus.model.ptychopinn._payload import ReconstructPayload, TrainPayload
-from ptychodus.model.processing.api import build_options
 from ptychodus.model.ptychopinn._subprocess import _build_arrays, _read_epoch_losses
 
 _TESTS_DIR = str(Path(__file__).parent)
@@ -117,7 +116,7 @@ def test_train_hands_the_public_door_a_settings_mapping() -> None:
     with pytest.raises(ChildError) as excinfo:
         list(
             adapter.train(
-                Path('/unused/input'), Path('/unused/output'), options=build_options(adapter)
+                Path('/unused/input'), Path('/unused/output'), options=adapter.get_default_options()
             )
         )
 
@@ -153,7 +152,7 @@ def test_reconstruct_stages_declared_arrays_through_the_embedder_seam() -> None:
     )
 
     with pytest.raises(ChildError) as excinfo:
-        list(adapter.reconstruct(SimpleNamespace(), options=build_options(adapter)))  # type: ignore[arg-type]
+        list(adapter.reconstruct(SimpleNamespace(), options=adapter.get_default_options()))  # type: ignore[arg-type]
 
     captured = _captured(excinfo)
     assert captured['array_keys'] == sorted(

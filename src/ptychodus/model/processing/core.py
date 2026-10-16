@@ -7,6 +7,7 @@ from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .api import ProcessingAPI, ProcessingAlgorithmParameter
 from .monitor import ProcessingTaskMonitor
+from .parameter_store import ProcessingParameterStore
 from .settings import ProcessingSettings
 
 
@@ -23,11 +24,23 @@ class ProcessingCore:
             self._settings.algorithm, algorithm_libraries
         )
         self._task_monitor = ProcessingTaskMonitor(task_manager)
+        self.parameter_store = ProcessingParameterStore(settings_registry)
+
+        # Every reconstructor is filed under the same key the algorithm selection
+        # uses, so a panel and the options handed to a run cannot disagree.
+        for library in algorithm_libraries:
+            for reconstructor in library:
+                self.parameter_store.register(
+                    ProcessingAlgorithmParameter.generate_key(library.name, reconstructor.name),
+                    reconstructor,
+                )
+
         self.processing_api = ProcessingAPI(
             task_manager,
             product_api,
             self.algorithm_parameter,
             self._task_monitor,
+            self.parameter_store,
         )
 
         for library in algorithm_libraries:

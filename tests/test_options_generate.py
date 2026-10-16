@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from enum import StrEnum
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, Field
 import pytest
 
 from ptychodus.api.parameters import (
     BooleanParameter,
+    Parameter,
     IntegerParameter,
     PathParameter,
     RealParameter,
@@ -20,6 +23,7 @@ from ptychodus.model.processing.flatten import FlatteningPolicy
 from ptychodus.model.processing.generate import (
     UnsupportedParameterError,
     build_parameter_group,
+    restore_options,
 )
 
 
@@ -37,6 +41,14 @@ class Declared(BaseModel):
     mode: Mode = Mode.FAST
     output: Path = Path('/path/to/out')
     stop: int | None = -1
+
+
+class Inner(BaseModel):
+    weight: float = 1.0
+
+
+class Outer(BaseModel):
+    inner: Inner = Inner()
 
 
 class Unsupported(BaseModel):
@@ -136,3 +148,50 @@ class TestUnrepresentableFields:
         policy = FlatteningPolicy(structural={'count': ('Min', 'Max')})
         with pytest.raises(UnsupportedParameterError, match='value adapter'):
             build_parameter_group(registry, 'Declared', Declared(), policy)
+
+
+class TestRestoringOptions:
+    """Edits made against the flat live parameters must reach the nested object."""
+
+    def _round_trip(
+        self, policy: FlatteningPolicy | None = None
+    ) -> tuple[Declared, Mapping[str, Parameter[Any]], FlatteningPolicy]:
+        registry = SettingsRegistry()
+        defaults = Declared()
+        used = policy or FlatteningPolicy()
+        parameters = build_parameter_group(registry, 'Declared', defaults, used)
+        return defaults, parameters, used
+
+    def test_an_untouched_round_trip_reproduces_the_defaults(self) -> None:
+        defaults, parameters, policy = self._round_trip()
+        assert restore_options(defaults, parameters, policy) == defaults
+
+    def test_an_edited_parameter_reaches_the_restored_object(self) -> None:
+        defaults, parameters, policy = self._round_trip()
+        parameters['Count'].set_value(11)
+        assert restore_options(defaults, parameters, policy).count == 11
+
+    def test_an_enum_is_restored_from_its_member_name(self) -> None:
+        defaults, parameters, policy = self._round_trip()
+        parameters['Mode'].set_value('EXACT')
+        assert restore_options(defaults, parameters, policy).mode is Mode.EXACT
+
+    def test_an_enum_is_restored_from_its_value_under_a_verbatim_policy(self) -> None:
+        defaults, parameters, policy = self._round_trip(FlatteningPolicy(enum_by_name=False))
+        parameters['Mode'].set_value('exact')
+        assert restore_options(defaults, parameters, policy).mode is Mode.EXACT
+
+    def test_the_defaults_are_not_mutated_by_restoring(self) -> None:
+        """The store keeps the defaults as its record of where each field started."""
+        defaults, parameters, policy = self._round_trip()
+        parameters['Count'].set_value(11)
+        restore_options(defaults, parameters, policy)
+        assert defaults.count == 4
+
+    def test_a_nested_edit_reaches_the_nested_object(self) -> None:
+        registry = SettingsRegistry()
+        defaults = Outer()
+        policy = FlatteningPolicy(prefixes={'inner': 'Inner'})
+        parameters = build_parameter_group(registry, 'Outer', defaults, policy)
+        parameters['InnerWeight'].set_value(7.5)
+        assert restore_options(defaults, parameters, policy).inner.weight == 7.5
