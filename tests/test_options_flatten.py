@@ -317,3 +317,21 @@ class TestStructuralAdapters:
         adapter = OptionalRange('On', 'Min', 'Max')
         assert adapter.decode(adapter.encode(None)) is None
         assert adapter.decode(adapter.encode((0.1, 0.9))) == (0.1, 0.9)
+
+
+class TestAbsoluteKeys:
+    """A few pty-chi keys sit unprefixed inside an otherwise prefixed group."""
+
+    def test_a_marked_name_escapes_the_group_prefix(self) -> None:
+        policy = FlatteningPolicy(
+            hidden=_ONLY_L1,
+            prefixes={'l1_norm': 'ConstrainL1Norm'},
+            renames={'l1_norm.weight': '/StandaloneWeight'},
+        )
+        keys = _keys(policy)
+        assert 'StandaloneWeight' in keys
+        assert 'ConstrainL1NormStandaloneWeight' not in keys
+
+    def test_unmarked_names_are_still_prefixed(self) -> None:
+        policy = FlatteningPolicy(hidden=_ONLY_L1, prefixes={'l1_norm': 'ConstrainL1Norm'})
+        assert 'ConstrainL1NormWeight' in _keys(policy)

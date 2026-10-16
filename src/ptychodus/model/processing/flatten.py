@@ -29,6 +29,8 @@ from typing import Any, Final
 
 __all__ = [
     'BoolEnum',
+    'compose_key',
+    'fields_of',
     'FlatParameter',
     'FlatteningPolicy',
     'OptionalGate',
@@ -189,6 +191,17 @@ def _join_words(name: str) -> str:
     return ''.join(word[:1].upper() + word[1:] for word in name.split('_'))
 
 
+# A name beginning with this escapes its group's prefix. A handful of pty-chi
+# keys sit unprefixed inside an otherwise prefixed group -- UseTotalIntensityForCOM
+# within ConstrainCenter, for one -- and nothing in the structure predicts which.
+_ABSOLUTE = '/'
+
+
+def compose_key(prefix: str, name: str) -> str:
+    """Join a group prefix and a key name, honouring the absolute marker."""
+    return name[1:] if name.startswith(_ABSOLUTE) else prefix + name
+
+
 def _is_nested(value: Any) -> bool:
     """Return True for a nested pydantic object, whether model or dataclass.
 
@@ -198,7 +211,7 @@ def _is_nested(value: Any) -> bool:
     return hasattr(value, '__pydantic_fields__')
 
 
-def _fields_of(model: type) -> Mapping[str, Any]:
+def fields_of(model: type) -> Mapping[str, Any]:
     """Return a model's pydantic field map.
 
     Read reflectively because the two shapes a declaration may take -- a
@@ -240,6 +253,10 @@ class FlatteningPolicy:
     name-keyed table would silently apply the wrong one.
     """
 
+    # Prepended to every key this policy produces. A section covering an
+    # algorithm's additions to a shared branch files them under its own name:
+    # the object branch's extras persist as ObjectOptimalStepSizeScaler.
+    base_prefix: str = ''
     # Dotted paths ptychodus does not surface. Hiding a nested object hides its
     # whole subtree. This exists for declarations ptychodus does not own -- a model
     # it writes simply omits the field instead.
@@ -279,13 +296,13 @@ def flatten_options(options: Any, policy: FlatteningPolicy) -> list[FlatParamete
     ``default_factory`` reports its class-level default as undefined, so only an
     instance carries the value the generated parameter should start at.
     """
-    return list(_walk(options, policy, path='', prefix=''))
+    return list(_walk(options, policy, path='', prefix=policy.base_prefix))
 
 
 def _walk(options: Any, policy: FlatteningPolicy, *, path: str, prefix: str) -> list[FlatParameter]:
     flat: list[FlatParameter] = []
 
-    for name, info in _fields_of(type(options)).items():
+    for name, info in fields_of(type(options)).items():
         child_path = f'{path}.{name}' if path else name
 
         if policy.is_hidden(child_path):
@@ -305,13 +322,13 @@ def _walk(options: Any, policy: FlatteningPolicy, *, path: str, prefix: str) -> 
         try:
             adapter = policy.structural[child_path]
         except KeyError:
-            key = prefix + policy.render_name(child_path, name)
+            key = compose_key(prefix, policy.render_name(child_path, name))
             flat.append(_leaf(key, child_path, info, value))
         else:
             encoded = adapter.encode(value)
             flat.extend(
                 _leaf(
-                    prefix + suffix,
+                    compose_key(prefix, suffix),
                     child_path,
                     info,
                     encoded[suffix],
