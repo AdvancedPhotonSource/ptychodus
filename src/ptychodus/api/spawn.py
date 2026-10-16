@@ -44,9 +44,10 @@ from __future__ import annotations
 import importlib
 import logging
 import multiprocessing
+import os
 import pickle
 import traceback
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from multiprocessing.context import SpawnProcess
@@ -153,13 +154,18 @@ def _child_main(
     payload: Any,
     result_queue: Queue[Any],
     log_level: int,
+    environment: Mapping[str, str],
 ) -> None:
     """Default target for the spawned :class:`multiprocessing.Process`.
 
-    Runs in the child. Installs the log forwarder, imports the user entry
-    point lazily (so GPU libraries load here, not in the parent), calls
-    ``entry(payload, queue)``, and always sends the sentinel.
+    Runs in the child. Applies the environment, installs the log forwarder,
+    imports the user entry point lazily (so GPU libraries load here, not in the
+    parent), calls ``entry(payload, queue)``, and always sends the sentinel.
     """
+    # Before anything else, and before the entry point is imported: a runtime
+    # reads its visibility variable once, when it is first touched, and ignores
+    # every later change to it.
+    os.environ.update(environment)
     handler = install_child_log_forwarder(result_queue, level=log_level)
     try:
         module_path, _, func_name = entry_point.partition(':')
@@ -196,6 +202,7 @@ def run_subprocess(
     *,
     log_level: int | None = None,
     terminate_grace_sec: float = 10.0,
+    environment: Mapping[str, str] | None = None,
 ) -> Iterator[Iterator[tuple[Any, ...]]]:
     """Spawn a child process and yield an iterator over its queue messages.
 
@@ -211,6 +218,9 @@ def run_subprocess(
     :class:`ChildError` (with the child's original exception attached when
     unpicklable-safe). ``None`` terminates the iterator normally.
 
+    ``environment`` is applied in the child before its entry point is imported,
+    which is what makes it the place to restrict the devices the child can see.
+
     On ``__exit__``, the child is terminated (SIGTERM), joined with
     ``terminate_grace_sec`` seconds of grace, then killed (SIGKILL) if it did
     not exit. This mirrors the ptychozoon shutdown discipline.
@@ -222,7 +232,7 @@ def run_subprocess(
     result_queue: Queue[Any] = ctx.Queue()
     process = ctx.Process(
         target=_child_main,
-        args=(entry_point, payload, result_queue, log_level),
+        args=(entry_point, payload, result_queue, log_level, dict(environment or {})),
     )
     process.start()
 

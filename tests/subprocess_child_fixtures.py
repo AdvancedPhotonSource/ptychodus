@@ -14,15 +14,17 @@ import pickle
 import sys
 import time
 from collections.abc import Mapping
+from multiprocessing.queues import Queue
 from types import ModuleType, SimpleNamespace
 from typing import Any
 
-from ptychodus.api.reconstruct import ReconstructOutput, TrainOutput
 from ptychodus.api.reconstruct import (
     TAG_MODEL_SAVED,
     TAG_OUTPUT,
     TAG_SETTINGS_SYNC,
     TAG_TRAIN_OUTPUT,
+    ReconstructOutput,
+    TrainOutput,
 )
 
 logger = logging.getLogger(__name__)
@@ -192,3 +194,18 @@ def train_and_save(payload: Any, queue: Any) -> None:
     """Emit one :class:`TrainOutput` and a model-saved path."""
     queue.put((TAG_TRAIN_OUTPUT, pickle.dumps(TrainOutput(progress=1))))
     queue.put((TAG_MODEL_SAVED, payload['saved_path']))
+
+
+def probe_cuda_uuids(_payload: Any, queue: Queue[Any]) -> None:
+    """Report the UUID of every CUDA device visible to this child.
+
+    A name does not identify a device when a host holds two of the same model,
+    so proving a restriction reached the right one takes something unique.
+    """
+    import torch
+
+    uuids = [
+        str(torch.cuda.get_device_properties(index).uuid)
+        for index in range(torch.cuda.device_count())
+    ]
+    queue.put((TAG_OUTPUT, pickle.dumps(uuids)))

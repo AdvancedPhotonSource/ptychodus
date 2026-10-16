@@ -27,6 +27,15 @@
    :show-inheritance:
 ```
 
+## Devices
+
+```{eval-rst}
+.. automodule:: ptychodus.api.devices
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Diffraction
 
 ```{eval-rst}

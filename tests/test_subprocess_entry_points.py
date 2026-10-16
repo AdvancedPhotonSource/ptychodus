@@ -24,7 +24,10 @@ import pytest
 
 import ptychodus
 
-_MODEL_ROOT = Path(ptychodus.__file__).parent / 'model'
+# The whole package, not just model/: entry points are addressed the same way
+# wherever they are written, and a scan narrower than that silently stops
+# covering one the day it moves.
+_PACKAGE_ROOT = Path(ptychodus.__file__).parent
 
 
 def _discover_entry_points() -> list[tuple[str, str, str]]:
@@ -35,7 +38,7 @@ def _discover_entry_points() -> list[tuple[str, str, str]]:
     """
     found: list[tuple[str, str, str]] = []
 
-    for path in sorted(_MODEL_ROOT.rglob('*.py')):
+    for path in sorted(_PACKAGE_ROOT.rglob('*.py')):
         tree = ast.parse(path.read_text(), filename=str(path))
 
         for node in tree.body:
