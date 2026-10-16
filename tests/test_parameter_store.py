@@ -160,3 +160,37 @@ class TestLookup:
         store = ProcessingParameterStore(registry)
         store.register('lib_algo', FakeReconstructor('algo', NoOptions()), [])
         assert 'lib_algo' in store and 'lib_other' not in store
+
+
+class TestOneGroupFromSeveralSections:
+    """pty-chi's per-algorithm groups draw keys from four branches of one declaration."""
+
+    def _store(self, registry: SettingsRegistry) -> ProcessingParameterStore:
+        store = ProcessingParameterStore(registry)
+        store.register(
+            'lib_algo',
+            FakeReconstructor('algo', Declared()),
+            [
+                OptionsSection(
+                    'Algo',
+                    root_path='object_',
+                    policy=FlatteningPolicy(hidden=frozenset({'slices'})),
+                ),
+                OptionsSection('Algo', root_path='probe'),
+            ],
+        )
+        return store
+
+    def test_both_sections_land_in_one_group(self, registry: SettingsRegistry) -> None:
+        self._store(registry)
+        assert set(registry) == {'Algo'}
+        assert set(registry['Algo'].parameters()) == {'Weight', 'Power'}
+
+    def test_edits_from_either_section_reach_the_served_object(
+        self, registry: SettingsRegistry
+    ) -> None:
+        store = self._store(registry)
+        registry['Algo'].parameters()['Weight'].set_value(3.5)
+        registry['Algo'].parameters()['Power'].set_value(9.0)
+        options = store.get_options('lib_algo')
+        assert (options.object_.weight, options.probe.power) == (3.5, 9.0)

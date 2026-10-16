@@ -19,12 +19,12 @@ from typing import Any
 import copy
 import logging
 
-from ptychodus.api.parameters import Parameter
+from ptychodus.api.parameters import Parameter, ParameterGroup
 from ptychodus.api.reconstruct import Reconstructor
 from ptychodus.api.settings import SettingsRegistry
 
 from .flatten import FlatteningPolicy, flatten_options
-from .generate import apply_options, build_parameter_group
+from .generate import apply_options, populate_parameter_group
 
 __all__ = [
     'OptionsSection',
@@ -38,8 +38,10 @@ logger = logging.getLogger(__name__)
 class OptionsSection:
     """One settings group generated from part of a declaration.
 
-    ``root_path`` is the dotted path of the declared object this group covers;
-    empty means the whole declaration.
+    ``root_path`` is the dotted path of the declared object this section covers;
+    empty means the whole declaration. Several sections may name the same group:
+    pty-chi's per-algorithm groups draw their keys from four separate branches of
+    one declaration, so a group is assembled from however many sections feed it.
     """
 
     group_name: str
@@ -93,6 +95,7 @@ class ProcessingParameterStore:
             )
 
         bound: list[_BoundSection] = []
+        groups: dict[str, ParameterGroup] = {}
 
         for section in sections:
             root = _resolve(defaults, section.root_path)
@@ -101,9 +104,15 @@ class ProcessingParameterStore:
                 logger.debug(f'{key}: section "{section.group_name}" declares nothing; skipped.')
                 continue
 
-            parameters = build_parameter_group(
-                self._settings_registry, section.group_name, root, section.policy
-            )
+            # Created on first use, so that several sections can feed one group
+            # without the second attempt colliding with the first.
+            group = groups.get(section.group_name)
+
+            if group is None:
+                group = self._settings_registry.create_group(section.group_name)
+                groups[section.group_name] = group
+
+            parameters = populate_parameter_group(group, root, section.policy)
             bound.append(_BoundSection(section, parameters))
 
         self._entries[key] = _Entry(defaults, bound)

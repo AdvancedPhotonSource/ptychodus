@@ -21,13 +21,12 @@ from typing import Any, Union, get_args, get_origin
 import logging
 
 from ptychodus.api.parameters import Parameter, ParameterGroup
-from ptychodus.api.settings import SettingsRegistry
 
 from .flatten import FlatParameter, FlatteningPolicy, flatten_options, render_value
 
 __all__ = [
     'UnsupportedParameterError',
-    'build_parameter_group',
+    'populate_parameter_group',
     'apply_options',
     'restore_options',
 ]
@@ -89,18 +88,19 @@ def _create(group: ParameterGroup, flat: FlatParameter, policy: FlatteningPolicy
     )
 
 
-def build_parameter_group(
-    registry: SettingsRegistry,
-    group_name: str,
-    options: Any,
-    policy: FlatteningPolicy,
+def populate_parameter_group(
+    group: ParameterGroup, options: Any, policy: FlatteningPolicy
 ) -> Mapping[str, Parameter[Any]]:
-    """Create *group_name* in *registry* from *options*, returning its live parameters.
+    """Add the parameters *options* declares to *group*, returning them.
+
+    Takes an existing group rather than creating one, because a settings group is
+    not always fed by a single declared object: pty-chi's per-algorithm groups
+    draw their keys from four different branches of one declaration, and each
+    contributes to the same group.
 
     Keyed by persisted name, so a caller holding the flattened description can
     pair each declared path with the handle that now backs it.
     """
-    group = registry.create_group(group_name)
     parameters: dict[str, Parameter[Any]] = {}
 
     for flat in flatten_options(options, policy):
@@ -168,7 +168,7 @@ def restore_options(
 ) -> Any:
     """Return a copy of *defaults* carrying the values now held in *parameters*.
 
-    The inverse of :func:`build_parameter_group`. The declared object is what a
+    The inverse of :func:`populate_parameter_group`. The declared object is what a
     reconstructor is handed, so edits made against the flat live parameters have
     to be written back into its nested shape before the call.
 

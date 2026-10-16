@@ -22,7 +22,7 @@ from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.processing.flatten import FlatteningPolicy
 from ptychodus.model.processing.generate import (
     UnsupportedParameterError,
-    build_parameter_group,
+    populate_parameter_group,
     restore_options,
 )
 
@@ -58,7 +58,9 @@ class Unsupported(BaseModel):
 @pytest.fixture
 def built() -> dict[str, object]:
     registry = SettingsRegistry()
-    return dict(build_parameter_group(registry, 'Declared', Declared(), FlatteningPolicy()))
+    return dict(
+        populate_parameter_group(registry.create_group('Declared'), Declared(), FlatteningPolicy())
+    )
 
 
 class TestParameterKinds:
@@ -110,8 +112,8 @@ class TestEnums:
 
     def test_enum_persists_by_value_under_a_verbatim_policy(self) -> None:
         registry = SettingsRegistry()
-        built = build_parameter_group(
-            registry, 'Declared', Declared(), FlatteningPolicy(enum_by_name=False)
+        built = populate_parameter_group(
+            registry.create_group('Declared'), Declared(), FlatteningPolicy(enum_by_name=False)
         )
         assert built['Mode'].get_value() == 'fast'
 
@@ -119,19 +121,23 @@ class TestEnums:
 class TestRegistryIntegration:
     def test_the_group_is_registered_under_its_name(self) -> None:
         registry = SettingsRegistry()
-        build_parameter_group(registry, 'Declared', Declared(), FlatteningPolicy())
+        populate_parameter_group(registry.create_group('Declared'), Declared(), FlatteningPolicy())
         assert 'Declared' in set(registry)
 
     def test_parameters_are_live_and_observable(self) -> None:
         registry = SettingsRegistry()
-        built = build_parameter_group(registry, 'Declared', Declared(), FlatteningPolicy())
+        built = populate_parameter_group(
+            registry.create_group('Declared'), Declared(), FlatteningPolicy()
+        )
         count = built['Count']
         count.set_value(9)
         assert registry['Declared'].parameters()['Count'].get_value_as_string() == '9'
 
     def test_bounds_clamp_a_value_loaded_from_file(self) -> None:
         registry = SettingsRegistry()
-        built = build_parameter_group(registry, 'Declared', Declared(), FlatteningPolicy())
+        built = populate_parameter_group(
+            registry.create_group('Declared'), Declared(), FlatteningPolicy()
+        )
         built['Count'].set_value_from_string('999')
         assert built['Count'].get_value() == 16
 
@@ -140,14 +146,16 @@ class TestUnrepresentableFields:
     def test_an_unsupported_type_is_rejected_by_name(self) -> None:
         registry = SettingsRegistry()
         with pytest.raises(UnsupportedParameterError, match='weights'):
-            build_parameter_group(registry, 'Unsupported', Unsupported(), FlatteningPolicy())
+            populate_parameter_group(
+                registry.create_group('Unsupported'), Unsupported(), FlatteningPolicy()
+            )
 
     def test_a_structural_field_without_an_adapter_is_rejected(self) -> None:
         """Described but not created would be an invisibly missing setting."""
         registry = SettingsRegistry()
         policy = FlatteningPolicy(structural={'count': ('Min', 'Max')})
         with pytest.raises(UnsupportedParameterError, match='value adapter'):
-            build_parameter_group(registry, 'Declared', Declared(), policy)
+            populate_parameter_group(registry.create_group('Declared'), Declared(), policy)
 
 
 class TestRestoringOptions:
@@ -159,7 +167,7 @@ class TestRestoringOptions:
         registry = SettingsRegistry()
         defaults = Declared()
         used = policy or FlatteningPolicy()
-        parameters = build_parameter_group(registry, 'Declared', defaults, used)
+        parameters = populate_parameter_group(registry.create_group('Declared'), defaults, used)
         return defaults, parameters, used
 
     def test_an_untouched_round_trip_reproduces_the_defaults(self) -> None:
@@ -192,6 +200,6 @@ class TestRestoringOptions:
         registry = SettingsRegistry()
         defaults = Outer()
         policy = FlatteningPolicy(prefixes={'inner': 'Inner'})
-        parameters = build_parameter_group(registry, 'Outer', defaults, policy)
+        parameters = populate_parameter_group(registry.create_group('Outer'), defaults, policy)
         parameters['InnerWeight'].set_value(7.5)
         assert restore_options(defaults, parameters, policy).inner.weight == 7.5
