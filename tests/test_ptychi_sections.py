@@ -88,3 +88,32 @@ def test_the_table_covers_every_algorithm() -> None:
 
     for algorithm in ALGORITHMS:
         assert sections_for(algorithm, task_options_classes()[algorithm]())
+
+
+# A plan's triple is drawn as one composite row labelled 'Plan:', so the three
+# keys behind it carry no text of their own.
+_PLAN_SUFFIXES = ('Start', 'Stop', 'Stride')
+
+
+@pytest.mark.parametrize('algorithm', ALGORITHMS)
+def test_every_key_a_panel_shows_has_a_label(algorithm: str) -> None:
+    """An upstream declaration carries no text, so a missing entry renders blank."""
+    options = task_options_classes()[algorithm]()
+    unlabelled = []
+
+    for section in sections_for(algorithm, options):
+        for flat in flatten_options(_resolve(options, section.root_path), section.policy):
+            if not flat.ini_key.endswith(_PLAN_SUFFIXES) and not flat.label:
+                unlabelled.append(f'{section.group_name}.{flat.ini_key}')
+
+    assert not unlabelled
+
+
+@pytest.mark.parametrize('algorithm', ALGORITHMS)
+def test_plan_keys_are_left_to_the_composite_that_draws_them(algorithm: str) -> None:
+    options = task_options_classes()[algorithm]()
+
+    for section in sections_for(algorithm, options):
+        for flat in flatten_options(_resolve(options, section.root_path), section.policy):
+            if flat.ini_key.endswith(_PLAN_SUFFIXES):
+                assert not flat.label, flat.ini_key

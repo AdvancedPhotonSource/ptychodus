@@ -21,6 +21,7 @@ from typing import Any
 
 from .flatten import (
     BoolEnum,
+    Label,
     fields_of,
     FlatteningPolicy,
     OptionalGate,
@@ -87,6 +88,102 @@ _POSITION_BRANCHES = ('correction_options', 'affine_transform_constraint')
 _OPR_BRANCHES = ('smoothing',)
 
 
+_OBJECT_LABELS: Mapping[str, Label] = {
+    'optimizable': Label('Optimize Object', 'Whether the object is optimizable'),
+    'optimizer': Label('Optimizer:'),
+    'step_size': Label('Step Size:', 'Optimizer step size (learning rate).'),
+    'patch_interpolation_method': Label(
+        'Patch Interpolator:',
+        'Interpolation method used for extracting and updating patches of the object',
+    ),
+    'build_preconditioner_with_all_modes': Label(
+        'Build Preconditioner with All Modes',
+        'Build the illumination preconditioner from the summed intensity of all probe modes.',
+    ),
+    'slice_spacing_options.optimizable': Label(
+        'Optimize Slice Spacing', 'Whether to optimize the slice spacing'
+    ),
+    'slice_spacing_options.optimizer': Label('Optimizer:'),
+    'slice_spacing_options.step_size': Label('Step Size:', 'Optimizer step size (learning rate).'),
+    'l1_norm_constraint.enabled': Label(
+        'Constrain L\u2081 Norm', 'Whether to constrain the L\u2081 norm'
+    ),
+    'l1_norm_constraint.weight': Label(
+        'Weight:', 'Weight of the L\u2081 norm constraint (0 or less disables it).'
+    ),
+    'l2_norm_constraint.enabled': Label(
+        'Constrain L\u2082 Norm', 'Whether to constrain the L\u2082 norm'
+    ),
+    'l2_norm_constraint.weight': Label(
+        'Weight:', 'Weight of the L\u2082 norm constraint (0 or less disables it).'
+    ),
+    'smoothness_constraint.enabled': Label(
+        'Constrain Smoothness',
+        'Whether to constrain smoothness in the magnitude (but not phase) of the object',
+    ),
+    'smoothness_constraint.alpha': Label(
+        'Alpha:',
+        'Relaxation smoothing constant; must be in (0, 1/8], with maximal smoothing at 1/8.',
+    ),
+    'total_variation.enabled': Label(
+        'Constrain Total Variation', 'Whether to constrain the total variation'
+    ),
+    'total_variation.weight': Label(
+        'Weight:', 'Weight of the total variation constraint (0 or less disables it).'
+    ),
+    'remove_grid_artifacts.enabled': Label(
+        'Remove Grid Artifacts',
+        "Whether to remove grid artifacts in the object's phase at the end of an epoch.",
+    ),
+    'remove_grid_artifacts.period_x_m': Label(
+        'Period X:', 'Horizontal period of grid artifacts in meters'
+    ),
+    'remove_grid_artifacts.period_y_m': Label(
+        'Period Y:', 'Vertical period of grid artifacts in meters'
+    ),
+    'remove_grid_artifacts.window_size': Label(
+        'Window Size [px]:', 'Window size for grid artifact removal in pixels'
+    ),
+    'remove_grid_artifacts.direction': Label('Direction:', 'Direction of grid artifact removal'),
+    'remove_grid_artifacts.component': Label(
+        'Component:', 'Component of the object to apply grid artifact removal to'
+    ),
+    'multislice_regularization.enabled': Label(
+        'Regularize Multislice',
+        'Whether to regularize multislice objects using cross-slice smoothing',
+    ),
+    'multislice_regularization.weight': Label(
+        'Weight:',
+        'Weight of the cross-slice smoothing regularization for multislice objects '
+        '(0 disables it).',
+    ),
+    'multislice_regularization.unwrap_phase': Label(
+        'Unwrap Phase',
+        'Whether to unwrap the phase of the object during multislice regularization',
+    ),
+    'multislice_regularization.unwrap_image_grad_method': Label(
+        'Gradient Method:', 'Method for calculating the phase gradient during phase unwrapping'
+    ),
+    'multislice_regularization.unwrap_image_integration_method': Label(
+        'Integration Method:',
+        'Method for integrating the phase gradient during phase unwrapping',
+    ),
+    'remove_object_probe_ambiguity.enabled': Label(
+        'Remove Object Probe Ambiguity', 'Whether to remove object-probe ambiguity'
+    ),
+    'hard_limits_magnitude_phase.enabled': Label(
+        'Constrain Hard Limits',
+        'Whether to apply hard magnitude/phase limits to the object',
+    ),
+    'EnableAbs': Label('Limit Magnitude', 'Whether to apply magnitude limits'),
+    'AbsMin': Label('Magnitude Min:', 'Minimum magnitude value'),
+    'AbsMax': Label('Magnitude Max:', 'Maximum magnitude value'),
+    'EnablePhase': Label('Limit Phase', 'Whether to apply phase limits'),
+    'PhaseMinDeg': Label('Phase Min [deg]:', 'Minimum phase value in degrees'),
+    'PhaseMaxDeg': Label('Phase Max [deg]:', 'Maximum phase value in degrees'),
+}
+
+
 def _object_policy(extras: set[str]) -> FlatteningPolicy:
     return FlatteningPolicy(
         hidden=frozenset(
@@ -130,7 +227,63 @@ def _object_policy(extras: set[str]) -> FlatteningPolicy:
             ),
             **_stops(*_OBJECT_BRANCHES),
         },
+        labels=_OBJECT_LABELS,
     )
+
+
+_PROBE_LABELS: Mapping[str, Label] = {
+    'optimizable': Label('Optimize Probe', 'Whether the probe is optimizable'),
+    'optimizer': Label('Optimizer:'),
+    'step_size': Label('Step Size:', 'Optimizer step size (learning rate).'),
+    'eigenmode_update_relaxation': Label(
+        'Relax Eigenmode Update:', 'Separate step size (relaxation) for the eigenmode update.'
+    ),
+    'power_constraint.enabled': Label('Constrain Power', 'Whether to constrain probe power'),
+    'power_constraint.scale_object': Label(
+        'Scale Object',
+        'Scale the object inversely when the probe power is constrained; otherwise only '
+        'the probe is rescaled.',
+    ),
+    'orthogonalize_incoherent_modes.enabled': Label(
+        'Orthogonalize Incoherent Modes', 'Whether to orthogonalize incoherent probe modes'
+    ),
+    'orthogonalize_incoherent_modes.method': Label(
+        'Method:', 'Method to use for incoherent mode orthogonalization'
+    ),
+    'orthogonalize_incoherent_modes.sort_by_occupancy': Label(
+        'Sort By Occupancy',
+        'Keep modes sorted so the highest-occupancy mode is the first shared mode.',
+    ),
+    'orthogonalize_opr_modes.enabled': Label(
+        'Orthogonalize OPR Modes', 'Whether to orthogonalize OPR modes'
+    ),
+    'support_constraint.enabled': Label(
+        'Constrain Support',
+        'When enabled, the probe will be shrinkwrapped so that small values are set to zero',
+    ),
+    'support_constraint.threshold': Label(
+        'Threshold:',
+        'Shrinkwrap threshold: probe pixels below this fraction of the blurred maximum are '
+        'set to zero.',
+    ),
+    'support_constraint.fixed_probe_support': Label(
+        'Method:',
+        'Optional fixed support mask (ellipse or rectangle) applied before shrinkwrapping.',
+    ),
+    'center_constraint.enabled': Label(
+        'Constrain Center',
+        'When enabled, the probe center of mass will be constrained to the center of the '
+        'probe array',
+    ),
+    'center_constraint.use_total_intensity_for_com': Label(
+        'Use Intensity for Mass Centroid',
+        'Use the total probe intensity for the center-of-mass calculation instead of the '
+        "dominant shared mode's magnitude.",
+    ),
+    'center_constraint.center_modes_individually': Label(
+        'Center Modes Individually', 'When checked, each probe mode will be centered independently'
+    ),
+}
 
 
 def _probe_policy(extras: set[str]) -> FlatteningPolicy:
@@ -166,8 +319,81 @@ def _probe_policy(extras: set[str]) -> FlatteningPolicy:
             # The prefix already says Center.
             'center_constraint.center_modes_individually': 'ModesIndividually',
         },
+        labels=_PROBE_LABELS,
         structural=dict(_stops(*_PROBE_BRANCHES)),
     )
+
+
+_POSITION_LABELS: Mapping[str, Label] = {
+    'optimizable': Label('Optimize Probe Positions', 'Whether the probe positions are optimizable'),
+    'optimizer': Label('Optimizer:'),
+    'step_size': Label('Step Size:', 'Optimizer step size (learning rate).'),
+    'constrain_position_mean': Label(
+        'Constrain Centroid',
+        'Whether to subtract the mean from positions after updating positions',
+    ),
+    'correction_options.correction_type': Label(
+        'Correction Type:', 'Algorithm used to calculate the position correction update'
+    ),
+    'correction_options.differentiation_method': Label(
+        'Differentiation Method:',
+        'Method for computing the object gradient (GRADIENT correction only); '
+        'FOURIER_DIFFERENTIATION is usually fastest.',
+    ),
+    'correction_options.cross_correlation_scale': Label(
+        'Scale:', 'Upsampling factor of the cross-correlation in real space'
+    ),
+    'correction_options.cross_correlation_real_space_width': Label(
+        'Real Space Width:', 'Width of the cross-correlation in real-space'
+    ),
+    'correction_options.cross_correlation_probe_threshold': Label(
+        'Probe Threshold:', 'Probe intensity threshold used to calculate the probe mask'
+    ),
+    'correction_options.clip_update_magnitude_by_mad': Label(
+        'Clip Update Magnitude by MAD',
+        'Whether to clip the update magnitude by the median absolute deviation',
+    ),
+    'ChooseSliceForCorrection': Label(
+        'Slice For Correction:',
+        'Specify the object slice used for position correction; otherwise the middle slice '
+        'is used.',
+    ),
+    'SliceForCorrection': Label(
+        'Slice:', 'Slice that is used for position correction (0-based index)'
+    ),
+    'LimitUpdateMagnitude': Label(
+        'Limit Update Magnitude:', 'Whether to limit the update magnitude'
+    ),
+    'UpdateMagnitudeLimit': Label(
+        'Limit:', 'Maximum allowed magnitude of position update in each axis'
+    ),
+    'affine_transform_constraint.enabled': Label(
+        'Constrain Affine Transform',
+        'Fit an affine transform from the initial to the current positions and penalize '
+        'positions that deviate from it.',
+    ),
+    'affine_transform_constraint.degrees_of_freedom': Label('Degrees of Freedom:'),
+    'affine_transform_constraint.position_weight_update_interval': Label(
+        'Weight Update Interval:', 'Number of epochs between position weight updates.'
+    ),
+    'affine_transform_constraint.apply_constraint': Label(
+        'Apply Constraint',
+        'Apply the fitted transform to the positions; when off, weights are still computed '
+        'for logging but positions are unchanged.',
+    ),
+    'affine_transform_constraint.max_expected_error': Label(
+        'Max Expected Error [px]:',
+        'Maximum expected position error in pixels; used only to estimate friction in the '
+        'affine constraint.',
+    ),
+    '/OverrideAffineTransformUpdateFlexibility': Label(
+        'Override Update Flexibility:',
+        'When checked, the affine transform update flexibility will be overridden',
+    ),
+    'OverrideUpdateFlexibility': Label(
+        'Flexibility:', 'Update flexibility value (0 = rigid, 1 = fully flexible)'
+    ),
+}
 
 
 def _position_policy(extras: set[str]) -> FlatteningPolicy:
@@ -201,7 +427,52 @@ def _position_policy(extras: set[str]) -> FlatteningPolicy:
             ),
             **_stops('affine_transform_constraint'),
         },
+        labels=_POSITION_LABELS,
     )
+
+
+# Ported from the panels, because an upstream declaration carries no text. The
+# wording is deliberately short: each sits inside a group box that supplies the
+# rest of the context, and a group box's own title is the label of the key its
+# branch collapses onto.
+#
+# A plan's Start/Stop/Stride triple carries no text. The panels render all
+# twenty-six of them as one composite row labelled 'Plan:', so that label is the
+# same everywhere and belongs to whatever draws the composite, not here.
+_OPR_LABELS: Mapping[str, Label] = {
+    'optimizable': Label(
+        'Orthogonal Probe Relaxation', 'Master switch for optimizing OPR mode weights.'
+    ),
+    'optimizer': Label('Optimizer:'),
+    'step_size': Label('Step Size:', 'Optimizer step size (learning rate).'),
+    'optimize_eigenmode_weights': Label(
+        'Optimize Eigenmode Weights',
+        'Whether to optimize eigenmode weights (i.e., the weights of the second and '
+        'following OPR modes)',
+    ),
+    'optimize_intensity_variation': Label(
+        'Optimize Intensities',
+        'Whether to optimize intensity variation (i.e., the weight of the first OPR mode)',
+    ),
+    'update_relaxation': Label(
+        'Relax Update:', 'Separate step size (relaxation) for the OPR mode weight update.'
+    ),
+    'EnablePrimaryModeWeightFloor': Label(
+        'Primary Mode Weight Floor',
+        'Clamp the weight of the primary (0th) OPR mode to a lower bound',
+    ),
+    'PrimaryModeWeightFloor': Label(
+        'Floor:', 'Lower bound applied to the primary OPR mode weight.'
+    ),
+    'smoothing.enabled': Label('Smooth OPR Mode Weights', 'Smooth the OPR mode weights'),
+    'smoothing.method': Label(
+        'Smoothing Method:',
+        'Method for smoothing OPR mode weights (MEDIAN filter or POLYNOMIAL fit).',
+    ),
+    'smoothing.polynomial_degree': Label(
+        'Polynomial Degree:', 'Degree of the polynomial used for smoothing OPR mode weights'
+    ),
+}
 
 
 def _opr_policy(extras: set[str]) -> FlatteningPolicy:
@@ -222,6 +493,7 @@ def _opr_policy(extras: set[str]) -> FlatteningPolicy:
             'smoothing.method': '/SmoothingMethod',
             'smoothing.polynomial_degree': '/PolynomialSmoothingDegree',
         },
+        labels=_OPR_LABELS,
         structural={
             'primary_mode_weight_floor': OptionalGate(
                 'EnablePrimaryModeWeightFloor', 'PrimaryModeWeightFloor'
@@ -229,6 +501,144 @@ def _opr_policy(extras: set[str]) -> FlatteningPolicy:
             **_stops(*_OPR_BRANCHES),
         },
     )
+
+
+_RECONSTRUCTOR_LABELS: Mapping[str, Label] = {
+    'num_epochs': Label('Number of Epochs:', 'Number of epochs to run'),
+    'batch_size': Label('Batch Size:', 'Number of data to process in each minibatch'),
+    'batching_mode': Label('Batch Mode:'),
+    'compact_mode_update_clustering': Label(
+        'Update Clustering:',
+        'Number of epochs between cluster updates in COMPACT batching mode (0 disables).',
+    ),
+    'use_double_precision_for_fft': Label(
+        'FFT Precision:',
+        'Use double precision for critical FFT operations, overriding the compute precision.',
+    ),
+    'allow_nondeterministic_algorithms': Label(
+        'Allow Nondeterministic Algorithms',
+        'Allow nondeterministic algorithms, which can be faster but cause larger '
+        'run-to-run variation.',
+    ),
+    'UseDoublePrecision': Label(
+        'Compute Precision:', 'Floating point precision to use for computation'
+    ),
+    'EnableExcludeMeasuredPixelsBelow': Label(
+        'Exclude Measured Pixels Below',
+        'When enabled, measured pixels below the threshold will be excluded',
+    ),
+    'ExcludeMeasuredPixelsBelow': Label(
+        'Threshold:',
+        'Gradients for measured pixels with intensity at or below this threshold are zeroed.',
+    ),
+    'forward_model_options.low_memory_mode': Label(
+        'Use Low Memory Mode',
+        'When checked, forward propagation of ptychography will be done using less '
+        'vectorized code. This reduces the speed, but also lowers memory usage',
+    ),
+    'PadForShift': Label(
+        'Pad For Shift:', 'Number of pixels to pad arrays (with border values) before shifting'
+    ),
+    'EnableDiffractionPatternBlur': Label(
+        'Blur Diffraction Patterns',
+        'When enabled, diffraction patterns will be blurred with a Gaussian kernel',
+    ),
+    'DiffractionPatternBlurSigma': Label(
+        'Sigma:',
+        'Sigma (in pixels) of the Gaussian kernel used to blur simulated diffraction patterns.',
+    ),
+}
+
+_DATA_LABELS: Mapping[str, Label] = {
+    'fft_shift': Label(
+        'FFT Shift Diffraction Patterns',
+        'When checked, the diffraction patterns will be FFT-shifted',
+    ),
+    'save_data_on_device': Label(
+        'Save Data on Device', 'Keep the diffraction data on the compute device (e.g. GPU).'
+    ),
+}
+
+_ALGORITHM_LABELS: Mapping[str, Label] = {
+    # Reconstructor-branch additions, which ptychodus files under the algorithm.
+    'loss_function': Label('Loss Function:', 'Loss function to optimize'),
+    'forward_model_class': Label('Forward Model:', 'Forward model class'),
+    'exit_wave_update_relaxation': Label(
+        'Exit Wave Update Relaxation:', 'Relaxation multiplier for the exit wave update'
+    ),
+    'chunk_length': Label('Chunk Length:'),
+    'beta': Label('Beta:'),
+    'method': Label('BH Method:'),
+    'probe_rho': Label(
+        'BH Probe Rho:',
+        'Scaling factor for the probe relative to the object (~1 near-field, 0.1 far-field).',
+    ),
+    'probe_position_rho': Label(
+        'BH Probe Position Rho:',
+        'Scaling factor for probe positions relative to the object (~0.1 near-field, 1 far-field).',
+    ),
+    'noise_model': Label('Noise Model:', 'Noise model to use'),
+    'gaussian_noise_std': Label(
+        'Gaussian Noise Deviation:',
+        'Standard deviation of the Gaussian noise (used only with the Gaussian noise model).',
+    ),
+    'single_slice_solve_obj_prb_step_size_jointly': Label(
+        'Solve Object/Probe Step Size Jointly (Single Slice)',
+        'When checked, object and probe step lengths are solved simultaneously in '
+        'single-slice mode',
+    ),
+    'multislice_solve_obj_prb_step_size_jointly': Label(
+        'Solve Object/Probe Step Size Jointly (Multislice)',
+        'When checked, object and probe step lengths are solved simultaneously in multislice mode',
+    ),
+    'solve_step_sizes_only_using_first_probe_mode': Label(
+        'Solve Step Sizes Only Using First Probe Mode',
+        'When checked, the step sizes will be calculated using only the first probe mode',
+    ),
+    'momentum_acceleration_gain': Label(
+        'Momentum Acceleration Gain:',
+        'Gain of momentum acceleration for object and probe; 0 disables it.',
+    ),
+    'AutoMomentumAccelerationGradientMixingFactor': Label(
+        'Use Gradient Mixing Factor',
+        'Mixing factor of the current gradient into the accumulated velocity; set to 1 to '
+        'reproduce PtychoShelves.',
+    ),
+    'MomentumAccelerationGradientMixingFactor': Label('Mixing Factor:'),
+    'rescale_probe_intensity_in_first_epoch': Label(
+        'Rescale Probe Intensity In First Epoch',
+        'When checked, the probe intensity will be rescaled on the first epoch',
+    ),
+    'preconditioning_damping_factor': Label(
+        'Preconditioning Damping Factor:', 'Damping factor for preconditioning the object update'
+    ),
+    'momentum_acceleration_memory': Label(
+        'Position Momentum Memory:',
+        'Number of previous epochs used to estimate friction in probe-position momentum '
+        'acceleration.',
+    ),
+    'AutoMomentumGradientMixingFactor': Label(
+        'Use Position Gradient Mixing Factor',
+        'Mixing factor of the current position update into the accumulated velocity; set to '
+        '1 to reproduce foldslice.',
+    ),
+    # Branch additions other than the reconstructor's.
+    'amplitude_clamp_limit': Label(
+        'Amplitude Clamp Limit:',
+        'Maximum object amplitude; larger values are clamped to this limit.',
+    ),
+    'inertia': Label('Inertia:', 'Inertia of the object update; should be between 0 and 1.'),
+    'alpha': Label('Alpha:'),
+    'optimal_step_size_scaler': Label(
+        'Optimal Step Size Scaler:',
+        'Scaler applied to the solved optimal step size for the object update.',
+    ),
+    'multimodal_update': Label(
+        'Multimodal Update',
+        'Compute the object update direction summed over all probe modes rather than only '
+        'the first mode.',
+    ),
+}
 
 
 def _reconstructor_policy(extras: set[str]) -> FlatteningPolicy:
@@ -261,6 +671,7 @@ def _reconstructor_policy(extras: set[str]) -> FlatteningPolicy:
                 'EnableDiffractionPatternBlur', 'DiffractionPatternBlurSigma', fallback=1.0
             ),
         },
+        labels=_RECONSTRUCTOR_LABELS,
     )
 
 
@@ -271,6 +682,7 @@ def _data_policy() -> FlatteningPolicy:
             {'data', 'free_space_propagation_distance_m', 'wavelength_m', 'valid_pixel_mask'}
         ),
         renames={'fft_shift': 'FFTShiftDiffractionPatterns'},
+        labels=_DATA_LABELS,
     )
 
 
@@ -364,22 +776,22 @@ def _algorithm_sections(algorithm: str, options: Any) -> Sequence[OptionsSection
 
     group = _ALGORITHM_GROUPS[algorithm]
     branches: Sequence[
-        tuple[str, type, str, Mapping[str, str], Mapping[str, StructuralAdapter]]
+        tuple[str, type, str, Mapping[str, Label], Mapping[str, StructuralAdapter]]
     ] = (
         (
             'reconstructor_options',
             ReconstructorOptions,
             '',
-            _RECONSTRUCTOR_EXTRA_NAMES,
+            {},
             _RECONSTRUCTOR_EXTRA_ADAPTERS,
         ),
         ('object_options', ObjectOptions, 'Object', {}, {}),
-        ('probe_options', ProbeOptions, 'Probe', {}, {}),
+        ('probe_options', ProbeOptions, 'Probe', _PROBE_EXTRA_LABELS, {}),
         (
             'probe_position_options',
             ProbePositionOptions,
             'ProbePosition',
-            {},
+            _POSITION_EXTRA_LABELS,
             {
                 'momentum_acceleration_gradient_mixing_factor': OptionalGate(
                     'AutoMomentumGradientMixingFactor',
@@ -392,7 +804,7 @@ def _algorithm_sections(algorithm: str, options: Any) -> Sequence[OptionsSection
     )
     sections: list[OptionsSection] = []
 
-    for path, base, prefix, renames, structural in branches:
+    for path, base, prefix, branch_labels, structural in branches:
         root = getattr(options, path)
 
         if not _extras(root, base) - _UNSURFACED_EXTRAS:
@@ -405,7 +817,8 @@ def _algorithm_sections(algorithm: str, options: Any) -> Sequence[OptionsSection
                 policy=FlatteningPolicy(
                     base_prefix=prefix,
                     hidden=_only_extras(root, base),
-                    renames=renames,
+                    renames=_RECONSTRUCTOR_EXTRA_NAMES if path == 'reconstructor_options' else {},
+                    labels={**_ALGORITHM_LABELS, **branch_labels},
                     structural=structural,
                 ),
             )
@@ -417,6 +830,21 @@ def _algorithm_sections(algorithm: str, options: Any) -> Sequence[OptionsSection
 _RECONSTRUCTOR_EXTRA_NAMES: Mapping[str, str] = {
     'multislice_solve_obj_prb_step_size_jointly': 'MultisliceSolveObjectProbeStepSizeJointly',
     'single_slice_solve_obj_prb_step_size_jointly': 'SingleSliceSolveObjectProbeStepSizeJointly',
+}
+
+# 'rho' names a different quantity on each branch, so the text cannot be shared.
+_PROBE_EXTRA_LABELS: Mapping[str, Label] = {
+    'rho': Label(
+        'BH Probe Rho:',
+        'Scaling factor for the probe relative to the object (~1 near-field, 0.1 far-field).',
+    ),
+}
+
+_POSITION_EXTRA_LABELS: Mapping[str, Label] = {
+    'rho': Label(
+        'BH Probe Position Rho:',
+        'Scaling factor for probe positions relative to the object (~0.1 near-field, 1 far-field).',
+    ),
 }
 
 _RECONSTRUCTOR_EXTRA_ADAPTERS: Mapping[str, StructuralAdapter] = {
