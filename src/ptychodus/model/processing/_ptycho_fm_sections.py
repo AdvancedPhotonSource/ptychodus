@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from .flatten import FlatteningPolicy, Label, Sentinel, fields_of
+from .flatten import FlatteningPolicy, Overlay, Sentinel, fields_of
 from .parameter_store import OptionsSection
 
 __all__ = ['sections']
@@ -33,30 +33,30 @@ def _hide_all_but(model: type, prefix: str, *exposed: str) -> set[str]:
     return {f'{prefix}{name}' for name in fields_of(model) if name not in exposed}
 
 
-_DATA_LABELS: Mapping[str, Label] = {
-    'scale': Label(
+_DATA_OVERLAYS: Mapping[str, Overlay] = {
+    'scale': Overlay(
         'Diffraction Scale:', 'Scale factor applied to diffraction intensities before sqrt.'
     ),
-    'default_normalization': Label('Default Normalization:'),
-    'cache_object': Label('Cache Object In Memory'),
-    'max_probe_modes': Label(
+    'default_normalization': Overlay('Default Normalization:'),
+    'cache_object': Overlay('Cache Object In Memory'),
+    'max_probe_modes': Overlay(
         'Max Probe Modes:', 'Probes are zero-padded to this many mixed-state modes.'
     ),
-    'max_OPR_modes': Label(
+    'max_OPR_modes': Overlay(
         'Max OPR Modes:',
         'Probes are zero-padded to this many orthogonal probe relaxation modes.',
     ),
-    'cache_memory_budget_mb': Label(
+    'cache_memory_budget_mb': Overlay(
         'Array Cache Budget (MiB):',
         'Per-worker budget for cached object and probe arrays; 0 disables caching.',
     ),
-    'train_split': Label(
+    'train_split': Overlay(
         'Train Split:', 'Fraction of dataset used for training; remainder is validation.'
     ),
-    'random_seed': Label('Random Seed:'),
-    'max_files': Label('Max Files (0 = no cap):'),
-    'num_workers': Label('Dataloader Workers:'),
-    'prefetch_factor': Label('Prefetch Factor:'),
+    'random_seed': Overlay('Random Seed:'),
+    'max_files': Overlay('Max Files (0 = no cap):'),
+    'num_workers': Overlay('Dataloader Workers:'),
+    'prefetch_factor': Overlay('Prefetch Factor:'),
 }
 
 
@@ -90,47 +90,42 @@ def _data_policy() -> FlatteningPolicy:
             )
         ),
         structural={'max_files': Sentinel('max_files', value_type=int, sentinel=0)},
-        labels=_DATA_LABELS,
+        overlays=_DATA_OVERLAYS,
     )
 
 
-_MODEL_LABELS: Mapping[str, Label] = {
-    'encoder_type': Label('Encoder Type:'),
-    'coupled_decoder_mode': Label(
+# 'none' is how ptychodus spells the absent mode, which builds separate
+# amplitude and phase decoders; a Sentinel turns it back into None.
+_COUPLED_DECODER_MODES: Sequence[str] = ('none', 'real_imag', 'amp_phase')
+
+_MODEL_OVERLAYS: Mapping[str, Overlay] = {
+    'encoder_type': Overlay('Encoder Type:', choices=('custom', 'pretrained')),
+    'coupled_decoder_mode': Overlay(
         'Coupled Decoder:',
         "'none' decodes amplitude and phase separately; the coupled modes share one "
         'decoder and run the forward physics. A checkpoint loads only into the mode '
         'it was trained with.',
+        choices=_COUPLED_DECODER_MODES,
     ),
-    'encoder.img_size': Label('Image Size:'),
-    'encoder.patch_size': Label('Patch Size:'),
-    'encoder.embed_dim': Label('Embed Dimension:'),
-    'encoder.depth': Label('Depth:'),
-    'encoder.num_heads': Label('Attention Heads:'),
-    'encoder.mlp_ratio': Label('MLP Ratio:'),
-    'encoder.use_cls_token': Label('Use CLS Token'),
-    'encoder.dropout': Label('Dropout:'),
-    'encoder.attn_dropout': Label('Attention Dropout:'),
-    'encoder.timm_model_name': Label(
+    'encoder.img_size': Overlay('Image Size:'),
+    'encoder.patch_size': Overlay('Patch Size:'),
+    'encoder.embed_dim': Overlay('Embed Dimension:'),
+    'encoder.depth': Overlay('Depth:'),
+    'encoder.num_heads': Overlay('Attention Heads:'),
+    'encoder.mlp_ratio': Overlay('MLP Ratio:'),
+    'encoder.use_cls_token': Overlay('Use CLS Token'),
+    'encoder.dropout': Overlay('Dropout:'),
+    'encoder.attn_dropout': Overlay('Attention Dropout:'),
+    'encoder.timm_model_name': Overlay(
         'TIMM Model Name:', "Only used when encoder_type is 'pretrained'."
     ),
-    'decoder.base_channels': Label('Decoder Base Channels:'),
-    'decoder.latent_dim': Label('Decoder Latent Dim:'),
-    'decoder.num_stages': Label('Decoder Upsample Stages:'),
-    'decoder.use_batchnorm': Label('Decoder Batch Norm'),
-    'decoder.dropout': Label('Decoder Dropout:'),
-    'init.enabled': Label('Custom Weight Init'),
-    'init.method': Label('Init Method:'),
-}
-
-# 'none' is how ptychodus spells the absent mode, which builds separate
-# amplitude and phase decoders; the Sentinel below turns it back into None.
-_COUPLED_DECODER_MODES: Sequence[str] = ('none', 'real_imag', 'amp_phase')
-
-_MODEL_CHOICES: Mapping[str, Sequence[str]] = {
-    'encoder_type': ('custom', 'pretrained'),
-    'coupled_decoder_mode': _COUPLED_DECODER_MODES,
-    'init.method': ('trunc_normal', 'kaiming'),
+    'decoder.base_channels': Overlay('Decoder Base Channels:'),
+    'decoder.latent_dim': Overlay('Decoder Latent Dim:'),
+    'decoder.num_stages': Overlay('Decoder Upsample Stages:'),
+    'decoder.use_batchnorm': Overlay('Decoder Batch Norm'),
+    'decoder.dropout': Overlay('Decoder Dropout:'),
+    'init.enabled': Overlay('Custom Weight Init'),
+    'init.method': Overlay('Init Method:', choices=('trunc_normal', 'kaiming')),
 }
 
 
@@ -185,55 +180,9 @@ def _model_policy() -> FlatteningPolicy:
                 'coupled_decoder_mode', value_type=str, sentinel='none'
             )
         },
-        labels=_MODEL_LABELS,
-        choices=_MODEL_CHOICES,
+        overlays=_MODEL_OVERLAYS,
     )
 
-
-_TRAINING_LABELS: Mapping[str, Label] = {
-    'batch_size': Label('Batch Size:'),
-    'learning_rate': Label('Learning Rate:'),
-    'epochs': Label('Epochs:'),
-    'loss_function': Label('Loss Function:'),
-    'weighted_loss.loss_type': Label(
-        'Weighted Loss Type:', "Only used when loss_function is 'weighted'."
-    ),
-    'weighted_loss.threshold': Label('Weighted Loss Threshold:'),
-    'weighted_loss.alpha': Label('Weighted Loss Alpha:'),
-    'probe_aware_loss.loss_type': Label(
-        'Probe-Aware Loss Type:', "Only used when loss_function is 'probe_aware'."
-    ),
-    'probe_aware_loss.threshold': Label('Probe-Aware Loss Threshold:'),
-    'probe_aware_loss.alpha': Label(
-        'Probe-Aware Loss Alpha:',
-        'Power applied to the probe far-field envelope in the denominator.',
-    ),
-    'probe_aware_loss.envelope_floor': Label(
-        'Probe-Aware Envelope Floor:', 'Per-sample floor as a fraction of the mean probe envelope.'
-    ),
-    'q_dependent_loss.loss_type': Label(
-        'Q-Dependent Loss Type:', "Only used when loss_function is 'q_dependent'."
-    ),
-    'q_dependent_loss.alpha': Label(
-        'Q-Dependent Loss Alpha:',
-        'Focal exponent emphasizing poorly matched pixels; 0 disables it.',
-    ),
-    'q_dependent_loss.q_beta': Label(
-        'Q-Dependent Q Exponent:',
-        'Radial exponent emphasizing high-Q pixels; 0 disables Q weighting.',
-    ),
-    'q_dependent_loss.q_floor': Label(
-        'Q-Dependent Q Floor:', 'Minimum normalized Q, so low-Q pixels are not zero-weighted.'
-    ),
-    'q_dependent_loss.threshold': Label('Q-Dependent Loss Threshold:'),
-    'q_dependent_loss.log_error': Label(
-        'Q-Dependent Log Error', 'Compute the data error on log10 amplitudes.'
-    ),
-    'q_dependent_loss.normalize_q': Label(
-        'Q-Dependent Normalize Q', 'Normalize the Q weight map to unit mean.'
-    ),
-    'save_epoch_models': Label('Save Per-Epoch Models'),
-}
 
 # 'combined' is absent on purpose: it is configured by a list of weighted loss
 # terms, which a settings group of scalars cannot hold.
@@ -251,11 +200,53 @@ _LOSS_FUNCTIONS: Sequence[str] = (
 # The weighted, probe-aware and q-dependent losses validate against the same pair.
 _LOSS_TYPES: Sequence[str] = ('mse', 'mae')
 
-_TRAINING_CHOICES: Mapping[str, Sequence[str]] = {
-    'loss_function': _LOSS_FUNCTIONS,
-    'weighted_loss.loss_type': _LOSS_TYPES,
-    'probe_aware_loss.loss_type': _LOSS_TYPES,
-    'q_dependent_loss.loss_type': _LOSS_TYPES,
+_TRAINING_OVERLAYS: Mapping[str, Overlay] = {
+    'batch_size': Overlay('Batch Size:'),
+    'learning_rate': Overlay('Learning Rate:'),
+    'epochs': Overlay('Epochs:'),
+    'loss_function': Overlay('Loss Function:', choices=_LOSS_FUNCTIONS),
+    'weighted_loss.loss_type': Overlay(
+        'Weighted Loss Type:', "Only used when loss_function is 'weighted'.", choices=_LOSS_TYPES
+    ),
+    'weighted_loss.threshold': Overlay('Weighted Loss Threshold:'),
+    'weighted_loss.alpha': Overlay('Weighted Loss Alpha:'),
+    'probe_aware_loss.loss_type': Overlay(
+        'Probe-Aware Loss Type:',
+        "Only used when loss_function is 'probe_aware'.",
+        choices=_LOSS_TYPES,
+    ),
+    'probe_aware_loss.threshold': Overlay('Probe-Aware Loss Threshold:'),
+    'probe_aware_loss.alpha': Overlay(
+        'Probe-Aware Loss Alpha:',
+        'Power applied to the probe far-field envelope in the denominator.',
+    ),
+    'probe_aware_loss.envelope_floor': Overlay(
+        'Probe-Aware Envelope Floor:', 'Per-sample floor as a fraction of the mean probe envelope.'
+    ),
+    'q_dependent_loss.loss_type': Overlay(
+        'Q-Dependent Loss Type:',
+        "Only used when loss_function is 'q_dependent'.",
+        choices=_LOSS_TYPES,
+    ),
+    'q_dependent_loss.alpha': Overlay(
+        'Q-Dependent Loss Alpha:',
+        'Focal exponent emphasizing poorly matched pixels; 0 disables it.',
+    ),
+    'q_dependent_loss.q_beta': Overlay(
+        'Q-Dependent Q Exponent:',
+        'Radial exponent emphasizing high-Q pixels; 0 disables Q weighting.',
+    ),
+    'q_dependent_loss.q_floor': Overlay(
+        'Q-Dependent Q Floor:', 'Minimum normalized Q, so low-Q pixels are not zero-weighted.'
+    ),
+    'q_dependent_loss.threshold': Overlay('Q-Dependent Loss Threshold:'),
+    'q_dependent_loss.log_error': Overlay(
+        'Q-Dependent Log Error', 'Compute the data error on log10 amplitudes.'
+    ),
+    'q_dependent_loss.normalize_q': Overlay(
+        'Q-Dependent Normalize Q', 'Normalize the Q weight map to unit mean.'
+    ),
+    'save_epoch_models': Overlay('Save Per-Epoch Models'),
 }
 
 
@@ -322,8 +313,7 @@ def _training_policy() -> FlatteningPolicy:
             'probe_aware_loss.loss_type': 'type',
             'q_dependent_loss.loss_type': 'type',
         },
-        labels=_TRAINING_LABELS,
-        choices=_TRAINING_CHOICES,
+        overlays=_TRAINING_OVERLAYS,
     )
 
 

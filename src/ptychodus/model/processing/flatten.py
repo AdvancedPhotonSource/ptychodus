@@ -12,7 +12,9 @@ The projection is rule-driven, not a key-by-key map. A nested options object
 contributes a prefix; its subfields append their own names to it; a subfield that
 merely enables the group collapses onto the bare prefix. Only what the rules
 cannot derive is tabulated: the prefix for each nested object, the handful of
-fields renamed on the way out, and the few that expand into several keys.
+fields renamed on the way out, the few that expand into several keys, and --
+by far the largest table -- what a declaration ptychodus does not own cannot
+carry about itself.
 
 Naming policy is per model, because no single convention fits: ptychodus's own
 groups are PascalCase with spelled-out units, while two backends persist the
@@ -32,10 +34,10 @@ __all__ = [
     'compose_key',
     'fields_of',
     'FlatParameter',
-    'Label',
     'FlatteningPolicy',
     'OptionalGate',
     'OptionalRange',
+    'Overlay',
     'Sentinel',
     'StructuralAdapter',
     'flatten_options',
@@ -224,27 +226,42 @@ def fields_of(model: type) -> Mapping[str, Any]:
 
 
 @dataclass(frozen=True)
-class Label:
-    """Display text for one field, where its declaration cannot carry it.
+class Overlay:
+    """What a field's declaration cannot carry, for a model ptychodus does not own.
 
-    A model ptychodus owns states its own text through ``pydantic.Field``. An
-    upstream declaration cannot be annotated -- pty-chi's 749 option fields
-    carry no title or description at all -- so ptychodus supplies the text
-    beside the naming rules instead, and this is the only reason it lives in a
-    module otherwise concerned with persistence.
+    A model ptychodus owns states all five of these inline: ``pydantic.Field``
+    carries a title, a description and a pair of bounds, and an enum annotation
+    carries the values a choice accepts. An upstream declaration often carries
+    none of them -- pty-chi annotates no field with a title or description, and
+    PtychoFM spells every choice as a bare ``str`` -- so ptychodus states them
+    beside the naming rules instead. One concept, two homes, and the only
+    reason display text appears in a module otherwise concerned with
+    persistence.
+
+    Each field is resolved against the declaration on its own, and one left
+    unset keeps whatever the declaration states. Erasing a declared bound is
+    therefore not expressible.
     """
 
     text: str = ''
     tool_tip: str = ''
+    minimum: Any = None
+    maximum: Any = None
+    choices: Sequence[str] = ()
+
+
+# What a key with no entry resolves to, so that every field falls through to
+# the declaration without the common case allocating a record.
+_NOTHING_STATED: Final = Overlay()
 
 
 @dataclass(frozen=True)
 class FlatParameter:
     """One persisted key, and where in the declared model its value comes from.
 
-    Label, tool tip and bounds are read from the declaration itself: pydantic's
-    ``Field(title=..., description=..., ge=..., le=...)`` already carries all four,
-    so a model ptychodus owns states them inline and needs no sidecar.
+    Display text, bounds and choices come from the declaration where it states
+    them and from the policy's overlay where it does not, or where ptychodus
+    disagrees. By the time a key is described here the two are reconciled.
     """
 
     ini_key: str
@@ -255,7 +272,7 @@ class FlatParameter:
     tool_tip: str = ''
     minimum: Any = None
     maximum: Any = None
-    # The values a choice field accepts. Empty unless the policy supplies them:
+    # The values a choice field accepts. Empty unless an overlay supplies them:
     # a field typed as an enum already carries its members in its annotation.
     choices: Sequence[str] = ()
     # Set when several keys share one declared field, naming this key's role.
@@ -285,13 +302,10 @@ class FlatteningPolicy:
     prefixes: Mapping[str, str] = field(default_factory=dict)
     # Dotted path of a leaf -> its persisted name, where the rules miss.
     renames: Mapping[str, str] = field(default_factory=dict)
-    # Dotted path of a leaf, or an adapter's key suffix -> its display text.
-    # Consulted ahead of the declaration, which for an upstream model has none.
-    labels: Mapping[str, Label] = field(default_factory=dict)
-    # Dotted path of a leaf, or an adapter's key suffix -> the values it accepts.
-    # Only for a declaration that spells a choice as a bare string, as PtychoFM
-    # does throughout; pty-chi types its own with real enums and needs no entry.
-    choices: Mapping[str, Sequence[str]] = field(default_factory=dict)
+    # Dotted path of a leaf, or an adapter's key suffix -> what its declaration
+    # cannot carry. Consulted ahead of the declaration, field by field, so a
+    # model ptychodus owns needs no entry at all.
+    overlays: Mapping[str, Overlay] = field(default_factory=dict)
     # Dotted path of a leaf -> the adapter bridging it and the keys it persists as.
     structural: Mapping[str, StructuralAdapter] = field(default_factory=dict)
     # Leaf names that merely switch their group on, and so take the bare prefix.
@@ -411,6 +425,16 @@ def _bounds(info: Any) -> tuple[Any, Any]:
     return minimum, maximum
 
 
+def _stated_or_declared(stated: Any, declared: Any) -> Any:
+    """Return the bound an overlay states, else the one the field declares.
+
+    Compared against None rather than tested for truth: ``ge=0.0`` is the most
+    common bound in this codebase and is falsy, so the precedence idiom the
+    display text uses would silently drop it.
+    """
+    return declared if stated is None else stated
+
+
 def _leaf(
     key: str,
     path: str,
@@ -421,21 +445,28 @@ def _leaf(
     role: str = '',
     annotation: Any = None,
 ) -> FlatParameter:
-    minimum, maximum = _bounds(info)
-    # An adapter splits one field into several keys, which need separate text, so
-    # its suffix is looked up before the field's own path.
-    declared = policy.labels.get(role) or policy.labels.get(path) or Label()
-    choices = policy.choices.get(role) or policy.choices.get(path) or ()
+    held = info.annotation if annotation is None else annotation
+    # A switch has no range. An adapter's gate key records whether the field
+    # has a value rather than what it is, so the field's bounds do not describe
+    # it, and a renderer reading them would offer a spin box for a check box.
+    declared_minimum, declared_maximum = (None, None) if held is bool else _bounds(info)
+    # An adapter splits one field into several keys, which need their own text
+    # and their own bounds, so its suffix is looked up before the field's path.
+    # The whole record wins; an entry under a suffix is not merged with one
+    # under the path.
+    overlay = policy.overlays.get(role) or policy.overlays.get(path) or _NOTHING_STATED
     return FlatParameter(
         ini_key=key,
         path=path,
-        annotation=info.annotation if annotation is None else annotation,
+        annotation=held,
         default=value,
-        label=declared.text or info.title or '',
-        tool_tip=declared.tool_tip or info.description or '',
-        minimum=minimum,
-        maximum=maximum,
-        choices=choices,
+        label=overlay.text or info.title or '',
+        tool_tip=overlay.tool_tip or info.description or '',
+        # Resolved one at a time, so an overlay stating only a maximum leaves
+        # the declared minimum in place.
+        minimum=_stated_or_declared(overlay.minimum, declared_minimum),
+        maximum=_stated_or_declared(overlay.maximum, declared_maximum),
+        choices=overlay.choices,
         structural_role=role,
     )
 

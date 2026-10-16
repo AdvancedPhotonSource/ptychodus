@@ -120,7 +120,7 @@ def test_plan_keys_are_left_to_the_composite_that_draws_them(algorithm: str) -> 
                 assert not flat.label, flat.ini_key
 
 
-def test_no_table_entry_names_a_field_no_branch_declares() -> None:
+def test_no_overlay_entry_names_a_field_no_branch_declares() -> None:
     """A dead entry is silent: its text simply never reaches a key.
 
     Two survived the port from the panels because pty-chi names the field `rho`
@@ -142,7 +142,7 @@ def test_no_table_entry_names_a_field_no_branch_declares() -> None:
     declared: set[str] = set()
 
     for name, table in vars(_ptychi_sections).items():
-        if name.endswith('_LABELS') and isinstance(table, dict):
+        if name.endswith('_OVERLAYS') and isinstance(table, dict):
             declared |= set(table)
 
     assert declared - consulted == set()

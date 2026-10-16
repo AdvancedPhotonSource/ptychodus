@@ -21,7 +21,7 @@ from typing import Any
 
 from .flatten import (
     BoolEnum,
-    Label,
+    Overlay,
     fields_of,
     FlatteningPolicy,
     OptionalGate,
@@ -88,99 +88,101 @@ _POSITION_BRANCHES = ('correction_options', 'affine_transform_constraint')
 _OPR_BRANCHES = ('smoothing',)
 
 
-_OBJECT_LABELS: Mapping[str, Label] = {
-    'optimizable': Label('Optimize Object', 'Whether the object is optimizable'),
-    'optimizer': Label('Optimizer:'),
-    'step_size': Label('Step Size:', 'Optimizer step size (learning rate).'),
-    'patch_interpolation_method': Label(
+_OBJECT_OVERLAYS: Mapping[str, Overlay] = {
+    'optimizable': Overlay('Optimize Object', 'Whether the object is optimizable'),
+    'optimizer': Overlay('Optimizer:'),
+    'step_size': Overlay('Step Size:', 'Optimizer step size (learning rate).'),
+    'patch_interpolation_method': Overlay(
         'Patch Interpolator:',
         'Interpolation method used for extracting and updating patches of the object',
     ),
-    'build_preconditioner_with_all_modes': Label(
+    'build_preconditioner_with_all_modes': Overlay(
         'Build Preconditioner with All Modes',
         'Build the illumination preconditioner from the summed intensity of all probe modes.',
     ),
-    'slice_spacing_options.optimizable': Label(
+    'slice_spacing_options.optimizable': Overlay(
         'Optimize Slice Spacing', 'Whether to optimize the slice spacing'
     ),
-    'slice_spacing_options.optimizer': Label('Optimizer:'),
-    'slice_spacing_options.step_size': Label('Step Size:', 'Optimizer step size (learning rate).'),
-    'l1_norm_constraint.enabled': Label(
+    'slice_spacing_options.optimizer': Overlay('Optimizer:'),
+    'slice_spacing_options.step_size': Overlay(
+        'Step Size:', 'Optimizer step size (learning rate).'
+    ),
+    'l1_norm_constraint.enabled': Overlay(
         'Constrain L\u2081 Norm', 'Whether to constrain the L\u2081 norm'
     ),
-    'l1_norm_constraint.weight': Label(
+    'l1_norm_constraint.weight': Overlay(
         'Weight:', 'Weight of the L\u2081 norm constraint (0 or less disables it).'
     ),
-    'l2_norm_constraint.enabled': Label(
+    'l2_norm_constraint.enabled': Overlay(
         'Constrain L\u2082 Norm', 'Whether to constrain the L\u2082 norm'
     ),
-    'l2_norm_constraint.weight': Label(
+    'l2_norm_constraint.weight': Overlay(
         'Weight:', 'Weight of the L\u2082 norm constraint (0 or less disables it).'
     ),
-    'smoothness_constraint.enabled': Label(
+    'smoothness_constraint.enabled': Overlay(
         'Constrain Smoothness',
         'Whether to constrain smoothness in the magnitude (but not phase) of the object',
     ),
-    'smoothness_constraint.alpha': Label(
+    'smoothness_constraint.alpha': Overlay(
         'Alpha:',
         'Relaxation smoothing constant; must be in (0, 1/8], with maximal smoothing at 1/8.',
     ),
-    'total_variation.enabled': Label(
+    'total_variation.enabled': Overlay(
         'Constrain Total Variation', 'Whether to constrain the total variation'
     ),
-    'total_variation.weight': Label(
+    'total_variation.weight': Overlay(
         'Weight:', 'Weight of the total variation constraint (0 or less disables it).'
     ),
-    'remove_grid_artifacts.enabled': Label(
+    'remove_grid_artifacts.enabled': Overlay(
         'Remove Grid Artifacts',
         "Whether to remove grid artifacts in the object's phase at the end of an epoch.",
     ),
-    'remove_grid_artifacts.period_x_m': Label(
+    'remove_grid_artifacts.period_x_m': Overlay(
         'Period X:', 'Horizontal period of grid artifacts in meters'
     ),
-    'remove_grid_artifacts.period_y_m': Label(
+    'remove_grid_artifacts.period_y_m': Overlay(
         'Period Y:', 'Vertical period of grid artifacts in meters'
     ),
-    'remove_grid_artifacts.window_size': Label(
+    'remove_grid_artifacts.window_size': Overlay(
         'Window Size [px]:', 'Window size for grid artifact removal in pixels'
     ),
-    'remove_grid_artifacts.direction': Label('Direction:', 'Direction of grid artifact removal'),
-    'remove_grid_artifacts.component': Label(
+    'remove_grid_artifacts.direction': Overlay('Direction:', 'Direction of grid artifact removal'),
+    'remove_grid_artifacts.component': Overlay(
         'Component:', 'Component of the object to apply grid artifact removal to'
     ),
-    'multislice_regularization.enabled': Label(
+    'multislice_regularization.enabled': Overlay(
         'Regularize Multislice',
         'Whether to regularize multislice objects using cross-slice smoothing',
     ),
-    'multislice_regularization.weight': Label(
+    'multislice_regularization.weight': Overlay(
         'Weight:',
         'Weight of the cross-slice smoothing regularization for multislice objects '
         '(0 disables it).',
     ),
-    'multislice_regularization.unwrap_phase': Label(
+    'multislice_regularization.unwrap_phase': Overlay(
         'Unwrap Phase',
         'Whether to unwrap the phase of the object during multislice regularization',
     ),
-    'multislice_regularization.unwrap_image_grad_method': Label(
+    'multislice_regularization.unwrap_image_grad_method': Overlay(
         'Gradient Method:', 'Method for calculating the phase gradient during phase unwrapping'
     ),
-    'multislice_regularization.unwrap_image_integration_method': Label(
+    'multislice_regularization.unwrap_image_integration_method': Overlay(
         'Integration Method:',
         'Method for integrating the phase gradient during phase unwrapping',
     ),
-    'remove_object_probe_ambiguity.enabled': Label(
+    'remove_object_probe_ambiguity.enabled': Overlay(
         'Remove Object Probe Ambiguity', 'Whether to remove object-probe ambiguity'
     ),
-    'hard_limits_magnitude_phase.enabled': Label(
+    'hard_limits_magnitude_phase.enabled': Overlay(
         'Constrain Hard Limits',
         'Whether to apply hard magnitude/phase limits to the object',
     ),
-    'EnableAbs': Label('Limit Magnitude', 'Whether to apply magnitude limits'),
-    'AbsMin': Label('Magnitude Min:', 'Minimum magnitude value'),
-    'AbsMax': Label('Magnitude Max:', 'Maximum magnitude value'),
-    'EnablePhase': Label('Limit Phase', 'Whether to apply phase limits'),
-    'PhaseMinDeg': Label('Phase Min [deg]:', 'Minimum phase value in degrees'),
-    'PhaseMaxDeg': Label('Phase Max [deg]:', 'Maximum phase value in degrees'),
+    'EnableAbs': Overlay('Limit Magnitude', 'Whether to apply magnitude limits'),
+    'AbsMin': Overlay('Magnitude Min:', 'Minimum magnitude value'),
+    'AbsMax': Overlay('Magnitude Max:', 'Maximum magnitude value'),
+    'EnablePhase': Overlay('Limit Phase', 'Whether to apply phase limits'),
+    'PhaseMinDeg': Overlay('Phase Min [deg]:', 'Minimum phase value in degrees'),
+    'PhaseMaxDeg': Overlay('Phase Max [deg]:', 'Maximum phase value in degrees'),
 }
 
 
@@ -227,60 +229,60 @@ def _object_policy(extras: set[str]) -> FlatteningPolicy:
             ),
             **_stops(*_OBJECT_BRANCHES),
         },
-        labels=_OBJECT_LABELS,
+        overlays=_OBJECT_OVERLAYS,
     )
 
 
-_PROBE_LABELS: Mapping[str, Label] = {
-    'optimizable': Label('Optimize Probe', 'Whether the probe is optimizable'),
-    'optimizer': Label('Optimizer:'),
-    'step_size': Label('Step Size:', 'Optimizer step size (learning rate).'),
-    'eigenmode_update_relaxation': Label(
+_PROBE_OVERLAYS: Mapping[str, Overlay] = {
+    'optimizable': Overlay('Optimize Probe', 'Whether the probe is optimizable'),
+    'optimizer': Overlay('Optimizer:'),
+    'step_size': Overlay('Step Size:', 'Optimizer step size (learning rate).'),
+    'eigenmode_update_relaxation': Overlay(
         'Relax Eigenmode Update:', 'Separate step size (relaxation) for the eigenmode update.'
     ),
-    'power_constraint.enabled': Label('Constrain Power', 'Whether to constrain probe power'),
-    'power_constraint.scale_object': Label(
+    'power_constraint.enabled': Overlay('Constrain Power', 'Whether to constrain probe power'),
+    'power_constraint.scale_object': Overlay(
         'Scale Object',
         'Scale the object inversely when the probe power is constrained; otherwise only '
         'the probe is rescaled.',
     ),
-    'orthogonalize_incoherent_modes.enabled': Label(
+    'orthogonalize_incoherent_modes.enabled': Overlay(
         'Orthogonalize Incoherent Modes', 'Whether to orthogonalize incoherent probe modes'
     ),
-    'orthogonalize_incoherent_modes.method': Label(
+    'orthogonalize_incoherent_modes.method': Overlay(
         'Method:', 'Method to use for incoherent mode orthogonalization'
     ),
-    'orthogonalize_incoherent_modes.sort_by_occupancy': Label(
+    'orthogonalize_incoherent_modes.sort_by_occupancy': Overlay(
         'Sort By Occupancy',
         'Keep modes sorted so the highest-occupancy mode is the first shared mode.',
     ),
-    'orthogonalize_opr_modes.enabled': Label(
+    'orthogonalize_opr_modes.enabled': Overlay(
         'Orthogonalize OPR Modes', 'Whether to orthogonalize OPR modes'
     ),
-    'support_constraint.enabled': Label(
+    'support_constraint.enabled': Overlay(
         'Constrain Support',
         'When enabled, the probe will be shrinkwrapped so that small values are set to zero',
     ),
-    'support_constraint.threshold': Label(
+    'support_constraint.threshold': Overlay(
         'Threshold:',
         'Shrinkwrap threshold: probe pixels below this fraction of the blurred maximum are '
         'set to zero.',
     ),
-    'support_constraint.fixed_probe_support': Label(
+    'support_constraint.fixed_probe_support': Overlay(
         'Method:',
         'Optional fixed support mask (ellipse or rectangle) applied before shrinkwrapping.',
     ),
-    'center_constraint.enabled': Label(
+    'center_constraint.enabled': Overlay(
         'Constrain Center',
         'When enabled, the probe center of mass will be constrained to the center of the '
         'probe array',
     ),
-    'center_constraint.use_total_intensity_for_com': Label(
+    'center_constraint.use_total_intensity_for_com': Overlay(
         'Use Intensity for Mass Centroid',
         'Use the total probe intensity for the center-of-mass calculation instead of the '
         "dominant shared mode's magnitude.",
     ),
-    'center_constraint.center_modes_individually': Label(
+    'center_constraint.center_modes_individually': Overlay(
         'Center Modes Individually', 'When checked, each probe mode will be centered independently'
     ),
 }
@@ -319,78 +321,80 @@ def _probe_policy(extras: set[str]) -> FlatteningPolicy:
             # The prefix already says Center.
             'center_constraint.center_modes_individually': 'ModesIndividually',
         },
-        labels=_PROBE_LABELS,
+        overlays=_PROBE_OVERLAYS,
         structural=dict(_stops(*_PROBE_BRANCHES)),
     )
 
 
-_POSITION_LABELS: Mapping[str, Label] = {
-    'optimizable': Label('Optimize Probe Positions', 'Whether the probe positions are optimizable'),
-    'optimizer': Label('Optimizer:'),
-    'step_size': Label('Step Size:', 'Optimizer step size (learning rate).'),
-    'constrain_position_mean': Label(
+_POSITION_OVERLAYS: Mapping[str, Overlay] = {
+    'optimizable': Overlay(
+        'Optimize Probe Positions', 'Whether the probe positions are optimizable'
+    ),
+    'optimizer': Overlay('Optimizer:'),
+    'step_size': Overlay('Step Size:', 'Optimizer step size (learning rate).'),
+    'constrain_position_mean': Overlay(
         'Constrain Centroid',
         'Whether to subtract the mean from positions after updating positions',
     ),
-    'correction_options.correction_type': Label(
+    'correction_options.correction_type': Overlay(
         'Correction Type:', 'Algorithm used to calculate the position correction update'
     ),
-    'correction_options.differentiation_method': Label(
+    'correction_options.differentiation_method': Overlay(
         'Differentiation Method:',
         'Method for computing the object gradient (GRADIENT correction only); '
         'FOURIER_DIFFERENTIATION is usually fastest.',
     ),
-    'correction_options.cross_correlation_scale': Label(
+    'correction_options.cross_correlation_scale': Overlay(
         'Scale:', 'Upsampling factor of the cross-correlation in real space'
     ),
-    'correction_options.cross_correlation_real_space_width': Label(
+    'correction_options.cross_correlation_real_space_width': Overlay(
         'Real Space Width:', 'Width of the cross-correlation in real-space'
     ),
-    'correction_options.cross_correlation_probe_threshold': Label(
+    'correction_options.cross_correlation_probe_threshold': Overlay(
         'Probe Threshold:', 'Probe intensity threshold used to calculate the probe mask'
     ),
-    'correction_options.clip_update_magnitude_by_mad': Label(
+    'correction_options.clip_update_magnitude_by_mad': Overlay(
         'Clip Update Magnitude by MAD',
         'Whether to clip the update magnitude by the median absolute deviation',
     ),
-    'ChooseSliceForCorrection': Label(
+    'ChooseSliceForCorrection': Overlay(
         'Slice For Correction:',
         'Specify the object slice used for position correction; otherwise the middle slice '
         'is used.',
     ),
-    'SliceForCorrection': Label(
+    'SliceForCorrection': Overlay(
         'Slice:', 'Slice that is used for position correction (0-based index)'
     ),
-    'LimitUpdateMagnitude': Label(
+    'LimitUpdateMagnitude': Overlay(
         'Limit Update Magnitude:', 'Whether to limit the update magnitude'
     ),
-    'UpdateMagnitudeLimit': Label(
+    'UpdateMagnitudeLimit': Overlay(
         'Limit:', 'Maximum allowed magnitude of position update in each axis'
     ),
-    'affine_transform_constraint.enabled': Label(
+    'affine_transform_constraint.enabled': Overlay(
         'Constrain Affine Transform',
         'Fit an affine transform from the initial to the current positions and penalize '
         'positions that deviate from it.',
     ),
-    'affine_transform_constraint.degrees_of_freedom': Label('Degrees of Freedom:'),
-    'affine_transform_constraint.position_weight_update_interval': Label(
+    'affine_transform_constraint.degrees_of_freedom': Overlay('Degrees of Freedom:'),
+    'affine_transform_constraint.position_weight_update_interval': Overlay(
         'Weight Update Interval:', 'Number of epochs between position weight updates.'
     ),
-    'affine_transform_constraint.apply_constraint': Label(
+    'affine_transform_constraint.apply_constraint': Overlay(
         'Apply Constraint',
         'Apply the fitted transform to the positions; when off, weights are still computed '
         'for logging but positions are unchanged.',
     ),
-    'affine_transform_constraint.max_expected_error': Label(
+    'affine_transform_constraint.max_expected_error': Overlay(
         'Max Expected Error [px]:',
         'Maximum expected position error in pixels; used only to estimate friction in the '
         'affine constraint.',
     ),
-    '/OverrideAffineTransformUpdateFlexibility': Label(
+    '/OverrideAffineTransformUpdateFlexibility': Overlay(
         'Override Update Flexibility:',
         'When checked, the affine transform update flexibility will be overridden',
     ),
-    'OverrideUpdateFlexibility': Label(
+    'OverrideUpdateFlexibility': Overlay(
         'Flexibility:', 'Update flexibility value (0 = rigid, 1 = fully flexible)'
     ),
 }
@@ -427,7 +431,7 @@ def _position_policy(extras: set[str]) -> FlatteningPolicy:
             ),
             **_stops('affine_transform_constraint'),
         },
-        labels=_POSITION_LABELS,
+        overlays=_POSITION_OVERLAYS,
     )
 
 
@@ -439,37 +443,37 @@ def _position_policy(extras: set[str]) -> FlatteningPolicy:
 # A plan's Start/Stop/Stride triple carries no text. The panels render all
 # twenty-six of them as one composite row labelled 'Plan:', so that label is the
 # same everywhere and belongs to whatever draws the composite, not here.
-_OPR_LABELS: Mapping[str, Label] = {
-    'optimizable': Label(
+_OPR_OVERLAYS: Mapping[str, Overlay] = {
+    'optimizable': Overlay(
         'Orthogonal Probe Relaxation', 'Master switch for optimizing OPR mode weights.'
     ),
-    'optimizer': Label('Optimizer:'),
-    'step_size': Label('Step Size:', 'Optimizer step size (learning rate).'),
-    'optimize_eigenmode_weights': Label(
+    'optimizer': Overlay('Optimizer:'),
+    'step_size': Overlay('Step Size:', 'Optimizer step size (learning rate).'),
+    'optimize_eigenmode_weights': Overlay(
         'Optimize Eigenmode Weights',
         'Whether to optimize eigenmode weights (i.e., the weights of the second and '
         'following OPR modes)',
     ),
-    'optimize_intensity_variation': Label(
+    'optimize_intensity_variation': Overlay(
         'Optimize Intensities',
         'Whether to optimize intensity variation (i.e., the weight of the first OPR mode)',
     ),
-    'update_relaxation': Label(
+    'update_relaxation': Overlay(
         'Relax Update:', 'Separate step size (relaxation) for the OPR mode weight update.'
     ),
-    'EnablePrimaryModeWeightFloor': Label(
+    'EnablePrimaryModeWeightFloor': Overlay(
         'Primary Mode Weight Floor',
         'Clamp the weight of the primary (0th) OPR mode to a lower bound',
     ),
-    'PrimaryModeWeightFloor': Label(
+    'PrimaryModeWeightFloor': Overlay(
         'Floor:', 'Lower bound applied to the primary OPR mode weight.'
     ),
-    'smoothing.enabled': Label('Smooth OPR Mode Weights', 'Smooth the OPR mode weights'),
-    'smoothing.method': Label(
+    'smoothing.enabled': Overlay('Smooth OPR Mode Weights', 'Smooth the OPR mode weights'),
+    'smoothing.method': Overlay(
         'Smoothing Method:',
         'Method for smoothing OPR mode weights (MEDIAN filter or POLYNOMIAL fit).',
     ),
-    'smoothing.polynomial_degree': Label(
+    'smoothing.polynomial_degree': Overlay(
         'Polynomial Degree:', 'Degree of the polynomial used for smoothing OPR mode weights'
     ),
 }
@@ -493,7 +497,7 @@ def _opr_policy(extras: set[str]) -> FlatteningPolicy:
             'smoothing.method': '/SmoothingMethod',
             'smoothing.polynomial_degree': '/PolynomialSmoothingDegree',
         },
-        labels=_OPR_LABELS,
+        overlays=_OPR_OVERLAYS,
         structural={
             'primary_mode_weight_floor': OptionalGate(
                 'EnablePrimaryModeWeightFloor', 'PrimaryModeWeightFloor'
@@ -503,129 +507,129 @@ def _opr_policy(extras: set[str]) -> FlatteningPolicy:
     )
 
 
-_RECONSTRUCTOR_LABELS: Mapping[str, Label] = {
-    'num_epochs': Label('Number of Epochs:', 'Number of epochs to run'),
-    'batch_size': Label('Batch Size:', 'Number of data to process in each minibatch'),
-    'batching_mode': Label('Batch Mode:'),
-    'compact_mode_update_clustering': Label(
+_RECONSTRUCTOR_OVERLAYS: Mapping[str, Overlay] = {
+    'num_epochs': Overlay('Number of Epochs:', 'Number of epochs to run'),
+    'batch_size': Overlay('Batch Size:', 'Number of data to process in each minibatch'),
+    'batching_mode': Overlay('Batch Mode:'),
+    'compact_mode_update_clustering': Overlay(
         'Update Clustering:',
         'Number of epochs between cluster updates in COMPACT batching mode (0 disables).',
     ),
-    'use_double_precision_for_fft': Label(
+    'use_double_precision_for_fft': Overlay(
         'FFT Precision:',
         'Use double precision for critical FFT operations, overriding the compute precision.',
     ),
-    'allow_nondeterministic_algorithms': Label(
+    'allow_nondeterministic_algorithms': Overlay(
         'Allow Nondeterministic Algorithms',
         'Allow nondeterministic algorithms, which can be faster but cause larger '
         'run-to-run variation.',
     ),
-    'UseDoublePrecision': Label(
+    'UseDoublePrecision': Overlay(
         'Compute Precision:', 'Floating point precision to use for computation'
     ),
-    'EnableExcludeMeasuredPixelsBelow': Label(
+    'EnableExcludeMeasuredPixelsBelow': Overlay(
         'Exclude Measured Pixels Below',
         'When enabled, measured pixels below the threshold will be excluded',
     ),
-    'ExcludeMeasuredPixelsBelow': Label(
+    'ExcludeMeasuredPixelsBelow': Overlay(
         'Threshold:',
         'Gradients for measured pixels with intensity at or below this threshold are zeroed.',
     ),
-    'forward_model_options.low_memory_mode': Label(
+    'forward_model_options.low_memory_mode': Overlay(
         'Use Low Memory Mode',
         'When checked, forward propagation of ptychography will be done using less '
         'vectorized code. This reduces the speed, but also lowers memory usage',
     ),
-    'PadForShift': Label(
+    'PadForShift': Overlay(
         'Pad For Shift:', 'Number of pixels to pad arrays (with border values) before shifting'
     ),
-    'EnableDiffractionPatternBlur': Label(
+    'EnableDiffractionPatternBlur': Overlay(
         'Blur Diffraction Patterns',
         'When enabled, diffraction patterns will be blurred with a Gaussian kernel',
     ),
-    'DiffractionPatternBlurSigma': Label(
+    'DiffractionPatternBlurSigma': Overlay(
         'Sigma:',
         'Sigma (in pixels) of the Gaussian kernel used to blur simulated diffraction patterns.',
     ),
 }
 
-_DATA_LABELS: Mapping[str, Label] = {
-    'fft_shift': Label(
+_DATA_OVERLAYS: Mapping[str, Overlay] = {
+    'fft_shift': Overlay(
         'FFT Shift Diffraction Patterns',
         'When checked, the diffraction patterns will be FFT-shifted',
     ),
-    'save_data_on_device': Label(
+    'save_data_on_device': Overlay(
         'Save Data on Device', 'Keep the diffraction data on the compute device (e.g. GPU).'
     ),
 }
 
-_ALGORITHM_LABELS: Mapping[str, Label] = {
+_ALGORITHM_OVERLAYS: Mapping[str, Overlay] = {
     # Reconstructor-branch additions, which ptychodus files under the algorithm.
-    'loss_function': Label('Loss Function:', 'Loss function to optimize'),
-    'forward_model_class': Label('Forward Model:', 'Forward model class'),
-    'exit_wave_update_relaxation': Label(
+    'loss_function': Overlay('Loss Function:', 'Loss function to optimize'),
+    'forward_model_class': Overlay('Forward Model:', 'Forward model class'),
+    'exit_wave_update_relaxation': Overlay(
         'Exit Wave Update Relaxation:', 'Relaxation multiplier for the exit wave update'
     ),
-    'chunk_length': Label('Chunk Length:'),
-    'beta': Label('Beta:'),
-    'method': Label('BH Method:'),
-    'noise_model': Label('Noise Model:', 'Noise model to use'),
-    'gaussian_noise_std': Label(
+    'chunk_length': Overlay('Chunk Length:'),
+    'beta': Overlay('Beta:'),
+    'method': Overlay('BH Method:'),
+    'noise_model': Overlay('Noise Model:', 'Noise model to use'),
+    'gaussian_noise_std': Overlay(
         'Gaussian Noise Deviation:',
         'Standard deviation of the Gaussian noise (used only with the Gaussian noise model).',
     ),
-    'single_slice_solve_obj_prb_step_size_jointly': Label(
+    'single_slice_solve_obj_prb_step_size_jointly': Overlay(
         'Solve Object/Probe Step Size Jointly (Single Slice)',
         'When checked, object and probe step lengths are solved simultaneously in '
         'single-slice mode',
     ),
-    'multislice_solve_obj_prb_step_size_jointly': Label(
+    'multislice_solve_obj_prb_step_size_jointly': Overlay(
         'Solve Object/Probe Step Size Jointly (Multislice)',
         'When checked, object and probe step lengths are solved simultaneously in multislice mode',
     ),
-    'solve_step_sizes_only_using_first_probe_mode': Label(
+    'solve_step_sizes_only_using_first_probe_mode': Overlay(
         'Solve Step Sizes Only Using First Probe Mode',
         'When checked, the step sizes will be calculated using only the first probe mode',
     ),
-    'momentum_acceleration_gain': Label(
+    'momentum_acceleration_gain': Overlay(
         'Momentum Acceleration Gain:',
         'Gain of momentum acceleration for object and probe; 0 disables it.',
     ),
-    'AutoMomentumAccelerationGradientMixingFactor': Label(
+    'AutoMomentumAccelerationGradientMixingFactor': Overlay(
         'Use Gradient Mixing Factor',
         'Mixing factor of the current gradient into the accumulated velocity; set to 1 to '
         'reproduce PtychoShelves.',
     ),
-    'MomentumAccelerationGradientMixingFactor': Label('Mixing Factor:'),
-    'rescale_probe_intensity_in_first_epoch': Label(
+    'MomentumAccelerationGradientMixingFactor': Overlay('Mixing Factor:'),
+    'rescale_probe_intensity_in_first_epoch': Overlay(
         'Rescale Probe Intensity In First Epoch',
         'When checked, the probe intensity will be rescaled on the first epoch',
     ),
-    'preconditioning_damping_factor': Label(
+    'preconditioning_damping_factor': Overlay(
         'Preconditioning Damping Factor:', 'Damping factor for preconditioning the object update'
     ),
-    'momentum_acceleration_memory': Label(
+    'momentum_acceleration_memory': Overlay(
         'Position Momentum Memory:',
         'Number of previous epochs used to estimate friction in probe-position momentum '
         'acceleration.',
     ),
-    'AutoMomentumGradientMixingFactor': Label(
+    'AutoMomentumGradientMixingFactor': Overlay(
         'Use Position Gradient Mixing Factor',
         'Mixing factor of the current position update into the accumulated velocity; set to '
         '1 to reproduce foldslice.',
     ),
     # Branch additions other than the reconstructor's.
-    'amplitude_clamp_limit': Label(
+    'amplitude_clamp_limit': Overlay(
         'Amplitude Clamp Limit:',
         'Maximum object amplitude; larger values are clamped to this limit.',
     ),
-    'inertia': Label('Inertia:', 'Inertia of the object update; should be between 0 and 1.'),
-    'alpha': Label('Alpha:'),
-    'optimal_step_size_scaler': Label(
+    'inertia': Overlay('Inertia:', 'Inertia of the object update; should be between 0 and 1.'),
+    'alpha': Overlay('Alpha:'),
+    'optimal_step_size_scaler': Overlay(
         'Optimal Step Size Scaler:',
         'Scaler applied to the solved optimal step size for the object update.',
     ),
-    'multimodal_update': Label(
+    'multimodal_update': Overlay(
         'Multimodal Update',
         'Compute the object update direction summed over all probe modes rather than only '
         'the first mode.',
@@ -663,7 +667,7 @@ def _reconstructor_policy(extras: set[str]) -> FlatteningPolicy:
                 'EnableDiffractionPatternBlur', 'DiffractionPatternBlurSigma', fallback=1.0
             ),
         },
-        labels=_RECONSTRUCTOR_LABELS,
+        overlays=_RECONSTRUCTOR_OVERLAYS,
     )
 
 
@@ -674,7 +678,7 @@ def _data_policy() -> FlatteningPolicy:
             {'data', 'free_space_propagation_distance_m', 'wavelength_m', 'valid_pixel_mask'}
         ),
         renames={'fft_shift': 'FFTShiftDiffractionPatterns'},
-        labels=_DATA_LABELS,
+        overlays=_DATA_OVERLAYS,
     )
 
 
@@ -768,7 +772,7 @@ def _algorithm_sections(algorithm: str, options: Any) -> Sequence[OptionsSection
 
     group = _ALGORITHM_GROUPS[algorithm]
     branches: Sequence[
-        tuple[str, type, str, Mapping[str, Label], Mapping[str, StructuralAdapter]]
+        tuple[str, type, str, Mapping[str, Overlay], Mapping[str, StructuralAdapter]]
     ] = (
         (
             'reconstructor_options',
@@ -778,12 +782,12 @@ def _algorithm_sections(algorithm: str, options: Any) -> Sequence[OptionsSection
             _RECONSTRUCTOR_EXTRA_ADAPTERS,
         ),
         ('object_options', ObjectOptions, 'Object', {}, {}),
-        ('probe_options', ProbeOptions, 'Probe', _PROBE_EXTRA_LABELS, {}),
+        ('probe_options', ProbeOptions, 'Probe', _PROBE_EXTRA_OVERLAYS, {}),
         (
             'probe_position_options',
             ProbePositionOptions,
             'ProbePosition',
-            _POSITION_EXTRA_LABELS,
+            _POSITION_EXTRA_OVERLAYS,
             {
                 'momentum_acceleration_gradient_mixing_factor': OptionalGate(
                     'AutoMomentumGradientMixingFactor',
@@ -796,7 +800,7 @@ def _algorithm_sections(algorithm: str, options: Any) -> Sequence[OptionsSection
     )
     sections: list[OptionsSection] = []
 
-    for path, base, prefix, branch_labels, structural in branches:
+    for path, base, prefix, branch_overlays, structural in branches:
         root = getattr(options, path)
 
         if not _extras(root, base) - _UNSURFACED_EXTRAS:
@@ -810,7 +814,7 @@ def _algorithm_sections(algorithm: str, options: Any) -> Sequence[OptionsSection
                     base_prefix=prefix,
                     hidden=_only_extras(root, base),
                     renames=_RECONSTRUCTOR_EXTRA_NAMES if path == 'reconstructor_options' else {},
-                    labels={**_ALGORITHM_LABELS, **branch_labels},
+                    overlays={**_ALGORITHM_OVERLAYS, **branch_overlays},
                     structural=structural,
                 ),
             )
@@ -825,15 +829,15 @@ _RECONSTRUCTOR_EXTRA_NAMES: Mapping[str, str] = {
 }
 
 # 'rho' names a different quantity on each branch, so the text cannot be shared.
-_PROBE_EXTRA_LABELS: Mapping[str, Label] = {
-    'rho': Label(
+_PROBE_EXTRA_OVERLAYS: Mapping[str, Overlay] = {
+    'rho': Overlay(
         'BH Probe Rho:',
         'Scaling factor for the probe relative to the object (~1 near-field, 0.1 far-field).',
     ),
 }
 
-_POSITION_EXTRA_LABELS: Mapping[str, Label] = {
-    'rho': Label(
+_POSITION_EXTRA_OVERLAYS: Mapping[str, Overlay] = {
+    'rho': Overlay(
         'BH Probe Position Rho:',
         'Scaling factor for probe positions relative to the object (~0.1 near-field, 1 far-field).',
     ),

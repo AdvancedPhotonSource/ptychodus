@@ -14,7 +14,7 @@ import pytest
 from ptychodus.model.processing.flatten import (
     BoolEnum,
     FlatteningPolicy,
-    Label,
+    Overlay,
     OptionalGate,
     OptionalRange,
     Sentinel,
@@ -176,7 +176,7 @@ class TestFlattening:
 
 
 class TestDeclaredMetadata:
-    """Bounds, label and tool tip come from the declaration, not a sidecar."""
+    """Bounds, label and tool tip come from the declaration where it states them."""
 
     def _step_size(self) -> object:
         return next(
@@ -379,7 +379,7 @@ class TestLabels:
     def test_the_policy_supplies_text_a_declaration_lacks(self) -> None:
         policy = FlatteningPolicy(
             hidden=_ONLY_SCALARS,
-            labels={'period_x_m': Label('Period X:', 'Grid artifact period.')},
+            overlays={'period_x_m': Overlay('Period X:', 'Grid artifact period.')},
         )
         period = next(p for p in flatten_options(Options(), policy) if p.path == 'period_x_m')
         assert period.label == 'Period X:'
@@ -388,7 +388,7 @@ class TestLabels:
     def test_the_policy_wins_over_the_declaration(self) -> None:
         """A model ptychodus owns may still need different wording in the panel."""
         policy = FlatteningPolicy(
-            hidden=_ONLY_SCALARS, labels={'step_size': Label('Learning Rate:')}
+            hidden=_ONLY_SCALARS, overlays={'step_size': Overlay('Learning Rate:')}
         )
         step = next(p for p in flatten_options(Options(), policy) if p.path == 'step_size')
         assert step.label == 'Learning Rate:'
@@ -400,11 +400,65 @@ class TestLabels:
         policy = FlatteningPolicy(
             hidden=_ONLY_SCALARS,
             structural={'step_size': OptionalGate('EnableStep', 'StepSize')},
-            labels={
-                'EnableStep': Label('Limit Step Size'),
-                'StepSize': Label('Step Size Limit:'),
+            overlays={
+                'EnableStep': Overlay('Limit Step Size'),
+                'StepSize': Overlay('Step Size Limit:'),
             },
         )
         produced = {p.ini_key: p.label for p in flatten_options(Options(), policy)}
         assert produced['EnableStep'] == 'Limit Step Size'
         assert produced['StepSize'] == 'Step Size Limit:'
+
+    def test_the_policy_supplies_a_bound_a_declaration_lacks(self) -> None:
+        """Zero is the commonest bound here, so a truthiness test would drop it."""
+        policy = FlatteningPolicy(
+            hidden=_ONLY_SCALARS, overlays={'period_x_m': Overlay(minimum=0.0)}
+        )
+        period = next(p for p in flatten_options(Options(), policy) if p.path == 'period_x_m')
+        assert period.minimum == 0.0
+
+    def test_the_policy_wins_over_a_declared_bound(self) -> None:
+        """ptychodus narrows some upstream ranges; it must be able to say so."""
+        policy = FlatteningPolicy(
+            hidden=_ONLY_SCALARS, overlays={'step_size': Overlay(minimum=1.0e-12)}
+        )
+        step = next(p for p in flatten_options(Options(), policy) if p.path == 'step_size')
+        assert step.minimum == 1.0e-12
+        # Resolved one at a time, so the declared maximum is left in place.
+        assert step.maximum == 10.0
+
+    def test_an_overlay_stating_only_text_leaves_a_zero_bound_alone(self) -> None:
+        policy = FlatteningPolicy(
+            hidden=_ONLY_SCALARS, overlays={'step_size': Overlay('Learning Rate:')}
+        )
+        step = next(p for p in flatten_options(Options(), policy) if p.path == 'step_size')
+        assert step.minimum == 0.0
+
+    def test_each_adapted_key_can_be_bounded_separately(self) -> None:
+        """A switch has no range; the value beside it does."""
+        policy = FlatteningPolicy(
+            hidden=_ONLY_SCALARS,
+            structural={'step_size': OptionalGate('EnableStep', 'StepSize')},
+            overlays={'StepSize': Overlay(minimum=0.1)},
+        )
+        produced = {p.ini_key: p for p in flatten_options(Options(), policy)}
+        assert produced['StepSize'].minimum == 0.1
+        assert produced['EnableStep'].minimum is None
+
+    def test_the_policy_supplies_the_values_a_bare_string_accepts(self) -> None:
+        """A field typed as an enum needs no entry; one typed as str does."""
+        policy = FlatteningPolicy(
+            hidden=_ONLY_SCALARS,
+            overlays={'period_x_m': Overlay('Period X:', choices=('fine', 'coarse'))},
+        )
+        period = next(p for p in flatten_options(Options(), policy) if p.path == 'period_x_m')
+        assert tuple(period.choices) == ('fine', 'coarse')
+        assert period.label == 'Period X:'
+
+    def test_a_field_with_no_entry_accepts_any_value(self) -> None:
+        step = next(
+            p
+            for p in flatten_options(Options(), FlatteningPolicy(hidden=_ONLY_SCALARS))
+            if p.path == 'step_size'
+        )
+        assert tuple(step.choices) == ()
