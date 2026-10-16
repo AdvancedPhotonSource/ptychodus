@@ -51,6 +51,15 @@ class Options(BaseModel):
     l1_norm: Constraint = Constraint()
 
 
+class ExclusiveBounds(BaseModel):
+    """A field can exclude an endpoint; a ptychodus parameter's range cannot."""
+
+    above_zero: float = Field(1.0, gt=0.0)
+    beta: float = Field(0.75, gt=0.5, le=1.0)
+    below_one: float = Field(0.5, lt=1.0)
+    unbounded: float = 1.0
+
+
 @pydantic_dataclass
 class InnerDataclass:
     weight: float = 1.0
@@ -185,6 +194,32 @@ class TestDeclaredMetadata:
         step = self._step_size()
         assert step.label == 'Step Size:'  # type: ignore[attr-defined]
         assert step.tool_tip == 'Learning rate.'  # type: ignore[attr-defined]
+
+    def _exclusive(self, path: str) -> object:
+        return next(
+            p for p in flatten_options(ExclusiveBounds(), FlatteningPolicy()) if p.path == path
+        )
+
+    def test_an_exclusive_lower_bound_becomes_the_closest_inclusive_one(self) -> None:
+        """A field declared gt=0 must not admit exactly zero."""
+        field = self._exclusive('above_zero')
+        assert field.minimum > 0.0  # type: ignore[attr-defined]
+        assert field.minimum == pytest.approx(0.0, abs=1.0e-11)  # type: ignore[attr-defined]
+
+    def test_an_exclusive_upper_bound_becomes_the_closest_inclusive_one(self) -> None:
+        field = self._exclusive('below_one')
+        assert field.maximum < 1.0  # type: ignore[attr-defined]
+        assert field.maximum == pytest.approx(1.0, abs=1.0e-11)  # type: ignore[attr-defined]
+
+    def test_the_two_forms_of_a_bound_coexist_on_one_field(self) -> None:
+        """pty-chi's RAAR beta is declared gt=0.5, le=1."""
+        field = self._exclusive('beta')
+        assert field.minimum > 0.5  # type: ignore[attr-defined]
+        assert field.maximum == 1.0  # type: ignore[attr-defined]
+
+    def test_a_field_with_no_constraint_is_left_unbounded(self) -> None:
+        field = self._exclusive('unbounded')
+        assert field.minimum is None and field.maximum is None  # type: ignore[attr-defined]
 
     def test_an_unannotated_field_carries_no_metadata(self) -> None:
         period = next(

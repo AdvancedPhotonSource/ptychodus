@@ -368,11 +368,22 @@ def _walk(options: Any, policy: FlatteningPolicy, *, path: str, prefix: str) -> 
     return flat
 
 
-def _bounds(info: Any) -> tuple[Any, Any]:
-    """Read inclusive bounds off a pydantic field.
+# How far an exclusive bound is moved to become an inclusive one. A parameter
+# clamps to an inclusive range and has no way to exclude an endpoint, so a field
+# declared strictly greater than zero would otherwise admit exactly zero and
+# fail validation wherever it is used. Small enough to be indistinguishable
+# from the excluded value in use, and far below any default declared against
+# such a bound.
+_EXCLUSIVE_BOUND_OFFSET: Final = 1.0e-12
 
-    Only ``ge`` and ``le`` are mapped: ptychodus parameters clamp to an inclusive
-    range and cannot express an exclusive one.
+
+def _bounds(info: Any) -> tuple[Any, Any]:
+    """Read an inclusive bound pair off a pydantic field.
+
+    An exclusive constraint is moved inward by :data:`_EXCLUSIVE_BOUND_OFFSET`,
+    since the range a parameter clamps to includes its endpoints. A field
+    carrying both forms of a bound takes the exclusive one, which is the
+    narrower of the two.
     """
     minimum: Any = None
     maximum: Any = None
@@ -382,6 +393,14 @@ def _bounds(info: Any) -> tuple[Any, Any]:
         # common bound in this codebase and is falsy.
         lower = getattr(constraint, 'ge', None)
         upper = getattr(constraint, 'le', None)
+        above = getattr(constraint, 'gt', None)
+        below = getattr(constraint, 'lt', None)
+
+        if above is not None:
+            lower = above + _EXCLUSIVE_BOUND_OFFSET
+
+        if below is not None:
+            upper = below - _EXCLUSIVE_BOUND_OFFSET
 
         if lower is not None:
             minimum = lower
