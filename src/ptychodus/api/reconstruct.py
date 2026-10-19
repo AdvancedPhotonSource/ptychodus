@@ -8,7 +8,7 @@ the only thing it adds is where the work happens.
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, fields
 from enum import auto, Enum
 from pathlib import Path
@@ -220,6 +220,9 @@ SaveModel = Callable[[Path, Path], None]
 ApplySettingsSync = Callable[[dict[str, dict[str, str]]], None]
 """Optional handler for ('settings_sync', dict) messages the child emits."""
 
+DeviceEnvironment = Callable[[], Mapping[str, str]]
+"""() -> the environment entries restricting a child to the chosen devices."""
+
 
 class SubprocessReconstructor(TrainableReconstructor):
     """Parent-side adapter that runs any reconstructor in a fresh subprocess.
@@ -283,6 +286,10 @@ class SubprocessReconstructor(TrainableReconstructor):
         self._terminate_grace_sec = terminate_grace_sec
 
         self._loaded_model_path: Path | None = None
+        # Where the work runs, which is the spawning process's to decide and
+        # not the backend's. Replaced after construction by whatever owns the
+        # selection; until then a child sees every device this process does.
+        self.device_environment: DeviceEnvironment = dict
 
     @property
     def name(self) -> str:
@@ -306,6 +313,7 @@ class SubprocessReconstructor(TrainableReconstructor):
             self._reconstruct_entry_point,
             payload,
             terminate_grace_sec=self._terminate_grace_sec,
+            environment=self.device_environment(),
         ) as events:
             for event in events:
                 tag = event[0]
@@ -370,6 +378,7 @@ class SubprocessReconstructor(TrainableReconstructor):
             self._train_entry_point,
             payload,
             terminate_grace_sec=self._terminate_grace_sec,
+            environment=self.device_environment(),
         ) as events:
             for event in events:
                 tag = event[0]

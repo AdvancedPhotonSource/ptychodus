@@ -66,9 +66,5 @@ class TrainPayload:
     input_path: Path
     output_path: Path
 
-    # Comma-separated GPU indices, or '' to inherit. The child exports this as
-    # CUDA_VISIBLE_DEVICES before touching the CUDA runtime.
-    visible_gpu_indices: str
-
     accelerator: str
     num_workers: int

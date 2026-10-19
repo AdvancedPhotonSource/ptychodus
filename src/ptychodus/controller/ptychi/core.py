@@ -59,7 +59,6 @@ class PtyChiViewController(QWidget):
             lsqml_settings,
             raar_settings,
             model.enumerators,
-            model.device_repository,
         )
         self._object_view_controller = PtyChiObjectViewController(
             model.object_settings,

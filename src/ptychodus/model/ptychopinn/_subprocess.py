@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import csv
 import logging
-import os
 import pickle
 import tempfile
 from collections.abc import Sequence
@@ -176,18 +175,6 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
     queue.put((TAG_OUTPUT, pickle.dumps(ReconstructOutput(product=product, progress=1))))
 
 
-def _apply_visible_devices(visible_gpu_indices: str) -> None:
-    """Set CUDA_VISIBLE_DEVICES before the first CUDA call in this process.
-
-    The driver resolves CUDA_VISIBLE_DEVICES when the runtime is first touched,
-    so masking works as long as nothing has called ``torch.cuda.*`` yet. Keep
-    this the first statement of :func:`run_train`.
-    """
-    trimmed = visible_gpu_indices.strip()
-    if trimmed:
-        os.environ['CUDA_VISIBLE_DEVICES'] = trimmed
-
-
 def _latest_metrics_csv(output_path: Path) -> Path | None:
     """Return the newest Lightning CSV metrics file, or None if there is none."""
     candidates: list[tuple[int, Path]] = []
@@ -276,7 +263,6 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
     Masks the visible GPUs, then hands the already-translated settings mapping
     to the backend's public dataset-to-bundle training door.
     """
-    _apply_visible_devices(payload.visible_gpu_indices)
 
     from ptycho_torch.execution_request import ExecutionRequest
     from ptycho_torch.train import train

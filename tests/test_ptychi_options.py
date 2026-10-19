@@ -16,7 +16,6 @@ these tests also pin down that separation.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 import dataclasses
 import json
 import logging
@@ -142,26 +141,6 @@ def _make_reconstruct_input() -> ReconstructInput:
         bad_pixels=bad_pixels,
         product=product,
     )
-
-
-@pytest.fixture(scope='module', autouse=True)
-def _stub_the_device_probe() -> Iterator[None]:
-    """Skip the spawned GPU enumeration; nothing here reads the device list.
-
-    PtyChiDeviceRepository probes devices in a child process that imports
-    torch -- about 17 seconds, once per library construction, and this module
-    builds sixteen. The repository resolves the probe on its module at call
-    time, so patching the module attribute takes effect.
-
-    Module-scoped, and therefore not the function-scoped ``monkeypatch``
-    fixture: ``built_options_by_algorithm`` below is itself module-scoped and
-    would build its library before any function-scoped patch was in place.
-    """
-    from ptychodus.model.ptychi import device
-
-    with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(device, 'probe_devices_via_subprocess', lambda: ['cpu'])
-        yield
 
 
 def _make_library() -> PtyChiReconstructorLibrary:

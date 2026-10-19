@@ -8,9 +8,11 @@ already ran parent-side; the child receives a finished
 :class:`PtychographyTaskOptions`, derives pty-chi's task-data arrays from the
 ``ReconstructInput`` that travels with it, and streams outputs back.
 
-The device-probing entry point is a one-shot: it enumerates devices and
-exits. Parent-side callers spawn it via :mod:`.device` when populating
-:class:`PtyChiDeviceRepository`.
+Which device pty-chi runs on is settled here rather than parent-side, because
+this is the first process that can see one. ptychodus restricts the child to
+the devices a run selected, so asking torch what survived that restriction is
+the same question as asking what the user chose -- and a selection naming only
+the CPU leaves nothing for ``Devices.GPU`` to mean.
 """
 
 from __future__ import annotations
@@ -27,21 +29,27 @@ from .task import reconstruct_with_ptychi
 logger = logging.getLogger(__name__)
 
 
+def _resolve_default_device(options: Any) -> None:
+    """Point the options at a GPU if one is visible here, and at the CPU if not."""
+    import torch
+
+    from ptychi.api.enums import Devices
+
+    visible = (
+        torch.cuda.is_available()
+        or getattr(torch, 'xpu', None) is not None
+        and (torch.xpu.is_available())
+    )
+    device = Devices.GPU if visible else Devices.CPU
+    options.reconstructor_options.default_device = device
+    logger.info(f'Reconstructing on the {device.name}.')
+
+
 def run_reconstruct(payload: PtyChiPayload, queue: Queue[Any]) -> None:
     """Child entry point. Acquire a GPU context via PtychographyTask, stream outputs."""
+    _resolve_default_device(payload.task_options)
+
     for output in reconstruct_with_ptychi(
         payload.reconstruct_input, payload.task_options, payload.num_sync_epochs
     ):
         queue.put((TAG_OUTPUT, pickle.dumps(output)))
-
-
-def probe_device_list() -> list[str]:
-    """One-shot device enumeration for the parent-side device repository."""
-    import ptychi
-
-    return [f'{d.name} ({d.torch_device})' for d in ptychi.list_available_devices()]
-
-
-def probe_devices(_payload: Any, queue: Queue[Any]) -> None:
-    """Spawn-safe entry point that emits the device list on the queue and exits."""
-    queue.put((TAG_OUTPUT, pickle.dumps(probe_device_list())))

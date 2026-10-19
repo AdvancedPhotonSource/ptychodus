@@ -28,9 +28,9 @@ from ptychodus.model.ptychi import settings as ptychi_settings  # noqa: E402
 from ptychodus.model.ptychi.algorithms import task_options_classes  # noqa: E402
 
 # Not derived from the declaration: NumSyncEpochs chunks the epoch loop for
-# progress reporting and has no pty-chi equivalent, and UseDevices is device
-# selection. Both stay in a ptychodus-owned settings group.
-PTYCHODUS_OWNED = frozenset({'NumSyncEpochs', 'UseDevices'})
+# progress reporting and has no pty-chi equivalent, so it stays in a
+# ptychodus-owned settings group.
+PTYCHODUS_OWNED = frozenset({'NumSyncEpochs'})
 
 ALGORITHMS = sorted(task_options_classes())
 

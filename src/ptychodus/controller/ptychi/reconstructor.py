@@ -3,7 +3,6 @@ from PyQt5.QtWidgets import (
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
-    QLabel,
     QRadioButton,
     QVBoxLayout,
     QWidget,
@@ -16,7 +15,6 @@ from ...model.ptychi import (
     PtyChiAutodiffSettings,
     PtyChiBHSettings,
     PtyChiDMSettings,
-    PtyChiDeviceRepository,
     PtyChiEnumerators,
     PtyChiLSQMLSettings,
     PtyChiRAARSettings,
@@ -33,24 +31,6 @@ from ..parameters import (
 from .group_box import PtyChiCheckableGroupBoxViewController
 
 __all__ = ['PtyChiReconstructorViewController']
-
-
-class PtyChiDeviceViewController(PtyChiCheckableGroupBoxViewController):
-    def __init__(
-        self,
-        use_devices: BooleanParameter,
-        repository: PtyChiDeviceRepository,
-        *,
-        tool_tip: str = '',
-    ) -> None:
-        super().__init__(use_devices, 'Use Devices', tool_tip=tool_tip)
-        layout = QVBoxLayout()
-
-        for device in repository:
-            device_label = QLabel(device)
-            layout.addWidget(device_label)
-
-        self.get_widget().set_contents_layout(layout)
 
 
 class PtyChiPrecisionParameterViewController(ParameterViewController, Observer):
@@ -138,7 +118,6 @@ class PtyChiReconstructorViewController(ParameterViewController):
         lsqml_settings: PtyChiLSQMLSettings | None,
         raar_settings: PtyChiRAARSettings | None,
         enumerators: PtyChiEnumerators,
-        repository: PtyChiDeviceRepository,
     ) -> None:
         super().__init__()
         self._num_epochs_view_controller = SpinBoxParameterViewController(
@@ -161,9 +140,6 @@ class PtyChiReconstructorViewController(ParameterViewController):
         self._compact_mode_update_clustering_view_controller = SpinBoxParameterViewController(
             settings.compact_mode_update_clustering,
             tool_tip='Number of epochs between cluster updates in COMPACT batching mode (0 disables).',
-        )
-        self._device_view_controller = PtyChiDeviceViewController(
-            settings.use_devices, repository, tool_tip='Default device to use for computation'
         )
         self._compute_precision_view_controller = PtyChiPrecisionParameterViewController(
             settings.use_double_precision,
@@ -252,7 +228,6 @@ class PtyChiReconstructorViewController(ParameterViewController):
                 self._compact_mode_update_clustering_view_controller.get_widget(),
             )
 
-        layout.addRow(self._device_view_controller.get_widget())
         layout.addRow('Compute Precision:', self._compute_precision_view_controller.get_widget())
         layout.addRow('FFT Precision:', self._fft_precision_view_controller.get_widget())
         layout.addRow(self.allow_nondeterministic_algorithms_view_controller.get_widget())

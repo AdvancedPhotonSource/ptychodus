@@ -45,7 +45,6 @@ from ptychi.api import (
     DMProbeOptions,
     DMProbePositionOptions,
     DMReconstructorOptions,
-    Devices,
     Directions,
     Dtypes,
     EPIEOptions,
@@ -243,7 +242,6 @@ class PtyChiCommon:
             ),
             'compact_mode_update_clustering': clustering_raw > 0,
             'compact_mode_update_clustering_stride': max(1, clustering_raw),
-            'default_device': Devices.GPU if s.use_devices.get_value() else Devices.CPU,
             'default_dtype': (
                 Dtypes.FLOAT64 if s.use_double_precision.get_value() else Dtypes.FLOAT32
             ),

@@ -19,6 +19,7 @@ import pytest
 
 pytest.importorskip('ptychi')
 
+from ptychodus.api.devices import Device  # noqa: E402
 from ptychodus.api.exit_codes import ExitCode  # noqa: E402
 from ptychodus.api.object import compute_uniform_layer_spacing_m  # noqa: E402
 from ptychodus.cli import reconstruct_batch_lamni  # noqa: E402
@@ -306,44 +307,24 @@ def test_the_record_payload_is_plain_data() -> None:
 # physical devices. These pin the composition between the two.
 
 
-@pytest.mark.parametrize(
-    ('inherited', 'probed', 'expected'),
-    [
-        # Nothing inherited: the two numberings coincide.
-        (None, ['gpu (cuda:0)', 'gpu (cuda:1)'], ['0', '1']),
-        # A full mask is the identity, which is the case that hides the bug.
-        ('0,1', ['gpu (cuda:0)', 'gpu (cuda:1)'], ['0', '1']),
-        # One device allocated, and not the first: the probe still calls it cuda:0.
-        ('1', ['gpu (cuda:0)'], ['1']),
-        ('3', ['gpu (cuda:0)'], ['3']),
-        # A reordered or sparse allocation maps positionally.
-        ('2,5', ['gpu (cuda:0)', 'gpu (cuda:1)'], ['2', '5']),
-        ('5,2', ['gpu (cuda:0)', 'gpu (cuda:1)'], ['5', '2']),
-        # Whitespace is tolerated, as a hand-written allocation may carry it.
-        (' 2 , 5 ', ['gpu (cuda:0)', 'gpu (cuda:1)'], ['2', '5']),
-        # A mask of UUIDs composes the same way, because entries are copied not parsed.
-        ('GPU-abc,GPU-def', ['gpu (cuda:0)', 'gpu (cuda:1)'], ['GPU-abc', 'GPU-def']),
-        # No devices at all, however that came about.
-        ('', [], []),
-        (None, [], []),
-        # A CPU-only probe reports no cuda ordinal to map.
-        (None, ['cpu'], []),
-    ],
-)
-def test_device_ordinals_compose_with_an_inherited_mask(
-    monkeypatch: pytest.MonkeyPatch,
-    inherited: str | None,
-    probed: list[str],
-    expected: list[str],
-) -> None:
-    if inherited is None:
-        monkeypatch.delenv('CUDA_VISIBLE_DEVICES', raising=False)
-    else:
-        monkeypatch.setenv('CUDA_VISIBLE_DEVICES', inherited)
+def test_the_fanout_runs_one_worker_per_accelerator(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The CPU is a device to the shared probe, but not something to fan out across."""
+    probed = [
+        Device('cpu', 'CPU'),
+        Device('cuda:0', 'A'),
+        Device('cuda:1', 'B'),
+    ]
+    monkeypatch.setattr(reconstruct_batch_lamni, 'probe_devices', lambda: probed)
 
-    monkeypatch.setattr(reconstruct_batch_lamni, 'probe_devices_via_subprocess', lambda: probed)
+    assert [d.identifier for d in reconstruct_batch_lamni.visible_accelerators()] == [
+        'cuda:0',
+        'cuda:1',
+    ]
 
-    assert reconstruct_batch_lamni.visible_cuda_devices() == expected
+
+def test_a_cpu_only_host_fans_out_across_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(reconstruct_batch_lamni, 'probe_devices', lambda: [Device('cpu', 'CPU')])
+    assert reconstruct_batch_lamni.visible_accelerators() == []
 
 
 # --- the Python API --------------------------------------------------------------------

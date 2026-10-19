@@ -306,16 +306,6 @@ class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
             ),
             group=training_group,
         )
-        builder.add_line_edit(
-            training_settings.visible_gpu_indices,
-            'Visible GPU Indices:',
-            tool_tip=(
-                'Comma-separated CUDA device indices exposed to the training '
-                'subprocess (via CUDA_VISIBLE_DEVICES). Leave blank to inherit '
-                "ptychodus's environment."
-            ),
-            group=training_group,
-        )
         builder.add_combo_box(
             training_settings.learning_rate_scheduler,
             enumerators.get_learning_rate_schedulers(),

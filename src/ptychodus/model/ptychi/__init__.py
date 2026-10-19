@@ -1,6 +1,5 @@
 from .affine import PtyChiAffineDegreesOfFreedomBitField
 from .core import PtyChiReconstructorLibrary
-from .device import PtyChiDeviceRepository
 from .enums import PtyChiEnumerators
 from .settings import (
     PtyChiAutodiffSettings,
@@ -21,7 +20,6 @@ __all__ = [
     'PtyChiAutodiffSettings',
     'PtyChiBHSettings',
     'PtyChiDMSettings',
-    'PtyChiDeviceRepository',
     'PtyChiEnumerators',
     'PtyChiLSQMLSettings',
     'PtyChiOPRSettings',

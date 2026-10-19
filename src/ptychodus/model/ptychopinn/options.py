@@ -243,13 +243,6 @@ class TrainingOptions(_Options):
         description='Hardware to train on. "auto" prefers CUDA when a device is visible and '
         'otherwise falls back to the CPU.',
     )
-    # Removed once device selection moves to the spawn layer.
-    visible_gpu_indices: str = Field(
-        '',
-        title='Visible GPU Indices:',
-        description='Comma-separated CUDA device indices exposed to the training subprocess '
-        '(via CUDA_VISIBLE_DEVICES).',
-    )
     learning_rate_scheduler: LearningRateScheduler = Field(
         LearningRateScheduler.DEFAULT, title='Learning Rate Scheduler:'
     )

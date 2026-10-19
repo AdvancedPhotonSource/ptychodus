@@ -59,8 +59,6 @@ def reconstruct_scan(payload: dict[str, Any], queue: Queue[Any]) -> None:
     back to the parent, which counts the scan as failed and, under
     ``misc.continue_on_error``, carries on with the rest.
     """
-    os.environ['CUDA_VISIBLE_DEVICES'] = payload['cuda_visible_devices']
-
     for name in _RANK_ENVIRONMENT_VARIABLES:
         os.environ.pop(name, None)
 

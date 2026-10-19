@@ -265,7 +265,6 @@ def build_reconstructor(
             ),
             input_path=input_path,
             output_path=output_path,
-            visible_gpu_indices=training_settings.visible_gpu_indices.get_value(),
             accelerator=training_settings.accelerator.get_value(),
             num_workers=training_settings.num_dataloader_workers.get_value(),
         )

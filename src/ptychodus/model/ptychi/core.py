@@ -14,7 +14,6 @@ from ptychodus.api.reconstruct import (
 from ptychodus.api.settings import SettingsRegistry
 
 from ._names import DISPLAY_NAMES
-from .device import PtyChiDeviceRepository
 from .enums import PtyChiEnumerators
 from .settings import (
     PtyChiAutodiffSettings,
@@ -58,9 +57,6 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
         self.settings = PtyChiSettings(settings_registry)
 
         self.enumerators = PtyChiEnumerators()
-        self.device_repository = PtyChiDeviceRepository(
-            is_developer_mode_enabled=is_developer_mode_enabled
-        )
         self.reconstructor_list: list[Reconstructor] = list()
         self._algorithms: dict[str, PtyChiAlgorithm[Any]] | None = None
 

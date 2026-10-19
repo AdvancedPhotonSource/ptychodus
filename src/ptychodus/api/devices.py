@@ -11,6 +11,12 @@ CUDA, ROCm and XPU, and torch presents the first two through the same interface.
 The identifier carries the family, which is what decides the variable its
 runtime reads.
 
+**The CPU is a device in this list.** Choosing where to run and choosing whether
+to use an accelerator at all are the same question asked once, so a selection
+naming only the CPU masks every accelerator away and a backend that asks its
+framework what it can see finds nothing. That is what lets a backend hold no
+device option of its own.
+
 **Restriction is a mask over a mask.** A probe inherits whatever mask the parent
 was launched under, so the ordinals it reports are positions *within* that mask:
 started under ``CUDA_VISIBLE_DEVICES=1``, it sees one device and calls it zero.
@@ -33,7 +39,9 @@ import pickle
 from .spawn import ChildError, run_subprocess
 
 __all__ = [
+    'CPU',
     'Device',
+    'enumerate_devices',
     'probe_devices',
     'visibility_environment',
 ]
@@ -56,22 +64,34 @@ class Device:
     name: str
 
 
-# Identifier family -> the variable its runtime reads to decide which devices
-# exist. torch exposes ROCm through its CUDA interface, so the two present
-# identically and are told apart by the build rather than by the API; the probe
-# resolves that once and spells the difference into the identifier.
-_VISIBILITY_VARIABLES: Final[Mapping[str, str]] = {
-    'cuda': 'CUDA_VISIBLE_DEVICES',
-    'rocm': 'HIP_VISIBLE_DEVICES',
-    'xpu': 'ZE_AFFINITY_MASK',
-}
+# Always present, and the only way a selection says 'no accelerator'.
+CPU = Device('cpu', 'CPU')
 
 
-def _enumerate_devices() -> list[Device]:
-    """Return the devices torch can see. Runs in a child: this imports torch."""
-    import torch
+def enumerate_devices() -> list[Device]:
+    """Return the devices torch can see, **by asking it in this process**.
 
-    devices: list[Device] = []
+    Importing torch and querying it may leave this process holding a GPU
+    context, which is fatal to a long-lived parent: it pins driver state and
+    memory, and a child spawned afterwards can fail to initialize. Call this
+    only from a process that is about to exit anyway, such as a one-shot
+    diagnostic or a child spawned for the purpose. Everywhere else, and in
+    particular anywhere the GUI can reach, call :func:`probe_devices`.
+
+    Shared so that what counts as a device, and how it is named, is decided in
+    one place: the family spelled into an identifier is resolved here, where
+    the torch build can be inspected.
+
+    torch is an optional dependency, and its absence is an answer rather than a
+    failure: a machine without it has exactly one device, and saying so keeps a
+    bare install able to express where a run should go.
+    """
+    devices: list[Device] = [CPU]
+
+    try:
+        import torch
+    except ImportError:
+        return devices
 
     if torch.cuda.is_available():
         family = 'rocm' if torch.version.hip else 'cuda'
@@ -90,18 +110,21 @@ def _enumerate_devices() -> list[Device]:
 
 def _probe_devices_child(_payload: Any, queue: Queue[Any]) -> None:
     """Child entry point: enumerate devices, put them on the queue, exit."""
-    queue.put((_PROBE_TAG, pickle.dumps(_enumerate_devices())))
+    queue.put((_PROBE_TAG, pickle.dumps(enumerate_devices())))
 
 
 def probe_devices(*, terminate_grace_sec: float = 5.0) -> Sequence[Device]:
     """Return the devices a child spawned from this process would see.
 
-    Asked in a throwaway child, because asking it here would leave a GPU
-    context in a process that must never hold one -- and a child spawned from a
-    process holding one is a known source of initialization failures.
+    Asked in a throwaway child running :func:`enumerate_devices`, because
+    asking it here would leave a GPU context in a process that must never hold
+    one -- and a child spawned from a process holding one is a known source of
+    initialization failures.
 
-    Every failure is non-fatal and yields an empty sequence: a broken GPU stack
-    should cost a user the device list, not the application.
+    Always reports at least the CPU, so a selection can still say where a run
+    should go. Every failure is non-fatal: a broken GPU stack should cost a
+    user the accelerators it could not enumerate, not the application, and not
+    the one device that is there whatever happens.
     """
     try:
         with run_subprocess(_PROBE_ENTRY, None, terminate_grace_sec=terminate_grace_sec) as events:
@@ -116,31 +139,47 @@ def probe_devices(*, terminate_grace_sec: float = 5.0) -> Sequence[Device]:
     except Exception:
         logger.exception('Device probe subprocess raised in the parent.')
 
-    return []
+    return [CPU]
 
 
 def visibility_environment(
-    identifiers: Sequence[str], *, environ: Mapping[str, str] | None = None
+    selected: Sequence[str],
+    available: Sequence[str] = (),
+    *,
+    environ: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
-    """Return the environment entries that restrict a child to *identifiers*.
+    """Return the environment entries that restrict a child to *selected*.
 
     Empty when nothing is selected, which leaves the child seeing whatever this
-    process does. An identifier naming a family with no mask of its own, or one
-    this process cannot reach, contributes nothing rather than raising: a
-    selection outlives the hardware it was made against.
+    process does.
+
+    *available* is every identifier the probe reported. A family that appears
+    there and is named by nothing in *selected* is masked to empty, so that
+    selecting the CPU hides the accelerators rather than silently leaving them
+    in reach. Only families that were actually probed are touched: writing a
+    mask for a runtime this machine does not have risks hiding the one it does,
+    since HIP reads CUDA's variable as well as its own.
+
+    An identifier this process cannot reach contributes nothing rather than
+    raising -- a selection outlives the hardware it was made against.
     """
+    if not selected:
+        return {}
+
     environ = os.environ if environ is None else environ
-    selected: dict[str, list[str]] = {}
+    entries: dict[str, list[str]] = {
+        variable: []
+        for variable in (_maskable_family(i) for i in (*available, *selected))
+        if variable is not None
+    }
 
-    for identifier in identifiers:
-        family, _, ordinal = identifier.partition(':')
+    for identifier in selected:
+        variable = _maskable_family(identifier)
 
-        try:
-            variable = _VISIBILITY_VARIABLES[family]
-        except KeyError:
-            logger.debug(f'Device "{identifier}" names no maskable family; ignored.')
+        if variable is None:
             continue
 
+        _, _, ordinal = identifier.partition(':')
         entry = _resolve_through_inherited_mask(ordinal, environ.get(variable, ''))
 
         if entry is None:
@@ -150,9 +189,26 @@ def visibility_environment(
             )
             continue
 
-        selected.setdefault(variable, []).append(entry)
+        entries[variable].append(entry)
 
-    return {variable: ','.join(entries) for variable, entries in selected.items()}
+    return {variable: ','.join(values) for variable, values in entries.items()}
+
+
+def _maskable_family(identifier: str) -> str | None:
+    """Return the variable that hides or reveals *identifier*, if anything does.
+
+    torch exposes ROCm through its CUDA interface, so the two present
+    identically and are told apart by the build rather than by the API; the
+    probe resolves that once and spells the difference into the identifier.
+    Nothing hides a CPU, which is why it maps to no variable at all.
+    """
+    variables: Final[Mapping[str, str]] = {
+        'cuda': 'CUDA_VISIBLE_DEVICES',
+        'rocm': 'HIP_VISIBLE_DEVICES',
+        'xpu': 'ZE_AFFINITY_MASK',
+    }
+    family, _, _ = identifier.partition(':')
+    return variables.get(family)
 
 
 def _resolve_through_inherited_mask(ordinal: str, inherited_mask: str) -> str | None:

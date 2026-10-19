@@ -98,7 +98,6 @@ def test_train_hands_the_public_door_a_settings_mapping() -> None:
         settings={'mode': 'Unsupervised', 'epochs': 3},
         input_path=Path('/unused/input'),
         output_path=Path('/unused/output'),
-        visible_gpu_indices='',
         accelerator='cpu',
         num_workers=2,
     )

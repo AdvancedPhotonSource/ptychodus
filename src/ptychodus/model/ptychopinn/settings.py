@@ -142,9 +142,6 @@ class PtychoPINNTrainingSettings(Observable, Observer):
         )
 
         self.accelerator = self._group.create_string_parameter('accelerator', 'auto')
-        # Comma-separated CUDA device indices to expose to the training subprocess
-        # via CUDA_VISIBLE_DEVICES, or empty to inherit the parent's setting.
-        self.visible_gpu_indices = self._group.create_string_parameter('visible_gpu_indices', '')
         self.learning_rate_scheduler = self._group.create_string_parameter(
             'learning_rate_scheduler', 'Default'
         )

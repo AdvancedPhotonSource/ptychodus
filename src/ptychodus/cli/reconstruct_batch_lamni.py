@@ -69,11 +69,10 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import queue
-import re
 import sys
 import threading
+from collections.abc import Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -113,8 +112,8 @@ from ptychodus.cli._reconstruct_common import (
     load_ptychi_options,
     resolve_crop_region,
 )
+from ptychodus.api.devices import CPU, Device, probe_devices, visibility_environment
 from ptychodus.api.spawn import ChildError, run_subprocess
-from ptychodus.model.ptychi.device import probe_devices_via_subprocess
 from ptychodus.model.ptychi.task import dump_task_options
 from ptychodus.plugins.aps31id_lamni._scan_table import (
     APS31IDEScanRecord,
@@ -144,7 +143,7 @@ __all__ = [
     'plan_batch_lamni',
     'reconstruct_batch_lamni',
     'report_plan',
-    'visible_cuda_devices',
+    'visible_accelerators',
 ]
 
 logger = logging.getLogger('reconstruct_batch_lamni')
@@ -153,46 +152,15 @@ DIFFRACTION_READER = 'APS_LamNI'
 
 _WORKER_ENTRY = 'ptychodus.cli._batch_lamni_worker:reconstruct_scan'
 
-# ``ptychi.list_available_devices()`` reports e.g. 'NVIDIA A100 80GB (cuda:3)'.
-_CUDA_DEVICE_PATTERN = re.compile(r'cuda:(\d+)')
 
+def visible_accelerators() -> list[Device]:
+    """The accelerators this run may fan out across, one worker each.
 
-def visible_cuda_devices() -> list[str]:
-    """The CUDA devices this run may use, as values for ``CUDA_VISIBLE_DEVICES``.
-
-    Probed in a throwaway child, because asking the question in this process would leave a
-    CUDA context behind, and a spawned child of a process holding one is a known source of
-    initialization failures.
-
-    The two sides of that mask count differently, which is the whole difficulty here. The
-    probe inherits this process's ``CUDA_VISIBLE_DEVICES``, so the ordinals it reports are
-    positions *within* that mask: under ``CUDA_VISIBLE_DEVICES=1`` it reports one device
-    and calls it ``cuda:0``. But the value a worker sets is read against the physical
-    devices, so handing it that ``0`` would send it to the GPU the scheduler did not give
-    us -- quite possibly one already running someone else's job. The probe's ordinals are
-    therefore indices back into the inherited list, and what each worker is handed is the
-    entry found there. With nothing inherited the two numberings coincide and the ordinal
-    is passed through. Entries are copied verbatim rather than parsed, so a mask written
-    as GPU UUIDs composes the same way.
+    Probed in a throwaway child by the shared device layer, which also owns the
+    arithmetic that makes an inherited mask compose correctly. Empty when the
+    process was given none, which the caller turns into a single CPU worker.
     """
-    ordinals: list[int] = list()
-
-    for description in probe_devices_via_subprocess():
-        match = _CUDA_DEVICE_PATTERN.search(description)
-
-        if match is not None:
-            ordinals.append(int(match.group(1)))
-
-    inherited = [
-        entry.strip()
-        for entry in os.environ.get('CUDA_VISIBLE_DEVICES', '').split(',')
-        if entry.strip()
-    ]
-
-    if not inherited:
-        return [str(ordinal) for ordinal in ordinals]
-
-    return [inherited[ordinal] for ordinal in ordinals if ordinal < len(inherited)]
+    return [device for device in probe_devices() if device != CPU]
 
 
 @dataclass(frozen=True)
@@ -238,7 +206,7 @@ class _Tally:
 def _worker_loop(
     settings: BatchSettings,
     work: queue.Queue[tuple[int, APS31IDEScanRecord]],
-    device: str,
+    environment: Mapping[str, str],
     *,
     settings_text: str,
     options_json: str | None,
@@ -249,7 +217,8 @@ def _worker_loop(
 ) -> None:
     """Take scans off the shared queue until it empties or the run is cancelled.
 
-    One of these runs per device, in a thread. Each spawns a worker process per scan and
+    One of these runs per device, in a thread. Each spawns a worker process per scan,
+    restricted to that device by the environment the spawn layer applies, and
     waits on its events; the thread never does work of its own, so a thread apiece costs
     nothing against the reconstruction it is waiting for.
 
@@ -264,9 +233,8 @@ def _worker_loop(
             return
 
         position = f'[{index}/{num_selected}]'
-        device_name = f'cuda:{device}' if device else 'cpu'
+        device_name = ', '.join(f'{k}={v}' for k, v in environment.items()) or 'inherited'
         payload: dict[str, object] = {
-            'cuda_visible_devices': device,
             'settings_text': settings_text,
             'ptychi_options_json': options_json,
             'scan': record_payload(record),
@@ -277,7 +245,7 @@ def _worker_loop(
         completed = False
 
         try:
-            with run_subprocess(_WORKER_ENTRY, payload) as events:
+            with run_subprocess(_WORKER_ENTRY, payload, environment=environment) as events:
                 for event in events:
                     if event[0] == 'output':
                         completed = bool(event[1].get('completed'))
@@ -522,31 +490,35 @@ def reconstruct_batch_lamni(
 
     tally = _Tally()
     work = _queue_pending_scans(settings, selected, tally)
-    devices = visible_cuda_devices()
+    accelerators = visible_accelerators()
+    available = [device.identifier for device in probe_devices()]
 
-    if devices:
+    if accelerators:
         logger.info(
-            'Reconstructing %d scan(s) across %d CUDA device(s): %s',
+            'Reconstructing %d scan(s) across %d device(s): %s',
             work.qsize(),
-            len(devices),
-            ', '.join(f'cuda:{device}' for device in devices),
+            len(accelerators),
+            ', '.join(device.identifier for device in accelerators),
         )
+        environments = [
+            visibility_environment([device.identifier], available) for device in accelerators
+        ]
     else:
-        # One worker, inheriting an empty CUDA_VISIBLE_DEVICES, so a device this process
-        # could not see is not found by the child either.
         logger.warning(
-            'No CUDA devices are visible. Reconstructing %d scan(s) one at a time on the '
+            'No accelerators are visible. Reconstructing %d scan(s) one at a time on the '
             'CPU, which will be very slow. Set CUDA_VISIBLE_DEVICES, or ask the job '
             'scheduler for GPUs.',
             work.qsize(),
         )
-        devices = ['']
+        # One worker, inheriting whatever this process has, so a device it could
+        # not see is not found by the child either.
+        environments = [{}]
 
     options_json = None if options is None else dump_task_options(options)
     futures: list[Future[None]] = list()
 
-    with ThreadPoolExecutor(max_workers=len(devices)) as pool:
-        for device in devices:
+    with ThreadPoolExecutor(max_workers=len(environments)) as pool:
+        for device in environments:
             futures.append(
                 pool.submit(
                     _worker_loop,

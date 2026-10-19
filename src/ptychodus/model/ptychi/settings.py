@@ -24,7 +24,6 @@ class PtyChiSettings(Observable, Observer):
         self.compact_mode_update_clustering = self._group.create_integer_parameter(
             'CompactModeUpdateClustering', 0, minimum=0
         )
-        self.use_devices = self._group.create_boolean_parameter('UseDevices', True)
         self.use_double_precision = self._group.create_boolean_parameter(
             'UseDoublePrecision', False
         )
