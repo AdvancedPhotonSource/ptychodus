@@ -250,11 +250,6 @@ class Overlay:
     choices: Sequence[str] = ()
 
 
-# What a key with no entry resolves to, so that every field falls through to
-# the declaration without the common case allocating a record.
-_NOTHING_STATED: Final = Overlay()
-
-
 @dataclass(frozen=True)
 class FlatParameter:
     """One persisted key, and where in the declared model its value comes from.
@@ -382,23 +377,17 @@ def _walk(options: Any, policy: FlatteningPolicy, *, path: str, prefix: str) -> 
     return flat
 
 
-# How far an exclusive bound is moved to become an inclusive one. A parameter
-# clamps to an inclusive range and has no way to exclude an endpoint, so a field
-# declared strictly greater than zero would otherwise admit exactly zero and
-# fail validation wherever it is used. Small enough to be indistinguishable
-# from the excluded value in use, and far below any default declared against
-# such a bound.
-_EXCLUSIVE_BOUND_OFFSET: Final = 1.0e-12
-
-
 def _bounds(info: Any) -> tuple[Any, Any]:
     """Read an inclusive bound pair off a pydantic field.
 
-    An exclusive constraint is moved inward by :data:`_EXCLUSIVE_BOUND_OFFSET`,
-    since the range a parameter clamps to includes its endpoints. A field
-    carrying both forms of a bound takes the exclusive one, which is the
-    narrower of the two.
+    An exclusive constraint is moved inward, since the range a parameter clamps
+    to includes its endpoints: a field declared strictly greater than zero
+    would otherwise admit exactly zero and fail validation wherever it is used.
+    The offset is small enough to be indistinguishable from the excluded value
+    in use, and far below any default declared against such a bound. A field
+    carrying both forms of a bound takes the exclusive one, the narrower.
     """
+    exclusive_offset: Final = 1.0e-12
     minimum: Any = None
     maximum: Any = None
 
@@ -411,10 +400,10 @@ def _bounds(info: Any) -> tuple[Any, Any]:
         below = getattr(constraint, 'lt', None)
 
         if above is not None:
-            lower = above + _EXCLUSIVE_BOUND_OFFSET
+            lower = above + exclusive_offset
 
         if below is not None:
-            upper = below - _EXCLUSIVE_BOUND_OFFSET
+            upper = below - exclusive_offset
 
         if lower is not None:
             minimum = lower
@@ -454,7 +443,9 @@ def _leaf(
     # and their own bounds, so its suffix is looked up before the field's path.
     # The whole record wins; an entry under a suffix is not merged with one
     # under the path.
-    overlay = policy.overlays.get(role) or policy.overlays.get(path) or _NOTHING_STATED
+    # An absent entry resolves to a record with every field unset, so each one
+    # falls through to the declaration.
+    overlay = policy.overlays.get(role) or policy.overlays.get(path) or Overlay()
     return FlatParameter(
         ini_key=key,
         path=path,
