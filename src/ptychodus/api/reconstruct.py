@@ -201,6 +201,9 @@ SaveModel = Callable[[Path, Path], None]
 ApplySettingsSync = Callable[[dict[str, dict[str, str]]], None]
 """Optional handler for ('settings_sync', dict) messages the child emits."""
 
+DefaultOptions = Callable[[], BaseModel]
+"""() -> a fresh object describing what this backend accepts, at its defaults."""
+
 DeviceEnvironment = Callable[[], Mapping[str, str]]
 """() -> the environment entries restricting a child to the chosen devices."""
 
@@ -238,6 +241,7 @@ class SubprocessReconstructor(TrainableReconstructor):
         name: str,
         reconstruct_entry_point: str,
         build_reconstruct_payload: BuildReconstructPayload,
+        default_options: DefaultOptions = NoOptions,
         is_trainable: bool = False,
         train_entry_point: str | None = None,
         build_train_payload: BuildTrainPayload | None = None,
@@ -253,6 +257,7 @@ class SubprocessReconstructor(TrainableReconstructor):
         self._name = name
         self._reconstruct_entry_point = reconstruct_entry_point
         self._build_reconstruct_payload = build_reconstruct_payload
+        self._default_options = default_options
         self._is_trainable = is_trainable
         self._train_entry_point = train_entry_point
         self._build_train_payload = build_train_payload
@@ -277,6 +282,11 @@ class SubprocessReconstructor(TrainableReconstructor):
     @property
     def is_trainable(self) -> bool:
         return self._is_trainable
+
+    def get_default_options(self) -> BaseModel:
+        # A fresh object per call, so a caller editing what it was handed
+        # cannot change what the next caller is handed.
+        return self._default_options()
 
     def reconstruct(
         self, input_: ReconstructInput, *, options: BaseModel

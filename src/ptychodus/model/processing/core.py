@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 
 from ptychodus.api.reconstruct import ReconstructorLibrary, SubprocessReconstructor
 from ptychodus.api.settings import SettingsRegistry
@@ -6,10 +6,20 @@ from ptychodus.api.settings import SettingsRegistry
 from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .api import ProcessingAPI, ProcessingAlgorithmParameter
+from . import _ptycho_fm_sections
 from .devices import DeviceSelection
 from .monitor import ProcessingTaskMonitor
-from .parameter_store import ProcessingParameterStore
+from .parameter_store import OptionsSection, ProcessingParameterStore
 from .settings import ProcessingSettings
+
+
+# Which settings groups back which backend. **Transitional**, with the flat
+# layout it serves: a backend states what it accepts, and this says where each
+# option is persisted until the Qt panels stop needing a flat one. A backend
+# absent here registers no groups and runs on its declared defaults.
+_SECTIONS_BY_LIBRARY: Mapping[str, Callable[[], Sequence[OptionsSection]]] = {
+    'PtychoFM': _ptycho_fm_sections.sections,
+}
 
 
 class ProcessingCore:
@@ -35,6 +45,7 @@ class ProcessingCore:
                 self.parameter_store.register(
                     ProcessingAlgorithmParameter.generate_key(library.name, reconstructor.name),
                     reconstructor,
+                    _SECTIONS_BY_LIBRARY.get(library.name, lambda: ())(),
                 )
 
                 # Placement is ptychodus's to decide, so it is attached here

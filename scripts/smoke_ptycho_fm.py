@@ -35,7 +35,6 @@ from ptychodus.api.reconstruct import (
     TAG_TRAIN_OUTPUT,
     ReconstructInput,
 )
-from ptychodus.api.settings import SettingsRegistry
 from ptychodus.plugins.ptycho_fm._payload import ReconstructPayload, TrainPayload
 from ptychodus.plugins.ptycho_fm._subprocess import (
     _build_criterion,
@@ -44,12 +43,7 @@ from ptychodus.plugins.ptycho_fm._subprocess import (
     run_train,
 )
 from ptychodus.plugins.ptycho_fm.reconstructor import _build_config, build_reconstructor
-from ptychodus.plugins.ptycho_fm.settings import (
-    PtychoFMDataSettings,
-    PtychoFMInferenceSettings,
-    PtychoFMModelSettings,
-    PtychoFMTrainingSettings,
-)
+from ptychodus.plugins.ptycho_fm.options import PtychoFMOptions, default_options
 
 # Small enough to train in seconds. The decoder upsamples the token grid by
 # 2**num_stages, so (img_size / patch_size) * 2**num_stages must come back to
@@ -61,36 +55,33 @@ N_PATTERNS = 12
 OBJECT_SIZE = 96
 
 
-def _settings() -> tuple[Any, Any, Any, Any]:
-    registry = SettingsRegistry()
-    data = PtychoFMDataSettings(registry)
-    model = PtychoFMModelSettings(registry)
-    training = PtychoFMTrainingSettings(registry)
-    inference = PtychoFMInferenceSettings(registry)
+def _options() -> PtychoFMOptions:
+    options = default_options()
 
-    model.img_size.set_value(IMG_SIZE)
-    model.patch_size.set_value(PATCH_SIZE)
-    model.embed_dim.set_value(64)
-    model.depth.set_value(2)
-    model.num_heads.set_value(2)
-    model.decoder_base_channels.set_value(8)
-    model.decoder_latent_dim.set_value(64)
-    model.decoder_num_stages.set_value(NUM_STAGES)
+    options.model.encoder.img_size = IMG_SIZE
+    options.model.encoder.patch_size = PATCH_SIZE
+    options.model.encoder.embed_dim = 64
+    options.model.encoder.depth = 2
+    options.model.encoder.num_heads = 2
+    options.model.decoder.base_channels = 8
+    options.model.decoder.latent_dim = 64
+    options.model.decoder.num_stages = NUM_STAGES
     # Pinned so the baseline phases cover the uncoupled path; the mode sweep
-    # below is the only place that varies it.
-    model.coupled_decoder_mode.set_value('none')
+    # below is the only place that varies it. None is how the declaration
+    # spells it; the settings file spells the same thing 'none'.
+    options.model.coupled_decoder_mode = None
 
-    data.max_probe_modes.set_value(2)
-    data.num_workers.set_value(0)
+    options.data.max_probe_modes = 2
+    options.data.num_workers = 0
 
-    training.epochs.set_value(2)
-    training.batch_size.set_value(4)
-    training.loss_function.set_value('mse')
+    options.training.epochs = 2
+    options.training.batch_size = 4
+    options.training.loss_function = 'mse'
 
-    inference.batch_size.set_value(4)
-    inference.central_crop.set_value(8)
-    inference.pad.set_value(4)
-    return data, model, training, inference
+    options.inference.batch_size = 4
+    options.inference.central_crop = 8
+    options.inference.pad = 4
+    return options
 
 
 def _product(pattern_size: int) -> Product:
@@ -156,43 +147,39 @@ def _drain(q: queue.Queue[Any]) -> list[Any]:
     return events
 
 
-def check_export_validation(data: Any, model: Any, training: Any, inference: Any) -> None:
+def check_export_validation(options: PtychoFMOptions) -> None:
     """The exporter must refuse a product whose patterns are not img_size square."""
-    reconstructor = build_reconstructor('Supervised', data, model, inference, training)
+    reconstructor = build_reconstructor('Supervised')
 
     with tempfile.TemporaryDirectory() as tmp:
         stem = Path(tmp) / 'scan'
         try:
             reconstructor.export_training_data(
-                stem, _reconstruct_input(IMG_SIZE // 2), options=reconstructor.get_default_options()
+                stem, _reconstruct_input(IMG_SIZE // 2), options=options
             )
         except ValueError as exc:
             print(f'  [ok] export rejected undersized patterns: {exc}')
         else:
             raise AssertionError('export_training_data accepted a wrongly-sized product')
 
-        reconstructor.export_training_data(
-            stem, _reconstruct_input(IMG_SIZE), options=reconstructor.get_default_options()
-        )
+        reconstructor.export_training_data(stem, _reconstruct_input(IMG_SIZE), options=options)
         produced = sorted(p.name for p in Path(tmp).iterdir())
         assert produced == ['scan_dp.hdf5', 'scan_para.hdf5'], produced
         print(f'  [ok] export wrote {produced}')
 
 
-def run_training(
-    mode: str, data: Any, model: Any, training: Any, inference: Any, out_dir: Path
-) -> tuple[Path, list[float]]:
-    reconstructor = build_reconstructor(mode, data, model, inference, training)
+def run_training(mode: str, options: PtychoFMOptions, out_dir: Path) -> tuple[Path, list[float]]:
+    reconstructor = build_reconstructor(mode)
     in_dir = out_dir / 'input'
     in_dir.mkdir(parents=True, exist_ok=True)
     reconstructor.export_training_data(
-        in_dir / 'scan', _reconstruct_input(IMG_SIZE), options=reconstructor.get_default_options()
+        in_dir / 'scan', _reconstruct_input(IMG_SIZE), options=options
     )
 
     model_dir = out_dir / 'output'
     payload = TrainPayload(
         name=mode,
-        config=_build_config(mode, data, model, training, inference),
+        config=_build_config(mode, options),
         input_path=in_dir,
         output_path=model_dir,
     )
@@ -212,11 +199,11 @@ def run_training(
     return Path(saved[0]), losses
 
 
-def run_inference(checkpoint: Path, data: Any, model: Any, training: Any, inference: Any) -> None:
+def run_inference(checkpoint: Path, options: PtychoFMOptions) -> None:
     parameters = _reconstruct_input(IMG_SIZE)
     payload = ReconstructPayload(
         name='Supervised',
-        config=_build_config('Supervised', data, model, training, inference),
+        config=_build_config('Supervised', options),
         model_path=checkpoint,
         reconstruct_input=parameters,
     )
@@ -238,50 +225,48 @@ def run_inference(checkpoint: Path, data: Any, model: Any, training: Any, infere
     )
 
 
-def check_coupled_decoder_modes(data: Any, model: Any, training: Any, inference: Any) -> None:
+def check_coupled_decoder_modes(options: PtychoFMOptions) -> None:
     """Train and infer under each decoder mode, and prove the mode is honoured.
 
     An inference-only model ignores the probe entirely, so a mode that silently
     collapsed to the uncoupled class would still produce a plausible object.
     Differing loss traces are what rules that out.
     """
-    training.loss_function.set_value('mse')
-    original_mode = model.coupled_decoder_mode.get_value()
+    options.training.loss_function = 'mse'
+    original_mode = options.model.coupled_decoder_mode
     losses_by_mode: dict[str, list[float]] = {}
 
     for coupled_decoder_mode in ('none', 'real_imag', 'amp_phase'):
-        model.coupled_decoder_mode.set_value(coupled_decoder_mode)
+        options.model.coupled_decoder_mode = coupled_decoder_mode
 
         with tempfile.TemporaryDirectory() as tmp:
             checkpoint, losses = run_training(
-                'Unsupervised', data, model, training, inference, Path(tmp) / coupled_decoder_mode
+                'Unsupervised', options, Path(tmp) / coupled_decoder_mode
             )
             losses_by_mode[coupled_decoder_mode] = losses
-            run_inference(checkpoint, data, model, training, inference)
+            run_inference(checkpoint, options)
 
     distinct = {tuple(losses) for losses in losses_by_mode.values()}
     assert len(distinct) == len(losses_by_mode), (
         f'decoder modes produced identical losses ({losses_by_mode}); the mode is not honoured'
     )
     print('  [ok] the three decoder modes optimize distinct architectures')
-    model.coupled_decoder_mode.set_value(original_mode)
+    options.model.coupled_decoder_mode = original_mode
 
 
-def check_mode_mismatch_is_reported(data: Any, model: Any, training: Any, inference: Any) -> None:
+def check_mode_mismatch_is_reported(options: PtychoFMOptions) -> None:
     """A checkpoint loaded under the wrong mode must name the mode, not the keys."""
-    training.loss_function.set_value('mse')
-    original_mode = model.coupled_decoder_mode.get_value()
-    model.coupled_decoder_mode.set_value('amp_phase')
+    options.training.loss_function = 'mse'
+    original_mode = options.model.coupled_decoder_mode
+    options.model.coupled_decoder_mode = 'amp_phase'
 
     with tempfile.TemporaryDirectory() as tmp:
-        checkpoint, _ = run_training(
-            'Unsupervised', data, model, training, inference, Path(tmp) / 'mismatch'
-        )
+        checkpoint, _ = run_training('Unsupervised', options, Path(tmp) / 'mismatch')
 
-        model.coupled_decoder_mode.set_value('none')
+        options.model.coupled_decoder_mode = None
         payload = ReconstructPayload(
             name='Unsupervised',
-            config=_build_config('Unsupervised', data, model, training, inference),
+            config=_build_config('Unsupervised', options),
             model_path=checkpoint,
             reconstruct_input=_reconstruct_input(IMG_SIZE),
         )
@@ -295,30 +280,28 @@ def check_mode_mismatch_is_reported(data: Any, model: Any, training: Any, infere
         else:
             raise AssertionError('loading an amp_phase checkpoint as uncoupled did not raise')
 
-    model.coupled_decoder_mode.set_value(original_mode)
+    options.model.coupled_decoder_mode = original_mode
 
 
-def check_new_losses(data: Any, model: Any, training: Any, inference: Any) -> None:
+def check_new_losses(options: PtychoFMOptions) -> None:
     """Each diffraction-space loss trains to a finite value."""
-    original_mode = model.coupled_decoder_mode.get_value()
-    model.coupled_decoder_mode.set_value('none')
+    original_mode = options.model.coupled_decoder_mode
+    options.model.coupled_decoder_mode = None
 
     for loss_function in ('total_flux', 'probe_aware', 'q_dependent'):
-        training.loss_function.set_value(loss_function)
+        options.training.loss_function = loss_function
 
         with tempfile.TemporaryDirectory() as tmp:
-            _, losses = run_training(
-                'Unsupervised', data, model, training, inference, Path(tmp) / loss_function
-            )
+            _, losses = run_training('Unsupervised', options, Path(tmp) / loss_function)
 
         assert all(numpy.isfinite(value) for value in losses), f'{loss_function}: {losses}'
         print(f'  [ok] {loss_function}: finite losses {losses}')
 
-    training.loss_function.set_value('mse')
-    model.coupled_decoder_mode.set_value(original_mode)
+    options.training.loss_function = 'mse'
+    options.model.coupled_decoder_mode = original_mode
 
 
-def check_probe_envelope_dispatch(data: Any, model: Any, training: Any, inference: Any) -> None:
+def check_probe_envelope_dispatch(options: PtychoFMOptions) -> None:
     """The probe-aware loss must actually receive the probe.
 
     Called with prediction and target alone it still returns a number -- a
@@ -326,8 +309,8 @@ def check_probe_envelope_dispatch(data: Any, model: Any, training: Any, inferenc
     """
     import torch
 
-    training.loss_function.set_value('probe_aware')
-    config = _build_config('Unsupervised', data, model, training, inference)
+    options.training.loss_function = 'probe_aware'
+    config = _build_config('Unsupervised', options)
     criterion = _build_criterion(config['training'])
 
     assert getattr(criterion, 'uses_probe_envelope', False), (
@@ -357,7 +340,7 @@ def check_probe_envelope_dispatch(data: Any, model: Any, training: Any, inferenc
         f'without={without_envelope.item():.6g}'
     )
 
-    training.loss_function.set_value('mse')
+    options.training.loss_function = 'mse'
 
 
 def main() -> int:
@@ -374,18 +357,16 @@ def main() -> int:
 
     print(f'torch {torch.__version__}, cuda available: {torch.cuda.is_available()}')
 
-    data, model, training, inference = _settings()
+    options = _options()
 
     print('1. export validation')
-    check_export_validation(data, model, training, inference)
+    check_export_validation(options)
 
     losses_by_mode = {}
     with tempfile.TemporaryDirectory() as tmp:
         print('2. training')
         for mode in ('Supervised', 'Unsupervised'):
-            checkpoint, losses = run_training(
-                mode, data, model, training, inference, Path(tmp) / mode
-            )
+            checkpoint, losses = run_training(mode, options, Path(tmp) / mode)
             losses_by_mode[mode] = losses
             if mode == 'Supervised':
                 supervised_checkpoint = checkpoint
@@ -396,19 +377,19 @@ def main() -> int:
         print('  [ok] the two modes optimize different objectives')
 
         print('3. inference')
-        run_inference(supervised_checkpoint, data, model, training, inference)
+        run_inference(supervised_checkpoint, options)
 
     print('4. coupled decoder modes')
-    check_coupled_decoder_modes(data, model, training, inference)
+    check_coupled_decoder_modes(options)
 
     print('5. checkpoint/mode mismatch')
-    check_mode_mismatch_is_reported(data, model, training, inference)
+    check_mode_mismatch_is_reported(options)
 
     print('6. diffraction-space losses')
-    check_new_losses(data, model, training, inference)
+    check_new_losses(options)
 
     print('7. probe-envelope dispatch')
-    check_probe_envelope_dispatch(data, model, training, inference)
+    check_probe_envelope_dispatch(options)
 
     print('\nAll smoke checks passed.')
     return 0

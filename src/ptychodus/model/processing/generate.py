@@ -100,11 +100,18 @@ def populate_parameter_group(
 
     Keyed by persisted name, so a caller holding the flattened description can
     pair each declared path with the handle that now backs it.
+
+    Idempotent: a key the group already carries is reused, not recreated.
     """
+    existing = group.parameters()
     parameters: dict[str, Parameter[Any]] = {}
 
     for flat in flatten_options(options, policy):
-        parameters[flat.ini_key] = _create(group, flat, policy)
+        # Reused rather than recreated, so that two reconstructors declaring
+        # the same options share one set of live values. A backend's modes are
+        # configured by one settings section, and a file holds one copy of it.
+        parameter = existing.get(flat.ini_key)
+        parameters[flat.ini_key] = _create(group, flat, policy) if parameter is None else parameter
 
     return parameters
 
@@ -119,6 +126,25 @@ def _assign(root: Any, path: str, value: Any) -> None:
     setattr(owner, leaf, value)
 
 
+def _accepted(flat: FlatParameter, value: Any) -> Any:
+    """Return *value* if the declaration accepts it, else the default.
+
+    A settings file is hand-edited and outlives the version that wrote it, so
+    a key can hold something the declaration does not allow. Warning and
+    falling back keeps a run going with a value that is at least valid, and
+    says which key was ignored -- where passing it through would hand a
+    backend a word it has no case for.
+    """
+    if not flat.choices or value in flat.choices:
+        return value
+
+    logger.warning(
+        f'Ignoring "{flat.ini_key}" = "{value}": not one of '
+        f'{", ".join(flat.choices)}. Using "{flat.default}".'
+    )
+    return flat.default
+
+
 def _restore_value(flat: FlatParameter, value: Any, policy: FlatteningPolicy) -> Any:
     """Turn a live parameter's value back into what the declaration expects.
 
@@ -128,9 +154,17 @@ def _restore_value(flat: FlatParameter, value: Any, policy: FlatteningPolicy) ->
     annotation = _unwrap_optional(flat.annotation)
 
     if isinstance(annotation, type) and issubclass(annotation, Enum):
-        return annotation[value] if policy.enum_by_name else annotation(value)
+        try:
+            return annotation[value] if policy.enum_by_name else annotation(value)
+        except (KeyError, ValueError):
+            members = ', '.join(m.name if policy.enum_by_name else str(m.value) for m in annotation)
+            logger.warning(
+                f'Ignoring "{flat.ini_key}" = "{value}": not one of {members}. '
+                f'Using "{flat.default}".'
+            )
+            return flat.default
 
-    return value
+    return _accepted(flat, value)
 
 
 def apply_options(
@@ -153,7 +187,9 @@ def apply_options(
         if flat.structural_role:
             # Collected rather than assigned: the declared value is a function of
             # every key the adapter owns, so none can be written on its own.
-            adapted.setdefault(flat.path, {})[flat.structural_role] = parameter.get_value()
+            adapted.setdefault(flat.path, {})[flat.structural_role] = _accepted(
+                flat, parameter.get_value()
+            )
             continue
 
         _assign(target, flat.path, _restore_value(flat, parameter.get_value(), policy))

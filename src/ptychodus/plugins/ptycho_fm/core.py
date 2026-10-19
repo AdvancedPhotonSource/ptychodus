@@ -10,14 +10,6 @@ from ...api.reconstruct import (
     ReconstructorLibrary,
     TrainableReconstructor,
 )
-from ...api.settings import SettingsRegistry
-from .enums import PtychoFMEnumerators
-from .settings import (
-    PtychoFMDataSettings,
-    PtychoFMInferenceSettings,
-    PtychoFMModelSettings,
-    PtychoFMTrainingSettings,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -35,44 +27,43 @@ def _ptycho_fm_available() -> bool:
 
 
 class PtychoFMReconstructorLibrary(ReconstructorLibrary):
-    def __init__(self, settings_registry: SettingsRegistry) -> None:
+    """What PtychoFM offers, holding nothing but the answer to whether it is installed."""
+
+    def __init__(self) -> None:
         super().__init__('ptycho-fm')
-        self.data_settings = PtychoFMDataSettings(settings_registry)
-        self.model_settings = PtychoFMModelSettings(settings_registry)
-        self.training_settings = PtychoFMTrainingSettings(settings_registry)
-        self.inference_settings = PtychoFMInferenceSettings(settings_registry)
-        self.enumerators = PtychoFMEnumerators()
-        self._reconstructors: list[TrainableReconstructor] = list()
-
-        if not _ptycho_fm_available():
-            logger.info('PtychoFM (ptycho-fm) not found.')
-            return
-
-        try:
-            ptycho_fm_version = version('ptycho-fm')
-        except PackageNotFoundError:
-            ptycho_fm_version = 'unknown'
-        logger.info(f'PtychoFM (ptycho-fm) {ptycho_fm_version}')
-
-        # Lazy import: keeps this module's cost small in headless mode and
-        # ensures the parent never pulls torch in just because ptycho-fm is
-        # installed.
-        from .reconstructor import build_reconstructor
-
-        for mode in ('Unsupervised', 'Supervised'):
-            self._reconstructors.append(
-                build_reconstructor(
-                    mode,
-                    self.data_settings,
-                    self.model_settings,
-                    self.inference_settings,
-                    self.training_settings,
-                )
-            )
+        self._reconstructors: list[TrainableReconstructor] | None = None
 
     @property
     def name(self) -> str:
         return 'PtychoFM'
 
     def __iter__(self) -> Iterator[Reconstructor]:
+        if self._reconstructors is None:
+            self._reconstructors = self._build()
+
         return iter(self._reconstructors)
+
+    def _build(self) -> list[TrainableReconstructor]:
+        """Enumerate the reconstructors, on first use rather than at registration.
+
+        Registration happens in every process that loads plugins, including
+        ones that never reconstruct, so the cost of deciding what a backend
+        offers belongs to the first caller that asks.
+        """
+        if not _ptycho_fm_available():
+            logger.info('PtychoFM (ptycho-fm) not found.')
+            return []
+
+        try:
+            ptycho_fm_version = version('ptycho-fm')
+        except PackageNotFoundError:
+            ptycho_fm_version = 'unknown'
+
+        logger.info(f'PtychoFM (ptycho-fm) {ptycho_fm_version}')
+
+        # Deferred so that importing this module costs nothing: the factory
+        # reaches for h5py and numpy, and the child it configures reaches for
+        # torch.
+        from .reconstructor import build_reconstructor
+
+        return [build_reconstructor(mode) for mode in ('Unsupervised', 'Supervised')]

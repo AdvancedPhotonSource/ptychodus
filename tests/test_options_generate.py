@@ -19,7 +19,7 @@ from ptychodus.api.parameters import (
     StringParameter,
 )
 from ptychodus.api.settings import SettingsRegistry
-from ptychodus.model.processing.flatten import FlatteningPolicy, Sentinel
+from ptychodus.model.processing.flatten import FlatteningPolicy, Overlay, Sentinel
 from ptychodus.model.processing.generate import (
     UnsupportedParameterError,
     populate_parameter_group,
@@ -206,3 +206,54 @@ class TestRestoringOptions:
         parameters = populate_parameter_group(registry.create_group('Outer'), defaults, policy)
         parameters['InnerWeight'].set_value(7.5)
         assert restore_options(defaults, parameters, policy).inner.weight == 7.5
+
+
+class TestAValueTheDeclarationDoesNotAccept:
+    """A settings file is hand-edited and outlives the version that wrote it."""
+
+    def _bind(self, policy: FlatteningPolicy) -> tuple[Declared, Mapping[str, Any]]:
+        registry = SettingsRegistry()
+        declared = Declared()
+        parameters = populate_parameter_group(registry.create_group('Declared'), declared, policy)
+        return declared, parameters
+
+    def test_a_choice_outside_the_list_falls_back_and_says_so(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        policy = FlatteningPolicy(overlays={'label': Overlay(choices=('untitled', 'named'))})
+        declared, parameters = self._bind(policy)
+        parameters['Label'].set_value_from_string('bogus')
+
+        assert restore_options(declared, parameters, policy).label == 'untitled'
+        assert 'bogus' in caplog.text
+        assert 'Label' in caplog.text
+
+    def test_an_enum_member_that_no_longer_exists_falls_back(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A member removed upstream leaves the name it was persisted under."""
+        policy = FlatteningPolicy()
+        declared, parameters = self._bind(policy)
+        parameters['Mode'].set_value_from_string('RETIRED')
+
+        assert restore_options(declared, parameters, policy).mode is Mode.FAST
+        assert 'RETIRED' in caplog.text
+
+    def test_an_adapted_key_is_checked_too(self, caplog: pytest.LogCaptureFixture) -> None:
+        """A Sentinel bypasses the ordinary restore path, so it needs its own check."""
+        policy = FlatteningPolicy(
+            structural={'label': Sentinel('Label', value_type=str, sentinel='none')},
+            overlays={'Label': Overlay(choices=('none', 'named'))},
+        )
+        declared, parameters = self._bind(policy)
+        parameters['Label'].set_value_from_string('bogus')
+
+        restore_options(declared, parameters, policy)
+        assert 'bogus' in caplog.text
+
+    def test_a_value_within_the_list_is_left_alone(self) -> None:
+        policy = FlatteningPolicy(overlays={'label': Overlay(choices=('untitled', 'named'))})
+        declared, parameters = self._bind(policy)
+        parameters['Label'].set_value_from_string('named')
+
+        assert restore_options(declared, parameters, policy).label == 'named'

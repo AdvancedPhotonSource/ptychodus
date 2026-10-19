@@ -26,7 +26,12 @@ import importlib
 import inspect
 import pkgutil
 
+import pytest
+
+from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.processing import ProcessingAlgorithmParameter, ProcessingParameterStore
+from ptychodus.model.processing.core import _SECTIONS_BY_LIBRARY
 
 GOLDEN_PATH = Path(__file__).parent / 'data' / 'settings_defaults.ini'
 
@@ -44,7 +49,7 @@ _SETTINGS_ROOTS = ('ptychodus.model.', 'ptychodus.plugins.')
 
 
 def _build_registry() -> SettingsRegistry:
-    """Instantiate every discoverable ``*Settings`` class against one registry."""
+    """Build every settings group ptychodus would create, however it creates it."""
     registry = SettingsRegistry()
     constructed: set[type] = set()
 
@@ -53,7 +58,46 @@ def _build_registry() -> SettingsRegistry:
         root = Path(next(iter(package.__path__)))
         _construct_settings_under(root, prefix, registry, constructed)
 
+    _register_declared_sections(registry)
     return registry
+
+
+def absent_backends() -> list[str]:
+    """Reconstructor libraries that registered but offer nothing on this machine.
+
+    A backend that has crossed over has no ``*Settings`` class to discover --
+    its groups come from what it declares, and it declares nothing when the
+    package it wraps is not installed. So the groups such a backend
+    contributes are genuinely absent here, and the fixture cannot pin them.
+    """
+    absent: list[str] = []
+
+    for plugin in PluginRegistry.load_plugins().reconstructor_libraries:
+        library = plugin.strategy
+
+        if library.name in _SECTIONS_BY_LIBRARY and not list(library):
+            absent.append(library.name)
+
+    return absent
+
+
+def _register_declared_sections(registry: SettingsRegistry) -> None:
+    """Add the groups generated from each backend's declaration."""
+    store = ProcessingParameterStore(registry)
+
+    for plugin in PluginRegistry.load_plugins().reconstructor_libraries:
+        library = plugin.strategy
+        sections = _SECTIONS_BY_LIBRARY.get(library.name)
+
+        if sections is None:
+            continue
+
+        for reconstructor in library:
+            store.register(
+                ProcessingAlgorithmParameter.generate_key(library.name, reconstructor.name),
+                reconstructor,
+                sections(),
+            )
 
 
 def _construct_settings_under(
@@ -103,11 +147,38 @@ def test_settings_defaults_match_golden() -> None:
     assert GOLDEN_PATH.is_file(), (
         f'Missing {GOLDEN_PATH.name}; regenerate with "python {Path(__file__).name}".'
     )
+
+    absent = absent_backends()
+
+    if absent:
+        # A backend that has crossed over contributes no groups unless the
+        # package it wraps is installed, so on a bare install those sections
+        # genuinely do not exist and the fixture cannot pin them here. Compare
+        # what this machine can see, and say what it could not.
+        pytest.skip(f'Not installed, so their settings are absent: {", ".join(sorted(absent))}.')
+
     assert render_settings() == GOLDEN_PATH.read_text(), (
         'Settings sections, keys or defaults changed. If intended, regenerate with '
         f'"python tests/{Path(__file__).name}" and review the diff -- a renamed key '
         'orphans every saved settings file that still uses the old one.'
     )
+
+
+def test_every_installed_backend_still_contributes_its_groups() -> None:
+    """Runs everywhere, including where the golden comparison is skipped.
+
+    The comparison above pins values; this pins that a backend which *is*
+    installed did not silently stop producing settings -- the failure a
+    crossover would cause, and the one a skip would otherwise hide.
+    """
+    rendered = render_settings()
+
+    for plugin in PluginRegistry.load_plugins().reconstructor_libraries:
+        library = plugin.strategy
+
+        if library.name in _SECTIONS_BY_LIBRARY and list(library):
+            for section in _SECTIONS_BY_LIBRARY[library.name]():
+                assert f'[{section.group_name}]' in rendered, section.group_name
 
 
 def test_golden_covers_the_whole_surface() -> None:
@@ -120,3 +191,16 @@ def test_golden_covers_the_whole_surface() -> None:
 if __name__ == '__main__':
     GOLDEN_PATH.write_text(render_settings())
     print(f'Wrote {GOLDEN_PATH}')
+
+
+def test_every_backend_named_in_the_section_table_is_a_registered_library() -> None:
+    """The table is keyed on a display name, so a rename would drop its settings.
+
+    Nothing else would notice: a backend whose key no longer matches simply
+    registers no groups, which reads exactly like one that has not crossed
+    over yet.
+    """
+    registered = {
+        plugin.strategy.name for plugin in PluginRegistry.load_plugins().reconstructor_libraries
+    }
+    assert set(_SECTIONS_BY_LIBRARY) <= registered

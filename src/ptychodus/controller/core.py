@@ -21,11 +21,11 @@ from .probe import ProbeController
 from .probe_positions import ProbePositionsController
 from .helpers import create_brush_for_editable_cell
 from .processing import ProcessingController
+from .processing.generated import GeneratedViewControllerFactory
 from .product import ProductController
 from .product.core import ProductRepositoryTableModel
 from .product.visualization import ProductVisualizationController
 from .task_status import TaskStatusController
-from .ptycho_fm import PtychoFMViewControllerFactory
 from .ptychi import PtyChiViewControllerFactory
 from .ptychopinn import PtychoPINNViewControllerFactory
 from .settings import SettingsController
@@ -53,9 +53,10 @@ class ControllerCore:
             model.ptychopinn_reconstructor_library,
             self._file_dialog_factory,
         )
-        self._ptycho_fm_view_controller_factory = PtychoFMViewControllerFactory(
-            model.ptycho_fm_reconstructor_library,
-            self._file_dialog_factory,
+        # Rendered from what PtychoFM declares, rather than from a panel
+        # written key by key.
+        self._ptycho_fm_view_controller_factory = GeneratedViewControllerFactory(
+            'PtychoFM', model.processing_core.parameter_store
         )
         # Shared product-repository table model. Constructing it here (before
         # any consumer) lets SettingsController, DiffractionController,

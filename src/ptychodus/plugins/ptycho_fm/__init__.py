@@ -1,12 +1,17 @@
-"""PtychoFM, relocated ahead of the unit that makes it registrable.
+"""PtychoFM, discovered as a plugin rather than named in a composition root."""
 
-No ``register_plugins`` yet: constructing the library still needs a settings
-registry, and a plugin is registered as an instance. The hook arrives once the
-backend is configured from the options it is handed per call.
-"""
+from ptychodus.api.plugins import PluginRegistry
 
 from .core import PtychoFMReconstructorLibrary
 
 __all__ = [
     'PtychoFMReconstructorLibrary',
 ]
+
+
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.reconstructor_libraries.register_plugin(
+        PtychoFMReconstructorLibrary(),
+        simple_name='PtychoFM',
+        display_name='PtychoFM',
+    )

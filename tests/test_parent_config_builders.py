@@ -87,44 +87,24 @@ def _build_ptychopinn_settings() -> list[Any]:
 
 
 def _build_ptycho_fm_configs() -> list[Any]:
-    from ptychodus.api.settings import SettingsRegistry
+    from ptychodus.plugins.ptycho_fm.options import default_options
     from ptychodus.plugins.ptycho_fm.reconstructor import _build_config
-    from ptychodus.plugins.ptycho_fm.settings import (
-        PtychoFMDataSettings,
-        PtychoFMInferenceSettings,
-        PtychoFMModelSettings,
-        PtychoFMTrainingSettings,
-    )
-
-    registry = SettingsRegistry()
-    data_settings = PtychoFMDataSettings(registry)
-    model_settings = PtychoFMModelSettings(registry)
-    training_settings = PtychoFMTrainingSettings(registry)
-    inference_settings = PtychoFMInferenceSettings(registry)
 
     # The name selects the training objective, coupled_decoder_mode the model
     # class, and loss_function which sub-section the child reads back.
     configs: list[Any] = []
 
     for name in ('Unsupervised', 'Supervised'):
-        for coupled_decoder_mode in ('none', 'real_imag', 'amp_phase'):
-            model_settings.coupled_decoder_mode.set_value(coupled_decoder_mode)
-
+        for coupled_decoder_mode in (None, 'real_imag', 'amp_phase'):
             for loss_function in ('weighted', 'total_flux', 'probe_aware', 'q_dependent'):
                 if name == 'Supervised' and loss_function != 'weighted':
                     # Rejected on the train path; covered in-process below.
                     continue
 
-                training_settings.loss_function.set_value(loss_function)
-                configs.append(
-                    _build_config(
-                        name,
-                        data_settings,
-                        model_settings,
-                        training_settings,
-                        inference_settings,
-                    )
-                )
+                options = default_options()
+                options.model.coupled_decoder_mode = coupled_decoder_mode
+                options.training.loss_function = loss_function
+                configs.append(_build_config(name, options))
 
     return configs
 
@@ -231,24 +211,6 @@ def test_parent_config_builders_acquire_no_gpu_context(backend: str) -> None:
     assert result['count'] > 0, f'{backend} built no configs.'
 
 
-def _ptycho_fm_settings() -> Any:
-    from ptychodus.api.settings import SettingsRegistry
-    from ptychodus.plugins.ptycho_fm.settings import (
-        PtychoFMDataSettings,
-        PtychoFMInferenceSettings,
-        PtychoFMModelSettings,
-        PtychoFMTrainingSettings,
-    )
-
-    registry = SettingsRegistry()
-    return (
-        PtychoFMDataSettings(registry),
-        PtychoFMModelSettings(registry),
-        PtychoFMTrainingSettings(registry),
-        PtychoFMInferenceSettings(registry),
-    )
-
-
 @pytest.mark.parametrize('loss_function', ['total_flux', 'probe_aware', 'q_dependent'])
 def test_ptycho_fm_rejects_diffraction_losses_when_supervised(loss_function: str) -> None:
     """Diffraction-space losses are meaningless against an object patch.
@@ -272,29 +234,23 @@ def test_ptycho_fm_accepts_object_space_loss_when_supervised() -> None:
             _verify_loss_supports_mode(name, loss_function)
 
 
-def test_ptycho_fm_rejects_unknown_coupled_decoder_mode() -> None:
+def test_ptycho_fm_maps_the_uncoupled_mode_to_null() -> None:
+    """'none' is how the settings file spells it; ptycho_fm reads the key as null.
+
+    The translation moved into the section table's Sentinel when the backend
+    started declaring, so what is checked here is that the declared value
+    reaches the child unchanged rather than that a builder converts it.
+    """
+    from ptychodus.plugins.ptycho_fm.options import default_options
     from ptychodus.plugins.ptycho_fm.reconstructor import _build_config
 
-    data, model, training, inference = _ptycho_fm_settings()
-    model.coupled_decoder_mode.set_value('bogus')
+    options = default_options()
+    options.model.coupled_decoder_mode = None
+    assert _build_config('Unsupervised', options)['model']['coupled_decoder_mode'] is None
 
-    with pytest.raises(ValueError, match='coupled_decoder_mode'):
-        _build_config('Unsupervised', data, model, training, inference)
-
-
-def test_ptycho_fm_maps_uncoupled_mode_to_none() -> None:
-    """'none' is the settings spelling; ptycho_fm reads the key as null."""
-    from ptychodus.plugins.ptycho_fm.reconstructor import _build_config
-
-    data, model, training, inference = _ptycho_fm_settings()
-
-    model.coupled_decoder_mode.set_value('none')
-    config = _build_config('Unsupervised', data, model, training, inference)
-    assert config['model']['coupled_decoder_mode'] is None
-
-    model.coupled_decoder_mode.set_value('amp_phase')
-    config = _build_config('Unsupervised', data, model, training, inference)
-    assert config['model']['coupled_decoder_mode'] == 'amp_phase'
+    options = default_options()
+    options.model.coupled_decoder_mode = 'amp_phase'
+    assert _build_config('Unsupervised', options)['model']['coupled_decoder_mode'] == 'amp_phase'
 
 
 def _ptychopinn_settings() -> Any:

@@ -23,13 +23,7 @@ from pydantic import BaseModel
 from ptychodus.api.reconstruct import ReconstructInput, SubprocessReconstructor
 
 from ._payload import ReconstructPayload, TrainPayload
-from .enums import COUPLED_DECODER_MODES
-from .settings import (
-    PtychoFMDataSettings,
-    PtychoFMInferenceSettings,
-    PtychoFMModelSettings,
-    PtychoFMTrainingSettings,
-)
+from .options import PtychoFMOptions, default_options
 
 __all__ = [
     'build_reconstructor',
@@ -45,132 +39,22 @@ _TRAIN_ENTRY = 'ptychodus.plugins.ptycho_fm._subprocess:run_train'
 _DIFFRACTION_SPACE_LOSSES = frozenset({'total_flux', 'probe_aware', 'q_dependent'})
 
 
-def _build_config(
-    name: str,
-    data_settings: PtychoFMDataSettings,
-    model_settings: PtychoFMModelSettings,
-    training_settings: PtychoFMTrainingSettings,
-    inference_settings: PtychoFMInferenceSettings,
-) -> dict[str, Any]:
-    """Translate ptychodus settings into a nested ``ptycho_fm`` config dict.
+def _build_config(name: str, options: PtychoFMOptions) -> dict[str, Any]:
+    """Render the declared options as the nested dict ``ptycho_fm`` reads.
 
-    Mirrors the top-level shape of ``ptycho_fm/config.yaml``: ``data``,
-    ``model`` (with ``encoder`` / ``decoder`` / ``init`` sub-sections) and
-    ``training`` (with ``weighted_loss``, ``probe_aware_loss`` and
-    ``q_dependent_loss`` sub-sections). The child fills in any missing paths
-    (``data_path`` / model save path) from the training payload at call time.
+    ``exclude_unset`` is what preserves upstream's absent-means-resolve-later
+    semantics: pretrained encoder sizes, validation batch size and dataset
+    normalization are all decided by a field having no value, so only the
+    fields ptychodus surfaces may appear. The declaration sets exactly those.
 
-    ``coupled_decoder_mode`` selects the model class, so it is part of the
-    architecture a checkpoint was trained under rather than a free parameter:
-    a checkpoint loads only into the mode that produced it.
-
-    Losses are translated, not validated here: this runs on the inference path
-    too, where the training loss is irrelevant.
-
-    The ``inference`` section is ptychodus-local: ``ptycho_fm``'s own YAML has
-    no such section, and ``pad`` has no home in it at all. Only ``model`` is
-    read back by ptycho_fm itself (via ``resolve_inference_model``).
-
-    ``name`` selects the training objective: 'Supervised' compares the decoded
-    amplitude and phase against the object patch, anything else compares the
-    modelled diffraction against the measurement.
+    Two keys are not settings and so are added here rather than declared.
+    ``training.mode`` follows from which reconstructor was selected, and the
+    encoder takes one channel in every configuration ptychodus builds.
     """
-    max_files = data_settings.max_files.get_value()
-    data_config: dict[str, Any] = {
-        'scale': data_settings.scale.get_value(),
-        'default_normalization': data_settings.default_normalization.get_value(),
-        'cache_object': data_settings.cache_object.get_value(),
-        'max_probe_modes': data_settings.max_probe_modes.get_value(),
-        'max_OPR_modes': data_settings.max_opr_modes.get_value(),
-        'cache_memory_budget_mb': data_settings.cache_memory_budget_mb.get_value(),
-        'train_split': data_settings.train_split.get_value(),
-        'random_seed': data_settings.random_seed.get_value(),
-        # 0 in settings means "no cap" (null in the YAML).
-        'max_files': max_files if max_files > 0 else None,
-        'num_workers': data_settings.num_workers.get_value(),
-        'prefetch_factor': data_settings.prefetch_factor.get_value(),
-    }
-
-    coupled_decoder_mode = model_settings.coupled_decoder_mode.get_value()
-
-    if coupled_decoder_mode not in COUPLED_DECODER_MODES:
-        raise ValueError(
-            f'Unknown coupled_decoder_mode: {coupled_decoder_mode!r}. '
-            f'Expected one of {sorted(COUPLED_DECODER_MODES)}.'
-        )
-
-    model_config: dict[str, Any] = {
-        'encoder_type': model_settings.encoder_type.get_value(),
-        # Emitted even when uncoupled: ptycho_fm reads absent and None alike,
-        # and a stable dict shape is what the config-builder test pins.
-        'coupled_decoder_mode': None if coupled_decoder_mode == 'none' else coupled_decoder_mode,
-        'encoder': {
-            'img_size': model_settings.img_size.get_value(),
-            'patch_size': model_settings.patch_size.get_value(),
-            'in_channels': 1,
-            'embed_dim': model_settings.embed_dim.get_value(),
-            'depth': model_settings.depth.get_value(),
-            'num_heads': model_settings.num_heads.get_value(),
-            'mlp_ratio': model_settings.mlp_ratio.get_value(),
-            'use_cls_token': model_settings.use_cls_token.get_value(),
-            'dropout': model_settings.dropout.get_value(),
-            'attn_dropout': model_settings.attn_dropout.get_value(),
-            'timm_model_name': model_settings.timm_model_name.get_value(),
-        },
-        'decoder': {
-            'base_channels': model_settings.decoder_base_channels.get_value(),
-            'latent_dim': model_settings.decoder_latent_dim.get_value(),
-            'num_stages': model_settings.decoder_num_stages.get_value(),
-            'use_batchnorm': model_settings.decoder_use_batchnorm.get_value(),
-            'dropout': model_settings.decoder_dropout.get_value(),
-        },
-        'init': {
-            'enabled': model_settings.init_enabled.get_value(),
-            'method': model_settings.init_method.get_value(),
-        },
-    }
-
-    training_config: dict[str, Any] = {
-        'mode': 'supervised' if name == 'Supervised' else 'unsupervised',
-        'batch_size': training_settings.batch_size.get_value(),
-        'learning_rate': training_settings.learning_rate.get_value(),
-        'epochs': training_settings.epochs.get_value(),
-        'loss_function': training_settings.loss_function.get_value(),
-        'weighted_loss': {
-            'loss_type': training_settings.weighted_loss_type.get_value(),
-            'threshold': training_settings.weighted_loss_threshold.get_value(),
-            'alpha': training_settings.weighted_loss_alpha.get_value(),
-        },
-        'probe_aware_loss': {
-            'loss_type': training_settings.probe_aware_loss_type.get_value(),
-            'threshold': training_settings.probe_aware_loss_threshold.get_value(),
-            'alpha': training_settings.probe_aware_loss_alpha.get_value(),
-            'envelope_floor': training_settings.probe_aware_loss_envelope_floor.get_value(),
-        },
-        'q_dependent_loss': {
-            'loss_type': training_settings.q_dependent_loss_type.get_value(),
-            'alpha': training_settings.q_dependent_loss_alpha.get_value(),
-            'q_beta': training_settings.q_dependent_loss_q_beta.get_value(),
-            'q_floor': training_settings.q_dependent_loss_q_floor.get_value(),
-            'threshold': training_settings.q_dependent_loss_threshold.get_value(),
-            'log_error': training_settings.q_dependent_loss_log_error.get_value(),
-            'normalize_q': training_settings.q_dependent_loss_normalize_q.get_value(),
-        },
-        'save_epoch_models': training_settings.save_epoch_models.get_value(),
-    }
-
-    inference_config: dict[str, Any] = {
-        'central_crop': inference_settings.central_crop.get_value(),
-        'pad': inference_settings.pad.get_value(),
-        'batch_size': inference_settings.batch_size.get_value(),
-    }
-
-    return {
-        'data': data_config,
-        'model': model_config,
-        'training': training_config,
-        'inference': inference_config,
-    }
+    config: dict[str, Any] = options.model_dump(exclude_unset=True)
+    config['training']['mode'] = 'supervised' if name == 'Supervised' else 'unsupervised'
+    config['model']['encoder']['in_channels'] = 1
+    return config
 
 
 def _verify_spatial_size(shape: tuple[int, ...], img_size: int, what: str) -> None:
@@ -199,13 +83,21 @@ def _verify_loss_supports_mode(name: str, loss_function: str) -> None:
         )
 
 
-def build_reconstructor(
-    name: str,
-    data_settings: PtychoFMDataSettings,
-    model_settings: PtychoFMModelSettings,
-    inference_settings: PtychoFMInferenceSettings,
-    training_settings: PtychoFMTrainingSettings,
-) -> SubprocessReconstructor:
+def _declared(options: BaseModel) -> PtychoFMOptions:
+    """Narrow the options a call was given to what this backend declares.
+
+    Checked rather than asserted: the dispatching layer validates the type
+    against what ``get_default_options`` returns, so a mismatch here means
+    those two have drifted apart, and saying so beats an attribute error
+    several frames later.
+    """
+    if not isinstance(options, PtychoFMOptions):
+        raise TypeError(f'Expected PtychoFMOptions, got {type(options).__name__}.')
+
+    return options
+
+
+def build_reconstructor(name: str) -> SubprocessReconstructor:
     """Build a :class:`SubprocessReconstructor` for one PtychoFM mode.
 
     ``name`` is 'Unsupervised' or 'Supervised' and becomes the reconstructor's
@@ -217,9 +109,7 @@ def build_reconstructor(
     ) -> ReconstructPayload:
         return ReconstructPayload(
             name=name,
-            config=_build_config(
-                name, data_settings, model_settings, training_settings, inference_settings
-            ),
+            config=_build_config(name, _declared(options)),
             model_path=loaded_model_path,
             reconstruct_input=parameters,
         )
@@ -227,12 +117,11 @@ def build_reconstructor(
     def build_train_payload(
         input_path: Path, output_path: Path, options: BaseModel
     ) -> TrainPayload:
-        _verify_loss_supports_mode(name, training_settings.loss_function.get_value())
+        declared = _declared(options)
+        _verify_loss_supports_mode(name, str(declared.training.loss_function))
         return TrainPayload(
             name=name,
-            config=_build_config(
-                name, data_settings, model_settings, training_settings, inference_settings
-            ),
+            config=_build_config(name, declared),
             input_path=input_path,
             output_path=output_path,
         )
@@ -264,7 +153,7 @@ def build_reconstructor(
         pixel_geometry = obj.get_pixel_geometry()
         probe_array = parameters.product.probes.get_probe_no_opr().get_array()
 
-        img_size = model_settings.img_size.get_value()
+        img_size = int(_declared(options).model.encoder.img_size)
         _verify_spatial_size(dp.shape[-2:], img_size, 'Diffraction patterns')
         _verify_spatial_size(probe_array.shape[-2:], img_size, 'Probe')
 
@@ -292,6 +181,7 @@ def build_reconstructor(
     return SubprocessReconstructor(
         name=name,
         reconstruct_entry_point=_RECONSTRUCT_ENTRY,
+        default_options=default_options,
         build_reconstruct_payload=build_reconstruct_payload,
         is_trainable=True,
         train_entry_point=_TRAIN_ENTRY,

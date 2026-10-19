@@ -23,10 +23,12 @@ from ptychodus.api.parameters import Parameter, ParameterGroup
 from ptychodus.api.reconstruct import Reconstructor
 from ptychodus.api.settings import SettingsRegistry
 
-from .flatten import FlatteningPolicy, flatten_options
+from .flatten import FlatParameter, FlatteningPolicy, flatten_options
 from .generate import apply_options, populate_parameter_group
 
 __all__ = [
+    'DescribedField',
+    'DescribedGroup',
     'OptionsSection',
     'ProcessingParameterStore',
 ]
@@ -47,6 +49,27 @@ class OptionsSection:
     group_name: str
     root_path: str = ''
     policy: FlatteningPolicy = field(default_factory=FlatteningPolicy)
+
+
+@dataclass(frozen=True)
+class DescribedField:
+    """One persisted key: what the declaration says about it, and what holds it.
+
+    Pairs the flattened description -- type, bounds, choices, label, tool tip --
+    with the live parameter generated from it, which is everything needed to
+    put an editor on screen without knowing which backend it came from.
+    """
+
+    described: FlatParameter
+    parameter: Parameter[Any]
+
+
+@dataclass(frozen=True)
+class DescribedGroup:
+    """One settings group, in the order the declaration lists its fields."""
+
+    name: str
+    fields: Sequence[DescribedField]
 
 
 @dataclass(frozen=True)
@@ -76,6 +99,7 @@ class ProcessingParameterStore:
     def __init__(self, settings_registry: SettingsRegistry) -> None:
         self._settings_registry = settings_registry
         self._entries: dict[str, _Entry] = {}
+        self._groups: dict[str, ParameterGroup] = {}
 
     def register(
         self, key: str, reconstructor: Reconstructor, sections: Sequence[OptionsSection] = ()
@@ -95,7 +119,6 @@ class ProcessingParameterStore:
             )
 
         bound: list[_BoundSection] = []
-        groups: dict[str, ParameterGroup] = {}
 
         for section in sections:
             root = _resolve(defaults, section.root_path)
@@ -104,13 +127,16 @@ class ProcessingParameterStore:
                 logger.debug(f'{key}: section "{section.group_name}" declares nothing; skipped.')
                 continue
 
-            # Created on first use, so that several sections can feed one group
-            # without the second attempt colliding with the first.
-            group = groups.get(section.group_name)
+            # Created on first use and remembered across registrations, so
+            # that several sections can feed one group and several
+            # reconstructors can share one. Two modes of the same backend are
+            # configured by one set of keys, and a settings file has one
+            # section for them.
+            group = self._groups.get(section.group_name)
 
             if group is None:
                 group = self._settings_registry.create_group(section.group_name)
-                groups[section.group_name] = group
+                self._groups[section.group_name] = group
 
             parameters = populate_parameter_group(group, root, section.policy)
             bound.append(_BoundSection(section, parameters))
@@ -139,6 +165,33 @@ class ProcessingParameterStore:
             )
 
         return options
+
+    def describe(self, key: str) -> Sequence[DescribedGroup]:
+        """Return *key*'s settings groups, each field paired with its live parameter.
+
+        What a renderer needs and all it needs: a declaration says what kind of
+        value a field holds and what it may be, and the parameter beside it is
+        what an editor binds to. Several sections feeding one group are merged,
+        because the panel shows one group.
+        """
+        try:
+            entry = self._entries[key]
+        except KeyError:
+            return []
+
+        merged: dict[str, list[DescribedField]] = {}
+
+        for bound in entry.sections:
+            root = _resolve(entry.defaults, bound.section.root_path)
+            fields = merged.setdefault(bound.section.group_name, [])
+
+            for described in flatten_options(root, bound.section.policy):
+                parameter = bound.parameters.get(described.ini_key)
+
+                if parameter is not None:
+                    fields.append(DescribedField(described, parameter))
+
+        return [DescribedGroup(name, fields) for name, fields in merged.items()]
 
     def __contains__(self, key: str) -> bool:
         return key in self._entries

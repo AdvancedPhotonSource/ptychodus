@@ -33,7 +33,6 @@ from .globus import GlobusCore
 from .memory import MemoryPresenter
 from .processing import ProcessingCore
 from .product import PositionsStreamingContext, ProductCore
-from ..plugins.ptycho_fm import PtychoFMReconstructorLibrary
 from .ptychi import PtyChiReconstructorLibrary
 from .ptychopinn import PtychoPINNReconstructorLibrary
 from .task_manager import TaskManager
@@ -137,11 +136,7 @@ class ModelCore:
         self.ptychopinn_reconstructor_library = PtychoPINNReconstructorLibrary(
             self.settings_registry
         )
-        # Constructed directly rather than through the chooser it registered
-        # into: the view layer still asks for this concrete type, so the name
-        # has to be in scope here anyway. The registration is what a caller
-        # that does not need the concrete type can already use.
-        self.ptycho_fm_reconstructor_library = PtychoFMReconstructorLibrary(self.settings_registry)
+
         self.processing_core = ProcessingCore(
             self._task_manager,
             self.settings_registry,
@@ -149,7 +144,10 @@ class ModelCore:
             [
                 self.ptychi_reconstructor_library,
                 self.ptychopinn_reconstructor_library,
-                self.ptycho_fm_reconstructor_library,
+                # Whatever registered itself, taken as the interface rather
+                # than as a named backend. A library still constructed above
+                # is one that has not moved under plugins/ yet.
+                *(plugin.strategy for plugin in self.plugin_registry.reconstructor_libraries),
             ],
         )
         self.fluorescence_core = FluorescenceCore(
