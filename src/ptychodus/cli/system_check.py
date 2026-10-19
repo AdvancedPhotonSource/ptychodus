@@ -8,6 +8,9 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
+
+from ptychodus.api.devices import enumerate_devices
 
 
 def read_driver_cuda_version() -> str | None:
@@ -35,7 +38,7 @@ def read_driver_cuda_version() -> str | None:
     return None if match is None else match.group(1)
 
 
-def check_nvrtc_builtins(torch_module) -> None:
+def check_nvrtc_builtins(torch_module: ModuleType) -> None:
     cuda_ver = torch_module.version.cuda
     if not cuda_ver:
         return
@@ -51,7 +54,15 @@ def check_nvrtc_builtins(torch_module) -> None:
 
     print(f'NVRTC Builtins ({soname}): NOT LOADABLE by dynamic linker')
 
-    site_packages = Path(torch_module.__file__).parent.parent
+    module_file = torch_module.__file__
+
+    if module_file is None:
+        # A module need not come from a file, so the bundled-copy search has
+        # nowhere to start. The diagnosis above still stands.
+        print('  Cannot locate torch on disk, so no bundled copy was looked for.')
+        return
+
+    site_packages = Path(module_file).parent.parent
     bundled = sorted(site_packages.glob(f'nvidia/*/lib/{soname}'))
 
     if bundled:
@@ -104,6 +115,12 @@ def main() -> int:
         print(f'PyTorch Version: {torch.__version__}')
         print(f'CUDA Available: {is_cuda_available}')
         print(f'CUDA Version: {torch.version.cuda}')
+
+        # Enumerated the way ptychodus itself does, so a device missing from a
+        # reconstruction is missing from this report for the same reason. Safe
+        # in process here: this command is about to exit.
+        for device in enumerate_devices():
+            print(f'Device: {device.identifier} ({device.name})')
 
         if is_cuda_available:
             check_nvrtc_builtins(torch)
