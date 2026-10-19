@@ -172,7 +172,9 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
         losses=losses,
     )
 
-    queue.put((TAG_OUTPUT, pickle.dumps(ReconstructOutput(product=product, progress=1))))
+    queue.put(
+        (TAG_OUTPUT, pickle.dumps(ReconstructOutput(product=product, progress=1, progress_goal=1)))
+    )
 
 
 def _latest_metrics_csv(output_path: Path) -> Path | None:
@@ -301,6 +303,7 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
                     training_loss=training_loss,
                     validation_loss=validation_loss,
                     progress=progress,
+                    progress_goal=progress,
                 )
             ),
         )

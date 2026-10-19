@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import Any, Final
 
 from ptychodus.api.io import save_ptychopinn_training_data
+from pydantic import BaseModel
+
 from ptychodus.api.reconstruct import ReconstructInput, SubprocessReconstructor
 
 from ._payload import ReconstructPayload, TrainPayload
@@ -233,7 +235,7 @@ def build_reconstructor(
     bundle_dir_cache: dict[Path, Path] = dict()
 
     def build_reconstruct_payload(
-        parameters: ReconstructInput, loaded_model_path: Path | None
+        parameters: ReconstructInput, loaded_model_path: Path | None, options: BaseModel
     ) -> ReconstructPayload:
         if loaded_model_path is None:
             raise RuntimeError('Cannot reconstruct: no PtychoPINN model has been loaded.')
@@ -254,7 +256,9 @@ def build_reconstructor(
             num_workers=training_settings.num_dataloader_workers.get_value(),
         )
 
-    def build_train_payload(input_path: Path, output_path: Path) -> TrainPayload:
+    def build_train_payload(
+        input_path: Path, output_path: Path, options: BaseModel
+    ) -> TrainPayload:
         return TrainPayload(
             settings=_build_settings(
                 model_training_mode,
@@ -269,13 +273,14 @@ def build_reconstructor(
             num_workers=training_settings.num_dataloader_workers.get_value(),
         )
 
-    def export_training_data(file_path: Path, parameters: ReconstructInput) -> None:
+    def export_training_data(
+        file_path: Path, parameters: ReconstructInput, options: BaseModel
+    ) -> None:
         save_ptychopinn_training_data(file_path, parameters)
 
     return SubprocessReconstructor(
         name=model_training_mode,
         reconstruct_entry_point=_RECONSTRUCT_ENTRY,
-        progress_goal_fn=lambda: training_settings.epochs.get_value(),
         build_reconstruct_payload=build_reconstruct_payload,
         is_trainable=True,
         train_entry_point=_TRAIN_ENTRY,

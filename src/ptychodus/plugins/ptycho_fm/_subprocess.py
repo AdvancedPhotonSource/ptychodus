@@ -343,7 +343,9 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
         losses=losses,
     )
 
-    queue.put((TAG_OUTPUT, pickle.dumps(ReconstructOutput(product=product, progress=1))))
+    queue.put(
+        (TAG_OUTPUT, pickle.dumps(ReconstructOutput(product=product, progress=1, progress_goal=1)))
+    )
 
 
 def _build_criterion(training_config: dict[str, Any]) -> Any:
@@ -675,6 +677,7 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
                         training_loss=list(training_losses),
                         validation_loss=list(validation_losses),
                         progress=epoch + 1,
+                        progress_goal=epochs,
                     )
                 ),
             )

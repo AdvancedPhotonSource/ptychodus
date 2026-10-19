@@ -88,8 +88,8 @@ def _build_ptychopinn_settings() -> list[Any]:
 
 def _build_ptycho_fm_configs() -> list[Any]:
     from ptychodus.api.settings import SettingsRegistry
-    from ptychodus.model.ptycho_fm.reconstructor import _build_config
-    from ptychodus.model.ptycho_fm.settings import (
+    from ptychodus.plugins.ptycho_fm.reconstructor import _build_config
+    from ptychodus.plugins.ptycho_fm.settings import (
         PtychoFMDataSettings,
         PtychoFMInferenceSettings,
         PtychoFMModelSettings,
@@ -233,7 +233,7 @@ def test_parent_config_builders_acquire_no_gpu_context(backend: str) -> None:
 
 def _ptycho_fm_settings() -> Any:
     from ptychodus.api.settings import SettingsRegistry
-    from ptychodus.model.ptycho_fm.settings import (
+    from ptychodus.plugins.ptycho_fm.settings import (
         PtychoFMDataSettings,
         PtychoFMInferenceSettings,
         PtychoFMModelSettings,
@@ -256,7 +256,7 @@ def test_ptycho_fm_rejects_diffraction_losses_when_supervised(loss_function: str
     They do not raise on their own -- they compute a different quantity -- so
     the parent has to turn the combination away before a child is spawned.
     """
-    from ptychodus.model.ptycho_fm.reconstructor import _verify_loss_supports_mode
+    from ptychodus.plugins.ptycho_fm.reconstructor import _verify_loss_supports_mode
 
     with pytest.raises(ValueError, match=loss_function):
         _verify_loss_supports_mode('Supervised', loss_function)
@@ -265,7 +265,7 @@ def test_ptycho_fm_rejects_diffraction_losses_when_supervised(loss_function: str
 
 
 def test_ptycho_fm_accepts_object_space_loss_when_supervised() -> None:
-    from ptychodus.model.ptycho_fm.reconstructor import _verify_loss_supports_mode
+    from ptychodus.plugins.ptycho_fm.reconstructor import _verify_loss_supports_mode
 
     for name in ('Supervised', 'Unsupervised'):
         for loss_function in ('mse', 'l1', 'smooth_l1', 'poisson_nll', 'weighted'):
@@ -273,7 +273,7 @@ def test_ptycho_fm_accepts_object_space_loss_when_supervised() -> None:
 
 
 def test_ptycho_fm_rejects_unknown_coupled_decoder_mode() -> None:
-    from ptychodus.model.ptycho_fm.reconstructor import _build_config
+    from ptychodus.plugins.ptycho_fm.reconstructor import _build_config
 
     data, model, training, inference = _ptycho_fm_settings()
     model.coupled_decoder_mode.set_value('bogus')
@@ -284,7 +284,7 @@ def test_ptycho_fm_rejects_unknown_coupled_decoder_mode() -> None:
 
 def test_ptycho_fm_maps_uncoupled_mode_to_none() -> None:
     """'none' is the settings spelling; ptycho_fm reads the key as null."""
-    from ptychodus.model.ptycho_fm.reconstructor import _build_config
+    from ptychodus.plugins.ptycho_fm.reconstructor import _build_config
 
     data, model, training, inference = _ptycho_fm_settings()
 

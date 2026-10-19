@@ -474,4 +474,4 @@ def reconstruct_with_ptychi(
 
             epoch += step_epochs
 
-            yield ReconstructOutput(product=product, progress=epoch)
+            yield ReconstructOutput(product=product, progress=epoch, progress_goal=num_epochs)

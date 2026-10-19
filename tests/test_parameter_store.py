@@ -47,9 +47,6 @@ class FakeReconstructor(Reconstructor):
     def name(self) -> str:
         return self._name
 
-    def get_progress_goal(self) -> int:
-        return 0
-
     def get_default_options(self) -> BaseModel:
         return self._options
 

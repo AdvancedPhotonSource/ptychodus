@@ -36,15 +36,15 @@ from ptychodus.api.reconstruct import (
     ReconstructInput,
 )
 from ptychodus.api.settings import SettingsRegistry
-from ptychodus.model.ptycho_fm._payload import ReconstructPayload, TrainPayload
-from ptychodus.model.ptycho_fm._subprocess import (
+from ptychodus.plugins.ptycho_fm._payload import ReconstructPayload, TrainPayload
+from ptychodus.plugins.ptycho_fm._subprocess import (
     _build_criterion,
     _compute_loss,
     run_reconstruct,
     run_train,
 )
-from ptychodus.model.ptycho_fm.reconstructor import _build_config, build_reconstructor
-from ptychodus.model.ptycho_fm.settings import (
+from ptychodus.plugins.ptycho_fm.reconstructor import _build_config, build_reconstructor
+from ptychodus.plugins.ptycho_fm.settings import (
     PtychoFMDataSettings,
     PtychoFMInferenceSettings,
     PtychoFMModelSettings,

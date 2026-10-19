@@ -1129,7 +1129,6 @@ class TestNullReconstructor:
     def test_it_reconstructs_nothing(self) -> None:
         null = NullReconstructor('null')
         assert list(null.reconstruct(cast(ReconstructInput, None), options=NoOptions())) == []
-        assert null.get_progress_goal() == 0
 
     def test_it_is_not_trainable(self) -> None:
         """What a bare install selects, so a Train button must not appear for it."""

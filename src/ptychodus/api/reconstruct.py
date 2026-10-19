@@ -55,10 +55,17 @@ class ReconstructInput:
 
 @dataclass(frozen=True)
 class ReconstructOutput:
-    """Reconstruction result yielded at each iteration: updated product, progress, and status code."""
+    """Reconstruction result yielded at each iteration.
+
+    ``progress_goal`` is what ``progress`` counts towards, reported by the run
+    rather than predicted before it: a backend that resolves its own iteration
+    count can only say so once it has started. Zero means unknown, which a
+    progress bar reads as indeterminate.
+    """
 
     product: Product
     progress: int = 0
+    progress_goal: int = 0
     status: int = 0
 
 
@@ -68,10 +75,6 @@ class Reconstructor(ABC):
     @property
     @abstractmethod
     def name(self) -> str:
-        pass
-
-    @abstractmethod
-    def get_progress_goal(self) -> int:
         pass
 
     def get_default_options(self) -> BaseModel:
@@ -99,11 +102,15 @@ class Reconstructor(ABC):
 
 @dataclass(frozen=True)
 class TrainOutput:
-    """Training result yielded at each step: loss curves, progress, and status code."""
+    """Training result yielded at each step: loss curves, progress, and status code.
+
+    ``progress_goal`` is reported by the run, as for :class:`ReconstructOutput`.
+    """
 
     training_loss: Sequence[LossValue] = field(default_factory=list)
     validation_loss: Sequence[LossValue] = field(default_factory=list)
     progress: int = 0
+    progress_goal: int = 0
     status: int = 0
 
 
@@ -165,9 +172,6 @@ class NullReconstructor(Reconstructor):
     def name(self) -> str:
         return self._name
 
-    def get_progress_goal(self) -> int:
-        return 0
-
     def reconstruct(
         self, input_: ReconstructInput, *, options: BaseModel
     ) -> Iterator[ReconstructOutput]:
@@ -182,14 +186,14 @@ TAG_SETTINGS_SYNC = 'settings_sync'  # payload = {group_name: {param_name: value
 
 
 # Type aliases for the callbacks each backend supplies.
-BuildReconstructPayload = Callable[[ReconstructInput, 'Path | None'], Any]
-"""(reconstruct_input, loaded_model_path_or_none) -> pickled payload for the child."""
+BuildReconstructPayload = Callable[[ReconstructInput, 'Path | None', BaseModel], Any]
+"""(reconstruct_input, loaded_model_path_or_none, options) -> pickled payload for the child."""
 
-BuildTrainPayload = Callable[[Path, Path], Any]
-"""(input_dir, output_dir) -> pickled payload for the child."""
+BuildTrainPayload = Callable[[Path, Path, BaseModel], Any]
+"""(input_dir, output_dir, options) -> pickled payload for the child."""
 
-ExportTrainingData = Callable[[Path, ReconstructInput], None]
-"""(file_path, reconstruct_input) -> None. Runs parent-side; must not touch GPU."""
+ExportTrainingData = Callable[[Path, ReconstructInput, BaseModel], None]
+"""(file_path, reconstruct_input, options) -> None. Runs parent-side; must not touch GPU."""
 
 SaveModel = Callable[[Path, Path], None]
 """(source_path_loaded_by_child, destination_path) -> None. Runs parent-side."""
@@ -233,7 +237,6 @@ class SubprocessReconstructor(TrainableReconstructor):
         *,
         name: str,
         reconstruct_entry_point: str,
-        progress_goal_fn: Callable[[], int],
         build_reconstruct_payload: BuildReconstructPayload,
         is_trainable: bool = False,
         train_entry_point: str | None = None,
@@ -249,7 +252,6 @@ class SubprocessReconstructor(TrainableReconstructor):
         super().__init__()
         self._name = name
         self._reconstruct_entry_point = reconstruct_entry_point
-        self._progress_goal_fn = progress_goal_fn
         self._build_reconstruct_payload = build_reconstruct_payload
         self._is_trainable = is_trainable
         self._train_entry_point = train_entry_point
@@ -276,15 +278,10 @@ class SubprocessReconstructor(TrainableReconstructor):
     def is_trainable(self) -> bool:
         return self._is_trainable
 
-    def get_progress_goal(self) -> int:
-        return self._progress_goal_fn()
-
     def reconstruct(
         self, input_: ReconstructInput, *, options: BaseModel
     ) -> Iterator[ReconstructOutput]:
-        # options is accepted but not yet consulted: each backend still reads the
-        # settings objects it holds, until its parameters are declared.
-        payload = self._build_reconstruct_payload(input_, self._loaded_model_path)
+        payload = self._build_reconstruct_payload(input_, self._loaded_model_path, options)
 
         with run_subprocess(
             self._reconstruct_entry_point,
@@ -339,7 +336,7 @@ class SubprocessReconstructor(TrainableReconstructor):
     ) -> None:
         if self._export_training_data is None:
             raise NotImplementedError(f'{self._name} does not support exporting training data.')
-        self._export_training_data(file_path, input_)
+        self._export_training_data(file_path, input_, options)
 
     def train(
         self, input_directory: Path, output_directory: Path, *, options: BaseModel
@@ -349,7 +346,7 @@ class SubprocessReconstructor(TrainableReconstructor):
         if self._train_entry_point is None or self._build_train_payload is None:
             raise NotImplementedError(f'{self._name} does not support training.')
 
-        payload = self._build_train_payload(input_directory, output_directory)
+        payload = self._build_train_payload(input_directory, output_directory, options)
 
         with run_subprocess(
             self._train_entry_point,

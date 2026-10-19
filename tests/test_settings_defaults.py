@@ -26,7 +26,6 @@ import importlib
 import inspect
 import pkgutil
 
-import ptychodus.model
 from ptychodus.api.settings import SettingsRegistry
 
 GOLDEN_PATH = Path(__file__).parent / 'data' / 'settings_defaults.ini'
@@ -37,14 +36,36 @@ GOLDEN_PATH = Path(__file__).parent / 'data' / 'settings_defaults.ini'
 _HOME_TOKEN = '${HOME}'
 
 
+# Both trees, because a reconstructor backend's settings live under plugins/
+# once it has moved there and under model/ until it does. Walking only one
+# would drop a whole backend's groups from the fixture and read as an
+# intentional removal rather than as a package that moved.
+_SETTINGS_ROOTS = ('ptychodus.model.', 'ptychodus.plugins.')
+
+
 def _build_registry() -> SettingsRegistry:
     """Instantiate every discoverable ``*Settings`` class against one registry."""
-    root = Path(ptychodus.model.__file__).parent
     registry = SettingsRegistry()
     constructed: set[type] = set()
 
-    for info in pkgutil.walk_packages([str(root)], 'ptychodus.model.'):
-        module = importlib.import_module(info.name)
+    for prefix in _SETTINGS_ROOTS:
+        package = importlib.import_module(prefix.rstrip('.'))
+        root = Path(next(iter(package.__path__)))
+        _construct_settings_under(root, prefix, registry, constructed)
+
+    return registry
+
+
+def _construct_settings_under(
+    root: Path, prefix: str, registry: SettingsRegistry, constructed: set[type]
+) -> None:
+    for info in pkgutil.walk_packages([str(root)], prefix):
+        try:
+            module = importlib.import_module(info.name)
+        except ImportError:
+            # Matches how plugins are loaded: a module whose optional
+            # dependency is absent is skipped, not fatal.
+            continue
 
         for name, obj in vars(module).items():
             if (
@@ -57,8 +78,6 @@ def _build_registry() -> SettingsRegistry:
                 # isclass narrows only to type[object], which takes no arguments; every
                 # *Settings class was verified to accept exactly a registry.
                 cast(Callable[[SettingsRegistry], object], obj)(registry)
-
-    return registry
 
 
 def render_settings() -> str:

@@ -34,9 +34,6 @@ class _Reconstructor(Reconstructor):
     def name(self) -> str:
         return self._name
 
-    def get_progress_goal(self) -> int:
-        return 1
-
     def reconstruct(
         self, input_: ReconstructInput, *, options: BaseModel
     ) -> Iterator[ReconstructOutput]:

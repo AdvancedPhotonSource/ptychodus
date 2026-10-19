@@ -58,13 +58,15 @@ class ReconstructBackgroundTask:
 
     def __call__(self) -> None:
         with self.task_monitor as monitor:
-            monitor.update_progress(0, self.reconstructor.get_progress_goal())
+            # Zero until the run says otherwise, which a progress bar reads
+            # as indeterminate: only the run knows how many steps it will take.
+            monitor.update_progress(0, 0)
             tic = time.perf_counter()
 
             for result in self.reconstructor.reconstruct(
                 self.reconstruct_input, options=self.options
             ):
-                monitor.update_progress(result.progress, self.reconstructor.get_progress_goal())
+                monitor.update_progress(result.progress, result.progress_goal)
                 monitor.update_product(self.product_item, result)
                 of = self.output_product_file
 
@@ -90,13 +92,13 @@ class TrainBackgroundTask:
 
     def __call__(self) -> None:
         with self.task_monitor as monitor:
-            monitor.update_progress(0, self.trainer.get_progress_goal())
+            monitor.update_progress(0, 0)
             tic = time.perf_counter()
 
             for result in self.trainer.train(
                 self.input_directory, self.output_directory, options=self.options
             ):
-                monitor.update_progress(result.progress, self.trainer.get_progress_goal())
+                monitor.update_progress(result.progress, result.progress_goal)
 
                 if monitor.is_stopping:
                     break

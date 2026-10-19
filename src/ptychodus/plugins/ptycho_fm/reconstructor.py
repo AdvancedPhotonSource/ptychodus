@@ -18,6 +18,8 @@ import h5py
 import numpy
 
 from ptychodus.api.preprocess.diffraction import zero_bad_pixels
+from pydantic import BaseModel
+
 from ptychodus.api.reconstruct import ReconstructInput, SubprocessReconstructor
 
 from ._payload import ReconstructPayload, TrainPayload
@@ -34,8 +36,8 @@ __all__ = [
 ]
 
 
-_RECONSTRUCT_ENTRY = 'ptychodus.model.ptycho_fm._subprocess:run_reconstruct'
-_TRAIN_ENTRY = 'ptychodus.model.ptycho_fm._subprocess:run_train'
+_RECONSTRUCT_ENTRY = 'ptychodus.plugins.ptycho_fm._subprocess:run_reconstruct'
+_TRAIN_ENTRY = 'ptychodus.plugins.ptycho_fm._subprocess:run_train'
 
 # Losses evaluated on the detector plane. The supervised objective applies the
 # criterion to object amplitude and phase patches instead, where a probe
@@ -211,7 +213,7 @@ def build_reconstructor(
     """
 
     def build_reconstruct_payload(
-        parameters: ReconstructInput, loaded_model_path: Path | None
+        parameters: ReconstructInput, loaded_model_path: Path | None, options: BaseModel
     ) -> ReconstructPayload:
         return ReconstructPayload(
             name=name,
@@ -222,7 +224,9 @@ def build_reconstructor(
             reconstruct_input=parameters,
         )
 
-    def build_train_payload(input_path: Path, output_path: Path) -> TrainPayload:
+    def build_train_payload(
+        input_path: Path, output_path: Path, options: BaseModel
+    ) -> TrainPayload:
         _verify_loss_supports_mode(name, training_settings.loss_function.get_value())
         return TrainPayload(
             name=name,
@@ -233,7 +237,9 @@ def build_reconstructor(
             output_path=output_path,
         )
 
-    def export_training_data(file_path: Path, parameters: ReconstructInput) -> None:
+    def export_training_data(
+        file_path: Path, parameters: ReconstructInput, options: BaseModel
+    ) -> None:
         # ptycho_fm.CombinedDataset expects one directory per scan holding
         # two HDF5 files sharing a common stem:
         #     <stem>_dp.hdf5    dataset 'dp'    (N, H, W) float
@@ -286,7 +292,6 @@ def build_reconstructor(
     return SubprocessReconstructor(
         name=name,
         reconstruct_entry_point=_RECONSTRUCT_ENTRY,
-        progress_goal_fn=lambda: training_settings.epochs.get_value(),
         build_reconstruct_payload=build_reconstruct_payload,
         is_trainable=True,
         train_entry_point=_TRAIN_ENTRY,

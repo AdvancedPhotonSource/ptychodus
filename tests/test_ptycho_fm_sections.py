@@ -37,9 +37,9 @@ from ptychodus.model.processing.generate import (  # noqa: E402
     restore_options,
 )
 from ptychodus.model.processing.parameter_store import OptionsSection  # noqa: E402
-from ptychodus.model.ptycho_fm import settings as ptycho_fm_settings  # noqa: E402
-from ptychodus.model.ptycho_fm.enums import PtychoFMEnumerators  # noqa: E402
-from ptychodus.model.ptycho_fm.options import default_options  # noqa: E402
+from ptychodus.plugins.ptycho_fm import settings as ptycho_fm_settings  # noqa: E402
+from ptychodus.plugins.ptycho_fm.enums import PtychoFMEnumerators  # noqa: E402
+from ptychodus.plugins.ptycho_fm.options import default_options  # noqa: E402
 
 
 def _golden() -> dict[str, dict[str, str]]:
@@ -201,8 +201,8 @@ def test_only_the_fields_ptychodus_surfaces_are_set() -> None:
 
 def test_the_dump_reproduces_the_config_built_by_hand() -> None:
     """The nested shape and every value the child reads, from the declaration instead."""
-    from ptychodus.model.ptycho_fm.reconstructor import _build_config
-    from ptychodus.model.ptycho_fm.settings import (
+    from ptychodus.plugins.ptycho_fm.reconstructor import _build_config
+    from ptychodus.plugins.ptycho_fm.settings import (
         PtychoFMDataSettings,
         PtychoFMInferenceSettings,
         PtychoFMModelSettings,

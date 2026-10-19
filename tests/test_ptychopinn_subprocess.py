@@ -104,11 +104,10 @@ def test_train_hands_the_public_door_a_settings_mapping() -> None:
     adapter = SubprocessReconstructor(
         name='PtychoPINN train probe',
         reconstruct_entry_point=f'{FIXTURES_MODULE}:capture_ptychopinn_train_call',
-        progress_goal_fn=lambda: 0,
-        build_reconstruct_payload=lambda _parameters, _loaded: payload,
+        build_reconstruct_payload=lambda _parameters, _loaded, _options: payload,
         is_trainable=True,
         train_entry_point=f'{FIXTURES_MODULE}:capture_ptychopinn_train_call',
-        build_train_payload=lambda _input, _output: payload,
+        build_train_payload=lambda _input, _output, _options: payload,
     )
 
     with pytest.raises(ChildError) as excinfo:
@@ -145,8 +144,7 @@ def test_reconstruct_stages_declared_arrays_through_the_embedder_seam() -> None:
     adapter = SubprocessReconstructor(
         name='PtychoPINN reconstruct probe',
         reconstruct_entry_point=f'{FIXTURES_MODULE}:capture_ptychopinn_reconstruct_call',
-        progress_goal_fn=lambda: 0,
-        build_reconstruct_payload=lambda _parameters, _loaded: payload,
+        build_reconstruct_payload=lambda _parameters, _loaded, _options: payload,
     )
 
     with pytest.raises(ChildError) as excinfo:

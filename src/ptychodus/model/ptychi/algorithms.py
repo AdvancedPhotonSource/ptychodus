@@ -107,6 +107,8 @@ from ptychi.api.options.base import (
 from ptychi.api.options.task import PtychographyTaskOptions
 
 from ptychodus.api.product import Product
+from pydantic import BaseModel
+
 from ptychodus.api.reconstruct import ReconstructInput, SubprocessReconstructor
 
 from ._names import DISPLAY_NAMES
@@ -848,12 +850,10 @@ def wrap_as_subprocess_reconstructor(
     algorithm: PtyChiAlgorithm[Any],
     common: PtyChiCommon,
 ) -> SubprocessReconstructor:
-    def progress_goal() -> int:
-        return common.num_epochs
-
     def build_payload(
         parameters: ReconstructInput,
         _loaded_model_path: Path | None,
+        _options: BaseModel,
     ) -> PtyChiPayload:
         return PtyChiPayload(
             reconstruct_input=parameters,
@@ -864,7 +864,6 @@ def wrap_as_subprocess_reconstructor(
     return SubprocessReconstructor(
         name=algorithm.spec.display_name,
         reconstruct_entry_point=_RECONSTRUCT_ENTRY,
-        progress_goal_fn=progress_goal,
         build_reconstruct_payload=build_payload,
     )
 

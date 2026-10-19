@@ -354,7 +354,9 @@ class PluginRegistry:
         self.upscaling_strategies = PluginChooser[UpscalingStrategy]()
         self.deconvolution_strategies = PluginChooser[DeconvolutionStrategy]()
         # A reconstructor backend is discovered the same way a file format is:
-        # by registering itself, rather than by being named somewhere.
+        # by registering itself, rather than by being named somewhere. An
+        # instance like every other chooser holds, which a backend can supply
+        # because it is configured per call and holds nothing of its own.
         self.reconstructor_libraries = PluginChooser[ReconstructorLibrary]()
 
     def register_product_file_reader_with_adapters(

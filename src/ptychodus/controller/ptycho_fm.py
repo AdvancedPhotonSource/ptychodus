@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QWidget
 
-from ..model.ptycho_fm.core import PtychoFMReconstructorLibrary
+from ..plugins.ptycho_fm import PtychoFMReconstructorLibrary
 from .data import FileDialogFactory
 from .parameters import ParameterViewBuilder
 from .processing import ReconstructorViewControllerFactory
