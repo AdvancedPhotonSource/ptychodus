@@ -31,10 +31,16 @@ class ProcessingCore:
         algorithm_libraries: Sequence[ReconstructorLibrary],
     ) -> None:
         self._settings = ProcessingSettings(settings_registry)
+        self._task_monitor = ProcessingTaskMonitor(task_manager)
+
+        # Ahead of the first thing that asks a library for its reconstructors,
+        # since that is when a library builds them and says what it found.
+        for library in algorithm_libraries:
+            library.get_logger().addHandler(self._task_monitor.get_log_handler())
+
         self.algorithm_parameter = ProcessingAlgorithmParameter(
             self._settings.algorithm, algorithm_libraries
         )
-        self._task_monitor = ProcessingTaskMonitor(task_manager)
         self.parameter_store = ProcessingParameterStore(settings_registry)
         self.device_selection = DeviceSelection(self._settings.devices)
 
@@ -60,6 +66,3 @@ class ProcessingCore:
             self._task_monitor,
             self.parameter_store,
         )
-
-        for library in algorithm_libraries:
-            library.get_logger().addHandler(self._task_monitor.get_log_handler())

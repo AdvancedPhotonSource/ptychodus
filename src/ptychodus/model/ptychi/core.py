@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
-from importlib.metadata import PackageNotFoundError, version
-import logging
 from typing import TYPE_CHECKING, Any
 
 from ptychodus.api.product import Product
@@ -32,12 +29,10 @@ if TYPE_CHECKING:
 
     from .algorithms import PtyChiAlgorithm
 
-logger = logging.getLogger(__name__)
-
 
 class PtyChiReconstructorLibrary(ReconstructorLibrary):
     def __init__(self, settings_registry: SettingsRegistry) -> None:
-        super().__init__('ptychi')
+        super().__init__('ptychi', 'ptychi', requires=('ptychi', 'torch'))
         self.autodiff_settings = PtyChiAutodiffSettings(settings_registry)
         self.bh_settings = PtyChiBHSettings(settings_registry)
         self.dm_settings = PtyChiDMSettings(settings_registry)
@@ -51,45 +46,33 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
         self.settings = PtyChiSettings(settings_registry)
 
         self.enumerators = PtyChiEnumerators()
-        self.reconstructor_list: list[Reconstructor] = list()
         self._algorithms: dict[str, PtyChiAlgorithm[Any]] | None = None
 
-        # One try/except/else: import the minimal pty-chi surface needed to
-        # construct the wrappers (ptychi.api pulls torch for type annotations
-        # only -- no CUDA context), then build the reconstructors. An absent
-        # backend leaves the list empty, which is a state this library may
-        # report rather than an error it has to raise.
-        try:
-            from .algorithms import PtyChiCommon, build_algorithms, wrap_as_subprocess_reconstructor
-        except ImportError:
-            logger.info('pty-chi not found.')
-        else:
-            try:
-                ptychi_version = version('ptychi')
-            except PackageNotFoundError:
-                ptychi_version = 'unknown'
-            logger.info(f'Pty-Chi {ptychi_version}')
+    def _build(self) -> list[Reconstructor]:
+        # ptychi.api pulls torch for type annotations only -- no CUDA context.
+        from .algorithms import PtyChiCommon, build_algorithms, wrap_as_subprocess_reconstructor
 
-            common = PtyChiCommon(
-                self.settings,
-                self.object_settings,
-                self.probe_settings,
-                self.probe_position_settings,
-                self.opr_settings,
-            )
-            self._algorithms = build_algorithms(
-                common,
-                dm_settings=self.dm_settings,
-                raar_settings=self.raar_settings,
-                pie_settings=self.pie_settings,
-                lsqml_settings=self.lsqml_settings,
-                autodiff_settings=self.autodiff_settings,
-                bh_settings=self.bh_settings,
-            )
-            self.reconstructor_list.extend(
-                wrap_as_subprocess_reconstructor(algorithm, common)
-                for algorithm in self._algorithms.values()
-            )
+        common = PtyChiCommon(
+            self.settings,
+            self.object_settings,
+            self.probe_settings,
+            self.probe_position_settings,
+            self.opr_settings,
+        )
+        self._algorithms = build_algorithms(
+            common,
+            dm_settings=self.dm_settings,
+            raar_settings=self.raar_settings,
+            pie_settings=self.pie_settings,
+            lsqml_settings=self.lsqml_settings,
+            autodiff_settings=self.autodiff_settings,
+            bh_settings=self.bh_settings,
+        )
+
+        return [
+            wrap_as_subprocess_reconstructor(algorithm, common)
+            for algorithm in self._algorithms.values()
+        ]
 
     def build_task_options(self, algorithm_name: str, product: Product) -> PtychographyTaskOptions:
         """Build a pty-chi ``PtychographyTaskOptions`` for the named algorithm.
@@ -97,6 +80,8 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
         Public so that a launcher can build the options a child process will run.
         Case-insensitive on the display name, so 'rPIE' and 'rpie' both resolve.
         """
+        list(self)  # the algorithms are a by-product of building the reconstructors
+
         if self._algorithms is None:
             raise RuntimeError('pty-chi is not available; cannot build task options.')
         try:
@@ -108,6 +93,3 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
     @property
     def name(self) -> str:
         return 'pty-chi'
-
-    def __iter__(self) -> Iterator[Reconstructor]:
-        return iter(self.reconstructor_list)

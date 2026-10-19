@@ -11,6 +11,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, fields
 from enum import auto, Enum
+from importlib.metadata import PackageNotFoundError, version
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
 import logging
@@ -383,37 +385,103 @@ class SubprocessReconstructor(TrainableReconstructor):
 
 
 class ReconstructorLibrary(Iterable[Reconstructor], ABC):
-    """Iterable collection of Reconstructor instances provided by a plugin library."""
+    """Iterable collection of Reconstructor instances provided by a plugin library.
 
-    def __init__(self, logger_name: str) -> None:
+    A library is named twice over, for two readers. ``name`` is what a person
+    selecting an algorithm sees; ``distribution`` is what the package it wraps
+    is called on PyPI, which is the name a version lives under and is often
+    spelled differently. ``requires`` lists the modules the library cannot
+    work without.
+
+    What a library offers is settled on first use rather than at
+    construction, because registration happens in every process that loads
+    plugins including the many that never reconstruct. Whichever way it
+    turns out, it is announced the same way: a library whose packages are
+    missing offers nothing and says so, and one that builds reports the
+    version it built against.
+    """
+
+    def __init__(
+        self, logger_name: str, distribution: str, *, requires: Sequence[str] = ()
+    ) -> None:
         super().__init__()
         self._logger = logging.getLogger(logger_name)
+        self._distribution = distribution
+        self._requires = tuple(requires)
+        self._reconstructors: list[Reconstructor] | None = None
 
     @property
     @abstractmethod
     def name(self) -> str:
         pass
 
-    def log_levels(self) -> Iterable[str]:
-        return ('CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG')
-
     def get_logger(self) -> logging.Logger:
         return self._logger
 
-    def get_log_level(self) -> str:
-        level = self._logger.getEffectiveLevel()
-        return logging.getLevelName(level)
+    def is_available(self) -> bool:
+        """Report whether every module this library needs can be located.
 
-    def set_log_level(self, name: str) -> None:
-        name_before = self.get_log_level()
+        Names are resolved without being imported, so asking costs nothing in
+        a process that will never reconstruct. It is a precondition and not a
+        promise: a module that resolves can still fail to import, which is
+        why building is guarded separately.
+        """
+        return all(find_spec(module) is not None for module in self._requires)
+
+    def get_version(self) -> str:
+        """Return the installed version of the package this wraps, or 'unknown'.
+
+        Which build produced a result is the first question asked when two
+        machines disagree, so this is logged where a reconstruction's own log
+        records it rather than only reported by a diagnostic command.
+        """
+        try:
+            return version(self._distribution)
+        except PackageNotFoundError:
+            return 'unknown'
+
+    def log_version(self) -> None:
+        """Record the version through this library's own logger.
+
+        Its own, not the module's: the logger named at construction is the one
+        a task monitor attaches a handler to, so anything logged elsewhere
+        never reaches whatever is watching the run.
+        """
+        self._logger.info(f'{self.name} {self.get_version()}')
+
+    def __iter__(self) -> Iterator[Reconstructor]:
+        if self._reconstructors is None:
+            self._reconstructors = self._enumerate()
+
+        return iter(self._reconstructors)
+
+    def _enumerate(self) -> list[Reconstructor]:
+        """Build once, reporting either outcome through this library's logger."""
+        if not self.is_available():
+            self._logger.info(f'{self.name} not found.')
+            return []
 
         try:
-            self._logger.setLevel(name)
-        except ValueError:
-            self._logger.error(f'Bad log level "{name}".')
+            reconstructors = list(self._build())
+        except ImportError:
+            # Locating a module does not execute it, so a package that is
+            # present but unusable -- a dependency of its own missing, a
+            # partial install -- is only discovered here. The traceback goes
+            # with it, because this is the one case the caller cannot tell
+            # apart from simply not having installed the backend.
+            self._logger.info(f'{self.name} not found.', exc_info=True)
+            return []
 
-        name_after = self.get_log_level()
-        self._logger.info(f'Changed {self.name} logging level {name_before} -> {name_after}')
+        self.log_version()
+        return reconstructors
+
+    @abstractmethod
+    def _build(self) -> Iterable[Reconstructor]:
+        """Create the reconstructors, importing whatever they need.
+
+        Called at most once, and only after ``is_available`` has agreed, so
+        an implementation imports its backend directly rather than guarding.
+        """
 
 
 class PositionIndexFilter(Enum):

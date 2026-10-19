@@ -42,16 +42,16 @@ class _Reconstructor(Reconstructor):
 
 class _Library(ReconstructorLibrary):
     def __init__(self, name: str, *reconstructors: Reconstructor) -> None:
-        super().__init__(name)
+        super().__init__(name, name)
         self._name = name
-        self._reconstructors = reconstructors
+        self._built = reconstructors
 
     @property
     def name(self) -> str:
         return self._name
 
-    def __iter__(self) -> Iterator[Reconstructor]:
-        return iter(self._reconstructors)
+    def _build(self) -> tuple[Reconstructor, ...]:
+        return self._built
 
 
 @pytest.fixture
