@@ -34,7 +34,6 @@ from .memory import MemoryPresenter
 from .processing import ProcessingCore
 from .product import PositionsStreamingContext, ProductCore
 from .ptychi import PtyChiReconstructorLibrary
-from .ptychopinn import PtychoPINNReconstructorLibrary
 from .task_manager import TaskManager
 from .visualization import VisualizationEngine
 from .workflow import ConcreteWorkflowAPI
@@ -133,9 +132,6 @@ class ModelCore:
         self.object_visualization_engine = VisualizationEngine(is_complex=True)
 
         self.ptychi_reconstructor_library = PtyChiReconstructorLibrary(self.settings_registry)
-        self.ptychopinn_reconstructor_library = PtychoPINNReconstructorLibrary(
-            self.settings_registry
-        )
 
         self.processing_core = ProcessingCore(
             self._task_manager,
@@ -143,7 +139,6 @@ class ModelCore:
             self.product_core.product_api,
             [
                 self.ptychi_reconstructor_library,
-                self.ptychopinn_reconstructor_library,
                 # Whatever registered itself, taken as the interface rather
                 # than as a named backend. A library still constructed above
                 # is one that has not moved under plugins/ yet.

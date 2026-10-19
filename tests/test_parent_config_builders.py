@@ -64,26 +64,10 @@ def _gpu_context_offenders() -> list[str]:
 
 
 def _build_ptychopinn_settings() -> list[Any]:
-    from ptychodus.api.settings import SettingsRegistry
-    from ptychodus.model.ptychopinn.reconstructor import _build_settings
-    from ptychodus.model.ptychopinn.settings import (
-        PtychoPINNDataSettings,
-        PtychoPINNInferenceSettings,
-        PtychoPINNModelSettings,
-        PtychoPINNTrainingSettings,
-    )
+    from ptychodus.plugins.ptychopinn.options import default_options
+    from ptychodus.plugins.ptychopinn.reconstructor import _build_settings
 
-    registry = SettingsRegistry()
-
-    return [
-        _build_settings(
-            'Unsupervised',
-            PtychoPINNDataSettings(registry),
-            PtychoPINNModelSettings(registry),
-            PtychoPINNTrainingSettings(registry),
-            PtychoPINNInferenceSettings(registry),
-        )
-    ]
+    return [_build_settings('Unsupervised', default_options())]
 
 
 def _build_ptycho_fm_configs() -> list[Any]:
@@ -253,39 +237,21 @@ def test_ptycho_fm_maps_the_uncoupled_mode_to_null() -> None:
     assert _build_config('Unsupervised', options)['model']['coupled_decoder_mode'] == 'amp_phase'
 
 
-def _ptychopinn_settings() -> Any:
-    from ptychodus.api.settings import SettingsRegistry
-    from ptychodus.model.ptychopinn.settings import (
-        PtychoPINNDataSettings,
-        PtychoPINNInferenceSettings,
-        PtychoPINNModelSettings,
-        PtychoPINNTrainingSettings,
-    )
-
-    registry = SettingsRegistry()
-    return (
-        PtychoPINNDataSettings(registry),
-        PtychoPINNModelSettings(registry),
-        PtychoPINNTrainingSettings(registry),
-        PtychoPINNInferenceSettings(registry),
-    )
-
-
 def _build_ptychopinn_settings_mapping(**overrides: Any) -> dict[str, Any]:
-    from ptychodus.model.ptychopinn.reconstructor import _build_settings
+    from ptychodus.plugins.ptychopinn.options import default_options
+    from ptychodus.plugins.ptychopinn.reconstructor import _build_settings
 
-    data, model, training, inference = _ptychopinn_settings()
+    options = default_options()
 
     for name, value in overrides.items():
-        for settings in (data, model, training, inference):
-            parameter = getattr(settings, name, None)
-            if parameter is not None:
-                parameter.set_value(value)
+        for branch in (options.data, options.model, options.training, options.inference):
+            if name in type(branch).model_fields:
+                setattr(branch, name, value)
                 break
         else:
-            raise AssertionError(f'no PtychoPINN setting named {name!r}')
+            raise AssertionError(f'no PtychoPINN option named {name!r}')
 
-    return _build_settings('Unsupervised', data, model, training, inference)
+    return _build_settings('Unsupervised', options)
 
 
 def test_ptychopinn_settings_omit_nphotons() -> None:

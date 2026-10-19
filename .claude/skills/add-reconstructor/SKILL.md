@@ -5,127 +5,122 @@ description: Scaffold a new reconstructor backend library (a *ReconstructorLibra
 
 # add-reconstructor
 
-Reconstructor backends are optional dependencies. Each lives under `src/ptychodus/model/<backend>/` and exposes a `*ReconstructorLibrary` that `ModelCore` composes and hands to `ProcessingCore`. The library must degrade gracefully when the backend package isn't installed — the GUI should still open.
+Reconstructor backends are optional dependencies. Each lives under **`src/ptychodus/plugins/<backend>/`** and registers a `*ReconstructorLibrary` **instance** with the plugin registry, which `ModelCore` passes to `ProcessingCore` as the abstract type. A backend is discovered, never named in a composition root, so adding one touches no existing file except the settings-section table.
+
+A backend holds no settings and reads none. It **declares** what it accepts as a nested pydantic object, and `model/processing/` generates the live parameters, the INI keys and the panel from that declaration.
 
 ## Steps
 
 ### 1. Directory layout
 
-Create `src/ptychodus/model/<backend>/` with:
+Create `src/ptychodus/plugins/<backend>/` with:
 
-- `__init__.py` — re-exports the `*ReconstructorLibrary` class only.
+- `__init__.py` — `register_plugins(registry)`, registering one library instance.
 - `core.py` — the `*ReconstructorLibrary` class.
-- `settings.py` — one or more `*Settings` classes (see the `add-core` skill for the settings pattern).
-  **Being replaced.** A backend is moving toward declaring what it accepts as a nested pydantic
-  object returned from `get_default_options()`, with `model/processing/` generating the settings
-  from it; see `model/ptychopinn/options.py` for a declaration ptychodus owns and
-  `model/processing/_ptycho_fm_sections.py` for an overlay on an upstream one. Until the backends
-  are switched over, write the `*Settings` class — but keep bounds and display text out of the
-  controller, because that is the half the migration cannot do for you.
-- `reconstructor.py` (or several) — the actual `Reconstructor` / `TrainableReconstructor` implementations. `core.py` imports this module only after its `find_spec` probe has confirmed the backend is installed.
+- `options.py` — the pydantic declaration plus a `default_options()` factory.
+- `reconstructor.py` — builds the `Reconstructor` / `TrainableReconstructor`. Imported only from `_build()`, never at module scope.
+- `_subprocess.py` — the child-side entry points, if the backend touches a GPU.
 
-### 2. Library class
+Write no `settings.py`. The hand-written `*Settings` class is the retired idiom; a new backend declares instead.
 
-Model on [src/ptychodus/model/ptychopinn/core.py](../../src/ptychodus/model/ptychopinn/core.py):
+### 2. Declare what the backend accepts
+
+In `options.py`, one `BaseModel` per settings group plus a root that composes them. State bounds, titles and descriptions **on the field** — `controller/parameters.py` raises on a missing bound, and the generated panel takes its label and tool tip from `title` and `description`.
 
 ```python
-from collections.abc import Iterator
-from importlib.metadata import PackageNotFoundError, version
-from importlib.util import find_spec
-from typing import Final
-import logging
-
-from ptychodus.api.reconstruct import (
-    NullReconstructor, Reconstructor, ReconstructorLibrary, TrainableReconstructor,
-)
-from ptychodus.api.settings import SettingsRegistry
-
-from .settings import <Backend>Settings
-
-logger = logging.getLogger(__name__)
-
-_MODES: Final[tuple[str, ...]] = ('Algorithm1', 'Algorithm2')
+class DataOptions(BaseModel):
+    batch_size: int = Field(16, ge=1, title='Batch Size:', description='Patterns per step.')
 
 
-def _<backend>_available() -> bool:
-    """Return True iff the backend is importable, without importing it."""
-    return all(find_spec(mod) is not None for mod in ('<backend_package>',))
+class <Backend>Options(BaseModel):
+    data: DataOptions = Field(default_factory=DataOptions)
+
+
+def default_options() -> <Backend>Options:
+    """Return the configuration ptychodus starts a <Backend> run from."""
+    return <Backend>Options()
+```
+
+Use a `StrEnum` for a fixed set of values; the panel reads the members and builds a combo box, so no separate enumerators class is needed. Pass the declaration as an **instance**, not the class — a field built by a `default_factory` reports its class-level default as undefined.
+
+### 3. The library class
+
+Model on [src/ptychodus/plugins/ptychopinn/core.py](../../src/ptychodus/plugins/ptychopinn/core.py):
+
+```python
+from ...api.reconstruct import ReconstructorLibrary, TrainableReconstructor
 
 
 class <Backend>ReconstructorLibrary(ReconstructorLibrary):
-    def __init__(
-        self, settings_registry: SettingsRegistry, is_developer_mode_enabled: bool
-    ) -> None:
-        super().__init__('<backend_short_name>')
-        self.settings = <Backend>Settings(settings_registry)
-        self._reconstructors: list[Reconstructor] = []  # or list[TrainableReconstructor]
+    """What <Backend> offers, holding nothing but the names it is built from."""
 
-        if not _<backend>_available():
-            logger.info('<Backend> not found.')
-
-            if is_developer_mode_enabled:
-                for mode in _MODES:
-                    self._reconstructors.append(NullReconstructor(mode))
-            return
-
-        try:
-            pkg_version = version('<backend_package>')
-        except PackageNotFoundError:
-            pkg_version = 'unknown'
-        logger.info(f'<Backend> {pkg_version}')
-
-        # Imported only now, so a missing backend never reaches an import.
-        from .reconstructor import build_reconstructor
-
-        for mode in _MODES:
-            self._reconstructors.append(build_reconstructor(mode, self.settings))
+    def __init__(self) -> None:
+        super().__init__('<logger-name>', '<distribution>', requires=('<module>', 'torch'))
 
     @property
     def name(self) -> str:
         return '<Backend>'
 
-    def __iter__(self) -> Iterator[Reconstructor]:
-        return iter(self._reconstructors)
+    def _build(self) -> list[TrainableReconstructor]:
+        # Imported lazily so this module's own import cost stays small.
+        from .reconstructor import build_reconstructor
+
+        return [build_reconstructor(mode) for mode in ('Algorithm1', 'Algorithm2')]
 ```
 
 Key rules:
 
-- **Detect the backend with `find_spec`, not by catching `ModuleNotFoundError` around the import.** A probe cannot be satisfied by a half-installed package, and it keeps the backend out of `sys.modules` entirely — which `tests/test_no_gpu_context.py` enforces for any backend that would otherwise pull in a GPU framework at composition-root time.
-- **Share one tuple of mode names** between the real reconstructors and the developer-mode stubs, so the GUI advertises the same names either way.
-- **In developer mode**, populate `NullReconstructor` stubs so the GUI still shows the algorithm names for testing. Outside developer mode, leave the list empty when the backend is missing.
-- **Add `<backend_package>` as an optional extra** in `pyproject.toml` under `[project.optional-dependencies]`, unless it is published on no index — see the comment above `[project.optional-dependencies]` for backends installed from a checkout instead.
+- **The constructor takes no arguments and does no work.** Registration happens in every process that loads plugins, including the many that never reconstruct.
+- **`requires` names every module the backend cannot work without**, including transitive ones it imports directly. The base resolves them with `find_spec` — without importing, which keeps a GPU framework out of `sys.modules` as [tests/test_no_gpu_context.py](../../tests/test_no_gpu_context.py) enforces.
+- **Write no availability logic.** The base calls `_build()` once on first iteration and announces either outcome through the library's own logger: the version on success, `<Backend> not found.` when a required module is absent or when `_build()` raises `ImportError`.
+- **`name` is the display name; `distribution` is the PyPI package** a version lives under. They are usually spelled differently.
 
-### 3. Implement the reconstructor
+### 4. Build the reconstructor
 
-In `reconstructor.py`, subclass `Reconstructor` or `TrainableReconstructor` from [src/ptychodus/api/reconstructor.py](../../src/ptychodus/api/reconstructor.py). The core contract:
+In `reconstructor.py`, narrow the incoming options once and pass `default_options` to the reconstructor so the settings layer knows what to generate:
 
-- `reconstruct(parameters) -> Iterator[ReconstructOutput]` — yield one `ReconstructOutput` per iteration so the GUI can stream progress.
-- For `TrainableReconstructor`, also implement `train(...)` and the ingest/export hooks.
+```python
+def _declared(options: BaseModel) -> <Backend>Options:
+    if not isinstance(options, <Backend>Options):
+        raise TypeError(f'Expected <Backend>Options, got {type(options).__name__}.')
 
-### 4. Wire into ModelCore
+    return options
+```
 
-In [src/ptychodus/model/core.py](../../src/ptychodus/model/core.py):
+GPU work belongs in a spawned child: wrap it with `SubprocessReconstructor` (see [src/ptychodus/api/reconstruct.py](../../src/ptychodus/api/reconstruct.py)), passing `default_options=default_options` and the child entry points. Yield one `ReconstructOutput` per iteration so the GUI can stream progress; set `progress_goal` once the run knows its own iteration count.
 
-1. Import `<Backend>ReconstructorLibrary`.
-2. Construct it in `ModelCore.__init__` after `settings_registry` is available.
-3. Include it in the list passed to `ProcessingCore(...)`.
+### 5. Register the plugin
 
-Follow the existing pattern for `PtyChiReconstructorLibrary`, `PtychoPINNReconstructorLibrary`, `PtychoFMReconstructorLibrary`.
+```python
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.reconstructor_libraries.register_plugin(
+        <Backend>ReconstructorLibrary(),
+        simple_name='<Backend>',
+        display_name='<Backend>',
+    )
+```
 
-### 5. Optional-dependency plumbing
+Nothing else is wired. `ModelCore` takes whatever registered, and `ControllerCore` builds a panel from the declaration for any backend without a hand-written one.
 
-Add the backend to `pyproject.toml`:
+### 6. Say where the options are persisted
+
+Add `src/ptychodus/model/processing/_<backend>_sections.py` exporting `sections()`, one `OptionsSection` per settings group, and list it in `_SECTIONS_BY_LIBRARY` in [src/ptychodus/model/processing/core.py](../../src/ptychodus/model/processing/core.py) keyed by the library's `name`. A backend absent from that table registers no groups and runs on its declared defaults. The table is **transitional**, retiring with the flat INI layout.
+
+A guard test asserts every name in the table matches a registered library, because a rename would otherwise silently drop the backend's settings.
+
+### 7. Optional-dependency plumbing
 
 ```toml
 [project.optional-dependencies]
 <backend> = ["<backend-package>>=<min-version>"]
 ```
 
-Document the install command in the backend's `core.py` docstring if the install isn't a plain `uv sync --extra <backend>` (e.g. requires a sibling checkout).
+See the comment above `[project.optional-dependencies]` for a backend published on no index. If the install is not a plain `uv sync --extra <backend>`, say so in the backend's `core.py` docstring.
 
 ## Verify
 
 - `uv sync --extra <backend>` — install the backend.
-- `uv run ptychodus` — launch the GUI; the new backend should appear in the reconstructor list. Toggle `--log-level 10` to see the "found / not found" message.
-- Without the extra (`uv sync` without `--extra <backend>`), the GUI still opens and other reconstructors still work; if developer mode is on, `NullReconstructor` stubs appear.
+- `uv run ptychodus` — the backend appears in the reconstructor list with a generated panel. `--log-level 10` shows the version or the "not found" line.
+- Without the extra, the GUI still opens, the backend offers nothing, and no other reconstructor is affected.
+- `uv run pytest tests/test_settings_defaults.py` — the golden INI gains the new groups; regenerate the fixture deliberately and review the diff.
 - `pre-push` — full CI gate green.

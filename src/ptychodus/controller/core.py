@@ -21,13 +21,13 @@ from .probe import ProbeController
 from .probe_positions import ProbePositionsController
 from .helpers import create_brush_for_editable_cell
 from .processing import ProcessingController
+from .processing.core import ReconstructorViewControllerFactory
 from .processing.generated import GeneratedViewControllerFactory
 from .product import ProductController
 from .product.core import ProductRepositoryTableModel
 from .product.visualization import ProductVisualizationController
 from .task_status import TaskStatusController
 from .ptychi import PtyChiViewControllerFactory
-from .ptychopinn import PtychoPINNViewControllerFactory
 from .settings import SettingsController
 
 
@@ -46,18 +46,23 @@ class ControllerCore:
 
         self._memory_controller = MemoryController(model.memory_presenter, view.memory_widget)
         self._file_dialog_factory = FileDialogFactory()
-        self._ptychi_view_controller_factory = PtyChiViewControllerFactory(
-            model.ptychi_reconstructor_library
-        )
-        self._ptychopinn_view_controller_factory = PtychoPINNViewControllerFactory(
-            model.ptychopinn_reconstructor_library,
-            self._file_dialog_factory,
-        )
-        # Rendered from what PtychoFM declares, rather than from a panel
-        # written key by key.
-        self._ptycho_fm_view_controller_factory = GeneratedViewControllerFactory(
-            'PtychoFM', model.processing_core.parameter_store
-        )
+        # Panels ptychodus still lays out by hand. A backend named here keeps
+        # its own panel; every other one gets a panel rendered from what it
+        # declares, so adding a backend needs no wiring here.
+        bespoke: list[ReconstructorViewControllerFactory] = [
+            PtyChiViewControllerFactory(model.ptychi_reconstructor_library),
+        ]
+        hand_written = {factory.name.casefold() for factory in bespoke}
+        self._view_controller_factories: list[ReconstructorViewControllerFactory] = [
+            *bespoke,
+            *(
+                GeneratedViewControllerFactory(
+                    plugin.strategy.name, model.processing_core.parameter_store
+                )
+                for plugin in model.plugin_registry.reconstructor_libraries
+                if plugin.strategy.name.casefold() not in hand_written
+            ),
+        ]
         # Shared product-repository table model. Constructing it here (before
         # any consumer) lets SettingsController, DiffractionController,
         # ProductController, and ProcessingController all bind to the same
@@ -203,11 +208,7 @@ class ControllerCore:
             view.processing_view,
             view.processing_status_view,
             self._file_dialog_factory,
-            [
-                self._ptychi_view_controller_factory,
-                self._ptychopinn_view_controller_factory,
-                self._ptycho_fm_view_controller_factory,
-            ],
+            self._view_controller_factories,
         )
         self._globus_controller = GlobusController(
             model.globus_core.settings,

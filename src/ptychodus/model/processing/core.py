@@ -6,7 +6,7 @@ from ptychodus.api.settings import SettingsRegistry
 from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .api import ProcessingAPI, ProcessingAlgorithmParameter
-from . import _ptycho_fm_sections
+from . import _ptycho_fm_sections, _ptychopinn_sections
 from .devices import DeviceSelection
 from .monitor import ProcessingTaskMonitor
 from .parameter_store import OptionsSection, ProcessingParameterStore
@@ -19,6 +19,7 @@ from .settings import ProcessingSettings
 # absent here registers no groups and runs on its declared defaults.
 _SECTIONS_BY_LIBRARY: Mapping[str, Callable[[], Sequence[OptionsSection]]] = {
     'PtychoFM': _ptycho_fm_sections.sections,
+    'PtychoPINN': _ptychopinn_sections.sections,
 }
 
 

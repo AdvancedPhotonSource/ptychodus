@@ -8,7 +8,8 @@ description: Verify api/model/view+controller layer boundary compliance across t
 CLAUDE.md documents a strict three-layer separation:
 
 - `src/ptychodus/api/` — pure domain, depends on nothing else in ptychodus.
-- `src/ptychodus/model/` — application logic, depends only on `api/`.
+- `src/ptychodus/model/` — application logic; depends on `api/` and `plugins/`.
+- `src/ptychodus/plugins/` — discovered plugins; depends on `api/` only, never on `model/`.
 - `src/ptychodus/view/` and `src/ptychodus/controller/` — GUI; may depend on `api/` and `model/`.
 - `src/ptychodus_store/` — separate package; reads from `ptychodus.api` only, never from `ptychodus.model` or `ptychodus.view`.
 
@@ -44,7 +45,18 @@ grep -rn --include='*.py' -E "^(from|import)[[:space:]]+PyQt5" src/ptychodus/api
 
 Expected: no output. If found, the code should move to `view/` or `controller/`.
 
-### 4. ptychodus_store/ must not import ptychodus.model or ptychodus.view
+### 4. plugins/ must not import model/, view/, or controller/
+
+A plugin is loaded by `api/plugins.py`, which `model/` builds on, so an import back into `model/` inverts the layering and risks a cycle at discovery time.
+
+```sh
+grep -rn --include='*.py' -E "^(from|import)[[:space:]]+ptychodus\.(model|view|controller)" src/ptychodus/plugins/
+grep -rn --include='*.py' -E "^from[[:space:]]+\.\.\.(model|view|controller)" src/ptychodus/plugins/
+```
+
+Expected: no output. The second form catches the relative spelling a plugin is more likely to reach for.
+
+### 5. ptychodus_store/ must not import ptychodus.model or ptychodus.view
 
 ```sh
 grep -rn --include='*.py' -E "^(from|import)[[:space:]]+ptychodus\.(model|view|controller)" src/ptychodus_store/
@@ -52,7 +64,7 @@ grep -rn --include='*.py' -E "^(from|import)[[:space:]]+ptychodus\.(model|view|c
 
 Expected: no output.
 
-### 5. Circular-check inside model/ (informational)
+### 6. Circular-check inside model/ (informational)
 
 Not a hard rule, but flag any `model/<A>/` file importing from `model/<B>/` where `B` is composed *after* `A` in `ModelCore.__init__` — that's an ordering bug waiting to happen.
 

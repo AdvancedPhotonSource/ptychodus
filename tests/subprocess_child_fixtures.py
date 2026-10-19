@@ -111,7 +111,7 @@ def capture_ptychopinn_reconstruct_call(payload: Any, queue: Any) -> None:
         },
     )
 
-    from ptychodus.model.ptychopinn import _subprocess
+    from ptychodus.plugins.ptychopinn import _subprocess
 
     _subprocess.run_reconstruct(payload, queue)
 
@@ -142,7 +142,7 @@ def capture_ptychopinn_train_call(payload: Any, queue: Any) -> None:
         ptycho_torch_DOT_train={'train': train},
     )
 
-    from ptychodus.model.ptychopinn import _subprocess
+    from ptychodus.plugins.ptychopinn import _subprocess
 
     _subprocess.run_train(payload, queue)
 

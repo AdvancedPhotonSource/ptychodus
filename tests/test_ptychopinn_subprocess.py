@@ -23,8 +23,8 @@ from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructInput, SubprocessReconstructor
 from ptychodus.api.spawn import ChildError
-from ptychodus.model.ptychopinn._payload import ReconstructPayload, TrainPayload
-from ptychodus.model.ptychopinn._subprocess import _build_arrays, _read_epoch_losses
+from ptychodus.plugins.ptychopinn._payload import ReconstructPayload, TrainPayload
+from ptychodus.plugins.ptychopinn._subprocess import _build_arrays, _read_epoch_losses
 
 _TESTS_DIR = str(Path(__file__).parent)
 if _TESTS_DIR not in sys.path:

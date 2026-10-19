@@ -35,6 +35,7 @@ __all__ = [
     'PhysicsWeightSchedule',
     'PtychoPINNOptions',
     'TrainingOptions',
+    'default_options',
 ]
 
 
@@ -315,3 +316,12 @@ class PtychoPINNOptions(_Options):
     model: ModelOptions = Field(default_factory=ModelOptions)
     training: TrainingOptions = Field(default_factory=TrainingOptions)
     inference: InferenceOptions = Field(default_factory=InferenceOptions)
+
+
+def default_options() -> PtychoPINNOptions:
+    """Return the configuration ptychodus starts a PtychoPINN run from.
+
+    Nothing to override: this declaration is ptychodus's own, so every field
+    already states the default it starts at.
+    """
+    return PtychoPINNOptions()

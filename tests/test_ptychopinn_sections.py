@@ -20,7 +20,7 @@ from ptychodus.model.processing._ptychopinn_sections import sections
 from ptychodus.model.processing.flatten import flatten_options, render_value
 from ptychodus.model.processing.generate import populate_parameter_group, restore_options
 from ptychodus.model.processing.parameter_store import OptionsSection
-from ptychodus.model.ptychopinn.options import Accelerator, PtychoPINNOptions
+from ptychodus.plugins.ptychopinn.options import Accelerator, PtychoPINNOptions
 
 
 def _golden() -> dict[str, dict[str, str]]:
