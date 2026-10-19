@@ -6,7 +6,6 @@ import logging
 from typing import Final
 
 from ...api.reconstruct import (
-    NullReconstructor,
     Reconstructor,
     ReconstructorLibrary,
     TrainableReconstructor,
@@ -33,9 +32,7 @@ def _ptychopinn_available() -> bool:
 
 
 class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
-    def __init__(
-        self, settings_registry: SettingsRegistry, is_developer_mode_enabled: bool
-    ) -> None:
+    def __init__(self, settings_registry: SettingsRegistry) -> None:
         super().__init__('ptychopinn')
         self.data_settings = PtychoPINNDataSettings(settings_registry)
         self.model_settings = PtychoPINNModelSettings(settings_registry)
@@ -46,10 +43,6 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
 
         if not _ptychopinn_available():
             logger.info('PtychoPINN not found.')
-
-            if is_developer_mode_enabled:
-                for reconstructor in _MODES:
-                    self._reconstructors.append(NullReconstructor(reconstructor))
             return
 
         # find_spec succeeded above, but the metadata query still hits importlib

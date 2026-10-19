@@ -7,13 +7,11 @@ from typing import TYPE_CHECKING, Any
 
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import (
-    NullReconstructor,
     Reconstructor,
     ReconstructorLibrary,
 )
 from ptychodus.api.settings import SettingsRegistry
 
-from ._names import DISPLAY_NAMES
 from .enums import PtyChiEnumerators
 from .settings import (
     PtyChiAutodiffSettings,
@@ -38,11 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 class PtyChiReconstructorLibrary(ReconstructorLibrary):
-    def __init__(
-        self,
-        settings_registry: SettingsRegistry,
-        is_developer_mode_enabled: bool,
-    ) -> None:
+    def __init__(self, settings_registry: SettingsRegistry) -> None:
         super().__init__('ptychi')
         self.autodiff_settings = PtyChiAutodiffSettings(settings_registry)
         self.bh_settings = PtyChiBHSettings(settings_registry)
@@ -62,15 +56,13 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
 
         # One try/except/else: import the minimal pty-chi surface needed to
         # construct the wrappers (ptychi.api pulls torch for type annotations
-        # only -- no CUDA context), then either build the real reconstructors
-        # or fall back to NullReconstructors.
+        # only -- no CUDA context), then build the reconstructors. An absent
+        # backend leaves the list empty, which is a state this library may
+        # report rather than an error it has to raise.
         try:
             from .algorithms import PtyChiCommon, build_algorithms, wrap_as_subprocess_reconstructor
         except ImportError:
             logger.info('pty-chi not found.')
-            if is_developer_mode_enabled:
-                for display_name in DISPLAY_NAMES:
-                    self.reconstructor_list.append(NullReconstructor(display_name))
         else:
             try:
                 ptychi_version = version('ptychi')

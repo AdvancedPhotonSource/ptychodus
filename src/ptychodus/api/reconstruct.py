@@ -150,8 +150,13 @@ class TrainableReconstructor(Reconstructor):
         pass
 
 
-class NullReconstructor(TrainableReconstructor):
-    """No-op TrainableReconstructor used as a placeholder when no algorithm is available."""
+class NullReconstructor(Reconstructor):
+    """Stands in for a selection that resolves to no reconstructor at all.
+
+    A plain :class:`Reconstructor` rather than a trainable one, deliberately:
+    there is nothing here to train, so a test for trainability should say so
+    rather than find a stub. Reconstructing yields nothing.
+    """
 
     def __init__(self, name: str) -> None:
         self._name = name
@@ -166,34 +171,6 @@ class NullReconstructor(TrainableReconstructor):
     def reconstruct(
         self, input_: ReconstructInput, *, options: BaseModel
     ) -> Iterator[ReconstructOutput]:
-        yield from ()
-
-    def is_model_loaded(self) -> bool:
-        return False
-
-    def get_model_file_filter(self) -> str:
-        return ''
-
-    def load_model(self, file_path: Path) -> None:
-        pass
-
-    def get_model_file_extension(self) -> str:
-        return ''
-
-    def save_model(self, file_path: Path) -> None:
-        pass
-
-    def get_training_data_file_filter(self) -> str:
-        return ''
-
-    def export_training_data(
-        self, file_path: Path, input_: ReconstructInput, *, options: BaseModel
-    ) -> None:
-        pass
-
-    def train(
-        self, input_directory: Path, output_directory: Path, *, options: BaseModel
-    ) -> Iterator[TrainOutput]:
         yield from ()
 
 

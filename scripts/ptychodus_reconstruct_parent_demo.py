@@ -92,7 +92,7 @@ def main() -> int:
     # Build the options the way ptychodus itself does, from a settings INI.
     registry = SettingsRegistry()
     registry.open_settings(args.settings)
-    library = PtyChiReconstructorLibrary(registry, is_developer_mode_enabled=False)
+    library = PtyChiReconstructorLibrary(registry)
 
     # The chosen algorithm lives in the settings as '<library>_<reconstructor>'
     # (e.g. 'pty-chi_lsqml'); split off the library half and hand the

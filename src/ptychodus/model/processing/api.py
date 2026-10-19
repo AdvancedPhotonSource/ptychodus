@@ -87,11 +87,15 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
             try:
                 reconstructor = self._reconstructor_map[sanitized_value]
             except KeyError:
-                logger.debug(
+                # The persisted value is left alone rather than written back.
+                # A settings file naming a backend this install lacks is an
+                # ordinary thing to carry between machines, and rewriting the
+                # key would lose the user's choice the first time it was
+                # opened somewhere that could not resolve it.
+                logger.warning(
                     f'Invalid plugin name "{value}". '
-                    f'Registered plugins: {self._reconstructor_map.keys()}.'
+                    f'Registered plugins: {sorted(self._reconstructor_map)}.'
                 )
-                self._parameter.set_value(self._current_value)
             else:
                 logger.debug(f'{self._current_value} -> {sanitized_value}')
                 self._current_value = sanitized_value

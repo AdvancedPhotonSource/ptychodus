@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from pathlib import Path
 
 import numpy
 import numpy.testing
 import pytest
 
 from ptychodus.api.geometry import PixelGeometry
+from typing import cast
+
 from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
@@ -18,9 +19,12 @@ from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.metrics import estimate_reconstruction_ambiguities
 from ptychodus.api.reconstruct import (
+    NoOptions,
     NullReconstructor,
     PositionIndexFilter,
+    ReconstructInput,
     ReconstructionAmbiguities,
+    TrainableReconstructor,
     prepare_reconstruct_input,
     warn_if_propagation_regime_disagrees,
 )
@@ -1119,16 +1123,17 @@ class TestNullReconstructor:
     """NullReconstructor must remain instantiable as new abstract methods are added."""
 
     def test_instantiable(self) -> None:
-        # Will raise TypeError if any abstract method on TrainableReconstructor lacks a stub.
+        # Will raise TypeError if any abstract method on Reconstructor lacks a stub.
         NullReconstructor('null')
 
-    def test_get_model_file_extension_returns_empty(self) -> None:
-        assert NullReconstructor('null').get_model_file_extension() == ''
+    def test_it_reconstructs_nothing(self) -> None:
+        null = NullReconstructor('null')
+        assert list(null.reconstruct(cast(ReconstructInput, None), options=NoOptions())) == []
+        assert null.get_progress_goal() == 0
 
-    def test_save_model_is_noop(self, tmp_path: Path) -> None:
-        target = tmp_path / 'model.bin'
-        NullReconstructor('null').save_model(target)
-        assert not target.exists()
+    def test_it_is_not_trainable(self) -> None:
+        """What a bare install selects, so a Train button must not appear for it."""
+        assert not isinstance(NullReconstructor('null'), TrainableReconstructor)
 
 
 # ---------------------------------------------------------------------------

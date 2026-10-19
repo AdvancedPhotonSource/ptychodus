@@ -144,10 +144,7 @@ def _make_reconstruct_input() -> ReconstructInput:
 
 
 def _make_library() -> PtyChiReconstructorLibrary:
-    return PtyChiReconstructorLibrary(
-        SettingsRegistry(),
-        is_developer_mode_enabled=False,
-    )
+    return PtyChiReconstructorLibrary(SettingsRegistry())
 
 
 def _make_common(library: PtyChiReconstructorLibrary) -> PtyChiCommon:

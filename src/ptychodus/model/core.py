@@ -133,16 +133,11 @@ class ModelCore:
         self.probe_visualization_engine = VisualizationEngine(is_complex=True)
         self.object_visualization_engine = VisualizationEngine(is_complex=True)
 
-        self.ptychi_reconstructor_library = PtyChiReconstructorLibrary(
-            self.settings_registry,
-            self.is_developer_mode_enabled,
-        )
+        self.ptychi_reconstructor_library = PtyChiReconstructorLibrary(self.settings_registry)
         self.ptychopinn_reconstructor_library = PtychoPINNReconstructorLibrary(
-            self.settings_registry, self.is_developer_mode_enabled
+            self.settings_registry
         )
-        self.ptycho_fm_reconstructor_library = PtychoFMReconstructorLibrary(
-            self.settings_registry, self.is_developer_mode_enabled
-        )
+        self.ptycho_fm_reconstructor_library = PtychoFMReconstructorLibrary(self.settings_registry)
         self.processing_core = ProcessingCore(
             self._task_manager,
             self.settings_registry,
@@ -287,6 +282,14 @@ class ModelCore:
             except Exception as exc:
                 logger.error(f'Reconstruction failed: {type(exc).__name__}: {exc}')
                 return ExitCode.FAILURE
+
+            if not output_product_path.is_file():
+                # Nothing raised and nothing was written, which is a failure
+                # even though no step reported one: an empty output directory
+                # is not a reconstruction, and a batch queue branches on the
+                # exit code rather than reading the log.
+                logger.error(f'Reconstruction wrote no product to {output_product_path}!')
+                return ExitCode.FAILURE
         else:
             logger.error('Input product is not a file!')
             return ExitCode.USAGE
@@ -321,6 +324,13 @@ class ModelCore:
             return ExitCode.USAGE
 
         input_product_path = input_directory / StandardFileLayout.PRODUCT
+
+        if not self.processing_core.processing_api.is_reconstructor_trainable():
+            # Refused here so the status says so. A request to train something
+            # that cannot is a usage error, and a batch queue branches on the
+            # exit code rather than reading the log.
+            logger.error('The selected algorithm cannot train!')
+            return ExitCode.USAGE
 
         if input_product_path.is_file():
             input_product_api = self.workflow_api.load_product(

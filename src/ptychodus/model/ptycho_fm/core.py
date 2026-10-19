@@ -6,7 +6,6 @@ from importlib.metadata import PackageNotFoundError, version
 from importlib.util import find_spec
 
 from ...api.reconstruct import (
-    NullReconstructor,
     Reconstructor,
     ReconstructorLibrary,
     TrainableReconstructor,
@@ -36,9 +35,7 @@ def _ptycho_fm_available() -> bool:
 
 
 class PtychoFMReconstructorLibrary(ReconstructorLibrary):
-    def __init__(
-        self, settings_registry: SettingsRegistry, is_developer_mode_enabled: bool
-    ) -> None:
+    def __init__(self, settings_registry: SettingsRegistry) -> None:
         super().__init__('ptycho-fm')
         self.data_settings = PtychoFMDataSettings(settings_registry)
         self.model_settings = PtychoFMModelSettings(settings_registry)
@@ -49,10 +46,6 @@ class PtychoFMReconstructorLibrary(ReconstructorLibrary):
 
         if not _ptycho_fm_available():
             logger.info('PtychoFM (ptycho-fm) not found.')
-
-            if is_developer_mode_enabled:
-                for reconstructor in ('Unsupervised', 'Supervised'):
-                    self._reconstructors.append(NullReconstructor(reconstructor))
             return
 
         try:

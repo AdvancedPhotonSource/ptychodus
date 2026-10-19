@@ -36,6 +36,7 @@ from .probe_positions import (
     ProbePositionSequence,
 )
 from .product import ProductFileReader, ProductFileWriter
+from .reconstruct import ReconstructorLibrary
 from .workflow import FileBasedWorkflow
 
 __all__ = [
@@ -210,10 +211,10 @@ class PluginChooser(Iterable[Plugin[T]], Observable):
 class PluginChooserParameter(Parameter[str], Observer, Generic[T]):
     """Parameter[str] view of a PluginChooser whose value space is plugin display names.
 
-    A chooser has two name spaces: the human-readable ``display_name`` shown in the
-    GUI and the ``simple_name`` persisted to settings. This adapter is the single
-    place that translates between them. Its own value space is display names, so a
-    plain combo box bound to it round trips correctly.
+    A chooser has two name spaces: the human-readable ``display_name`` a person
+    chooses by and the ``simple_name`` persisted to settings. This adapter is the
+    single place that translates between them. Its own value space is display
+    names, so an editor bound to it round trips without knowing there are two.
 
     Passing *settings* additionally binds the chooser to that settings parameter: the
     persisted name selects a plugin at construction and is rewritten to its canonical
@@ -241,7 +242,7 @@ class PluginChooserParameter(Parameter[str], Observer, Generic[T]):
         chooser.add_observer(self)
 
     def choices(self) -> Iterator[str]:
-        """Yield the display names to populate a combo box with."""
+        """Yield every value this parameter accepts, by display name."""
         for plugin in self._chooser:
             yield plugin.display_name
 
@@ -352,6 +353,9 @@ class PluginRegistry:
         self.fluorescence_file_writers = PluginChooser[FluorescenceFileWriter]()
         self.upscaling_strategies = PluginChooser[UpscalingStrategy]()
         self.deconvolution_strategies = PluginChooser[DeconvolutionStrategy]()
+        # A reconstructor backend is discovered the same way a file format is:
+        # by registering itself, rather than by being named somewhere.
+        self.reconstructor_libraries = PluginChooser[ReconstructorLibrary]()
 
     def register_product_file_reader_with_adapters(
         self, strategy: ProductFileReader, *, display_name: str, simple_name: str = ''
