@@ -10,10 +10,9 @@ verbatim; the three nested branches contribute an underscore-suffixed prefix,
 except the encoder branch, which is transparent -- which is how ``dropout`` and
 ``decoder_dropout`` coexist.
 
-Upstream types every choice as a bare ``str``, so the accepted values come from
-the policy's ``choices`` table rather than from an enum in the declaration. The
-display text is ported from the Qt panel for the same reason it is for pty-chi:
-an upstream declaration carries no title or description.
+Upstream carries nothing a reader would need: no title, no description, no
+bound, and every choice typed as a bare ``str`` rather than an enum. All of it
+is supplied here, in the policy's overlay.
 
 **Transitional**, with the flat layout it serves.
 """

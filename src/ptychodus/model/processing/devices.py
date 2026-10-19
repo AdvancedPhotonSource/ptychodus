@@ -1,8 +1,8 @@
 """The devices a reconstruction may use, probed once and chosen by settings.
 
 The probe costs a spawned child that imports torch, so it is taken on first
-request rather than at startup: a headless batch run that never opens a device
-panel should not pay for one, and a machine whose GPU stack is broken should
+request rather than at startup: a run that never asks which devices exist
+should not pay to find out, and a machine whose GPU stack is broken should
 still start.
 
 The selection is ptychodus's own, not any backend's. It is persisted as the

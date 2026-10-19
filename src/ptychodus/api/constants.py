@@ -26,8 +26,8 @@ PLANCK_CONSTANT_J_PER_HZ: Final[float] = 6.62607015e-34
 # the numerator omitted when it is dimensionless: m2_per_kg, J_per_m2, rad_per_m, per_s,
 # per_s_m2. A bare _ never means division, and a rate is never spelled _Hz -- so that one
 # quantity carries one name wherever it is derived, mapped or measured. The enums below
-# convert to and from those base units at the boundaries -- file readers on the way in,
-# the GUI on the way out.
+# convert to and from those base units at the edges, where a value arrives in whatever
+# unit it was written in and leaves in whatever unit it is to be read in.
 
 
 class LengthUnit(Enum):
@@ -35,8 +35,9 @@ class LengthUnit(Enum):
 
     The member value pairs the unit's power of ten relative to the meter with its display
     label. The exponent, not a float, is the source of truth: both scale factors --
-    ``meters_per_unit`` for ordinary float arithmetic and ``decimal_meters_per_unit`` for the
-    exact decimal arithmetic the GUI needs -- are derived from it, so neither can drift.
+    ``meters_per_unit`` for ordinary float arithmetic and ``decimal_meters_per_unit`` for
+    arithmetic that must not accumulate binary rounding error -- are derived from it, so
+    neither can drift.
     """
 
     PICOMETER = (-12, 'pm')

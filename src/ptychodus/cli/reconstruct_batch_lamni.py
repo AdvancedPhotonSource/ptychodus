@@ -157,8 +157,8 @@ def visible_accelerators() -> list[Device]:
     """The accelerators this run may fan out across, one worker each.
 
     Probed in a throwaway child by the shared device layer, which also owns the
-    arithmetic that makes an inherited mask compose correctly. Empty when the
-    process was given none, which the caller turns into a single CPU worker.
+    arithmetic that makes an inherited mask compose correctly. Empty when this
+    process was given none.
     """
     return [device for device in probe_devices() if device != CPU]
 

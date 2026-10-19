@@ -75,8 +75,8 @@ def enumerate_devices() -> list[Device]:
     context, which is fatal to a long-lived parent: it pins driver state and
     memory, and a child spawned afterwards can fail to initialize. Call this
     only from a process that is about to exit anyway, such as a one-shot
-    diagnostic or a child spawned for the purpose. Everywhere else, and in
-    particular anywhere the GUI can reach, call :func:`probe_devices`.
+    diagnostic or a child spawned for the purpose. A process that outlives the
+    call wants :func:`probe_devices` instead.
 
     Shared so that what counts as a device, and how it is named, is decided in
     one place: the family spelled into an identifier is resolved here, where

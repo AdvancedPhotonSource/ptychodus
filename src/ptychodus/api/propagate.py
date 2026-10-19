@@ -695,7 +695,8 @@ class PropagatedWavefield:
 
     Stores the complex wavefield as ``(num_steps, num_incoherent_modes, height_px,
     width_px)``. Per-step intensity (incoherent-mode sum of ``|wf|^2``) and the three
-    orthogonal planes used by the GUI are derived lazily.
+    orthogonal cuts through it -- one transverse plane per step, and the two longitudinal
+    planes through the centre -- are derived lazily.
     """
 
     wavefield: ComplexArrayType
