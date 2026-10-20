@@ -47,7 +47,7 @@ class PtyChiOptions(BaseModel):
     num_sync_epochs: int = Field(
         1,
         ge=1,
-        title='Number of Sync Epochs:',
+        title='Update Interval:',
         description='Number of epochs between reports of intermediate results.',
     )
     compact_mode_update_clustering: int = Field(

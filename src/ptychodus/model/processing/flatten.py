@@ -331,6 +331,12 @@ class FlatParameter:
     # How an enum value is spelled in the settings file, resolved here so that
     # whatever writes or reads the key needs only this record.
     enum_by_name: bool = True
+    # True when this key is its branch's own switch rather than a value inside
+    # it -- the leaf a declaration uses to say whether the branch applies at
+    # all. Carried through because the flat layout erases it: such a leaf takes
+    # the bare group prefix, so nothing downstream could tell it apart from a
+    # plain boolean that happens to be named for its group.
+    gates_group: bool = False
 
 
 @dataclass(frozen=True)
@@ -527,6 +533,10 @@ def _leaf(
         choices=overlay.choices,
         structural_role=role,
         enum_by_name=_stated_or_declared(overlay.enum_by_name, policy.enum_by_name),
+        # An adapter's key is never the switch: it is one of several keys a
+        # single declared field persists as, and which of them gates the rest
+        # is the adapter's own business.
+        gates_group=not role and path.rsplit('.', 1)[-1] in policy.collapse_onto_prefix,
     )
 
 

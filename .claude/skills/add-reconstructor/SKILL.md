@@ -96,7 +96,7 @@ def register_plugins(registry: PluginRegistry) -> None:
     )
 ```
 
-Nothing else is wired. `ModelCore` takes whatever registered, and `ControllerCore` builds a panel from the declaration for any backend without a hand-written one.
+Nothing else is wired. `ModelCore` takes whatever registered, and `ControllerCore` builds every backend's panel from what it declares — there are no hand-written reconstructor panels left.
 
 ### 6. Say where the options are persisted
 

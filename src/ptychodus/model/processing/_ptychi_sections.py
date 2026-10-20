@@ -146,10 +146,10 @@ _OBJECT_OVERLAYS: Mapping[str, Overlay] = {
         "Whether to remove grid artifacts in the object's phase at the end of an epoch.",
     ),
     'remove_grid_artifacts.period_x_m': Overlay(
-        'Period X:', 'Horizontal period of grid artifacts in meters'
+        'Period X [m]:', 'Horizontal period of grid artifacts in meters'
     ),
     'remove_grid_artifacts.period_y_m': Overlay(
-        'Period Y:', 'Vertical period of grid artifacts in meters'
+        'Period Y [m]:', 'Vertical period of grid artifacts in meters'
     ),
     'remove_grid_artifacts.window_size': Overlay(
         'Window Size [px]:', 'Window size for grid artifact removal in pixels'
@@ -398,7 +398,15 @@ _POSITION_OVERLAYS: Mapping[str, Overlay] = {
         'Fit an affine transform from the initial to the current positions and penalize '
         'positions that deviate from it.',
     ),
-    'affine_transform_constraint.degrees_of_freedom': Overlay('Degrees of Freedom:', minimum=0),
+    'affine_transform_constraint.degrees_of_freedom': Overlay(
+        'Degrees of Freedom:',
+        'Which components of the affine transform are fitted and constrained.',
+        minimum=0,
+        # One name per bit, in the order the bit field below sets them. An
+        # integer key carrying a choice list is a chosen subset rather than a
+        # single pick, so this is both the labels and the width of the field.
+        choices=('Translation', 'Rotation', 'Scaling', 'Shearing', 'Asymmetry'),
+    ),
     'affine_transform_constraint.position_weight_update_interval': Overlay(
         'Weight Update Interval:', 'Number of epochs between position weight updates.'
     ),
@@ -430,8 +438,8 @@ def _affine_degrees_of_freedom() -> BitField:
 
     Bit order is the settings contract and is older than the upstream enum, so
     the members are named here in that order rather than read off the enum,
-    whose declaration order pty-chi is free to change. The panel that offers
-    these states the same order again, for the labels it shows beside them.
+    whose declaration order pty-chi is free to change. The overlay above names
+    the same bits in the same order, which is what an editor shows beside them.
     """
     from ptychi.api import AffineDegreesOfFreedom
 
@@ -564,7 +572,7 @@ _RECONSTRUCTOR_OVERLAYS: Mapping[str, Overlay] = {
     'batch_size': Overlay('Batch Size:', 'Number of data to process in each minibatch'),
     'batching_mode': Overlay('Batch Mode:'),
     'use_double_precision_for_fft': Overlay(
-        'FFT Precision:',
+        'Use Double Precision for FFT',
         'Use double precision for critical FFT operations, overriding the compute precision.',
     ),
     'allow_nondeterministic_algorithms': Overlay(
@@ -573,7 +581,7 @@ _RECONSTRUCTOR_OVERLAYS: Mapping[str, Overlay] = {
         'run-to-run variation.',
     ),
     'UseDoublePrecision': Overlay(
-        'Compute Precision:', 'Floating point precision to use for computation'
+        'Use Double Precision', 'Floating point precision to use for computation'
     ),
     'EnableExcludeMeasuredPixelsBelow': Overlay(
         'Exclude Measured Pixels Below',
@@ -644,7 +652,13 @@ _ALGORITHM_OVERLAYS: Mapping[str, Overlay] = {
     ),
     'chunk_length': Overlay('Chunk Length:'),
     'beta': Overlay('Beta:'),
-    'method': Overlay('BH Method:'),
+    'method': Overlay(
+        'BH Method:',
+        'Reconstruction algorithm: GD (gradient descent, for batched updates) or '
+        'CG (conjugate gradients, faster with a single batch).',
+        # Declared upstream as a bare string, so the two it accepts are named here.
+        choices=('GD', 'CG'),
+    ),
     'noise_model': Overlay('Noise Model:', 'Noise model to use'),
     'gaussian_noise_std': Overlay(
         'Gaussian Noise Deviation:',
@@ -666,6 +680,10 @@ _ALGORITHM_OVERLAYS: Mapping[str, Overlay] = {
     'momentum_acceleration_gain': Overlay(
         'Momentum Acceleration Gain:',
         'Gain of momentum acceleration for object and probe; 0 disables it.',
+    ),
+    'optimal_step_size_scaler': Overlay(
+        'Optimal Step Size Scaler:',
+        'Scaler applied to the solved optimal step size.',
     ),
     'AutoMomentumAccelerationGradientMixingFactor': Overlay(
         'Use Gradient Mixing Factor',
@@ -696,12 +714,7 @@ _ALGORITHM_OVERLAYS: Mapping[str, Overlay] = {
         'Amplitude Clamp Limit:',
         'Maximum object amplitude; larger values are clamped to this limit.',
     ),
-    'inertia': Overlay('Inertia:', 'Inertia of the object update; should be between 0 and 1.'),
     'alpha': Overlay('Alpha:', maximum=1.0),
-    'optimal_step_size_scaler': Overlay(
-        'Optimal Step Size Scaler:',
-        'Scaler applied to the solved optimal step size for the object update.',
-    ),
     'multimodal_update': Overlay(
         'Multimodal Update',
         'Compute the object update direction summed over all probe modes rather than only '
@@ -880,7 +893,7 @@ def _algorithm_sections(algorithm: str, task: Any) -> Sequence[OptionsSection]:
             {},
             _RECONSTRUCTOR_EXTRA_ADAPTERS,
         ),
-        ('object_options', ObjectOptions, 'Object', {}, {}),
+        ('object_options', ObjectOptions, 'Object', _OBJECT_EXTRA_OVERLAYS, {}),
         ('probe_options', ProbeOptions, 'Probe', _PROBE_EXTRA_OVERLAYS, {}),
         (
             'probe_position_options',
@@ -927,8 +940,28 @@ _RECONSTRUCTOR_EXTRA_NAMES: Mapping[str, str] = {
     'single_slice_solve_obj_prb_step_size_jointly': 'SingleSliceSolveObjectProbeStepSizeJointly',
 }
 
-# 'rho' names a different quantity on each branch, so the text cannot be shared.
+# A name that means something different on each branch that declares it. The
+# algorithm's own group shows every branch's additions side by side, so a word
+# that reads unambiguously in the branch it came from need not read that way
+# here -- and 'rho' means a different quantity on each branch besides.
+_OBJECT_EXTRA_OVERLAYS: Mapping[str, Overlay] = {
+    'optimal_step_size_scaler': Overlay(
+        'Object Optimal Step Size Scaler:',
+        'Scaler applied to the solved optimal step size for the object update.',
+    ),
+    'inertia': Overlay(
+        'Object Inertia:', 'Inertia of the object update; should be between 0 and 1.'
+    ),
+    'alpha': Overlay('Object Alpha:', 'Relaxation of the object update.', maximum=1.0),
+}
+
 _PROBE_EXTRA_OVERLAYS: Mapping[str, Overlay] = {
+    'optimal_step_size_scaler': Overlay(
+        'Probe Optimal Step Size Scaler:',
+        'Scaler applied to the solved optimal step size for the probe update.',
+    ),
+    'inertia': Overlay('Probe Inertia:', 'Inertia of the probe update; should be between 0 and 1.'),
+    'alpha': Overlay('Probe Alpha:', 'Relaxation of the probe update.', maximum=1.0),
     'rho': Overlay(
         'BH Probe Rho:',
         'Scaling factor for the probe relative to the object (~1 near-field, 0.1 far-field).',
@@ -936,6 +969,10 @@ _PROBE_EXTRA_OVERLAYS: Mapping[str, Overlay] = {
 }
 
 _POSITION_EXTRA_OVERLAYS: Mapping[str, Overlay] = {
+    'momentum_acceleration_gain': Overlay(
+        'Position Momentum Gain:',
+        'Gain of probe-position momentum acceleration; 0 disables it.',
+    ),
     'rho': Overlay(
         'BH Probe Position Rho:',
         'Scaling factor for probe positions relative to the object (~0.1 near-field, 1 far-field).',

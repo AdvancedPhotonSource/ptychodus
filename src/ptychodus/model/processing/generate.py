@@ -134,8 +134,13 @@ def _accepted(flat: FlatParameter, value: Any) -> Any:
     falling back keeps a run going with a value that is at least valid, and
     says which key was ignored -- where passing it through would hand a
     backend a word it has no case for.
+
+    Only a key that holds one of the choices is policed. A key naming a
+    *subset* of them carries the same list and holds a number instead, which
+    is never one of the names, so checking it would reject every value it can
+    ever have.
     """
-    if not flat.choices or value in flat.choices:
+    if not flat.choices or not isinstance(value, str) or value in flat.choices:
         return value
 
     logger.warning(

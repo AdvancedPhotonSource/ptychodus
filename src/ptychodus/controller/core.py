@@ -27,7 +27,6 @@ from .product import ProductController
 from .product.core import ProductRepositoryTableModel
 from .product.visualization import ProductVisualizationController
 from .task_status import TaskStatusController
-from .ptychi import PtyChiViewControllerFactory
 from .settings import SettingsController
 
 
@@ -46,20 +45,11 @@ class ControllerCore:
 
         self._memory_controller = MemoryController(model.memory_presenter, view.memory_widget)
         self._file_dialog_factory = FileDialogFactory()
-        # Panels ptychodus still lays out by hand. A backend named here keeps
-        # its own panel; every other one gets a panel rendered from what it
-        # declares, so adding a backend needs no wiring here.
-        bespoke: list[ReconstructorViewControllerFactory] = [
-            PtyChiViewControllerFactory(model.processing_core.parameter_store),
-        ]
-        hand_written = {factory.name.casefold() for factory in bespoke}
+        # Every backend's panel is rendered from what it declares, so adding
+        # one needs no wiring here.
         self._view_controller_factories: list[ReconstructorViewControllerFactory] = [
-            *bespoke,
-            *(
-                GeneratedViewControllerFactory(name, model.processing_core.parameter_store)
-                for name in model.processing_core.library_names()
-                if name.casefold() not in hand_written
-            ),
+            GeneratedViewControllerFactory(name, model.processing_core.parameter_store)
+            for name in model.processing_core.library_names()
         ]
         # Shared product-repository table model. Constructing it here (before
         # any consumer) lets SettingsController, DiffractionController,
