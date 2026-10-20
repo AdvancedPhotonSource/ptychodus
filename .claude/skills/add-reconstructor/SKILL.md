@@ -19,7 +19,7 @@ Create `src/ptychodus/plugins/<backend>/` with:
 - `core.py` — the `*ReconstructorLibrary` class.
 - `options.py` — the pydantic declaration plus a `default_options()` factory.
 - `reconstructor.py` — builds the `Reconstructor` / `TrainableReconstructor`. Imported only from `_build()`, never at module scope.
-- `_subprocess.py` — the child-side entry points, if the backend touches a GPU.
+- `_subprocess.py` — the child-side entry points, if the backend touches a GPU. The name is the contract: the dispatcher derives it from the library's own package and looks for `run_reconstruct` and `run_train` inside it.
 
 Write no `settings.py`. The hand-written `*Settings` class is the retired idiom; a new backend declares instead.
 
@@ -83,7 +83,11 @@ def _declared(options: BaseModel) -> <Backend>Options:
     return options
 ```
 
-GPU work belongs in a spawned child: wrap it with `SubprocessReconstructor` (see [src/ptychodus/api/reconstruct.py](../../src/ptychodus/api/reconstruct.py)), passing `default_options=default_options` and the child entry points. Yield one `ReconstructOutput` per iteration so the GUI can stream progress; set `progress_goal` once the run knows its own iteration count.
+GPU work belongs in a spawned child: wrap it with `SubprocessReconstructor` (see [src/ptychodus/api/reconstruct.py](../../src/ptychodus/api/reconstruct.py)), passing `default_options=default_options` and a `dump_reconstruct_options` callback returning the subset of the declaration the child reads — plus `dump_train_options` if the backend trains, and `resolve_model_path` if it unpacks what the user loaded. Yield one `ReconstructOutput` per iteration so the GUI can stream progress; set `progress_goal` once the run knows its own iteration count.
+
+**Name no entry point.** The library stamps each reconstructor it builds with `<its own package>._subprocess`, and every child is spawned through one dispatcher that calls `run_reconstruct` or `run_train` there.
+
+A child entry point takes `(payload, queue)`. The `SubprocessPayload` carries the operation, whatever the dump returned, and whichever of the input, the two directories and the model path that operation fills; ask for those with `require_input()`, `require_directories()` and `require_model_path()` rather than reading the optional fields, so a payload built wrong says so by name. Put results on the queue tagged with a `ReconstructorMessage` member.
 
 ### 5. Register the plugin
 
