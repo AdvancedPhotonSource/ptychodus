@@ -113,7 +113,7 @@ def reconstruct_scan(payload: dict[str, Any], queue: Queue[Any]) -> None:
     options = load_ptychi_options(None)
 
     if payload['ptychi_options_json'] is not None:
-        from ptychodus.model.ptychi.task import load_task_options
+        from ptychodus.plugins.ptychi.task import load_task_options
 
         options = load_task_options(payload['ptychi_options_json'])
 

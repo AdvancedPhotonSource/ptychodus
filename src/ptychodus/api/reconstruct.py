@@ -387,11 +387,12 @@ class SubprocessReconstructor(TrainableReconstructor):
 class ReconstructorLibrary(Iterable[Reconstructor], ABC):
     """Iterable collection of Reconstructor instances provided by a plugin library.
 
-    A library is named twice over, for two readers. ``name`` is what a person
-    selecting an algorithm sees; ``distribution`` is what the package it wraps
-    is called on PyPI, which is the name a version lives under and is often
-    spelled differently. ``requires`` lists the modules the library cannot
-    work without.
+    A library does not name itself. What a person selecting an algorithm sees
+    is the name it was registered under, which the plugin registry holds
+    beside it -- so a library carries only what it needs to find and report
+    its own package: ``distribution`` is what that package is called on PyPI,
+    the name a version lives under, and ``requires`` lists the modules the
+    library cannot work without.
 
     What a library offers is settled on first use rather than at
     construction, because registration happens in every process that loads
@@ -409,11 +410,6 @@ class ReconstructorLibrary(Iterable[Reconstructor], ABC):
         self._distribution = distribution
         self._requires = tuple(requires)
         self._reconstructors: list[Reconstructor] | None = None
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        pass
 
     def get_logger(self) -> logging.Logger:
         return self._logger
@@ -446,8 +442,11 @@ class ReconstructorLibrary(Iterable[Reconstructor], ABC):
         Its own, not the module's: the logger named at construction is the one
         a task monitor attaches a handler to, so anything logged elsewhere
         never reaches whatever is watching the run.
+
+        Reported under the distribution name, because a library is not told
+        what it was registered as and this is the name whose version it is.
         """
-        self._logger.info(f'{self.name} {self.get_version()}')
+        self._logger.info(f'{self._distribution} {self.get_version()}')
 
     def __iter__(self) -> Iterator[Reconstructor]:
         if self._reconstructors is None:
@@ -458,7 +457,7 @@ class ReconstructorLibrary(Iterable[Reconstructor], ABC):
     def _enumerate(self) -> list[Reconstructor]:
         """Build once, reporting either outcome through this library's logger."""
         if not self.is_available():
-            self._logger.info(f'{self.name} not found.')
+            self._logger.info(f'{self._distribution} not found.')
             return []
 
         try:
@@ -469,7 +468,7 @@ class ReconstructorLibrary(Iterable[Reconstructor], ABC):
             # partial install -- is only discovered here. The traceback goes
             # with it, because this is the one case the caller cannot tell
             # apart from simply not having installed the backend.
-            self._logger.info(f'{self.name} not found.', exc_info=True)
+            self._logger.info(f'{self._distribution} not found.', exc_info=True)
             return []
 
         self.log_version()

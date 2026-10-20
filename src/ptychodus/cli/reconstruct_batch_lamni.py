@@ -114,7 +114,7 @@ from ptychodus.cli._reconstruct_common import (
 )
 from ptychodus.api.devices import CPU, Device, probe_devices, visibility_environment
 from ptychodus.api.spawn import ChildError, run_subprocess
-from ptychodus.model.ptychi.task import dump_task_options
+from ptychodus.plugins.ptychi.task import dump_task_options
 from ptychodus.plugins.aps31id_lamni._scan_table import (
     APS31IDEScanRecord,
     read_aps31ide_scan_table,

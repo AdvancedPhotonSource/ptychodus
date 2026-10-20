@@ -497,7 +497,7 @@ object_guess = generate_random_object(
 
 ## Using Generated Guesses With Pty-Chi
 
-Ptychodus has a Pty-Chi adapter in `ptychodus.model.ptychi`. When using the normal Ptychodus reconstruction path, the adapter receives a {py:class}`ptychodus.api.reconstruct.ReconstructInput`, builds Pty-Chi task options from the settings, and passes the following data from the product to `PtychographyTask` as keyword arguments:
+Ptychodus has a Pty-Chi adapter in `ptychodus.plugins.ptychi`. When using the normal Ptychodus reconstruction path, the adapter receives a {py:class}`ptychodus.api.reconstruct.ReconstructInput` together with the Pty-Chi options the settings hold, reconciles those options with the product, and passes the following data from the product to `PtychographyTask` as keyword arguments:
 
 - object initial guess: `product.object_.get_array()`;
 - probe initial guess: `product.probes.get_array()`;

@@ -68,7 +68,9 @@ def test_every_declared_default_matches_the_persisted_one(section: OptionsSectio
     expected = _golden()[section.group_name]
 
     for flat in flatten_options(root, section.policy):
-        assert render_value(flat.default, section.policy) == expected[flat.ini_key], flat.ini_key
+        assert render_value(flat.default, by_name=flat.enum_by_name) == expected[flat.ini_key], (
+            flat.ini_key
+        )
 
 
 @pytest.mark.parametrize('section', sections(), ids=lambda s: s.group_name)

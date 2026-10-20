@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import field as dataclass_field
 from enum import StrEnum
 from pathlib import Path
+import math
 import re
 
 from pydantic import BaseModel, Field
@@ -12,6 +13,7 @@ from pydantic.dataclasses import dataclass as pydantic_dataclass
 import pytest
 
 from ptychodus.model.processing.flatten import (
+    BitField,
     BoolEnum,
     FlatteningPolicy,
     Overlay,
@@ -233,10 +235,10 @@ class TestDeclaredMetadata:
 class TestValueRendering:
     def test_enums_render_by_member_name_by_default(self) -> None:
         """ptychodus persists pty-chi enums as SGD, while the StrEnum value is sgd."""
-        assert render_value(Optimizers.SGD, FlatteningPolicy()) == 'SGD'
+        assert render_value(Optimizers.SGD, by_name=True) == 'SGD'
 
     def test_enums_render_by_value_when_the_policy_says_so(self) -> None:
-        assert render_value(Optimizers.SGD, FlatteningPolicy(enum_by_name=False)) == 'sgd'
+        assert render_value(Optimizers.SGD, by_name=False) == 'sgd'
 
 
 class TestAgainstRealPtyChiOptions:
@@ -352,7 +354,27 @@ class TestStructuralAdapters:
     def test_optional_range_round_trips_both_states(self) -> None:
         adapter = OptionalRange('On', 'Min', 'Max')
         assert adapter.decode(adapter.encode(None)) is None
-        assert adapter.decode(adapter.encode((0.1, 0.9))) == (0.1, 0.9)
+        # A list, which is what a serializable pair of bounds has to be; the
+        # input is a tuple to show the adapter does not merely pass it back.
+        assert adapter.decode(adapter.encode((0.1, 0.9))) == [0.1, 0.9]
+
+    def test_optional_range_converts_between_the_declared_and_persisted_unit(self) -> None:
+        """A pair persisted in degrees comes back in the radians upstream takes."""
+        adapter = OptionalRange('On', 'Min', 'Max', scale=math.pi / 180.0)
+        encoded = adapter.encode((-math.pi, math.pi))
+
+        assert encoded['Min'] == pytest.approx(-180.0)
+        assert encoded['Max'] == pytest.approx(180.0)
+        assert adapter.decode(encoded) == pytest.approx([-math.pi, math.pi])
+
+    def test_a_bit_field_round_trips_the_members_it_names(self) -> None:
+        """Each member takes the bit at its own position, and absence means zero."""
+        adapter = BitField('Flags', ('a', 'b', 'c'))
+
+        assert adapter.encode([]) == {'Flags': 0}
+        assert adapter.encode(['a', 'c']) == {'Flags': 0b101}
+        assert adapter.decode({'Flags': 0b101}) == ['a', 'c']
+        assert adapter.decode({'Flags': 0}) == []
 
 
 class TestAbsoluteKeys:

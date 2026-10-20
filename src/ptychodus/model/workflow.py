@@ -131,12 +131,14 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
     def reconstruct_local(
         self,
         *,
+        library: str | None = None,
         algorithm: str | None = None,
         output_product_file: Path | None = None,
         block: bool = False,
     ) -> ProductWorkflowAPI:
         output_product_index = self._processing_api.reconstruct(
             product_index=self._product_index,
+            library=library,
             algorithm=algorithm,
             output_product_file=output_product_file,
             block=block,
@@ -156,14 +158,19 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
     def reconstruct_remote(
         self,
         *,
+        library: str | None = None,
         algorithm: str | None = None,
         provider: RemoteComputeProvider = RemoteComputeProvider.GLOBUS,
     ) -> None:
         match provider:
             case RemoteComputeProvider.GLOBUS:
-                self._globus_executor.reconstruct(self._product_index, algorithm=algorithm)
+                self._globus_executor.reconstruct(
+                    self._product_index, library=library, algorithm=algorithm
+                )
             case RemoteComputeProvider.GENESIS:
-                self._genesis_executor.reconstruct(self._product_index, algorithm=algorithm)
+                self._genesis_executor.reconstruct(
+                    self._product_index, library=library, algorithm=algorithm
+                )
             case _:
                 raise ValueError(f'Unsupported remote compute provider: {provider}')
 
@@ -172,6 +179,7 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
         input_path: Path,
         output_path: Path,
         *,
+        library: str | None = None,
         algorithm: str | None = None,
         block: bool = False,
     ) -> None:
@@ -180,6 +188,7 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
             input_path,
             output_path,
             product_index=self._product_index,
+            library=library,
             algorithm=algorithm,
             block=block,
         )
@@ -187,22 +196,30 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
     def train_reconstructor_remote(
         self,
         *,
+        library: str | None = None,
         algorithm: str | None = None,
         provider: RemoteComputeProvider = RemoteComputeProvider.GLOBUS,
     ) -> None:
         # TODO mlflow
         match provider:
             case RemoteComputeProvider.GLOBUS:
-                self._globus_executor.train(self._product_index, algorithm=algorithm)
+                self._globus_executor.train(
+                    self._product_index, library=library, algorithm=algorithm
+                )
             case RemoteComputeProvider.GENESIS:
-                self._genesis_executor.train(self._product_index, algorithm=algorithm)
+                self._genesis_executor.train(
+                    self._product_index, library=library, algorithm=algorithm
+                )
             case _:
                 raise ValueError(f'Unsupported remote compute provider: {provider}')
 
-    def export_training_data(self, file_path: Path, *, algorithm: str | None = None) -> None:
+    def export_training_data(
+        self, file_path: Path, *, library: str | None = None, algorithm: str | None = None
+    ) -> None:
         self._processing_api.export_training_data(
             file_path,
             product_index=self._product_index,
+            library=library,
             algorithm=algorithm,
         )
 
@@ -292,8 +309,11 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         )
         return ConcreteDiffractionWorkflowAPI(self._diffraction_api, dataset_index)
 
-    def available_reconstructors(self) -> Iterator[str]:
-        return self._processing_api.available_reconstructors()
+    def available_libraries(self) -> Iterator[str]:
+        return self._processing_api.available_libraries()
+
+    def available_algorithms(self, library: str | None = None) -> Iterator[str]:
+        return self._processing_api.available_algorithms(library)
 
     def load_assembled_diffraction_data(self, file_path: Path) -> DiffractionWorkflowAPI:
         dataset_index = self._diffraction_api.import_assembled_patterns(file_path)

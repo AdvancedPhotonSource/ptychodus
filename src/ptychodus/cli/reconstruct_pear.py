@@ -4,7 +4,7 @@
 The parameter file is the one PEAR's batch loop writes before spawning a worker, so
 this script substitutes for a ``ptycho_recon`` invocation on the same inputs. Every
 stage below runs through ``ptychodus.api``; only the pty-chi task boundary comes from
-``ptychodus.model.ptychi.task``, as in ``reconstruct_lamni.py``.
+``ptychodus.plugins.ptychi.task``, as in ``reconstruct_lamni.py``.
 
 Scope and limitations
 ---------------------

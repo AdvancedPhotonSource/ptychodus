@@ -20,10 +20,6 @@ class PtychoFMReconstructorLibrary(ReconstructorLibrary):
     def __init__(self) -> None:
         super().__init__('ptycho-fm', 'ptycho-fm', requires=('ptycho_fm', 'torch', 'ptychi'))
 
-    @property
-    def name(self) -> str:
-        return 'PtychoFM'
-
     def _build(self) -> list[TrainableReconstructor]:
         # Deferred so that importing this module costs nothing: the factory
         # reaches for h5py and numpy, and the child it configures reaches for

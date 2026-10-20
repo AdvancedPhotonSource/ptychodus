@@ -49,7 +49,7 @@ from ptychodus.cli._reconstruct_common import (  # noqa: E402
     run_reconstruction,
     save_assembled_diffraction,
 )
-from ptychodus.model.ptychi.task import (  # noqa: E402
+from ptychodus.plugins.ptychi.task import (  # noqa: E402
     dump_task_options,
     dump_task_options_yaml,
 )

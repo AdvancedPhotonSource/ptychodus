@@ -67,14 +67,14 @@ class TestUndeclaredReconstructors:
     ) -> None:
         """An empty section would appear in every saved settings file and mean nothing."""
         store = ProcessingParameterStore(registry)
-        store.register('lib_algo', FakeReconstructor('algo', NoOptions()), [OptionsSection('Algo')])
+        store.register('lib', FakeReconstructor('algo', NoOptions()), [OptionsSection('Algo')])
         assert list(registry) == []
 
     def test_its_options_are_still_served(self, registry: SettingsRegistry) -> None:
         store = ProcessingParameterStore(registry)
         reconstructor = FakeReconstructor('algo', NoOptions())
-        store.register('lib_algo', reconstructor, [OptionsSection('Algo')])
-        assert isinstance(store.get_options('lib_algo'), NoOptions)
+        store.register('lib', reconstructor, [OptionsSection('Algo')])
+        assert isinstance(store.get_options('lib', 'algo'), NoOptions)
 
 
 class TestSingleSection:
@@ -82,7 +82,7 @@ class TestSingleSection:
         store = ProcessingParameterStore(registry)
         policy = FlatteningPolicy(prefixes={'object_': 'Object', 'probe': 'Probe'})
         store.register(
-            'lib_algo',
+            'lib',
             FakeReconstructor('algo', Declared()),
             [OptionsSection('Algo', policy=policy)],
         )
@@ -93,12 +93,12 @@ class TestSingleSection:
         store = ProcessingParameterStore(registry)
         policy = FlatteningPolicy(prefixes={'object_': 'Object', 'probe': 'Probe'})
         store.register(
-            'lib_algo',
+            'lib',
             FakeReconstructor('algo', Declared()),
             [OptionsSection('Algo', policy=policy)],
         )
         registry['Algo'].parameters()['ObjectWeight'].set_value(4.5)
-        assert store.get_options('lib_algo').object_.weight == 4.5
+        assert store.get_options('lib', 'algo').object_.weight == 4.5
 
 
 class TestSeveralSections:
@@ -107,7 +107,7 @@ class TestSeveralSections:
     def _store(self, registry: SettingsRegistry) -> ProcessingParameterStore:
         store = ProcessingParameterStore(registry)
         store.register(
-            'lib_algo',
+            'lib',
             FakeReconstructor('algo', Declared()),
             [
                 OptionsSection(
@@ -136,27 +136,28 @@ class TestSeveralSections:
         registry['Algo'].parameters()['Epochs'].set_value(99)
         registry['AlgoObject'].parameters()['Weight'].set_value(4.5)
         registry['AlgoProbe'].parameters()['Power'].set_value(8.0)
-        options = store.get_options('lib_algo')
+        options = store.get_options('lib', 'algo')
         assert (options.epochs, options.object_.weight, options.probe.power) == (99, 4.5, 8.0)
 
     def test_the_defaults_survive_repeated_reads(self, registry: SettingsRegistry) -> None:
         store = self._store(registry)
         registry['AlgoObject'].parameters()['Weight'].set_value(4.5)
-        store.get_options('lib_algo')
+        store.get_options('lib', 'algo')
         registry['AlgoObject'].parameters()['Weight'].set_value(6.0)
-        assert store.get_options('lib_algo').object_.weight == 6.0
+        assert store.get_options('lib', 'algo').object_.weight == 6.0
 
 
 class TestLookup:
     def test_an_unregistered_key_is_rejected_by_name(self, registry: SettingsRegistry) -> None:
         store = ProcessingParameterStore(registry)
         with pytest.raises(KeyError, match='lib_missing'):
-            store.get_options('lib_missing')
+            store.get_options('lib', 'missing')
 
     def test_membership_reports_what_is_registered(self, registry: SettingsRegistry) -> None:
         store = ProcessingParameterStore(registry)
-        store.register('lib_algo', FakeReconstructor('algo', NoOptions()), [])
-        assert 'lib_algo' in store and 'lib_other' not in store
+        store.register('lib', FakeReconstructor('algo', NoOptions()), [])
+        assert store.is_registered('lib', 'algo')
+        assert not store.is_registered('lib', 'other')
 
 
 class TestOneGroupFromSeveralSections:
@@ -165,7 +166,7 @@ class TestOneGroupFromSeveralSections:
     def _store(self, registry: SettingsRegistry) -> ProcessingParameterStore:
         store = ProcessingParameterStore(registry)
         store.register(
-            'lib_algo',
+            'lib',
             FakeReconstructor('algo', Declared()),
             [
                 OptionsSection(
@@ -189,5 +190,5 @@ class TestOneGroupFromSeveralSections:
         store = self._store(registry)
         registry['Algo'].parameters()['Weight'].set_value(3.5)
         registry['Algo'].parameters()['Power'].set_value(9.0)
-        options = store.get_options('lib_algo')
+        options = store.get_options('lib', 'algo')
         assert (options.object_.weight, options.probe.power) == (3.5, 9.0)

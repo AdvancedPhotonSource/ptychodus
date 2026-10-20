@@ -18,8 +18,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from typing import Any
+import math
 
 from .flatten import (
+    BitField,
     BoolEnum,
     Overlay,
     fields_of,
@@ -35,6 +37,12 @@ __all__ = ['sections_for']
 
 # Every optimizable branch carries a plan whose three visible fields sit directly
 # under that branch's prefix; its scheduler fields are not surfaced.
+# pty-chi rejects exactly zero where a field is declared strictly positive,
+# and a ptychodus bound is inclusive and clamping, so the closest inclusive
+# minimum stands in for one. Far below any default declared against such a
+# bound, and indistinguishable from the excluded value in use.
+_STRICTLY_POSITIVE = 1.0e-12
+
 _PLAN = 'optimization_plan'
 _PLAN_HIDDEN = ('step_size_scheduler_class', 'step_size_scheduler_options')
 
@@ -224,9 +232,18 @@ def _object_policy(extras: set[str]) -> FlatteningPolicy:
             'multislice_regularization.unwrap_image_integration_method': 'UnwrapPhaseImageIntegrationMethod',
         },
         structural={
-            'hard_limits_magnitude_phase.abs_lim': OptionalRange('EnableAbs', 'AbsMin', 'AbsMax'),
+            'hard_limits_magnitude_phase.abs_lim': OptionalRange(
+                'EnableAbs', 'AbsMin', 'AbsMax', fallback=(0.0, 1.0)
+            ),
+            # pty-chi takes the phase limit in radians; ptychodus has always
+            # written it in degrees, so the keys carry degrees and the scale
+            # is what rebuilds the declared pair.
             'hard_limits_magnitude_phase.phase_lim': OptionalRange(
-                'EnablePhase', 'PhaseMinDeg', 'PhaseMaxDeg'
+                'EnablePhase',
+                'PhaseMinDeg',
+                'PhaseMaxDeg',
+                fallback=(-180.0, 180.0),
+                scale=math.pi / 180.0,
             ),
             **_stops(*_OBJECT_BRANCHES),
         },
@@ -366,13 +383,15 @@ _POSITION_OVERLAYS: Mapping[str, Overlay] = {
         'is used.',
     ),
     'SliceForCorrection': Overlay(
-        'Slice:', 'Slice that is used for position correction (0-based index)'
+        'Slice:', 'Slice that is used for position correction (0-based index)', minimum=0
     ),
     'LimitUpdateMagnitude': Overlay(
         'Limit Update Magnitude:', 'Whether to limit the update magnitude'
     ),
     'UpdateMagnitudeLimit': Overlay(
-        'Limit:', 'Maximum allowed magnitude of position update in each axis'
+        'Limit:',
+        'Maximum allowed magnitude of position update in each axis',
+        minimum=_STRICTLY_POSITIVE,
     ),
     'affine_transform_constraint.enabled': Overlay(
         'Constrain Affine Transform',
@@ -398,9 +417,34 @@ _POSITION_OVERLAYS: Mapping[str, Overlay] = {
         'When checked, the affine transform update flexibility will be overridden',
     ),
     'OverrideUpdateFlexibility': Overlay(
-        'Flexibility:', 'Update flexibility value (0 = rigid, 1 = fully flexible)'
+        'Flexibility:',
+        'Update flexibility value (0 = rigid, 1 = fully flexible)',
+        minimum=0.0,
+        maximum=1.0,
     ),
 }
+
+
+def _affine_degrees_of_freedom() -> BitField:
+    """The affine degrees of freedom, persisted as the bit field ptychodus writes.
+
+    Bit order is the settings contract and is older than the upstream enum, so
+    the members are named here in that order rather than read off the enum,
+    whose declaration order pty-chi is free to change. The panel that offers
+    these states the same order again, for the labels it shows beside them.
+    """
+    from ptychi.api import AffineDegreesOfFreedom
+
+    return BitField(
+        'DegreesOfFreedom',
+        (
+            AffineDegreesOfFreedom.TRANSLATION,
+            AffineDegreesOfFreedom.ROTATION,
+            AffineDegreesOfFreedom.SCALE,
+            AffineDegreesOfFreedom.SHEAR,
+            AffineDegreesOfFreedom.ASYMMETRY,
+        ),
+    )
 
 
 def _position_policy(extras: set[str]) -> FlatteningPolicy:
@@ -430,8 +474,11 @@ def _position_policy(extras: set[str]) -> FlatteningPolicy:
                 'LimitUpdateMagnitude', 'UpdateMagnitudeLimit', fallback=0.1
             ),
             'affine_transform_constraint.override_update_flexibility': OptionalGate(
-                '/OverrideAffineTransformUpdateFlexibility', 'OverrideUpdateFlexibility'
+                '/OverrideAffineTransformUpdateFlexibility',
+                'OverrideUpdateFlexibility',
+                fallback=0.5,
             ),
+            'affine_transform_constraint.degrees_of_freedom': _affine_degrees_of_freedom(),
             **_stops('affine_transform_constraint'),
         },
         overlays=_POSITION_OVERLAYS,
@@ -469,7 +516,7 @@ _OPR_OVERLAYS: Mapping[str, Overlay] = {
         'Clamp the weight of the primary (0th) OPR mode to a lower bound',
     ),
     'PrimaryModeWeightFloor': Overlay(
-        'Floor:', 'Lower bound applied to the primary OPR mode weight.'
+        'Floor:', 'Lower bound applied to the primary OPR mode weight.', minimum=0.0
     ),
     'smoothing.enabled': Overlay('Smooth OPR Mode Weights', 'Smooth the OPR mode weights'),
     'smoothing.method': Overlay(
@@ -516,11 +563,6 @@ _RECONSTRUCTOR_OVERLAYS: Mapping[str, Overlay] = {
     'num_epochs': Overlay('Number of Epochs:', 'Number of epochs to run'),
     'batch_size': Overlay('Batch Size:', 'Number of data to process in each minibatch'),
     'batching_mode': Overlay('Batch Mode:'),
-    'compact_mode_update_clustering': Overlay(
-        'Update Clustering:',
-        'Number of epochs between cluster updates in COMPACT batching mode (0 disables).',
-        minimum=0,
-    ),
     'use_double_precision_for_fft': Overlay(
         'FFT Precision:',
         'Use double precision for critical FFT operations, overriding the compute precision.',
@@ -546,10 +588,14 @@ _RECONSTRUCTOR_OVERLAYS: Mapping[str, Overlay] = {
         'When checked, forward propagation of ptychography will be done using less '
         'vectorized code. This reduces the speed, but also lowers memory usage',
     ),
-    'PadForShift': Overlay(
+    # Typed optional upstream, but zero is its own default and its own
+    # meaning -- no padding -- so ptychodus offers the count rather than a
+    # switch, and never sends the absent value.
+    'forward_model_options.pad_for_shift': Overlay(
         'Pad For Shift:',
         'Number of pixels to pad arrays (with border values) before shifting',
         minimum=0,
+        annotation=int,
     ),
     'EnableDiffractionPatternBlur': Overlay(
         'Blur Diffraction Patterns',
@@ -572,10 +618,27 @@ _DATA_OVERLAYS: Mapping[str, Overlay] = {
     ),
 }
 
+
+def _forward_models() -> type:
+    """pty-chi's forward-model enum, which is the half of that field ptychodus offers.
+
+    Upstream types the field as the enum *or* any class implementing the
+    model. A settings key cannot hold a class, so ptychodus offers the named
+    models and the enum is what the key means.
+    """
+    from ptychi.api import ForwardModels
+
+    return ForwardModels
+
+
 _ALGORITHM_OVERLAYS: Mapping[str, Overlay] = {
     # Reconstructor-branch additions, which ptychodus files under the algorithm.
     'loss_function': Overlay('Loss Function:', 'Loss function to optimize'),
-    'forward_model_class': Overlay('Forward Model:', 'Forward model class'),
+    'forward_model_class': Overlay(
+        'Forward Model:',
+        'Forward model class',
+        annotation=_forward_models(),
+    ),
     'exit_wave_update_relaxation': Overlay(
         'Exit Wave Update Relaxation:', 'Relaxation multiplier for the exit wave update'
     ),
@@ -609,7 +672,8 @@ _ALGORITHM_OVERLAYS: Mapping[str, Overlay] = {
         'Mixing factor of the current gradient into the accumulated velocity; set to 1 to '
         'reproduce PtychoShelves.',
     ),
-    'MomentumAccelerationGradientMixingFactor': Overlay('Mixing Factor:'),
+    # Named once for both branches that persist it, which agree on the floor.
+    'MomentumAccelerationGradientMixingFactor': Overlay('Mixing Factor:', minimum=0.0),
     'rescale_probe_intensity_in_first_epoch': Overlay(
         'Rescale Probe Intensity In First Epoch',
         'When checked, the probe intensity will be rescaled on the first epoch',
@@ -646,11 +710,27 @@ _ALGORITHM_OVERLAYS: Mapping[str, Overlay] = {
 }
 
 
+def _precision() -> BoolEnum:
+    """The compute precision, which ptychodus offers as single or double.
+
+    pty-chi names three floating point types; ptychodus persists a boolean, so
+    both members it stands for have to be named or the switch decodes to
+    nothing.
+    """
+    from ptychi.api import Dtypes
+
+    return BoolEnum('UseDoublePrecision', when_true=Dtypes.FLOAT64, when_false=Dtypes.FLOAT32)
+
+
 def _reconstructor_policy(extras: set[str]) -> FlatteningPolicy:
     """The shared half of ``reconstructor_options``; the rest is the algorithm's own."""
     return FlatteningPolicy(
         hidden=frozenset(
             {
+                # Both halves of the clustering switch: ptychodus persists one
+                # count whose zero means off, which is a shape the declaration
+                # does not have, so the backend states it instead.
+                'compact_mode_update_clustering',
                 'compact_mode_update_clustering_stride',
                 'default_device',
                 'random_seed',
@@ -663,14 +743,12 @@ def _reconstructor_policy(extras: set[str]) -> FlatteningPolicy:
             'num_epochs': 'NumEpochs',
             'use_double_precision_for_fft': 'UseDoublePrecisionForFFT',
             'forward_model_options.low_memory_mode': 'UseLowMemoryMode',
+            'forward_model_options.pad_for_shift': 'PadForShift',
         },
         structural={
-            'default_dtype': BoolEnum('UseDoublePrecision'),
+            'default_dtype': _precision(),
             'exclude_measured_pixels_below': OptionalGate(
                 'EnableExcludeMeasuredPixelsBelow', 'ExcludeMeasuredPixelsBelow'
-            ),
-            'forward_model_options.pad_for_shift': Sentinel(
-                'PadForShift', value_type=int, sentinel=0
             ),
             'forward_model_options.diffraction_pattern_blur_sigma': OptionalGate(
                 'EnableDiffractionPatternBlur', 'DiffractionPatternBlurSigma', fallback=1.0
@@ -703,6 +781,17 @@ _ALGORITHM_GROUPS: Mapping[str, str] = {
 }
 
 
+# Where the pty-chi options sit inside what the backend declares. The
+# declaration wraps them so that the one knob ptychodus adds has somewhere to
+# live that is not inside a class pty-chi stamps its own name into.
+_TASK = 'task'
+
+
+def _wrapper_policy() -> FlatteningPolicy:
+    """The ptychodus-owned keys beside the task options, which are the one."""
+    return FlatteningPolicy(hidden=frozenset({_TASK}))
+
+
 def sections_for(algorithm: str, options: Any) -> Sequence[OptionsSection]:
     """Return the settings sections backing *algorithm*, given its declared options.
 
@@ -718,36 +807,37 @@ def sections_for(algorithm: str, options: Any) -> Sequence[OptionsSection]:
         ReconstructorOptions,
     )
 
+    task = options.task
+
     return [
+        OptionsSection('PtyChi', policy=_wrapper_policy()),
         OptionsSection(
             'PtyChi',
-            root_path='reconstructor_options',
-            policy=_reconstructor_policy(
-                _extras(options.reconstructor_options, ReconstructorOptions)
-            ),
+            root_path=f'{_TASK}.reconstructor_options',
+            policy=_reconstructor_policy(_extras(task.reconstructor_options, ReconstructorOptions)),
         ),
-        OptionsSection('PtyChi', root_path='data_options', policy=_data_policy()),
+        OptionsSection('PtyChi', root_path=f'{_TASK}.data_options', policy=_data_policy()),
         OptionsSection(
             'PtyChiObject',
-            root_path='object_options',
-            policy=_object_policy(_extras(options.object_options, ObjectOptions)),
+            root_path=f'{_TASK}.object_options',
+            policy=_object_policy(_extras(task.object_options, ObjectOptions)),
         ),
         OptionsSection(
             'PtyChiProbe',
-            root_path='probe_options',
-            policy=_probe_policy(_extras(options.probe_options, ProbeOptions)),
+            root_path=f'{_TASK}.probe_options',
+            policy=_probe_policy(_extras(task.probe_options, ProbeOptions)),
         ),
         OptionsSection(
             'PtyChiProbePosition',
-            root_path='probe_position_options',
-            policy=_position_policy(_extras(options.probe_position_options, ProbePositionOptions)),
+            root_path=f'{_TASK}.probe_position_options',
+            policy=_position_policy(_extras(task.probe_position_options, ProbePositionOptions)),
         ),
         OptionsSection(
             'PtyChiOPR',
-            root_path='opr_mode_weight_options',
-            policy=_opr_policy(_extras(options.opr_mode_weight_options, OPRModeWeightsOptions)),
+            root_path=f'{_TASK}.opr_mode_weight_options',
+            policy=_opr_policy(_extras(task.opr_mode_weight_options, OPRModeWeightsOptions)),
         ),
-        *_algorithm_sections(algorithm, options),
+        *_algorithm_sections(algorithm, task),
     ]
 
 
@@ -769,7 +859,7 @@ _AUTO_MIXING = OptionalGate(
 )
 
 
-def _algorithm_sections(algorithm: str, options: Any) -> Sequence[OptionsSection]:
+def _algorithm_sections(algorithm: str, task: Any) -> Sequence[OptionsSection]:
     """The group holding whatever this algorithm adds to each shared branch."""
     from ptychi.api.options.base import (
         ObjectOptions,
@@ -810,7 +900,7 @@ def _algorithm_sections(algorithm: str, options: Any) -> Sequence[OptionsSection
     sections: list[OptionsSection] = []
 
     for path, base, prefix, branch_overlays, structural in branches:
-        root = getattr(options, path)
+        root = getattr(task, path)
 
         if not _extras(root, base) - _UNSURFACED_EXTRAS:
             continue
@@ -818,7 +908,7 @@ def _algorithm_sections(algorithm: str, options: Any) -> Sequence[OptionsSection
         sections.append(
             OptionsSection(
                 group,
-                root_path=path,
+                root_path=f'{_TASK}.{path}',
                 policy=FlatteningPolicy(
                     base_prefix=prefix,
                     hidden=_only_extras(root, base),

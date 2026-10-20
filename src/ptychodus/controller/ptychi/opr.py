@@ -7,7 +7,7 @@ from ptychodus.api.parameters import (
     StringParameter,
 )
 
-from ...model.ptychi import PtyChiEnumerators, PtyChiOPRSettings
+from ._settings import PtyChiOPRSettings, PtyChiSettingsSource
 from ..parameters import (
     CheckBoxParameterViewController,
     ComboBoxParameterViewController,
@@ -29,7 +29,7 @@ class PtyChiSmoothOPRModeWeightsViewController(PtyChiCheckableGroupBoxViewContro
         smoothing_method: StringParameter,
         polynomial_smoothing_degree: IntegerParameter,
         num_epochs: IntegerParameter,
-        enumerators: PtyChiEnumerators,
+        choices: PtyChiSettingsSource,
     ) -> None:
         super().__init__(
             smooth_mode_weights,
@@ -41,7 +41,7 @@ class PtyChiSmoothOPRModeWeightsViewController(PtyChiCheckableGroupBoxViewContro
         )
         self._smoothing_method_view_controller = ComboBoxParameterViewController(
             smoothing_method,
-            enumerators.opr_weight_smoothing_methods(),
+            choices.choices_of(smoothing_method),
             tool_tip='Method for smoothing OPR mode weights (MEDIAN filter or POLYNOMIAL fit).',
         )
         self._polynomial_smoothing_degree_view_controller = SpinBoxParameterViewController(
@@ -79,7 +79,7 @@ class PtyChiOPRViewController(PtyChiCheckableGroupBoxViewController):
         self,
         settings: PtyChiOPRSettings,
         num_epochs: IntegerParameter,
-        enumerators: PtyChiEnumerators,
+        choices: PtyChiSettingsSource,
     ) -> None:
         super().__init__(
             settings.is_optimizable,
@@ -93,7 +93,7 @@ class PtyChiOPRViewController(PtyChiCheckableGroupBoxViewController):
             num_epochs,
         )
         self._optimizer_view_controller = PtyChiOptimizerParameterViewController(
-            settings.optimizer, enumerators
+            settings.optimizer, choices
         )
         self._step_size_view_controller = DecimalLineEditParameterViewController(
             settings.step_size, tool_tip='Optimizer step size (learning rate).'
@@ -122,7 +122,7 @@ class PtyChiOPRViewController(PtyChiCheckableGroupBoxViewController):
             settings.smoothing_method,
             settings.polynomial_smoothing_degree,
             num_epochs,
-            enumerators,
+            choices,
         )
         self._update_relaxation_view_controller = DecimalSliderParameterViewController(
             settings.update_relaxation,

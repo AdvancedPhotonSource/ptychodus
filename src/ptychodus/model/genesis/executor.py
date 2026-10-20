@@ -189,8 +189,14 @@ class GenesisExecutor:
         )
         self._task_manager.put_background_task(workflow_task)
 
-    def reconstruct(self, input_product_index: int, *, algorithm: str | None = None) -> None:
-        self._processing_api.set_reconstructor_if_provided(algorithm)
+    def reconstruct(
+        self,
+        input_product_index: int,
+        *,
+        library: str | None = None,
+        algorithm: str | None = None,
+    ) -> None:
+        self._processing_api.set_reconstructor_if_provided(library=library, algorithm=algorithm)
         dir_structure = self.populate_input_directory(input_product_index)
 
         if self._processing_api.is_reconstructor_trainable():
@@ -200,8 +206,14 @@ class GenesisExecutor:
 
         self._run_flow('reconstruct', dir_structure)
 
-    def train(self, input_product_index: int, *, algorithm: str | None = None) -> None:
-        self._processing_api.set_reconstructor_if_provided(algorithm)
+    def train(
+        self,
+        input_product_index: int,
+        *,
+        library: str | None = None,
+        algorithm: str | None = None,
+    ) -> None:
+        self._processing_api.set_reconstructor_if_provided(library=library, algorithm=algorithm)
         dir_structure = self.populate_input_directory(input_product_index)
         self._run_flow('train', dir_structure)
         # TODO customize input/output directories; put model to mlflow

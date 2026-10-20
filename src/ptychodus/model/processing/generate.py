@@ -52,7 +52,7 @@ def _unwrap_optional(annotation: Any) -> Any:
     return members[0] if len(members) == 1 else annotation
 
 
-def _create(group: ParameterGroup, flat: FlatParameter, policy: FlatteningPolicy) -> Parameter[Any]:
+def _create(group: ParameterGroup, flat: FlatParameter) -> Parameter[Any]:
     annotation = _unwrap_optional(flat.annotation)
     key = flat.ini_key
     default = flat.default
@@ -61,7 +61,7 @@ def _create(group: ParameterGroup, flat: FlatParameter, policy: FlatteningPolicy
     # models ptychodus owns -- so the live parameter is a string either way, and
     # the declared type is what restores meaning on the way back out.
     if isinstance(annotation, type) and issubclass(annotation, Enum):
-        return group.create_string_parameter(key, render_value(default, policy))
+        return group.create_string_parameter(key, render_value(default, by_name=flat.enum_by_name))
 
     # bool is a subclass of int, so it has to be tested first.
     if annotation is bool:
@@ -111,7 +111,7 @@ def populate_parameter_group(
         # the same options share one set of live values. A backend's modes are
         # configured by one settings section, and a file holds one copy of it.
         parameter = existing.get(flat.ini_key)
-        parameters[flat.ini_key] = _create(group, flat, policy) if parameter is None else parameter
+        parameters[flat.ini_key] = _create(group, flat) if parameter is None else parameter
 
     return parameters
 
@@ -145,22 +145,24 @@ def _accepted(flat: FlatParameter, value: Any) -> Any:
     return flat.default
 
 
-def _restore_value(flat: FlatParameter, value: Any, policy: FlatteningPolicy) -> Any:
+def _restore_value(flat: FlatParameter, value: Any) -> Any:
     """Turn a live parameter's value back into what the declaration expects.
 
     Only enums need turning back: they persist as a string, and which string
-    depends on the policy that wrote them.
+    depends on how the key was written.
     """
     annotation = _unwrap_optional(flat.annotation)
 
     if isinstance(annotation, type) and issubclass(annotation, Enum):
         try:
-            return annotation[value] if policy.enum_by_name else annotation(value)
+            return annotation[value] if flat.enum_by_name else annotation(value)
         except (KeyError, ValueError):
-            members = ', '.join(m.name if policy.enum_by_name else str(m.value) for m in annotation)
+            members = ', '.join(m.name if flat.enum_by_name else str(m.value) for m in annotation)
+            # The fallback is spelled the way the members are listed, so the
+            # message does not appear to name a value it just rejected.
             logger.warning(
                 f'Ignoring "{flat.ini_key}" = "{value}": not one of {members}. '
-                f'Using "{flat.default}".'
+                f'Using "{render_value(flat.default, by_name=flat.enum_by_name)}".'
             )
             return flat.default
 
@@ -192,7 +194,7 @@ def apply_options(
             )
             continue
 
-        _assign(target, flat.path, _restore_value(flat, parameter.get_value(), policy))
+        _assign(target, flat.path, _restore_value(flat, parameter.get_value()))
 
     for path, values in adapted.items():
         _assign(target, path, policy.structural[path].decode(values))

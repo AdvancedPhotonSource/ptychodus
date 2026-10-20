@@ -115,6 +115,7 @@ class ProductWorkflowAPI(ABC):
     def reconstruct_local(
         self,
         *,
+        library: str | None = None,
         algorithm: str | None = None,
         output_product_file: Path | None = None,
         block: bool = False,
@@ -129,6 +130,7 @@ class ProductWorkflowAPI(ABC):
     def reconstruct_remote(
         self,
         *,
+        library: str | None = None,
         algorithm: str | None = None,
         provider: RemoteComputeProvider = RemoteComputeProvider.GLOBUS,
     ) -> None:
@@ -141,6 +143,7 @@ class ProductWorkflowAPI(ABC):
         input_path: Path,
         output_path: Path,
         *,
+        library: str | None = None,
         algorithm: str | None = None,
         block: bool = False,
     ) -> None:
@@ -154,6 +157,7 @@ class ProductWorkflowAPI(ABC):
     def train_reconstructor_remote(
         self,
         *,
+        library: str | None = None,
         algorithm: str | None = None,
         provider: RemoteComputeProvider = RemoteComputeProvider.GLOBUS,
     ) -> None:
@@ -161,7 +165,9 @@ class ProductWorkflowAPI(ABC):
         pass
 
     @abstractmethod
-    def export_training_data(self, file_path: Path, *, algorithm: str | None = None) -> None:
+    def export_training_data(
+        self, file_path: Path, *, library: str | None = None, algorithm: str | None = None
+    ) -> None:
         """Export training data for the current reconstructor to file."""
         pass
 
@@ -182,6 +188,9 @@ class ProductWorkflowAPI(ABC):
         block: bool = False,
     ) -> None:
         """Run fluorescence enhancement locally and write the result to output_path.
+
+        ``algorithm`` names an enhancement strategy, not a reconstructor, so
+        it has no library beside it.
 
         Blocks until completion when block is True, otherwise returns immediately.
         """
@@ -269,8 +278,17 @@ class WorkflowAPI(ABC):
         pass
 
     @abstractmethod
-    def available_reconstructors(self) -> Iterator[str]:
-        """Yield the names of all registered reconstructors."""
+    def available_libraries(self) -> Iterator[str]:
+        """Yield the names of all registered reconstructor backends."""
+        pass
+
+    @abstractmethod
+    def available_algorithms(self, library: str | None = None) -> Iterator[str]:
+        """Yield the algorithms a backend offers, or the selected one's when None.
+
+        Asking about another backend selects it, because what a backend
+        offers is only knowable by looking at it.
+        """
         pass
 
     @abstractmethod

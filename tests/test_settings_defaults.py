@@ -19,18 +19,17 @@ Regenerate after an intentional change, then read the diff::
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Container, Iterable
 from pathlib import Path
 from typing import cast
 import importlib
 import inspect
 import pkgutil
-
-import pytest
+import warnings
 
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.settings import SettingsRegistry
-from ptychodus.model.processing import ProcessingAlgorithmParameter, ProcessingParameterStore
+from ptychodus.model.processing import ProcessingParameterStore
 from ptychodus.model.processing.core import _SECTIONS_BY_LIBRARY
 
 GOLDEN_PATH = Path(__file__).parent / 'data' / 'settings_defaults.ini'
@@ -73,10 +72,8 @@ def absent_backends() -> list[str]:
     absent: list[str] = []
 
     for plugin in PluginRegistry.load_plugins().reconstructor_libraries:
-        library = plugin.strategy
-
-        if library.name in _SECTIONS_BY_LIBRARY and not list(library):
-            absent.append(library.name)
+        if plugin.display_name in _SECTIONS_BY_LIBRARY and not list(plugin.strategy):
+            absent.append(plugin.display_name)
 
     return absent
 
@@ -86,17 +83,16 @@ def _register_declared_sections(registry: SettingsRegistry) -> None:
     store = ProcessingParameterStore(registry)
 
     for plugin in PluginRegistry.load_plugins().reconstructor_libraries:
-        library = plugin.strategy
-        sections = _SECTIONS_BY_LIBRARY.get(library.name)
+        sections = _SECTIONS_BY_LIBRARY.get(plugin.display_name)
 
         if sections is None:
             continue
 
-        for reconstructor in library:
+        for reconstructor in plugin.strategy:
             store.register(
-                ProcessingAlgorithmParameter.generate_key(library.name, reconstructor.name),
+                plugin.display_name,
                 reconstructor,
-                sections(),
+                sections(reconstructor.name, reconstructor.get_default_options()),
             )
 
 
@@ -143,21 +139,101 @@ def render_settings() -> str:
     return '\n'.join(lines)
 
 
+# The prefix every settings group of a crossed-over backend carries. Named
+# here because the backend itself cannot say when its package is absent: its
+# section table is answered per reconstructor, and an absent backend offers
+# none -- which is exactly the case this fixture needs the answer for.
+# ``test_each_backends_group_prefix_covers_what_it_declares`` checks each entry
+# against the backend wherever the backend is installed.
+_GROUP_PREFIX_BY_BACKEND = {
+    'PtychoFM': 'PtychoFM',
+    'PtychoPINN': 'PtychoPINN',
+    'pty-chi': 'PtyChi',
+}
+
+
+def declared_groups(backends: Iterable[str], text: str) -> set[str]:
+    """The groups in *text* belonging to the named backends."""
+    prefixes = tuple(
+        prefix for name, prefix in _GROUP_PREFIX_BY_BACKEND.items() if name in set(backends)
+    )
+
+    if not prefixes:
+        return set()
+
+    return {
+        line.strip('[]')
+        for line in text.split('\n')
+        if line.startswith('[') and line.strip('[]').startswith(prefixes)
+    }
+
+
+def generated_groups(backend: str) -> set[str]:
+    """Every group *backend* generates, asked of each reconstructor it offers.
+
+    Asked per reconstructor because a section table may answer differently for
+    each: pty-chi files every algorithm's additions under a group of that
+    algorithm's own. Empty for a backend whose package is absent.
+    """
+    groups: set[str] = set()
+
+    for plugin in PluginRegistry.load_plugins().reconstructor_libraries:
+        sections = _SECTIONS_BY_LIBRARY.get(plugin.display_name)
+
+        if sections is None or plugin.display_name != backend:
+            continue
+
+        for reconstructor in plugin.strategy:
+            for section in sections(reconstructor.name, reconstructor.get_default_options()):
+                groups.add(section.group_name)
+
+    return groups
+
+
+def _without_groups(text: str, group_names: Container[str]) -> str:
+    """The same INI text with the named groups dropped whole.
+
+    Split on the separator rather than by lines, so the trailing newline is
+    the last element and survives the round trip: a group's block is its
+    header, its keys and the blank line after them, and dropping the final
+    group has to take that blank line with it.
+    """
+    lines: list[str] = []
+    keep = True
+
+    for line in text.split('\n'):
+        if line.startswith('['):
+            keep = line.strip('[]') not in group_names
+
+        if keep:
+            lines.append(line)
+
+    return '\n'.join(lines)
+
+
 def test_settings_defaults_match_golden() -> None:
     assert GOLDEN_PATH.is_file(), (
         f'Missing {GOLDEN_PATH.name}; regenerate with "python {Path(__file__).name}".'
     )
 
+    # A backend that has crossed over contributes no groups unless the package
+    # it wraps is installed, so on a bare install its sections genuinely do not
+    # exist here. Elide exactly those from the golden text and compare
+    # everything else: skipping outright would stop pinning every other
+    # subsystem too, which is far more surface than the backend costs.
+    golden = GOLDEN_PATH.read_text()
     absent = absent_backends()
+    unpinned = declared_groups(absent, golden)
+    expected = _without_groups(golden, unpinned)
 
     if absent:
-        # A backend that has crossed over contributes no groups unless the
-        # package it wraps is installed, so on a bare install those sections
-        # genuinely do not exist and the fixture cannot pin them here. Compare
-        # what this machine can see, and say what it could not.
-        pytest.skip(f'Not installed, so their settings are absent: {", ".join(sorted(absent))}.')
+        warnings.warn(
+            f'Not installed, so {len(unpinned)} of their settings groups went '
+            f'uncompared: {", ".join(sorted(absent))}.',
+            stacklevel=1,
+        )
 
-    assert render_settings() == GOLDEN_PATH.read_text(), (
+    assert render_settings() == expected, (
         'Settings sections, keys or defaults changed. If intended, regenerate with '
         f'"python tests/{Path(__file__).name}" and review the diff -- a renamed key '
         'orphans every saved settings file that still uses the old one.'
@@ -165,20 +241,40 @@ def test_settings_defaults_match_golden() -> None:
 
 
 def test_every_installed_backend_still_contributes_its_groups() -> None:
-    """Runs everywhere, including where the golden comparison is skipped.
+    """Complements the comparison above, which elides what it cannot see.
 
-    The comparison above pins values; this pins that a backend which *is*
-    installed did not silently stop producing settings -- the failure a
-    crossover would cause, and the one a skip would otherwise hide.
+    That one pins values; this pins that a backend which *is* installed did
+    not silently stop producing settings -- the failure a crossover would
+    cause, and the one an elision would otherwise absorb.
     """
     rendered = render_settings()
 
     for plugin in PluginRegistry.load_plugins().reconstructor_libraries:
-        library = plugin.strategy
+        if plugin.display_name in _SECTIONS_BY_LIBRARY and list(plugin.strategy):
+            for group_name in generated_groups(plugin.display_name):
+                assert f'[{group_name}]' in rendered, group_name
 
-        if library.name in _SECTIONS_BY_LIBRARY and list(library):
-            for section in _SECTIONS_BY_LIBRARY[library.name]():
-                assert f'[{section.group_name}]' in rendered, section.group_name
+
+def test_each_backends_group_prefix_covers_what_it_declares() -> None:
+    """The prefix table must agree with the backends that can be asked.
+
+    It exists for the backends that cannot -- an absent one generates no
+    groups to read a prefix off -- so it is checked here against every
+    backend this machine does have, which is the only place it can be.
+    """
+    golden = GOLDEN_PATH.read_text()
+
+    for backend in _GROUP_PREFIX_BY_BACKEND:
+        generated = generated_groups(backend)
+
+        if generated:
+            assert declared_groups([backend], golden) == generated, backend
+
+
+def test_the_prefix_table_names_every_crossed_over_backend() -> None:
+    """A backend missing from the table would be compared against a golden
+    that cannot contain it, so a bare install would fail rather than elide."""
+    assert set(_GROUP_PREFIX_BY_BACKEND) == set(_SECTIONS_BY_LIBRARY)
 
 
 def test_golden_covers_the_whole_surface() -> None:
@@ -189,6 +285,19 @@ def test_golden_covers_the_whole_surface() -> None:
 
 
 if __name__ == '__main__':
+    # Refuse rather than quietly drop what this machine cannot build: a
+    # regeneration run without every backend installed would delete those
+    # groups from the fixture, and the deletion reads as an intended removal.
+    missing = absent_backends()
+
+    if missing:
+        raise SystemExit(
+            f'Refusing to regenerate: {", ".join(sorted(missing))} '
+            f'{"is" if len(missing) == 1 else "are"} not installed, so '
+            f'{len(declared_groups(missing, GOLDEN_PATH.read_text()))} '
+            'settings groups would be dropped.'
+        )
+
     GOLDEN_PATH.write_text(render_settings())
     print(f'Wrote {GOLDEN_PATH}')
 
@@ -201,6 +310,6 @@ def test_every_backend_named_in_the_section_table_is_a_registered_library() -> N
     over yet.
     """
     registered = {
-        plugin.strategy.name for plugin in PluginRegistry.load_plugins().reconstructor_libraries
+        plugin.display_name for plugin in PluginRegistry.load_plugins().reconstructor_libraries
     }
     assert set(_SECTIONS_BY_LIBRARY) <= registered

@@ -145,6 +145,13 @@ def _check_in_subprocess(result_queue: multiprocessing.Queue[dict[str, list[str]
         import ptychodus  # noqa: F401
         import ptychodus.model.core  # noqa: F401
         import ptychodus.api.spawn  # noqa: F401
+        from ptychodus.api.plugins import PluginRegistry
+
+        # Registering is what reaches every backend now that no composition
+        # root names one. It must still not import a GPU framework: a library
+        # resolves its modules without loading them and builds its
+        # reconstructors only when something asks for them.
+        PluginRegistry.load_plugins()
 
         context_offenders, notes = _gpu_context_offenders()
         result_queue.put(

@@ -11,14 +11,14 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parameters import BooleanParameter, RealParameter
 
-from ...model.ptychi import (
+from ._settings import (
     PtyChiAutodiffSettings,
     PtyChiBHSettings,
     PtyChiDMSettings,
-    PtyChiEnumerators,
     PtyChiLSQMLSettings,
     PtyChiRAARSettings,
     PtyChiSettings,
+    PtyChiSettingsSource,
 )
 from ..parameters import (
     CheckBoxParameterViewController,
@@ -117,7 +117,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
         dm_settings: PtyChiDMSettings | None,
         lsqml_settings: PtyChiLSQMLSettings | None,
         raar_settings: PtyChiRAARSettings | None,
-        enumerators: PtyChiEnumerators,
+        choices: PtyChiSettingsSource,
     ) -> None:
         super().__init__()
         self._num_epochs_view_controller = SpinBoxParameterViewController(
@@ -131,7 +131,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
         )
         self._batching_mode_view_controller = ComboBoxParameterViewController(
             settings.batching_mode,
-            enumerators.batching_modes(),
+            choices.choices_of(settings.batching_mode),
             tool_tip=(
                 'Minibatch selection: RANDOM (random points), COMPACT (spatially clustered), '
                 'or UNIFORM (spread across the scan).'
@@ -243,14 +243,14 @@ class PtyChiReconstructorViewController(ParameterViewController):
         if autodiff_settings is not None:
             self._loss_function_view_controller = ComboBoxParameterViewController(
                 autodiff_settings.loss_function,
-                enumerators.loss_functions(),
+                choices.choices_of(autodiff_settings.loss_function),
                 tool_tip='Loss function to optimize',
             )
             layout.addRow('Loss Function:', self._loss_function_view_controller.get_widget())
 
             self._forward_model_class_view_controller = ComboBoxParameterViewController(
                 autodiff_settings.forward_model_class,
-                enumerators.forward_models(),
+                choices.choices_of(autodiff_settings.forward_model_class),
                 tool_tip='Forward model class',
             )
             layout.addRow('Forward Model:', self._forward_model_class_view_controller.get_widget())
@@ -297,7 +297,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
         if lsqml_settings is not None:
             self._noise_model_view_controller = ComboBoxParameterViewController(
                 lsqml_settings.noise_model,
-                enumerators.noise_models(),
+                choices.choices_of(lsqml_settings.noise_model),
                 tool_tip='Noise model to use',
             )
             layout.addRow('Noise Model:', self._noise_model_view_controller.get_widget())

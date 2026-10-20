@@ -5,6 +5,7 @@ import logging
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
+    QComboBox,
     QFormLayout,
     QLabel,
     QScrollArea,
@@ -13,7 +14,12 @@ from PyQt5.QtWidgets import (
 )
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.reconstruct import SubprocessReconstructor, TrainableReconstructor
+from ptychodus.api.plugins import PluginChooserParameter
+from ptychodus.api.reconstruct import (
+    ReconstructorLibrary,
+    SubprocessReconstructor,
+    TrainableReconstructor,
+)
 
 from ...model.genesis import GenesisCore
 from ...model.globus import GlobusCore
@@ -23,7 +29,7 @@ from ...view.processing import ProcessingActionsView, ProcessingStatusView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..helpers import connect_triggered_signal
-from ..parameters import ComboBoxParameterViewController
+from ..parameters import ComboBoxParameterViewController, ParameterViewController
 from ..product.core import ProductRepositoryTableModel
 from .parameters import (
     ProcessingStatusController,
@@ -32,6 +38,53 @@ from .parameters import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _centered_label(text: str) -> QLabel:
+    label = QLabel(text)
+    label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    return label
+
+
+class _AlgorithmComboViewController(ParameterViewController, Observer):
+    """A combo box whose items change with the library that offers them.
+
+    ``ComboBoxParameterViewController`` fixes its items at construction,
+    which an algorithm list cannot be: selecting another backend replaces
+    every choice. Kept here rather than beside that one because the shared
+    module is tested and this is panel wiring.
+    """
+
+    def __init__(self, parameter: ProcessingAlgorithmParameter) -> None:
+        super().__init__()
+        self._parameter = parameter
+        self._widget = QComboBox()
+        self._repopulate()
+        # textActivated, not currentTextChanged: it fires only when a person
+        # picks something, so rebuilding the items below cannot write back.
+        self._widget.textActivated.connect(parameter.set_value)
+        parameter.add_observer(self)
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+    def _repopulate(self) -> None:
+        choices = list(self._parameter.choices())
+        current = self._parameter.get_value()
+
+        self._widget.blockSignals(True)
+
+        if [self._widget.itemText(row) for row in range(self._widget.count())] != choices:
+            self._widget.clear()
+            self._widget.addItems(choices)
+
+        self._widget.setCurrentText(current)
+        self._widget.setEnabled(bool(choices))
+        self._widget.blockSignals(False)
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self._repopulate()
 
 
 class ReconstructorViewControllerFactory(ABC):
@@ -48,6 +101,7 @@ class ReconstructorViewControllerFactory(ABC):
 class ProcessingController(Observer):
     def __init__(
         self,
+        library_parameter: PluginChooserParameter[ReconstructorLibrary],
         algorithm_parameter: ProcessingAlgorithmParameter,
         processing_api: ProcessingAPI,
         product_repository: ProductRepository,
@@ -60,6 +114,7 @@ class ProcessingController(Observer):
         view_controller_factories: Iterable[ReconstructorViewControllerFactory],
     ) -> None:
         super().__init__()
+        self._library_parameter = library_parameter
         self._algorithm_parameter = algorithm_parameter
         self._processing_api = processing_api
         self._product_repository = product_repository
@@ -70,6 +125,8 @@ class ProcessingController(Observer):
         self._file_dialog_factory = file_dialog_factory
 
         self._stacked_widget = QStackedWidget()
+        self._page: dict[tuple[str, str], int] = {}
+        self._empty_page: dict[str, int] = {}
         self._populate_stacked_widget(view_controller_factories)
         stacked_widget_layout = self._stacked_widget.layout()
 
@@ -80,9 +137,10 @@ class ProcessingController(Observer):
         self._scroll_area.setWidgetResizable(True)
         self._scroll_area.setWidget(self._stacked_widget)
 
-        self._algorithm_view_controller = ComboBoxParameterViewController(
-            algorithm_parameter, algorithm_parameter.available_reconstructors()
+        self._library_view_controller = ComboBoxParameterViewController(
+            library_parameter, library_parameter.choices()
         )
+        self._algorithm_view_controller = _AlgorithmComboViewController(algorithm_parameter)
         self._status_controller = ProcessingStatusController(
             product_repository, processing_api.task_monitor, status_view
         )
@@ -96,6 +154,7 @@ class ProcessingController(Observer):
         self._actions_view = ProcessingActionsView()
 
         layout = QFormLayout()
+        layout.addRow('Library:', self._library_view_controller.get_widget())
         layout.addRow('Algorithm:', self._algorithm_view_controller.get_widget())
         layout.addRow('Product:', self._product_view_controller.get_widget())
 
@@ -130,6 +189,7 @@ class ProcessingController(Observer):
         self._sync_action_buttons_to_selection()
 
         self._sync_model_to_view()
+        library_parameter.add_observer(self)
         algorithm_parameter.add_observer(self)
 
     def _sync_action_buttons_to_selection(self) -> None:
@@ -155,20 +215,38 @@ class ProcessingController(Observer):
     def _populate_stacked_widget(
         self, view_controller_factories: Iterable[ReconstructorViewControllerFactory]
     ) -> None:
+        """Build one page per algorithm, remembered by the pair that selects it.
+
+        By the pair rather than by position: the combo boxes no longer
+        enumerate pages one-for-one, and a page found by counting would
+        follow whichever list happened to be built the same way.
+        """
         vcf_map = {vcf.name.casefold(): vcf for vcf in view_controller_factories}
 
-        for library, reconstructor in self._processing_api.available_reconstructors_parts():
-            try:
-                vcf = vcf_map[library]
-            except KeyError:
-                label = QLabel(f'{library} not found!')
-                logger.warning(label.text())
-                label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                widget: QWidget = label
-            else:
-                widget = vcf.create_view_controller(reconstructor)
+        for library in self._processing_api.available_libraries():
+            algorithms = list(self._processing_api.available_algorithms(library))
 
-            self._stacked_widget.addWidget(widget)
+            if not algorithms:
+                # The backend is registered but its packages are not
+                # installed. It is still offered, so it needs somewhere to
+                # land rather than leaving the previous backend's panel up.
+                self._empty_page[library.casefold()] = self._stacked_widget.addWidget(
+                    _centered_label(f'{library} is not installed.')
+                )
+                continue
+
+            for algorithm in algorithms:
+                try:
+                    vcf = vcf_map[library.casefold()]
+                except KeyError:
+                    logger.warning(f'{library} not found!')
+                    widget: QWidget = _centered_label(f'{library} not found!')
+                else:
+                    widget = vcf.create_view_controller(algorithm)
+
+                self._page[library.casefold(), algorithm.casefold()] = (
+                    self._stacked_widget.addWidget(widget)
+                )
 
     def _has_dataset_or_warn(self, product_index: int, action: str) -> bool:
         try:
@@ -306,9 +384,18 @@ class ProcessingController(Observer):
             ExceptionDialog.show_exception('Export Training Data', exc)
 
     def _sync_model_to_view(self) -> None:
-        self._stacked_widget.setCurrentIndex(
-            self._algorithm_view_controller.get_widget().currentIndex()
-        )
+        # Asked of the model rather than read off a combo box, so that a
+        # library change part-way through settling its algorithm selects
+        # nothing rather than the wrong thing.
+        library, algorithm = self._processing_api.current_selection()
+        index = self._page.get((library.casefold(), algorithm.casefold()))
+
+        if index is None:
+            index = self._empty_page.get(library.casefold())
+
+        if index is not None:
+            self._stacked_widget.setCurrentIndex(index)
+
         reconstructor = self._algorithm_parameter.get_current_reconstructor()
         is_trainable = isinstance(reconstructor, TrainableReconstructor)
 
@@ -329,5 +416,5 @@ class ProcessingController(Observer):
         self._export_training_data_action.setVisible(is_trainable)
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._algorithm_parameter:
+        if observable in (self._library_parameter, self._algorithm_parameter):
             self._sync_model_to_view()

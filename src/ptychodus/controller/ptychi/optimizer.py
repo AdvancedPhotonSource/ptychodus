@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import QHBoxLayout, QLabel, QSpinBox, QWidget
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parameters import IntegerParameter, StringParameter
 
-from ...model.ptychi import PtyChiEnumerators
+from ._settings import PtyChiSettingsSource
 from ..parameters import (
     ComboBoxParameterViewController,
     SpinBoxParameterViewController,
@@ -89,5 +89,7 @@ class PtyChiOptimizationPlanViewController(ParameterViewController):
 
 
 class PtyChiOptimizerParameterViewController(ComboBoxParameterViewController):
-    def __init__(self, parameter: StringParameter, enumerators: PtyChiEnumerators) -> None:
-        super().__init__(parameter, enumerators.optimizers(), tool_tip='Name of the optimizer.')
+    def __init__(self, parameter: StringParameter, choices: PtyChiSettingsSource) -> None:
+        super().__init__(
+            parameter, choices.choices_of(parameter), tool_tip='Name of the optimizer.'
+        )

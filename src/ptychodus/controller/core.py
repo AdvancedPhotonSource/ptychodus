@@ -50,17 +50,15 @@ class ControllerCore:
         # its own panel; every other one gets a panel rendered from what it
         # declares, so adding a backend needs no wiring here.
         bespoke: list[ReconstructorViewControllerFactory] = [
-            PtyChiViewControllerFactory(model.ptychi_reconstructor_library),
+            PtyChiViewControllerFactory(model.processing_core.parameter_store),
         ]
         hand_written = {factory.name.casefold() for factory in bespoke}
         self._view_controller_factories: list[ReconstructorViewControllerFactory] = [
             *bespoke,
             *(
-                GeneratedViewControllerFactory(
-                    plugin.strategy.name, model.processing_core.parameter_store
-                )
-                for plugin in model.plugin_registry.reconstructor_libraries
-                if plugin.strategy.name.casefold() not in hand_written
+                GeneratedViewControllerFactory(name, model.processing_core.parameter_store)
+                for name in model.processing_core.library_names()
+                if name.casefold() not in hand_written
             ),
         ]
         # Shared product-repository table model. Constructing it here (before
@@ -199,6 +197,7 @@ class ControllerCore:
             self._file_dialog_factory,
         )
         self._processing_controller = ProcessingController(
+            model.processing_core.library_parameter,
             model.processing_core.algorithm_parameter,
             model.processing_core.processing_api,
             model.product_core.product_repository,

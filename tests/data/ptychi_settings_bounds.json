@@ -1,0 +1,414 @@
+{
+  "PtyChi": {
+    "BatchSize": [
+      1,
+      null
+    ],
+    "CompactModeUpdateClustering": [
+      0,
+      null
+    ],
+    "DiffractionPatternBlurSigma": [
+      0.0,
+      null
+    ],
+    "NumEpochs": [
+      1,
+      null
+    ],
+    "NumSyncEpochs": [
+      1,
+      null
+    ],
+    "PadForShift": [
+      0,
+      null
+    ]
+  },
+  "PtyChiBH": {
+    "ProbePositionRho": [
+      1e-12,
+      null
+    ],
+    "ProbeRho": [
+      1e-12,
+      null
+    ]
+  },
+  "PtyChiDM": {
+    "ChunkLength": [
+      1,
+      null
+    ],
+    "ExitWaveUpdateRelaxation": [
+      0.0,
+      1.0
+    ],
+    "ObjectAmplitudeClampLimit": [
+      1e-12,
+      null
+    ],
+    "ObjectInertia": [
+      0.0,
+      1.0
+    ],
+    "ProbeInertia": [
+      0.0,
+      1.0
+    ]
+  },
+  "PtyChiLSQML": {
+    "GaussianNoiseStd": [
+      1e-12,
+      null
+    ],
+    "MomentumAccelerationGain": [
+      0.0,
+      null
+    ],
+    "MomentumAccelerationGradientMixingFactor": [
+      0.0,
+      null
+    ],
+    "ObjectOptimalStepSizeScaler": [
+      1e-12,
+      null
+    ],
+    "PreconditioningDampingFactor": [
+      0.0,
+      null
+    ],
+    "ProbeOptimalStepSizeScaler": [
+      1e-12,
+      null
+    ],
+    "ProbePositionMomentumAccelerationGain": [
+      0.0,
+      null
+    ],
+    "ProbePositionMomentumAccelerationGradientMixingFactor": [
+      0.0,
+      null
+    ],
+    "ProbePositionMomentumAccelerationMemory": [
+      1,
+      null
+    ]
+  },
+  "PtyChiOPR": {
+    "OptimizationPlanStart": [
+      0,
+      null
+    ],
+    "OptimizationPlanStride": [
+      1,
+      null
+    ],
+    "PolynomialSmoothingDegree": [
+      0,
+      10
+    ],
+    "PrimaryModeWeightFloor": [
+      0.0,
+      null
+    ],
+    "SmoothModeWeightsStart": [
+      0,
+      null
+    ],
+    "SmoothModeWeightsStride": [
+      1,
+      null
+    ],
+    "StepSize": [
+      0.0,
+      null
+    ],
+    "UpdateRelaxation": [
+      0.0,
+      1.0
+    ]
+  },
+  "PtyChiObject": {
+    "ConstrainHardLimitsAbsMax": [
+      0.0,
+      null
+    ],
+    "ConstrainHardLimitsAbsMin": [
+      0.0,
+      null
+    ],
+    "ConstrainHardLimitsStart": [
+      0,
+      null
+    ],
+    "ConstrainHardLimitsStride": [
+      1,
+      null
+    ],
+    "ConstrainL1NormStart": [
+      0,
+      null
+    ],
+    "ConstrainL1NormStride": [
+      1,
+      null
+    ],
+    "ConstrainL1NormWeight": [
+      0.0,
+      null
+    ],
+    "ConstrainL2NormStart": [
+      0,
+      null
+    ],
+    "ConstrainL2NormStride": [
+      1,
+      null
+    ],
+    "ConstrainL2NormWeight": [
+      0.0,
+      null
+    ],
+    "ConstrainSmoothnessAlpha": [
+      0.0,
+      0.125
+    ],
+    "ConstrainSmoothnessStart": [
+      0,
+      null
+    ],
+    "ConstrainSmoothnessStride": [
+      1,
+      null
+    ],
+    "ConstrainTotalVariationStart": [
+      0,
+      null
+    ],
+    "ConstrainTotalVariationStride": [
+      1,
+      null
+    ],
+    "ConstrainTotalVariationWeight": [
+      0.0,
+      null
+    ],
+    "OptimizationPlanStart": [
+      0,
+      null
+    ],
+    "OptimizationPlanStride": [
+      1,
+      null
+    ],
+    "OptimizeSliceSpacingStart": [
+      0,
+      null
+    ],
+    "OptimizeSliceSpacingStepSize": [
+      0.0,
+      null
+    ],
+    "OptimizeSliceSpacingStride": [
+      1,
+      null
+    ],
+    "RegularizeMultisliceStart": [
+      0,
+      null
+    ],
+    "RegularizeMultisliceStride": [
+      1,
+      null
+    ],
+    "RegularizeMultisliceWeight": [
+      0.0,
+      null
+    ],
+    "RemoveGridArtifactsPeriodXInMeters": [
+      1e-12,
+      null
+    ],
+    "RemoveGridArtifactsPeriodYInMeters": [
+      1e-12,
+      null
+    ],
+    "RemoveGridArtifactsStart": [
+      0,
+      null
+    ],
+    "RemoveGridArtifactsStride": [
+      1,
+      null
+    ],
+    "RemoveGridArtifactsWindowSizeInPixels": [
+      1,
+      null
+    ],
+    "RemoveObjectProbeAmbiguityStart": [
+      0,
+      null
+    ],
+    "RemoveObjectProbeAmbiguityStride": [
+      1,
+      null
+    ],
+    "StepSize": [
+      0.0,
+      null
+    ]
+  },
+  "PtyChiPIE": {
+    "ObjectAlpha": [
+      0.0,
+      1.0
+    ],
+    "ProbeAlpha": [
+      0.0,
+      1.0
+    ]
+  },
+  "PtyChiProbe": {
+    "ConstrainCenterStart": [
+      0,
+      null
+    ],
+    "ConstrainCenterStride": [
+      1,
+      null
+    ],
+    "ConstrainProbePowerStart": [
+      0,
+      null
+    ],
+    "ConstrainProbePowerStride": [
+      1,
+      null
+    ],
+    "ConstrainSupportStart": [
+      0,
+      null
+    ],
+    "ConstrainSupportStride": [
+      1,
+      null
+    ],
+    "ConstrainSupportThreshold": [
+      0.0,
+      null
+    ],
+    "EigenmodeUpdateRelaxation": [
+      0.0,
+      1.0
+    ],
+    "OptimizationPlanStart": [
+      0,
+      null
+    ],
+    "OptimizationPlanStride": [
+      1,
+      null
+    ],
+    "OrthogonalizeIncoherentModesStart": [
+      0,
+      null
+    ],
+    "OrthogonalizeIncoherentModesStride": [
+      1,
+      null
+    ],
+    "OrthogonalizeOPRModesStart": [
+      0,
+      null
+    ],
+    "OrthogonalizeOPRModesStride": [
+      1,
+      null
+    ],
+    "StepSize": [
+      0.0,
+      null
+    ]
+  },
+  "PtyChiProbePosition": {
+    "ConstrainAffineTransformDegreesOfFreedom": [
+      0,
+      null
+    ],
+    "ConstrainAffineTransformMaxExpectedErrorInPixels": [
+      1e-12,
+      null
+    ],
+    "ConstrainAffineTransformOverrideUpdateFlexibility": [
+      0.0,
+      1.0
+    ],
+    "ConstrainAffineTransformPositionWeightUpdateInterval": [
+      1,
+      null
+    ],
+    "ConstrainAffineTransformStart": [
+      0,
+      null
+    ],
+    "ConstrainAffineTransformStride": [
+      1,
+      null
+    ],
+    "CrossCorrelationProbeThreshold": [
+      0.0,
+      1.0
+    ],
+    "CrossCorrelationRealSpaceWidth": [
+      1e-12,
+      null
+    ],
+    "CrossCorrelationScale": [
+      1,
+      null
+    ],
+    "OptimizationPlanStart": [
+      0,
+      null
+    ],
+    "OptimizationPlanStride": [
+      1,
+      null
+    ],
+    "SliceForCorrection": [
+      0,
+      null
+    ],
+    "StepSize": [
+      0.0,
+      null
+    ],
+    "UpdateMagnitudeLimit": [
+      1e-12,
+      null
+    ]
+  },
+  "PtyChiRAAR": {
+    "Beta": [
+      0.500000000001,
+      1.0
+    ],
+    "ChunkLength": [
+      1,
+      null
+    ],
+    "ObjectAmplitudeClampLimit": [
+      1e-12,
+      null
+    ],
+    "ObjectInertia": [
+      0.0,
+      1.0
+    ],
+    "ProbeInertia": [
+      0.0,
+      1.0
+    ]
+  }
+}

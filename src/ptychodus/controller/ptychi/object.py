@@ -7,13 +7,13 @@ from ptychodus.api.parameters import (
     StringParameter,
 )
 
-from ...model.ptychi import (
+from ._settings import (
     PtyChiDMSettings,
-    PtyChiEnumerators,
     PtyChiLSQMLSettings,
     PtyChiObjectSettings,
     PtyChiPIESettings,
     PtyChiRAARSettings,
+    PtyChiSettingsSource,
 )
 from ..parameters import (
     CheckBoxParameterViewController,
@@ -39,7 +39,7 @@ class PtyChiOptimizeSliceSpacingViewController(PtyChiCheckableGroupBoxViewContro
         optimizer: StringParameter,
         step_size: RealParameter,
         num_epochs: IntegerParameter,
-        enumerators: PtyChiEnumerators,
+        choices: PtyChiSettingsSource,
     ) -> None:
         super().__init__(
             optimize_slice_spacing,
@@ -52,9 +52,7 @@ class PtyChiOptimizeSliceSpacingViewController(PtyChiCheckableGroupBoxViewContro
             stride,
             num_epochs,
         )
-        self._optimizer_view_controller = PtyChiOptimizerParameterViewController(
-            optimizer, enumerators
-        )
+        self._optimizer_view_controller = PtyChiOptimizerParameterViewController(optimizer, choices)
         self._step_size_view_controller = DecimalLineEditParameterViewController(
             step_size, tool_tip='Optimizer step size (learning rate).'
         )
@@ -195,7 +193,7 @@ class PtyChiRemoveGridArtifactsViewController(PtyChiCheckableGroupBoxViewControl
         direction: StringParameter,
         component: StringParameter,
         num_epochs: IntegerParameter,
-        enumerators: PtyChiEnumerators,
+        choices: PtyChiSettingsSource,
     ) -> None:
         super().__init__(
             remove_grid_artifacts,
@@ -215,11 +213,13 @@ class PtyChiRemoveGridArtifactsViewController(PtyChiCheckableGroupBoxViewControl
             window_size_px, tool_tip='Window size for grid artifact removal in pixels'
         )
         self._direction_view_controller = ComboBoxParameterViewController(
-            direction, enumerators.directions(), tool_tip='Direction of grid artifact removal'
+            direction,
+            choices.choices_of(direction),
+            tool_tip='Direction of grid artifact removal',
         )
         self._component_view_controller = ComboBoxParameterViewController(
             component,
-            enumerators.mag_phase_components(),
+            choices.choices_of(component),
             tool_tip='Component of the object to apply grid artifact removal to',
         )
 
@@ -245,7 +245,7 @@ class PtyChiRegularizeMultisliceViewController(PtyChiCheckableGroupBoxViewContro
         gradient_method: StringParameter,
         integration_method: StringParameter,
         num_epochs: IntegerParameter,
-        enumerators: PtyChiEnumerators,
+        choices: PtyChiSettingsSource,
     ) -> None:
         super().__init__(
             regularize_multislice,
@@ -266,12 +266,12 @@ class PtyChiRegularizeMultisliceViewController(PtyChiCheckableGroupBoxViewContro
         )
         self._gradient_method_view_controller = ComboBoxParameterViewController(
             gradient_method,
-            enumerators.image_gradient_methods(),
+            choices.choices_of(gradient_method),
             tool_tip='Method for calculating the phase gradient during phase unwrapping',
         )
         self._integration_method_view_controller = ComboBoxParameterViewController(
             integration_method,
-            enumerators.image_integration_methods(),
+            choices.choices_of(integration_method),
             tool_tip='Method for integrating the phase gradient during phase unwrapping',
         )
 
@@ -369,7 +369,7 @@ class PtyChiObjectViewController(PtyChiCheckableGroupBoxViewController):
         pie_settings: PtyChiPIESettings | None,
         raar_settings: PtyChiRAARSettings | None,
         num_epochs: IntegerParameter,
-        enumerators: PtyChiEnumerators,
+        choices: PtyChiSettingsSource,
     ) -> None:
         super().__init__(
             settings.is_optimizable,
@@ -383,7 +383,7 @@ class PtyChiObjectViewController(PtyChiCheckableGroupBoxViewController):
             num_epochs,
         )
         self._optimizer_view_controller = PtyChiOptimizerParameterViewController(
-            settings.optimizer, enumerators
+            settings.optimizer, choices
         )
         self._step_size_view_controller = DecimalLineEditParameterViewController(
             settings.step_size, tool_tip='Optimizer step size (learning rate).'
@@ -396,7 +396,7 @@ class PtyChiObjectViewController(PtyChiCheckableGroupBoxViewController):
             settings.optimize_slice_spacing_optimizer,
             settings.optimize_slice_spacing_step_size,
             num_epochs,
-            enumerators,
+            choices,
         )
         self._constrain_l1_norm_view_controller = PtyChiConstrainL1NormViewController(
             settings.constrain_l1_norm,
@@ -443,7 +443,7 @@ class PtyChiObjectViewController(PtyChiCheckableGroupBoxViewController):
             settings.remove_grid_artifacts_direction,
             settings.remove_grid_artifacts_component,
             num_epochs,
-            enumerators,
+            choices,
         )
         self._regularize_multislice_view_controller = PtyChiRegularizeMultisliceViewController(
             settings.regularize_multislice,
@@ -455,11 +455,11 @@ class PtyChiObjectViewController(PtyChiCheckableGroupBoxViewController):
             settings.regularize_multislice_unwrap_phase_image_gradient_method,
             settings.regularize_multislice_unwrap_phase_image_integration_method,
             num_epochs,
-            enumerators,
+            choices,
         )
         self._patch_interpolation_method_view_controller = ComboBoxParameterViewController(
             settings.patch_interpolation_method,
-            enumerators.patch_interpolation_methods(),
+            choices.choices_of(settings.patch_interpolation_method),
             tool_tip='Interpolation method used for extracting and updating patches of the object',
         )
         self._remove_object_probe_ambiguity_view_controller = (

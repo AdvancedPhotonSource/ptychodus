@@ -7,13 +7,13 @@ from ptychodus.api.parameters import (
     StringParameter,
 )
 
-from ...model.ptychi import (
+from ._settings import (
     PtyChiDMSettings,
-    PtyChiEnumerators,
     PtyChiLSQMLSettings,
     PtyChiPIESettings,
     PtyChiProbeSettings,
     PtyChiRAARSettings,
+    PtyChiSettingsSource,
 )
 from ..parameters import (
     CheckBoxParameterViewController,
@@ -65,7 +65,7 @@ class PtyChiOrthogonalizeIncoherentModesViewController(PtyChiCheckableGroupBoxVi
         method: StringParameter,
         sort_by_occupancy: BooleanParameter,
         num_epochs: IntegerParameter,
-        enumerators: PtyChiEnumerators,
+        choices: PtyChiSettingsSource,
     ) -> None:
         super().__init__(
             orthogonalize_modes,
@@ -77,7 +77,7 @@ class PtyChiOrthogonalizeIncoherentModesViewController(PtyChiCheckableGroupBoxVi
         )
         self._method_view_controller = ComboBoxParameterViewController(
             method,
-            enumerators.orthogonalization_methods(),
+            choices.choices_of(method),
             tool_tip='Method to use for incoherent mode orthogonalization',
         )
         self._sort_by_occupancy_view_controller = CheckBoxParameterViewController(
@@ -126,7 +126,7 @@ class PtyChiConstrainSupportViewController(PtyChiCheckableGroupBoxViewController
         threshold: RealParameter,
         method: StringParameter,
         num_epochs: IntegerParameter,
-        enumerators: PtyChiEnumerators,
+        choices: PtyChiSettingsSource,
     ) -> None:
         super().__init__(
             constrain_support,
@@ -142,7 +142,7 @@ class PtyChiConstrainSupportViewController(PtyChiCheckableGroupBoxViewController
         )
         self._method_view_controller = ComboBoxParameterViewController(
             method,
-            enumerators.probe_support_methods(),
+            choices.choices_of(method),
             tool_tip='Optional fixed support mask (ellipse or rectangle) applied before shrinkwrapping.',
         )
 
@@ -199,7 +199,7 @@ class PtyChiProbeViewController(PtyChiCheckableGroupBoxViewController):
         pie_settings: PtyChiPIESettings | None,
         raar_settings: PtyChiRAARSettings | None,
         num_epochs: IntegerParameter,
-        enumerators: PtyChiEnumerators,
+        choices: PtyChiSettingsSource,
     ) -> None:
         super().__init__(
             settings.is_optimizable, 'Optimize Probe', tool_tip='Whether the probe is optimizable'
@@ -211,7 +211,7 @@ class PtyChiProbeViewController(PtyChiCheckableGroupBoxViewController):
             num_epochs,
         )
         self._optimizer_view_controller = PtyChiOptimizerParameterViewController(
-            settings.optimizer, enumerators
+            settings.optimizer, choices
         )
         self._step_size_view_controller = DecimalLineEditParameterViewController(
             settings.step_size, tool_tip='Optimizer step size (learning rate).'
@@ -233,7 +233,7 @@ class PtyChiProbeViewController(PtyChiCheckableGroupBoxViewController):
                 settings.orthogonalize_incoherent_modes_method,
                 settings.orthogonalize_incoherent_modes_sort_by_occupancy,
                 num_epochs,
-                enumerators,
+                choices,
             )
         )
         self._orthogonalize_opr_modes_view_controller = PtyChiOrthogonalizeOPRModesViewController(
@@ -251,7 +251,7 @@ class PtyChiProbeViewController(PtyChiCheckableGroupBoxViewController):
             settings.constrain_support_threshold,
             settings.constrain_support_method,
             num_epochs,
-            enumerators,
+            choices,
         )
         self._constrain_center_view_controller = PtyChiConstrainCenterViewController(
             settings.constrain_center,

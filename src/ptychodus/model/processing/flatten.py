@@ -30,6 +30,7 @@ from enum import Enum
 from typing import Any, Final
 
 __all__ = [
+    'BitField',
     'BoolEnum',
     'compose_key',
     'fields_of',
@@ -104,27 +105,39 @@ class OptionalGate(StructuralAdapter):
 
 @dataclass(frozen=True)
 class OptionalRange(StructuralAdapter):
-    """An optional pair of bounds persisted as a switch plus a low and a high key."""
+    """An optional pair of bounds persisted as a switch plus a low and a high key.
+
+    ``scale`` is how many declared units one persisted unit is worth, for a
+    pair ptychodus persists in a unit the declaration does not use: a phase
+    limit is radians upstream and degrees in the settings file, so the keys
+    carry degrees and the declared value is rebuilt in radians.
+    """
 
     gate: str
     minimum: str
     maximum: str
     value_type: type = float
     fallback: tuple[Any, Any] = (0.0, 0.0)
+    scale: float = 1.0
 
     @property
     def fields(self) -> Mapping[str, type]:
         return {self.gate: bool, self.minimum: self.value_type, self.maximum: self.value_type}
 
     def encode(self, value: Any) -> Mapping[str, Any]:
-        low, high = self.fallback if value is None else (value[0], value[1])
+        low, high = (
+            self.fallback if value is None else (value[0] / self.scale, value[1] / self.scale)
+        )
         return {self.gate: value is not None, self.minimum: low, self.maximum: high}
 
     def decode(self, values: Mapping[str, Any]) -> Any:
         if not values[self.gate]:
             return None
 
-        return (values[self.minimum], values[self.maximum])
+        # A list, not a tuple: a pair of bounds is a serializable field, and
+        # pty-chi's own validators take the sequence types its wire format can
+        # represent rather than whatever happens to be iterable.
+        return [values[self.minimum] * self.scale, values[self.maximum] * self.scale]
 
 
 @dataclass(frozen=True)
@@ -145,6 +158,39 @@ class Sentinel(StructuralAdapter):
     def decode(self, values: Mapping[str, Any]) -> Any:
         held = values[self.key]
         return None if held == self.sentinel else held
+
+
+@dataclass(frozen=True)
+class BitField(StructuralAdapter):
+    """A chosen subset of members persisted as one integer, one bit per member.
+
+    ``members`` is positional and is the contract: bit *n* selects the *n*-th
+    member named here. Inserting one anywhere but the end renumbers every bit
+    after it, and so silently reinterprets every settings file already
+    written.
+    """
+
+    key: str
+    members: Sequence[Any]
+    value_type: type = int
+
+    @property
+    def fields(self) -> Mapping[str, type]:
+        return {self.key: self.value_type}
+
+    def encode(self, value: Any) -> Mapping[str, Any]:
+        chosen = set(value or ())
+        bits = 0
+
+        for index, member in enumerate(self.members):
+            if member in chosen:
+                bits |= 1 << index
+
+        return {self.key: bits}
+
+    def decode(self, values: Mapping[str, Any]) -> Any:
+        bits = int(values[self.key])
+        return [member for index, member in enumerate(self.members) if bits & (1 << index)]
 
 
 @dataclass(frozen=True)
@@ -248,6 +294,15 @@ class Overlay:
     minimum: Any = None
     maximum: Any = None
     choices: Sequence[str] = ()
+    # The type to read the field as, where the declared one says more than
+    # ptychodus offers. pty-chi's forward model is an enum member or any class
+    # implementing the model; ptychodus offers the enum, so that is what the
+    # key holds and what restores it. Ignored where an adapter is in play,
+    # since an adapter already names the type behind each key it owns.
+    annotation: Any = None
+    # Whether this one enum key is written by member name, where it disagrees
+    # with the rest of its model. Unset defers to the policy.
+    enum_by_name: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -273,6 +328,9 @@ class FlatParameter:
     # Set when several keys share one declared field, naming this key's role.
     # The value adapter is the backend's, since only it knows the field's shape.
     structural_role: str = ''
+    # How an enum value is spelled in the settings file, resolved here so that
+    # whatever writes or reads the key needs only this record.
+    enum_by_name: bool = True
 
 
 @dataclass(frozen=True)
@@ -434,11 +492,6 @@ def _leaf(
     role: str = '',
     annotation: Any = None,
 ) -> FlatParameter:
-    held = info.annotation if annotation is None else annotation
-    # A switch has no range. An adapter's gate key records whether the field
-    # has a value rather than what it is, so the field's bounds do not describe
-    # it, and a renderer reading them would offer a spin box for a check box.
-    declared_minimum, declared_maximum = (None, None) if held is bool else _bounds(info)
     # An adapter splits one field into several keys, which need their own text
     # and their own bounds, so its suffix is looked up before the field's path.
     # The whole record wins; an entry under a suffix is not merged with one
@@ -446,6 +499,20 @@ def _leaf(
     # An absent entry resolves to a record with every field unset, so each one
     # falls through to the declaration.
     overlay = policy.overlays.get(role) or policy.overlays.get(path) or Overlay()
+    held = info.annotation if annotation is None else annotation
+
+    if annotation is None and overlay.annotation is not None:
+        held = overlay.annotation
+
+    # An adapter's key is not the declared field, so the field's bounds do not
+    # describe it: a gate records whether the field has a value rather than
+    # what it is, a sentinel is deliberately outside the field's range, and a
+    # pair may be persisted in a unit the field does not use. Whatever range
+    # such a key does have is the overlay's to state. Inheriting instead
+    # clamps the key silently -- a parameter reports a bounded value but
+    # persists the raw one, so the settings file looks right and the value
+    # handed to the backend is not.
+    declared_minimum, declared_maximum = (None, None) if role else _bounds(info)
     return FlatParameter(
         ini_key=key,
         path=path,
@@ -459,17 +526,19 @@ def _leaf(
         maximum=_stated_or_declared(overlay.maximum, declared_maximum),
         choices=overlay.choices,
         structural_role=role,
+        enum_by_name=_stated_or_declared(overlay.enum_by_name, policy.enum_by_name),
     )
 
 
-def render_value(value: Any, policy: FlatteningPolicy) -> str:
+def render_value(value: Any, *, by_name: bool) -> str:
     """Render *value* the way the persisted file spells it.
 
-    An enum is the case that matters: ptychodus writes pty-chi's enums by member
-    name, so serializing a ``StrEnum`` as a plain string would silently rewrite
-    every such key from ``SGD`` to ``sgd``.
+    An enum is the case that matters: ptychodus writes most of pty-chi's enums
+    by member name, so serializing a ``StrEnum`` as a plain string would
+    silently rewrite every such key from ``SGD`` to ``sgd``. Which way round a
+    key goes is settled per key by then, so this is told rather than asked.
     """
     if isinstance(value, Enum):
-        return value.name if policy.enum_by_name else str(value.value)
+        return value.name if by_name else str(value.value)
 
     return str(value)

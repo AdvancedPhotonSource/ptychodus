@@ -11,11 +11,8 @@ from ptychodus.api.parameters import (
     StringParameter,
 )
 
-from ...model.ptychi import (
-    PtyChiAffineDegreesOfFreedomBitField,
-    PtyChiEnumerators,
-    PtyChiProbePositionSettings,
-)
+from .affine import PtyChiAffineDegreesOfFreedomBitField
+from ._settings import PtyChiProbePositionSettings, PtyChiSettingsSource
 from ..parameters import (
     CheckBoxParameterViewController,
     ComboBoxParameterViewController,
@@ -278,7 +275,7 @@ class PtyChiProbePositionsViewController(PtyChiCheckableGroupBoxViewController):
         self,
         settings: PtyChiProbePositionSettings,
         num_epochs: IntegerParameter,
-        enumerators: PtyChiEnumerators,
+        choices: PtyChiSettingsSource,
     ) -> None:
         super().__init__(
             settings.is_optimizable,
@@ -292,7 +289,7 @@ class PtyChiProbePositionsViewController(PtyChiCheckableGroupBoxViewController):
             num_epochs,
         )
         self._optimizer_view_controller = PtyChiOptimizerParameterViewController(
-            settings.optimizer, enumerators
+            settings.optimizer, choices
         )
         self._step_size_view_controller = DecimalLineEditParameterViewController(
             settings.step_size, tool_tip='Optimizer step size (learning rate).'
@@ -304,12 +301,12 @@ class PtyChiProbePositionsViewController(PtyChiCheckableGroupBoxViewController):
         )
         self._correction_type_view_controller = ComboBoxParameterViewController(
             settings.correction_type,
-            enumerators.position_correction_types(),
+            choices.choices_of(settings.correction_type),
             tool_tip='Algorithm used to calculate the position correction update',
         )
         self._differentiation_method_view_controller = ComboBoxParameterViewController(
             settings.differentiation_method,
-            enumerators.image_gradient_methods(),
+            choices.choices_of(settings.differentiation_method),
             tool_tip='Method for computing the object gradient (GRADIENT correction only); FOURIER_DIFFERENTIATION is usually fastest.',
         )
         self._cross_correlation_view_controller = PtyChiCrossCorrelationViewController(

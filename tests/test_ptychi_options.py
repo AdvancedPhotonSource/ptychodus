@@ -2,10 +2,9 @@
 
 pty-chi's ``Options`` classes are Pydantic dataclasses that enforce every
 ``ge``/``gt``/``le`` constraint at construction time. These tests build the full
-per-reconstructor task-options object from ptychodus settings and let pty-chi's
-validators run, so any default or bound in ``ptychodus.model.ptychi.settings``
-that pty-chi would reject surfaces here rather than as a reconstruction-time
-crash. No GPU or real dataset is required — per-field validation runs at
+per-reconstructor task-options object from the live settings and let pty-chi's
+validators run, so a default or a bound that pty-chi would reject surfaces
+here rather than as a reconstruction-time crash. No GPU or real dataset is required — per-field validation runs at
 construction; the task-level ``.check()`` and ``check_task_data()`` cross
 validation only runs inside ``PtychographyTask``.
 
@@ -48,32 +47,28 @@ from ptychi.api import (
 from ptychi.api.options.data import PtychographyDataOptions
 import torch
 
-from ptychodus.model.ptychi.core import PtyChiReconstructorLibrary
-from ptychodus.model.ptychi.task import _recover_layer_spacing_m
+from ptychodus.model.processing import ProcessingParameterStore
+from ptychodus.model.processing._ptychi_sections import sections_for
+from ptychodus.plugins.ptychi.task import _recover_layer_spacing_m
 
 # Deliberately imported at module scope: this file already does
 # ``pytest.importorskip('ptychi')`` above.
-from ptychodus.model.ptychi.algorithms import (  # noqa: E402
-    AutodiffAlgorithm,
-    BHAlgorithm,
-    DMAlgorithm,
-    EPIEAlgorithm,
-    LSQMLAlgorithm,
-    PIEAlgorithm,
-    PtyChiAlgorithm,
-    PtyChiCommon,
-    RAARAlgorithm,
-    RPIEAlgorithm,
-    build_algorithms,
+from ptychodus.plugins.ptychi.algorithms import (  # noqa: E402
+    _ALGORITHM_CLASSES,
+    build_reconstructors,
 )
+from ptychodus.plugins.ptychi.options import apply_to_task  # noqa: E402
+
+# The name pty-chi registers itself under, which is how the store files it.
+_LIBRARY = 'pty-chi'
 from ptychodus.cli._reconstruct_common import (  # noqa: E402
     _DATA_DERIVED_OPTION_FIELDS,
     add_print_ptychi_options_argument,
     format_ptychi_options_defaults,
     load_ptychi_options,
 )
-from ptychodus.model.ptychi.algorithms import task_options_classes  # noqa: E402
-from ptychodus.model.ptychi.task import (  # noqa: E402
+from ptychodus.plugins.ptychi.algorithms import task_options_classes  # noqa: E402
+from ptychodus.plugins.ptychi.task import (  # noqa: E402
     _initial_opr_mode_weights,
     align_task_options_with_product,
     dump_task_options,
@@ -143,70 +138,63 @@ def _make_reconstruct_input() -> ReconstructInput:
     )
 
 
-def _make_library() -> PtyChiReconstructorLibrary:
-    return PtyChiReconstructorLibrary(SettingsRegistry())
+class _Harness:
+    """Every pty-chi algorithm, with the live settings generated behind it.
 
+    The same arrangement a run uses: each reconstructor's declaration is
+    registered with a parameter store, and options are read back out of it.
+    Exercising that path is the point -- a test that built options straight
+    from the declaration would skip the flattening and the restoration that
+    stand between a settings file and pty-chi.
 
-def _make_common(library: PtyChiReconstructorLibrary) -> PtyChiCommon:
-    return PtyChiCommon(
-        library.settings,
-        library.object_settings,
-        library.probe_settings,
-        library.probe_position_settings,
-        library.opr_settings,
-    )
-
-
-def _make_algorithms(library: PtyChiReconstructorLibrary) -> list[PtyChiAlgorithm]:
-    """Instantiate the algorithm wrappers directly against ``library``'s settings.
-
-    DM is first because the two ``[0]`` assertions below rely on it —
-    ``build_algorithms`` guarantees that ordering.
+    DM is first, because two assertions below take the first algorithm.
     """
-    algorithms = build_algorithms(
-        _make_common(library),
-        dm_settings=library.dm_settings,
-        raar_settings=library.raar_settings,
-        pie_settings=library.pie_settings,
-        lsqml_settings=library.lsqml_settings,
-        autodiff_settings=library.autodiff_settings,
-        bh_settings=library.bh_settings,
-    )
-    return list(algorithms.values())
 
+    def __init__(self) -> None:
+        self.registry = SettingsRegistry()
+        self.store = ProcessingParameterStore(self.registry)
+        self._names: list[str] = []
 
-def _build_all_task_options(library: PtyChiReconstructorLibrary, parameters: ReconstructInput):
-    # Building each task-options tree runs pty-chi's Pydantic validators over
-    # every sub-option object.
-    return [
-        algorithm.build_task_options(parameters.product) for algorithm in _make_algorithms(library)
-    ]
+        for reconstructor in build_reconstructors():
+            self.store.register(
+                _LIBRARY,
+                reconstructor,
+                sections_for(reconstructor.name, reconstructor.get_default_options()),
+            )
+            self._names.append(reconstructor.name)
 
+    @property
+    def names(self) -> list[str]:
+        return list(self._names)
 
-def _numeric_parameters(library: PtyChiReconstructorLibrary):
-    settings_groups = [
-        library.settings,
-        library.object_settings,
-        library.probe_settings,
-        library.probe_position_settings,
-        library.opr_settings,
-        library.autodiff_settings,
-        library.bh_settings,
-        library.dm_settings,
-        library.lsqml_settings,
-        library.pie_settings,
-        library.raar_settings,
-    ]
-    for group in settings_groups:
-        for name, attr in vars(group).items():
-            if isinstance(attr, (RealParameter, IntegerParameter)):
-                yield f'{type(group).__name__}.{name}', attr
+    def parameter(self, group: str, key: str):
+        return self.registry[group].parameters()[key]
+
+    def declared_task_options(self, name: str):
+        """What the settings alone produce, before the product has a say."""
+        return apply_to_task(self.store.get_options(_LIBRARY, name))
+
+    def task_options(self, name: str, product: Product):
+        # Building each task-options tree runs pty-chi's Pydantic validators
+        # over every sub-option object.
+        return align_task_options_with_product(self.declared_task_options(name), product)
+
+    def all_task_options(self, product: Product) -> list:
+        return [self.task_options(name, product) for name in self._names]
+
+    def numeric_parameters(self):
+        for group_name in sorted(self.registry):
+            if not group_name.startswith('PtyChi'):
+                continue
+
+            for key, parameter in self.registry[group_name].parameters().items():
+                if isinstance(parameter, (RealParameter, IntegerParameter)):
+                    yield f'{group_name}.{key}', parameter
 
 
 def test_default_settings_build_valid_options() -> None:
     """Every reconstructor's default options must satisfy pty-chi's validators."""
-    library = _make_library()
-    _build_all_task_options(library, _make_reconstruct_input())
+    _Harness().all_task_options(_make_reconstruct_input().product)
 
 
 def test_boundary_values_build_valid_options() -> None:
@@ -215,17 +203,17 @@ def test_boundary_values_build_valid_options() -> None:
     This catches ptychodus bounds that are looser than pty-chi's enforced
     constraints (e.g. an inclusive minimum of 0 where pty-chi requires ``gt=0``).
     """
-    library = _make_library()
-    parameters = _make_reconstruct_input()
+    harness = _Harness()
+    product = _make_reconstruct_input().product
 
-    for label, parameter in _numeric_parameters(library):
+    for label, parameter in harness.numeric_parameters():
         original = parameter.get_value()
         for bound in (parameter.get_minimum(), parameter.get_maximum()):
             if bound is None:
                 continue
             parameter.set_value(bound)
             try:
-                _build_all_task_options(library, parameters)
+                harness.all_task_options(product)
             except Exception as exc:  # noqa: BLE001 - surface the offending parameter
                 pytest.fail(f'{label} = {bound!r} produced invalid pty-chi options: {exc}')
         parameter.set_value(original)
@@ -233,13 +221,16 @@ def test_boundary_values_build_valid_options() -> None:
 
 def test_hard_limits_are_serialized_as_lists() -> None:
     """Enabled magnitude/phase hard limits must be plain lists (pty-chi rejects ndarrays)."""
-    library = _make_library()
-    obj = library.object_settings
-    obj.constrain_hard_limits.set_value(True)
-    obj.constrain_hard_limits_enable_abs.set_value(True)
-    obj.constrain_hard_limits_enable_phase.set_value(True)
+    harness = _Harness()
 
-    options = _make_algorithms(library)[0].build_task_options(_make_reconstruct_input().product)
+    for key in (
+        'ConstrainHardLimits',
+        'ConstrainHardLimitsEnableAbs',
+        'ConstrainHardLimitsEnablePhase',
+    ):
+        harness.parameter('PtyChiObject', key).set_value(True)
+
+    options = harness.task_options('DM', _make_reconstruct_input().product)
     hard_limits = options.object_options.hard_limits_magnitude_phase
     assert isinstance(hard_limits.abs_lim, list)
     assert isinstance(hard_limits.phase_lim, list)
@@ -257,9 +248,8 @@ def test_hard_limits_are_serialized_as_lists() -> None:
 
 def test_compact_mode_clustering_stride_is_at_least_one() -> None:
     """Disabled compact-mode clustering must still yield a stride >= 1 for pty-chi."""
-    library = _make_library()
     # Default (disabled) value is 0; pty-chi's stride field is now ge=1.
-    options = _make_algorithms(library)[0].build_task_options(_make_reconstruct_input().product)
+    options = _Harness().task_options('DM', _make_reconstruct_input().product)
     assert options.reconstructor_options.compact_mode_update_clustering_stride >= 1
     assert options.reconstructor_options.compact_mode_update_clustering is False
 
@@ -272,11 +262,9 @@ def test_built_options_carry_no_task_data() -> None:
     reach the parent, so these ``is None`` assertions are the guard that keeps
     ptychodus off the deprecated path.
     """
-    library = _make_library()
     parameters = _make_reconstruct_input()
 
-    for algorithm in _make_algorithms(library):
-        options = algorithm.build_task_options(parameters.product)
+    for options in _Harness().all_task_options(parameters.product):
         assert options.data_options.data is None
         assert options.data_options.valid_pixel_mask is None
         assert options.object_options.initial_guess is None
@@ -332,28 +320,27 @@ def test_no_setting_selects_the_propagation_mode() -> None:
     default; the product supplies the value during alignment. See
     ``test_near_field_distance_comes_from_the_product``.
     """
-    library = _make_library()
-    common = _make_common(library)
+    harness = _Harness()
 
-    assert not hasattr(library.settings, 'use_far_field_propagation')
+    assert 'UseFarFieldPropagation' not in harness.registry['PtyChi'].parameters()
     assert (
-        common.data_options().free_space_propagation_distance_m
+        harness.declared_task_options('DM').data_options.free_space_propagation_distance_m
         == PtychographyDataOptions().free_space_propagation_distance_m
     )
 
 
 def test_near_field_distance_comes_from_the_product() -> None:
     """A product declaring near field supplies the distance; far field stays infinite."""
-    library = _make_library()
+    harness = _Harness()
     parameters = _make_reconstruct_input()
 
     near_field = _with_far_field(parameters.product, False)
-    options = _make_algorithms(library)[0].build_task_options(near_field)
+    options = harness.task_options('DM', near_field)
     assert options.data_options.free_space_propagation_distance_m == pytest.approx(
         near_field.metadata.detector_distance_m
     )
 
-    options = _make_algorithms(library)[0].build_task_options(parameters.product)
+    options = harness.task_options('DM', parameters.product)
     assert options.data_options.free_space_propagation_distance_m == numpy.inf
 
 
@@ -366,9 +353,7 @@ def test_options_round_trip_through_the_wire_format() -> None:
     every algorithm-specific field. The subclass check below is what catches
     that.
     """
-    library = _make_library()
-
-    for task_options in _build_all_task_options(library, _make_reconstruct_input()):
+    for task_options in _Harness().all_task_options(_make_reconstruct_input().product):
         loaded = load_task_options(dump_task_options(task_options))
 
         assert type(loaded) is type(task_options)
@@ -380,11 +365,10 @@ def test_options_round_trip_through_the_wire_format() -> None:
 
 def test_lsqml_algorithm_specific_field_survives_round_trip() -> None:
     """A field that exists only on the subclass must come back with its value."""
-    library = _make_library()
-    library.lsqml_settings.momentum_acceleration_gain.set_value(0.75)
+    harness = _Harness()
+    harness.parameter('PtyChiLSQML', 'MomentumAccelerationGain').set_value(0.75)
 
-    algorithm = LSQMLAlgorithm(_make_common(library), library.lsqml_settings)
-    task_options = algorithm.build_task_options(_make_reconstruct_input().product)
+    task_options = harness.task_options('LSQML', _make_reconstruct_input().product)
 
     loaded = load_task_options(dump_task_options(task_options))
 
@@ -401,27 +385,28 @@ def test_algorithm_task_options_class_matches_built_options() -> None:
     ``get_reconstructor_type()`` disagrees with the expected reconstructor, and
     when two subclasses map to the same reconstructor type.
     """
-    library = _make_library()
+    harness = _Harness()
     parameters = _make_reconstruct_input()
-    common = _make_common(library)
 
-    cases: list[tuple[PtyChiAlgorithm, Reconstructors]] = [
-        (DMAlgorithm(common, library.dm_settings), Reconstructors.DM),
-        (RAARAlgorithm(common, library.raar_settings), Reconstructors.RAAR),
-        (PIEAlgorithm(common, library.pie_settings), Reconstructors.PIE),
-        (EPIEAlgorithm(common, library.pie_settings), Reconstructors.EPIE),
-        (RPIEAlgorithm(common, library.pie_settings), Reconstructors.RPIE),
-        (LSQMLAlgorithm(common, library.lsqml_settings), Reconstructors.LSQML),
-        (AutodiffAlgorithm(common, library.autodiff_settings), Reconstructors.AD_PTYCHO),
-        (BHAlgorithm(common, library.bh_settings), Reconstructors.BH),
-    ]
+    expected_by_name = {
+        'DM': Reconstructors.DM,
+        'RAAR': Reconstructors.RAAR,
+        'PIE': Reconstructors.PIE,
+        'ePIE': Reconstructors.EPIE,
+        'rPIE': Reconstructors.RPIE,
+        'LSQML': Reconstructors.LSQML,
+        'Autodiff': Reconstructors.AD_PTYCHO,
+        'BH': Reconstructors.BH,
+    }
+    specs = {cls.spec.display_name: cls.spec for cls in _ALGORITHM_CLASSES}
+    assert set(expected_by_name) == set(specs)
 
     reconstructors_seen: set[Reconstructors] = set()
 
-    for algorithm, expected_reconstructor in cases:
-        options = algorithm.build_task_options(parameters.product)
+    for name, expected_reconstructor in expected_by_name.items():
+        options = harness.task_options(name, parameters.product)
 
-        assert type(options) is type(algorithm).spec.task_options_cls
+        assert type(options) is specs[name].task_options_cls
         assert options.reconstructor_options.get_reconstructor_type() == expected_reconstructor
         assert expected_reconstructor not in reconstructors_seen
         reconstructors_seen.add(expected_reconstructor)
@@ -439,10 +424,8 @@ def test_spec_option_classes_match_the_upstream_reconstructor_map() -> None:
     the display name stay ptychodus's own, which is why this guards the spec
     rather than replacing it.
     """
-    library = _make_library()
-
-    for algorithm in _make_algorithms(library):
-        spec = type(algorithm).spec
+    for cls in _ALGORITHM_CLASSES:
+        spec = cls.spec
         reconstructor = spec.reconstructor_options_cls().get_reconstructor_type()
         expected = RECONSTRUCTOR_OPTIONS_MAP[reconstructor]
 
@@ -464,9 +447,7 @@ def test_wire_format_carries_the_options_class_name() -> None:
     (which would let PIE/ePIE/rPIE alias each other, since their dicts are
     otherwise identical).
     """
-    library = _make_library()
-    algorithm = LSQMLAlgorithm(_make_common(library), library.lsqml_settings)
-    task_options = algorithm.build_task_options(_make_reconstruct_input().product)
+    task_options = _Harness().task_options('LSQML', _make_reconstruct_input().product)
 
     options_dict = json.loads(dump_task_options(task_options))
 
@@ -484,19 +465,12 @@ def test_wire_format_distinguishes_pie_variants() -> None:
     keeping a dumped ePIE from reloading as PIE and running a different
     algorithm. This is what the hand-rolled envelope used to guarantee.
     """
-    library = _make_library()
-    common = _make_common(library)
+    harness = _Harness()
     product = _make_reconstruct_input().product
-
-    algorithms = [
-        PIEAlgorithm(common, library.pie_settings),
-        EPIEAlgorithm(common, library.pie_settings),
-        RPIEAlgorithm(common, library.pie_settings),
-    ]
     stamps = set()
 
-    for algorithm in algorithms:
-        task_options = algorithm.build_task_options(product)
+    for name in ('PIE', 'ePIE', 'rPIE'):
+        task_options = harness.task_options(name, product)
         loaded = load_task_options(dump_task_options(task_options))
 
         assert type(loaded) is type(task_options)
@@ -515,11 +489,9 @@ def test_yaml_round_trips_every_algorithm_to_the_same_payload_as_json() -> None:
     field of some further unrepresentable type would otherwise fail at the end of a
     reconstruction, after the expensive part, rather than here.
     """
-    library = _make_library()
     product = _make_reconstruct_input().product
 
-    for algorithm in _make_algorithms(library):
-        task_options = algorithm.build_task_options(product)
+    for task_options in _Harness().all_task_options(product):
         text = dump_task_options_yaml(task_options)
         loaded = load_task_options_from_mapping(yaml.safe_load(text))
 
@@ -737,16 +709,13 @@ def _assert_field_equals(options, path: str, expected) -> None:
 def built_options_by_algorithm() -> list[tuple[str, object]]:
     """Options for all eight algorithms, built once.
 
-    Module-scoped because ``_make_library`` spawns a device-probe subprocess
-    that dominates this file's runtime; the parametrized test below reads these
+    Module-scoped because registering eight declarations and restoring each
+    one dominates this file's runtime; the parametrized test below reads these
     options without mutating settings, so one build serves every case.
     """
-    library = _make_library()
+    harness = _Harness()
     product = _make_reconstruct_input().product
-    return [
-        (type(algorithm).__name__, algorithm.build_task_options(product))
-        for algorithm in _make_algorithms(library)
-    ]
+    return [(name, harness.task_options(name, product)) for name in harness.names]
 
 
 @pytest.mark.parametrize(('path', 'expected'), _PRODUCT_DERIVED_FIELDS, ids=lambda v: str(v)[:48])
@@ -810,7 +779,7 @@ def test_align_is_idempotent(caplog) -> None:
     parameters = _make_reconstruct_input()
     once = align_task_options_with_product(LSQMLOptions(), parameters.product)
 
-    with caplog.at_level(logging.WARNING, logger='ptychodus.model.ptychi.task'):
+    with caplog.at_level(logging.WARNING, logger='ptychodus.plugins.ptychi.task'):
         twice = align_task_options_with_product(once, parameters.product)
 
     assert dump_task_options(twice) == dump_task_options(once)
@@ -824,7 +793,7 @@ def test_align_warns_only_when_it_overrides_a_caller_value(caplog) -> None:
     options = LSQMLOptions()
     options.object_options.pixel_size_m = 5.0e-9
 
-    with caplog.at_level(logging.WARNING, logger='ptychodus.model.ptychi.task'):
+    with caplog.at_level(logging.WARNING, logger='ptychodus.plugins.ptychi.task'):
         aligned = align_task_options_with_product(options, parameters.product)
 
     assert aligned.object_options.pixel_size_m == pytest.approx(PIXEL_M)
@@ -833,7 +802,7 @@ def test_align_warns_only_when_it_overrides_a_caller_value(caplog) -> None:
 
     # The same field left at pty-chi's default is overwritten silently.
     caplog.clear()
-    with caplog.at_level(logging.WARNING, logger='ptychodus.model.ptychi.task'):
+    with caplog.at_level(logging.WARNING, logger='ptychodus.plugins.ptychi.task'):
         align_task_options_with_product(LSQMLOptions(), parameters.product)
 
     assert caplog.records == []
@@ -867,7 +836,7 @@ def test_align_overwrites_a_contradicting_caller_distance_and_warns(caplog) -> N
     options = LSQMLOptions()
     options.data_options.free_space_propagation_distance_m = 0.5
 
-    with caplog.at_level(logging.WARNING, logger='ptychodus.model.ptychi.task'):
+    with caplog.at_level(logging.WARNING, logger='ptychodus.plugins.ptychi.task'):
         aligned = align_task_options_with_product(options, parameters.product)
 
     assert aligned.data_options.free_space_propagation_distance_m == numpy.inf
@@ -1047,29 +1016,26 @@ def test_slice_spacings_from_an_ndarray_product_are_lists() -> None:
     assert aligned.object_options.slice_spacings_m == pytest.approx([3.0e-8])
 
 
-def test_common_kwargs_carry_no_product_derived_fields() -> None:
-    """PtyChiCommon must not re-acquire an owner for anything the helper writes.
+def test_the_settings_write_nothing_the_product_owns() -> None:
+    """Alignment must be the only writer of every field it owns.
 
     A second writer would make the helper's override warning fire on every
-    reconstruction.
+    reconstruction. Checked against a pristine options object rather than
+    against a list of expected values: whatever pty-chi declares as the
+    starting point is what an unwritten field still holds.
     """
-    library = _make_library()
-    common = _make_common(library)
+    harness = _Harness()
+    specs = {cls.spec.display_name: cls.spec for cls in _ALGORITHM_CLASSES}
 
-    object_keys = set(common.object_kwargs())
-    probe_keys = set(common.probe_kwargs())
-    data_options = common.data_options()
+    for name in harness.names:
+        declared = harness.declared_task_options(name)
+        pristine = specs[name].task_options_cls()
 
-    assert not object_keys & {
-        'pixel_size_m',
-        'pixel_size_aspect_ratio',
-        'slice_spacings_m',
-        'determine_position_origin_coords_by',
-        'position_origin_coords',
-    }
-    assert not probe_keys & {'probe_power', 'pixel_size_m', 'pixel_size_aspect_ratio'}
-    assert data_options.wavelength_m == PtychographyDataOptions().wavelength_m
-    assert not math.isfinite(data_options.free_space_propagation_distance_m)
+        for path, _expected in _PRODUCT_DERIVED_FIELDS:
+            read = operator.attrgetter(path)
+            assert read(declared) == read(pristine), f'{name}/{path}'
+
+    assert not math.isfinite(PtychographyDataOptions().free_space_propagation_distance_m)
 
 
 # ---------------------------------------------------------------------------

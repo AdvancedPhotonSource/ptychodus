@@ -1,15 +1,21 @@
 from PyQt5.QtWidgets import QVBoxLayout, QWidget
 
-from ...model.ptychi import (
+from ...model.processing import ProcessingParameterStore
+
+from ._settings import (
     PtyChiAutodiffSettings,
     PtyChiBHSettings,
     PtyChiDMSettings,
     PtyChiLSQMLSettings,
+    PtyChiOPRSettings,
+    PtyChiObjectSettings,
     PtyChiPIESettings,
+    PtyChiProbePositionSettings,
+    PtyChiProbeSettings,
     PtyChiRAARSettings,
-    PtyChiReconstructorLibrary,
+    PtyChiSettings,
+    PtyChiSettingsSource,
 )
-
 from ..processing import ReconstructorViewControllerFactory
 from .object import PtyChiObjectViewController
 from .opr import PtyChiOPRViewController
@@ -21,9 +27,17 @@ __all__ = ['PtyChiViewControllerFactory']
 
 
 class PtyChiViewController(QWidget):
+    """pty-chi's hand-laid-out panel, bound to the settings for one algorithm.
+
+    Only the algorithm's own group is passed down; the five shared groups go
+    to every panel. Which algorithm-specific group exists is decided here
+    rather than read from the source, because each sub-panel shows different
+    rows for each and has to be told which it is looking at.
+    """
+
     def __init__(
         self,
-        model: PtyChiReconstructorLibrary,
+        source: PtyChiSettingsSource,
         reconstructor_name: str,
         parent: QWidget | None = None,
     ) -> None:
@@ -37,54 +51,60 @@ class PtyChiViewController(QWidget):
 
         match reconstructor_name.lower():
             case 'autodiff':
-                autodiff_settings = model.autodiff_settings
+                autodiff_settings = PtyChiAutodiffSettings(source)
             case 'bh':
-                bh_settings = model.bh_settings
+                bh_settings = PtyChiBHSettings(source)
             case 'dm':
-                dm_settings = model.dm_settings
+                dm_settings = PtyChiDMSettings(source)
             case 'lsqml':
-                lsqml_settings = model.lsqml_settings
+                lsqml_settings = PtyChiLSQMLSettings(source)
             case 'pie' | 'epie' | 'rpie':
-                pie_settings = model.pie_settings
+                pie_settings = PtyChiPIESettings(source)
             case 'raar':
-                raar_settings = model.raar_settings
+                raar_settings = PtyChiRAARSettings(source)
             case _:
                 raise ValueError(f'Unknown reconstructor name: {reconstructor_name}')
 
+        settings = PtyChiSettings(source)
+        object_settings = PtyChiObjectSettings(source)
+        probe_settings = PtyChiProbeSettings(source)
+        probe_position_settings = PtyChiProbePositionSettings(source)
+        opr_settings = PtyChiOPRSettings(source)
+
         self._reconstructor_view_controller = PtyChiReconstructorViewController(
-            model.settings,
+            settings,
             autodiff_settings,
             bh_settings,
             dm_settings,
             lsqml_settings,
             raar_settings,
-            model.enumerators,
+            source,
         )
         self._object_view_controller = PtyChiObjectViewController(
-            model.object_settings,
+            object_settings,
             dm_settings,
             lsqml_settings,
             pie_settings,
             raar_settings,
-            model.settings.num_epochs,
-            model.enumerators,
+            settings.num_epochs,
+            source,
         )
         self._probe_view_controller = PtyChiProbeViewController(
-            model.probe_settings,
+            probe_settings,
             dm_settings,
             lsqml_settings,
             pie_settings,
             raar_settings,
-            model.settings.num_epochs,
-            model.enumerators,
+            settings.num_epochs,
+            source,
         )
         self._probe_positions_view_controller = PtyChiProbePositionsViewController(
-            model.probe_position_settings,
-            model.settings.num_epochs,
-            model.enumerators,
+            probe_position_settings,
+            settings.num_epochs,
+            source,
         )
         self._opr_view_controller = PtyChiOPRViewController(
-            model.opr_settings, model.settings.num_epochs, model.enumerators
+            opr_settings, settings.num_epochs, source
         )
 
         layout = QVBoxLayout()
@@ -98,13 +118,16 @@ class PtyChiViewController(QWidget):
 
 
 class PtyChiViewControllerFactory(ReconstructorViewControllerFactory):
-    def __init__(self, model: PtyChiReconstructorLibrary) -> None:
+    def __init__(self, parameter_store: ProcessingParameterStore) -> None:
         super().__init__()
-        self._model = model
+        self._parameter_store = parameter_store
 
     @property
     def name(self) -> str:
         return 'pty-chi'
 
     def create_view_controller(self, reconstructor_name: str) -> QWidget:
-        return PtyChiViewController(self._model, reconstructor_name)
+        return PtyChiViewController(
+            PtyChiSettingsSource(self._parameter_store, self.name, reconstructor_name),
+            reconstructor_name,
+        )

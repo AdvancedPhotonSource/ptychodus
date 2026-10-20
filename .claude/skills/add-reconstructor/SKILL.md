@@ -5,7 +5,7 @@ description: Scaffold a new reconstructor backend library (a *ReconstructorLibra
 
 # add-reconstructor
 
-Reconstructor backends are optional dependencies. Each lives under **`src/ptychodus/plugins/<backend>/`** and registers a `*ReconstructorLibrary` **instance** with the plugin registry, which `ModelCore` passes to `ProcessingCore` as the abstract type. A backend is discovered, never named in a composition root, so adding one touches no existing file except the settings-section table.
+Reconstructor backends are optional dependencies. Each lives under **`src/ptychodus/plugins/<backend>/`** and registers a `*ReconstructorLibrary` **instance** with the plugin registry, whose chooser `ModelCore` hands to `ProcessingCore`. A backend is discovered, never named in a composition root, so adding one touches no existing file except the settings-section table.
 
 A backend holds no settings and reads none. It **declares** what it accepts as a nested pydantic object, and `model/processing/` generates the live parameters, the INI keys and the panel from that declaration.
 
@@ -57,10 +57,6 @@ class <Backend>ReconstructorLibrary(ReconstructorLibrary):
     def __init__(self) -> None:
         super().__init__('<logger-name>', '<distribution>', requires=('<module>', 'torch'))
 
-    @property
-    def name(self) -> str:
-        return '<Backend>'
-
     def _build(self) -> list[TrainableReconstructor]:
         # Imported lazily so this module's own import cost stays small.
         from .reconstructor import build_reconstructor
@@ -73,7 +69,7 @@ Key rules:
 - **The constructor takes no arguments and does no work.** Registration happens in every process that loads plugins, including the many that never reconstruct.
 - **`requires` names every module the backend cannot work without**, including transitive ones it imports directly. The base resolves them with `find_spec` — without importing, which keeps a GPU framework out of `sys.modules` as [tests/test_no_gpu_context.py](../../tests/test_no_gpu_context.py) enforces.
 - **Write no availability logic.** The base calls `_build()` once on first iteration and announces either outcome through the library's own logger: the version on success, `<Backend> not found.` when a required module is absent or when `_build()` raises `ImportError`.
-- **`name` is the display name; `distribution` is the PyPI package** a version lives under. They are usually spelled differently.
+- **A library does not name itself.** It is named where it registers: `display_name` is what a person picks and what the section table and the parameter store are keyed on, `simple_name` is the form a settings file persists, and `distribution` is the PyPI package a version lives under — which is what the backend's own log lines report.
 
 ### 4. Build the reconstructor
 
@@ -104,9 +100,9 @@ Nothing else is wired. `ModelCore` takes whatever registered, and `ControllerCor
 
 ### 6. Say where the options are persisted
 
-Add `src/ptychodus/model/processing/_<backend>_sections.py` exporting `sections()`, one `OptionsSection` per settings group, and list it in `_SECTIONS_BY_LIBRARY` in [src/ptychodus/model/processing/core.py](../../src/ptychodus/model/processing/core.py) keyed by the library's `name`. A backend absent from that table registers no groups and runs on its declared defaults. The table is **transitional**, retiring with the flat INI layout.
+Add `src/ptychodus/model/processing/_<backend>_sections.py` exporting `sections()`, one `OptionsSection` per settings group, and list it in `_SECTIONS_BY_LIBRARY` in [src/ptychodus/model/processing/core.py](../../src/ptychodus/model/processing/core.py) keyed by the name the backend registers under. Entries are asked per reconstructor — `(name, declared_options) -> sections` — so wrap a table that is the same for every reconstructor a backend offers in `_regardless`; answer the arguments only when the groups differ per reconstructor, as pty-chi's do. A backend absent from that table registers no groups and runs on its declared defaults. The table is **transitional**, retiring with the flat INI layout.
 
-A guard test asserts every name in the table matches a registered library, because a rename would otherwise silently drop the backend's settings.
+Two guard tests cover the table: every name in it must match a registered library, because a rename would otherwise silently drop the backend's settings, and every name must also appear in the golden fixture's group-prefix table, which is what lets that fixture keep checking the rest of the tree when the backend is not installed.
 
 ### 7. Optional-dependency plumbing
 

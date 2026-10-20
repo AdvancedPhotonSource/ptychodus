@@ -50,8 +50,8 @@ from ptychodus.api.io import StandardFileLayout, save_diffraction_data, save_pro
 from ptychodus.api.preprocess.diffraction import FilterValuesStep, estimate_beam_center
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
-from ptychodus.model.ptychi.algorithms import task_options_classes
-from ptychodus.model.ptychi.task import (
+from ptychodus.plugins.ptychi.algorithms import task_options_classes
+from ptychodus.plugins.ptychi.task import (
     align_task_options_with_product,
     dump_task_options_yaml,
     load_task_options,

@@ -30,11 +30,7 @@ from ptychodus.api.parameters import (
     RealParameter,
     StringParameter,
 )
-from ptychodus.model.processing import (
-    DescribedField,
-    ProcessingAlgorithmParameter,
-    ProcessingParameterStore,
-)
+from ptychodus.model.processing import DescribedField, ProcessingParameterStore
 
 from ..parameters import ParameterViewBuilder
 from .core import ReconstructorViewControllerFactory
@@ -145,8 +141,7 @@ class GeneratedViewControllerFactory(ReconstructorViewControllerFactory):
         return self._library_name
 
     def create_view_controller(self, reconstructor_name: str) -> QWidget:
-        key = ProcessingAlgorithmParameter.generate_key(self._library_name, reconstructor_name)
-        groups = self._parameter_store.describe(key)
+        groups = self._parameter_store.describe(self._library_name, reconstructor_name)
 
         if not groups:
             return QLabel(f'{self._library_name} declares no settings.')

@@ -84,6 +84,17 @@ class _Entry:
     sections: Sequence[_BoundSection]
 
 
+def _compose_key(library: str, algorithm: str) -> str:
+    """Name the entry holding one reconstructor's settings.
+
+    The format is this module's own: nothing outside ``model/processing``
+    composes one, and nothing outside it should. Callers name the pair and
+    this decides how the two halves are spelled together -- which is what
+    lets the spelling change without a search across the tree.
+    """
+    return f'{library.casefold()}_{algorithm.casefold()}'
+
+
 def _resolve(root: Any, path: str) -> Any:
     target = root
 
@@ -102,14 +113,18 @@ class ProcessingParameterStore:
         self._groups: dict[str, ParameterGroup] = {}
 
     def register(
-        self, key: str, reconstructor: Reconstructor, sections: Sequence[OptionsSection] = ()
+        self,
+        library: str,
+        reconstructor: Reconstructor,
+        sections: Sequence[OptionsSection] = (),
     ) -> None:
-        """Generate the live parameters backing *reconstructor*, filed under *key*.
+        """Generate the live parameters backing *reconstructor* of *library*.
 
         A reconstructor that declares nothing registers no settings group at all:
         an empty section would appear in every saved settings file and mean
         nothing. Its options are still served, unchanged from their defaults.
         """
+        key = _compose_key(library, reconstructor.name)
         defaults = reconstructor.get_default_options()
 
         if not sections and type(defaults).__pydantic_fields__:
@@ -143,13 +158,15 @@ class ProcessingParameterStore:
 
         self._entries[key] = _Entry(defaults, bound)
 
-    def get_options(self, key: str) -> Any:
-        """Return *key*'s declared object carrying the values currently held.
+    def get_options(self, library: str, algorithm: str) -> Any:
+        """Return the declared object carrying the values currently held.
 
         Falls back to the declared defaults for a reconstructor that was never
         registered, so a caller does not have to know which backends have
         converted.
         """
+        key = _compose_key(library, algorithm)
+
         try:
             entry = self._entries[key]
         except KeyError:
@@ -166,8 +183,8 @@ class ProcessingParameterStore:
 
         return options
 
-    def describe(self, key: str) -> Sequence[DescribedGroup]:
-        """Return *key*'s settings groups, each field paired with its live parameter.
+    def describe(self, library: str, algorithm: str) -> Sequence[DescribedGroup]:
+        """Return the settings groups, each field paired with its live parameter.
 
         What a renderer needs and all it needs: a declaration says what kind of
         value a field holds and what it may be, and the parameter beside it is
@@ -175,7 +192,7 @@ class ProcessingParameterStore:
         because the panel shows one group.
         """
         try:
-            entry = self._entries[key]
+            entry = self._entries[_compose_key(library, algorithm)]
         except KeyError:
             return []
 
@@ -193,5 +210,6 @@ class ProcessingParameterStore:
 
         return [DescribedGroup(name, fields) for name, fields in merged.items()]
 
-    def __contains__(self, key: str) -> bool:
-        return key in self._entries
+    def is_registered(self, library: str, algorithm: str) -> bool:
+        """Report whether this reconstructor's settings were generated."""
+        return _compose_key(library, algorithm) in self._entries

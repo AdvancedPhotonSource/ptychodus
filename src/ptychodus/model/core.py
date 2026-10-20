@@ -33,7 +33,6 @@ from .globus import GlobusCore
 from .memory import MemoryPresenter
 from .processing import ProcessingCore
 from .product import PositionsStreamingContext, ProductCore
-from .ptychi import PtyChiReconstructorLibrary
 from .task_manager import TaskManager
 from .visualization import VisualizationEngine
 from .workflow import ConcreteWorkflowAPI
@@ -131,19 +130,11 @@ class ModelCore:
         self.probe_visualization_engine = VisualizationEngine(is_complex=True)
         self.object_visualization_engine = VisualizationEngine(is_complex=True)
 
-        self.ptychi_reconstructor_library = PtyChiReconstructorLibrary(self.settings_registry)
-
         self.processing_core = ProcessingCore(
             self._task_manager,
             self.settings_registry,
             self.product_core.product_api,
-            [
-                self.ptychi_reconstructor_library,
-                # Whatever registered itself, taken as the interface rather
-                # than as a named backend. A library still constructed above
-                # is one that has not moved under plugins/ yet.
-                *(plugin.strategy for plugin in self.plugin_registry.reconstructor_libraries),
-            ],
+            self.plugin_registry.reconstructor_libraries,
         )
         self.fluorescence_core = FluorescenceCore(
             self._task_manager,

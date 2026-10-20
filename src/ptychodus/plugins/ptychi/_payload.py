@@ -20,11 +20,11 @@ class PtyChiPayload:
 
     ``task_options`` is a fully-populated algorithm-specific subclass of
     :class:`PtychographyTaskOptions` (``DMOptions``, ``PIEOptions``,
-    ``LSQMLOptions``, ...) that the parent built via the option-helper classes
-    in :mod:`.helper` and the per-algorithm classes in :mod:`.dm`, :mod:`.pie`,
-    etc. It carries settings only: pty-chi takes the diffraction data,
-    positions, and initial guesses as ``PtychographyTask`` keyword arguments,
-    which the child derives from ``reconstruct_input``.
+    ``LSQMLOptions``, ...), carrying the values the settings layer holds
+    reconciled with the product being reconstructed. It carries settings
+    only: pty-chi takes the diffraction data, positions, and initial guesses
+    as ``PtychographyTask`` keyword arguments, which the child derives from
+    ``reconstruct_input``.
     """
 
     reconstruct_input: ReconstructInput

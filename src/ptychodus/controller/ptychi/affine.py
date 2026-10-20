@@ -7,6 +7,14 @@ from ptychodus.api.parameters import IntegerParameter
 
 
 class PtyChiAffineDegreesOfFreedom(IntEnum):
+    """Which bit of the persisted integer selects which degree of freedom.
+
+    The order is the settings contract and is stated twice: here, for the
+    labels this list shows, and in the section table's bit-field adapter, for
+    the pty-chi members each bit stands for. Reordering one without the other
+    reinterprets every settings file already written.
+    """
+
     TRANSLATION = 0
     ROTATION = 1
     SCALING = 2
