@@ -99,10 +99,11 @@ def test_train_hands_the_public_door_a_settings_mapping() -> None:
     }
     adapter = SubprocessReconstructor(
         name='PtychoPINN train probe',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:capture_ptychopinn_train_call',
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='capture_ptychopinn_train_call',
         dump_reconstruct_options=lambda _parameters, _options: options,
         is_trainable=True,
-        train_entry_point=f'{FIXTURES_MODULE}:capture_ptychopinn_train_call',
+        train_function='capture_ptychopinn_train_call',
         dump_train_options=lambda _options: options,
     )
 
@@ -138,7 +139,8 @@ def test_reconstruct_stages_declared_arrays_through_the_embedder_seam() -> None:
     # mode against the reconstructor the payload came from.
     adapter = SubprocessReconstructor(
         name='Unsupervised',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:capture_ptychopinn_reconstruct_call',
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='capture_ptychopinn_reconstruct_call',
         dump_reconstruct_options=lambda _parameters, _options: options,
     )
     adapter.load_model(Path('/unused'))

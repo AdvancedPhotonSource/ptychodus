@@ -30,8 +30,6 @@ logger = logging.getLogger(__name__)
 
 MODEL_FILE_NAME: Final[str] = 'wts.h5.zip'
 
-_RECONSTRUCT_ENTRY = 'ptychodus.plugins.ptychopinn._subprocess:run_reconstruct'
-_TRAIN_ENTRY = 'ptychodus.plugins.ptychopinn._subprocess:run_train'
 
 # 'None' in a settings combo box means "no auxiliary loss", which the backend
 # spells as the absent value rather than a string.
@@ -275,12 +273,10 @@ def build_reconstructor(model_training_mode: str) -> SubprocessReconstructor:
 
     return SubprocessReconstructor(
         name=model_training_mode,
-        reconstruct_entry_point=_RECONSTRUCT_ENTRY,
         default_options=default_options,
         dump_reconstruct_options=dump_reconstruct_options,
         resolve_model_path=resolve_model_path,
         is_trainable=True,
-        train_entry_point=_TRAIN_ENTRY,
         dump_train_options=dump_train_options,
         model_file_filter='Zipped Archive (*.zip)',
         model_file_extension='.zip',

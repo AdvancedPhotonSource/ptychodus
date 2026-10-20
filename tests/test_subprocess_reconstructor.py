@@ -92,7 +92,8 @@ def test_reconstruct_streams_all_outputs_in_order() -> None:
 
     adapter = SubprocessReconstructor(
         name='FAKE',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:yield_n_outputs',
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='yield_n_outputs',
         dump_reconstruct_options=dump_options,
     )
 
@@ -110,7 +111,8 @@ def test_child_exception_propagates_as_child_error() -> None:
 
     adapter = SubprocessReconstructor(
         name='FAKE',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:raise_immediately',
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='raise_immediately',
         dump_reconstruct_options=dump_options,
     )
 
@@ -163,7 +165,8 @@ def test_hanging_child_is_terminated_on_iterator_close(monkeypatch: pytest.Monke
 
     adapter = SubprocessReconstructor(
         name='FAKE',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:emit_output_then_hang',
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='emit_output_then_hang',
         dump_reconstruct_options=dump_options,
         terminate_grace_sec=1.0,
     )
@@ -195,7 +198,8 @@ def test_child_log_is_forwarded_to_parent_logger(caplog: pytest.LogCaptureFixtur
 
     adapter = SubprocessReconstructor(
         name='FAKE',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:emit_log_then_output',
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='emit_log_then_output',
         dump_reconstruct_options=dump_options,
     )
 
@@ -217,7 +221,8 @@ def test_settings_sync_message_invokes_callback() -> None:
 
     adapter = SubprocessReconstructor(
         name='FAKE',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:emit_settings_sync_then_output',
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='emit_settings_sync_then_output',
         dump_reconstruct_options=dump_options,
         apply_settings_sync=seen.append,
     )
@@ -242,10 +247,11 @@ def test_train_records_model_saved_path(tmp_path: Path) -> None:
 
     adapter = SubprocessReconstructor(
         name='FAKE',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:hang_forever',
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='hang_forever',
         dump_reconstruct_options=dump_reconstruct_options,
         is_trainable=True,
-        train_entry_point=f'{FIXTURES_MODULE}:train_and_save',
+        train_function='train_and_save',
         dump_train_options=dump_train_options,
         model_file_extension='.bin',
     )
@@ -267,7 +273,8 @@ def test_train_records_model_saved_path(tmp_path: Path) -> None:
 def test_non_trainable_train_raises() -> None:
     adapter = SubprocessReconstructor(
         name='FAKE',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:hang_forever',
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='hang_forever',
         dump_reconstruct_options=lambda p, o: {},
     )
 
@@ -278,10 +285,11 @@ def test_non_trainable_train_raises() -> None:
 def test_save_without_load_or_train_raises() -> None:
     adapter = SubprocessReconstructor(
         name='FAKE',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:hang_forever',
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='hang_forever',
         dump_reconstruct_options=lambda p, o: {},
         is_trainable=True,
-        train_entry_point=f'{FIXTURES_MODULE}:train_and_save',
+        train_function='train_and_save',
         dump_train_options=lambda opts: {},
     )
 

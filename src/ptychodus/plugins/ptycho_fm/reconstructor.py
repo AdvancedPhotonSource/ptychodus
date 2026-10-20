@@ -29,9 +29,6 @@ __all__ = [
 ]
 
 
-_RECONSTRUCT_ENTRY = 'ptychodus.plugins.ptycho_fm._subprocess:run_reconstruct'
-_TRAIN_ENTRY = 'ptychodus.plugins.ptycho_fm._subprocess:run_train'
-
 # Losses evaluated on the detector plane. The supervised objective applies the
 # criterion to object amplitude and phase patches instead, where a probe
 # envelope, a radial detector coordinate and a total photon flux are undefined.
@@ -167,11 +164,9 @@ def build_reconstructor(name: str) -> SubprocessReconstructor:
 
     return SubprocessReconstructor(
         name=name,
-        reconstruct_entry_point=_RECONSTRUCT_ENTRY,
         default_options=default_options,
         dump_reconstruct_options=dump_reconstruct_options,
         is_trainable=True,
-        train_entry_point=_TRAIN_ENTRY,
         dump_train_options=dump_train_options,
         model_file_filter='PyTorch Checkpoint (*.pth *.pt)',
         model_file_extension='.pth',

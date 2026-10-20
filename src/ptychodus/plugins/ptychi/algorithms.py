@@ -74,9 +74,6 @@ __all__ = [
 ]
 
 
-_RECONSTRUCT_ENTRY = 'ptychodus.plugins.ptychi._subprocess:run_reconstruct'
-
-
 @dataclass(frozen=True)
 class _Spec:
     """Names the six pty-chi ``*Options`` classes plus the algorithm's display name."""
@@ -263,7 +260,6 @@ def _wrap_as_subprocess_reconstructor(
 
     return SubprocessReconstructor(
         name=algorithm.spec.display_name,
-        reconstruct_entry_point=_RECONSTRUCT_ENTRY,
         default_options=build_default_options,
         dump_reconstruct_options=dump_options,
     )

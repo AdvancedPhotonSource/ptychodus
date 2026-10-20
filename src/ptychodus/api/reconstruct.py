@@ -12,7 +12,9 @@ from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, fields
 from enum import auto, Enum, StrEnum
 from importlib.metadata import PackageNotFoundError, version
+from importlib import import_module
 from importlib.util import find_spec
+from multiprocessing.queues import Queue
 from pathlib import Path
 from typing import Any
 import logging
@@ -208,6 +210,16 @@ class SubprocessOperation(StrEnum):
     RECONSTRUCT = 'reconstruct'
     TRAIN = 'train'
 
+    @property
+    def child_function(self) -> str:
+        """What a backend following the convention calls this operation's entry point.
+
+        Derived from the operation rather than tabulated beside it, so the
+        two cannot disagree and a backend reading this knows the rule rather
+        than a pair of names.
+        """
+        return f'run_{self.value}'
+
 
 @dataclass(frozen=True)
 class SubprocessPayload:
@@ -231,6 +243,11 @@ class SubprocessPayload:
     operation: SubprocessOperation
     reconstructor: str
     options: Any
+    # Where the child code lives. Derived from the library that built this
+    # reconstructor rather than written down, so there is no dotted string to
+    # go stale when a module moves.
+    child_module: str = ''
+    child_function: str = ''
     input_: ReconstructInput | None = None
     input_directory: Path | None = None
     output_directory: Path | None = None
@@ -308,7 +325,7 @@ class SubprocessReconstructor(TrainableReconstructor):
     object is still a single kind that needs no special-casing in a list.
 
     The parent-side object holds no GPU state. It stores:
-    - the child entry-point strings (dotted module paths),
+    - the module its child code lives in, stamped on by its library,
     - backend-supplied callbacks that dump options and export training data,
     - the loaded-model path (as recorded by ``load_model`` /
       remembered from the last ``train`` call).
@@ -330,12 +347,13 @@ class SubprocessReconstructor(TrainableReconstructor):
         self,
         *,
         name: str,
-        reconstruct_entry_point: str,
         dump_reconstruct_options: DumpReconstructOptions,
+        child_module: str = '',
+        reconstruct_function: str = '',
         default_options: DefaultOptions = NoOptions,
         resolve_model_path: ResolveModelPath | None = None,
         is_trainable: bool = False,
-        train_entry_point: str | None = None,
+        train_function: str = '',
         dump_train_options: DumpTrainOptions | None = None,
         model_file_filter: str = '',
         model_file_extension: str = '',
@@ -347,13 +365,18 @@ class SubprocessReconstructor(TrainableReconstructor):
     ) -> None:
         super().__init__()
         self._name = name
-        self._reconstruct_entry_point = reconstruct_entry_point
         self._dump_reconstruct_options = dump_reconstruct_options
+        self._reconstruct_function = reconstruct_function
         self._default_options = default_options
         self._resolve_model_path = resolve_model_path
         self._is_trainable = is_trainable
-        self._train_entry_point = train_entry_point
+        self._train_function = train_function
         self._dump_train_options = dump_train_options
+
+        # Where this reconstructor's child code lives. Stamped by the library
+        # that builds it, which is the thing that knows; set directly only by
+        # a caller building one outside a library.
+        self.child_module = child_module
         self._model_file_filter = model_file_filter
         self._model_file_extension = model_file_extension
         self._training_data_file_filter = training_data_file_filter
@@ -388,6 +411,8 @@ class SubprocessReconstructor(TrainableReconstructor):
             operation=SubprocessOperation.RECONSTRUCT,
             reconstructor=self._name,
             options=self._dump_reconstruct_options(input_, options),
+            child_module=self.child_module,
+            child_function=self._reconstruct_function,
             input_=input_,
             model_path=(
                 self._loaded_model_path
@@ -397,7 +422,7 @@ class SubprocessReconstructor(TrainableReconstructor):
         )
 
         with run_subprocess(
-            self._reconstruct_entry_point,
+            _DISPATCH_ENTRY_POINT,
             payload,
             terminate_grace_sec=self._terminate_grace_sec,
             environment=self.device_environment(),
@@ -456,19 +481,21 @@ class SubprocessReconstructor(TrainableReconstructor):
     ) -> Iterator[TrainOutput]:
         if not self._is_trainable:
             raise NotImplementedError(f'{self._name} does not support training.')
-        if self._train_entry_point is None or self._dump_train_options is None:
+        if self._dump_train_options is None:
             raise NotImplementedError(f'{self._name} does not support training.')
 
         payload = SubprocessPayload(
             operation=SubprocessOperation.TRAIN,
             reconstructor=self._name,
             options=self._dump_train_options(options),
+            child_module=self.child_module,
+            child_function=self._train_function,
             input_directory=input_directory,
             output_directory=output_directory,
         )
 
         with run_subprocess(
-            self._train_entry_point,
+            _DISPATCH_ENTRY_POINT,
             payload,
             terminate_grace_sec=self._terminate_grace_sec,
             environment=self.device_environment(),
@@ -489,6 +516,60 @@ class SubprocessReconstructor(TrainableReconstructor):
                     logger.debug(
                         f'{self._name}: dropping unrecognized subprocess message tag {tag!r}'
                     )
+
+
+def _child_module_for(library_class: type) -> str:
+    """The module a library's reconstructors run their children in.
+
+    Derived from where the library class lives rather than written down by
+    the backend: a plugin lives in a package of its own and keeps its child
+    entry points in one module there, so the path follows from the class and
+    cannot disagree with it.
+    """
+    package, _, _ = library_class.__module__.rpartition('.')
+    return f'{package}._subprocess'
+
+
+# Module scope, and underscored, for the reason tests/test_subprocess_entry_points.py
+# states: it discovers entry points by AST-scanning module-level assignments whose
+# name carries ENTRY, so inlining this into its one reader would drop it from that
+# guard with nothing to show for it.
+_DISPATCH_ENTRY_POINT = 'ptychodus.api.reconstruct:_run_in_child'
+
+
+def _run_in_child(payload: SubprocessPayload, queue: Queue[Any]) -> None:
+    """Import the backend the payload names and hand it the payload.
+
+    Runs in the child. One entry point for every backend and both
+    operations, so what varies is data rather than a dotted string written
+    per backend per operation -- a string that resolves only when a child is
+    actually spawned, and so goes stale without anything noticing.
+
+    Only the module this payload names is imported. Rebuilding the plugin
+    registry here would work too, and would cost a second of importing every
+    plugin to recover a mapping the parent already had.
+    """
+    if not payload.child_module:
+        raise ValueError(
+            f'{payload.reconstructor}: no child module to run {payload.operation} in. '
+            'A reconstructor is given one by the library that builds it.'
+        )
+
+    # Coerced rather than trusted: a payload is unpickled from another
+    # process, and a bare string where the member was still names the
+    # operation. An unknown one says so here instead of failing to find a
+    # function nobody named.
+    function = payload.child_function or SubprocessOperation(payload.operation).child_function
+    module = import_module(payload.child_module)
+
+    try:
+        entry = getattr(module, function)
+    except AttributeError:
+        raise AttributeError(
+            f'{payload.reconstructor}: {payload.child_module} defines no "{function}".'
+        ) from None
+
+    entry(payload, queue)
 
 
 class ReconstructorLibrary(Iterable[Reconstructor], ABC):
@@ -579,7 +660,21 @@ class ReconstructorLibrary(Iterable[Reconstructor], ABC):
             return []
 
         self.log_version()
+        self._locate_child_code(reconstructors)
         return reconstructors
+
+    def _locate_child_code(self, reconstructors: Iterable[Reconstructor]) -> None:
+        """Tell each reconstructor where its child code lives.
+
+        One already carrying a module keeps it, which is how a backend
+        laid out differently -- or a caller building one in a test -- says so.
+        """
+        child_module = _child_module_for(type(self))
+
+        for reconstructor in reconstructors:
+            if isinstance(reconstructor, SubprocessReconstructor):
+                if not reconstructor.child_module:
+                    reconstructor.child_module = child_module
 
     @abstractmethod
     def _build(self) -> Iterable[Reconstructor]:
