@@ -19,11 +19,8 @@ from types import ModuleType, SimpleNamespace
 from typing import Any
 
 from ptychodus.api.reconstruct import (
-    TAG_MODEL_SAVED,
-    TAG_OUTPUT,
-    TAG_SETTINGS_SYNC,
-    TAG_TRAIN_OUTPUT,
     ReconstructOutput,
+    ReconstructorMessage,
     TrainOutput,
 )
 
@@ -152,7 +149,7 @@ def yield_n_outputs(payload: Any, queue: Any) -> None:
     n = int(payload.options['n'])
     for i in range(n):
         output = ReconstructOutput(product=payload.options['product'], progress=i + 1)
-        queue.put((TAG_OUTPUT, pickle.dumps(output)))
+        queue.put((ReconstructorMessage.OUTPUT, pickle.dumps(output)))
 
 
 def raise_immediately(payload: Any, queue: Any) -> None:
@@ -174,7 +171,7 @@ def emit_output_then_hang(payload: Any, queue: Any) -> None:
     """
     queue.put(
         (
-            TAG_OUTPUT,
+            ReconstructorMessage.OUTPUT,
             pickle.dumps(ReconstructOutput(product=payload.options['product'], progress=1)),
         )
     )
@@ -185,20 +182,20 @@ def emit_log_then_output(payload: Any, queue: Any) -> None:
     """Log a message, then emit one output; parent must see log before output."""
     logger.warning(payload.options['log_message'])
     output = ReconstructOutput(product=payload.options['product'], progress=1)
-    queue.put((TAG_OUTPUT, pickle.dumps(output)))
+    queue.put((ReconstructorMessage.OUTPUT, pickle.dumps(output)))
 
 
 def emit_settings_sync_then_output(payload: Any, queue: Any) -> None:
     """Emit a settings-sync message, then an output."""
-    queue.put((TAG_SETTINGS_SYNC, payload.options['settings']))
+    queue.put((ReconstructorMessage.SETTINGS_SYNC, payload.options['settings']))
     output = ReconstructOutput(product=payload.options['product'], progress=1)
-    queue.put((TAG_OUTPUT, pickle.dumps(output)))
+    queue.put((ReconstructorMessage.OUTPUT, pickle.dumps(output)))
 
 
 def train_and_save(payload: Any, queue: Any) -> None:
     """Emit one :class:`TrainOutput` and a model-saved path."""
-    queue.put((TAG_TRAIN_OUTPUT, pickle.dumps(TrainOutput(progress=1))))
-    queue.put((TAG_MODEL_SAVED, payload.options['saved_path']))
+    queue.put((ReconstructorMessage.TRAIN_OUTPUT, pickle.dumps(TrainOutput(progress=1))))
+    queue.put((ReconstructorMessage.MODEL_SAVED, payload.options['saved_path']))
 
 
 def probe_cuda_uuids(_payload: Any, queue: Queue[Any]) -> None:
@@ -213,4 +210,4 @@ def probe_cuda_uuids(_payload: Any, queue: Queue[Any]) -> None:
         str(torch.cuda.get_device_properties(index).uuid)
         for index in range(torch.cuda.device_count())
     ]
-    queue.put((TAG_OUTPUT, pickle.dumps(uuids)))
+    queue.put((ReconstructorMessage.OUTPUT, pickle.dumps(uuids)))

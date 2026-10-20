@@ -10,7 +10,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, fields
-from enum import auto, Enum
+from enum import auto, Enum, StrEnum
 from importlib.metadata import PackageNotFoundError, version
 from importlib.util import find_spec
 from pathlib import Path
@@ -180,15 +180,33 @@ class NullReconstructor(Reconstructor):
         yield from ()
 
 
-# Tags emitted by child entry points and consumed by this adapter.
-TAG_OUTPUT = 'output'  # payload = pickle.dumps(ReconstructOutput)
-TAG_TRAIN_OUTPUT = 'train_output'  # payload = pickle.dumps(TrainOutput)
-TAG_MODEL_SAVED = 'model_saved'  # payload = str path where child wrote checkpoint
-TAG_SETTINGS_SYNC = 'settings_sync'  # payload = {group_name: {param_name: value_str}}
+class ReconstructorMessage(StrEnum):
+    """What a reconstructor's child has to say, beside what the transport owns.
+
+    One place names every message :class:`SubprocessReconstructor` acts on,
+    so a backend writing a child can see the whole vocabulary without
+    reading the adapter. A string enum, because the tag is pickled to the
+    parent and a child writing the bare string must still compare equal.
+
+    What rides with each is fixed by the tag:
+
+    - ``OUTPUT`` -- a pickled :class:`ReconstructOutput`
+    - ``TRAIN_OUTPUT`` -- a pickled :class:`TrainOutput`
+    - ``MODEL_SAVED`` -- the path, as a string, the child wrote a checkpoint to
+    - ``SETTINGS_SYNC`` -- ``{group_name: {parameter_name: value_as_string}}``
+    """
+
+    OUTPUT = 'output'
+    TRAIN_OUTPUT = 'train_output'
+    MODEL_SAVED = 'model_saved'
+    SETTINGS_SYNC = 'settings_sync'
 
 
-OPERATION_RECONSTRUCT = 'reconstruct'
-OPERATION_TRAIN = 'train'
+class SubprocessOperation(StrEnum):
+    """What a child was spawned to do, and so which payload fields are filled."""
+
+    RECONSTRUCT = 'reconstruct'
+    TRAIN = 'train'
 
 
 @dataclass(frozen=True)
@@ -210,7 +228,7 @@ class SubprocessPayload:
     that would coerce the values on the way through.
     """
 
-    operation: str
+    operation: SubprocessOperation
     reconstructor: str
     options: Any
     input_: ReconstructInput | None = None
@@ -367,7 +385,7 @@ class SubprocessReconstructor(TrainableReconstructor):
         self, input_: ReconstructInput, *, options: BaseModel
     ) -> Iterator[ReconstructOutput]:
         payload = SubprocessPayload(
-            operation=OPERATION_RECONSTRUCT,
+            operation=SubprocessOperation.RECONSTRUCT,
             reconstructor=self._name,
             options=self._dump_reconstruct_options(input_, options),
             input_=input_,
@@ -386,9 +404,9 @@ class SubprocessReconstructor(TrainableReconstructor):
         ) as events:
             for event in events:
                 tag = event[0]
-                if tag == TAG_OUTPUT:
+                if tag == ReconstructorMessage.OUTPUT:
                     yield pickle.loads(event[1])
-                elif tag == TAG_SETTINGS_SYNC:
+                elif tag == ReconstructorMessage.SETTINGS_SYNC:
                     if self._apply_settings_sync is not None:
                         try:
                             self._apply_settings_sync(event[1])
@@ -442,7 +460,7 @@ class SubprocessReconstructor(TrainableReconstructor):
             raise NotImplementedError(f'{self._name} does not support training.')
 
         payload = SubprocessPayload(
-            operation=OPERATION_TRAIN,
+            operation=SubprocessOperation.TRAIN,
             reconstructor=self._name,
             options=self._dump_train_options(options),
             input_directory=input_directory,
@@ -457,11 +475,11 @@ class SubprocessReconstructor(TrainableReconstructor):
         ) as events:
             for event in events:
                 tag = event[0]
-                if tag == TAG_TRAIN_OUTPUT:
+                if tag == ReconstructorMessage.TRAIN_OUTPUT:
                     yield pickle.loads(event[1])
-                elif tag == TAG_MODEL_SAVED:
+                elif tag == ReconstructorMessage.MODEL_SAVED:
                     self._loaded_model_path = Path(event[1])
-                elif tag == TAG_SETTINGS_SYNC:
+                elif tag == ReconstructorMessage.SETTINGS_SYNC:
                     if self._apply_settings_sync is not None:
                         try:
                             self._apply_settings_sync(event[1])

@@ -19,7 +19,7 @@ Two entry points are exposed:
   diffraction alongside amplitude and phase -- and a minimal train/validate
   loop that mirrors ``ptycho_fm/train.py`` stripped of its distributed
   machinery. Emits a :class:`TrainOutput` after each epoch and
-  a final ``TAG_MODEL_SAVED`` with the path of the best checkpoint.
+  a final ``ReconstructorMessage.MODEL_SAVED`` with the path of the best checkpoint.
 
 Stitching is done here rather than reused: ptycho_fm's own
 ``run_inference_and_stitch`` lives in its ``scripts/`` tree, which is excluded
@@ -42,10 +42,8 @@ from ptychodus.api.preprocess.diffraction import zero_bad_pixels
 from ptychodus.api.object import Object
 from ptychodus.api.product import LossValue, Product
 from ptychodus.api.reconstruct import (
-    TAG_MODEL_SAVED,
-    TAG_OUTPUT,
-    TAG_TRAIN_OUTPUT,
     ReconstructOutput,
+    ReconstructorMessage,
     SubprocessPayload,
     TrainOutput,
 )
@@ -343,7 +341,10 @@ def run_reconstruct(payload: SubprocessPayload, queue: Queue[Any]) -> None:
     )
 
     queue.put(
-        (TAG_OUTPUT, pickle.dumps(ReconstructOutput(product=product, progress=1, progress_goal=1)))
+        (
+            ReconstructorMessage.OUTPUT,
+            pickle.dumps(ReconstructOutput(product=product, progress=1, progress_goal=1)),
+        )
     )
 
 
@@ -500,7 +501,7 @@ def run_train(payload: SubprocessPayload, queue: Queue[Any]) -> None:
     train/validate loop directly against the model ``coupled_decoder_mode``
     selects, emitting one :class:`TrainOutput` per epoch. The best checkpoint by validation loss is
     written to ``output_directory/best.pth`` and its path streamed back via
-    ``TAG_MODEL_SAVED``.
+    ``ReconstructorMessage.MODEL_SAVED``.
     """
     # Guard the training loop against picking up an in-flight environment: a
     # user may have limited devices via CUDA_VISIBLE_DEVICES already; we
@@ -671,7 +672,7 @@ def run_train(payload: SubprocessPayload, queue: Queue[Any]) -> None:
 
         queue.put(
             (
-                TAG_TRAIN_OUTPUT,
+                ReconstructorMessage.TRAIN_OUTPUT,
                 pickle.dumps(
                     TrainOutput(
                         training_loss=list(training_losses),
@@ -687,7 +688,7 @@ def run_train(payload: SubprocessPayload, queue: Queue[Any]) -> None:
         raise FileNotFoundError(
             f'Training finished but no best checkpoint was written at {best_path}.'
         )
-    queue.put((TAG_MODEL_SAVED, str(best_path)))
+    queue.put((ReconstructorMessage.MODEL_SAVED, str(best_path)))
 
 
 def _atomic_save_state_dict(state_dict: Any, destination: Path) -> None:

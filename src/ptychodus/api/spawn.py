@@ -25,13 +25,13 @@ Messages travel over a ``multiprocessing.Queue`` as tagged tuples. Because a
 single child thread produces every message, ordering is preserved (a log line
 arrives before the result it precedes).
 
-- ``('log', levelno, logger_name, formatted_message)`` -- child log record
-- ``('error', traceback_str, exception_type_name, pickled_exc_or_none)``
+- ``(ChildMessage.LOG, levelno, logger_name, formatted_message)``
+- ``(ChildMessage.ERROR, traceback_str, exception_type_name, pickled_exc_or_none)``
 - ``None`` -- end-of-stream sentinel (always the final message)
 
-Any other tag is passed through to the consumer verbatim; consumers are free
-to define their own tags (e.g. ``'output'``, ``'progress'``, ``'result'``,
-``'settings_sync'``, ``'model_saved'``).
+Any other tag is passed through to the consumer verbatim. A consumer names
+its own in an enum of its own, since what a child has to say about its work
+is the consumer's vocabulary rather than the transport's.
 
 Child entry points are addressed by ``'dotted.module.path:function_name'``
 strings; the child imports the module lazily and calls
@@ -50,6 +50,7 @@ import traceback
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
+from enum import StrEnum
 from multiprocessing.context import SpawnProcess
 from multiprocessing.queues import Queue
 from typing import Any
@@ -57,9 +58,8 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    'TAG_ERROR',
-    'TAG_LOG',
     'ChildError',
+    'ChildMessage',
     'SubprocessLogHandler',
     'install_child_log_forwarder',
     'run_subprocess',
@@ -67,8 +67,18 @@ __all__ = [
 ]
 
 
-TAG_LOG = 'log'
-TAG_ERROR = 'error'
+class ChildMessage(StrEnum):
+    """The two messages this module itself puts on the queue.
+
+    A string enum rather than a pair of constants, so one place names every
+    tag the transport owns and a reader need not go looking for the others.
+    What travels is the value, and a child writing the bare string compares
+    equal to the member -- which is what keeps an entry point that predates
+    this class working unchanged.
+    """
+
+    LOG = 'log'
+    ERROR = 'error'
 
 
 class ChildError(RuntimeError):
@@ -107,7 +117,9 @@ class SubprocessLogHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord) -> None:
         try:
-            self._result_queue.put((TAG_LOG, record.levelno, record.name, self.format(record)))
+            self._result_queue.put(
+                (ChildMessage.LOG, record.levelno, record.name, self.format(record))
+            )
         except Exception:
             # Never let logging failures break the worker.
             pass
@@ -143,7 +155,7 @@ def send_error(result_queue: Queue[Any], exc: BaseException) -> None:
     except Exception:
         pickled_exc = None
     try:
-        result_queue.put((TAG_ERROR, tb, type(exc).__name__, pickled_exc))
+        result_queue.put((ChildMessage.ERROR, tb, type(exc).__name__, pickled_exc))
     except Exception:
         # Queue might already be closed; nothing we can do.
         pass
@@ -213,8 +225,9 @@ def run_subprocess(
                 tag = event[0]
                 ...
 
-    Messages tagged ``'log'`` are dispatched to the parent's logging tree by
-    logger name and NOT re-yielded. Messages tagged ``'error'`` raise
+    Messages tagged :attr:`ChildMessage.LOG` are dispatched to the parent's
+    logging tree by logger name and NOT re-yielded. Messages tagged
+    :attr:`ChildMessage.ERROR` raise
     :class:`ChildError` (with the child's original exception attached when
     unpicklable-safe). ``None`` terminates the iterator normally.
 
@@ -251,12 +264,12 @@ def _iter_events(state: _RunState) -> Iterator[tuple[Any, ...]]:
 
         tag = item[0]
 
-        if tag == TAG_LOG:
+        if tag == ChildMessage.LOG:
             _, levelno, logger_name, message = item
             logging.getLogger(logger_name).log(levelno, message)
             continue
 
-        if tag == TAG_ERROR:
+        if tag == ChildMessage.ERROR:
             _, tb, type_name, pickled_exc = item
             child_exc: BaseException | None = None
             if pickled_exc is not None:

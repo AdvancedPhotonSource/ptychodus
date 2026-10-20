@@ -36,10 +36,8 @@ from ptychodus.api.object import Object
 from ptychodus.api.preprocess.diffraction import inpaint_bad_pixels
 from ptychodus.api.product import LossValue, Product
 from ptychodus.api.reconstruct import (
-    TAG_MODEL_SAVED,
-    TAG_OUTPUT,
-    TAG_TRAIN_OUTPUT,
     ReconstructOutput,
+    ReconstructorMessage,
     SubprocessPayload,
     TrainOutput,
 )
@@ -173,7 +171,10 @@ def run_reconstruct(payload: SubprocessPayload, queue: Queue[Any]) -> None:
     )
 
     queue.put(
-        (TAG_OUTPUT, pickle.dumps(ReconstructOutput(product=product, progress=1, progress_goal=1)))
+        (
+            ReconstructorMessage.OUTPUT,
+            pickle.dumps(ReconstructOutput(product=product, progress=1, progress_goal=1)),
+        )
     )
 
 
@@ -301,7 +302,7 @@ def run_train(payload: SubprocessPayload, queue: Queue[Any]) -> None:
 
     queue.put(
         (
-            TAG_TRAIN_OUTPUT,
+            ReconstructorMessage.TRAIN_OUTPUT,
             pickle.dumps(
                 TrainOutput(
                     training_loss=training_loss,
@@ -312,4 +313,4 @@ def run_train(payload: SubprocessPayload, queue: Queue[Any]) -> None:
             ),
         )
     )
-    queue.put((TAG_MODEL_SAVED, str(bundle_path)))
+    queue.put((ReconstructorMessage.MODEL_SAVED, str(bundle_path)))

@@ -23,7 +23,7 @@ import pickle
 from multiprocessing.queues import Queue
 from typing import Any
 
-from ...api.reconstruct import TAG_OUTPUT, SubprocessPayload
+from ...api.reconstruct import ReconstructorMessage, SubprocessPayload
 from .task import reconstruct_with_ptychi
 
 logger = logging.getLogger(__name__)
@@ -53,4 +53,4 @@ def run_reconstruct(payload: SubprocessPayload, queue: Queue[Any]) -> None:
     for output in reconstruct_with_ptychi(
         payload.require_input(), task_options, payload.options['num_sync_epochs']
     ):
-        queue.put((TAG_OUTPUT, pickle.dumps(output)))
+        queue.put((ReconstructorMessage.OUTPUT, pickle.dumps(output)))

@@ -215,7 +215,7 @@ def _cuda_uuids(environment: dict[str, str]) -> list[str]:
     """Ask a child spawned under *environment* which physical devices it can see."""
     import pickle
 
-    from ptychodus.api.reconstruct import TAG_OUTPUT
+    from ptychodus.api.reconstruct import ReconstructorMessage
     from ptychodus.api.spawn import run_subprocess
 
     sys.path.insert(0, str(Path(__file__).parent))
@@ -225,7 +225,7 @@ def _cuda_uuids(environment: dict[str, str]) -> list[str]:
             'subprocess_child_fixtures:probe_cuda_uuids', None, environment=environment
         ) as events:
             for event in events:
-                if event[0] == TAG_OUTPUT:
+                if event[0] == ReconstructorMessage.OUTPUT:
                     uuids: list[str] = pickle.loads(event[1])
                     return uuids
     finally:

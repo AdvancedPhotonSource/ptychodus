@@ -30,12 +30,9 @@ from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import (
-    TAG_MODEL_SAVED,
-    TAG_OUTPUT,
-    TAG_TRAIN_OUTPUT,
-    OPERATION_RECONSTRUCT,
-    OPERATION_TRAIN,
     ReconstructInput,
+    ReconstructorMessage,
+    SubprocessOperation,
     SubprocessPayload,
 )
 from ptychodus.plugins.ptycho_fm._subprocess import (
@@ -180,7 +177,7 @@ def run_training(mode: str, options: PtychoFMOptions, out_dir: Path) -> tuple[Pa
 
     model_dir = out_dir / 'output'
     payload = SubprocessPayload(
-        operation=OPERATION_TRAIN,
+        operation=SubprocessOperation.TRAIN,
         reconstructor=mode,
         options=_build_config(mode, options),
         input_directory=in_dir,
@@ -190,11 +187,13 @@ def run_training(mode: str, options: PtychoFMOptions, out_dir: Path) -> tuple[Pa
     run_train(payload, q)  # type: ignore[arg-type]
 
     events = _drain(q)
-    train_outputs = [pickle.loads(e[1]) for e in events if e[0] == TAG_TRAIN_OUTPUT]
-    saved = [e[1] for e in events if e[0] == TAG_MODEL_SAVED]
+    train_outputs = [
+        pickle.loads(e[1]) for e in events if e[0] == ReconstructorMessage.TRAIN_OUTPUT
+    ]
+    saved = [e[1] for e in events if e[0] == ReconstructorMessage.MODEL_SAVED]
 
     assert len(train_outputs) == 2, f'expected 2 TrainOutput, got {len(train_outputs)}'
-    assert len(saved) == 1, f'expected 1 TAG_MODEL_SAVED, got {len(saved)}'
+    assert len(saved) == 1, f'expected 1 ReconstructorMessage.MODEL_SAVED, got {len(saved)}'
     assert Path(saved[0]).is_file(), saved[0]
 
     losses = [lv.value for lv in train_outputs[-1].training_loss]
@@ -205,7 +204,7 @@ def run_training(mode: str, options: PtychoFMOptions, out_dir: Path) -> tuple[Pa
 def run_inference(checkpoint: Path, options: PtychoFMOptions) -> None:
     parameters = _reconstruct_input(IMG_SIZE)
     payload = SubprocessPayload(
-        operation=OPERATION_RECONSTRUCT,
+        operation=SubprocessOperation.RECONSTRUCT,
         reconstructor='Supervised',
         options=_build_config('Supervised', options),
         model_path=checkpoint,
@@ -215,7 +214,7 @@ def run_inference(checkpoint: Path, options: PtychoFMOptions) -> None:
     run_reconstruct(payload, q)  # type: ignore[arg-type]
 
     events = _drain(q)
-    outputs = [pickle.loads(e[1]) for e in events if e[0] == TAG_OUTPUT]
+    outputs = [pickle.loads(e[1]) for e in events if e[0] == ReconstructorMessage.OUTPUT]
     assert len(outputs) == 1, f'expected 1 ReconstructOutput, got {len(outputs)}'
 
     array = outputs[0].product.object_.get_array()
@@ -269,7 +268,7 @@ def check_mode_mismatch_is_reported(options: PtychoFMOptions) -> None:
 
         options.model.coupled_decoder_mode = None
         payload = SubprocessPayload(
-            operation=OPERATION_RECONSTRUCT,
+            operation=SubprocessOperation.RECONSTRUCT,
             reconstructor='Unsupervised',
             options=_build_config('Unsupervised', options),
             model_path=checkpoint,
