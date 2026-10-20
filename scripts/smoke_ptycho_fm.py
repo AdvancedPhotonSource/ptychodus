@@ -33,9 +33,11 @@ from ptychodus.api.reconstruct import (
     TAG_MODEL_SAVED,
     TAG_OUTPUT,
     TAG_TRAIN_OUTPUT,
+    OPERATION_RECONSTRUCT,
+    OPERATION_TRAIN,
     ReconstructInput,
+    SubprocessPayload,
 )
-from ptychodus.plugins.ptycho_fm._payload import ReconstructPayload, TrainPayload
 from ptychodus.plugins.ptycho_fm._subprocess import (
     _build_criterion,
     _compute_loss,
@@ -177,11 +179,12 @@ def run_training(mode: str, options: PtychoFMOptions, out_dir: Path) -> tuple[Pa
     )
 
     model_dir = out_dir / 'output'
-    payload = TrainPayload(
-        name=mode,
-        config=_build_config(mode, options),
-        input_path=in_dir,
-        output_path=model_dir,
+    payload = SubprocessPayload(
+        operation=OPERATION_TRAIN,
+        reconstructor=mode,
+        options=_build_config(mode, options),
+        input_directory=in_dir,
+        output_directory=model_dir,
     )
     q: queue.Queue[Any] = queue.Queue()
     run_train(payload, q)  # type: ignore[arg-type]
@@ -201,11 +204,12 @@ def run_training(mode: str, options: PtychoFMOptions, out_dir: Path) -> tuple[Pa
 
 def run_inference(checkpoint: Path, options: PtychoFMOptions) -> None:
     parameters = _reconstruct_input(IMG_SIZE)
-    payload = ReconstructPayload(
-        name='Supervised',
-        config=_build_config('Supervised', options),
+    payload = SubprocessPayload(
+        operation=OPERATION_RECONSTRUCT,
+        reconstructor='Supervised',
+        options=_build_config('Supervised', options),
         model_path=checkpoint,
-        reconstruct_input=parameters,
+        input_=parameters,
     )
     q: queue.Queue[Any] = queue.Queue()
     run_reconstruct(payload, q)  # type: ignore[arg-type]
@@ -264,11 +268,12 @@ def check_mode_mismatch_is_reported(options: PtychoFMOptions) -> None:
         checkpoint, _ = run_training('Unsupervised', options, Path(tmp) / 'mismatch')
 
         options.model.coupled_decoder_mode = None
-        payload = ReconstructPayload(
-            name='Unsupervised',
-            config=_build_config('Unsupervised', options),
+        payload = SubprocessPayload(
+            operation=OPERATION_RECONSTRUCT,
+            reconstructor='Unsupervised',
+            options=_build_config('Unsupervised', options),
             model_path=checkpoint,
-            reconstruct_input=_reconstruct_input(IMG_SIZE),
+            input_=_reconstruct_input(IMG_SIZE),
         )
         q: queue.Queue[Any] = queue.Queue()
 

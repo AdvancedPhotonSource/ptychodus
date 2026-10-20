@@ -15,8 +15,7 @@ happens child-side when ``PtychographyTask`` is instantiated in :mod:`.task`.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
-from typing import ClassVar, Final
+from typing import Any, ClassVar, Final
 
 from ptychi.api import (
     AutodiffPtychographyOPRModeWeightsOptions,
@@ -65,7 +64,6 @@ from pydantic import BaseModel
 
 from ptychodus.api.reconstruct import ReconstructInput, SubprocessReconstructor
 
-from ._payload import PtyChiPayload
 from .options import PtyChiOptions, apply_to_task, default_options
 from .task import align_task_options_with_product
 
@@ -242,22 +240,23 @@ def _wrap_as_subprocess_reconstructor(
 ) -> SubprocessReconstructor:
     task_options_cls = algorithm.spec.task_options_cls
 
-    def build_payload(
-        parameters: ReconstructInput,
-        _loaded_model_path: Path | None,
-        options: BaseModel,
-    ) -> PtyChiPayload:
+    def dump_options(parameters: ReconstructInput, options: BaseModel) -> dict[str, Any]:
+        """The two things the child reads, under the names the declaration gives them.
+
+        The task options stay the object pty-chi declares rather than becoming
+        a mapping of their own: they are a pydantic dataclass whose float
+        fields are defaulted with int literals, so a dump and a reparse would
+        hand pty-chi floats where it had ints. Nothing would be gained -- the
+        payload is pickled either way.
+        """
         declared = _declared(options)
-        return PtyChiPayload(
-            reconstruct_input=parameters,
+        return {
             # Every field that must agree with the product rather than with a
             # setting is applied here, in one place, rather than being read
             # off the product wherever it happens to be needed.
-            task_options=align_task_options_with_product(
-                apply_to_task(declared), parameters.product
-            ),
-            num_sync_epochs=declared.num_sync_epochs,
-        )
+            'task': align_task_options_with_product(apply_to_task(declared), parameters.product),
+            'num_sync_epochs': declared.num_sync_epochs,
+        }
 
     def build_default_options() -> BaseModel:
         return default_options(task_options_cls)
@@ -266,7 +265,7 @@ def _wrap_as_subprocess_reconstructor(
         name=algorithm.spec.display_name,
         reconstruct_entry_point=_RECONSTRUCT_ENTRY,
         default_options=build_default_options,
-        build_reconstruct_payload=build_payload,
+        dump_reconstruct_options=dump_options,
     )
 
 

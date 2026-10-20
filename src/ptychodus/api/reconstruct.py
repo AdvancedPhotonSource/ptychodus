@@ -187,12 +187,83 @@ TAG_MODEL_SAVED = 'model_saved'  # payload = str path where child wrote checkpoi
 TAG_SETTINGS_SYNC = 'settings_sync'  # payload = {group_name: {param_name: value_str}}
 
 
-# Type aliases for the callbacks each backend supplies.
-BuildReconstructPayload = Callable[[ReconstructInput, 'Path | None', BaseModel], Any]
-"""(reconstruct_input, loaded_model_path_or_none, options) -> pickled payload for the child."""
+OPERATION_RECONSTRUCT = 'reconstruct'
+OPERATION_TRAIN = 'train'
 
-BuildTrainPayload = Callable[[Path, Path, BaseModel], Any]
-"""(input_dir, output_dir, options) -> pickled payload for the child."""
+
+@dataclass(frozen=True)
+class SubprocessPayload:
+    """What a child is handed, whichever backend and whichever operation.
+
+    One envelope rather than a pair of dataclasses per backend, so every
+    child reads the same shape and a new backend states only what goes in
+    ``options``. Which fields are filled follows from ``operation``:
+    reconstructing supplies ``input_`` and, where a backend loads one,
+    ``model_path``; training supplies the two directories.
+
+    ``options`` is the subset of the declaration this operation's child
+    reads, in the form that child consumes -- usually a mapping, since
+    dumping only what is read keeps a reconstruct payload free of
+    training-only values. A declaration that cannot dump itself to a mapping
+    without changing what it holds travels as the object it built instead;
+    the payload is pickled either way, so nothing is gained by a round trip
+    that would coerce the values on the way through.
+    """
+
+    operation: str
+    reconstructor: str
+    options: Any
+    input_: ReconstructInput | None = None
+    input_directory: Path | None = None
+    output_directory: Path | None = None
+    model_path: Path | None = None
+
+    def require_input(self) -> ReconstructInput:
+        """The data to reconstruct, or a complaint naming what was missing.
+
+        A child is spawned for one operation and reads the fields that
+        operation fills. Asking rather than assuming turns a payload built
+        wrong into one message here, instead of an attribute error on None
+        several frames into a GPU framework.
+        """
+        if self.input_ is None:
+            raise ValueError(f'{self.reconstructor}: {self.operation} payload carries no input.')
+
+        return self.input_
+
+    def require_model_path(self) -> Path:
+        """The model to load, or a complaint naming what was missing."""
+        if self.model_path is None:
+            raise ValueError(
+                f'{self.reconstructor}: {self.operation} payload carries no model path.'
+            )
+
+        return self.model_path
+
+    def require_directories(self) -> tuple[Path, Path]:
+        """The directories to read from and write to, or a complaint."""
+        if self.input_directory is None or self.output_directory is None:
+            raise ValueError(
+                f'{self.reconstructor}: {self.operation} payload carries no directories.'
+            )
+
+        return self.input_directory, self.output_directory
+
+
+# Type aliases for the callbacks each backend supplies.
+DumpReconstructOptions = Callable[[ReconstructInput, BaseModel], Any]
+"""(reconstruct_input, options) -> the subset of the declaration the child reads."""
+
+DumpTrainOptions = Callable[[BaseModel], Any]
+"""(options) -> the subset of the declaration the training child reads."""
+
+ResolveModelPath = Callable[['Path | None'], Path]
+"""(path recorded by load_model) -> the path the child loads from.
+
+Runs parent-side, before the child is spawned, so a backend that unpacks an
+archive or picks a file out of a bundle directory does it once and complains
+here rather than in the child when there is nothing to load.
+"""
 
 ExportTrainingData = Callable[[Path, ReconstructInput, BaseModel], None]
 """(file_path, reconstruct_input, options) -> None. Runs parent-side; must not touch GPU."""
@@ -220,7 +291,7 @@ class SubprocessReconstructor(TrainableReconstructor):
 
     The parent-side object holds no GPU state. It stores:
     - the child entry-point strings (dotted module paths),
-    - backend-supplied callbacks that build payloads and export training data,
+    - backend-supplied callbacks that dump options and export training data,
     - the loaded-model path (as recorded by ``load_model`` /
       remembered from the last ``train`` call).
 
@@ -242,11 +313,12 @@ class SubprocessReconstructor(TrainableReconstructor):
         *,
         name: str,
         reconstruct_entry_point: str,
-        build_reconstruct_payload: BuildReconstructPayload,
+        dump_reconstruct_options: DumpReconstructOptions,
         default_options: DefaultOptions = NoOptions,
+        resolve_model_path: ResolveModelPath | None = None,
         is_trainable: bool = False,
         train_entry_point: str | None = None,
-        build_train_payload: BuildTrainPayload | None = None,
+        dump_train_options: DumpTrainOptions | None = None,
         model_file_filter: str = '',
         model_file_extension: str = '',
         training_data_file_filter: str = '',
@@ -258,11 +330,12 @@ class SubprocessReconstructor(TrainableReconstructor):
         super().__init__()
         self._name = name
         self._reconstruct_entry_point = reconstruct_entry_point
-        self._build_reconstruct_payload = build_reconstruct_payload
+        self._dump_reconstruct_options = dump_reconstruct_options
         self._default_options = default_options
+        self._resolve_model_path = resolve_model_path
         self._is_trainable = is_trainable
         self._train_entry_point = train_entry_point
-        self._build_train_payload = build_train_payload
+        self._dump_train_options = dump_train_options
         self._model_file_filter = model_file_filter
         self._model_file_extension = model_file_extension
         self._training_data_file_filter = training_data_file_filter
@@ -293,7 +366,17 @@ class SubprocessReconstructor(TrainableReconstructor):
     def reconstruct(
         self, input_: ReconstructInput, *, options: BaseModel
     ) -> Iterator[ReconstructOutput]:
-        payload = self._build_reconstruct_payload(input_, self._loaded_model_path, options)
+        payload = SubprocessPayload(
+            operation=OPERATION_RECONSTRUCT,
+            reconstructor=self._name,
+            options=self._dump_reconstruct_options(input_, options),
+            input_=input_,
+            model_path=(
+                self._loaded_model_path
+                if self._resolve_model_path is None
+                else self._resolve_model_path(self._loaded_model_path)
+            ),
+        )
 
         with run_subprocess(
             self._reconstruct_entry_point,
@@ -355,10 +438,16 @@ class SubprocessReconstructor(TrainableReconstructor):
     ) -> Iterator[TrainOutput]:
         if not self._is_trainable:
             raise NotImplementedError(f'{self._name} does not support training.')
-        if self._train_entry_point is None or self._build_train_payload is None:
+        if self._train_entry_point is None or self._dump_train_options is None:
             raise NotImplementedError(f'{self._name} does not support training.')
 
-        payload = self._build_train_payload(input_directory, output_directory, options)
+        payload = SubprocessPayload(
+            operation=OPERATION_TRAIN,
+            reconstructor=self._name,
+            options=self._dump_train_options(options),
+            input_directory=input_directory,
+            output_directory=output_directory,
+        )
 
         with run_subprocess(
             self._train_entry_point,

@@ -40,9 +40,9 @@ from ptychodus.api.reconstruct import (
     TAG_OUTPUT,
     TAG_TRAIN_OUTPUT,
     ReconstructOutput,
+    SubprocessPayload,
     TrainOutput,
 )
-from ._payload import ReconstructPayload, TrainPayload
 
 logger = logging.getLogger(__name__)
 
@@ -105,35 +105,35 @@ def _build_arrays(parameters: Any) -> dict[str, Any]:
     }
 
 
-def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
+def run_reconstruct(payload: SubprocessPayload, queue: Queue[Any]) -> None:
     """Child entry point for one inference pass. Streams a single ReconstructOutput."""
-    if payload.model_bundle_dir is None:
-        raise RuntimeError('Cannot reconstruct: no PtychoPINN model has been loaded.')
+    bundle_dir = payload.require_model_path()
+    options = payload.options
 
     from ptycho_torch.inference import ReconstructionRuntimeParams, reconstruct_from_arrays
     from ptycho_torch.workflows.bundle_io import load_inference_bundle_torch
 
-    loaded_model, _bundle_params = load_inference_bundle_torch(payload.model_bundle_dir)
+    loaded_model, _bundle_params = load_inference_bundle_torch(bundle_dir)
 
     bundle_mode = getattr(loaded_model.model_config, 'mode', None)
-    if bundle_mode is not None and bundle_mode != payload.model_training_mode:
+    if bundle_mode is not None and bundle_mode != payload.reconstructor:
         logger.warning(
             'Loaded bundle mode %r does not match reconstructor mode %r; '
             'predictions may be inconsistent.',
             bundle_mode,
-            payload.model_training_mode,
+            payload.reconstructor,
         )
 
     # The bundle owns geometry and trimming; only the presentation knobs below
     # are ptychodus's to choose at reconstruct time.
     inference_config = replace(
         loaded_model.inference_config,
-        patch_weighting=payload.patch_weighting,
-        batch_size=payload.inference_batch_size,
+        patch_weighting=options['patch_weighting'],
+        batch_size=options['inference_batch_size'],
     )
 
-    parameters = payload.reconstruct_input
-    device = _resolve_device(payload.accelerator)
+    parameters = payload.require_input()
+    device = _resolve_device(options['accelerator'])
 
     with tempfile.TemporaryDirectory(prefix='ptychopinn-reconstruct-') as workspace:
         result = reconstruct_from_arrays(
@@ -150,7 +150,7 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
             ),
             workspace=workspace,
             device=device,
-            num_workers=payload.num_workers,
+            num_workers=options['num_workers'],
         )
         # Snapshot before the workspace unlinks its memory-mapped backing.
         object_out_array = numpy.squeeze(numpy.asarray(result.complex_canvas))
@@ -259,7 +259,7 @@ def _read_epoch_losses(output_path: Path) -> tuple[list[LossValue], list[LossVal
     return collect(train_column), collect(val_column)
 
 
-def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
+def run_train(payload: SubprocessPayload, queue: Queue[Any]) -> None:
     """Child entry point for one training session.
 
     Masks the visible GPUs, then hands the already-translated settings mapping
@@ -269,31 +269,35 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
     from ptycho_torch.execution_request import ExecutionRequest
     from ptycho_torch.train import train
 
+    input_directory, output_directory = payload.require_directories()
+    options = payload.options
+    settings = options['settings']
+
     execution_values: dict[str, Any] = {
-        'accelerator': payload.accelerator,
+        'accelerator': options['accelerator'],
         # Resolves to the number of devices actually visible after the mask
         # above, so no manual clamping is needed.
         'devices': 'auto',
-        'num_workers': payload.num_workers,
+        'num_workers': options['num_workers'],
         'enable_progress_bar': False,
     }
 
     bundle_path = train(
-        payload.input_path / 'train_data.npz',
-        payload.output_path,
-        payload.settings,
+        input_directory / 'train_data.npz',
+        output_directory,
+        settings,
         execution_config=ExecutionRequest(
             values=execution_values,
             explicit_fields=frozenset(execution_values),
         ),
     )
 
-    training_loss, validation_loss = _read_epoch_losses(payload.output_path)
+    training_loss, validation_loss = _read_epoch_losses(output_directory)
 
     # Training has finished by now, so report it as complete even when the log
     # could not be read -- a run that produced a bundle but no loss curve is
     # still a finished run, and zero progress would read as a failure.
-    progress = len(training_loss) or int(payload.settings.get('epochs', 0))
+    progress = len(training_loss) or int(settings.get('epochs', 0))
 
     queue.put(
         (

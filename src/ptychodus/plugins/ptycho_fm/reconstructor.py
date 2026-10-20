@@ -22,7 +22,6 @@ from pydantic import BaseModel
 
 from ptychodus.api.reconstruct import ReconstructInput, SubprocessReconstructor
 
-from ._payload import ReconstructPayload, TrainPayload
 from .options import PtychoFMOptions, default_options
 
 __all__ = [
@@ -104,27 +103,15 @@ def build_reconstructor(name: str) -> SubprocessReconstructor:
     display name.
     """
 
-    def build_reconstruct_payload(
-        parameters: ReconstructInput, loaded_model_path: Path | None, options: BaseModel
-    ) -> ReconstructPayload:
-        return ReconstructPayload(
-            name=name,
-            config=_build_config(name, _declared(options)),
-            model_path=loaded_model_path,
-            reconstruct_input=parameters,
-        )
+    def dump_reconstruct_options(
+        parameters: ReconstructInput, options: BaseModel
+    ) -> dict[str, Any]:
+        return _build_config(name, _declared(options))
 
-    def build_train_payload(
-        input_path: Path, output_path: Path, options: BaseModel
-    ) -> TrainPayload:
+    def dump_train_options(options: BaseModel) -> dict[str, Any]:
         declared = _declared(options)
         _verify_loss_supports_mode(name, str(declared.training.loss_function))
-        return TrainPayload(
-            name=name,
-            config=_build_config(name, declared),
-            input_path=input_path,
-            output_path=output_path,
-        )
+        return _build_config(name, declared)
 
     def export_training_data(
         file_path: Path, parameters: ReconstructInput, options: BaseModel
@@ -182,10 +169,10 @@ def build_reconstructor(name: str) -> SubprocessReconstructor:
         name=name,
         reconstruct_entry_point=_RECONSTRUCT_ENTRY,
         default_options=default_options,
-        build_reconstruct_payload=build_reconstruct_payload,
+        dump_reconstruct_options=dump_reconstruct_options,
         is_trainable=True,
         train_entry_point=_TRAIN_ENTRY,
-        build_train_payload=build_train_payload,
+        dump_train_options=dump_train_options,
         model_file_filter='PyTorch Checkpoint (*.pth *.pt)',
         model_file_extension='.pth',
         training_data_file_filter='PtychoFM Training Pair (*.hdf5)',

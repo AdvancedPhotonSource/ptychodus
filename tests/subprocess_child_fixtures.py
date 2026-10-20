@@ -148,16 +148,16 @@ def capture_ptychopinn_train_call(payload: Any, queue: Any) -> None:
 
 
 def yield_n_outputs(payload: Any, queue: Any) -> None:
-    """Emit ``payload['n']`` :class:`ReconstructOutput`s with product=None."""
-    n = int(payload['n'])
+    """Emit ``payload.options['n']`` :class:`ReconstructOutput`s with product=None."""
+    n = int(payload.options['n'])
     for i in range(n):
-        output = ReconstructOutput(product=payload['product'], progress=i + 1)
+        output = ReconstructOutput(product=payload.options['product'], progress=i + 1)
         queue.put((TAG_OUTPUT, pickle.dumps(output)))
 
 
 def raise_immediately(payload: Any, queue: Any) -> None:
     """Raise a :class:`ValueError` before emitting anything."""
-    raise ValueError(payload['message'])
+    raise ValueError(payload.options['message'])
 
 
 def hang_forever(payload: Any, queue: Any) -> None:
@@ -172,28 +172,33 @@ def emit_output_then_hang(payload: Any, queue: Any) -> None:
     only sleeps leaves the parent generator un-started, and closing a generator
     that never ran executes no cleanup at all.
     """
-    queue.put((TAG_OUTPUT, pickle.dumps(ReconstructOutput(product=payload['product'], progress=1))))
+    queue.put(
+        (
+            TAG_OUTPUT,
+            pickle.dumps(ReconstructOutput(product=payload.options['product'], progress=1)),
+        )
+    )
     time.sleep(3600.0)
 
 
 def emit_log_then_output(payload: Any, queue: Any) -> None:
     """Log a message, then emit one output; parent must see log before output."""
-    logger.warning(payload['log_message'])
-    output = ReconstructOutput(product=payload['product'], progress=1)
+    logger.warning(payload.options['log_message'])
+    output = ReconstructOutput(product=payload.options['product'], progress=1)
     queue.put((TAG_OUTPUT, pickle.dumps(output)))
 
 
 def emit_settings_sync_then_output(payload: Any, queue: Any) -> None:
     """Emit a settings-sync message, then an output."""
-    queue.put((TAG_SETTINGS_SYNC, payload['settings']))
-    output = ReconstructOutput(product=payload['product'], progress=1)
+    queue.put((TAG_SETTINGS_SYNC, payload.options['settings']))
+    output = ReconstructOutput(product=payload.options['product'], progress=1)
     queue.put((TAG_OUTPUT, pickle.dumps(output)))
 
 
 def train_and_save(payload: Any, queue: Any) -> None:
     """Emit one :class:`TrainOutput` and a model-saved path."""
     queue.put((TAG_TRAIN_OUTPUT, pickle.dumps(TrainOutput(progress=1))))
-    queue.put((TAG_MODEL_SAVED, payload['saved_path']))
+    queue.put((TAG_MODEL_SAVED, payload.options['saved_path']))
 
 
 def probe_cuda_uuids(_payload: Any, queue: Queue[Any]) -> None:

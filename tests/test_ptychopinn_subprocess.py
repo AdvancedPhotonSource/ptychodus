@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 
 import numpy
@@ -23,7 +22,6 @@ from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructInput, SubprocessReconstructor
 from ptychodus.api.spawn import ChildError
-from ptychodus.plugins.ptychopinn._payload import ReconstructPayload, TrainPayload
 from ptychodus.plugins.ptychopinn._subprocess import _build_arrays, _read_epoch_losses
 
 _TESTS_DIR = str(Path(__file__).parent)
@@ -94,20 +92,18 @@ def _captured(excinfo: pytest.ExceptionInfo[ChildError]) -> dict[str, Any]:
 
 def test_train_hands_the_public_door_a_settings_mapping() -> None:
     """Training goes through the dataset-to-bundle door, not a config object."""
-    payload = TrainPayload(
-        settings={'mode': 'Unsupervised', 'epochs': 3},
-        input_path=Path('/unused/input'),
-        output_path=Path('/unused/output'),
-        accelerator='cpu',
-        num_workers=2,
-    )
+    options = {
+        'settings': {'mode': 'Unsupervised', 'epochs': 3},
+        'accelerator': 'cpu',
+        'num_workers': 2,
+    }
     adapter = SubprocessReconstructor(
         name='PtychoPINN train probe',
         reconstruct_entry_point=f'{FIXTURES_MODULE}:capture_ptychopinn_train_call',
-        build_reconstruct_payload=lambda _parameters, _loaded, _options: payload,
+        dump_reconstruct_options=lambda _parameters, _options: options,
         is_trainable=True,
         train_entry_point=f'{FIXTURES_MODULE}:capture_ptychopinn_train_call',
-        build_train_payload=lambda _input, _output, _options: payload,
+        dump_train_options=lambda _options: options,
     )
 
     with pytest.raises(ChildError) as excinfo:
@@ -132,23 +128,23 @@ def test_train_hands_the_public_door_a_settings_mapping() -> None:
 
 
 def test_reconstruct_stages_declared_arrays_through_the_embedder_seam() -> None:
-    payload = ReconstructPayload(
-        model_training_mode='Unsupervised',
-        model_bundle_dir=Path('/unused'),
-        reconstruct_input=_make_reconstruct_input(),
-        patch_weighting='uniform',
-        inference_batch_size=64,
-        accelerator='auto',
-        num_workers=3,
-    )
+    options = {
+        'patch_weighting': 'uniform',
+        'inference_batch_size': 64,
+        'accelerator': 'auto',
+        'num_workers': 3,
+    }
+    # Named as the backend names it: the child compares the loaded bundle's
+    # mode against the reconstructor the payload came from.
     adapter = SubprocessReconstructor(
-        name='PtychoPINN reconstruct probe',
+        name='Unsupervised',
         reconstruct_entry_point=f'{FIXTURES_MODULE}:capture_ptychopinn_reconstruct_call',
-        build_reconstruct_payload=lambda _parameters, _loaded, _options: payload,
+        dump_reconstruct_options=lambda _parameters, _options: options,
     )
+    adapter.load_model(Path('/unused'))
 
     with pytest.raises(ChildError) as excinfo:
-        list(adapter.reconstruct(SimpleNamespace(), options=adapter.get_default_options()))  # type: ignore[arg-type]
+        list(adapter.reconstruct(_make_reconstruct_input(), options=adapter.get_default_options()))
 
     captured = _captured(excinfo)
     assert captured['array_keys'] == sorted(

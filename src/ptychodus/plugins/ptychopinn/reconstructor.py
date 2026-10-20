@@ -20,7 +20,6 @@ from pydantic import BaseModel
 
 from ptychodus.api.reconstruct import ReconstructInput, SubprocessReconstructor
 
-from ._payload import ReconstructPayload, TrainPayload
 from .options import PtychoPINNOptions, default_options
 
 __all__ = [
@@ -232,41 +231,42 @@ def build_reconstructor(model_training_mode: str) -> SubprocessReconstructor:
     # against the same model unpack the archive only once.
     bundle_dir_cache: dict[Path, Path] = dict()
 
-    def build_reconstruct_payload(
-        parameters: ReconstructInput, loaded_model_path: Path | None, options: BaseModel
-    ) -> ReconstructPayload:
+    def resolve_model_path(loaded_model_path: Path | None) -> Path:
+        """The bundle directory the child loads from, unpacked at most once.
+
+        A bundle arrives as an archive the user picked; the child wants the
+        directory inside it. Unpacking here rather than child-side means
+        repeated reconstructs against one model pay for it once, and a
+        reconstruct with nothing loaded says so before a process is spawned.
+        """
         if loaded_model_path is None:
             raise RuntimeError('Cannot reconstruct: no PtychoPINN model has been loaded.')
 
-        declared = _declared(options)
-
         try:
-            bundle_dir = bundle_dir_cache[loaded_model_path]
+            return bundle_dir_cache[loaded_model_path]
         except KeyError:
             bundle_dir = _extract_bundle_dir(loaded_model_path)
             bundle_dir_cache[loaded_model_path] = bundle_dir
+            return bundle_dir
 
-        return ReconstructPayload(
-            model_training_mode=model_training_mode,
-            model_bundle_dir=bundle_dir,
-            reconstruct_input=parameters,
-            patch_weighting=str(declared.inference.patch_weighting_method),
-            inference_batch_size=declared.inference.batch_size,
-            accelerator=str(declared.training.accelerator),
-            num_workers=declared.training.num_dataloader_workers,
-        )
-
-    def build_train_payload(
-        input_path: Path, output_path: Path, options: BaseModel
-    ) -> TrainPayload:
+    def dump_reconstruct_options(
+        parameters: ReconstructInput, options: BaseModel
+    ) -> dict[str, Any]:
         declared = _declared(options)
-        return TrainPayload(
-            settings=_build_settings(model_training_mode, declared),
-            input_path=input_path,
-            output_path=output_path,
-            accelerator=str(declared.training.accelerator),
-            num_workers=declared.training.num_dataloader_workers,
-        )
+        return {
+            'patch_weighting': str(declared.inference.patch_weighting_method),
+            'inference_batch_size': declared.inference.batch_size,
+            'accelerator': str(declared.training.accelerator),
+            'num_workers': declared.training.num_dataloader_workers,
+        }
+
+    def dump_train_options(options: BaseModel) -> dict[str, Any]:
+        declared = _declared(options)
+        return {
+            'settings': _build_settings(model_training_mode, declared),
+            'accelerator': str(declared.training.accelerator),
+            'num_workers': declared.training.num_dataloader_workers,
+        }
 
     def export_training_data(
         file_path: Path, parameters: ReconstructInput, options: BaseModel
@@ -277,10 +277,11 @@ def build_reconstructor(model_training_mode: str) -> SubprocessReconstructor:
         name=model_training_mode,
         reconstruct_entry_point=_RECONSTRUCT_ENTRY,
         default_options=default_options,
-        build_reconstruct_payload=build_reconstruct_payload,
+        dump_reconstruct_options=dump_reconstruct_options,
+        resolve_model_path=resolve_model_path,
         is_trainable=True,
         train_entry_point=_TRAIN_ENTRY,
-        build_train_payload=build_train_payload,
+        dump_train_options=dump_train_options,
         model_file_filter='Zipped Archive (*.zip)',
         model_file_extension='.zip',
         training_data_file_filter='NumPy Zipped Archive (*.npz)',

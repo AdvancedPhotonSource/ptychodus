@@ -87,15 +87,13 @@ def _minimal_reconstruct_input() -> ReconstructInput:
 def test_reconstruct_streams_all_outputs_in_order() -> None:
     product = _minimal_product()
 
-    def build_payload(
-        parameters: ReconstructInput, _loaded: Path | None, _options: BaseModel
-    ) -> Any:
+    def dump_options(parameters: ReconstructInput, _options: BaseModel) -> Any:
         return {'n': 3, 'product': product}
 
     adapter = SubprocessReconstructor(
         name='FAKE',
         reconstruct_entry_point=f'{FIXTURES_MODULE}:yield_n_outputs',
-        build_reconstruct_payload=build_payload,
+        dump_reconstruct_options=dump_options,
     )
 
     outputs = list(
@@ -107,15 +105,13 @@ def test_reconstruct_streams_all_outputs_in_order() -> None:
 
 
 def test_child_exception_propagates_as_child_error() -> None:
-    def build_payload(
-        parameters: ReconstructInput, _loaded: Path | None, _options: BaseModel
-    ) -> Any:
+    def dump_options(parameters: ReconstructInput, _options: BaseModel) -> Any:
         return {'message': 'boom'}
 
     adapter = SubprocessReconstructor(
         name='FAKE',
         reconstruct_entry_point=f'{FIXTURES_MODULE}:raise_immediately',
-        build_reconstruct_payload=build_payload,
+        dump_reconstruct_options=dump_options,
     )
 
     with pytest.raises(ChildError) as excinfo:
@@ -159,9 +155,7 @@ def test_hanging_child_is_terminated_on_iterator_close(monkeypatch: pytest.Monke
 
     product = _minimal_product()
 
-    def build_payload(
-        parameters: ReconstructInput, _loaded: Path | None, _options: BaseModel
-    ) -> Any:
+    def dump_options(parameters: ReconstructInput, _options: BaseModel) -> Any:
         return {'product': product}
 
     recorded = _ProcessRecordingContext(multiprocessing.get_context('spawn'))
@@ -170,7 +164,7 @@ def test_hanging_child_is_terminated_on_iterator_close(monkeypatch: pytest.Monke
     adapter = SubprocessReconstructor(
         name='FAKE',
         reconstruct_entry_point=f'{FIXTURES_MODULE}:emit_output_then_hang',
-        build_reconstruct_payload=build_payload,
+        dump_reconstruct_options=dump_options,
         terminate_grace_sec=1.0,
     )
 
@@ -196,15 +190,13 @@ def test_hanging_child_is_terminated_on_iterator_close(monkeypatch: pytest.Monke
 def test_child_log_is_forwarded_to_parent_logger(caplog: pytest.LogCaptureFixture) -> None:
     product = _minimal_product()
 
-    def build_payload(
-        parameters: ReconstructInput, _loaded: Path | None, _options: BaseModel
-    ) -> Any:
+    def dump_options(parameters: ReconstructInput, _options: BaseModel) -> Any:
         return {'product': product, 'log_message': 'hello from the child'}
 
     adapter = SubprocessReconstructor(
         name='FAKE',
         reconstruct_entry_point=f'{FIXTURES_MODULE}:emit_log_then_output',
-        build_reconstruct_payload=build_payload,
+        dump_reconstruct_options=dump_options,
     )
 
     with caplog.at_level(logging.WARNING, logger=FIXTURES_MODULE):
@@ -220,15 +212,13 @@ def test_settings_sync_message_invokes_callback() -> None:
     product = _minimal_product()
     seen: list[dict[str, dict[str, str]]] = []
 
-    def build_payload(
-        parameters: ReconstructInput, _loaded: Path | None, _options: BaseModel
-    ) -> Any:
+    def dump_options(parameters: ReconstructInput, _options: BaseModel) -> Any:
         return {'product': product, 'settings': {'GroupA': {'p': '42'}}}
 
     adapter = SubprocessReconstructor(
         name='FAKE',
         reconstruct_entry_point=f'{FIXTURES_MODULE}:emit_settings_sync_then_output',
-        build_reconstruct_payload=build_payload,
+        dump_reconstruct_options=dump_options,
         apply_settings_sync=seen.append,
     )
 
@@ -244,21 +234,19 @@ def test_train_records_model_saved_path(tmp_path: Path) -> None:
     saved_path = tmp_path / 'ckpt.bin'
     saved_path.write_bytes(b'x')
 
-    def build_train_payload(input_path: Path, output_path: Path, _options: BaseModel) -> Any:
+    def dump_train_options(_options: BaseModel) -> Any:
         return {'saved_path': str(saved_path)}
 
-    def build_reconstruct_payload(
-        _p: ReconstructInput, _loaded: Path | None, _options: BaseModel
-    ) -> Any:
+    def dump_reconstruct_options(_p: ReconstructInput, _options: BaseModel) -> Any:
         return {}
 
     adapter = SubprocessReconstructor(
         name='FAKE',
         reconstruct_entry_point=f'{FIXTURES_MODULE}:hang_forever',
-        build_reconstruct_payload=build_reconstruct_payload,
+        dump_reconstruct_options=dump_reconstruct_options,
         is_trainable=True,
         train_entry_point=f'{FIXTURES_MODULE}:train_and_save',
-        build_train_payload=build_train_payload,
+        dump_train_options=dump_train_options,
         model_file_extension='.bin',
     )
 
@@ -280,7 +268,7 @@ def test_non_trainable_train_raises() -> None:
     adapter = SubprocessReconstructor(
         name='FAKE',
         reconstruct_entry_point=f'{FIXTURES_MODULE}:hang_forever',
-        build_reconstruct_payload=lambda p, m, o: {},
+        dump_reconstruct_options=lambda p, o: {},
     )
 
     with pytest.raises(NotImplementedError):
@@ -291,10 +279,10 @@ def test_save_without_load_or_train_raises() -> None:
     adapter = SubprocessReconstructor(
         name='FAKE',
         reconstruct_entry_point=f'{FIXTURES_MODULE}:hang_forever',
-        build_reconstruct_payload=lambda p, m, o: {},
+        dump_reconstruct_options=lambda p, o: {},
         is_trainable=True,
         train_entry_point=f'{FIXTURES_MODULE}:train_and_save',
-        build_train_payload=lambda i, o, opts: {},
+        dump_train_options=lambda opts: {},
     )
 
     with pytest.raises(RuntimeError):

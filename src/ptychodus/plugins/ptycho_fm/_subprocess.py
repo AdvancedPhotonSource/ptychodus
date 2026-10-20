@@ -46,9 +46,9 @@ from ptychodus.api.reconstruct import (
     TAG_OUTPUT,
     TAG_TRAIN_OUTPUT,
     ReconstructOutput,
+    SubprocessPayload,
     TrainOutput,
 )
-from ._payload import ReconstructPayload, TrainPayload
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +161,7 @@ def _make_inference_dataset(
     return _InMemoryPatternDataset()
 
 
-def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
+def run_reconstruct(payload: SubprocessPayload, queue: Queue[Any]) -> None:
     """Child entry point for one inference pass. Streams a single ReconstructOutput.
 
     ``resolve_inference_model`` picks the model class from the config and
@@ -170,8 +170,7 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
     expected in a plain ptycho_fm checkpoint). Patch prediction is delegated to
     ``iter_object_patch_predictions``; only the stitch is ours.
     """
-    if payload.model_path is None:
-        raise RuntimeError('Cannot reconstruct: no model checkpoint has been loaded.')
+    model_path = payload.require_model_path()
 
     import torch
     from ptychi.image_proc import place_patches_fourier_shift
@@ -184,7 +183,7 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
     )
 
     device = _select_device()
-    config = payload.config
+    config = payload.options
     data_config = config['data']
     inference_config = config['inference']
 
@@ -192,10 +191,10 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
     model, image_size = resolve_inference_model(config)
 
     try:
-        load_checkpoint(model, payload.model_path, device)
+        load_checkpoint(model, model_path, device)
     except RuntimeError as exc:
         raise ValueError(
-            f'Could not load {payload.model_path} into the model selected by '
+            f'Could not load {model_path} into the model selected by '
             f'coupled_decoder_mode={coupled_decoder_mode!r}. A .pth holds a bare state '
             'dict with no mode metadata, so the most common cause is a mode differing '
             'from the one the checkpoint was trained with. Set Coupled Decoder to that '
@@ -203,7 +202,7 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
             'selectable.'
         ) from exc
 
-    parameters = payload.reconstruct_input
+    parameters = payload.require_input()
 
     diff_intensity = zero_bad_pixels(parameters.diffraction_patterns, parameters.bad_pixels)
     diff_intensity = numpy.asarray(diff_intensity, dtype=numpy.float32)
@@ -492,15 +491,15 @@ def _build_param_groups(
     ]
 
 
-def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
+def run_train(payload: SubprocessPayload, queue: Queue[Any]) -> None:
     """Child entry point for one training session.
 
     Single-device, no DDP, no mlflow, no wandb. Builds a CombinedDataset over
-    ``payload.input_path`` (a directory of paired ``*_dp.hdf5`` / ``*_para.hdf5``
+    ``input_directory`` (a directory of paired ``*_dp.hdf5`` / ``*_para.hdf5``
     files -- ptycho_fm's own training format) and runs a lightweight
     train/validate loop directly against the model ``coupled_decoder_mode``
     selects, emitting one :class:`TrainOutput` per epoch. The best checkpoint by validation loss is
-    written to ``payload.output_path/best.pth`` and its path streamed back via
+    written to ``output_directory/best.pth`` and its path streamed back via
     ``TAG_MODEL_SAVED``.
     """
     # Guard the training loop against picking up an in-flight environment: a
@@ -517,23 +516,24 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
     from ptycho_fm.data import CombinedDataset
 
     device = _select_device()
-    config = payload.config
+    input_directory, output_directory = payload.require_directories()
+    config = payload.options
     data_config = config['data']
     training_config = config['training']
     model_config = config['model']
 
-    if not payload.input_path.exists():
-        raise FileNotFoundError(f'Training input directory does not exist: {payload.input_path}')
-    if not payload.input_path.is_dir():
+    if not input_directory.exists():
+        raise FileNotFoundError(f'Training input directory does not exist: {input_directory}')
+    if not input_directory.is_dir():
         raise NotADirectoryError(
             'ptycho_fm training expects a directory of paired *_dp.hdf5 / '
-            f'*_para.hdf5 files; got file: {payload.input_path}'
+            f'*_para.hdf5 files; got file: {input_directory}'
         )
 
-    payload.output_path.mkdir(parents=True, exist_ok=True)
+    output_directory.mkdir(parents=True, exist_ok=True)
 
     dataset = CombinedDataset(
-        file_paths=str(payload.input_path),
+        file_paths=str(input_directory),
         rank=0,
         world_size=1,
         scale=data_config['scale'],
@@ -633,7 +633,7 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
     training_losses: list[LossValue] = []
     validation_losses: list[LossValue] = []
     best_val = float('inf')
-    best_path = payload.output_path / 'best.pth'
+    best_path = output_directory / 'best.pth'
     save_epoch_models = bool(training_config['save_epoch_models'])
     epochs = int(training_config['epochs'])
 
@@ -666,7 +666,7 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
             best_val = val_loss
             _atomic_save_state_dict(model.state_dict(), best_path)
         if save_epoch_models:
-            epoch_path = payload.output_path / f'model_epoch_{epoch + 1:03d}.pth'
+            epoch_path = output_directory / f'model_epoch_{epoch + 1:03d}.pth'
             _atomic_save_state_dict(model.state_dict(), epoch_path)
 
         queue.put(
