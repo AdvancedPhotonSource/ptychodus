@@ -25,7 +25,7 @@ import numpy
 from pydantic import BaseModel
 
 from .assemble import AssembledDiffractionData
-from .diffraction import BadPixels, DiffractionPatterns
+from .diffraction import BadPixels, DetectorBackground, DiffractionPatterns, FlatField
 from .geometry import ImageExtent
 from .object import Object
 from .probe import ProbeEnsemble
@@ -77,11 +77,19 @@ class NoOptions(BaseModel):
 
 @dataclass(frozen=True)
 class ReconstructInput:
-    """All data required to start a reconstruction: patterns, bad-pixel mask, and initial product."""
+    """All data required to start a reconstruction: patterns, bad-pixel mask, and initial product.
+
+    `background` and `flat_field` are measured detector maps the patterns have not
+    been corrected for, on the pattern grid; each is None when absent or already
+    applied. A flat field is the detector's response, so a model prediction is
+    multiplied by it and the background added to compare with the patterns.
+    """
 
     diffraction_patterns: DiffractionPatterns
     bad_pixels: BadPixels
     product: Product
+    background: DetectorBackground | None = None
+    flat_field: FlatField | None = None
 
 
 @dataclass(frozen=True)
@@ -880,7 +888,13 @@ def prepare_reconstruct_input(
         losses=product.losses,
     )
 
-    return ReconstructInput(patterns, assembled_data.get_bad_pixels(), product)
+    return ReconstructInput(
+        patterns,
+        assembled_data.get_bad_pixels(),
+        product,
+        background=assembled_data.get_background(),
+        flat_field=assembled_data.get_flat_field(),
+    )
 
 
 def warn_if_propagation_regime_disagrees(

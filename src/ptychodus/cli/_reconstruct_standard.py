@@ -27,6 +27,7 @@ import numpy
 
 from ptychodus.api.assemble import (
     AssembledDiffractionData,
+    DetectorCorrections,
     assemble_dataset,
     compute_dataset_total_counts,
 )
@@ -60,9 +61,11 @@ from ptychodus.api.simulate.probe import (
 )
 from ptychodus.cli import (
     DirectoryType,
+    add_detector_map_arguments,
     add_log_level_argument,
     configure_logging,
     positive_int,
+    read_detector_corrections,
 )
 from ptychodus.cli._reconstruct_common import (
     add_print_ptychi_options_argument,
@@ -222,6 +225,7 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
             default=profile.default_bad_pixels_reader,
             help='Name of the bad-pixel file reader plugin.',
         )
+        add_detector_map_arguments(parser)
 
     parser.add_argument(
         '--probe-file',
@@ -384,6 +388,8 @@ def _select_patterns(
         pixel_geometry=assembled_data.get_pixel_geometry(),
         bad_pixels=assembled_data.get_bad_pixels(),
         probe_photon_counts=photon_counts,
+        background=assembled_data.get_background(),
+        flat_field=assembled_data.get_flat_field(),
     )
 
 
@@ -394,6 +400,7 @@ def _total_counts_bounds(
     pipeline: DiffractionPrepPipeline | None,
     bad_pixels: BadPixels | None,
     read_region: CropRegion | None,
+    corrections: DetectorCorrections | None = None,
 ) -> tuple[int | None, int | None]:
     """Resolve the total-counts window from --min-total-counts and --dp-mad-k.
 
@@ -410,7 +417,11 @@ def _total_counts_bounds(
 
     logger.info('Measuring per-pattern total counts for the --dp-mad-k window')
     measured = compute_dataset_total_counts(
-        raw_dataset, pipeline, bad_pixels=bad_pixels, read_region=read_region
+        raw_dataset,
+        pipeline,
+        bad_pixels=bad_pixels,
+        read_region=read_region,
+        corrections=corrections,
     )
     mad_lower, mad_upper = _mad_bounds(measured.total_counts.astype(float), args.dp_mad_k)
 
@@ -654,6 +665,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
     )
 
     bad_pixels: BadPixels | None = None
+    corrections: DetectorCorrections | None = None
     pipeline: DiffractionPrepPipeline | None = None
     read_region: CropRegion | None = None
     lower_counts: int | None = None
@@ -683,6 +695,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             )
             bad_pixels = bad_pixels_reader.read(args.bad_pixels_file)
 
+        corrections = read_detector_corrections(registry, args, raw_dataset)
         read_region = resolve_crop_region(
             logger,
             raw_dataset,
@@ -693,7 +706,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             value_filter=value_filter,
         )
         lower_counts, upper_counts = _total_counts_bounds(
-            logger, args, raw_dataset, pipeline, bad_pixels, read_region
+            logger, args, raw_dataset, pipeline, bad_pixels, read_region, corrections
         )
 
     logger.info('Assembling diffraction patterns')
@@ -705,6 +718,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             bad_pixels=bad_pixels,
             raw_pixel_geometry=raw_pixel_geometry,
             read_region=read_region,
+            corrections=corrections,
             total_counts_lower_bound=lower_counts,
             total_counts_upper_bound=upper_counts,
         )

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from itertools import accumulate
 import concurrent.futures
 import logging
@@ -15,6 +15,7 @@ from .constants import format_bytes
 from .diffraction import (
     BadPixels,
     CropRegion,
+    DetectorBackground,
     DiffractionArray,
     DiffractionDataset,
     DiffractionIndexes,
@@ -23,7 +24,9 @@ from .diffraction import (
     DiffractionPatternCounts,
     DiffractionPatternDType,
     DiffractionPatterns,
+    FlatField,
     SimpleDiffractionArray,
+    validate_pixel_map,
 )
 from .geometry import ImageExtent, PixelGeometry
 from .preprocess.diffraction import (
@@ -37,11 +40,13 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     'AssembledDiffractionData',
+    'DetectorCorrections',
     'DiffractionSummary',
     'DiffractionTotalCounts',
     'allocate_assembled_data',
     'assemble_dataset',
     'compute_array_offsets',
+    'compute_assembled_dtype',
     'compute_assembled_patterns_shape',
     'compute_dataset_total_counts',
     'compute_probe_photon_counts_by_index',
@@ -121,12 +126,17 @@ class AssembledDiffractionData:
         pixel_geometry: PixelGeometry,
         bad_pixels: BadPixels,
         probe_photon_counts: DiffractionPatternCounts | None = None,
+        *,
+        background: DetectorBackground | None = None,
+        flat_field: FlatField | None = None,
     ) -> None:
         self._indexes = indexes
         self._patterns = patterns
         self._pixel_geometry = pixel_geometry
         self._bad_pixels = bad_pixels
         self._probe_photon_counts = probe_photon_counts
+        self._background = background
+        self._flat_field = flat_field
 
         if indexes.ndim != 1:
             raise ValueError(
@@ -138,19 +148,10 @@ class AssembledDiffractionData:
                 f'Unexpected number of dimensions for patterns! (actual={patterns.ndim} expected=3)'
             )
 
-        if bad_pixels.ndim != 2:
-            raise ValueError(
-                f'Unexpected number of dimensions for bad pixels! (actual={bad_pixels.ndim} expected=2)'
-            )
-
         if indexes.shape[0] != patterns.shape[0]:
             raise ValueError('Number of indexes does not match number of patterns!')
 
-        if patterns.shape[1:] != bad_pixels.shape:
-            raise ValueError(
-                'Patterns shape does not match bad pixels shape! '
-                f'(actual={patterns.shape[1:]} expected={bad_pixels.shape})'
-            )
+        validate_pixel_map(bad_pixels, patterns.shape[1:], name='Bad pixels')
 
         if probe_photon_counts is not None:
             if probe_photon_counts.ndim != 1:
@@ -167,6 +168,15 @@ class AssembledDiffractionData:
                     'Probe photon counts must be finite and non-negative; '
                     f'got {probe_photon_counts[first]!r} at position {first}.'
                 )
+
+        validate_pixel_map(background, bad_pixels.shape, name='Background')
+        validate_pixel_map(flat_field, bad_pixels.shape, name='Flat field')
+
+        if background is not None and not numpy.isfinite(background).all():
+            raise ValueError('Background must be finite.')
+
+        if flat_field is not None and not numpy.isfinite(flat_field).all():
+            raise ValueError('Flat field must be finite.')
 
     @classmethod
     def create_null(cls) -> AssembledDiffractionData:
@@ -198,6 +208,23 @@ class AssembledDiffractionData:
     def get_bad_pixels(self) -> BadPixels:
         return self._bad_pixels
 
+    def get_background(self) -> DetectorBackground | None:
+        """Processed detector background not yet subtracted from the patterns, if any."""
+        return None if self._background is None else _read_only(self._background)
+
+    def get_flat_field(self) -> FlatField | None:
+        """Processed flat-field response the patterns have not been divided by, if any."""
+        return None if self._flat_field is None else _read_only(self._flat_field)
+
+    def add_bad_pixels(self, bad_pixels: BadPixels) -> None:
+        """Mark more pixels bad, in addition to those already masked.
+
+        The mask is replaced rather than written in place, since the array held here
+        may be shared with whoever supplied it.
+        """
+        validate_pixel_map(bad_pixels, self._bad_pixels.shape, name='Bad pixels')
+        self._bad_pixels = numpy.logical_or(self._bad_pixels, bad_pixels)
+
     def assemble(self, data: AssembledDiffractionData, offset: int) -> AssembledDiffractionData:
         """Scatter a dense block into this buffer at `offset` and return a read-only view."""
         assembled_indexes = slice(offset, offset + len(data._indexes))
@@ -219,6 +246,8 @@ class AssembledDiffractionData:
             pixel_geometry=self._pixel_geometry,
             bad_pixels=data._bad_pixels,
             probe_photon_counts=probe_photon_counts_view,
+            background=self._background,
+            flat_field=self._flat_field,
         )
 
     def _every_slot_assembled(self) -> bool:
@@ -319,6 +348,10 @@ class AssembledDiffractionData:
         sz = self._indexes.nbytes + self._patterns.nbytes + self._bad_pixels.nbytes
         if self._probe_photon_counts is not None:
             sz += self._probe_photon_counts.nbytes
+        if self._background is not None:
+            sz += self._background.nbytes
+        if self._flat_field is not None:
+            sz += self._flat_field.nbytes
         return sz
 
     def __str__(self) -> str:
@@ -337,11 +370,187 @@ def compute_array_offsets(metadata: DiffractionMetadata) -> Sequence[int]:
     return list(accumulate(metadata.num_patterns_per_array, initial=0))
 
 
+@dataclass(frozen=True)
+class DetectorCorrections:
+    """A measured detector background and flat field, and whether to apply them.
+
+    The flat field is the detector's response to uniform illumination, so a pattern
+    is corrected as ``(pattern - background) / flat_field`` and clipped at zero.
+    Correction happens after the preprocessing pipeline, with both maps carried
+    through it, so value filters and bad-pixel repair act on measured counts. Maps
+    that are not applied travel with the assembled data instead, for consumers that
+    model them.
+
+    The maps start on the raw detector extent (see :meth:`crop` and
+    :meth:`through_pipeline`). A non-finite map entry marks its pixel bad, as does a
+    flat-field response at or below `flat_field_floor` when dividing, because
+    dividing by it would amplify noise without bound; values at those pixels are
+    never used.
+    """
+
+    background: DetectorBackground | None = None
+    flat_field: FlatField | None = None
+    subtract_background: bool = False
+    divide_flat_field: bool = False
+    flat_field_floor: float = 1.0e-3
+
+    @classmethod
+    def create_null(cls) -> DetectorCorrections:
+        """No maps, so nothing is applied or carried."""
+        return cls()
+
+    @property
+    def applies_background(self) -> bool:
+        return self.subtract_background and self.background is not None
+
+    @property
+    def applies_flat_field(self) -> bool:
+        return self.divide_flat_field and self.flat_field is not None
+
+    def apply_to_dtype(self, dtype: numpy.dtype) -> numpy.dtype:
+        """Return the pattern dtype after correction: floating once anything is applied."""
+        if not (self.applies_background or self.applies_flat_field):
+            return dtype
+
+        return numpy.dtype(numpy.float64 if dtype == numpy.float64 else numpy.float32)
+
+    def apply_to_bad_pixels(self, bad_pixels: BadPixels) -> BadPixels:
+        """Return `bad_pixels` widened by the pixels whose map entries are unusable."""
+        widened = bad_pixels
+
+        if self.background is not None:
+            widened = numpy.logical_or(widened, numpy.logical_not(numpy.isfinite(self.background)))
+
+        if self.flat_field is not None:
+            unusable = numpy.logical_not(numpy.isfinite(self.flat_field))
+
+            if self.divide_flat_field:
+                unusable = numpy.logical_or(
+                    unusable, numpy.nan_to_num(self.flat_field, nan=0.0) <= self.flat_field_floor
+                )
+
+            widened = numpy.logical_or(widened, unusable)
+
+        return widened
+
+    def apply(self, patterns: DiffractionPatterns) -> DiffractionPatterns:
+        """Subtract and divide as configured, clipping at zero; a no-op when nothing applies.
+
+        The maps must be on the same grid as `patterns`. Values at pixels
+        :meth:`apply_to_bad_pixels` flags are meaningless, as they are for any bad pixel.
+        """
+        background = self.background if self.subtract_background else None
+        flat_field = self.flat_field if self.divide_flat_field else None
+
+        if background is None and flat_field is None:
+            return patterns
+
+        corrected = patterns.astype(self.apply_to_dtype(patterns.dtype))
+
+        if background is not None:
+            neutral_background = numpy.nan_to_num(background, nan=0.0, posinf=0.0, neginf=0.0)
+            corrected -= neutral_background.astype(corrected.dtype)
+
+        if flat_field is not None:
+            neutral_flat_field = numpy.nan_to_num(flat_field, nan=1.0, posinf=1.0, neginf=1.0)
+            divisor = numpy.where(
+                neutral_flat_field > self.flat_field_floor, neutral_flat_field, 1.0
+            )
+            corrected /= divisor.astype(corrected.dtype)
+
+        numpy.clip(corrected, 0, None, out=corrected)
+        return corrected
+
+    def crop(self, read_region: CropRegion | None) -> DetectorCorrections:
+        """Return these corrections with both maps cut to `read_region`."""
+        if read_region is None:
+            return self
+
+        return replace(
+            self,
+            background=None if self.background is None else read_region.apply_to(self.background),
+            flat_field=None if self.flat_field is None else read_region.apply_to(self.flat_field),
+        )
+
+    def through_pipeline(self, pipeline: DiffractionPrepPipeline | None) -> DetectorCorrections:
+        """Return these corrections with both maps carried onto the pipeline's output grid.
+
+        The background is summed wherever the pipeline combines pixels and is zero
+        where it pads; the flat field is averaged and is one where it pads. Non-finite
+        entries become neutral values, since their pixels are bad.
+        """
+        background = None
+        flat_field = None
+
+        if self.background is not None:
+            background = numpy.nan_to_num(self.background, nan=0.0, posinf=0.0, neginf=0.0)
+
+            if pipeline is not None:
+                background = pipeline.apply_to_pixel_map(background)
+
+        if self.flat_field is not None:
+            flat_field = numpy.nan_to_num(self.flat_field, nan=1.0, posinf=1.0, neginf=1.0)
+
+            if pipeline is not None:
+                summed = pipeline.apply_to_pixel_map(flat_field)
+                weights = pipeline.apply_to_pixel_map(numpy.ones_like(flat_field))
+                flat_field = numpy.divide(
+                    summed, weights, out=numpy.ones_like(summed), where=weights > 0
+                )
+
+        return replace(self, background=background, flat_field=flat_field)
+
+
+@dataclass(frozen=True)
+class _ResolvedCorrections:
+    """Corrections cut to the read region, and the same carried through the pipeline.
+
+    `raw` widens the raw bad-pixel mask; `processed` corrects the processed patterns.
+    The carried maps are the processed ones that are not applied.
+    """
+
+    raw: DetectorCorrections
+    processed: DetectorCorrections
+
+    @property
+    def carried_background(self) -> DetectorBackground | None:
+        return None if self.processed.applies_background else self.processed.background
+
+    @property
+    def carried_flat_field(self) -> FlatField | None:
+        return None if self.processed.applies_flat_field else self.processed.flat_field
+
+
+def _resolve_corrections(
+    dataset: DiffractionDataset,
+    pipeline: DiffractionPrepPipeline | None,
+    corrections: DetectorCorrections | None,
+    read_region: CropRegion | None = None,
+) -> _ResolvedCorrections:
+    """Return corrections cropped to `read_region`, and carried through `pipeline`.
+
+    None means the dataset's own maps, carried rather than applied.
+    """
+    if corrections is None:
+        corrections = DetectorCorrections(
+            background=dataset.get_background(), flat_field=dataset.get_flat_field()
+        )
+
+    expected_shape = dataset.get_metadata().detector_extent.get_shape()
+
+    validate_pixel_map(corrections.background, expected_shape, name='Background')
+    validate_pixel_map(corrections.flat_field, expected_shape, name='Flat field')
+
+    raw = corrections.crop(read_region)
+    return _ResolvedCorrections(raw, raw.through_pipeline(pipeline))
+
+
 def _resolve_bad_pixels(
     dataset: DiffractionDataset,
     pipeline: DiffractionPrepPipeline | None,
     bad_pixels: BadPixels | None,
     read_region: CropRegion | None = None,
+    corrections: DetectorCorrections | None = None,
 ) -> tuple[BadPixels, BadPixels]:
     """Return the (raw-in-read-region, processed) bad-pixel masks for a dataset.
 
@@ -349,18 +558,20 @@ def _resolve_bad_pixels(
     returned pair matches what a reader with load-time cropping delivers: the
     "raw" mask is the cropped detector mask (still pre-pipeline), and the
     "processed" mask is that cropped mask run through the pipeline.
+
+    `corrections`, already cropped to `read_region`, widen the raw mask by the
+    pixels whose map entries are unusable before the pipeline runs.
     """
     raw_bad_pixels = dataset.get_bad_pixels() if bad_pixels is None else bad_pixels
     expected_shape = dataset.get_metadata().detector_extent.get_shape()
 
-    if raw_bad_pixels.shape != expected_shape:
-        raise ValueError(
-            'Bad pixels shape does not match the detector extent! '
-            f'(actual={raw_bad_pixels.shape} expected={expected_shape})'
-        )
+    validate_pixel_map(raw_bad_pixels, expected_shape, name='Bad pixels')
 
     if read_region is not None:
         raw_bad_pixels = read_region.apply_to(raw_bad_pixels)
+
+    if corrections is not None:
+        raw_bad_pixels = corrections.apply_to_bad_pixels(raw_bad_pixels)
 
     processed_bad_pixels = (
         raw_bad_pixels if pipeline is None else pipeline.apply_to_mask(raw_bad_pixels)
@@ -398,7 +609,7 @@ def compute_assembled_patterns_shape(
 
     The frame dimensions come from the *processed* bad-pixel mask, so they already
     account for load-time cropping (`read_region`), binning, padding, and
-    transposition.
+    transposition. Detector corrections never change the shape.
     """
     _, processed_bad_pixels = _resolve_bad_pixels(dataset, pipeline, bad_pixels, read_region)
     num_patterns_total = sum(dataset.get_metadata().num_patterns_per_array)
@@ -415,6 +626,7 @@ def allocate_assembled_data(
     patterns: DiffractionPatterns | None = None,
     dtype: DiffractionPatternDType | None = None,
     read_region: CropRegion | None = None,
+    corrections: DetectorCorrections | None = None,
 ) -> AssembledDiffractionData:
     """Allocate an empty buffer sized for the whole dataset.
 
@@ -424,22 +636,28 @@ def allocate_assembled_data(
     file for no benefit.
 
     `raw_pixel_geometry` is the *raw* detector geometry; the value stored on the
-    result is the processed one. `dtype` defaults to
-    ``pipeline.compute_output_dtype(metadata.pattern_dtype)``.
+    result is the processed one. `dtype` defaults to :func:`compute_assembled_dtype`.
+
+    `corrections` of None means the dataset's own background and flat field,
+    carried rather than applied. Whichever maps are not applied are stored on the
+    result in processed coordinates; the stored mask includes the pixels the maps
+    make unusable.
     """
     metadata = dataset.get_metadata()
-    _, processed_bad_pixels = _resolve_bad_pixels(dataset, pipeline, bad_pixels, read_region)
+    resolved = _resolve_corrections(dataset, pipeline, corrections, read_region)
+    _, processed_bad_pixels = _resolve_bad_pixels(
+        dataset, pipeline, bad_pixels, read_region, resolved.raw
+    )
     pixel_geometry = _resolve_pixel_geometry(metadata, pipeline, raw_pixel_geometry)
 
     num_patterns_total = sum(metadata.num_patterns_per_array)
     height, width = processed_bad_pixels.shape
     patterns_shape = (num_patterns_total, height, width)
-    if dtype is not None:
-        patterns_dtype = dtype
-    elif pipeline is not None:
-        patterns_dtype = pipeline.compute_output_dtype(metadata.pattern_dtype)
-    else:
-        patterns_dtype = metadata.pattern_dtype
+    patterns_dtype = (
+        compute_assembled_dtype(dataset, pipeline, corrections=resolved.raw)
+        if dtype is None
+        else dtype
+    )
 
     if patterns is None:
         logger.debug(f'Allocating {patterns_shape} {patterns_dtype} patterns buffer')
@@ -476,7 +694,81 @@ def allocate_assembled_data(
         pixel_geometry,
         processed_bad_pixels,
         probe_photon_counts=probe_photon_counts,
+        background=resolved.carried_background,
+        flat_field=resolved.carried_flat_field,
     )
+
+
+def compute_assembled_dtype(
+    dataset: DiffractionDataset,
+    pipeline: DiffractionPrepPipeline | None = None,
+    *,
+    corrections: DetectorCorrections | None = None,
+) -> DiffractionPatternDType:
+    """Return the pattern dtype an assembled buffer needs to hold every result.
+
+    The pipeline widens the measured dtype for any step that sums; detector
+    corrections, applied after it, then make the patterns floating point.
+    """
+    dtype = dataset.get_metadata().pattern_dtype
+
+    if pipeline is not None:
+        dtype = pipeline.compute_output_dtype(dtype)
+
+    return dtype if corrections is None else corrections.apply_to_dtype(dtype)
+
+
+def _zero_nonfinite_values(
+    patterns: DiffractionPatterns,
+) -> tuple[DiffractionPatterns, BadPixels | None]:
+    """Zero every NaN or infinite value, and return the pixels that held one in any frame.
+
+    Integer patterns cannot hold such values and are returned untouched, as are
+    floating patterns that hold none; the second element is then None.
+    """
+    if not numpy.issubdtype(patterns.dtype, numpy.inexact):
+        return patterns, None
+
+    nonfinite = numpy.logical_not(numpy.isfinite(patterns))
+
+    if not nonfinite.any():
+        return patterns, None
+
+    cleaned = patterns.copy()
+    cleaned[nonfinite] = 0
+    nonfinite_pixels: BadPixels = numpy.any(nonfinite, axis=0)
+    return cleaned, nonfinite_pixels
+
+
+def _with_nonfinite_pixels(
+    processed_bad_pixels: BadPixels,
+    pipeline: DiffractionPrepPipeline | None,
+    nonfinite_pixels: BadPixels | None,
+) -> BadPixels:
+    """Return the processed mask widened by raw-coordinate non-finite pixels."""
+    if nonfinite_pixels is None:
+        return processed_bad_pixels
+
+    processed_nonfinite = (
+        nonfinite_pixels if pipeline is None else pipeline.apply_to_mask(nonfinite_pixels)
+    )
+    return numpy.logical_or(processed_bad_pixels, processed_nonfinite)
+
+
+@dataclass(frozen=True)
+class _PreprocessedPatterns:
+    """One array after preprocessing, with the masks that apply to it.
+
+    `bad_pixels` is the processed mask for this array: the dataset mask widened by
+    any pixel that held a non-finite value here. `nonfinite_pixels` holds those
+    pixels in raw (read-region) coordinates, or None when there were none.
+    """
+
+    indexes: DiffractionIndexes
+    patterns: DiffractionPatterns
+    probe_photon_counts: DiffractionPatternCounts | None
+    bad_pixels: BadPixels
+    nonfinite_pixels: BadPixels | None
 
 
 def _preprocess_patterns(
@@ -489,7 +781,8 @@ def _preprocess_patterns(
     total_counts_upper_bound: int | None = None,
     exposure_time_s: float | None = None,
     read_region: CropRegion | None = None,
-) -> tuple[DiffractionIndexes, DiffractionPatterns, DiffractionPatternCounts | None]:
+    corrections: DetectorCorrections | None = None,
+) -> _PreprocessedPatterns:
     """Read one array and run the preprocessing pipeline over it.
 
     The geometry-free core of :func:`preprocess_array`: everything that shapes the
@@ -506,6 +799,14 @@ def _preprocess_patterns(
     matches full-frame preprocessing followed by cropping. Patterns outside the
     (inclusive) total-counts bounds are dropped after the pipeline runs.
 
+    A NaN or infinite value is zeroed before anything else touches it, and its
+    pixel is masked for this array; the pixel is reported back so a caller can
+    mask it for the whole dataset.
+
+    `corrections`, already on the pipeline's output grid, are applied after the
+    pipeline and before the total-counts filter; the masks must already include the
+    pixels the corrections make unusable (see :func:`_resolve_bad_pixels`).
+
     When ``array`` provides per-pattern probe photon flux (Hz) and
     ``exposure_time_s`` is a positive number, the flux is converted to per-pattern
     photon counts and attached to the returned block. A reader that reports flux
@@ -513,7 +814,10 @@ def _preprocess_patterns(
     that array.
     """
     label = array.get_label()
-    raw_patterns = array.get_patterns(read_region=read_region)
+    raw_patterns, nonfinite_pixels = _zero_nonfinite_values(
+        array.get_patterns(read_region=read_region)
+    )
+    block_bad_pixels = _with_nonfinite_pixels(processed_bad_pixels, pipeline, nonfinite_pixels)
 
     # Zero bad pixels before the pipeline so saturated values don't leak into
     # neighboring bins under bin/pad/flip/transpose. When read_region is set,
@@ -523,6 +827,9 @@ def _preprocess_patterns(
     processed_array = loaded_array if pipeline is None else pipeline(loaded_array)
     indexes = processed_array.get_indexes()
     patterns = processed_array.get_patterns()
+
+    if corrections is not None:
+        patterns = corrections.apply(patterns)
 
     probe_photon_counts: DiffractionPatternCounts | None = None
     probe_photon_flux_per_s = array.get_probe_photon_flux_per_s()
@@ -541,7 +848,7 @@ def _preprocess_patterns(
     upper = total_counts_upper_bound
 
     if lower is not None or upper is not None:
-        counts = compute_total_counts(patterns, processed_bad_pixels)
+        counts = compute_total_counts(patterns, block_bad_pixels)
         keep = numpy.ones(len(counts), dtype=bool)
 
         if lower is not None:
@@ -574,7 +881,13 @@ def _preprocess_patterns(
             if probe_photon_counts is not None:
                 probe_photon_counts = probe_photon_counts[keep]
 
-    return indexes, patterns, probe_photon_counts
+    return _PreprocessedPatterns(
+        indexes=indexes,
+        patterns=patterns,
+        probe_photon_counts=probe_photon_counts,
+        bad_pixels=block_bad_pixels,
+        nonfinite_pixels=nonfinite_pixels,
+    )
 
 
 def preprocess_array(
@@ -588,14 +901,20 @@ def preprocess_array(
     total_counts_upper_bound: int | None = None,
     exposure_time_s: float | None = None,
     read_region: CropRegion | None = None,
+    corrections: DetectorCorrections | None = None,
+    on_nonfinite_pixels: Callable[[BadPixels], None] | None = None,
 ) -> AssembledDiffractionData:
     """Preprocess one array into a dense block of patterns with its pixel geometry.
 
     Wraps :func:`_preprocess_patterns` -- which documents the preprocessing
     itself -- and folds `pipeline` through `raw_pixel_geometry` so the returned
     block carries the processed geometry matching its patterns.
+
+    The returned block's mask includes any pixel that held a NaN or infinite value
+    in this array. Those pixels are also passed, in raw read-region coordinates, to
+    `on_nonfinite_pixels` when there are any.
     """
-    indexes, patterns, probe_photon_counts = _preprocess_patterns(
+    preprocessed = _preprocess_patterns(
         array,
         pipeline,
         raw_bad_pixels=raw_bad_pixels,
@@ -604,18 +923,23 @@ def preprocess_array(
         total_counts_upper_bound=total_counts_upper_bound,
         exposure_time_s=exposure_time_s,
         read_region=read_region,
+        corrections=corrections,
     )
+
+    if preprocessed.nonfinite_pixels is not None and on_nonfinite_pixels is not None:
+        on_nonfinite_pixels(preprocessed.nonfinite_pixels)
+
     pixel_geometry = (
         raw_pixel_geometry
         if pipeline is None
         else pipeline.compute_output_pixel_geometry(raw_pixel_geometry)
     )
     return AssembledDiffractionData(
-        indexes=indexes,
-        patterns=patterns,
+        indexes=preprocessed.indexes,
+        patterns=preprocessed.patterns,
         pixel_geometry=pixel_geometry,
-        bad_pixels=processed_bad_pixels,
-        probe_photon_counts=probe_photon_counts,
+        bad_pixels=preprocessed.bad_pixels,
+        probe_photon_counts=preprocessed.probe_photon_counts,
     )
 
 
@@ -722,6 +1046,43 @@ def _map_arrays(
                 cancelled = True
 
 
+class _NonfinitePixelUnion:
+    """Thread-safe union of the raw-coordinate non-finite pixels found across arrays."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._pixels: BadPixels | None = None
+
+    def add(self, nonfinite_pixels: BadPixels) -> None:
+        with self._lock:
+            if self._pixels is None:
+                self._pixels = nonfinite_pixels.copy()
+            else:
+                numpy.logical_or(self._pixels, nonfinite_pixels, out=self._pixels)
+
+    def get(self) -> BadPixels | None:
+        return self._pixels
+
+
+def _embed_in_detector(
+    pixels: BadPixels, detector_extent: ImageExtent, read_region: CropRegion | None
+) -> BadPixels:
+    """Place a read-region mask into a detector-extent mask that is False elsewhere."""
+    if read_region is None:
+        return pixels
+
+    embedded = numpy.zeros(detector_extent.get_shape(), dtype=numpy.bool_)
+    read_region.apply_to(embedded)[...] = pixels
+    return embedded
+
+
+def _warn_nonfinite_pixels(nonfinite_pixels: BadPixels) -> None:
+    logger.warning(
+        f'Masked {int(numpy.count_nonzero(nonfinite_pixels))} detector pixel(s) holding'
+        ' NaN or infinite values; those values were zeroed.'
+    )
+
+
 def assemble_dataset(
     dataset: DiffractionDataset,
     pipeline: DiffractionPrepPipeline | None = None,
@@ -732,7 +1093,9 @@ def assemble_dataset(
     total_counts_lower_bound: int | None = None,
     total_counts_upper_bound: int | None = None,
     read_region: CropRegion | None = None,
+    corrections: DetectorCorrections | None = None,
     on_array_assembled: Callable[[int, str, AssembledDiffractionData], None] | None = None,
+    on_nonfinite_pixels: Callable[[BadPixels], None] | None = None,
     on_progress: Callable[[int, int], None] | None = None,
     on_array_error: Callable[[int, str, Exception], None] | None = None,
     should_stop: Callable[[], bool] | None = None,
@@ -741,9 +1104,17 @@ def assemble_dataset(
     """Load, preprocess, and assemble every array of a dataset on a thread pool.
 
     Pass `out` to assemble into a buffer you allocated yourself (see
-    :func:`allocate_assembled_data`); it is returned unchanged, and its pixel
-    geometry wins over `raw_pixel_geometry`. Otherwise a fresh buffer is
-    allocated and returned.
+    :func:`allocate_assembled_data`), with the same `corrections`; it is returned,
+    and its pixel geometry wins over `raw_pixel_geometry`. Otherwise a fresh buffer
+    is allocated and returned. `corrections` of None means the dataset's own maps,
+    carried rather than applied.
+
+    A pixel holding a NaN or infinite value in any frame is masked for the whole
+    dataset once every array is assembled, and its values are zeroed. The returned
+    buffer's mask includes those pixels, and they are passed, in detector-extent
+    coordinates, to `on_nonfinite_pixels` when there are any. Arrays assembled
+    before such a pixel turned up were filtered on total counts that still
+    included it.
 
     A missing array is logged and skipped. Any other per-array exception is
     reported through `on_array_error` and does not abort the remaining arrays --
@@ -761,8 +1132,9 @@ def assemble_dataset(
             f'(actual={num_arrays} expected at most {len(num_patterns_per_array)})'
         )
 
+    resolved = _resolve_corrections(dataset, pipeline, corrections, read_region)
     raw_bad_pixels, processed_bad_pixels = _resolve_bad_pixels(
-        dataset, pipeline, bad_pixels, read_region
+        dataset, pipeline, bad_pixels, read_region, resolved.raw
     )
 
     if out is None:
@@ -772,6 +1144,7 @@ def assemble_dataset(
             bad_pixels=bad_pixels,
             raw_pixel_geometry=raw_pixel_geometry,
             read_region=read_region,
+            corrections=corrections,
         )
     else:
         data = out
@@ -780,6 +1153,7 @@ def assemble_dataset(
     # is overwritten when scattered.
     block_pixel_geometry = _resolve_pixel_geometry(metadata, None, raw_pixel_geometry)
     offsets = compute_array_offsets(metadata)
+    nonfinite_union = _NonfinitePixelUnion()
 
     def load_array(array_index: int, array: DiffractionArray) -> None:
         label = array.get_label()
@@ -793,6 +1167,8 @@ def assemble_dataset(
             total_counts_upper_bound=total_counts_upper_bound,
             exposure_time_s=metadata.exposure_time_s,
             read_region=read_region,
+            corrections=resolved.processed,
+            on_nonfinite_pixels=nonfinite_union.add,
         )
         num_patterns = block.get_patterns_shape()[0]
         capacity = num_patterns_per_array[array_index]
@@ -816,6 +1192,19 @@ def assemble_dataset(
         should_stop=should_stop,
         max_workers=max_workers,
     )
+
+    nonfinite_pixels = nonfinite_union.get()
+
+    if nonfinite_pixels is not None:
+        _warn_nonfinite_pixels(nonfinite_pixels)
+        data.add_bad_pixels(
+            _with_nonfinite_pixels(processed_bad_pixels, pipeline, nonfinite_pixels)
+        )
+
+        if on_nonfinite_pixels is not None:
+            on_nonfinite_pixels(
+                _embed_in_detector(nonfinite_pixels, metadata.detector_extent, read_region)
+            )
 
     return data
 
@@ -900,7 +1289,8 @@ def summarize_dataset(
     Streams the arrays on a thread pool so the full dataset never has to be held
     in memory. Bad-pixel positions in the frame-shaped min/mean/max arrays are
     inpainted with biharmonic fill; per-pattern totals are summed over the good
-    pixels only.
+    pixels only. A pixel holding a NaN or infinite value in any frame is zeroed
+    and treated as bad, as :func:`assemble_dataset` treats it.
 
     Per-pattern results are written at the offsets metadata reserves and then
     compacted, so they come back in array order whatever the completion order,
@@ -927,9 +1317,10 @@ def summarize_dataset(
 
     statistics = _FrameStatistics(height, width)
     offsets = compute_array_offsets(metadata)
+    nonfinite_union = _NonfinitePixelUnion()
 
     def summarize_array(array_index: int, array: DiffractionArray) -> None:
-        patterns = array.get_patterns()
+        patterns, nonfinite_pixels = _zero_nonfinite_values(array.get_patterns())
         num_patterns = patterns.shape[0]
 
         if num_patterns == 0:
@@ -946,13 +1337,18 @@ def summarize_dataset(
         # Reduce before publishing anything, so a read that fails partway leaves
         # this array's slots untouched rather than half-filled.
         array_indexes = array.get_indexes()
-        array_total_counts = compute_total_counts(patterns, raw_bad_pixels)
+        array_total_counts = compute_total_counts(
+            patterns, _with_nonfinite_pixels(raw_bad_pixels, None, nonfinite_pixels)
+        )
 
         offset = offsets[array_index]
         stop = offset + num_patterns
         indexes[offset:stop] = array_indexes
         total_counts[offset:stop] = array_total_counts
         statistics.add(patterns)
+
+        if nonfinite_pixels is not None:
+            nonfinite_union.add(nonfinite_pixels)
 
     _map_arrays(
         dataset,
@@ -978,11 +1374,17 @@ def summarize_dataset(
         )
 
     minimum_frame, mean_frame, maximum_frame = frames
+    nonfinite_pixels = nonfinite_union.get()
+
+    if nonfinite_pixels is not None:
+        _warn_nonfinite_pixels(nonfinite_pixels)
+
+    summary_bad_pixels = _with_nonfinite_pixels(raw_bad_pixels, None, nonfinite_pixels)
 
     return DiffractionSummary(
-        minimum_pattern=inpaint_bad_pixels(minimum_frame, raw_bad_pixels),
-        mean_pattern=inpaint_bad_pixels(mean_frame, raw_bad_pixels),
-        maximum_pattern=inpaint_bad_pixels(maximum_frame, raw_bad_pixels),
+        minimum_pattern=inpaint_bad_pixels(minimum_frame, summary_bad_pixels),
+        mean_pattern=inpaint_bad_pixels(mean_frame, summary_bad_pixels),
+        maximum_pattern=inpaint_bad_pixels(maximum_frame, summary_bad_pixels),
         indexes=indexes[summarized],
         total_counts=total_counts[summarized],
     )
@@ -1009,6 +1411,7 @@ def compute_dataset_total_counts(
     *,
     bad_pixels: BadPixels | None = None,
     read_region: CropRegion | None = None,
+    corrections: DetectorCorrections | None = None,
     on_progress: Callable[[int, int], None] | None = None,
     on_array_error: Callable[[int, str, Exception], None] | None = None,
     should_stop: Callable[[], bool] | None = None,
@@ -1045,8 +1448,9 @@ def compute_dataset_total_counts(
             f'(actual={num_arrays} expected at most {len(num_patterns_per_array)})'
         )
 
+    resolved = _resolve_corrections(dataset, pipeline, corrections, read_region)
     raw_bad_pixels, processed_bad_pixels = _resolve_bad_pixels(
-        dataset, pipeline, bad_pixels, read_region
+        dataset, pipeline, bad_pixels, read_region, resolved.raw
     )
 
     num_patterns_total = sum(num_patterns_per_array)
@@ -1056,14 +1460,16 @@ def compute_dataset_total_counts(
     offsets = compute_array_offsets(metadata)
 
     def count_array(array_index: int, array: DiffractionArray) -> None:
-        array_indexes, patterns, _ = _preprocess_patterns(
+        preprocessed = _preprocess_patterns(
             array,
             pipeline,
             raw_bad_pixels=raw_bad_pixels,
             processed_bad_pixels=processed_bad_pixels,
             exposure_time_s=metadata.exposure_time_s,
             read_region=read_region,
+            corrections=resolved.processed,
         )
+        array_indexes = preprocessed.indexes
         num_patterns = len(array_indexes)
 
         if num_patterns == 0:
@@ -1080,7 +1486,7 @@ def compute_dataset_total_counts(
         # Reduce before publishing anything, so a read that fails partway leaves
         # this array's slots untouched rather than half-filled. This is the same
         # reduction AssembledDiffractionData.get_total_counts delegates to.
-        array_total_counts = compute_total_counts(patterns, processed_bad_pixels)
+        array_total_counts = compute_total_counts(preprocessed.patterns, preprocessed.bad_pixels)
 
         offset = offsets[array_index]
         stop = offset + num_patterns

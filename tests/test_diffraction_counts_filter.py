@@ -467,6 +467,16 @@ def test_service_caches_counts_against_the_processing_settings() -> None:
     assert not service.is_total_counts_stale(0)
 
 
+def test_detector_correction_settings_invalidate_cached_counts() -> None:
+    """Subtracting a background changes the counts, so the cache must not survive it."""
+    service, detector_settings = _summary_service(_known_counts_dataset(pixel_geometry=None))
+    service.compute_total_counts(0)
+
+    detector_settings.subtract_background.set_value(True)
+
+    assert service.is_total_counts_stale(0)
+
+
 # ---------- Error attribution ----------
 
 

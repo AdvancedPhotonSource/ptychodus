@@ -5,12 +5,14 @@ import time
 
 from pydantic import BaseModel
 
+from ptychodus.api.io import save_cxi_reconstruct_input
 from ptychodus.api.reconstruct import (
     NullReconstructor,
     PositionIndexFilter,
     ReconstructInput,
     Reconstructor,
     ReconstructorLibrary,
+    SubprocessReconstructor,
     TrainableReconstructor,
     prepare_reconstruct_input,
 )
@@ -30,6 +32,16 @@ from .monitor import (
 )
 
 logger = logging.getLogger(__name__)
+
+_CXI_FILE_TYPE = 'CXI'
+
+
+def _is_trainable(reconstructor: Reconstructor) -> bool:
+    """Whether a reconstructor can train; a subprocess reconstructor says so itself."""
+    if isinstance(reconstructor, SubprocessReconstructor):
+        return reconstructor.is_trainable
+
+    return isinstance(reconstructor, TrainableReconstructor)
 
 
 def _algorithm_tag(library: str, algorithm: str) -> str:
@@ -287,6 +299,22 @@ class ProcessingAPI:
         )
         toc = time.perf_counter()
         logger.info(f'Data preparation time {toc - tic:.4f} seconds.')
+
+        carried: list[str] = []
+
+        if reconstruct_input.background is not None:
+            carried.append('background')
+
+        if reconstruct_input.flat_field is not None:
+            carried.append('flat field')
+
+        if carried:
+            logger.info(
+                f'The patterns carry an unapplied {" and ".join(carried)}; a reconstructor'
+                ' that does not model it ignores it. Enable the detector correction to'
+                ' apply it to the patterns instead.'
+            )
+
         return reconstruct_input
 
     def reconstruct(
@@ -401,24 +429,42 @@ class ProcessingAPI:
         library: str | None = None,
         algorithm: str | None = None,
         index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
+        file_type: str | None = None,
     ) -> None:
+        """Export what the current trainable reconstructor would train on.
+
+        `file_type` of None writes the reconstructor's own format; ``'CXI'`` writes a
+        standard CXI file holding the patterns, mask, detector maps and initial
+        product, with a ``.cxi`` suffix added when the path has none.
+        """
         self.set_reconstructor_if_provided(library=library, algorithm=algorithm)
         trainer = self._algorithm_parameter.get_current_reconstructor()
 
-        if isinstance(trainer, TrainableReconstructor):
-            reconstruct_input = self.get_reconstruct_input(
-                product_index=product_index,
-                index_filter=index_filter,
-            )
+        if not _is_trainable(trainer):
+            logger.warning('Algorithm is not trainable!')
+            return
 
-            logger.info('Exporting...')
-            tic = time.perf_counter()
+        if file_type is not None and file_type.casefold() != _CXI_FILE_TYPE.casefold():
+            raise ValueError(f'Unknown training data file type "{file_type}".')
+
+        reconstruct_input = self.get_reconstruct_input(
+            product_index=product_index,
+            index_filter=index_filter,
+        )
+
+        logger.info('Exporting...')
+        tic = time.perf_counter()
+
+        if file_type is None:
+            assert isinstance(trainer, TrainableReconstructor)
             options = self._options_for(trainer)
             trainer.export_training_data(file_path, reconstruct_input, options=options)
-            toc = time.perf_counter()
-            logger.info(f'Export time {toc - tic:.4f} seconds.')
         else:
-            logger.warning('Algorithm is not trainable!')
+            cxi_path = file_path if file_path.suffix else file_path.with_suffix('.cxi')
+            save_cxi_reconstruct_input(cxi_path, reconstruct_input)
+
+        toc = time.perf_counter()
+        logger.info(f'Export time {toc - tic:.4f} seconds.')
 
     def train(
         self,
@@ -458,18 +504,30 @@ class ProcessingAPI:
         else:
             logger.warning('Algorithm is not trainable!')
 
-    def get_training_data_file_filter(
+    def get_training_data_file_filters(
         self, *, library: str | None = None, algorithm: str | None = None
-    ) -> str:
+    ) -> dict[str, str | None]:
+        """Map each file-dialog name filter to the `file_type` that exports it.
+
+        The reconstructor's own format comes first, keyed to None, then CXI. A
+        reconstructor that is not trainable offers nothing.
+        """
         self.set_reconstructor_if_provided(library=library, algorithm=algorithm)
         trainer = self._algorithm_parameter.get_current_reconstructor()
 
-        if isinstance(trainer, TrainableReconstructor):
-            return trainer.get_training_data_file_filter()
-        else:
+        if not _is_trainable(trainer):
             logger.warning('Algorithm is not trainable!')
+            return {}
 
-        return ''
+        assert isinstance(trainer, TrainableReconstructor)
+        filters: dict[str, str | None] = {}
+        native_filter = trainer.get_training_data_file_filter()
+
+        if native_filter:
+            filters[native_filter] = None
+
+        filters['Coherent X-ray Imaging Files (*.cxi)'] = _CXI_FILE_TYPE
+        return filters
 
     def get_model_file_filter(
         self, *, library: str | None = None, algorithm: str | None = None

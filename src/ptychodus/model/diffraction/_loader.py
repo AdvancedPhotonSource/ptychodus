@@ -3,7 +3,7 @@ from collections.abc import Callable
 import logging
 import threading
 
-from ptychodus.api.assemble import AssembledDiffractionData, assemble_dataset
+from ptychodus.api.assemble import AssembledDiffractionData, DetectorCorrections, assemble_dataset
 from ptychodus.api.diffraction import BadPixels, CropRegion, DiffractionDataset
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.preprocess.diffraction import DiffractionPrepPipeline
@@ -34,7 +34,9 @@ class LoadDiffractionDataset:
         total_counts_lower_bound: int | None,
         total_counts_upper_bound: int | None,
         read_region: CropRegion | None,
+        corrections: DetectorCorrections,
         on_array_assembled: Callable[[int, str, AssembledDiffractionData], None],
+        on_nonfinite_pixels: Callable[[BadPixels], None],
         task_monitor: TaskProgressMonitor,
     ) -> None:
         super().__init__()
@@ -46,7 +48,9 @@ class LoadDiffractionDataset:
         self._total_counts_lower_bound = total_counts_lower_bound
         self._total_counts_upper_bound = total_counts_upper_bound
         self._read_region = read_region
+        self._corrections = corrections
         self._on_array_assembled = on_array_assembled
+        self._on_nonfinite_pixels = on_nonfinite_pixels
         self._task_monitor = task_monitor
         self._finished_event = threading.Event()
         self._error: BaseException | None = None
@@ -74,7 +78,9 @@ class LoadDiffractionDataset:
                     total_counts_lower_bound=self._total_counts_lower_bound,
                     total_counts_upper_bound=self._total_counts_upper_bound,
                     read_region=self._read_region,
+                    corrections=self._corrections,
                     on_array_assembled=self._on_array_assembled,
+                    on_nonfinite_pixels=self._on_nonfinite_pixels,
                     on_progress=monitor.update_progress,
                     on_array_error=self._handle_array_error,
                     should_stop=lambda: monitor.is_stopping,

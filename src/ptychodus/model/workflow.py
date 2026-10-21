@@ -214,13 +214,19 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
                 raise ValueError(f'Unsupported remote compute provider: {provider}')
 
     def export_training_data(
-        self, file_path: Path, *, library: str | None = None, algorithm: str | None = None
+        self,
+        file_path: Path,
+        *,
+        library: str | None = None,
+        algorithm: str | None = None,
+        file_type: str | None = None,
     ) -> None:
         self._processing_api.export_training_data(
             file_path,
             product_index=self._product_index,
             library=library,
             algorithm=algorithm,
+            file_type=file_type,
         )
 
     def save_product(self, file_path: Path, *, file_type: str | None = None) -> None:
@@ -295,6 +301,10 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         crop_region: CropRegion | None = None,
         bad_pixels_file_path: Path | None = None,
         bad_pixels_file_type: str | None = None,
+        background_file_path: Path | None = None,
+        background_file_type: str | None = None,
+        flat_field_file_path: Path | None = None,
+        flat_field_file_type: str | None = None,
         process_patterns: bool = True,
         block: bool = False,
     ) -> DiffractionWorkflowAPI:
@@ -304,6 +314,10 @@ class ConcreteWorkflowAPI(WorkflowAPI):
             crop_region=crop_region,
             bad_pixels_file_path=bad_pixels_file_path,
             bad_pixels_file_type=bad_pixels_file_type,
+            background_file_path=background_file_path,
+            background_file_type=background_file_type,
+            flat_field_file_path=flat_field_file_path,
+            flat_field_file_type=flat_field_file_type,
             process_patterns=process_patterns,
             block=block,
         )

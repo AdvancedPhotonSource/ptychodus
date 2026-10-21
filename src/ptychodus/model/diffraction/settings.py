@@ -25,6 +25,23 @@ class DetectorSettings(Observable, Observer):
             'BadPixelsFilePath', Path('/path/to/bad_pixels.npy')
         )
 
+        self.background_enabled = self._group.create_boolean_parameter('BackgroundEnabled', False)
+        self.background_file_type = self._group.create_string_parameter('BackgroundFileType', 'NPY')
+        self.background_file_path = self._group.create_path_parameter(
+            'BackgroundFilePath', Path('/path/to/background.npy')
+        )
+        self.subtract_background = self._group.create_boolean_parameter('SubtractBackground', False)
+
+        self.flat_field_enabled = self._group.create_boolean_parameter('FlatFieldEnabled', False)
+        self.flat_field_file_type = self._group.create_string_parameter('FlatFieldFileType', 'NPY')
+        self.flat_field_file_path = self._group.create_path_parameter(
+            'FlatFieldFilePath', Path('/path/to/flat_field.npy')
+        )
+        self.divide_flat_field = self._group.create_boolean_parameter('DivideFlatField', False)
+        self.flat_field_floor = self._group.create_real_parameter(
+            'FlatFieldFloor', 1.0e-3, minimum=0.0
+        )
+
     def _update(self, observable: Observable) -> None:
         if observable is self._group:
             self.notify_observers()

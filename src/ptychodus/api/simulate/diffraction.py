@@ -2,7 +2,14 @@
 
 import numpy
 
-from ..diffraction import BadPixels, DiffractionIndexes, DiffractionPatterns
+from ..diffraction import (
+    BadPixels,
+    DetectorBackground,
+    DiffractionIndexes,
+    DiffractionPatterns,
+    FlatField,
+    validate_pixel_map,
+)
 from ..geometry import ImageExtent, PixelGeometry
 from ..patch import iter_probe_patches
 from ..assemble import AssembledDiffractionData
@@ -18,7 +25,11 @@ from ..propagate import (
 
 
 def generate_diffraction_data(
-    product: Product, rng: numpy.random.Generator | None = None
+    product: Product,
+    rng: numpy.random.Generator | None = None,
+    *,
+    background: DetectorBackground | None = None,
+    flat_field: FlatField | None = None,
 ) -> AssembledDiffractionData:
     """Simulate diffraction patterns for all scan positions in *product* using a multislice forward model.
 
@@ -34,11 +45,17 @@ def generate_diffraction_data(
     ``layer_spacing_m`` is taken in the object frame unchanged rather than rescaled into
     the equivalent geometry.
 
+    A detector is modeled when either map is given, both on the pattern grid: each
+    intensity is multiplied by the `flat_field` response, then the `background` (in
+    counts per frame) is added, before any noise. The result carries both maps
+    unapplied, as measured data would.
+
     If *rng* is provided, Poisson noise is added to the intensity patterns.
 
     Raises:
         ValueError: when a near-field product places the detector at the focus, where
-            the magnification and hence the equivalent geometry are undefined.
+            the magnification and hence the equivalent geometry are undefined, or when
+            a map does not match the pattern grid.
     """
     object_ = product.object_
     probe_geometry = product.probes.get_geometry()
@@ -114,6 +131,9 @@ def generate_diffraction_data(
     )
     bad_pixels: BadPixels = numpy.full((probe_geometry.height_px, probe_geometry.width_px), False)
 
+    validate_pixel_map(background, bad_pixels.shape, name='Background')
+    validate_pixel_map(flat_field, bad_pixels.shape, name='Flat field')
+
     for index, probe_patch in enumerate(iter_probe_patches(product)):
         bounds = probe_patch.bounds
 
@@ -135,8 +155,21 @@ def generate_diffraction_data(
 
         indexes[index] = probe_patch.position.index
 
+    if flat_field is not None:
+        numpy.multiply(patterns, flat_field, out=patterns)
+
+    if background is not None:
+        numpy.add(patterns, background, out=patterns)
+
     if rng is not None:
         # NOTE: object and probe scaling influence how much noise is added
         patterns = rng.poisson(patterns).astype(float)
 
-    return AssembledDiffractionData(indexes, patterns, pixel_geometry, bad_pixels)
+    return AssembledDiffractionData(
+        indexes,
+        patterns,
+        pixel_geometry,
+        bad_pixels,
+        background=background,
+        flat_field=flat_field,
+    )

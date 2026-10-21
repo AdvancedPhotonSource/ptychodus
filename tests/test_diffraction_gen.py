@@ -468,3 +468,56 @@ class TestNearField:
 
         expected = _far_field_intensity(probe[0], product)
         numpy.testing.assert_allclose(result.get_pattern(0), expected, rtol=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# Detector maps
+# ---------------------------------------------------------------------------
+
+
+class TestDetectorMaps:
+    def test_flat_field_scales_and_background_adds_before_noise(self) -> None:
+        probe = _random_probe(numpy.random.default_rng(10))
+        product = _make_product([_center_pos()], probe)
+        flat_field = numpy.linspace(0.5, 1.5, _PROBE_PX * _PROBE_PX).reshape(_PROBE_PX, _PROBE_PX)
+        background = numpy.full((_PROBE_PX, _PROBE_PX), 2.5)
+
+        ideal = generate_diffraction_data(product).get_pattern(0)
+        detected = generate_diffraction_data(product, background=background, flat_field=flat_field)
+
+        numpy.testing.assert_allclose(detected.get_pattern(0), flat_field * ideal + background)
+
+    def test_the_maps_travel_with_the_simulated_data(self) -> None:
+        probe = _random_probe(numpy.random.default_rng(11))
+        background = numpy.full((_PROBE_PX, _PROBE_PX), 1.0)
+
+        result = generate_diffraction_data(
+            _make_product([_center_pos()], probe), background=background
+        )
+
+        numpy.testing.assert_array_equal(result.get_background(), background)
+        assert result.get_flat_field() is None
+
+    def test_a_map_off_the_pattern_grid_is_rejected(self) -> None:
+        probe = _random_probe(numpy.random.default_rng(12))
+
+        with pytest.raises(ValueError, match='Flat field shape'):
+            generate_diffraction_data(
+                _make_product([_center_pos()], probe), flat_field=numpy.ones((3, 3))
+            )
+
+    def test_noise_is_drawn_around_the_detected_intensity(self) -> None:
+        probe = _random_probe(numpy.random.default_rng(13))
+        product = _make_product([_center_pos()], probe)
+        background = numpy.full((_PROBE_PX, _PROBE_PX), 50.0)
+        expected = generate_diffraction_data(product, background=background).get_pattern(0)
+        rng = numpy.random.default_rng(14)
+
+        draws = numpy.stack(
+            [
+                generate_diffraction_data(product, rng, background=background).get_pattern(0)
+                for _ in range(200)
+            ]
+        )
+
+        numpy.testing.assert_allclose(draws.mean(axis=0).mean(), expected.mean(), rtol=0.02)

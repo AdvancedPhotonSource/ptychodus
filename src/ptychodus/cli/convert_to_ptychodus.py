@@ -66,7 +66,7 @@ from ptychodus.api.simulate.probe import (
     generate_fresnel_zone_plate_probe,
     generate_incoherent_probe_modes,
 )
-from ptychodus.cli import positive_int
+from ptychodus.cli import add_detector_map_arguments, positive_int, read_detector_corrections
 
 # Imported directly rather than through the registry because no plugin interface carries
 # either one: a ProbePositionFileReader returns coordinates, so the rest of what the
@@ -153,6 +153,7 @@ def _assemble_diffraction(
         dataset,
         bad_pixels=bad_pixels,
         raw_pixel_geometry=raw_pixel_geometry,
+        corrections=read_detector_corrections(registry, args, dataset),
         total_counts_lower_bound=args.min_total_counts,
         total_counts_upper_bound=args.max_total_counts,
     )
@@ -625,6 +626,7 @@ def _create_argument_parser() -> argparse.ArgumentParser:
         default='NPY_Bad_Pixels',
         help='Bad pixels file type.',
     )
+    add_detector_map_arguments(parser)
     parser.add_argument(
         '--list-plugins',
         action='store_true',

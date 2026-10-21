@@ -111,6 +111,12 @@ def test_unconditioned_profile_drops_the_conditioning_options() -> None:
         'max_valid_count',
         'bad_pixels_file',
         'bad_pixels_file_type',
+        'background_file',
+        'background_file_type',
+        'subtract_background',
+        'flat_field_file',
+        'flat_field_file_type',
+        'divide_flat_field',
     ):
         assert not hasattr(args, absent), absent
 
@@ -231,3 +237,30 @@ def test_total_counts_bounds_is_inert_when_both_options_are_off() -> None:
         None,
         None,
     )
+
+
+def test_select_patterns_keeps_the_detector_maps() -> None:
+    data = AssembledDiffractionData(
+        indexes=numpy.arange(3),
+        patterns=numpy.ones((3, 2, 2)),
+        pixel_geometry=PixelGeometry(width_m=1.0, height_m=1.0),
+        bad_pixels=numpy.zeros((2, 2), dtype=numpy.bool_),
+        background=numpy.full((2, 2), 4.0),
+        flat_field=numpy.full((2, 2), 0.5),
+    )
+
+    selected = rs._select_patterns(logger, data, numpy.array([True, False, True]), 'A filter')
+
+    numpy.testing.assert_array_equal(selected.get_background(), 4.0)
+    numpy.testing.assert_array_equal(selected.get_flat_field(), 0.5)
+
+
+def test_conditioning_profiles_offer_the_detector_map_options() -> None:
+    args = _defaults(_profiles()['12ide'])
+
+    assert args.background_file is None
+    assert args.background_file_type == 'NPY'
+    assert not args.subtract_background
+    assert args.flat_field_file is None
+    assert args.flat_field_file_type == 'NPY'
+    assert not args.divide_flat_field
