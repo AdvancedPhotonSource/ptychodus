@@ -25,7 +25,9 @@ from ptychodus.api.reconstruct import ReconstructInput, SubprocessReconstructor
 from .options import PtychoFMOptions, default_options
 
 __all__ = [
+    'build_reconstruct_config',
     'build_reconstructor',
+    'build_train_config',
 ]
 
 
@@ -35,22 +37,55 @@ __all__ = [
 _DIFFRACTION_SPACE_LOSSES = frozenset({'total_flux', 'probe_aware', 'q_dependent'})
 
 
-def _build_config(name: str, options: PtychoFMOptions) -> dict[str, Any]:
-    """Render the declared options as the nested dict ``ptycho_fm`` reads.
+def _build_config(
+    name: str, options: PtychoFMOptions, *, sections: frozenset[str]
+) -> dict[str, Any]:
+    """Render the branches named by *sections* as the nested dict ``ptycho_fm`` reads.
 
     ``exclude_unset`` is what preserves upstream's absent-means-resolve-later
     semantics: pretrained encoder sizes, validation batch size and dataset
     normalization are all decided by a field having no value, so only the
     fields ptychodus surfaces may appear. The declaration sets exactly those.
+    Narrowing composes with it rather than fighting it -- the two intersect --
+    so a branch that survives is spelled exactly as it would be whole.
+
+    *sections* names whole branches and nothing finer. Inside ``model`` the
+    keys are read by upstream with a default apiece, so dropping one there
+    would not raise but would quietly reconstruct against a different model.
 
     Two keys are not settings and so are added here rather than declared.
     ``training.mode`` follows from which reconstructor was selected, and the
     encoder takes one channel in every configuration ptychodus builds.
     """
-    config: dict[str, Any] = options.model_dump(exclude_unset=True)
-    config['training']['mode'] = 'supervised' if name == 'Supervised' else 'unsupervised'
+    config: dict[str, Any] = options.model_dump(exclude_unset=True, include=set(sections))
+
+    if 'training' in config:
+        config['training']['mode'] = 'supervised' if name == 'Supervised' else 'unsupervised'
+
     config['model']['encoder']['in_channels'] = 1
     return config
+
+
+def build_reconstruct_config(name: str, options: PtychoFMOptions) -> dict[str, Any]:
+    """The config an inference child is given.
+
+    Inference resolves the model, reads all three of its own knobs, and takes a
+    scale and a mode count off the data branch. It asks nothing about training,
+    so nothing about training is sent -- a reconstruct payload that changed
+    when a training value was edited would be indistinguishable from one that
+    mattered.
+    """
+    return _build_config(name, options, sections=frozenset({'data', 'inference', 'model'}))
+
+
+def build_train_config(name: str, options: PtychoFMOptions) -> dict[str, Any]:
+    """The config a training child is given, or a complaint about the objective.
+
+    Training reads the whole data branch and the whole training branch, and
+    never looks at the inference knobs.
+    """
+    _verify_loss_supports_mode(name, str(options.training.loss_function))
+    return _build_config(name, options, sections=frozenset({'data', 'model', 'training'}))
 
 
 def _verify_spatial_size(shape: tuple[int, ...], img_size: int, what: str) -> None:
@@ -103,12 +138,10 @@ def build_reconstructor(name: str) -> SubprocessReconstructor:
     def dump_reconstruct_options(
         parameters: ReconstructInput, options: BaseModel
     ) -> dict[str, Any]:
-        return _build_config(name, _declared(options))
+        return build_reconstruct_config(name, _declared(options))
 
     def dump_train_options(options: BaseModel) -> dict[str, Any]:
-        declared = _declared(options)
-        _verify_loss_supports_mode(name, str(declared.training.loss_function))
-        return _build_config(name, declared)
+        return build_train_config(name, _declared(options))
 
     def export_training_data(
         file_path: Path, parameters: ReconstructInput, options: BaseModel

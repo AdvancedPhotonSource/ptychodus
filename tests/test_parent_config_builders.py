@@ -72,10 +72,15 @@ def _build_ptychopinn_settings() -> list[Any]:
 
 def _build_ptycho_fm_configs() -> list[Any]:
     from ptychodus.plugins.ptycho_fm.options import default_options
-    from ptychodus.plugins.ptycho_fm.reconstructor import _build_config
+    from ptychodus.plugins.ptycho_fm.reconstructor import (
+        build_reconstruct_config,
+        build_train_config,
+    )
 
     # The name selects the training objective, coupled_decoder_mode the model
-    # class, and loss_function which sub-section the child reads back.
+    # class, and loss_function which sub-section the child reads back. Both
+    # section sets are built, since each operation narrows to its own and a
+    # builder that imported a backend would do it for either.
     configs: list[Any] = []
 
     for name in ('Unsupervised', 'Supervised'):
@@ -88,7 +93,8 @@ def _build_ptycho_fm_configs() -> list[Any]:
                 options = default_options()
                 options.model.coupled_decoder_mode = coupled_decoder_mode
                 options.training.loss_function = loss_function
-                configs.append(_build_config(name, options))
+                for build in (build_reconstruct_config, build_train_config):
+                    configs.append(build(name, options))
 
     return configs
 
@@ -226,15 +232,22 @@ def test_ptycho_fm_maps_the_uncoupled_mode_to_null() -> None:
     reaches the child unchanged rather than that a builder converts it.
     """
     from ptychodus.plugins.ptycho_fm.options import default_options
-    from ptychodus.plugins.ptycho_fm.reconstructor import _build_config
+    from ptychodus.plugins.ptycho_fm.reconstructor import (
+        build_reconstruct_config,
+    )
 
     options = default_options()
     options.model.coupled_decoder_mode = None
-    assert _build_config('Unsupervised', options)['model']['coupled_decoder_mode'] is None
+    assert (
+        build_reconstruct_config('Unsupervised', options)['model']['coupled_decoder_mode'] is None
+    )
 
     options = default_options()
     options.model.coupled_decoder_mode = 'amp_phase'
-    assert _build_config('Unsupervised', options)['model']['coupled_decoder_mode'] == 'amp_phase'
+    assert (
+        build_reconstruct_config('Unsupervised', options)['model']['coupled_decoder_mode']
+        == 'amp_phase'
+    )
 
 
 def _build_ptychopinn_settings_mapping(**overrides: Any) -> dict[str, Any]:

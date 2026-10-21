@@ -17,7 +17,7 @@ at reconstruct time, or does not offer it at all.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, Final
 import math
 
 from .flatten import (
@@ -146,10 +146,10 @@ _OBJECT_OVERLAYS: Mapping[str, Overlay] = {
         "Whether to remove grid artifacts in the object's phase at the end of an epoch.",
     ),
     'remove_grid_artifacts.period_x_m': Overlay(
-        'Period X [m]:', 'Horizontal period of grid artifacts in meters'
+        'Period X:', 'Horizontal period of grid artifacts in meters'
     ),
     'remove_grid_artifacts.period_y_m': Overlay(
-        'Period Y [m]:', 'Vertical period of grid artifacts in meters'
+        'Period Y:', 'Vertical period of grid artifacts in meters'
     ),
     'remove_grid_artifacts.window_size': Overlay(
         'Window Size [px]:', 'Window size for grid artifact removal in pixels'
@@ -735,9 +735,13 @@ def _precision() -> BoolEnum:
     return BoolEnum('UseDoublePrecision', when_true=Dtypes.FLOAT64, when_false=Dtypes.FLOAT32)
 
 
-def _reconstructor_policy(extras: set[str]) -> FlatteningPolicy:
+def _reconstructor_policy(extras: set[str], *, ignores_batching: bool = False) -> FlatteningPolicy:
     """The shared half of ``reconstructor_options``; the rest is the algorithm's own."""
+    # Two of the three keys an algorithm retaining the whole exit-wave stack
+    # has no use for; the third is ptychodus's own and sits on the wrapper.
+    batching: Final = frozenset({'batch_size', 'batching_mode'})
     return FlatteningPolicy(
+        panel_hidden=batching if ignores_batching else frozenset(),
         hidden=frozenset(
             {
                 # Both halves of the clustering switch: ptychodus persists one
@@ -800,9 +804,16 @@ _ALGORITHM_GROUPS: Mapping[str, str] = {
 _TASK = 'task'
 
 
-def _wrapper_policy() -> FlatteningPolicy:
-    """The ptychodus-owned keys beside the task options, which are the one."""
-    return FlatteningPolicy(hidden=frozenset({_TASK}))
+def _wrapper_policy(*, ignores_batching: bool = False) -> FlatteningPolicy:
+    """The ptychodus-owned keys beside the task options, which are the two."""
+    # Clustering is a batching concern like the other two, and is here rather
+    # than beside them only because ptychodus shapes it as one count where
+    # pty-chi has a flag and a stride.
+    clustering: Final = frozenset({'compact_mode_update_clustering'})
+    return FlatteningPolicy(
+        hidden=frozenset({_TASK}),
+        panel_hidden=clustering if ignores_batching else frozenset(),
+    )
 
 
 def sections_for(algorithm: str, options: Any) -> Sequence[OptionsSection]:
@@ -820,14 +831,25 @@ def sections_for(algorithm: str, options: Any) -> Sequence[OptionsSection]:
         ReconstructorOptions,
     )
 
+    # Algorithms that retain the full exit-wave stack between epochs. They
+    # ignore the batch size and size their working set from chunk_length
+    # instead, so the three batching keys mean nothing to them -- but the keys
+    # are shared with the six algorithms that do read them, so every algorithm
+    # persists all three and only the panel knows the difference.
+    batch_blind: Final = frozenset({'DM', 'RAAR'})
+
     task = options.task
+    ignores_batching = algorithm in batch_blind
 
     return [
-        OptionsSection('PtyChi', policy=_wrapper_policy()),
+        OptionsSection('PtyChi', policy=_wrapper_policy(ignores_batching=ignores_batching)),
         OptionsSection(
             'PtyChi',
             root_path=f'{_TASK}.reconstructor_options',
-            policy=_reconstructor_policy(_extras(task.reconstructor_options, ReconstructorOptions)),
+            policy=_reconstructor_policy(
+                _extras(task.reconstructor_options, ReconstructorOptions),
+                ignores_batching=ignores_batching,
+            ),
         ),
         OptionsSection('PtyChi', root_path=f'{_TASK}.data_options', policy=_data_policy()),
         OptionsSection(

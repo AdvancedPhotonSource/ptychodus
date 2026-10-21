@@ -32,6 +32,8 @@ from typing import Any, Final
 __all__ = [
     'BitField',
     'BoolEnum',
+    'EnumSpelling',
+    'NamingConvention',
     'compose_key',
     'fields_of',
     'FlatParameter',
@@ -41,8 +43,8 @@ __all__ = [
     'Overlay',
     'Sentinel',
     'StructuralAdapter',
+    'Unit',
     'flatten_options',
-    'render_value',
 ]
 
 
@@ -212,28 +214,105 @@ class BoolEnum(StructuralAdapter):
         return self.when_true if values[self.key] else self.when_false
 
 
-# Suffixes ptychodus spells out in persisted keys, longest first so that a
-# compound suffix is not shadowed by a shorter one that also matches.
-_UNIT_SUFFIXES: Final[Mapping[str, str]] = {
-    'm2_per_kg': 'SquareMetersPerKilogram',
-    'deg': 'InDegrees',
-    'rad': 'InRadians',
-    'eV': 'InElectronVolts',
-    'px': 'InPixels',
-    'tr': 'InTurns',
-    'm': 'InMeters',
-    's': 'InSeconds',
-}
+class EnumSpelling(Enum):
+    """Which of an enum member's two names the settings file holds.
+
+    ptychodus writes pty-chi's enums by member name and its own backends' by
+    value, so a `StrEnum` member has two valid spellings and the key decides
+    which. Everything that writes one, reads one back, or offers the choices a
+    key accepts has to agree, and they are in different layers -- so the rule
+    is a method here rather than a conditional repeated wherever it is needed.
+    Disagreeing is quiet rather than loud: a combo box told to show an item it
+    has no entry for keeps the one it had, so the panel looks right and the
+    next selection writes a value nothing reads back.
+    """
+
+    BY_NAME = 'name'
+    BY_VALUE = 'value'
+
+    def render(self, value: Any) -> str:
+        """Spell *value* the way the settings file holds it.
+
+        Takes any value, not only an enum: a key's spelling is settled before
+        anything asks, so a caller holding a declared value need not first
+        work out whether this one happens to be an enum member.
+        """
+        if not isinstance(value, Enum):
+            return str(value)
+
+        return value.name if self is EnumSpelling.BY_NAME else str(value.value)
+
+    def parse(self, annotation: type[Enum], text: str) -> Enum:
+        """The member *text* names, or raise ``KeyError``/``ValueError``."""
+        return annotation[text] if self is EnumSpelling.BY_NAME else annotation(text)
+
+    def members(self, annotation: type[Enum]) -> list[str]:
+        """Every member of *annotation*, each spelled as a persisted value."""
+        return [self.render(member) for member in annotation]
 
 
-def to_pascal_case(name: str) -> str:
-    """Render a snake_case field name in ptychodus's persisted-key style."""
-    for suffix in sorted(_UNIT_SUFFIXES, key=len, reverse=True):
-        if name.endswith(f'_{suffix}'):
-            stem = name[: -len(suffix) - 1]
-            return _join_words(stem) + _UNIT_SUFFIXES[suffix]
+class Unit(Enum):
+    """A unit a declared field names itself after, and how a key spells it out.
 
-    return _join_words(name)
+    Declared in descending suffix length, which is the order :meth:`of` matches
+    in: ``m`` is a suffix of ``m2_per_kg`` as a string, so a shorter member
+    reached first would claim a field belonging to a longer one.
+
+    Kept on the flattened key rather than consumed and discarded, because the
+    unit a value is held in is part of what the field says about itself and
+    nothing downstream can recover it once the suffix is words.
+    """
+
+    SQUARE_METERS_PER_KILOGRAM = ('m2_per_kg', 'SquareMetersPerKilogram')
+    DEGREE = ('deg', 'InDegrees')
+    RADIAN = ('rad', 'InRadians')
+    ELECTRON_VOLT = ('eV', 'InElectronVolts')
+    PIXEL = ('px', 'InPixels')
+    TURN = ('tr', 'InTurns')
+    METER = ('m', 'InMeters')
+    SECOND = ('s', 'InSeconds')
+
+    def __init__(self, suffix: str, words: str) -> None:
+        self.suffix = suffix
+        self.words = words
+
+    @classmethod
+    def of(cls, field_name: str) -> Unit | None:
+        """The unit *field_name* ends in, or None where it names none."""
+        return next(
+            (unit for unit in cls if field_name.endswith(f'_{unit.suffix}')),
+            None,
+        )
+
+    def strip_from(self, field_name: str) -> str:
+        """*field_name* without the trailing suffix that named this unit."""
+        return field_name[: -len(self.suffix) - 1]
+
+
+class NamingConvention(Enum):
+    """How one declared model's field names are spelled as persisted keys.
+
+    Per model because no single convention fits: ptychodus's own groups are
+    PascalCase with units spelled out, while two backends persist the
+    snake_case field names of the libraries they wrap. Stating which rather
+    than switching on a flag keeps both named, and keeps the spelling with the
+    convention that does it.
+    """
+
+    PASCAL_CASE = 'pascal_case'
+    VERBATIM = 'verbatim'
+
+    def render(self, field_name: str) -> str:
+        """Spell *field_name* as this convention persists it."""
+        if self is NamingConvention.VERBATIM:
+            return field_name
+
+        unit = Unit.of(field_name)
+
+        if unit is None:
+            return _join_words(field_name)
+
+        return _join_words(unit.strip_from(field_name)) + unit.words
 
 
 def _join_words(name: str) -> str:
@@ -300,9 +379,9 @@ class Overlay:
     # key holds and what restores it. Ignored where an adapter is in play,
     # since an adapter already names the type behind each key it owns.
     annotation: Any = None
-    # Whether this one enum key is written by member name, where it disagrees
-    # with the rest of its model. Unset defers to the policy.
-    enum_by_name: bool | None = None
+    # How this one enum key is spelled, where it disagrees with the rest of
+    # its model. Unset defers to the policy.
+    spelling: EnumSpelling | None = None
 
 
 @dataclass(frozen=True)
@@ -330,13 +409,28 @@ class FlatParameter:
     structural_role: str = ''
     # How an enum value is spelled in the settings file, resolved here so that
     # whatever writes or reads the key needs only this record.
-    enum_by_name: bool = True
+    spelling: EnumSpelling = EnumSpelling.BY_NAME
     # True when this key is its branch's own switch rather than a value inside
     # it -- the leaf a declaration uses to say whether the branch applies at
     # all. Carried through because the flat layout erases it: such a leaf takes
     # the bare group prefix, so nothing downstream could tell it apart from a
     # plain boolean that happens to be named for its group.
     gates_group: bool = False
+    # The unit the value is held in, as the field name declares it. None for a
+    # key whose name declares none, and for a key an adapter owns, since the
+    # declared field's unit need not be the one that key persists.
+    unit: Unit | None = None
+    # True for a key this reconstructor accepts and persists but does not read,
+    # so a panel has nothing to offer for it. Described rather than hidden: the
+    # key exists in every settings file whatever any one reconstructor makes of
+    # it, and which reconstructor was asked first must not decide that.
+    panel_hidden: bool = False
+
+
+def _covers(paths: frozenset[str], path: str) -> bool:
+    """Whether *paths* names *path* or an ancestor of it."""
+    parts = path.split('.')
+    return any('.'.join(parts[: index + 1]) in paths for index in range(len(parts)))
 
 
 @dataclass(frozen=True)
@@ -356,6 +450,13 @@ class FlatteningPolicy:
     # whole subtree. This exists for declarations ptychodus does not own -- a model
     # it writes simply omits the field instead.
     hidden: frozenset[str] = frozenset()
+    # Dotted paths this reconstructor persists but ignores, which a panel has
+    # no reason to offer. Not `hidden`: the key is still produced, still
+    # generated and still written, because a group shared by several
+    # reconstructors must hold the same keys whichever of them was registered
+    # first. Hiding one here would make the settings file depend on
+    # registration order.
+    panel_hidden: frozenset[str] = frozenset()
     # Dotted path of a nested model -> the segment it contributes. '' makes the
     # nesting transparent, so its subfields sit directly under the parent prefix.
     prefixes: Mapping[str, str] = field(default_factory=dict)
@@ -371,21 +472,23 @@ class FlatteningPolicy:
     collapse_onto_prefix: frozenset[str] = frozenset({'enabled', 'optimizable'})
     # ptychodus persists pty-chi enums by member name; the backends it owns
     # persist theirs by value.
-    enum_by_name: bool = True
-    # Rendered when the policy is applied to a model with no naming convention of
-    # its own, i.e. one that persists its declared field names verbatim.
-    verbatim: bool = False
+    spelling: EnumSpelling = EnumSpelling.BY_NAME
+    # How this model's field names become persisted keys.
+    naming: NamingConvention = NamingConvention.PASCAL_CASE
 
     def is_hidden(self, path: str) -> bool:
         """Return True if *path*, or any ancestor of it, is hidden."""
-        parts = path.split('.')
-        return any('.'.join(parts[: index + 1]) in self.hidden for index in range(len(parts)))
+        return _covers(self.hidden, path)
+
+    def is_panel_hidden(self, path: str) -> bool:
+        """Return True if *path*, or any ancestor of it, is kept off the panel."""
+        return _covers(self.panel_hidden, path)
 
     def render_name(self, path: str, name: str) -> str:
         try:
             return self.renames[path]
         except KeyError:
-            return name if self.verbatim else to_pascal_case(name)
+            return self.naming.render(name)
 
 
 def flatten_options(options: Any, policy: FlatteningPolicy) -> list[FlatParameter]:
@@ -532,23 +635,15 @@ def _leaf(
         maximum=_stated_or_declared(overlay.maximum, declared_maximum),
         choices=overlay.choices,
         structural_role=role,
-        enum_by_name=_stated_or_declared(overlay.enum_by_name, policy.enum_by_name),
+        spelling=_stated_or_declared(overlay.spelling, policy.spelling),
         # An adapter's key is never the switch: it is one of several keys a
         # single declared field persists as, and which of them gates the rest
         # is the adapter's own business.
         gates_group=not role and path.rsplit('.', 1)[-1] in policy.collapse_onto_prefix,
+        # Read off the declared field, so an adapter's key reports none: an
+        # adapter may persist a pair of radians as a pair of degrees, and
+        # inheriting the field's unit would label the key with the one it is
+        # not in.
+        unit=None if role else Unit.of(path.rsplit('.', 1)[-1]),
+        panel_hidden=policy.is_panel_hidden(path),
     )
-
-
-def render_value(value: Any, *, by_name: bool) -> str:
-    """Render *value* the way the persisted file spells it.
-
-    An enum is the case that matters: ptychodus writes most of pty-chi's enums
-    by member name, so serializing a ``StrEnum`` as a plain string would
-    silently rewrite every such key from ``SGD`` to ``sgd``. Which way round a
-    key goes is settled per key by then, so this is told rather than asked.
-    """
-    if isinstance(value, Enum):
-        return value.name if by_name else str(value.value)
-
-    return str(value)

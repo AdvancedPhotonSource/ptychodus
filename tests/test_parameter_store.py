@@ -192,3 +192,68 @@ class TestOneGroupFromSeveralSections:
         registry['Algo'].parameters()['Power'].set_value(9.0)
         options = store.get_options('lib', 'algo')
         assert (options.object_.weight, options.probe.power) == (3.5, 9.0)
+
+
+def _object_section(*, ignores_slices: bool) -> OptionsSection:
+    return OptionsSection(
+        'Algo',
+        root_path='object_',
+        policy=FlatteningPolicy(
+            panel_hidden=frozenset({'slices'}) if ignores_slices else frozenset()
+        ),
+    )
+
+
+def _register(
+    store: ProcessingParameterStore, name: str, *, ignores_slices: bool
+) -> ProcessingParameterStore:
+    store.register(
+        'lib', FakeReconstructor(name, Declared()), [_object_section(ignores_slices=ignores_slices)]
+    )
+    return store
+
+
+class TestKeysAPanelDoesNotShow:
+    """A reconstructor that ignores one of a shared group's keys still persists it.
+
+    Two reconstructors of one backend write the same settings section, so what that
+    section contains cannot depend on which of them was registered first.
+    """
+
+    def test_the_key_is_generated_and_persisted(self, registry: SettingsRegistry) -> None:
+        _register(ProcessingParameterStore(registry), 'frugal', ignores_slices=True)
+        assert set(registry['Algo'].parameters()) == {'Weight', 'Slices'}
+
+    def test_but_is_left_out_of_what_a_panel_is_told(self, registry: SettingsRegistry) -> None:
+        store = _register(ProcessingParameterStore(registry), 'frugal', ignores_slices=True)
+        (group,) = store.describe('lib', 'frugal')
+        assert [f.described.ini_key for f in group.fields] == ['Weight']
+
+    def test_a_reconstructor_that_reads_it_is_told(self, registry: SettingsRegistry) -> None:
+        store = _register(ProcessingParameterStore(registry), 'thorough', ignores_slices=False)
+        (group,) = store.describe('lib', 'thorough')
+        assert [f.described.ini_key for f in group.fields] == ['Weight', 'Slices']
+
+    def test_registration_order_does_not_decide_the_section(
+        self, registry: SettingsRegistry
+    ) -> None:
+        """The regression this shape exists to avoid: hiding must not move key creation."""
+        store = ProcessingParameterStore(registry)
+        _register(store, 'frugal', ignores_slices=True)
+        _register(store, 'thorough', ignores_slices=False)
+
+        reversed_registry = SettingsRegistry()
+        reversed_store = ProcessingParameterStore(reversed_registry)
+        _register(reversed_store, 'thorough', ignores_slices=False)
+        _register(reversed_store, 'frugal', ignores_slices=True)
+
+        assert set(registry['Algo'].parameters()) == set(reversed_registry['Algo'].parameters())
+        assert [f.described.ini_key for f in store.describe('lib', 'frugal')[0].fields] == [
+            f.described.ini_key for f in reversed_store.describe('lib', 'frugal')[0].fields
+        ]
+
+    def test_the_value_still_reaches_the_backend(self, registry: SettingsRegistry) -> None:
+        """Hidden from the panel is not withheld from the run."""
+        store = _register(ProcessingParameterStore(registry), 'frugal', ignores_slices=True)
+        registry['Algo'].parameters()['Slices'].set_value(7)
+        assert store.get_options('lib', 'frugal').object_.slices == 7

@@ -25,7 +25,7 @@ from ptychodus.api.fluorescence import (
 from ptychodus.api.product import Product
 
 from ...api.spawn import run_subprocess
-from ._payload import PtychozoonPayload
+from ._payload import PtychozoonMessage, PtychozoonPayload
 from .settings import FluorescenceSettings
 
 _ENTRY_POINT: Final[str] = 'ptychodus.model.fluorescence._subprocess:run_vspi_enhancement'
@@ -126,7 +126,7 @@ class PtychozoonFluorescenceEnhancer(FluorescenceEnhancer):
         # marshaling live in the shared subprocess protocol.
         with run_subprocess(_ENTRY_POINT, payload) as events:
             for event in events:
-                if event[0] != 'result':
+                if event[0] != PtychozoonMessage.RESULT:
                     continue
                 _, iteration, enhanced_maps = event
                 element_maps = [ElementMap(name, cps) for name, cps in enhanced_maps]

@@ -55,6 +55,7 @@ def _selection(
     algorithm: str,
     *libraries: tuple[str, _Library],
     library: str = '',
+    default: str = '',
 ) -> tuple[ProcessingAlgorithmParameter, StringParameter, StringParameter]:
     """Build the two live selections over *libraries*, as ProcessingCore does."""
     chooser = PluginChooser[ReconstructorLibrary]()
@@ -68,7 +69,7 @@ def _selection(
     library_parameter = PluginChooserParameter(chooser, library_setting)
 
     return (
-        ProcessingAlgorithmParameter(algorithm_setting, library_parameter),
+        ProcessingAlgorithmParameter(algorithm_setting, library_parameter, default=default),
         library_setting,
         algorithm_setting,
     )
@@ -207,3 +208,58 @@ def test_the_two_keys_resolve_whichever_order_they_arrive_in() -> None:
     library_setting.set_value('other')
 
     assert algorithm.get_value() == 'four'
+
+
+class TestWhatStandsInForAnUnresolvableName:
+    """Which algorithm is selected when the persisted one resolves to nothing.
+
+    The real case this exists for: a settings file predating a backend's split
+    into per-algorithm reconstructors still names the old combined value, and
+    the install it is opened on has every algorithm the file's author meant --
+    just not under that spelling.
+    """
+
+    def test_the_declared_default_is_preferred(self) -> None:
+        algorithm, _, _ = _selection(
+            'pty-chi_lsqml',
+            ('lib', _Library('lib', _Reconstructor('DM'), _Reconstructor('LSQML'))),
+            default='LSQML',
+        )
+
+        assert algorithm.get_value() == 'LSQML'
+
+    def test_the_first_offering_stands_in_where_the_default_is_not_offered(self) -> None:
+        """A backend with its own vocabulary has no reason to offer ptychodus's default."""
+        algorithm, _, _ = _selection(
+            'nope',
+            ('lib', _Library('lib', _Reconstructor('Unsupervised'), _Reconstructor('Supervised'))),
+            default='LSQML',
+        )
+
+        assert algorithm.get_value() == 'Unsupervised'
+
+    def test_the_first_offering_stands_in_where_no_default_was_given(self) -> None:
+        algorithm, _, _ = _selection(
+            'nope', ('lib', _Library('lib', _Reconstructor('DM'), _Reconstructor('LSQML')))
+        )
+
+        assert algorithm.get_value() == 'DM'
+
+    def test_the_stale_name_is_still_left_in_the_file(self) -> None:
+        """Standing in for a name is not the same as replacing it."""
+        _, _, setting = _selection(
+            'pty-chi_lsqml',
+            ('lib', _Library('lib', _Reconstructor('DM'), _Reconstructor('LSQML'))),
+            default='LSQML',
+        )
+
+        assert setting.get_value() == 'pty-chi_lsqml'
+
+    def test_a_copy_resolves_the_same_way(self) -> None:
+        algorithm, _, _ = _selection(
+            'pty-chi_lsqml',
+            ('lib', _Library('lib', _Reconstructor('DM'), _Reconstructor('LSQML'))),
+            default='LSQML',
+        )
+
+        assert algorithm.copy().get_value() == algorithm.get_value()

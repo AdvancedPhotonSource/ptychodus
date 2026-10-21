@@ -69,7 +69,10 @@ def reconstruct_scan(payload: dict[str, Any], queue: Queue[Any]) -> None:
     from ptychodus.api.diffraction import CropRegion
     from ptychodus.api.plugins import PluginRegistry
     from ptychodus.cli._batch_lamni_scan import ScanRequest, reconstruct_one_scan
-    from ptychodus.cli._batch_lamni_settings import load_batch_settings_from_text
+    from ptychodus.cli._batch_lamni_settings import (
+        WorkerMessage,
+        load_batch_settings_from_text,
+    )
     from ptychodus.cli._reconstruct_common import install_signal_handlers, load_ptychi_options
 
     settings = load_batch_settings_from_text(payload['settings_text'])
@@ -133,4 +136,4 @@ def reconstruct_scan(payload: dict[str, Any], queue: Queue[Any]) -> None:
         cancellation=cancellation,
     )
 
-    queue.put(('output', {'scan_no': scan['scan_no'], 'completed': completed}))
+    queue.put((WorkerMessage.SCAN_RESULT, {'scan_no': scan['scan_no'], 'completed': completed}))

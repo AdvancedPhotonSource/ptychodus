@@ -23,6 +23,7 @@ one that was typed is the failure worth preventing.
 from __future__ import annotations
 
 import logging
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal
 
@@ -30,7 +31,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ptychodus.api.affine import AffineTransform
-from ptychodus.plugins.aps31id_lamni._scan_table import APS31IDEScanRecord
+from ptychodus.plugins.aps31id_lamni.scan_table import APS31IDEScanRecord
 
 __all__ = [
     'Batch',
@@ -43,6 +44,7 @@ __all__ = [
     'ObjectFromFile',
     'Paths',
     'Positions',
+    'WorkerMessage',
     'ProbeFromFile',
     'SimulatedProbe',
     'dump_batch_settings',
@@ -356,6 +358,22 @@ def select_records(
     # is not guaranteed to be sorted.
     selected.sort(key=lambda record: record.scan_no)
     return selected
+
+
+class WorkerMessage(StrEnum):
+    """What a worker has to say about the scan it was given.
+
+    Here rather than in either process because the worker is reached by name and
+    the parent must not import it, and this module is already what the two agree
+    on: it renders the record that goes out, so it names the tag that comes back.
+
+    A string enum because the value is what travels. The value is the worker's
+    own word and means a scan-completion record -- not a reconstruction result,
+    which is a different child's vocabulary and travels under its own tag.
+    """
+
+    SCAN_RESULT = 'scan_result'
+    """One scan has finished, with whether it ran to completion."""
 
 
 def record_payload(record: APS31IDEScanRecord) -> dict[str, Any]:

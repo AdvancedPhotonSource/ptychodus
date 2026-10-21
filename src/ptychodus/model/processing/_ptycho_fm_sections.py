@@ -21,7 +21,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from .flatten import FlatteningPolicy, Overlay, Sentinel, fields_of
+from .flatten import (
+    EnumSpelling,
+    FlatteningPolicy,
+    NamingConvention,
+    Overlay,
+    Sentinel,
+    fields_of,
+)
 from .parameter_store import OptionsSection
 
 __all__ = ['sections']
@@ -77,8 +84,8 @@ def _data_policy() -> FlatteningPolicy:
     from ptycho_fm.config import DataConfig
 
     return FlatteningPolicy(
-        verbatim=True,
-        enum_by_name=False,
+        naming=NamingConvention.VERBATIM,
+        spelling=EnumSpelling.BY_VALUE,
         collapse_onto_prefix=frozenset(),
         hidden=frozenset(
             _hide_all_but(
@@ -142,8 +149,8 @@ def _model_policy() -> FlatteningPolicy:
     from ptycho_fm.config import DecoderConfig, EncoderConfig, InitConfig, ModelConfig
 
     return FlatteningPolicy(
-        verbatim=True,
-        enum_by_name=False,
+        naming=NamingConvention.VERBATIM,
+        spelling=EnumSpelling.BY_VALUE,
         # 'enabled' would otherwise collapse onto the bare 'init_' prefix,
         # where ptychodus persists it as 'init_enabled'.
         collapse_onto_prefix=frozenset(),
@@ -277,8 +284,8 @@ def _training_policy() -> FlatteningPolicy:
     )
 
     return FlatteningPolicy(
-        verbatim=True,
-        enum_by_name=False,
+        naming=NamingConvention.VERBATIM,
+        spelling=EnumSpelling.BY_VALUE,
         collapse_onto_prefix=frozenset(),
         hidden=frozenset(
             _hide_all_but(
@@ -332,7 +339,11 @@ def _training_policy() -> FlatteningPolicy:
 
 def _inference_policy() -> FlatteningPolicy:
     """The stitching branch, which is ptychodus's own and states its own text."""
-    return FlatteningPolicy(verbatim=True, enum_by_name=False, collapse_onto_prefix=frozenset())
+    return FlatteningPolicy(
+        naming=NamingConvention.VERBATIM,
+        spelling=EnumSpelling.BY_VALUE,
+        collapse_onto_prefix=frozenset(),
+    )
 
 
 def sections() -> Sequence[OptionsSection]:

@@ -15,14 +15,15 @@ import pytest
 from ptychodus.model.processing.flatten import (
     BitField,
     BoolEnum,
+    EnumSpelling,
     FlatteningPolicy,
+    NamingConvention,
     Overlay,
     OptionalGate,
     OptionalRange,
     Sentinel,
+    Unit,
     flatten_options,
-    render_value,
-    to_pascal_case,
 )
 
 
@@ -82,17 +83,83 @@ def _keys(policy: FlatteningPolicy) -> list[str]:
     return [p.ini_key for p in flatten_options(Options(), policy)]
 
 
+class TestUnitMatching:
+    def test_a_field_naming_a_unit_is_matched(self) -> None:
+        assert Unit.of('period_x_m') is Unit.METER
+        assert Unit.of('window_size_px') is Unit.PIXEL
+
+    def test_a_field_naming_none_matches_nothing(self) -> None:
+        assert Unit.of('step_size') is None
+
+    def test_a_bare_name_is_not_a_suffix(self) -> None:
+        """The match is on an underscore-delimited tail, not on any tail."""
+        assert Unit.of('m') is None
+        assert Unit.of('algorithm') is None
+
+    def test_the_longest_member_wins(self) -> None:
+        """`m` is a suffix of `m2_per_kg` as a string; declaration order decides."""
+        assert Unit.of('mass_attenuation_m2_per_kg') is Unit.SQUARE_METERS_PER_KILOGRAM
+
+    def test_members_are_declared_longest_suffix_first(self) -> None:
+        """What makes the match above work, stated where it can be checked."""
+        lengths = [len(unit.suffix) for unit in Unit]
+        assert lengths == sorted(lengths, reverse=True)
+
+    def test_stripping_leaves_the_stem(self) -> None:
+        assert Unit.METER.strip_from('period_x_m') == 'period_x'
+
+    def test_every_member_spells_itself_out(self) -> None:
+        assert all(unit.words for unit in Unit)
+
+
+class TestEnumSpelling:
+    def test_by_name_renders_the_member_name(self) -> None:
+        assert EnumSpelling.BY_NAME.render(Optimizers.SGD) == 'SGD'
+
+    def test_by_value_renders_the_member_value(self) -> None:
+        assert EnumSpelling.BY_VALUE.render(Optimizers.SGD) == 'sgd'
+
+    def test_a_value_that_is_not_an_enum_passes_through(self) -> None:
+        """A caller holds a declared value and need not first ask what kind it is."""
+        assert EnumSpelling.BY_NAME.render(3) == '3'
+        assert EnumSpelling.BY_VALUE.render(True) == 'True'
+
+    def test_rendering_round_trips_through_parsing(self) -> None:
+        for spelling in EnumSpelling:
+            for member in Optimizers:
+                assert spelling.parse(Optimizers, spelling.render(member)) is member
+
+    def test_parsing_the_other_spelling_is_rejected(self) -> None:
+        """The failure the duplicated conditional used to risk, now one call away."""
+        with pytest.raises(KeyError):
+            EnumSpelling.BY_NAME.parse(Optimizers, 'sgd')
+
+        with pytest.raises(ValueError):
+            EnumSpelling.BY_VALUE.parse(Optimizers, 'SGD')
+
+    def test_the_members_offered_are_the_members_written(self) -> None:
+        """A panel and the settings file have to agree, so both ask this."""
+        for spelling in EnumSpelling:
+            offered = spelling.members(Optimizers)
+            assert offered == [spelling.render(member) for member in Optimizers]
+
+
 class TestNamingRules:
+    def test_verbatim_renders_the_declared_name(self) -> None:
+        assert NamingConvention.VERBATIM.render('period_x_m') == 'period_x_m'
+
     def test_snake_case_becomes_pascal_case(self) -> None:
-        assert to_pascal_case('step_size') == 'StepSize'
+        assert NamingConvention.PASCAL_CASE.render('step_size') == 'StepSize'
 
     def test_unit_suffixes_are_spelled_out(self) -> None:
-        assert to_pascal_case('period_x_m') == 'PeriodXInMeters'
-        assert to_pascal_case('window_size_px') == 'WindowSizeInPixels'
+        assert NamingConvention.PASCAL_CASE.render('period_x_m') == 'PeriodXInMeters'
+        assert NamingConvention.PASCAL_CASE.render('window_size_px') == 'WindowSizeInPixels'
 
     def test_longest_unit_suffix_wins(self) -> None:
         """A short suffix must not shadow a compound one that also matches."""
-        assert to_pascal_case('mass_attenuation_m2_per_kg').endswith('SquareMetersPerKilogram')
+        assert NamingConvention.PASCAL_CASE.render('mass_attenuation_m2_per_kg').endswith(
+            'SquareMetersPerKilogram'
+        )
 
 
 class TestFlattening:
@@ -161,7 +228,7 @@ class TestFlattening:
 
     def test_verbatim_policy_persists_declared_field_names(self) -> None:
         """Two backends mirror their library's own snake_case names."""
-        keys = _keys(FlatteningPolicy(hidden=_ONLY_SCALARS, verbatim=True))
+        keys = _keys(FlatteningPolicy(hidden=_ONLY_SCALARS, naming=NamingConvention.VERBATIM))
         assert 'step_size' in keys and 'StepSize' not in keys
 
     def test_pydantic_dataclasses_nest_the_same_as_base_models(self) -> None:
@@ -235,10 +302,10 @@ class TestDeclaredMetadata:
 class TestValueRendering:
     def test_enums_render_by_member_name_by_default(self) -> None:
         """ptychodus persists pty-chi enums as SGD, while the StrEnum value is sgd."""
-        assert render_value(Optimizers.SGD, by_name=True) == 'SGD'
+        assert EnumSpelling.BY_NAME.render(Optimizers.SGD) == 'SGD'
 
     def test_enums_render_by_value_when_the_policy_says_so(self) -> None:
-        assert render_value(Optimizers.SGD, by_name=False) == 'sgd'
+        assert EnumSpelling.BY_VALUE.render(Optimizers.SGD) == 'sgd'
 
 
 class TestAgainstRealPtyChiOptions:
@@ -484,3 +551,114 @@ class TestOverlays:
             if p.path == 'step_size'
         )
         assert tuple(step.choices) == ()
+
+
+class TestSwitchLeaves:
+    """A leaf named by `collapse_onto_prefix` says whether its branch applies at all.
+
+    The flat layout erases the distinction -- such a leaf takes the bare group prefix,
+    so its key looks like any other boolean -- which is the whole reason the flag is
+    carried on the record rather than recomputed downstream.
+    """
+
+    def test_a_collapsing_leaf_is_marked_as_its_branch_switch(self) -> None:
+        policy = FlatteningPolicy(hidden=_ONLY_L1, prefixes={'l1_norm': 'ConstrainL1Norm'})
+        produced = {p.ini_key: p for p in flatten_options(Options(), policy)}
+        assert produced['ConstrainL1Norm'].gates_group
+        assert produced['ConstrainL1Norm'].path == 'l1_norm.enabled'
+
+    def test_a_value_inside_the_branch_is_not(self) -> None:
+        policy = FlatteningPolicy(hidden=_ONLY_L1, prefixes={'l1_norm': 'ConstrainL1Norm'})
+        produced = {p.ini_key: p for p in flatten_options(Options(), policy)}
+        assert not produced['ConstrainL1NormWeight'].gates_group
+
+    def test_a_leaf_outside_the_naming_rule_is_not(self) -> None:
+        produced = {
+            p.ini_key: p for p in flatten_options(Options(), FlatteningPolicy(hidden=_ONLY_SCALARS))
+        }
+        assert not produced['Optimizer'].gates_group
+
+    def test_the_rule_is_the_policy_s_to_state(self) -> None:
+        """A model spelling its switch differently names it rather than being missed."""
+        policy = FlatteningPolicy(
+            hidden=_ONLY_L1,
+            prefixes={'l1_norm': 'ConstrainL1Norm'},
+            collapse_onto_prefix=frozenset({'weight'}),
+        )
+        produced = {p.ini_key: p for p in flatten_options(Options(), policy)}
+        assert produced['ConstrainL1Norm'].path == 'l1_norm.weight'
+        assert produced['ConstrainL1Norm'].gates_group
+        assert not produced['ConstrainL1NormEnabled'].gates_group
+
+    def test_an_adapted_key_is_never_the_switch(self) -> None:
+        """Which of an adapter's keys gates the rest is the adapter's own business."""
+        policy = FlatteningPolicy(
+            hidden=_ONLY_SCALARS,
+            structural={'optimizable': OptionalGate('EnableOptimizable', 'Optimizable')},
+        )
+        produced = flatten_options(Options(), policy)
+        assert not any(p.gates_group for p in produced)
+
+
+class TestUnitsOnFlattenedKeys:
+    def test_a_field_naming_a_unit_carries_it(self) -> None:
+        period = next(
+            p
+            for p in flatten_options(Options(), FlatteningPolicy(hidden=_ONLY_SCALARS))
+            if p.path == 'period_x_m'
+        )
+        assert period.unit is Unit.METER
+        assert period.ini_key == 'PeriodXInMeters'
+
+    def test_a_field_naming_none_carries_none(self) -> None:
+        step = next(
+            p
+            for p in flatten_options(Options(), FlatteningPolicy(hidden=_ONLY_SCALARS))
+            if p.path == 'step_size'
+        )
+        assert step.unit is None
+
+    def test_the_unit_survives_a_verbatim_policy(self) -> None:
+        """The unit is the field's, not the key spelling's, so it outlives the rename."""
+        policy = FlatteningPolicy(hidden=_ONLY_SCALARS, naming=NamingConvention.VERBATIM)
+        period = next(p for p in flatten_options(Options(), policy) if p.path == 'period_x_m')
+        assert period.ini_key == 'period_x_m'
+        assert period.unit is Unit.METER
+
+    def test_an_adapted_key_reports_no_unit(self) -> None:
+        """An adapter may persist a value in a unit the declared field does not use."""
+        policy = FlatteningPolicy(
+            hidden=_ONLY_SCALARS,
+            structural={'period_x_m': OptionalGate('EnablePeriod', 'PeriodInDegrees')},
+        )
+        produced = flatten_options(Options(), policy)
+        assert [p.unit for p in produced if p.path == 'period_x_m'] == [None, None]
+
+
+class TestPanelHidden:
+    """A key a reconstructor persists but ignores is described away, not withheld.
+
+    The group holding it is shared, so withholding it would make the settings file
+    depend on which reconstructor registered first.
+    """
+
+    def test_a_panel_hidden_key_is_still_produced(self) -> None:
+        policy = FlatteningPolicy(hidden=_ONLY_SCALARS, panel_hidden=frozenset({'step_size'}))
+        assert 'StepSize' in _keys(policy)
+
+    def test_and_is_marked(self) -> None:
+        policy = FlatteningPolicy(hidden=_ONLY_SCALARS, panel_hidden=frozenset({'step_size'}))
+        produced = {p.ini_key: p for p in flatten_options(Options(), policy)}
+        assert produced['StepSize'].panel_hidden
+        assert not produced['Optimizer'].panel_hidden
+
+    def test_naming_a_branch_covers_its_subtree(self) -> None:
+        policy = FlatteningPolicy(hidden=_ONLY_L1, panel_hidden=frozenset({'l1_norm'}))
+        produced = flatten_options(Options(), policy)
+        marked = {p.ini_key for p in produced if p.panel_hidden}
+        assert marked == {p.ini_key for p in produced if p.path.startswith('l1_norm.')}
+        assert len(marked) > 1
+
+    def test_nothing_is_marked_by_default(self) -> None:
+        produced = flatten_options(Options(), FlatteningPolicy())
+        assert not any(p.panel_hidden for p in produced)

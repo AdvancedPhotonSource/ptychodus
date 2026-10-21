@@ -1,6 +1,7 @@
 from .group_box import CheckableGroupBox, GroupBoxWithPresets
 from .combo_box_item_delegate import ComboBoxItemDelegate
 from .decimal_line_edit import DecimalLineEdit
+from .decimal_range_slider import DecimalRangeSlider
 from .decimal_slider import DecimalSlider
 from .exception_dialog import ExceptionDialog
 from .power_two_spin_box import PowerTwoSpinBox
@@ -11,6 +12,7 @@ __all__ = [
     'CheckableGroupBox',
     'ComboBoxItemDelegate',
     'DecimalLineEdit',
+    'DecimalRangeSlider',
     'DecimalSlider',
     'ExceptionDialog',
     'GroupBoxWithPresets',

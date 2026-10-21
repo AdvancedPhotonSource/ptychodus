@@ -8,7 +8,7 @@ from PyQt5.QtCore import QEvent, QPoint, Qt
 from PyQt5.QtTest import QTest
 
 from ptychodus.api.geometry import Interval
-from ptychodus.view.image import DecimalRangeSlider, Handle
+from ptychodus.view.widgets.decimal_range_slider import DecimalRangeSlider, Handle
 
 
 def _iv(lower, upper) -> Interval[Decimal]:

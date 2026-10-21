@@ -190,6 +190,12 @@ class ProcessingParameterStore:
         value a field holds and what it may be, and the parameter beside it is
         what an editor binds to. Several sections feeding one group are merged,
         because the panel shows one group.
+
+        A key this reconstructor persists but ignores is left out. It is
+        described away rather than never generated, because the group holding
+        it is shared: two reconstructors of one backend write the same section,
+        and which of them was registered first must not decide what that
+        section contains.
         """
         try:
             entry = self._entries[_compose_key(library, algorithm)]
@@ -203,6 +209,9 @@ class ProcessingParameterStore:
             fields = merged.setdefault(bound.section.group_name, [])
 
             for described in flatten_options(root, bound.section.policy):
+                if described.panel_hidden:
+                    continue
+
                 parameter = bound.parameters.get(described.ini_key)
 
                 if parameter is not None:

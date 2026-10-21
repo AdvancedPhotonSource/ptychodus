@@ -72,7 +72,7 @@ from ptychodus.cli import positive_int
 # either one: a ProbePositionFileReader returns coordinates, so the rest of what the
 # parameter file records has nowhere to go, and a filename convention is not a plugin at
 # all. reconstruct_batch_lamni reaches into its instrument's plugin the same way.
-from ptychodus.plugins.fold_slice._pairing import find_position_file
+from ptychodus.plugins.fold_slice.pairing import find_position_file
 from ptychodus.plugins.fold_slice.position_file import (
     FoldSliceParameters,
     read_fold_slice_parameters,

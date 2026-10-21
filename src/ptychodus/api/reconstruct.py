@@ -35,6 +35,33 @@ from .propagate import compute_full_aperture_fresnel_number
 from .spawn import run_subprocess
 from .typing import RealArrayType
 
+__all__ = [
+    'ApplySettingsSync',
+    'DefaultOptions',
+    'DeviceEnvironment',
+    'DumpReconstructOptions',
+    'DumpTrainOptions',
+    'ExportTrainingData',
+    'NoOptions',
+    'NullReconstructor',
+    'PositionIndexFilter',
+    'ReconstructInput',
+    'ReconstructionAmbiguities',
+    'ReconstructOutput',
+    'Reconstructor',
+    'ReconstructorLibrary',
+    'ReconstructorMessage',
+    'ResolveModelPath',
+    'SaveModel',
+    'SubprocessOperation',
+    'SubprocessPayload',
+    'SubprocessReconstructor',
+    'TrainOutput',
+    'TrainableReconstructor',
+    'prepare_reconstruct_input',
+    'warn_if_propagation_regime_disagrees',
+]
+
 logger = logging.getLogger(__name__)
 
 
@@ -292,7 +319,7 @@ DumpReconstructOptions = Callable[[ReconstructInput, BaseModel], Any]
 DumpTrainOptions = Callable[[BaseModel], Any]
 """(options) -> the subset of the declaration the training child reads."""
 
-ResolveModelPath = Callable[['Path | None'], Path]
+ResolveModelPath = Callable[[Path | None], Path]
 """(path recorded by load_model) -> the path the child loads from.
 
 Runs parent-side, before the child is spawned, so a backend that unpacks an
@@ -307,7 +334,7 @@ SaveModel = Callable[[Path, Path], None]
 """(source_path_loaded_by_child, destination_path) -> None. Runs parent-side."""
 
 ApplySettingsSync = Callable[[dict[str, dict[str, str]]], None]
-"""Optional handler for ('settings_sync', dict) messages the child emits."""
+"""Optional handler for the settings a child reports back; see ReconstructorMessage."""
 
 DefaultOptions = Callable[[], BaseModel]
 """() -> a fresh object describing what this backend accepts, at its defaults."""
@@ -584,10 +611,11 @@ class ReconstructorLibrary(Iterable[Reconstructor], ABC):
 
     What a library offers is settled on first use rather than at
     construction, because registration happens in every process that loads
-    plugins including the many that never reconstruct. Whichever way it
-    turns out, it is announced the same way: a library whose packages are
-    missing offers nothing and says so, and one that builds reports the
-    version it built against.
+    plugins including the many that never reconstruct. However it turns out,
+    it is announced: a library that builds reports the version it built
+    against, one whose packages are absent says so, and one whose packages
+    are present but will not import says *that*, as a warning carrying the
+    traceback, since it is a fault rather than a choice.
     """
 
     def __init__(
@@ -653,10 +681,17 @@ class ReconstructorLibrary(Iterable[Reconstructor], ABC):
         except ImportError:
             # Locating a module does not execute it, so a package that is
             # present but unusable -- a dependency of its own missing, a
-            # partial install -- is only discovered here. The traceback goes
-            # with it, because this is the one case the caller cannot tell
-            # apart from simply not having installed the backend.
-            self._logger.info(f'{self._distribution} not found.', exc_info=True)
+            # partial install -- is only discovered here. Said differently
+            # from the branch above, and louder: not installing a backend is
+            # a choice, while installing one that cannot import is a fault
+            # nobody asked for, and a run that silently proceeds without it
+            # is the failure worth reporting. The traceback goes with it as
+            # the only thing that names what is actually broken.
+            self._logger.warning(
+                f'{self._distribution} is installed but failed to import; '
+                'this backend is disabled.',
+                exc_info=True,
+            )
             return []
 
         self.log_version()

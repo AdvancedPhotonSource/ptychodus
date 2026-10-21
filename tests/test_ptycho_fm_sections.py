@@ -29,7 +29,7 @@ pytest.importorskip('ptycho_fm')
 
 from ptychodus.api.settings import SettingsRegistry  # noqa: E402
 from ptychodus.model.processing._ptycho_fm_sections import sections  # noqa: E402
-from ptychodus.model.processing.flatten import flatten_options, render_value  # noqa: E402
+from ptychodus.model.processing.flatten import flatten_options  # noqa: E402
 from ptychodus.model.processing.generate import (  # noqa: E402
     apply_options,
     populate_parameter_group,
@@ -68,9 +68,7 @@ def test_every_declared_default_matches_the_persisted_one(section: OptionsSectio
     expected = _golden()[section.group_name]
 
     for flat in flatten_options(root, section.policy):
-        assert render_value(flat.default, by_name=flat.enum_by_name) == expected[flat.ini_key], (
-            flat.ini_key
-        )
+        assert flat.spelling.render(flat.default) == expected[flat.ini_key], flat.ini_key
 
 
 @pytest.mark.parametrize('section', sections(), ids=lambda s: s.group_name)
@@ -199,6 +197,19 @@ def test_only_the_fields_ptychodus_surfaces_are_set() -> None:
         assert getattr(restored, root_path).model_fields_set == names, root_path
 
 
+def _dumps(name: str) -> tuple[Any, Any]:
+    """The two payload builders one reconstructor was built with.
+
+    Reached through the reconstructor rather than called directly, because what
+    each operation sends is the thing worth pinning and the builders are
+    closures over the mode.
+    """
+    from ptychodus.plugins.ptycho_fm.reconstructor import build_reconstructor
+
+    built = build_reconstructor(name)
+    return built._dump_reconstruct_options, built._dump_train_options
+
+
 def test_the_config_the_child_receives_is_what_the_declaration_sets() -> None:
     """Only the surfaced fields, plus the two that are not settings at all.
 
@@ -208,24 +219,45 @@ def test_the_config_the_child_receives_is_what_the_declaration_sets() -> None:
     from a field having no value, so a key appearing here that nobody chose
     would silently override one of those.
     """
-    from ptychodus.plugins.ptycho_fm.reconstructor import _build_config
+    _, dump_train = _dumps('Unsupervised')
+    config = dump_train(_restored_config())
+    declared = _restored_config().model_dump(exclude_unset=True)
 
-    config = _build_config('Unsupervised', _restored_config())
-
-    assert set(config) == {'data', 'model', 'training', 'inference'}
     # Neither is a setting: the objective follows from which reconstructor was
     # selected, and the encoder takes one channel in every configuration.
     assert config['training'].pop('mode') == 'unsupervised'
     assert config['model']['encoder'].pop('in_channels') == 1
-    assert config == _restored_config().model_dump(exclude_unset=True)
+    assert config == {branch: declared[branch] for branch in config}
+
+
+def test_each_operation_is_sent_only_the_branches_it_reads() -> None:
+    """Training values do not travel to an inference run, nor the reverse.
+
+    Narrowing here is hygiene rather than a fix -- the child ignored what it
+    did not read either way -- but a payload that changed when an unrelated
+    setting was edited is one nobody can diff.
+    """
+    dump_reconstruct, dump_train = _dumps('Unsupervised')
+    options = _restored_config()
+
+    assert set(dump_reconstruct(None, options)) == {'data', 'inference', 'model'}
+    assert set(dump_train(options)) == {'data', 'model', 'training'}
+
+
+def test_a_surviving_branch_is_spelled_exactly_as_it_would_be_whole() -> None:
+    """Narrowing intersects with `exclude_unset` rather than overriding it."""
+    dump_reconstruct, _ = _dumps('Unsupervised')
+    options = _restored_config()
+    narrowed = dump_reconstruct(None, options)
+    declared = options.model_dump(exclude_unset=True)
+
+    assert narrowed['data'] == declared['data']
+    assert narrowed['inference'] == declared['inference']
 
 
 def test_the_objective_is_the_only_thing_the_mode_changes() -> None:
-    from ptychodus.plugins.ptycho_fm.reconstructor import _build_config
-
-    options = _restored_config()
-    supervised = _build_config('Supervised', options)
-    unsupervised = _build_config('Unsupervised', _restored_config())
+    supervised = _dumps('Supervised')[1](_restored_config())
+    unsupervised = _dumps('Unsupervised')[1](_restored_config())
 
     assert supervised['training'].pop('mode') == 'supervised'
     assert unsupervised['training'].pop('mode') == 'unsupervised'

@@ -22,7 +22,7 @@ import logging
 
 from ptychodus.api.parameters import Parameter, ParameterGroup
 
-from .flatten import FlatParameter, FlatteningPolicy, flatten_options, render_value
+from .flatten import FlatParameter, FlatteningPolicy, flatten_options
 
 __all__ = [
     'UnsupportedParameterError',
@@ -61,7 +61,7 @@ def _create(group: ParameterGroup, flat: FlatParameter) -> Parameter[Any]:
     # models ptychodus owns -- so the live parameter is a string either way, and
     # the declared type is what restores meaning on the way back out.
     if isinstance(annotation, type) and issubclass(annotation, Enum):
-        return group.create_string_parameter(key, render_value(default, by_name=flat.enum_by_name))
+        return group.create_string_parameter(key, flat.spelling.render(default))
 
     # bool is a subclass of int, so it has to be tested first.
     if annotation is bool:
@@ -160,14 +160,14 @@ def _restore_value(flat: FlatParameter, value: Any) -> Any:
 
     if isinstance(annotation, type) and issubclass(annotation, Enum):
         try:
-            return annotation[value] if flat.enum_by_name else annotation(value)
+            return flat.spelling.parse(annotation, value)
         except (KeyError, ValueError):
-            members = ', '.join(m.name if flat.enum_by_name else str(m.value) for m in annotation)
+            members = ', '.join(flat.spelling.members(annotation))
             # The fallback is spelled the way the members are listed, so the
             # message does not appear to name a value it just rejected.
             logger.warning(
                 f'Ignoring "{flat.ini_key}" = "{value}": not one of {members}. '
-                f'Using "{render_value(flat.default, by_name=flat.enum_by_name)}".'
+                f'Using "{flat.spelling.render(flat.default)}".'
             )
             return flat.default
 

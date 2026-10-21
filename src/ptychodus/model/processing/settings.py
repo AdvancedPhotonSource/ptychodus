@@ -1,5 +1,14 @@
+from typing import Final
+
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
+
+# The algorithm a fresh install starts on. Named so that it can also be the
+# fallback for a persisted name the selected library cannot resolve, which
+# is a better answer than whichever algorithm that library happens to list
+# first -- the one is a choice ptychodus made, the other is an accident of
+# registration order.
+_DEFAULT_ALGORITHM: Final = 'LSQML'
 
 
 class ProcessingSettings(Observable, Observer):
@@ -16,7 +25,8 @@ class ProcessingSettings(Observable, Observer):
         # The simple name, which is what a chooser writes back and so what
         # a saved file holds; the display name resolves too.
         self.library = self._group.create_string_parameter('Library', 'PtyChi')
-        self.algorithm = self._group.create_string_parameter('Algorithm', 'LSQML')
+        self.algorithm = self._group.create_string_parameter('Algorithm', _DEFAULT_ALGORITHM)
+        self.default_algorithm = _DEFAULT_ALGORITHM
         # Device identifiers, comma separated; empty means every device the
         # process can see. Identifiers rather than indices, so the value still
         # names the same hardware on a host with a different number of cards.

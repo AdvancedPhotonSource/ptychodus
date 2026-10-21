@@ -20,6 +20,13 @@ that switches a run of fields on encloses them in a group box it titles, so
 turning it off folds them away instead of leaving two dozen dead rows on
 screen. And a branch's start, stop and stride are one editor: they are a range
 written as three numbers, and reading them apart is reading a range apart.
+
+Two things a declaration does not state, and so two things no panel built here
+can do. It says nothing about one field applying only while another holds a
+particular value, so a field whose relevance is conditional is shown whatever
+the condition; and it says nothing that reaches across settings groups, so a
+value standing for "whatever that other group holds" is shown as the sentinel
+it actually stores.
 """
 
 from __future__ import annotations
@@ -49,15 +56,22 @@ from ptychodus.api.parameters import (
     RealParameter,
     StringParameter,
 )
-from ptychodus.model.processing import DescribedField, DescribedGroup, ProcessingParameterStore
+from ptychodus.model.processing import (
+    DescribedField,
+    DescribedGroup,
+    ProcessingParameterStore,
+    Unit,
+)
 
 from ..parameters import (
+    AngleParameterViewController,
     CheckableGroupBoxParameterViewController,
     CheckBoxParameterViewController,
     ComboBoxParameterViewController,
     DecimalLineEditParameterViewController,
     DecimalSliderParameterViewController,
     IntegerLineEditParameterViewController,
+    LengthParameterViewController,
     LineEditParameterViewController,
     ParameterViewController,
     ParameterWidget,
@@ -117,9 +131,7 @@ def _choices(field: DescribedField) -> Sequence[str]:
     annotation = _held_type(described.annotation)
 
     if isinstance(annotation, type) and issubclass(annotation, Enum):
-        return [
-            member.name if described.enum_by_name else str(member.value) for member in annotation
-        ]
+        return described.spelling.members(annotation)
 
     return []
 
@@ -216,6 +228,34 @@ def _whole_number_editor(
     return SpinBoxParameterViewController(parameter, tool_tip=tool_tip)
 
 
+def _real_number_editor(
+    parameter: RealParameter, unit: Unit | None, *, tool_tip: str = ''
+) -> ParameterViewController:
+    """A unit ladder where the field names a unit, else a slider or a line edit.
+
+    A bounded real slides between its ends; an unbounded one has nothing to
+    slide between and gets a line edit. A real naming a unit gets neither: a
+    length is read and written in whichever SI prefix suits its magnitude, and
+    a slider over the whole range would make the small end unreachable.
+    """
+    # Only the base unit of each quantity, because each of these controllers
+    # holds one: a field declaring degrees handed to the one that reads turns
+    # would be rescaled by a factor nobody asked for.
+    ladders: Final = {
+        Unit.METER: LengthParameterViewController,
+        Unit.TURN: AngleParameterViewController,
+    }
+    ladder = None if unit is None else ladders.get(unit)
+
+    if ladder is not None:
+        return ladder(parameter, tool_tip=tool_tip)
+
+    if parameter.get_minimum() is not None and parameter.get_maximum() is not None:
+        return DecimalSliderParameterViewController(parameter, tool_tip=tool_tip)
+
+    return DecimalLineEditParameterViewController(parameter, tool_tip=tool_tip)
+
+
 class _PlanViewController(ParameterViewController):
     """A branch's start, stop and stride on one row, each captioned by what it is."""
 
@@ -259,12 +299,7 @@ def _editor(field: DescribedField) -> ParameterViewController | None:
         return _whole_number_editor(parameter, tool_tip=tool_tip)
 
     if isinstance(parameter, RealParameter):
-        bounded = parameter.get_minimum() is not None and parameter.get_maximum() is not None
-
-        if bounded:
-            return DecimalSliderParameterViewController(parameter, tool_tip=tool_tip)
-
-        return DecimalLineEditParameterViewController(parameter, tool_tip=tool_tip)
+        return _real_number_editor(parameter, described.unit, tool_tip=tool_tip)
 
     if isinstance(parameter, StringParameter):
         if choices:

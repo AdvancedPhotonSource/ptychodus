@@ -17,7 +17,7 @@ import pytest
 
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.processing._ptychopinn_sections import sections
-from ptychodus.model.processing.flatten import flatten_options, render_value
+from ptychodus.model.processing.flatten import flatten_options
 from ptychodus.model.processing.generate import populate_parameter_group, restore_options
 from ptychodus.model.processing.parameter_store import OptionsSection
 from ptychodus.plugins.ptychopinn.options import Accelerator, PtychoPINNOptions
@@ -53,9 +53,7 @@ def test_every_declared_default_matches_the_persisted_one(section: OptionsSectio
     expected = _golden()[section.group_name]
 
     for flat in flatten_options(root, section.policy):
-        assert render_value(flat.default, by_name=flat.enum_by_name) == expected[flat.ini_key], (
-            flat.ini_key
-        )
+        assert flat.spelling.render(flat.default) == expected[flat.ini_key], flat.ini_key
 
 
 @pytest.mark.parametrize('section', sections(), ids=lambda s: s.group_name)

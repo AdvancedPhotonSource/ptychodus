@@ -96,6 +96,7 @@ from ptychodus.cli._batch_lamni_settings import (
     Positions,
     ProbeFromFile,
     SimulatedProbe,
+    WorkerMessage,
     dump_batch_settings,
     load_batch_settings,
     load_batch_settings_from_text,
@@ -115,7 +116,7 @@ from ptychodus.cli._reconstruct_common import (
 from ptychodus.api.devices import CPU, Device, probe_devices, visibility_environment
 from ptychodus.api.spawn import ChildError, run_subprocess
 from ptychodus.plugins.ptychi.task import dump_task_options
-from ptychodus.plugins.aps31id_lamni._scan_table import (
+from ptychodus.plugins.aps31id_lamni.scan_table import (
     APS31IDEScanRecord,
     read_aps31ide_scan_table,
 )
@@ -247,7 +248,7 @@ def _worker_loop(
         try:
             with run_subprocess(_WORKER_ENTRY, payload, environment=environment) as events:
                 for event in events:
-                    if event[0] == 'output':
+                    if event[0] == WorkerMessage.SCAN_RESULT:
                         completed = bool(event[1].get('completed'))
         except ChildError as exc:
             with tally.lock:

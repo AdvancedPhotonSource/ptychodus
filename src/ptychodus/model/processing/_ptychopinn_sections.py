@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from .flatten import FlatteningPolicy
+from .flatten import EnumSpelling, FlatteningPolicy, NamingConvention
 from .parameter_store import OptionsSection
 
 __all__ = ['sections']
@@ -24,9 +24,9 @@ def sections() -> Sequence[OptionsSection]:
 
     One per declared branch, with no prefix and no renaming: the persisted key
     is the field name. When the keys are normalized to house style, this becomes
-    a `verbatim=False` policy plus whatever the rules then miss.
+    a `NamingConvention.PASCAL_CASE` policy plus whatever the rules then miss.
     """
-    verbatim = FlatteningPolicy(verbatim=True, enum_by_name=False)
+    verbatim = FlatteningPolicy(naming=NamingConvention.VERBATIM, spelling=EnumSpelling.BY_VALUE)
 
     return [
         OptionsSection('PtychoPINNData', root_path='data', policy=verbatim),

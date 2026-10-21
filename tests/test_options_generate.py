@@ -19,7 +19,12 @@ from ptychodus.api.parameters import (
     StringParameter,
 )
 from ptychodus.api.settings import SettingsRegistry
-from ptychodus.model.processing.flatten import FlatteningPolicy, Overlay, Sentinel
+from ptychodus.model.processing.flatten import (
+    EnumSpelling,
+    FlatteningPolicy,
+    Overlay,
+    Sentinel,
+)
 from ptychodus.model.processing.generate import (
     UnsupportedParameterError,
     populate_parameter_group,
@@ -113,7 +118,9 @@ class TestEnums:
     def test_enum_persists_by_value_under_a_verbatim_policy(self) -> None:
         registry = SettingsRegistry()
         built = populate_parameter_group(
-            registry.create_group('Declared'), Declared(), FlatteningPolicy(enum_by_name=False)
+            registry.create_group('Declared'),
+            Declared(),
+            FlatteningPolicy(spelling=EnumSpelling.BY_VALUE),
         )
         assert built['Mode'].get_value() == 'fast'
 
@@ -188,7 +195,9 @@ class TestRestoringOptions:
         assert restore_options(defaults, parameters, policy).mode is Mode.EXACT
 
     def test_an_enum_is_restored_from_its_value_under_a_verbatim_policy(self) -> None:
-        defaults, parameters, policy = self._round_trip(FlatteningPolicy(enum_by_name=False))
+        defaults, parameters, policy = self._round_trip(
+            FlatteningPolicy(spelling=EnumSpelling.BY_VALUE)
+        )
         parameters['Mode'].set_value('exact')
         assert restore_options(defaults, parameters, policy).mode is Mode.EXACT
 

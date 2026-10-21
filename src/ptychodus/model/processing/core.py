@@ -88,7 +88,9 @@ class ProcessingCore:
             reconstructor_libraries, self._settings.library
         )
         self.algorithm_parameter = ProcessingAlgorithmParameter(
-            self._settings.algorithm, self.library_parameter
+            self._settings.algorithm,
+            self.library_parameter,
+            default=self._settings.default_algorithm,
         )
         self.parameter_store = ProcessingParameterStore(settings_registry)
         self.device_selection = DeviceSelection(self._settings.devices)

@@ -19,7 +19,7 @@ from typing import Any
 
 import numpy
 
-from ._payload import PtychozoonPayload
+from ._payload import PtychozoonMessage, PtychozoonPayload
 
 __all__ = [
     'run_vspi_enhancement',
@@ -31,7 +31,8 @@ def run_vspi_enhancement(payload: PtychozoonPayload, result_queue: Queue[Any]) -
 
     Intended as the ``entry_point`` for
     :func:`ptychodus.api.spawn.run_subprocess`.
-    Puts ``('result', iteration, [(name, cps), ...])`` tuples per checkpoint.
+    Puts one ``PtychozoonMessage.RESULT`` tuple per checkpoint, carrying the
+    iteration reached and the maps enhanced so far.
     """
     from ptychozoon.vspi_enhance import VSPIFluorescenceEnhancingAlgorithm
 
@@ -42,7 +43,7 @@ def run_vspi_enhancement(payload: PtychozoonPayload, result_queue: Queue[Any]) -
     ):
         result_queue.put(
             (
-                'result',
+                PtychozoonMessage.RESULT,
                 int(iteration),
                 [(emap.name, numpy.asarray(emap.counts_per_second)) for emap in enhanced_dataset],
             )

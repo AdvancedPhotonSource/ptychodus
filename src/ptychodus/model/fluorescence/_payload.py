@@ -18,6 +18,7 @@ the allow-list that pins that guarantee.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -28,8 +29,25 @@ if TYPE_CHECKING:
     from ptychozoon.settings import DeconvolutionEnhancementSettings
 
 __all__ = [
+    'PtychozoonMessage',
     'PtychozoonPayload',
 ]
+
+
+class PtychozoonMessage(StrEnum):
+    """What the enhancement child has to say about its work.
+
+    The transport owns the tags it puts on the queue itself and passes every
+    other one through, so the vocabulary of an enhancement run is named here
+    instead -- in the module both sides already share, since the entry point
+    is addressed by name and the parent must not import the child.
+
+    A string enum because the value is what travels, so a child writing the
+    bare string still compares equal to the member.
+    """
+
+    RESULT = 'result'
+    """One checkpoint: the iteration reached, and the maps enhanced so far."""
 
 
 @dataclass(frozen=True)

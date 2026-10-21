@@ -75,10 +75,13 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
         self,
         parameter: StringParameter,
         library: PluginChooserParameter[ReconstructorLibrary],
+        *,
+        default: str = '',
     ) -> None:
         super().__init__()
         self._parameter = parameter
         self._library = library
+        self._default = default
         self._current = ''
         self._current_reconstructor: Reconstructor = NullReconstructor('None')
         # The last algorithm chosen for each library this session, so that
@@ -113,12 +116,11 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
     def _settle(self, wanted: str, *, persist: bool, warn: bool = True) -> None:
         """Resolve *wanted* against the selected library and select the result.
 
-        An unresolvable name is stood in for by the first algorithm the
-        library offers, so the application is usable -- but it is not written
-        back unless *persist*. A settings file naming a backend or an
-        algorithm this install lacks is an ordinary thing to carry between
-        machines, and rewriting the key would lose the choice the first time
-        it was opened somewhere that could not resolve it.
+        An unresolvable name is stood in for, so the application is usable --
+        but it is not written back unless *persist*. A settings file naming a
+        backend or an algorithm this install lacks is an ordinary thing to
+        carry between machines, and rewriting the key would lose the choice
+        the first time it was opened somewhere that could not resolve it.
 
         *warn* distinguishes a name that was asked for from one merely
         carried over: changing library to one that does not offer the
@@ -135,7 +137,7 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
                     f'Available: {[r.name for r in available]}.'
                 )
 
-            selected = available[0] if available else None
+            selected = self._stand_in(available)
         else:
             selected = resolved
             persist = True
@@ -150,6 +152,22 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
 
             if persist:
                 self._parameter.set_value(selected.name)
+
+    def _stand_in(self, available: Sequence[Reconstructor]) -> Reconstructor | None:
+        """What to select when the name asked for resolves to nothing.
+
+        The declared default where this library offers it, since that is the
+        algorithm ptychodus chose and the one a settings file saying nothing
+        would land on. Otherwise the first on offer, which is an accident of
+        registration order but is at least an algorithm.
+        """
+        wanted = self._default.strip().casefold()
+        preferred = next((r for r in available if r.name.casefold() == wanted), None)
+
+        if preferred is not None:
+            return preferred
+
+        return available[0] if available else None
 
     def get_value(self) -> str:
         return self._current
@@ -177,7 +195,7 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
         return self._library_name(), self._current
 
     def copy(self) -> Parameter[str]:
-        return ProcessingAlgorithmParameter(self._parameter, self._library)
+        return ProcessingAlgorithmParameter(self._parameter, self._library, default=self._default)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:

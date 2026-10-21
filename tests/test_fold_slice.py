@@ -21,7 +21,7 @@ from ptychodus.api.io import load_product, save_product
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeGeometry
 from ptychodus.api.probe_positions import ProbePositionParseError
-from ptychodus.plugins.fold_slice._pairing import find_position_file
+from ptychodus.plugins.fold_slice.pairing import find_position_file
 from ptychodus.plugins.fold_slice.position_file import (
     FoldSlicePositionFileReader,
     read_fold_slice_parameters,

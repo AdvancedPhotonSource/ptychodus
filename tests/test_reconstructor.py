@@ -24,6 +24,8 @@ from ptychodus.api.reconstruct import (
     PositionIndexFilter,
     ReconstructInput,
     ReconstructionAmbiguities,
+    Reconstructor,
+    ReconstructorLibrary,
     TrainableReconstructor,
     prepare_reconstruct_input,
     warn_if_propagation_regime_disagrees,
@@ -1230,3 +1232,101 @@ class TestWarnIfPropagationRegimeDisagrees:
 
         assert product.metadata.magnification == 0.0
         assert caplog.records == []
+
+
+def _library(
+    requires: tuple[str, ...] = (), build: BaseException | None = None
+) -> ReconstructorLibrary:
+    """A library that either offers one reconstructor or fails to build."""
+
+    class _Library(ReconstructorLibrary):
+        def _build(self) -> list[Reconstructor]:
+            if build is not None:
+                raise build
+
+            return [NullReconstructor('algo')]
+
+    return _Library('backend_under_test', 'backend-under-test', requires=requires)
+
+
+class TestWhatALibrarySaysAboutItself:
+    """A backend's absence is a choice; a backend that cannot import is a fault.
+
+    Locating a module does not execute it, so the two outcomes are discovered at
+    different moments and only the second carries a traceback. They used to be
+    reported with the same sentence at the same level, which made an install
+    broken by a missing transitive dependency indistinguishable from one nobody
+    asked for -- and invisible wherever the threshold is above INFO.
+    """
+
+    def test_an_absent_backend_is_reported_once_at_info(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        library = _library(('a_module_that_does_not_exist',))
+
+        with caplog.at_level(logging.INFO, logger='backend_under_test'):
+            assert list(library) == []
+
+        (record,) = caplog.records
+        assert record.levelname == 'INFO'
+        assert record.getMessage() == 'backend-under-test not found.'
+        assert record.exc_info is None
+
+    def test_a_backend_that_cannot_import_warns_and_says_so(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        library = _library((), build=ImportError('no module named thing'))
+
+        with caplog.at_level(logging.INFO, logger='backend_under_test'):
+            assert list(library) == []
+
+        (record,) = caplog.records
+        assert record.levelname == 'WARNING'
+        assert 'installed but failed to import' in record.getMessage()
+        assert 'backend-under-test' in record.getMessage()
+
+    def test_and_carries_the_traceback_naming_what_broke(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        library = _library((), build=ImportError('no module named thing'))
+
+        with caplog.at_level(logging.INFO, logger='backend_under_test'):
+            list(library)
+
+        (record,) = caplog.records
+        assert record.exc_info is not None
+        assert 'no module named thing' in str(record.exc_info[1])
+
+    def test_the_two_outcomes_do_not_share_a_sentence(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Whichever happened has to be readable from the message alone."""
+        with caplog.at_level(logging.INFO, logger='backend_under_test'):
+            list(_library(('a_module_that_does_not_exist',)))
+            absent = caplog.records[-1].getMessage()
+            list(_library((), build=ImportError('broken')))
+            broken = caplog.records[-1].getMessage()
+
+        assert absent != broken
+
+    def test_a_backend_that_builds_reports_its_version(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        library = _library(())
+
+        with caplog.at_level(logging.INFO, logger='backend_under_test'):
+            assert [r.name for r in library] == ['algo']
+
+        (record,) = caplog.records
+        assert record.levelname == 'INFO'
+        assert record.getMessage().startswith('backend-under-test ')
+
+    def test_the_outcome_is_settled_once(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Iterating is not reprobing; a broken backend must not warn per panel."""
+        library = _library((), build=ImportError('broken'))
+
+        with caplog.at_level(logging.INFO, logger='backend_under_test'):
+            list(library)
+            list(library)
+
+        assert len(caplog.records) == 1

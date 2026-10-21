@@ -35,7 +35,7 @@ from ptychodus.cli._batch_lamni_settings import (  # noqa: E402
     select_records,
 )
 from ptychodus.cli.reconstruct_batch_lamni import BatchResult, plan_batch_lamni  # noqa: E402
-from ptychodus.plugins.aps31id_lamni._scan_table import APS31IDEScanRecord  # noqa: E402
+from ptychodus.plugins.aps31id_lamni.scan_table import APS31IDEScanRecord  # noqa: E402
 
 _SCAN_TABLE = Path(__file__).parent / 'data' / 'lamni' / 'tomography_scannumbers.txt'
 

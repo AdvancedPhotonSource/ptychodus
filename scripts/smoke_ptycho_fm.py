@@ -41,7 +41,11 @@ from ptychodus.plugins.ptycho_fm._subprocess import (
     run_reconstruct,
     run_train,
 )
-from ptychodus.plugins.ptycho_fm.reconstructor import _build_config, build_reconstructor
+from ptychodus.plugins.ptycho_fm.reconstructor import (
+    build_reconstruct_config,
+    build_reconstructor,
+    build_train_config,
+)
 from ptychodus.plugins.ptycho_fm.options import PtychoFMOptions, default_options
 
 # Small enough to train in seconds. The decoder upsamples the token grid by
@@ -179,7 +183,7 @@ def run_training(mode: str, options: PtychoFMOptions, out_dir: Path) -> tuple[Pa
     payload = SubprocessPayload(
         operation=SubprocessOperation.TRAIN,
         reconstructor=mode,
-        options=_build_config(mode, options),
+        options=build_train_config(mode, options),
         input_directory=in_dir,
         output_directory=model_dir,
     )
@@ -206,7 +210,7 @@ def run_inference(checkpoint: Path, options: PtychoFMOptions) -> None:
     payload = SubprocessPayload(
         operation=SubprocessOperation.RECONSTRUCT,
         reconstructor='Supervised',
-        options=_build_config('Supervised', options),
+        options=build_reconstruct_config('Supervised', options),
         model_path=checkpoint,
         input_=parameters,
     )
@@ -270,7 +274,7 @@ def check_mode_mismatch_is_reported(options: PtychoFMOptions) -> None:
         payload = SubprocessPayload(
             operation=SubprocessOperation.RECONSTRUCT,
             reconstructor='Unsupervised',
-            options=_build_config('Unsupervised', options),
+            options=build_reconstruct_config('Unsupervised', options),
             model_path=checkpoint,
             input_=_reconstruct_input(IMG_SIZE),
         )
@@ -314,7 +318,7 @@ def check_probe_envelope_dispatch(options: PtychoFMOptions) -> None:
     import torch
 
     options.training.loss_function = 'probe_aware'
-    config = _build_config('Unsupervised', options)
+    config = build_train_config('Unsupervised', options)
     criterion = _build_criterion(config['training'])
 
     assert getattr(criterion, 'uses_probe_envelope', False), (
