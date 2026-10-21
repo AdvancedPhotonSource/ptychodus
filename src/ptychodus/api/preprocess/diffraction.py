@@ -57,7 +57,9 @@ class DiffractionPrepStep(BaseModel):
     - Override `apply_to_extent` / `apply_to_pixel_geometry` / `apply_to_dtype` only where the
       step is not identity in that dimension; the defaults below pass the input through unchanged.
     - Branch on `_is_mask(data)` in `apply` if pattern and mask behavior differ, as
-      `BinningStep` does (sum for patterns, logical-AND for masks).
+      `BinningStep` does (sum for patterns, logical-OR for masks).
+    - Override `apply_to_pixel_map` where an additive per-pixel map (a detector background)
+      must not follow the pattern path; a dtype cannot tell such a map from a pattern.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -65,6 +67,15 @@ class DiffractionPrepStep(BaseModel):
     @abstractmethod
     def apply(self, data: numpy.ndarray) -> numpy.ndarray:
         """Apply this step. Mask vs pattern behavior is inferred from `data.dtype`."""
+
+    def apply_to_pixel_map(self, data: numpy.ndarray) -> numpy.ndarray:
+        """Apply this step to a 2-D additive per-pixel map, in floating point.
+
+        A map is a per-pixel quantity that adds up the way counts do, so it follows
+        the pattern geometrically and sums wherever pixels are combined. Default:
+        :meth:`apply`, which is right for steps that only rearrange pixels.
+        """
+        return self.apply(data)
 
     def apply_to_extent(self, extent: ImageExtent) -> ImageExtent:
         """Return the extent this step would produce given `extent`. Default: identity."""
@@ -103,9 +114,16 @@ class FilterValuesStep(DiffractionPrepStep):
 
         return out
 
+    def apply_to_pixel_map(self, data: numpy.ndarray) -> numpy.ndarray:
+        return data
+
 
 class BinningStep(DiffractionPrepStep):
-    """Reduce each `bin_size_y × bin_size_x` block. Sum for patterns; logical-AND for masks.
+    """Reduce each `bin_size_y × bin_size_x` block. Sum for patterns; logical-OR for masks.
+
+    A binned pixel is bad when any of its sub-pixels is: bad pixels are zeroed before the
+    pipeline runs, so a partly bad block sums fewer measured pixels than a whole one, and
+    flagging it keeps that undercount from passing as a measurement.
 
     An extent the bin size does not divide leaves a partial block at the far edge, which
     is discarded: the output holds `extent // bin_size` whole blocks, which is what
@@ -126,10 +144,13 @@ class BinningStep(DiffractionPrepStep):
         shape = data.shape[:-2] + (binned_height, self.bin_size_y, binned_width, self.bin_size_x)
         reshaped = whole_blocks.reshape(shape)
         if _is_mask(data):
-            return numpy.logical_and.reduce(reshaped, axis=(-3, -1), keepdims=False)
+            return numpy.logical_or.reduce(reshaped, axis=(-3, -1), keepdims=False)
         return numpy.sum(
             reshaped, axis=(-3, -1), keepdims=False, dtype=self.apply_to_dtype(data.dtype)
         )
+
+    def apply_to_pixel_map(self, data: numpy.ndarray) -> numpy.ndarray:
+        return self.apply(data.astype(numpy.float64))
 
     def apply_to_extent(self, extent: ImageExtent) -> ImageExtent:
         return ImageExtent(
@@ -187,6 +208,11 @@ class UpsampleStep(DiffractionPrepStep):
 
         return numpy.clip(upsampled, pattern_min, None).astype(data.dtype, copy=False)
 
+    def apply_to_pixel_map(self, data: numpy.ndarray) -> numpy.ndarray:
+        # Each output pixel keeps its parent's value, matching the per-pixel intensity
+        # the pattern path preserves.
+        return numpy.repeat(numpy.repeat(data, self.factor, axis=-2), self.factor, axis=-1)
+
     def apply_to_extent(self, extent: ImageExtent) -> ImageExtent:
         return ImageExtent(
             width_px=extent.width_px * self.factor,
@@ -201,7 +227,11 @@ class UpsampleStep(DiffractionPrepStep):
 
 
 class PaddingStep(DiffractionPrepStep):
-    """Symmetrically pad the last two axes. Fill 0 for patterns; False for masks."""
+    """Symmetrically pad the last two axes. Fill 0 for patterns; True for masks.
+
+    Padded pixels are bad: nothing was measured there, so flagging them keeps a zero fill
+    from reading as zero photons observed.
+    """
 
     type: Literal['padding'] = 'padding'
     pad_x: int = Field(ge=0)
@@ -210,8 +240,12 @@ class PaddingStep(DiffractionPrepStep):
     def apply(self, data: numpy.ndarray) -> numpy.ndarray:
         leading_pad = ((0, 0),) * (data.ndim - 2)
         pad_width = (*leading_pad, (self.pad_y, self.pad_y), (self.pad_x, self.pad_x))
-        fill = False if _is_mask(data) else 0
+        fill = True if _is_mask(data) else 0
         return numpy.pad(data, pad_width, mode='constant', constant_values=fill)
+
+    def apply_to_pixel_map(self, data: numpy.ndarray) -> numpy.ndarray:
+        pad_width = ((self.pad_y, self.pad_y), (self.pad_x, self.pad_x))
+        return numpy.pad(data, pad_width, mode='constant', constant_values=0.0)
 
     def apply_to_extent(self, extent: ImageExtent) -> ImageExtent:
         return ImageExtent(
@@ -296,6 +330,23 @@ class DiffractionPrepPipeline(BaseModel):
 
         return self._apply(bad_pixels)
 
+    def apply_to_pixel_map(self, pixel_map: numpy.ndarray) -> numpy.ndarray:
+        """Run every step over a 2-D additive per-pixel map, returning float64.
+
+        Pixels the pipeline combines are summed and padded pixels are zero, which is
+        what a detector background needs. A map that should average instead (a flat
+        field) can be divided afterwards by this method applied to an all-ones map.
+        """
+        if pixel_map.ndim != 2:
+            raise ValueError(f'Invalid pixel map dimensions! (shape={pixel_map.shape})')
+
+        data = pixel_map.astype(numpy.float64)
+
+        for step in self.steps:
+            data = step.apply_to_pixel_map(data)
+
+        return data
+
     def __call__(self, array: DiffractionArray) -> DiffractionArray:
         """Return a new array with the pipeline applied, preserving label and scan indexes."""
         patterns = self.apply_to_patterns(array.get_patterns())
@@ -376,6 +427,11 @@ def inpaint_bad_pixels(
     :func:`zero_bad_pixels` -- the two differ in what they put at the bad-pixel
     positions, nothing else.
 
+    Only interior holes are inpainted. A bad region that touches the array border
+    -- padding, a detector edge, a gap running off the frame -- is zeroed instead,
+    because filling it would extrapolate beyond every measured pixel rather than
+    interpolate between them.
+
     Returns the input unchanged when `bad_pixels` is None or all-False so the
     (expensive) skimage call is skipped. A stack shares one mask across all its
     frames, so the biharmonic system is solved once for the whole stack rather
@@ -387,18 +443,29 @@ def inpaint_bad_pixels(
     if bad_pixels is None or not numpy.any(bad_pixels):
         return data
 
-    match data.ndim:
-        case 2:
-            filled = inpaint_biharmonic(data.astype(numpy.float64), bad_pixels)
-        case 3:
-            stacked = inpaint_biharmonic(
-                numpy.moveaxis(data, 0, -1).astype(numpy.float64),
-                bad_pixels,
-                channel_axis=-1,
-            )
-            filled = numpy.moveaxis(stacked, -1, 0)
-        case _:
-            raise ValueError('Diffraction data must be 2- or 3-dimensional ndarray.')
+    if data.ndim not in (2, 3):
+        raise ValueError('Diffraction data must be 2- or 3-dimensional ndarray.')
+
+    labels, _ = ndimage.label(bad_pixels)
+    border_labels = numpy.unique(
+        numpy.concatenate((labels[0, :], labels[-1, :], labels[:, 0], labels[:, -1]))
+    )
+    edge_pixels = numpy.isin(labels, border_labels[border_labels != 0])
+    interior_pixels = numpy.logical_and(bad_pixels, numpy.logical_not(edge_pixels))
+
+    if not numpy.any(interior_pixels):
+        filled = data.astype(numpy.float64)
+    elif data.ndim == 2:
+        filled = inpaint_biharmonic(data.astype(numpy.float64), interior_pixels)
+    else:
+        stacked = inpaint_biharmonic(
+            numpy.moveaxis(data, 0, -1).astype(numpy.float64),
+            interior_pixels,
+            channel_axis=-1,
+        )
+        filled = numpy.moveaxis(stacked, -1, 0)
+
+    filled[..., edge_pixels] = 0.0
 
     dtype = data.dtype
 

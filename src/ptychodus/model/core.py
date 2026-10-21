@@ -107,6 +107,8 @@ class ModelCore:
             self.plugin_registry.diffraction_file_readers,
             self.plugin_registry.diffraction_file_writers,
             self.settings_registry,
+            self.plugin_registry.background_file_readers,
+            self.plugin_registry.flat_field_file_readers,
         )
         self.product_core = ProductCore(
             self.rng,

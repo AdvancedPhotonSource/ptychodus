@@ -14,6 +14,10 @@ import numpy
 from .geometry import ImageExtent, PixelGeometry
 
 BadPixels: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.bool_]]
+DetectorBackground: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.floating[Any]]]
+"""Additive per-pixel signal present without the sample, in counts per frame."""
+FlatField: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.floating[Any]]]
+"""Per-pixel response to uniform illumination; a measurement is corrected by dividing by it."""
 DiffractionPatternDType: TypeAlias = numpy.dtype[numpy.integer[Any] | numpy.floating[Any]]
 DiffractionPatternCounts: TypeAlias = numpy.ndarray[tuple[int], DiffractionPatternDType]
 DiffractionPattern: TypeAlias = numpy.ndarray[tuple[int, int], DiffractionPatternDType]
@@ -302,7 +306,8 @@ class DiffractionDataset(Sequence[DiffractionArray], ABC):
 
     Every dataset owns a bad-pixel mask; callers can always rely on
     ``get_bad_pixels()`` returning a real array, defaulting to all-good pixels
-    when the source data did not include a mask.
+    when the source data did not include a mask. A measured detector background
+    and flat field are optional and absent unless the source carries them.
     """
 
     @abstractmethod
@@ -317,6 +322,27 @@ class DiffractionDataset(Sequence[DiffractionArray], ABC):
     def get_bad_pixels(self) -> BadPixels:
         pass
 
+    def get_background(self) -> DetectorBackground | None:
+        """Measured additive background on the detector extent, or None if unknown."""
+        return None
+
+    def get_flat_field(self) -> FlatField | None:
+        """Measured flat-field response on the detector extent, or None if unknown."""
+        return None
+
+
+def validate_pixel_map(
+    pixel_map: numpy.ndarray | None, expected_shape: tuple[int, ...], *, name: str
+) -> None:
+    """Raise ValueError unless a per-pixel map is absent or has `expected_shape`.
+
+    A map is any array with one value per detector pixel: a bad-pixel mask, a
+    background or a flat field. `name` begins the message, so the caller says which
+    map was wrong.
+    """
+    if pixel_map is not None and pixel_map.shape != expected_shape:
+        raise ValueError(f'{name} shape {pixel_map.shape} does not match {expected_shape}.')
+
 
 class SimpleDiffractionDataset(DiffractionDataset):
     """Concrete DiffractionDataset backed by a list of DiffractionArray objects."""
@@ -327,6 +353,9 @@ class SimpleDiffractionDataset(DiffractionDataset):
         contents_tree: DiffractionDatasetLayoutNode,
         array_list: Sequence[DiffractionArray],
         bad_pixels: BadPixels | None = None,
+        *,
+        background: DetectorBackground | None = None,
+        flat_field: FlatField | None = None,
     ) -> None:
         super().__init__()
         self._metadata = metadata
@@ -337,13 +366,13 @@ class SimpleDiffractionDataset(DiffractionDataset):
 
         if bad_pixels is None:
             bad_pixels = numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool_)
-        elif bad_pixels.shape != extent.get_shape():
-            raise ValueError(
-                f'Bad pixels shape {bad_pixels.shape} does not match '
-                f'detector extent {extent.get_shape()}.'
-            )
 
+        validate_pixel_map(bad_pixels, extent.get_shape(), name='Bad pixels')
+        validate_pixel_map(background, extent.get_shape(), name='Background')
+        validate_pixel_map(flat_field, extent.get_shape(), name='Flat field')
         self._bad_pixels = bad_pixels
+        self._background = background
+        self._flat_field = flat_field
 
     @classmethod
     def create_null(cls, file_path: Path | None = None) -> SimpleDiffractionDataset:
@@ -360,6 +389,12 @@ class SimpleDiffractionDataset(DiffractionDataset):
 
     def get_bad_pixels(self) -> BadPixels:
         return self._bad_pixels
+
+    def get_background(self) -> DetectorBackground | None:
+        return self._background
+
+    def get_flat_field(self) -> FlatField | None:
+        return self._flat_field
 
     @overload
     def __getitem__(self, index: int) -> DiffractionArray: ...
@@ -398,4 +433,13 @@ class BadPixelsFileReader(ABC):
     @abstractmethod
     def read(self, file_path: Path) -> BadPixels:
         """Read a bad-pixel mask from file."""
+        pass
+
+
+class PixelMapFileReader(ABC):
+    """Plugin interface for reading a per-pixel detector map, such as a background or flat field."""
+
+    @abstractmethod
+    def read(self, file_path: Path) -> numpy.ndarray:
+        """Read a two-dimensional floating-point map from file."""
         pass

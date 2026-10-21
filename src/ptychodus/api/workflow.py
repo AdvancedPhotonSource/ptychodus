@@ -166,9 +166,17 @@ class ProductWorkflowAPI(ABC):
 
     @abstractmethod
     def export_training_data(
-        self, file_path: Path, *, library: str | None = None, algorithm: str | None = None
+        self,
+        file_path: Path,
+        *,
+        library: str | None = None,
+        algorithm: str | None = None,
+        file_type: str | None = None,
     ) -> None:
-        """Export training data for the current reconstructor to file."""
+        """Export training data for the current reconstructor to file.
+
+        None writes the reconstructor's own format; 'CXI' writes a combined CXI file.
+        """
         pass
 
     @abstractmethod
@@ -209,13 +217,20 @@ class WorkflowAPI(ABC):
         crop_region: CropRegion | None = None,
         bad_pixels_file_path: Path | None = None,
         bad_pixels_file_type: str | None = None,
+        background_file_path: Path | None = None,
+        background_file_type: str | None = None,
+        flat_field_file_path: Path | None = None,
+        flat_field_file_type: str | None = None,
         process_patterns: bool = True,
         block: bool = False,
     ) -> DiffractionWorkflowAPI:
         """Load and assemble a diffraction dataset from file.
 
         When bad_pixels_file_path is provided, its mask is applied to the loaded
-        dataset. Blocks until complete when block is True, otherwise returns immediately.
+        dataset; a background or flat-field file likewise replaces the map the data
+        file carries. Whether those maps are applied or carried follows the detector
+        settings. Blocks until complete when block is True, otherwise returns
+        immediately.
         """
         pass
 

@@ -68,6 +68,32 @@ def test_inpaint_frame_replaces_bad_positions_and_preserves_good() -> None:
     assert result[4, 4] == pytest.approx(5.0, abs=1.0)
 
 
+def test_inpaint_zeroes_a_bad_region_that_touches_the_border() -> None:
+    """A border region is zeroed rather than extrapolated, as padding is."""
+    pattern = numpy.full((8, 8), 5.0)
+    bad = numpy.zeros((8, 8), dtype=numpy.bool_)
+    bad[0, :] = True  # a padded row along the top edge
+    bad[:, -2:] = True  # and a two-column strip down the right edge
+
+    result = inpaint_bad_pixels(pattern, bad)
+
+    numpy.testing.assert_array_equal(result[bad], 0.0)
+    numpy.testing.assert_array_equal(result[~bad], 5.0)
+
+
+def test_inpaint_fills_an_interior_hole_beside_a_zeroed_border() -> None:
+    """Interior holes are still inpainted when the mask also has a border region."""
+    patterns = numpy.full((2, 10, 10), 7.0)
+    bad = numpy.zeros((10, 10), dtype=numpy.bool_)
+    bad[:, 0] = True  # touches the border
+    bad[5, 5] = True  # interior
+
+    result = inpaint_bad_pixels(patterns, bad)
+
+    numpy.testing.assert_array_equal(result[:, :, 0], 0.0)
+    numpy.testing.assert_allclose(result[:, 5, 5], 7.0, atol=1.0e-6)
+
+
 def _pattern_stack(dtype: numpy.typing.DTypeLike) -> DiffractionPatterns:
     rng = numpy.random.default_rng(0)
     return rng.integers(0, 1000, size=(6, 16, 16)).astype(dtype)
@@ -291,6 +317,27 @@ def test_summary_inpaints_frame_arrays_at_bad_pixel_positions() -> None:
     assert summary.minimum_pattern[3, 3] == pytest.approx(10.0, abs=1.0)
     assert summary.maximum_pattern[3, 3] == pytest.approx(10.0, abs=1.0)
     assert summary.mean_pattern[3, 3] == pytest.approx(10.0, abs=1.0)
+
+
+def test_summary_treats_non_finite_values_as_bad_pixels(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """NaN and Inf are zeroed and masked, so totals and frames stay finite."""
+    patterns = numpy.full((3, 4, 4), 2.0, dtype=numpy.float32)
+    patterns[0, 1, 1] = numpy.nan
+    patterns[2, 2, 2] = numpy.inf
+    array = SimpleDiffractionArray('float', numpy.arange(3, dtype=numpy.intp), patterns)
+    dataset = make_dataset([array], (4, 4))
+
+    with caplog.at_level('WARNING', logger='ptychodus.api.assemble'):
+        summary = summarize_dataset(dataset, max_workers=1)
+
+    assert numpy.isfinite(summary.total_counts).all()
+    # Both pixels are excluded from every frame's total, not only the frame holding them.
+    numpy.testing.assert_array_equal(summary.total_counts, [2.0 * 14] * 3)
+    assert numpy.isfinite(summary.mean_pattern).all()
+    assert numpy.isfinite(summary.maximum_pattern).all()
+    assert 'NaN or infinite' in caplog.text
 
 
 def test_summary_empty_dataset_returns_zero_frames_and_empty_arrays() -> None:

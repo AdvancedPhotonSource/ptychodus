@@ -76,7 +76,9 @@ def introspect_diffraction(path: Path) -> dict[str, Any]:
                 'num_bad_pixels': num_bad_pixels,
                 'nbytes': _dataset_nbytes(patterns)
                 + _dataset_nbytes(f.get(DiffractionFileKeys.INDEXES))
-                + _dataset_nbytes(bad_pixels),
+                + _dataset_nbytes(bad_pixels)
+                + _dataset_nbytes(f.get(DiffractionFileKeys.BACKGROUND))
+                + _dataset_nbytes(f.get(DiffractionFileKeys.FLAT_FIELD)),
             }
     except (OSError, KeyError) as exc:
         raise IntrospectionError(f'{path}: {exc}') from exc

@@ -5,6 +5,7 @@ from ptychodus.api.diffraction import (
     BadPixelsFileReader,
     DiffractionFileReader,
     DiffractionFileWriter,
+    PixelMapFileReader,
 )
 from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
 from ptychodus.api.settings import SettingsRegistry
@@ -28,6 +29,8 @@ class DiffractionCore(Observer):
         file_reader_chooser: PluginChooser[DiffractionFileReader],
         file_writer_chooser: PluginChooser[DiffractionFileWriter],
         reinit_observable: Observable,
+        background_file_reader_chooser: PluginChooser[PixelMapFileReader],
+        flat_field_file_reader_chooser: PluginChooser[PixelMapFileReader],
     ) -> None:
         super().__init__()
         self.detector_settings = DetectorSettings(settings_registry)
@@ -49,6 +52,12 @@ class DiffractionCore(Observer):
         self.file_reader_parameter = PluginChooserParameter(
             file_reader_chooser, self.diffraction_settings.file_type
         )
+        self.background_file_reader_parameter = PluginChooserParameter(
+            background_file_reader_chooser, self.detector_settings.background_file_type
+        )
+        self.flat_field_file_reader_parameter = PluginChooserParameter(
+            flat_field_file_reader_chooser, self.detector_settings.flat_field_file_type
+        )
 
         self.diffraction_api = DiffractionAPI(
             self.diffraction_settings,
@@ -58,6 +67,8 @@ class DiffractionCore(Observer):
             file_writer_chooser,
             self.bad_pixels_file_reader_parameter,
             self.file_reader_parameter,
+            background_file_reader_chooser,
+            flat_field_file_reader_chooser,
         )
         self.summary_service = DiffractionSummaryService(
             task_manager,
@@ -83,11 +94,24 @@ class DiffractionCore(Observer):
                 if self.detector_settings.bad_pixels_enabled.get_value()
                 else None
             )
+            settings = self.detector_settings
             dataset_index = self.diffraction_api.open_patterns(
                 file_path=self.diffraction_settings.file_path.get_value(),
                 file_type=self.diffraction_settings.file_type.get_value(),
                 bad_pixels_file_path=bad_pixels_file_path,
-                bad_pixels_file_type=self.detector_settings.bad_pixels_file_type.get_value(),
+                bad_pixels_file_type=settings.bad_pixels_file_type.get_value(),
+                background_file_path=(
+                    settings.background_file_path.get_value()
+                    if settings.background_enabled.get_value()
+                    else None
+                ),
+                background_file_type=settings.background_file_type.get_value(),
+                flat_field_file_path=(
+                    settings.flat_field_file_path.get_value()
+                    if settings.flat_field_enabled.get_value()
+                    else None
+                ),
+                flat_field_file_type=settings.flat_field_file_type.get_value(),
             )
 
             if dataset_index >= 0:

@@ -22,6 +22,7 @@ from ptychodus.api.assemble import (
     assemble_dataset,
     compute_array_offsets,
     compute_assembled_patterns_shape,
+    compute_dataset_total_counts,
     default_max_workers,
     preprocess_array,
 )
@@ -52,6 +53,15 @@ FRAME_SHAPE = (4, 4)
 
 def _array(label: str, first_index: int, num_patterns: int, fill: int) -> SimpleDiffractionArray:
     return make_array(label, first_index, num_patterns, fill, frame_shape=FRAME_SHAPE)
+
+
+def _float_array(
+    label: str, first_index: int, num_patterns: int, *, frame_shape: tuple[int, int] = FRAME_SHAPE
+) -> SimpleDiffractionArray:
+    """A constant float32 array of 3s, for planting non-finite values in."""
+    patterns = numpy.full((num_patterns, *frame_shape), 3.0, dtype=numpy.float32)
+    indexes = numpy.arange(first_index, first_index + num_patterns, dtype=numpy.intp)
+    return SimpleDiffractionArray(label, indexes, patterns)
 
 
 # ---------- compute_array_offsets ----------
@@ -92,7 +102,7 @@ def test_bad_pixels_shape_must_match_the_detector_extent() -> None:
     dataset = make_dataset([_array('a', 0, 3, 1)], (4, 4))
     override = numpy.zeros((8, 8), dtype=numpy.bool_)
 
-    with pytest.raises(ValueError, match='detector extent'):
+    with pytest.raises(ValueError, match='Bad pixels shape'):
         compute_assembled_patterns_shape(dataset, bad_pixels=override)
 
 
@@ -929,3 +939,124 @@ def test_an_explicit_worker_count_is_passed_through(monkeypatch: pytest.MonkeyPa
     assemble_dataset(_three_arrays(), max_workers=3)
 
     assert sizes == [3]
+
+
+# ---------- non-finite values ----------
+
+
+def test_assemble_masks_a_pixel_that_is_non_finite_in_any_frame(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """One NaN masks its pixel for every frame of every array, and the value is zeroed."""
+    first = _float_array('a', 0, 2)
+    second = _float_array('b', 2, 2)
+    cast(numpy.ndarray, second.get_patterns())[1, 2, 3] = numpy.nan
+    dataset = make_dataset([first, second], FRAME_SHAPE)
+    reported: list[numpy.ndarray] = []
+
+    with caplog.at_level('WARNING', logger='ptychodus.api.assemble'):
+        data = assemble_dataset(dataset, on_nonfinite_pixels=reported.append, max_workers=1)
+
+    patterns = data.get_patterns()
+    assert numpy.isfinite(patterns).all()
+    assert patterns[3, 2, 3] == 0.0
+    assert data.get_bad_pixels()[2, 3]
+    assert data.get_bad_pixels().sum() == 1
+    assert len(reported) == 1
+    assert reported[0].shape == FRAME_SHAPE
+    assert reported[0][2, 3]
+    assert 'NaN or infinite' in caplog.text
+
+
+def test_assemble_reports_non_finite_pixels_in_detector_coordinates() -> None:
+    """After a load-time crop, the reported mask is placed back on the full detector."""
+    array = _float_array('a', 0, 1, frame_shape=(8, 8))
+    cast(numpy.ndarray, array.get_patterns())[0, 3, 4] = numpy.inf
+    dataset = make_dataset([array], (8, 8))
+    region = CropRegion(x_range=(2, 6), y_range=(2, 6))
+    reported: list[numpy.ndarray] = []
+
+    data = assemble_dataset(
+        dataset, read_region=region, on_nonfinite_pixels=reported.append, max_workers=1
+    )
+
+    assert data.get_bad_pixels().shape == (4, 4)
+    assert data.get_bad_pixels()[1, 2]
+    assert reported[0].shape == (8, 8)
+    assert reported[0][3, 4]
+    assert reported[0].sum() == 1
+
+
+def test_assemble_leaves_the_supplied_bad_pixels_untouched() -> None:
+    """Masking non-finite pixels widens the buffer's mask without writing to the caller's."""
+    array = _float_array('a', 0, 1)
+    cast(numpy.ndarray, array.get_patterns())[0, 0, 1] = numpy.nan
+    supplied = numpy.zeros(FRAME_SHAPE, dtype=bool)
+    dataset = make_dataset([array], FRAME_SHAPE, bad_pixels=supplied)
+
+    data = assemble_dataset(dataset, max_workers=1)
+
+    assert data.get_bad_pixels()[0, 1]
+    assert not supplied.any()
+
+
+def test_assemble_follows_non_finite_pixels_through_the_pipeline() -> None:
+    """The masked pixel is binned like any bad pixel: its whole bin becomes bad."""
+    array = _float_array('a', 0, 1)
+    cast(numpy.ndarray, array.get_patterns())[0, 3, 0] = numpy.nan
+    dataset = make_dataset([array], FRAME_SHAPE)
+    pipeline = DiffractionPrepPipeline(steps=(BinningStep(bin_size_x=2, bin_size_y=2),))
+
+    data = assemble_dataset(dataset, pipeline, max_workers=1)
+
+    expected = numpy.array([[False, False], [True, False]])
+    numpy.testing.assert_array_equal(data.get_bad_pixels(), expected)
+    assert data.get_patterns()[0, 1, 0] == pytest.approx(3.0 * 3)
+
+
+def test_integer_patterns_skip_the_non_finite_check() -> None:
+    """Integer data cannot hold NaN; it is assembled as before with nothing reported."""
+    dataset = make_dataset([_array('a', 0, 2, fill=5)], FRAME_SHAPE)
+    reported: list[numpy.ndarray] = []
+
+    data = assemble_dataset(dataset, on_nonfinite_pixels=reported.append, max_workers=1)
+
+    assert not reported
+    assert not data.get_bad_pixels().any()
+
+
+def test_preprocess_array_masks_non_finite_pixels_in_its_block() -> None:
+    array = _float_array('a', 0, 2)
+    cast(numpy.ndarray, array.get_patterns())[0, 1, 1] = -numpy.inf
+    clean = numpy.zeros(FRAME_SHAPE, dtype=bool)
+    reported: list[numpy.ndarray] = []
+
+    block = preprocess_array(
+        array,
+        raw_bad_pixels=clean,
+        processed_bad_pixels=clean,
+        raw_pixel_geometry=GEOMETRY,
+        on_nonfinite_pixels=reported.append,
+    )
+
+    assert block.get_bad_pixels()[1, 1]
+    assert block.get_patterns()[0, 1, 1] == 0.0
+    assert reported[0][1, 1]
+
+
+def test_total_counts_exclude_non_finite_pixels() -> None:
+    array = _float_array('a', 0, 2)
+    cast(numpy.ndarray, array.get_patterns())[1, 0, 0] = numpy.nan
+    dataset = make_dataset([array], FRAME_SHAPE)
+
+    counts = compute_dataset_total_counts(dataset, max_workers=1)
+
+    numpy.testing.assert_array_equal(counts.total_counts[1], 3.0 * 15)
+    assert numpy.isfinite(counts.total_counts).all()
+
+
+def test_add_bad_pixels_rejects_a_mismatched_shape() -> None:
+    data = allocate_assembled_data(make_dataset([_array('a', 0, 1, fill=1)], FRAME_SHAPE))
+
+    with pytest.raises(ValueError, match='shape'):
+        data.add_bad_pixels(numpy.zeros((2, 2), dtype=bool))

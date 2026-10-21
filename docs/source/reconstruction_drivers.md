@@ -60,6 +60,12 @@ The remaining arguments fall into four groups.
   apply a bad-pixel mask covering the full uncropped detector. The ceiling defaults to the
   pattern dtype's maximum, which is how Dectris detectors mark an invalid pixel.
 
+`--background-file`, `--flat-field-file`, `--subtract-background`, `--divide-flat-field`
+: Supply a measured detector background and flat-field response covering the full detector,
+  overriding any the data file carries, and choose whether to correct the patterns with them
+  or carry them alongside. `--background-file-type` and `--flat-field-file-type` name the
+  readers. See [Detector Background and Flat Field](readers.md#detector-background-and-flat-field).
+
 `--num-probe-modes`, `--num-opr-modes`, `--fzp-preset`, `--fzp-defocus-m`, `--object-padding-px`, `--seed`
 : Shape the initial guesses. The zone-plate preset and defocus describe the optic that formed
   the probe.
@@ -69,8 +75,8 @@ its settings, `--dry-run` reports the resolved configuration without reconstruct
 `--log-level` takes a Python logging level as an integer (`10` for DEBUG, `20` for INFO).
 
 ```{note}
-A profile can add or remove arguments. `ptychodus-reconstruct-foldslice` has no cropping or
-bad-pixel options, because it reads patterns that are already prepared.
+A profile can add or remove arguments. `ptychodus-reconstruct-foldslice` has no cropping,
+bad-pixel, background or flat-field options, because it reads patterns that are already prepared.
 `ptychodus-reconstruct-polar` adds statistical pattern filters. Run any command with `--help`
 for the list it actually accepts.
 ```

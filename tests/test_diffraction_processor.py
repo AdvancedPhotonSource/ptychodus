@@ -94,15 +94,20 @@ def test_binning_apply_sums_blocks() -> None:
     assert (out == 4).all()
 
 
-def test_binning_apply_mask_logical_and() -> None:
-    data = numpy.ones((4, 4), dtype=bool)
-    data[0, 0] = False  # one True-cell of the (0,0) 2x2 block becomes False
+def test_binning_apply_mask_logical_or() -> None:
+    """One bad sub-pixel makes the whole binned pixel bad.
+
+    Bad pixels are zeroed before binning, so the block's sum is an undercount that
+    must not pass as a measurement.
+    """
+    data = numpy.zeros((4, 4), dtype=bool)
+    data[0, 0] = True  # one bad cell in the (0,0) 2x2 block
     out = BinningStep(bin_size_x=2, bin_size_y=2).apply(data)
     assert out.shape == (2, 2)
-    assert out[0, 0] == False  # logical AND of the block
-    assert out[0, 1] == True
-    assert out[1, 0] == True
-    assert out[1, 1] == True
+    assert out[0, 0] == True
+    assert out[0, 1] == False
+    assert out[1, 0] == False
+    assert out[1, 1] == False
 
 
 def test_binning_apply_drops_the_trailing_partial_block() -> None:
@@ -134,14 +139,14 @@ def test_binning_apply_shape_agrees_with_apply_to_extent() -> None:
 
 
 def test_binning_apply_mask_drops_the_trailing_partial_block() -> None:
-    """A mask bins by logical AND; the discarded edge must not influence the result."""
-    data = numpy.ones((5, 5), dtype=bool)
-    data[4, 4] = False  # in the dropped row and column only
+    """The discarded edge must not influence the binned mask."""
+    data = numpy.zeros((5, 5), dtype=bool)
+    data[4, 4] = True  # in the dropped row and column only
 
     out = BinningStep(bin_size_x=2, bin_size_y=2).apply(data)
 
     assert out.shape == (2, 2)
-    assert out.all()
+    assert not out.any()
 
 
 def test_binning_rejects_zero_bin_size() -> None:
@@ -238,12 +243,14 @@ def test_padding_apply_3d_produces_correct_shape() -> None:
 
 def test_padding_apply_mask_2d_produces_correct_shape() -> None:
     """B1 mirror: bad-pixels padding must not raise either."""
-    data = numpy.ones((4, 4), dtype=bool)
+    data = numpy.zeros((4, 4), dtype=bool)
     out = PaddingStep(pad_x=1, pad_y=1).apply(data)
     assert out.shape == (6, 6)
-    # Edges are padded with False; interior preserved.
-    assert out[0, 0] == False
-    assert out[3, 3] == True
+    # Padded pixels were never measured, so they are bad; the interior is preserved.
+    assert out[0, 0] == True
+    assert out[3, 3] == False
+    assert out[1:-1, 1:-1].sum() == 0
+    assert out.sum() == 6 * 6 - 4 * 4
 
 
 def test_padding_asymmetric_pad_x_pad_y() -> None:
@@ -345,8 +352,13 @@ def test_apply_to_mask_full_pipeline_with_load_time_crop() -> None:
         BinningStep(bin_size_x=2, bin_size_y=2),
         PaddingStep(pad_x=1, pad_y=1),
     ).apply_to_mask(region.apply_to(bad))
-    # 8x8 → crop to 4x4 (rows 2:6, cols 2:6, bad[4,4] inside) → bin 2x2 to 2x2 (logical AND so False) → pad to 4x4
+    # 8x8 → crop to 4x4 (rows 2:6, cols 2:6, bad[4,4] inside) → bin 2x2 to 2x2 (logical OR, so
+    # the block holding bad[4,4] is bad) → pad to 4x4 with a bad border
     assert out.shape == (4, 4)
+    expected = numpy.ones((4, 4), dtype=bool)
+    expected[1:3, 1:3] = False
+    expected[2, 2] = True
+    numpy.testing.assert_array_equal(out, expected)
 
 
 # ---------- Step extent / pixel-geometry ----------
@@ -824,3 +836,54 @@ def test_get_plan_is_quiet_when_the_bin_size_divides_the_crop(
         PrepPipelineBuilder(diff).get_plan(ImageExtent(width_px=128, height_px=128))
 
     assert not caplog.records
+
+
+# ---------- Additive per-pixel maps ----------
+
+
+def test_pixel_map_binning_sums_in_float64() -> None:
+    background = numpy.arange(16, dtype=numpy.float32).reshape(4, 4)
+
+    out = _pipeline(BinningStep(bin_size_x=2, bin_size_y=2)).apply_to_pixel_map(background)
+
+    assert out.dtype == numpy.float64
+    numpy.testing.assert_array_equal(
+        out, [[0 + 1 + 4 + 5, 2 + 3 + 6 + 7], [8 + 9 + 12 + 13, 10 + 11 + 14 + 15]]
+    )
+
+
+def test_pixel_map_padding_fills_zero() -> None:
+    out = _pipeline(PaddingStep(pad_x=1, pad_y=2)).apply_to_pixel_map(numpy.ones((2, 2)))
+
+    assert out.shape == (6, 4)
+    assert out.sum() == 4.0
+    assert out[0, 0] == 0.0
+
+
+def test_pixel_map_upsampling_repeats_each_value() -> None:
+    """A map keeps each pixel's value, as the patterns keep per-pixel intensity."""
+    out = _pipeline(UpsampleStep(factor=2)).apply_to_pixel_map(numpy.array([[1.0, 2.0]]))
+
+    numpy.testing.assert_array_equal(out, [[1.0, 1.0, 2.0, 2.0], [1.0, 1.0, 2.0, 2.0]])
+
+
+def test_pixel_map_value_filter_is_a_noop() -> None:
+    """A filter on measured values says nothing about a background's values."""
+    background = numpy.full((2, 2), 1.0e6)
+    step = FilterValuesStep(lower_bound=0, upper_bound=10)
+
+    numpy.testing.assert_array_equal(_pipeline(step).apply_to_pixel_map(background), background)
+
+
+def test_pixel_map_follows_flips_and_transposes() -> None:
+    pixel_map = numpy.arange(6, dtype=float).reshape(2, 3)
+    pipeline = _pipeline(HorizontalFlipStep(), VerticalFlipStep(), TransposeStep())
+
+    numpy.testing.assert_array_equal(
+        pipeline.apply_to_pixel_map(pixel_map), numpy.flip(pixel_map).T
+    )
+
+
+def test_pixel_map_must_be_2d() -> None:
+    with pytest.raises(ValueError, match='pixel map'):
+        _pipeline().apply_to_pixel_map(numpy.zeros((1, 2, 2)))

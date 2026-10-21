@@ -110,12 +110,29 @@ class OpenDatasetWizardController:
         if self._pending_dataset_index < 0:
             return
         try:
-            if self._detector_settings.bad_pixels_enabled.get_value():
+            settings = self._detector_settings
+
+            if settings.bad_pixels_enabled.get_value():
                 self._api.apply_bad_pixels(
                     self._pending_dataset_index,
-                    self._detector_settings.bad_pixels_file_path.get_value(),
-                    self._detector_settings.bad_pixels_file_type.get_value(),
+                    settings.bad_pixels_file_path.get_value(),
+                    settings.bad_pixels_file_type.get_value(),
                 )
+
+            if settings.background_enabled.get_value():
+                self._api.apply_background(
+                    self._pending_dataset_index,
+                    settings.background_file_path.get_value(),
+                    settings.background_file_type.get_value(),
+                )
+
+            if settings.flat_field_enabled.get_value():
+                self._api.apply_flat_field(
+                    self._pending_dataset_index,
+                    settings.flat_field_file_path.get_value(),
+                    settings.flat_field_file_type.get_value(),
+                )
+
             self._api.load_all_arrays(dataset_index=self._pending_dataset_index)
         except Exception as exc:
             logger.exception(exc)

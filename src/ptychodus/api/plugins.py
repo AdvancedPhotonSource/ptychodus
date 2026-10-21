@@ -18,7 +18,12 @@ import logging
 import pkgutil
 import re
 
-from .diffraction import BadPixelsFileReader, DiffractionFileReader, DiffractionFileWriter
+from .diffraction import (
+    BadPixelsFileReader,
+    DiffractionFileReader,
+    DiffractionFileWriter,
+    PixelMapFileReader,
+)
 from .fluorescence import (
     DeconvolutionStrategy,
     FluorescenceFileReader,
@@ -336,6 +341,8 @@ class PluginRegistry:
 
     def __init__(self) -> None:
         self.bad_pixels_file_readers = PluginChooser[BadPixelsFileReader]()
+        self.background_file_readers = PluginChooser[PixelMapFileReader]()
+        self.flat_field_file_readers = PluginChooser[PixelMapFileReader]()
         self.diffraction_file_readers = PluginChooser[DiffractionFileReader]()
         self.diffraction_file_writers = PluginChooser[DiffractionFileWriter]()
         self.probe_position_file_readers = PluginChooser[ProbePositionFileReader]()

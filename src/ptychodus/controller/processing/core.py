@@ -363,12 +363,16 @@ class ProcessingController(Observer):
         if input_product_index < 0:
             return
 
-        name_filter = self._processing_api.get_training_data_file_filter()
-        file_path, _ = self._file_dialog_factory.get_save_file_path(
+        name_filters = self._processing_api.get_training_data_file_filters()
+
+        if not name_filters:
+            return
+
+        file_path, selected_filter = self._file_dialog_factory.get_save_file_path(
             self._view,
             'Export Training Data',
-            name_filters=[name_filter],
-            selected_name_filter=name_filter,
+            name_filters=list(name_filters),
+            selected_name_filter=next(iter(name_filters)),
         )
 
         if not file_path:
@@ -378,7 +382,11 @@ class ProcessingController(Observer):
             return
 
         try:
-            self._processing_api.export_training_data(file_path, product_index=input_product_index)
+            self._processing_api.export_training_data(
+                file_path,
+                product_index=input_product_index,
+                file_type=name_filters.get(selected_filter),
+            )
         except Exception as exc:
             logger.exception(exc)
             ExceptionDialog.show_exception('Export Training Data', exc)

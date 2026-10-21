@@ -6,6 +6,7 @@ from typing import Final, Self
 import logging
 
 from ptychodus.api.assemble import (
+    DetectorCorrections,
     DiffractionSummary,
     DiffractionTotalCounts,
     compute_dataset_total_counts,
@@ -27,7 +28,7 @@ __all__ = [
     'TotalCountsBackgroundTask',
 ]
 
-_TotalCountsKey = tuple[int, DiffractionPrepPlan, bool, str, str]
+_TotalCountsKey = tuple[int, DiffractionPrepPlan, tuple[object, ...]]
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +128,7 @@ class TotalCountsBackgroundTask:
         bad_pixels: BadPixels | None,
         read_region: CropRegion | None,
         cache_key: _TotalCountsKey,
+        corrections: DetectorCorrections | None = None,
     ) -> None:
         self._service = service
         self._source = source
@@ -134,6 +136,7 @@ class TotalCountsBackgroundTask:
         self._bad_pixels = bad_pixels
         self._read_region = read_region
         self._cache_key = cache_key
+        self._corrections = corrections
 
     def __call__(self) -> None:
         with self._service.task_monitor.run_as(self.ACTOR) as monitor:
@@ -142,6 +145,7 @@ class TotalCountsBackgroundTask:
                 self._pipeline,
                 bad_pixels=self._bad_pixels,
                 read_region=self._read_region,
+                corrections=self._corrections,
                 on_progress=monitor.update_progress,
                 should_stop=lambda: monitor.is_stopping,
             )
@@ -232,9 +236,9 @@ class DiffractionSummaryService:
     def _build_total_counts_key(self, dataset_index: int) -> _TotalCountsKey:
         """Identify a counts pass by everything that changes the numbers it yields.
 
-        Raises ``ValueError`` when the live settings do not describe a usable prep
-        plan. The bad-pixels mask enters the key by its settings rather than its
-        contents so the key stays free of file I/O.
+        Raises ``ValueError`` when there is no dataset at ``dataset_index``. The
+        bad-pixels mask and the detector maps enter the key by their settings rather
+        than their contents so the key stays free of file I/O.
         """
         repository = self._api.get_repository()
 
@@ -244,13 +248,22 @@ class DiffractionSummaryService:
         detector_extent = repository[dataset_index].get_source().get_metadata().detector_extent
         plan = self._pipeline_builder.get_plan(detector_extent)
 
-        return (
-            dataset_index,
-            plan,
-            self._detector_settings.bad_pixels_enabled.get_value(),
-            str(self._detector_settings.bad_pixels_file_path.get_value()),
-            self._detector_settings.bad_pixels_file_type.get_value(),
+        settings = self._detector_settings
+        detector_inputs = (
+            settings.bad_pixels_enabled.get_value(),
+            str(settings.bad_pixels_file_path.get_value()),
+            settings.bad_pixels_file_type.get_value(),
+            settings.background_enabled.get_value(),
+            str(settings.background_file_path.get_value()),
+            settings.background_file_type.get_value(),
+            settings.subtract_background.get_value(),
+            settings.flat_field_enabled.get_value(),
+            str(settings.flat_field_file_path.get_value()),
+            settings.flat_field_file_type.get_value(),
+            settings.divide_flat_field.get_value(),
+            settings.flat_field_floor.get_value(),
         )
+        return (dataset_index, plan, detector_inputs)
 
     def compute_total_counts(self, dataset_index: int, *, force: bool = False) -> bool:
         """Kick off a background counts pass for the dataset at ``dataset_index``.
@@ -272,10 +285,17 @@ class DiffractionSummaryService:
             raise ValueError('Pending dataset has no arrays to measure.')
 
         bad_pixels = self._load_bad_pixels()
+        corrections = self._load_corrections(source)
         plan = key[1]
         self._task_manager.put_background_task(
             TotalCountsBackgroundTask(
-                self, source, plan.pipeline, bad_pixels, plan.read_region, key
+                self,
+                source,
+                plan.pipeline,
+                bad_pixels,
+                plan.read_region,
+                key,
+                corrections=corrections,
             )
         )
         return True
@@ -303,6 +323,36 @@ class DiffractionSummaryService:
 
         bad_pixels = self._load_bad_pixels()
         self._task_manager.put_background_task(SummarizeBackgroundTask(self, source, bad_pixels))
+
+    def _load_corrections(self, source: DiffractionDataset) -> DetectorCorrections:
+        """Build the detector corrections a load would use, from files the settings name.
+
+        A map whose file is not enabled falls back to the one the source carries.
+        """
+        settings = self._detector_settings
+        background = (
+            self._api.load_background(
+                settings.background_file_path.get_value(),
+                settings.background_file_type.get_value(),
+            )
+            if settings.background_enabled.get_value()
+            else source.get_background()
+        )
+        flat_field = (
+            self._api.load_flat_field(
+                settings.flat_field_file_path.get_value(),
+                settings.flat_field_file_type.get_value(),
+            )
+            if settings.flat_field_enabled.get_value()
+            else source.get_flat_field()
+        )
+        return DetectorCorrections(
+            background=background,
+            flat_field=flat_field,
+            subtract_background=settings.subtract_background.get_value(),
+            divide_flat_field=settings.divide_flat_field.get_value(),
+            flat_field_floor=settings.flat_field_floor.get_value(),
+        )
 
     def _load_bad_pixels(self) -> BadPixels | None:
         """Load the configured bad-pixels mask, or None when the override is off."""
