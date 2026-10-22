@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections.abc import Sequence
-from enum import IntEnum
+from enum import Enum
 from typing import Any, cast
 import logging
 
@@ -10,6 +10,7 @@ from PyQt5.QtCore import (
     QModelIndex,
     QObject,
     QSortFilterProxyModel,
+    QStringListModel,
     Qt,
 )
 from PyQt5.QtGui import QBrush, QFont
@@ -25,6 +26,7 @@ from ptychodus.api.product import LossValue
 
 from ...model.diffraction import AssembledDiffractionDataset, DiffractionDatasetRepository
 from ..diffraction.dataset import UNBOUND_DATASET, DiffractionDatasetComboModel
+from .editor import FAR_FIELD_CHOICES
 from ...model.product import (
     ProductAPI,
     ProductRepository,
@@ -44,32 +46,45 @@ from .editor import ProductEditorViewController
 logger = logging.getLogger(__name__)
 
 
-class _Column(IntEnum):
-    """Column order of ProductRepositoryTableModel.
+class _Column(Enum):
+    """Every column of ProductRepositoryTableModel: its order, header and editability.
+
+    Shaped like the product editor's ``_Row``: the member value pairs the header with
+    editability and the position follows declaration order, so a column cannot be
+    added to the ordering and forgotten in the headers or the editable set.
 
     An enum rather than module-level ints so that ``match`` arms are value patterns:
     a bare name would be a capture pattern that swallows every column.
     """
 
-    NAME = 0
-    DIFFRACTION_DATASET = 1
-    DETECTOR_DISTANCE_M = 2
-    PHOTON_ENERGY_KEV = 3
-    PROBE_PHOTON_COUNT = 4
-    PIXEL_WIDTH_NM = 5
-    PIXEL_HEIGHT_NM = 6
-    SIZE = 7
+    NAME = ('Name', True)
+    DIFFRACTION_DATASET = ('Diffraction\nDataset', True)
+    DETECTOR_DISTANCE_M = ('Detector-Object\nDistance [m]', True)
+    PHOTON_ENERGY_KEV = ('Photon Energy\n[keV]', True)
+    PROBE_PHOTON_COUNT = ('Probe Photon\nCount', True)
+    FAR_FIELD = ('Far Field', True)
+    PIXEL_WIDTH_NM = ('Pixel Width\n[nm]', False)
+    PIXEL_HEIGHT_NM = ('Pixel Height\n[nm]', False)
+    SIZE = ('Size', False)
 
+    def __init__(self, header: str, editable: bool) -> None:
+        self.header = header
+        self.editable = editable
+        # Members already defined when this one is constructed, which is its position.
+        self.index = len(self.__class__.__members__)
 
-_EDITABLE_COLUMNS = frozenset(
-    {
-        _Column.NAME,
-        _Column.DIFFRACTION_DATASET,
-        _Column.DETECTOR_DISTANCE_M,
-        _Column.PHOTON_ENERGY_KEV,
-        _Column.PROBE_PHOTON_COUNT,
-    }
-)
+    @classmethod
+    def from_index(cls, index: int) -> _Column:
+        """The column at `index`.
+
+        Raises:
+            IndexError: for a column outside the table, which the model's own
+                ``columnCount`` makes impossible and so would be a bug rather than input.
+        """
+        if index < 0:
+            raise IndexError(f'Column index {index} is negative.')
+
+        return list(cls)[index]
 
 
 class ProductRepositoryTableModel(QAbstractTableModel):
@@ -92,23 +107,13 @@ class ProductRepositoryTableModel(QAbstractTableModel):
         self._repository = repository
         self._diffraction_repository = diffraction_repository
         self._editable_item_brush = editable_item_brush
-        self._header = [
-            'Name',
-            'Diffraction\nDataset',
-            'Detector-Object\nDistance [m]',
-            'Photon Energy\n[keV]',
-            'Probe Photon\nCount',
-            'Pixel Width\n[nm]',
-            'Pixel Height\n[nm]',
-            'Size',
-        ]
         # Duck-typed; see class docstring on the ABC / sip metaclass conflict.
         repository.add_observer(cast(ProductRepositoryObserver, self))
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
 
-        if index.isValid() and index.column() in _EDITABLE_COLUMNS:
+        if index.isValid() and _Column.from_index(index.column()).editable:
             try:
                 item = self._repository[index.row()]
             except IndexError:
@@ -126,7 +131,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
         role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            return self._header[section]
+            return _Column.from_index(section).header
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid():
@@ -142,7 +147,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
             failed = item.is_failed()
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
-                match index.column():
+                match _Column.from_index(index.column()):
                     case _Column.NAME:
                         return metadata_item.name.get_value()
                     case _Column.DIFFRACTION_DATASET:
@@ -163,6 +168,8 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                         if pending or failed:
                             return '—'
                         return f'{metadata_item.probe_photon_count.get_value():.4g}'
+                    case _Column.FAR_FIELD:
+                        return FAR_FIELD_CHOICES[metadata_item.far_field.get_value()]
                     case _Column.PIXEL_WIDTH_NM:
                         if pending or failed:
                             return '—'
@@ -184,7 +191,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                             return '—'
                         return format_bytes(item.get_product().nbytes)
             elif role == Qt.ItemDataRole.UserRole:
-                if index.column() == _Column.SIZE:
+                if _Column.from_index(index.column()) is _Column.SIZE:
                     # Numeric sort key: the display text mixes units and cannot be
                     # ordered as a string. Pending and failed rows sort as zero so the
                     # comparator stays total.
@@ -200,14 +207,20 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                     return 'Loading…'
                 if failed:
                     return 'Load failed'
-                if index.column() == _Column.DIFFRACTION_DATASET and item.get_dataset() is None:
+                if (
+                    _Column.from_index(index.column()) is _Column.DIFFRACTION_DATASET
+                    and item.get_dataset() is None
+                ):
                     # Surface why Reconstruct / Train are greyed out in the Processing
                     # panel; otherwise an unbound product fails silently.
                     return 'No diffraction dataset — reconstruction unavailable'
             elif role == Qt.ItemDataRole.ForegroundRole:
                 if pending or failed:
                     return QBrush(Qt.GlobalColor.gray)
-                if index.column() == _Column.DIFFRACTION_DATASET and item.get_dataset() is None:
+                if (
+                    _Column.from_index(index.column()) is _Column.DIFFRACTION_DATASET
+                    and item.get_dataset() is None
+                ):
                     return QBrush(Qt.GlobalColor.gray)
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if not (pending or failed) and (index.flags() & Qt.ItemFlag.ItemIsEditable):
@@ -222,11 +235,12 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 return False
 
             metadata_item = item.get_metadata_item()
+            column = _Column.from_index(index.column())
 
-            if index.column() == _Column.NAME:
+            if column is _Column.NAME:
                 metadata_item.name.set_value(str(value))
                 return True
-            elif index.column() == _Column.DIFFRACTION_DATASET:
+            elif column is _Column.DIFFRACTION_DATASET:
                 text = str(value)
 
                 if text == UNBOUND_DATASET:
@@ -239,7 +253,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                         return True
 
                 return False
-            elif index.column() == _Column.DETECTOR_DISTANCE_M:
+            elif column is _Column.DETECTOR_DISTANCE_M:
                 try:
                     distance_m = float(value)
                 except ValueError:
@@ -247,7 +261,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 
                 metadata_item.detector_distance_m.set_value(distance_m)
                 return True
-            elif index.column() == _Column.PHOTON_ENERGY_KEV:
+            elif column is _Column.PHOTON_ENERGY_KEV:
                 try:
                     energy_keV = float(value)  # noqa: N806
                 except ValueError:
@@ -257,13 +271,21 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                     EnergyUnit.KILOELECTRONVOLT.to_electronvolts(energy_keV)
                 )
                 return True
-            elif index.column() == _Column.PROBE_PHOTON_COUNT:
+            elif column is _Column.PROBE_PHOTON_COUNT:
                 try:
                     photon_count = float(value)
                 except ValueError:
                     return False
 
                 metadata_item.probe_photon_count.set_value(photon_count)
+                return True
+            elif column is _Column.FAR_FIELD:
+                text = str(value)
+
+                if text not in FAR_FIELD_CHOICES.values():
+                    return False
+
+                metadata_item.far_field.set_value(text == FAR_FIELD_CHOICES[True])
                 return True
 
         return False
@@ -272,7 +294,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
         return len(self._repository)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
-        return len(self._header)
+        return len(_Column)
 
     def _emit_row_changed(self, index: int, roles: list[int]) -> None:
         top_left = self.index(index, 0)
@@ -434,8 +456,18 @@ class ProductController(ProductRepositoryObserver):
 
         view.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         view.table_view.setItemDelegateForColumn(
-            _Column.DIFFRACTION_DATASET,
+            _Column.DIFFRACTION_DATASET.index,
             ComboBoxItemDelegate(controller._dataset_combo_model, view.table_view),
+        )
+        # A two-state physical property reads as a named choice rather than a checkbox,
+        # matching the product editor's row. One delegate per column, so this is a
+        # second instance rather than a widened one.
+        view.table_view.setItemDelegateForColumn(
+            _Column.FAR_FIELD.index,
+            ComboBoxItemDelegate(
+                QStringListModel(list(FAR_FIELD_CHOICES.values()), view.table_view),
+                view.table_view,
+            ),
         )
         header = view.table_view.horizontalHeader()
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
