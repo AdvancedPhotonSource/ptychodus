@@ -207,7 +207,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
             metadata_item = self._product_item.get_metadata_item()
 
             match index.row():
-                case 7:
+                case _Row.EXPOSURE_TIME_S:
                     try:
                         exposure_time_s = float(value)
                     except ValueError:
@@ -215,7 +215,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
                     metadata_item.exposure_time_s.set_value(exposure_time_s)
                     return True
-                case 8:
+                case _Row.MASS_ATTENUATION_M2_PER_KG:
                     try:
                         mass_attenuation_m2_per_kg = float(value)
                     except ValueError:
@@ -223,7 +223,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
                     metadata_item.mass_attenuation_m2_per_kg.set_value(mass_attenuation_m2_per_kg)
                     return True
-                case 9:
+                case _Row.TOMOGRAPHY_ANGLE_DEG:
                     try:
                         tomography_angle_deg = float(value)
                     except ValueError:
@@ -231,7 +231,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
                     metadata_item.tomography_angle_deg.set_value(tomography_angle_deg)
                     return True
-                case 10:
+                case _Row.TILT_ANGLE_DEG:
                     try:
                         tilt_angle_deg = float(value)
                     except ValueError:
@@ -239,7 +239,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
                     metadata_item.tilt_angle_deg.set_value(tilt_angle_deg)
                     return True
-                case 11:
+                case _Row.POLARIZATION:
                     text = str(value)
                     if text in ('', '(unset)'):
                         metadata_item.polarization.set_value('')
