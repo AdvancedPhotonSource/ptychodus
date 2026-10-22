@@ -1,7 +1,7 @@
 from __future__ import annotations
 import logging
 from collections.abc import Callable, Iterable
-from enum import IntEnum
+from enum import Enum
 from typing import Any, Final, cast, overload
 
 import numpy
@@ -34,25 +34,46 @@ UNBOUND_DATASET: Final[str] = '(unbound)'
 """Label for the sentinel entry meaning "no diffraction dataset"."""
 
 
-class Column(IntEnum):
-    """Column order of DiffractionTreeModel.
+class Column(Enum):
+    """Every column of DiffractionTreeModel: its order and its header.
 
-    An enum rather than module-level ints so that ``match`` arms are value patterns:
-    a bare name would be a capture pattern that swallows every column. Public because
-    the controller installs the counts progress-bar delegate on one of these columns.
+    The member value is the header and the position comes from declaration order, so
+    a column cannot be added to the ordering and forgotten in the headers. Public
+    because the controller installs the counts progress-bar delegate on one of them.
+
+    Editability is not a member property here: NAME is the only editable column and
+    what actually gates it is the node type, which no column can state.
     """
 
-    NAME = 0
-    COUNTS = 1
-    FRAMES = 2
-    WIDTH_PX = 3
-    HEIGHT_PX = 4
-    PHYSICAL_PIXEL_WIDTH_UM = 5
-    PHYSICAL_PIXEL_HEIGHT_UM = 6
-    PROCESSED_PIXEL_WIDTH_UM = 7
-    PROCESSED_PIXEL_HEIGHT_UM = 8
-    NUM_BAD_PIXELS = 9
-    SIZE = 10
+    NAME = 'Name'
+    COUNTS = 'Counts'
+    FRAMES = 'Frames'
+    WIDTH_PX = 'Width\n[px]'
+    HEIGHT_PX = 'Height\n[px]'
+    PHYSICAL_PIXEL_WIDTH_UM = 'Physical Pixel\nWidth [µm]'
+    PHYSICAL_PIXEL_HEIGHT_UM = 'Physical Pixel\nHeight [µm]'
+    PROCESSED_PIXEL_WIDTH_UM = 'Processed Pixel\nWidth [µm]'
+    PROCESSED_PIXEL_HEIGHT_UM = 'Processed Pixel\nHeight [µm]'
+    NUM_BAD_PIXELS = 'Num Bad\nPixels'
+    SIZE = 'Size'
+
+    def __init__(self, header: str) -> None:
+        self.header = header
+        # Members already defined when this one is constructed, which is its position.
+        self.index = len(self.__class__.__members__)
+
+    @classmethod
+    def from_index(cls, index: int) -> Column:
+        """The column at `index`.
+
+        Raises:
+            IndexError: for a column outside the table, which the model's own
+                ``columnCount`` makes impossible and so would be a bug rather than input.
+        """
+        if index < 0:
+            raise IndexError(f'Column index {index} is negative.')
+
+        return list(cls)[index]
 
 
 class _TreeNode:
@@ -306,19 +327,6 @@ class DiffractionTreeModel(QAbstractItemModel):
         self._root = _TreeNode(None)
         self._max_counts = 1
         self._row_observers: dict[int, _DatasetRowObserver] = {}
-        self._header = [
-            'Name',
-            'Counts',
-            'Frames',
-            'Width\n[px]',
-            'Height\n[px]',
-            'Physical Pixel\nWidth [µm]',
-            'Physical Pixel\nHeight [µm]',
-            'Processed Pixel\nWidth [µm]',
-            'Processed Pixel\nHeight [µm]',
-            'Num Bad\nPixels',
-            'Size',
-        ]
 
         for dataset_row, dataset in enumerate(repository):
             self._attach_dataset(dataset_row, dataset)
@@ -479,8 +487,8 @@ class DiffractionTreeModel(QAbstractItemModel):
             num_frames = self.rowCount(array_index)
 
             if num_frames > 0:
-                top_left = self.index(0, Column.NAME, array_index)
-                bottom_right = self.index(num_frames - 1, Column.NAME, array_index)
+                top_left = self.index(0, Column.NAME.index, array_index)
+                bottom_right = self.index(num_frames - 1, Column.NAME.index, array_index)
                 self.dataChanged.emit(top_left, bottom_right)
 
     def refresh_array(self, dataset_row: int, array_row: int) -> None:
@@ -533,8 +541,8 @@ class DiffractionTreeModel(QAbstractItemModel):
         if num_rows == 0:
             return
 
-        top_left = self.index(0, Column.COUNTS, parent)
-        bottom_right = self.index(num_rows - 1, Column.COUNTS, parent)
+        top_left = self.index(0, Column.COUNTS.index, parent)
+        bottom_right = self.index(num_rows - 1, Column.COUNTS.index, parent)
         self.dataChanged.emit(top_left, bottom_right)
 
         for row, child_node in enumerate(node.child_nodes):
@@ -574,14 +582,14 @@ class DiffractionTreeModel(QAbstractItemModel):
         role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            return self._header[section]
+            return Column.from_index(section).header
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if not index.isValid():
             return None
 
         node = index.internalPointer()
-        column = index.column()
+        column = Column.from_index(index.column())
 
         if role == Qt.ItemDataRole.DisplayRole:
             match column:
@@ -596,10 +604,10 @@ class DiffractionTreeModel(QAbstractItemModel):
                 case _:
                     return self._dataset_column_display(node, column)
         elif role == Qt.ItemDataRole.EditRole:
-            if column == Column.NAME and isinstance(node, _DatasetTreeNode):
+            if column is Column.NAME and isinstance(node, _DatasetTreeNode):
                 return node.get_label()
         elif role == Qt.ItemDataRole.UserRole:
-            if column == Column.COUNTS:
+            if column is Column.COUNTS:
                 return int(100 * node.get_counts()) // int(self._max_counts)
         elif role == Qt.ItemDataRole.FontRole:
             return _state_font(self._state_of(node))
@@ -632,7 +640,7 @@ class DiffractionTreeModel(QAbstractItemModel):
         except IndexError:
             return DiffractionDatasetState.READY
 
-    def _dataset_column_display(self, node: _TreeNode, column: int) -> Any:
+    def _dataset_column_display(self, node: _TreeNode, column: Column) -> Any:
         # WIDTH_PX..NUM_BAD_PIXELS apply only to dataset rows; array/frame nodes
         # render blank.
         if not isinstance(node, _DatasetTreeNode):
@@ -661,7 +669,7 @@ class DiffractionTreeModel(QAbstractItemModel):
         base = super().flags(index)
         if not index.isValid():
             return base
-        if index.column() != Column.NAME:
+        if Column.from_index(index.column()) is not Column.NAME:
             return base
         node = index.internalPointer()
         if not isinstance(node, _DatasetTreeNode):
@@ -676,7 +684,7 @@ class DiffractionTreeModel(QAbstractItemModel):
     ) -> bool:
         if role != Qt.ItemDataRole.EditRole or not index.isValid():
             return False
-        if index.column() != Column.NAME:
+        if Column.from_index(index.column()) is not Column.NAME:
             return False
         node = index.internalPointer()
         if not isinstance(node, _DatasetTreeNode):
@@ -718,7 +726,7 @@ class DiffractionTreeModel(QAbstractItemModel):
         return len(node.child_nodes)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
-        return len(self._header)
+        return len(Column)
 
 
 class _DatasetRowObserver(DiffractionDatasetObserver):

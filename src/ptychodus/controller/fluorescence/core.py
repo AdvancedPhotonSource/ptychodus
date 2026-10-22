@@ -72,7 +72,7 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
         )
         view.tree_view.setModel(self._tree_model)
         view.tree_view.setItemDelegateForColumn(
-            Column.PRODUCT, ComboBoxItemDelegate(self._product_combo_model, view.tree_view)
+            Column.PRODUCT.index, ComboBoxItemDelegate(self._product_combo_model, view.tree_view)
         )
         header = view.tree_view.header()
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)

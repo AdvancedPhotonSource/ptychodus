@@ -1,5 +1,5 @@
 from __future__ import annotations
-from enum import IntEnum
+from enum import Enum, IntEnum
 from typing import Any
 import logging
 
@@ -21,22 +21,46 @@ from ptychodus.api.probe import (
 logger = logging.getLogger(__name__)
 
 
-class _Row(IntEnum):
-    """Row order of ProbeMetricsTableModel.
+class _Row(Enum):
+    """Every row of ProbeMetricsTableModel: its order, its label and its source.
 
-    An enum rather than module-level ints so that ``match`` arms are value patterns:
-    a bare name would be a capture pattern that swallows every row.
+    The member value pairs the label with the metrics object that supplies the value,
+    and the position comes from declaration order rather than being written out, so a
+    row cannot be added to the ordering and forgotten in the labels. Nothing could pin
+    that alignment: CLAUDE.md puts this file outside the tested surface.
+
+    Naming the source also drops the requirement that every size row precede every
+    entropy row, which a ``row < 7`` test had quietly imposed.
     """
 
-    MAJOR_AXIS_TILT_DEG = 0
-    MINOR_AXIS_TILT_DEG = 1
-    FWHM_MAJOR_AXIS_NM = 2
-    FWHM_MINOR_AXIS_NM = 3
-    RMS_MAJOR_AXIS_NM = 4
-    RMS_MINOR_AXIS_NM = 5
-    ENCIRCLED_ENERGY_DIAMETER_NM = 6
-    REAL_SPACE_INTENSITY_ENTROPY = 7
-    SPECTRAL_ENTROPY = 8
+    MAJOR_AXIS_TILT_DEG = ('Major Axis Tilt [deg]', True)
+    MINOR_AXIS_TILT_DEG = ('Minor Axis Tilt [deg]', True)
+    FWHM_MAJOR_AXIS_NM = ('FWHM Major Axis [nm]', True)
+    FWHM_MINOR_AXIS_NM = ('FWHM Minor Axis [nm]', True)
+    RMS_MAJOR_AXIS_NM = ('RMS Major Axis [nm]', True)
+    RMS_MINOR_AXIS_NM = ('RMS Minor Axis [nm]', True)
+    ENCIRCLED_ENERGY_DIAMETER_NM = ('Encircled Energy Diameter [nm]', True)
+    REAL_SPACE_INTENSITY_ENTROPY = ('Real-Space Intensity Entropy [bits, norm]', False)
+    SPECTRAL_ENTROPY = ('Spectral Entropy [bits, norm]', False)
+
+    def __init__(self, label: str, from_size_metrics: bool) -> None:
+        self.label = label
+        self.from_size_metrics = from_size_metrics
+        # Members already defined when this one is constructed, which is its position.
+        self.index = len(self.__class__.__members__)
+
+    @classmethod
+    def from_index(cls, index: int) -> _Row:
+        """The row at `index`.
+
+        Raises:
+            IndexError: for a row outside the table, which the model's own
+                ``rowCount`` makes impossible and so would be a bug rather than input.
+        """
+        if index < 0:
+            raise IndexError(f'Row index {index} is negative.')
+
+        return list(cls)[index]
 
 
 class _Col(IntEnum):
@@ -56,17 +80,6 @@ class ProbeMetricsTableModel(QAbstractTableModel):
         self._metrics: ProbeSizeMetrics | None = None
         self._entropy_metrics: ProbeEntropyMetrics | None = None
         self._header = ['Property', 'Value']
-        self._properties = [
-            'Major Axis Tilt [deg]',
-            'Minor Axis Tilt [deg]',
-            'FWHM Major Axis [nm]',
-            'FWHM Minor Axis [nm]',
-            'RMS Major Axis [nm]',
-            'RMS Minor Axis [nm]',
-            'Encircled Energy Diameter [nm]',
-            'Real-Space Intensity Entropy [bits, norm]',
-            'Spectral Entropy [bits, norm]',
-        ]
 
     def set_metrics(self, metrics: ProbeSizeMetrics | None) -> None:
         self.beginResetModel()
@@ -91,12 +104,12 @@ class ProbeMetricsTableModel(QAbstractTableModel):
         if not index.isValid() or role != Qt.ItemDataRole.DisplayRole:
             return None
 
+        row = _Row.from_index(index.row())
+
         if index.column() == _Col.PROPERTY:
-            return self._properties[index.row()]
+            return row.label
 
-        row = index.row()
-
-        if row < _Row.REAL_SPACE_INTENSITY_ENTROPY:
+        if row.from_size_metrics:
             if self._metrics is None:
                 return 'N/A'
 
@@ -130,7 +143,7 @@ class ProbeMetricsTableModel(QAbstractTableModel):
                     return f'{self._entropy_metrics.spectral_entropy:.4g}'
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
-        return len(self._properties)
+        return len(_Row)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._header)

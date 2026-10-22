@@ -109,7 +109,7 @@ class GlobusController(SequenceObserver[GlobusStatus]):
         view.setLayout(layout)
 
     def _handle_table_view_clicked(self, index: QModelIndex) -> None:
-        if index.column() == Column.RUN_ID:
+        if Column.from_index(index.column()) is Column.RUN_ID:
             url = index.data(Qt.ItemDataRole.UserRole)
             logger.info(f'Opening URL: "{url.toString()}"')
             QDesktopServices.openUrl(url)

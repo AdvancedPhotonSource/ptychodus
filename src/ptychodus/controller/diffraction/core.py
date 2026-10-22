@@ -92,7 +92,7 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         header = view.tree_view.header()
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
         counts_item_delegate = ProgressBarItemDelegate(view.tree_view)
-        view.tree_view.setItemDelegateForColumn(Column.COUNTS, counts_item_delegate)
+        view.tree_view.setItemDelegateForColumn(Column.COUNTS.index, counts_item_delegate)
         selection_model = view.tree_view.selectionModel()
 
         if selection_model is None:

@@ -78,7 +78,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         view.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         header = view.tree_view.header()
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
-        view.tree_view.setItemDelegateForColumn(Column.BUILDER, builder_item_delegate)
+        view.tree_view.setItemDelegateForColumn(Column.BUILDER.index, builder_item_delegate)
         selection_model = view.tree_view.selectionModel()
 
         if selection_model is None:

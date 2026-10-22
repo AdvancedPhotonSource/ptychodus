@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections.abc import Sequence
-from enum import IntEnum
+from enum import Enum, IntEnum
 from typing import Any
 
 from PyQt5.QtCore import (
@@ -31,35 +31,44 @@ from ...view.fluorescence import FluorescenceEditorDialog
 from ..helpers import create_brush_for_editable_cell
 
 
-class _Row(IntEnum):
-    """Row order of FluorescencePropertyTableModel.
+class _Row(Enum):
+    """Every row of FluorescencePropertyTableModel: its order, its label and whether it edits.
 
-    An enum rather than module-level ints so that ``match`` arms are value patterns:
-    a bare name would be a capture pattern that swallows every row.
+    The member value pairs the label with editability, and the position comes
+    from declaration order rather than being written out, so a row cannot be added
+    to the ordering and forgotten in the labels or the editable set. Nothing could pin
+    that alignment: CLAUDE.md puts this file outside the tested surface.
+
+    Bare names in a ``match`` arm are capture patterns, not value patterns.
     """
 
-    NAME = 0
-    PRODUCT = 1
-    SOURCE_PATH = 2
-    FILE_TYPE = 3
-    ELEMENTS = 4
-    COUNTS_PER_SECOND_PATH = 5
-    CHANNEL_NAMES_PATH = 6
-    SIZE = 7
+    NAME = ('Name', True)
+    PRODUCT = ('Product', True)
+    SOURCE_PATH = ('Source Path', False)
+    FILE_TYPE = ('File Type', False)
+    ELEMENTS = ('Elements', False)
+    COUNTS_PER_SECOND_PATH = ('Counts Per Second Path', False)
+    CHANNEL_NAMES_PATH = ('Channel Names Path', False)
+    SIZE = ('Size', False)
 
+    def __init__(self, label: str, editable: bool) -> None:
+        self.label = label
+        self.editable = editable
+        # Members already defined when this one is constructed, which is its position.
+        self.index = len(self.__class__.__members__)
 
-_EDITABLE_ROWS = frozenset({_Row.NAME, _Row.PRODUCT})
+    @classmethod
+    def from_index(cls, index: int) -> _Row:
+        """The row at `index`.
 
-_PROPERTY_LABELS = {
-    _Row.NAME: 'Name',
-    _Row.PRODUCT: 'Product',
-    _Row.SOURCE_PATH: 'Source Path',
-    _Row.FILE_TYPE: 'File Type',
-    _Row.ELEMENTS: 'Elements',
-    _Row.COUNTS_PER_SECOND_PATH: 'Counts Per Second Path',
-    _Row.CHANNEL_NAMES_PATH: 'Channel Names Path',
-    _Row.SIZE: 'Size',
-}
+        Raises:
+            IndexError: for a row outside the table, which the model's own
+                ``rowCount`` makes impossible and so would be a bug rather than input.
+        """
+        if index < 0:
+            raise IndexError(f'Row index {index} is negative.')
+
+        return list(cls)[index]
 
 
 class _Col(IntEnum):
@@ -92,8 +101,11 @@ class FluorescencePropertyTableModel(QAbstractTableModel):
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
 
-        if index.isValid() and index.column() == _Col.VALUE and index.row() in _EDITABLE_ROWS:
-            value |= Qt.ItemFlag.ItemIsEditable
+        # Only the Value column is editable: the Property column holds the row's
+        # read-only label, and setData keys off the row alone.
+        if index.isValid() and index.column() == _Col.VALUE:
+            if _Row.from_index(index.row()).editable:
+                value |= Qt.ItemFlag.ItemIsEditable
 
         return value
 
@@ -112,10 +124,10 @@ class FluorescencePropertyTableModel(QAbstractTableModel):
 
         if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
             if index.column() == _Col.PROPERTY:
-                return _PROPERTY_LABELS[_Row(index.row())]
+                return _Row.from_index(index.row()).label
 
             if index.column() == _Col.VALUE:
-                return self._value(_Row(index.row()))
+                return self._value(_Row.from_index(index.row()))
         elif role == Qt.ItemDataRole.BackgroundRole:
             if index.flags() & Qt.ItemFlag.ItemIsEditable:
                 return self._editable_item_brush
@@ -151,7 +163,7 @@ class FluorescencePropertyTableModel(QAbstractTableModel):
         if index.column() != _Col.VALUE:
             return False
 
-        match _Row(index.row()):
+        match _Row.from_index(index.row()):
             case _Row.NAME:
                 self._item.set_name(str(value))
                 return True
@@ -184,7 +196,7 @@ class _ProductDelegate(QStyledItemDelegate):
         self._product_repository = product_repository
 
     def _is_product_cell(self, index: QModelIndex) -> bool:
-        return index.column() == _Col.VALUE and index.row() == _Row.PRODUCT
+        return index.column() == _Col.VALUE and _Row.from_index(index.row()) is _Row.PRODUCT
 
     def createEditor(  # noqa: N802
         self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex

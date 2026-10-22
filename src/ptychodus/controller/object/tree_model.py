@@ -1,5 +1,5 @@
 from __future__ import annotations
-from enum import IntEnum
+from enum import Enum
 from typing import Any, overload
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
@@ -48,23 +48,47 @@ class ObjectTreeNode:
         return 0 if self.parent is None else self.parent.children.index(self)
 
 
-class Column(IntEnum):
-    """Column order of ObjectTreeModel.
+class Column(Enum):
+    """Every column of ObjectTreeModel: its order, its header and whether it edits.
 
-    An enum rather than module-level ints so that ``match`` arms are value patterns:
-    a bare name would be a capture pattern that swallows every column. Public because
-    the controller installs item delegates on some of these columns.
+    The member value pairs the header with editability, and the position comes
+    from declaration order rather than being written out, so a column cannot be added
+    to the ordering and forgotten in the labels or the editable set. Nothing could pin
+    that alignment: CLAUDE.md puts this file outside the tested surface.
+
+    Public because the controller installs item delegates on some of them.
+
+    ``editable`` is the item row's sense; a child row is governed by its own arm.
     """
 
-    NAME = 0
-    DISTANCE_M = 1
-    BUILDER = 2
-    DATA_TYPE = 3
-    WIDTH_PX = 4
-    HEIGHT_PX = 5
-    PIXEL_WIDTH_NM = 6
-    PIXEL_HEIGHT_NM = 7
-    SIZE = 8
+    NAME = ('Name', True)
+    DISTANCE_M = ('Distance [m]', False)
+    BUILDER = ('Builder', True)
+    DATA_TYPE = ('Data Type', False)
+    WIDTH_PX = ('Width [px]', False)
+    HEIGHT_PX = ('Height [px]', False)
+    PIXEL_WIDTH_NM = ('Pixel Width\n[nm]', False)
+    PIXEL_HEIGHT_NM = ('Pixel Height\n[nm]', False)
+    SIZE = ('Size', False)
+
+    def __init__(self, header: str, editable: bool) -> None:
+        self.header = header
+        self.editable = editable
+        # Members already defined when this one is constructed, which is its position.
+        self.index = len(self.__class__.__members__)
+
+    @classmethod
+    def from_index(cls, index: int) -> Column:
+        """The column at `index`.
+
+        Raises:
+            IndexError: for a column outside the table, which the model's own
+                ``columnCount`` makes impossible and so would be a bug rather than input.
+        """
+        if index < 0:
+            raise IndexError(f'Column index {index} is negative.')
+
+        return list(cls)[index]
 
 
 class ObjectTreeModel(QAbstractItemModel):
@@ -80,17 +104,6 @@ class ObjectTreeModel(QAbstractItemModel):
         self._api = api
         self._editable_item_brush = editable_item_brush
         self._tree_root = ObjectTreeNode()
-        self._header = [
-            'Name',
-            'Distance [m]',
-            'Builder',
-            'Data Type',
-            'Width [px]',
-            'Height [px]',
-            'Pixel Width\n[nm]',
-            'Pixel Height\n[nm]',
-            'Size',
-        ]
 
         for index, item in enumerate(repository):
             self.insert_item(index, item)
@@ -109,10 +122,10 @@ class ObjectTreeModel(QAbstractItemModel):
 
     def update_item(self, index: int, item: ObjectRepositoryItem) -> None:
         # Qt row/column bounds are inclusive, so the last valid column is
-        # len(self._header) - 1. Asking index() for one past the end fails
+        # len(Column) - 1. Asking index() for one past the end fails
         # hasIndex and yields an invalid QModelIndex, which makes the
         # dataChanged range malformed and the signal a no-op.
-        last_column = len(self._header) - 1
+        last_column = len(Column) - 1
         top_left = self.index(index, 0)
         bottom_right = self.index(index, last_column)
         self.dataChanged.emit(top_left, bottom_right)
@@ -153,7 +166,7 @@ class ObjectTreeModel(QAbstractItemModel):
         role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            return self._header[section]
+            return Column.from_index(section).header
 
     @overload
     def parent(self, child: QModelIndex) -> QModelIndex: ...
@@ -197,7 +210,7 @@ class ObjectTreeModel(QAbstractItemModel):
             item = self._repository[parent.row()]
 
             if role == Qt.ItemDataRole.DisplayRole:
-                match index.column():
+                match Column.from_index(index.column()):
                     case Column.NAME:
                         return f'Layer {index.row() + 1}'
                     case Column.DISTANCE_M:
@@ -221,7 +234,7 @@ class ObjectTreeModel(QAbstractItemModel):
             pixel_geometry = object_.get_pixel_geometry() if object_ is not None else None
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
-                match index.column():
+                match Column.from_index(index.column()):
                     case Column.NAME:
                         return self._repository.get_name(index.row())
                     case Column.DISTANCE_M:
@@ -257,15 +270,18 @@ class ObjectTreeModel(QAbstractItemModel):
 
         if index.isValid():
             parent = index.parent()
+            column = Column.from_index(index.column())
 
             if parent.isValid():
-                if index.column() == Column.DISTANCE_M:
+                # A layer row edits its spacing to the next layer, which the item
+                # row's own editability says nothing about.
+                if column is Column.DISTANCE_M:
                     item = self._repository[parent.row()]
 
                     if index.row() + 1 < item.get_num_layers():
                         value |= Qt.ItemFlag.ItemIsEditable
             else:
-                if index.column() in (Column.NAME, Column.BUILDER):
+                if column.editable:
                     value |= Qt.ItemFlag.ItemIsEditable
 
         return value
@@ -273,11 +289,12 @@ class ObjectTreeModel(QAbstractItemModel):
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
             parent = index.parent()
+            column = Column.from_index(index.column())
 
             if parent.isValid():
                 item = self._repository[parent.row()]
 
-                if index.column() == Column.DISTANCE_M:
+                if column is Column.DISTANCE_M:
                     try:
                         distance_m = float(value)
                     except ValueError:
@@ -286,10 +303,10 @@ class ObjectTreeModel(QAbstractItemModel):
                     item.layer_spacing_m[index.row()] = distance_m
                     return True
             else:
-                if index.column() == Column.NAME:
+                if column is Column.NAME:
                     self._repository.set_name(index.row(), str(value))
                     return True
-                elif index.column() == Column.BUILDER:
+                elif column is Column.BUILDER:
                     self._api.build_object(index.row(), str(value))
                     return True
 
@@ -303,4 +320,4 @@ class ObjectTreeModel(QAbstractItemModel):
         return len(node.children)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
-        return len(self._header)
+        return len(Column)

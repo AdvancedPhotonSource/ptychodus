@@ -1,5 +1,5 @@
 from __future__ import annotations
-from enum import IntEnum
+from enum import Enum
 from typing import Any
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject
@@ -7,33 +7,44 @@ from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject
 from ...model.genesis import GenesisStatusRepository
 
 
-class _Column(IntEnum):
-    """Column order of GenesisStatusTableModel.
+class _Column(Enum):
+    """Every column of GenesisStatusTableModel: its order and its header.
 
-    An enum rather than module-level ints so that ``match`` arms are value patterns:
-    a bare name would be a capture pattern that swallows every column.
+    The member value is the header and the position comes from declaration order,
+    so a column cannot be added to the ordering and forgotten in the headers.
+    Bare names in a ``match`` arm are capture patterns, not value patterns.
     """
 
-    FACILITY = 0
-    LABEL = 1
-    ACTION = 2
-    STATUS = 3
-    START_TIME = 4
-    COMPLETION_TIME = 5
+    FACILITY = 'Facility'
+    LABEL = 'Label'
+    ACTION = 'Action'
+    STATUS = 'Status'
+    START_TIME = 'Start Time'
+    COMPLETION_TIME = 'Completion Time'
+
+    def __init__(self, header: str) -> None:
+        self.header = header
+        # Members already defined when this one is constructed, which is its position.
+        self.index = len(self.__class__.__members__)
+
+    @classmethod
+    def from_index(cls, index: int) -> _Column:
+        """The column at `index`.
+
+        Raises:
+            IndexError: for a column outside the table, which the model's own
+                ``columnCount`` makes impossible and so would be a bug rather than input.
+        """
+        if index < 0:
+            raise IndexError(f'Column index {index} is negative.')
+
+        return list(cls)[index]
 
 
 class GenesisStatusTableModel(QAbstractTableModel):
     def __init__(self, presenter: GenesisStatusRepository, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
-        self._section_headers = [
-            'Facility',
-            'Label',
-            'Action',
-            'Status',
-            'Start Time',
-            'Completion Time',
-        ]
         self._dt_format = '%Y-%m-%d %H:%M:%S'
 
     def headerData(  # noqa: N802
@@ -45,7 +56,7 @@ class GenesisStatusTableModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.DisplayRole:
             match orientation:
                 case Qt.Orientation.Horizontal:
-                    return self._section_headers[section]
+                    return _Column.from_index(section).header
                 case Qt.Orientation.Vertical:
                     return section
 
@@ -53,7 +64,7 @@ class GenesisStatusTableModel(QAbstractTableModel):
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
             status = self._presenter[index.row()]
 
-            match index.column():
+            match _Column.from_index(index.column()):
                 case _Column.FACILITY:
                     return status.facility
                 case _Column.LABEL:
@@ -72,4 +83,4 @@ class GenesisStatusTableModel(QAbstractTableModel):
         return len(self._presenter)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
-        return len(self._section_headers)
+        return len(_Column)
