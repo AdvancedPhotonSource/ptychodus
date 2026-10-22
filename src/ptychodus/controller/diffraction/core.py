@@ -31,7 +31,7 @@ from ..image import ImageController
 from ..parameters import CheckBoxParameterViewController
 from ..task_status import TaskStatusController
 from ..product.core import ProductRepositoryComboProxyModel, ProductRepositoryTableModel
-from .dataset import DiffractionTreeModel
+from .dataset import Column, DiffractionTreeModel
 from .dataset_editor import DatasetEditorViewController
 from .wizard import OpenDatasetWizardController
 
@@ -92,7 +92,7 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         header = view.tree_view.header()
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
         counts_item_delegate = ProgressBarItemDelegate(view.tree_view)
-        view.tree_view.setItemDelegateForColumn(1, counts_item_delegate)
+        view.tree_view.setItemDelegateForColumn(Column.COUNTS, counts_item_delegate)
         selection_model = view.tree_view.selectionModel()
 
         if selection_model is None:

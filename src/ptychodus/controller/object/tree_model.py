@@ -1,4 +1,5 @@
 from __future__ import annotations
+from enum import IntEnum
 from typing import Any, overload
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
@@ -45,6 +46,25 @@ class ObjectTreeNode:
 
     def row(self) -> int:
         return 0 if self.parent is None else self.parent.children.index(self)
+
+
+class Column(IntEnum):
+    """Column order of ObjectTreeModel.
+
+    An enum rather than module-level ints so that ``match`` arms are value patterns:
+    a bare name would be a capture pattern that swallows every column. Public because
+    the controller installs item delegates on some of these columns.
+    """
+
+    NAME = 0
+    DISTANCE_M = 1
+    BUILDER = 2
+    DATA_TYPE = 3
+    WIDTH_PX = 4
+    HEIGHT_PX = 5
+    PIXEL_WIDTH_NM = 6
+    PIXEL_HEIGHT_NM = 7
+    SIZE = 8
 
 
 class ObjectTreeModel(QAbstractItemModel):
@@ -178,9 +198,9 @@ class ObjectTreeModel(QAbstractItemModel):
 
             if role == Qt.ItemDataRole.DisplayRole:
                 match index.column():
-                    case 0:
+                    case Column.NAME:
                         return f'Layer {index.row() + 1}'
-                    case 1:
+                    case Column.DISTANCE_M:
                         try:
                             return item.layer_spacing_m[index.row()]
                         except IndexError:
@@ -202,31 +222,31 @@ class ObjectTreeModel(QAbstractItemModel):
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 match index.column():
-                    case 0:
+                    case Column.NAME:
                         return self._repository.get_name(index.row())
-                    case 1:
+                    case Column.DISTANCE_M:
                         return raw_object.get_total_thickness_m()
-                    case 2:
+                    case Column.BUILDER:
                         return item.get_builder().get_name()
-                    case 3:
+                    case Column.DATA_TYPE:
                         return str(object_.dtype) if object_ is not None else None
-                    case 4:
+                    case Column.WIDTH_PX:
                         return object_.width_px if object_ is not None else None
-                    case 5:
+                    case Column.HEIGHT_PX:
                         return object_.height_px if object_ is not None else None
-                    case 6:
+                    case Column.PIXEL_WIDTH_NM:
                         return (
                             f'{LengthUnit.NANOMETER.convert(pixel_geometry.width_m):.4g}'
                             if pixel_geometry
                             else None
                         )
-                    case 7:
+                    case Column.PIXEL_HEIGHT_NM:
                         return (
                             f'{LengthUnit.NANOMETER.convert(pixel_geometry.height_m):.4g}'
                             if pixel_geometry
                             else None
                         )
-                    case 8:
+                    case Column.SIZE:
                         return format_bytes(raw_object.nbytes)
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
@@ -239,13 +259,13 @@ class ObjectTreeModel(QAbstractItemModel):
             parent = index.parent()
 
             if parent.isValid():
-                if index.column() == 1:
+                if index.column() == Column.DISTANCE_M:
                     item = self._repository[parent.row()]
 
                     if index.row() + 1 < item.get_num_layers():
                         value |= Qt.ItemFlag.ItemIsEditable
             else:
-                if index.column() in (0, 2):
+                if index.column() in (Column.NAME, Column.BUILDER):
                     value |= Qt.ItemFlag.ItemIsEditable
 
         return value
@@ -257,7 +277,7 @@ class ObjectTreeModel(QAbstractItemModel):
             if parent.isValid():
                 item = self._repository[parent.row()]
 
-                if index.column() == 1:
+                if index.column() == Column.DISTANCE_M:
                     try:
                         distance_m = float(value)
                     except ValueError:
@@ -266,10 +286,10 @@ class ObjectTreeModel(QAbstractItemModel):
                     item.layer_spacing_m[index.row()] = distance_m
                     return True
             else:
-                if index.column() == 0:
+                if index.column() == Column.NAME:
                     self._repository.set_name(index.row(), str(value))
                     return True
-                elif index.column() == 2:
+                elif index.column() == Column.BUILDER:
                     self._api.build_object(index.row(), str(value))
                     return True
 

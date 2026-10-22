@@ -1,9 +1,27 @@
+from __future__ import annotations
+from enum import IntEnum
 from typing import Any
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QUrl
 from PyQt5.QtGui import QColor, QFont
 
 from ...model.globus import GlobusStatusRepository
+
+
+class Column(IntEnum):
+    """Column order of GlobusStatusTableModel.
+
+    An enum rather than module-level ints so that ``match`` arms are value patterns:
+    a bare name would be a capture pattern that swallows every column. Public because
+    the controller's click handler opens the run URL from one of these columns.
+    """
+
+    LABEL = 0
+    START_TIME = 1
+    COMPLETION_TIME = 2
+    STATUS = 3
+    ACTION = 4
+    RUN_ID = 5
 
 
 class GlobusStatusTableModel(QAbstractTableModel):
@@ -39,20 +57,20 @@ class GlobusStatusTableModel(QAbstractTableModel):
 
             if role == Qt.ItemDataRole.DisplayRole:
                 match index.column():
-                    case 0:
+                    case Column.LABEL:
                         return flow_run.label
-                    case 1:
+                    case Column.START_TIME:
                         return flow_run.start_time.strftime(self._dt_format)
-                    case 2:
+                    case Column.COMPLETION_TIME:
                         if flow_run.completion_time is not None:
                             return flow_run.completion_time.strftime(self._dt_format)
-                    case 3:
+                    case Column.STATUS:
                         return flow_run.status
-                    case 4:
+                    case Column.ACTION:
                         return flow_run.action
-                    case 5:
+                    case Column.RUN_ID:
                         return flow_run.run_id
-            elif index.column() == 5:
+            elif index.column() == Column.RUN_ID:
                 match role:
                     case Qt.ItemDataRole.ToolTipRole:
                         return flow_run.run_url

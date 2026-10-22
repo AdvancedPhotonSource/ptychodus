@@ -1,8 +1,25 @@
+from __future__ import annotations
+from enum import IntEnum
 from typing import Any
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject
 
 from ...model.genesis import GenesisStatusRepository
+
+
+class _Column(IntEnum):
+    """Column order of GenesisStatusTableModel.
+
+    An enum rather than module-level ints so that ``match`` arms are value patterns:
+    a bare name would be a capture pattern that swallows every column.
+    """
+
+    FACILITY = 0
+    LABEL = 1
+    ACTION = 2
+    STATUS = 3
+    START_TIME = 4
+    COMPLETION_TIME = 5
 
 
 class GenesisStatusTableModel(QAbstractTableModel):
@@ -37,17 +54,17 @@ class GenesisStatusTableModel(QAbstractTableModel):
             status = self._presenter[index.row()]
 
             match index.column():
-                case 0:
+                case _Column.FACILITY:
                     return status.facility
-                case 1:
+                case _Column.LABEL:
                     return status.label
-                case 2:
+                case _Column.ACTION:
                     return status.action
-                case 3:
+                case _Column.STATUS:
                     return status.status
-                case 4:
+                case _Column.START_TIME:
                     return status.start_time.strftime(self._dt_format)
-                case 5:
+                case _Column.COMPLETION_TIME:
                     if status.completion_time is not None:
                         return status.completion_time.strftime(self._dt_format)
 

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from enum import Enum
+from enum import Enum, IntEnum
 from typing import Any, cast, overload
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
@@ -23,11 +23,19 @@ class DisplayMode(Enum):
     ENHANCED = 'enhanced'
 
 
-_COL_NAME = 0
-# Public: the controller installs the product combo delegate on this column.
-COL_PRODUCT = 1
-_COL_COUNTS = 3
-_COL_SIZE = 4
+class Column(IntEnum):
+    """Column order of FluorescenceRepositoryTreeModel.
+
+    An enum rather than module-level ints so that ``match`` arms are value patterns:
+    a bare name would be a capture pattern that swallows every column. Public because
+    the controller installs the product combo delegate on one of these columns.
+    """
+
+    NAME = 0
+    PRODUCT = 1
+    ELEMENTS = 2
+    COUNTS = 3
+    SIZE = 4
 
 
 def _select_display_quantity(
@@ -237,8 +245,8 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
         if num_rows == 0:
             return
         # Top-level rows: Counts follows the display.
-        top_left = self.index(0, _COL_COUNTS)
-        bottom_right = self.index(num_rows - 1, _COL_COUNTS)
+        top_left = self.index(0, Column.COUNTS)
+        bottom_right = self.index(num_rows - 1, Column.COUNTS)
         self.dataChanged.emit(top_left, bottom_right)
         # Element leaves: Counts likewise.
         for item_row in range(num_rows):
@@ -246,8 +254,8 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
             num_children = self.rowCount(parent_index)
             if num_children == 0:
                 continue
-            leaf_top = self.index(0, _COL_COUNTS, parent_index)
-            leaf_bottom = self.index(num_children - 1, _COL_COUNTS, parent_index)
+            leaf_top = self.index(0, Column.COUNTS, parent_index)
+            leaf_bottom = self.index(num_children - 1, Column.COUNTS, parent_index)
             self.dataChanged.emit(leaf_top, leaf_bottom)
 
     # ------------------------------------------------------------------
@@ -276,8 +284,8 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
         num_children = self.rowCount(parent_idx)
         if num_children > 0:
             # Spans Counts..Size: an enhance run adds element maps, so both move.
-            top_left = self.index(0, _COL_COUNTS, parent_idx)
-            bottom_right = self.index(num_children - 1, _COL_SIZE, parent_idx)
+            top_left = self.index(0, Column.COUNTS, parent_idx)
+            bottom_right = self.index(num_children - 1, Column.SIZE, parent_idx)
             self.dataChanged.emit(top_left, bottom_right)
 
     def handle_state_changed(self, index: int, item: FluorescenceRepositoryItem) -> None:
@@ -355,7 +363,7 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
         node = index.internalPointer()
         if not isinstance(node, _ItemNode):
             return value
-        if index.column() not in (_COL_NAME, COL_PRODUCT):
+        if index.column() not in (Column.NAME, Column.PRODUCT):
             return value
 
         try:
@@ -389,12 +397,12 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
         if isinstance(node, _ElementNode):
             if role == Qt.ItemDataRole.DisplayRole:
                 match index.column():
-                    case 0:
+                    case Column.NAME:
                         return node.element_name(item)
-                    case 3:
+                    case Column.COUNTS:
                         counts = node.get_counts(item, self._display)
                         return _format_counts(counts)
-                    case 4:
+                    case Column.SIZE:
                         return format_bytes(node.get_nbytes(item))
                     case _:
                         return None
@@ -413,16 +421,16 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
         # Item row.
         if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
             match index.column():
-                case 0:
+                case Column.NAME:
                     return item.get_name()
-                case 1:
+                case Column.PRODUCT:
                     return item.get_product().get_name()
-                case 2:
+                case Column.ELEMENTS:
                     return len(item.get_measured())
-                case 3:
+                case Column.COUNTS:
                     counts = node.get_counts(item, self._display)
                     return _format_counts(counts)
-                case 4:
+                case Column.SIZE:
                     return format_bytes(node.get_nbytes(item))
         elif role == Qt.ItemDataRole.FontRole:
             return _state_font(state)
@@ -442,14 +450,14 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
         node = index.internalPointer()
         if not isinstance(node, _ItemNode):
             return False
-        if index.column() not in (_COL_NAME, COL_PRODUCT):
+        if index.column() not in (Column.NAME, Column.PRODUCT):
             return False
         try:
             item = self._repository[index.row()]
         except IndexError:
             return False
 
-        if index.column() == _COL_NAME:
+        if index.column() == Column.NAME:
             item.set_name(str(value))
             return True
 

@@ -448,7 +448,7 @@ class ProductController(ProductRepositoryObserver):
 
         view.table_view.setModel(table_proxy_model)
         view.table_view.setSortingEnabled(True)
-        view.table_view.sortByColumn(0, Qt.SortOrder.AscendingOrder)
+        view.table_view.sortByColumn(_Column.NAME.index, Qt.SortOrder.AscendingOrder)
         vertical_header = view.table_view.verticalHeader()
 
         if vertical_header is not None:

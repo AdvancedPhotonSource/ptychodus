@@ -32,7 +32,7 @@ from .illumination import IlluminationViewController
 from .opr import OPRModeViewController
 from .overlap import ProbeOverlapViewController
 from .propagator import ProbePropagationViewController
-from .tree_model import ProbeTreeModel, try_get_probe
+from .tree_model import Column, ProbeTreeModel, try_get_probe
 
 logger = logging.getLogger(__name__)
 
@@ -97,8 +97,8 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         header = view.tree_view.header()
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
         power_item_delegate = ProgressBarItemDelegate(view.tree_view)
-        view.tree_view.setItemDelegateForColumn(1, power_item_delegate)
-        view.tree_view.setItemDelegateForColumn(2, builder_item_delegate)
+        view.tree_view.setItemDelegateForColumn(Column.RELATIVE_POWER, power_item_delegate)
+        view.tree_view.setItemDelegateForColumn(Column.BUILDER, builder_item_delegate)
         selection_model = view.tree_view.selectionModel()
 
         if selection_model is None:

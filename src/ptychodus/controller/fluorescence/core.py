@@ -23,7 +23,7 @@ from ..image import ImageController
 from .editor import FluorescenceEditorViewController
 from .enhance_dialog import FluorescenceEnhanceDialogController
 from ..product.core import ProductRepositoryComboProxyModel, ProductRepositoryTableModel
-from .repository_tree_model import COL_PRODUCT, FluorescenceRepositoryTreeModel, DisplayMode
+from .repository_tree_model import Column, FluorescenceRepositoryTreeModel, DisplayMode
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
         )
         view.tree_view.setModel(self._tree_model)
         view.tree_view.setItemDelegateForColumn(
-            COL_PRODUCT, ComboBoxItemDelegate(self._product_combo_model, view.tree_view)
+            Column.PRODUCT, ComboBoxItemDelegate(self._product_combo_model, view.tree_view)
         )
         header = view.tree_view.header()
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)

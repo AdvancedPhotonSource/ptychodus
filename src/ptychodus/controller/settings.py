@@ -1,5 +1,6 @@
 from __future__ import annotations
 from collections.abc import Sequence
+from enum import IntEnum
 from typing import Any
 import logging
 
@@ -15,6 +16,17 @@ from .data import FileDialogFactory
 from .product.core import ProductRepositoryComboProxyModel, ProductRepositoryTableModel
 
 logger = logging.getLogger(__name__)
+
+
+class _Column(IntEnum):
+    """Column order of SettingsTableModel.
+
+    An enum rather than module-level ints so that ``match`` arms are value patterns:
+    a bare name would be a capture pattern that swallows every column.
+    """
+
+    NAME = 0
+    VALUE = 1
 
 
 class SettingsTableModel(QAbstractTableModel):
@@ -36,16 +48,16 @@ class SettingsTableModel(QAbstractTableModel):
         role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
         if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
-            if section == 0:
+            if section == _Column.NAME:
                 return 'Name'
-            elif section == 1:
+            elif section == _Column.VALUE:
                 return 'Value'
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
-            if index.column() == 0:
+            if index.column() == _Column.NAME:
                 return self._names[index.row()]
-            elif index.column() == 1:
+            elif index.column() == _Column.VALUE:
                 return str(self._values[index.row()])
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802

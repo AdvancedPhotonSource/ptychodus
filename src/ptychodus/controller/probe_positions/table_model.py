@@ -1,3 +1,5 @@
+from __future__ import annotations
+from enum import IntEnum
 from typing import Any
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject
@@ -9,7 +11,20 @@ from ...model.product import ProbePositionsAPI, ProbePositionsRepository
 from ...model.product.probe_positions import ProbePositionsRepositoryItem
 
 
-_COL_SIZE = 5
+class Column(IntEnum):
+    """Column order of ProbePositionsTableModel.
+
+    An enum rather than module-level ints so that ``match`` arms are value patterns:
+    a bare name would be a capture pattern that swallows every column. Public because
+    the controller installs the builder combo delegate on one of these columns.
+    """
+
+    NAME = 0
+    PLOT = 1
+    BUILDER = 2
+    POINTS = 3
+    LENGTH_M = 4
+    SIZE = 5
 
 
 class ProbePositionsTableModel(QAbstractTableModel):
@@ -62,25 +77,25 @@ class ProbePositionsTableModel(QAbstractTableModel):
         length_m = 0.0 if geometry is None else geometry.length_m
 
         if role == Qt.ItemDataRole.DisplayRole:
-            if index.column() == 0:
+            if index.column() == Column.NAME:
                 return self._repository.get_name(index.row())
-            elif index.column() == 1:
+            elif index.column() == Column.PLOT:
                 return None
-            elif index.column() == 2:
+            elif index.column() == Column.BUILDER:
                 return item.get_builder().get_name()
-            elif index.column() == 3:
+            elif index.column() == Column.POINTS:
                 return len(probe_positions)
-            elif index.column() == 4:
+            elif index.column() == Column.LENGTH_M:
                 return f'{length_m:.6f}'
-            elif index.column() == _COL_SIZE:
+            elif index.column() == Column.SIZE:
                 return format_bytes(probe_positions.nbytes)
         elif role == Qt.ItemDataRole.UserRole:
-            if index.column() == _COL_SIZE:
+            if index.column() == Column.SIZE:
                 # Numeric sort key: the display text mixes units and cannot be
                 # ordered as a string.
                 return probe_positions.nbytes
         elif role == Qt.ItemDataRole.CheckStateRole:
-            if index.column() == 1:
+            if index.column() == Column.PLOT:
                 return (
                     Qt.CheckState.Checked
                     if index.row() in self._checked_item_indexes
@@ -94,10 +109,10 @@ class ProbePositionsTableModel(QAbstractTableModel):
         value = super().flags(index)
 
         if index.isValid():
-            if index.column() in (0, 2):
+            if index.column() in (Column.NAME, Column.BUILDER):
                 value |= Qt.ItemFlag.ItemIsEditable
 
-            if index.column() == 1:
+            if index.column() == Column.PLOT:
                 value |= Qt.ItemFlag.ItemIsUserCheckable
 
         return value
@@ -107,14 +122,14 @@ class ProbePositionsTableModel(QAbstractTableModel):
             return False
 
         if role == Qt.ItemDataRole.EditRole:
-            if index.column() == 0:
+            if index.column() == Column.NAME:
                 self._repository.set_name(index.row(), str(value))
                 return True
-            elif index.column() == 2:
+            elif index.column() == Column.BUILDER:
                 self._api.build_probe_positions(index.row(), str(value))
                 return True
         elif role == Qt.ItemDataRole.CheckStateRole:
-            if index.column() == 1:
+            if index.column() == Column.PLOT:
                 if value == Qt.CheckState.Checked:
                     self._checked_item_indexes.add(index.row())
                 else:

@@ -1,3 +1,5 @@
+from __future__ import annotations
+from enum import IntEnum
 from typing import Any
 import logging
 
@@ -17,6 +19,35 @@ from ptychodus.api.probe import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class _Row(IntEnum):
+    """Row order of ProbeMetricsTableModel.
+
+    An enum rather than module-level ints so that ``match`` arms are value patterns:
+    a bare name would be a capture pattern that swallows every row.
+    """
+
+    MAJOR_AXIS_TILT_DEG = 0
+    MINOR_AXIS_TILT_DEG = 1
+    FWHM_MAJOR_AXIS_NM = 2
+    FWHM_MINOR_AXIS_NM = 3
+    RMS_MAJOR_AXIS_NM = 4
+    RMS_MINOR_AXIS_NM = 5
+    ENCIRCLED_ENERGY_DIAMETER_NM = 6
+    REAL_SPACE_INTENSITY_ENTROPY = 7
+    SPECTRAL_ENTROPY = 8
+
+
+class _Col(IntEnum):
+    """Column order of ProbeMetricsTableModel.
+
+    An enum for the same reason as _Row: bare names in a ``match`` arm are capture
+    patterns, not value patterns.
+    """
+
+    PROPERTY = 0
+    VALUE = 1
 
 
 class ProbeMetricsTableModel(QAbstractTableModel):
@@ -60,42 +91,42 @@ class ProbeMetricsTableModel(QAbstractTableModel):
         if not index.isValid() or role != Qt.ItemDataRole.DisplayRole:
             return None
 
-        if index.column() == 0:
+        if index.column() == _Col.PROPERTY:
             return self._properties[index.row()]
 
         row = index.row()
 
-        if row < 7:
+        if row < _Row.REAL_SPACE_INTENSITY_ENTROPY:
             if self._metrics is None:
                 return 'N/A'
 
             match row:
-                case 0:
+                case _Row.MAJOR_AXIS_TILT_DEG:
                     return f'{numpy.rad2deg(self._metrics.major_axis_tilt_rad):.4g}'
-                case 1:
+                case _Row.MINOR_AXIS_TILT_DEG:
                     return f'{numpy.rad2deg(self._metrics.minor_axis_tilt_rad):.4g}'
-                case 2:
+                case _Row.FWHM_MAJOR_AXIS_NM:
                     return f'{LengthUnit.NANOMETER.convert(self._metrics.fwhm_major_axis_length_m):.4g}'
-                case 3:
+                case _Row.FWHM_MINOR_AXIS_NM:
                     return f'{LengthUnit.NANOMETER.convert(self._metrics.fwhm_minor_axis_length_m):.4g}'
-                case 4:
+                case _Row.RMS_MAJOR_AXIS_NM:
                     return (
                         f'{LengthUnit.NANOMETER.convert(self._metrics.rms_major_axis_length_m):.4g}'
                     )
-                case 5:
+                case _Row.RMS_MINOR_AXIS_NM:
                     return (
                         f'{LengthUnit.NANOMETER.convert(self._metrics.rms_minor_axis_length_m):.4g}'
                     )
-                case 6:
+                case _Row.ENCIRCLED_ENERGY_DIAMETER_NM:
                     return f'{LengthUnit.NANOMETER.convert(self._metrics.encircled_energy_diameter_m):.4g}'
         else:
             if self._entropy_metrics is None:
                 return 'N/A'
 
             match row:
-                case 7:
+                case _Row.REAL_SPACE_INTENSITY_ENTROPY:
                     return f'{self._entropy_metrics.real_space_intensity_entropy:.4g}'
-                case 8:
+                case _Row.SPECTRAL_ENTROPY:
                     return f'{self._entropy_metrics.spectral_entropy:.4g}'
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802

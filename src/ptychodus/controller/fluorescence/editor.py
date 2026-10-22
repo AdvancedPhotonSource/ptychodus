@@ -61,8 +61,16 @@ _PROPERTY_LABELS = {
     _Row.SIZE: 'Size',
 }
 
-_COL_PROPERTY = 0
-_COL_VALUE = 1
+
+class _Col(IntEnum):
+    """Column order of FluorescencePropertyTableModel.
+
+    An enum for the same reason as _Row: bare names in a ``match`` arm are capture
+    patterns, not value patterns.
+    """
+
+    PROPERTY = 0
+    VALUE = 1
 
 
 class FluorescencePropertyTableModel(QAbstractTableModel):
@@ -84,7 +92,7 @@ class FluorescencePropertyTableModel(QAbstractTableModel):
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
 
-        if index.isValid() and index.column() == _COL_VALUE and index.row() in _EDITABLE_ROWS:
+        if index.isValid() and index.column() == _Col.VALUE and index.row() in _EDITABLE_ROWS:
             value |= Qt.ItemFlag.ItemIsEditable
 
         return value
@@ -103,10 +111,10 @@ class FluorescencePropertyTableModel(QAbstractTableModel):
             return None
 
         if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
-            if index.column() == _COL_PROPERTY:
+            if index.column() == _Col.PROPERTY:
                 return _PROPERTY_LABELS[_Row(index.row())]
 
-            if index.column() == _COL_VALUE:
+            if index.column() == _Col.VALUE:
                 return self._value(_Row(index.row()))
         elif role == Qt.ItemDataRole.BackgroundRole:
             if index.flags() & Qt.ItemFlag.ItemIsEditable:
@@ -140,7 +148,7 @@ class FluorescencePropertyTableModel(QAbstractTableModel):
         if not index.isValid() or role != Qt.ItemDataRole.EditRole:
             return False
 
-        if index.column() != _COL_VALUE:
+        if index.column() != _Col.VALUE:
             return False
 
         match _Row(index.row()):
@@ -176,7 +184,7 @@ class _ProductDelegate(QStyledItemDelegate):
         self._product_repository = product_repository
 
     def _is_product_cell(self, index: QModelIndex) -> bool:
-        return index.column() == _COL_VALUE and index.row() == _Row.PRODUCT
+        return index.column() == _Col.VALUE and index.row() == _Row.PRODUCT
 
     def createEditor(  # noqa: N802
         self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex
@@ -247,7 +255,7 @@ class FluorescenceEditorViewController(ProductRepositoryObserver):
         )
         dialog.table_view.setModel(table_model)
         dialog.table_view.setItemDelegateForColumn(
-            _COL_VALUE, _ProductDelegate(product_repository, dialog.table_view)
+            _Col.VALUE, _ProductDelegate(product_repository, dialog.table_view)
         )
 
         vertical_header = dialog.table_view.verticalHeader()

@@ -19,7 +19,7 @@ from ..helpers import (
     create_brush_for_editable_cell,
 )
 from .editor_factory import ProbePositionsEditorViewControllerFactory
-from .table_model import ProbePositionsTableModel
+from .table_model import Column, ProbePositionsTableModel
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
         view.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         header = view.table_view.horizontalHeader()
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
-        view.table_view.setItemDelegateForColumn(2, builder_item_delegate)
+        view.table_view.setItemDelegateForColumn(Column.BUILDER, builder_item_delegate)
         connect_current_changed_signal(view.table_view, self._update_view)
         self._update_view(QModelIndex(), QModelIndex())
 

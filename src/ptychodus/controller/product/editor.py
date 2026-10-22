@@ -297,11 +297,11 @@ class ProductPropertyTableModel(QAbstractTableModel):
 class _PropertyValueDelegate(QStyledItemDelegate):
     """Combobox editor for the combo-valued rows of the product-property table.
 
-    Attached with ``setItemDelegateForColumn(1, ...)`` so column sorting through
-    the proxy model cannot mis-target the row; only one delegate can be installed
-    per column, so this one serves both combo rows and dispatches on the mapped
-    source row. ``mapToSource`` recovers the row in the underlying
-    ProductPropertyTableModel — every other row falls through to the base delegate.
+    Attached to the Value column alone so column sorting through the proxy model
+    cannot mis-target the row; only one delegate can be installed per column, so this
+    one serves both combo rows and dispatches on the mapped source row.
+    ``mapToSource`` recovers the row in the underlying ProductPropertyTableModel —
+    every other row falls through to the base delegate.
     """
 
     def __init__(self, dataset_combo_model: DiffractionDatasetComboModel, parent: QWidget) -> None:

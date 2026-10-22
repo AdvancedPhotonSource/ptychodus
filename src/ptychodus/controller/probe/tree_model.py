@@ -1,4 +1,5 @@
 from __future__ import annotations
+from enum import IntEnum
 from typing import Any, overload
 
 import numpy
@@ -55,6 +56,25 @@ def try_get_probe(item: ProbeRepositoryItem) -> Probe | None:
         return item.get_probes().get_probe_no_opr()
     except ValueError:
         return None
+
+
+class Column(IntEnum):
+    """Column order of ProbeTreeModel.
+
+    An enum rather than module-level ints so that ``match`` arms are value patterns:
+    a bare name would be a capture pattern that swallows every column. Public because
+    the controller installs item delegates on some of these columns.
+    """
+
+    NAME = 0
+    RELATIVE_POWER = 1
+    BUILDER = 2
+    DATA_TYPE = 3
+    WIDTH_PX = 4
+    HEIGHT_PX = 5
+    PIXEL_WIDTH_NM = 6
+    PIXEL_HEIGHT_NM = 7
+    SIZE = 8
 
 
 class ProbeTreeModel(QAbstractItemModel):
@@ -182,9 +202,9 @@ class ProbeTreeModel(QAbstractItemModel):
 
             if role == Qt.ItemDataRole.DisplayRole:
                 match index.column():
-                    case 0:
+                    case Column.NAME:
                         return f'Mode {index.row() + 1}'
-                    case 1:
+                    case Column.RELATIVE_POWER:
                         probe = try_get_probe(item)
                         if probe is None:
                             return None
@@ -193,7 +213,7 @@ class ProbeTreeModel(QAbstractItemModel):
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
                     return self._editable_item_brush
-            elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
+            elif role == Qt.ItemDataRole.UserRole and index.column() == Column.RELATIVE_POWER:
                 probe = try_get_probe(item)
                 if probe is None:
                     return None
@@ -208,39 +228,39 @@ class ProbeTreeModel(QAbstractItemModel):
 
             if role == Qt.ItemDataRole.DisplayRole:
                 match index.column():
-                    case 0:
+                    case Column.NAME:
                         return self._repository.get_name(index.row())
-                    case 1:
+                    case Column.RELATIVE_POWER:
                         if probe is None:
                             return None
                         coherent_percent = calc_coherent_percent(probe)
                         return f'{coherent_percent}%'
-                    case 2:
+                    case Column.BUILDER:
                         return item.get_builder().get_name()
-                    case 3:
+                    case Column.DATA_TYPE:
                         return str(probe.dtype) if probe is not None else None
-                    case 4:
+                    case Column.WIDTH_PX:
                         return probe.width_px if probe is not None else None
-                    case 5:
+                    case Column.HEIGHT_PX:
                         return probe.height_px if probe is not None else None
-                    case 6:
+                    case Column.PIXEL_WIDTH_NM:
                         return (
                             f'{LengthUnit.NANOMETER.convert(pixel_geometry.width_m):.4g}'
                             if pixel_geometry
                             else None
                         )
-                    case 7:
+                    case Column.PIXEL_HEIGHT_NM:
                         return (
                             f'{LengthUnit.NANOMETER.convert(pixel_geometry.height_m):.4g}'
                             if pixel_geometry
                             else None
                         )
-                    case 8:
+                    case Column.SIZE:
                         return format_bytes(probes.nbytes)
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
                     return self._editable_item_brush
-            elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
+            elif role == Qt.ItemDataRole.UserRole and index.column() == Column.RELATIVE_POWER:
                 probe = try_get_probe(item)
                 if probe is None:
                     return None
@@ -252,7 +272,7 @@ class ProbeTreeModel(QAbstractItemModel):
         if index.isValid():
             parent = index.parent()
 
-            if not parent.isValid() and index.column() in (0, 2):
+            if not parent.isValid() and index.column() in (Column.NAME, Column.BUILDER):
                 value |= Qt.ItemFlag.ItemIsEditable
 
         return value
@@ -262,10 +282,10 @@ class ProbeTreeModel(QAbstractItemModel):
             parent = index.parent()
 
             if not parent.isValid():
-                if index.column() == 0:
+                if index.column() == Column.NAME:
                     self._repository.set_name(index.row(), str(value))
                     return True
-                elif index.column() == 2:
+                elif index.column() == Column.BUILDER:
                     self._api.build_probe(index.row(), str(value))
                     return True
 
