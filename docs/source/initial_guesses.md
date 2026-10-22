@@ -29,7 +29,7 @@ with ModelCore(Path('settings.ini')) as model:
         'disk',
         {
             'diameter_m': 1.0e-6,
-            'defocus_distance_m': 0.0,
+            'propagation_distance_m': 0.0,
             'num_incoherent_modes': 1,
             'num_coherent_modes': 1,
         },
@@ -140,22 +140,22 @@ The Cartesian builders use:
 Use `WorkflowProductAPI.generate_probe(name, parameters)`. All generated probe builders first create a base complex probe, rescale its total intensity to the product metadata field `probe_photon_count`, then expand it into incoherent and OPR/coherent modes according to the mode settings described below.
 
 `disk`
-: Generates a binary circular aperture with parameter `diameter_m`. The aperture is optionally propagated by `defocus_distance_m` with the angular-spectrum propagator. This is the default probe builder.
+: Generates a binary circular aperture with parameter `diameter_m`. The aperture is optionally propagated by `propagation_distance_m` with the angular-spectrum propagator. This is the default probe builder.
 
 `rectangular`
-: Generates a binary rectangular aperture with `width_m` and `height_m`. It is also optionally propagated by `defocus_distance_m` with the angular-spectrum propagator.
+: Generates a binary rectangular aperture with `width_m` and `height_m`. It is also optionally propagated by `propagation_distance_m` with the angular-spectrum propagator.
 
 `super_gaussian`
 : Generates a super-Gaussian amplitude profile. Parameters are `annular_radius_m`, `full_width_at_half_maximum_m` (or the builder parameter name `fwhm_m` in the low-level function), and `order_parameter`. `annular_radius_m = 0` gives a Gaussian-like spot; a positive `annular_radius_m` gives a ring or donut-like profile. This is not a propagated zone-plate simulation; it is an analytic amplitude profile.
 
 `fresnel_zone_plate`
-: Simulates a Fresnel zone plate optic and propagates it to the sample plane with the Fresnel-transform propagator. Parameters are `zone_plate_diameter_m`, `outermost_zone_width_m`, `central_beamstop_diameter_m`, and `defocus_distance_m`. The central beamstop creates the donut-like zone-plate aperture. The focal length is computed as `zone_plate_diameter_m * outermost_zone_width_m / photon_wavelength_m` and the propagation distance is `focal_length_m + defocus_distance_m`.
+: Simulates a Fresnel zone plate optic and propagates it to the sample plane with the Fresnel-transform propagator. Parameters are `zone_plate_diameter_m`, `outermost_zone_width_m`, `central_beamstop_diameter_m`, and `defocus_distance_m`. The central beamstop creates the donut-like zone-plate aperture. The focal length is computed as `zone_plate_diameter_m * outermost_zone_width_m / photon_wavelength_m` and the propagation distance is `focal_length_m + defocus_distance_m`. `defocus_distance_m` is the object plane's position relative to the focus, which is the negated product metadata field `focus_object_distance_m`; when the product declares a nonzero focus the product's value is used and a disagreeing builder value is reported.
 
 `kb_mirror`
-: Simulates a Kirkpatrick-Baez mirror pair and propagates it to the sample plane. Each mirror takes an `acceptance_length_m`, a `grazing_angle_rad` and a `focus_distance_m`, from which the projected aperture `L sin(theta)` and the numerical aperture follow; `astigmatism_m` separates the two axis foci along the beam and `defocus_distance_m` moves the sample off the focal plane. Grazing angles are stored in radians rather than the turns the GUI uses elsewhere, because that is the number an optics log records. The pupil window is `photon_wavelength_m * z / probe_pixel_size_m`, so a high-aperture optic needs a fine probe pixel size; an aperture that does not fit is refused rather than silently clipped, since clipping would quietly change the optic.
+: Simulates a Kirkpatrick-Baez mirror pair and propagates it to the sample plane. Each mirror takes an `acceptance_length_m`, a `grazing_angle_rad` and a `focus_distance_m`, from which the projected aperture `L sin(theta)` and the numerical aperture follow; `astigmatism_m` separates the two axis foci along the beam and `defocus_distance_m` moves the sample off the focal plane, deferring to the product's `focus_object_distance_m` the same way the zone plate does. Grazing angles are stored in radians rather than the turns the GUI uses elsewhere, because that is the number an optics log records. The pupil window is `photon_wavelength_m * z / probe_pixel_size_m`, so a high-aperture optic needs a fine probe pixel size; an aperture that does not fit is refused rather than silently clipped, since clipping would quietly change the optic.
 
 `average_pattern`
-: Estimates a probe from diffraction data by taking the square root of the mean assembled diffraction pattern and back-propagating it by `detector_distance_m` with the Fresnel-transform propagator. This requires assembled diffraction data to already be available in the model.
+: Estimates a probe from diffraction data by taking the square root of the mean assembled diffraction pattern and back-propagating it to the object plane. Far field uses the Fresnel-transform propagator; near field uses the angular spectrum over the demagnified distance, which preserves pitch. The result is optionally propagated further by `propagation_distance_m`, which refines where the probe plane sits without altering the geometry the object pixel size comes from. This requires assembled diffraction data to already be available in the model.
 
 `zernike`
 : Generates a probe as a superposition of Zernike polynomial modes inside a disk with parameter `diameter_m`. Through the builder object, callers can set the Zernike order and individual coefficients before rebuilding. The workflow parameter mapping covers the common builder parameters, but coefficient-level editing is done on the `ZernikeProbeBuilder` object.

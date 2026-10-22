@@ -466,3 +466,41 @@ def test_every_exported_name_resolves() -> None:
     """``__all__`` is the surface a caller imports; a rename has to be deliberate."""
     for name in reconstruct_batch_lamni.__all__:
         assert hasattr(reconstruct_batch_lamni, name), name
+
+
+class TestNearFieldOverrides:
+    """The batch path declares the regime in its settings file, and defaults to far field."""
+
+    def test_both_keys_default_to_unset(self) -> None:
+        # None, not False: an existing batch file stays exactly as far field as it was.
+        overrides = _settings().metadata_overrides
+
+        assert overrides.far_field is None
+        assert overrides.focus_object_distance_m is None
+
+    def test_the_keys_round_trip_through_yaml(self) -> None:
+        settings = _settings("""
+metadata_overrides:
+  far_field: false
+  focus_object_distance_m: -0.0008
+""")
+
+        assert settings.metadata_overrides.far_field is False
+        assert settings.metadata_overrides.focus_object_distance_m == pytest.approx(-8.0e-4)
+
+    def test_declaring_near_field_alone_leaves_the_distance_to_the_defocus(self) -> None:
+        """The zone-plate defocus already states it, so a batch need not repeat it."""
+        settings = _settings("""
+metadata_overrides:
+  far_field: false
+""")
+
+        assert settings.metadata_overrides.focus_object_distance_m is None
+        assert settings.initial_probe.simulated_probe.fzp_defocus_m == pytest.approx(800.0e-6)
+
+    def test_an_unknown_regime_key_is_still_rejected(self) -> None:
+        with pytest.raises(ValueError):
+            _settings("""
+metadata_overrides:
+  near_field: true
+""")

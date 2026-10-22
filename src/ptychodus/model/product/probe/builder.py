@@ -2,6 +2,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from collections.abc import Callable, Mapping
 import logging
+import math
 
 import numpy
 
@@ -29,6 +30,46 @@ from ptychodus.api.probe import (
 from .settings import ProbeSettings
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_defocus_distance_m(
+    geometry_provider: ProbeGeometryProvider,
+    builder_defocus_distance_m: float,
+    *,
+    rel_tol: float = 1.0e-6,
+) -> float:
+    """How far past its focus a focusing optic's probe is sampled.
+
+    The same displacement is stated twice, in opposite frames: as the product's
+    signed focus position, and as the builder's own defocus. The product wins
+    wherever it names one, because the product is what the reconstruction geometry
+    is computed from -- a probe built against a different focus than the geometry
+    would disagree with the object pixel size it is reconstructed on.
+
+    A product leaving the focus at zero means no focusing optic, which cannot
+    describe a focused probe, so the builder's own value is used instead. A
+    disagreement beyond `rel_tol` is reported rather than silently resolved; widen
+    it only where the two are expected to differ in their last digits.
+    """
+    focus_object_distance_m = geometry_provider.focus_object_distance_m
+
+    if focus_object_distance_m == 0.0:
+        return builder_defocus_distance_m
+
+    from_product_m = -focus_object_distance_m
+
+    if builder_defocus_distance_m != 0.0 and not math.isclose(
+        builder_defocus_distance_m, from_product_m, rel_tol=rel_tol
+    ):
+        logger.warning(
+            'Probe defocus %g m disagrees with the focus-object distance %g m the product '
+            'declares, which implies %g m; using the product.',
+            builder_defocus_distance_m,
+            focus_object_distance_m,
+            from_product_m,
+        )
+
+    return from_product_m
 
 
 class ProbeEnsembleBuilder(ParameterGroup):

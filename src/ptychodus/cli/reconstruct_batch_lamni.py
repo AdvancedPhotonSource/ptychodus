@@ -419,7 +419,11 @@ def reconstruct_batch_lamni(
     owns the process.
     """
     selected = plan_batch_lamni(settings)
-    resolved_options = load_ptychi_options(None) if options is None else options
+    resolved_options = (
+        load_ptychi_options(None, far_field=settings.metadata_overrides.far_field is not False)
+        if options is None
+        else options
+    )
 
     if not resolved_options.probe_position_options.optimizable:
         logger.info(

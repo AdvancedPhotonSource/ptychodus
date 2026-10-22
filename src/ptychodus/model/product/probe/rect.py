@@ -24,8 +24,8 @@ class RectangularProbeBuilder(ProbeEnsembleBuilder):
         self._add_parameter('height_m', self.height_m)
 
         # from sample to the focal plane
-        self.defocus_distance_m = settings.defocus_distance_m.copy()
-        self._add_parameter('defocus_distance_m', self.defocus_distance_m)
+        self.propagation_distance_m = settings.propagation_distance_m.copy()
+        self._add_parameter('propagation_distance_m', self.propagation_distance_m)
 
     def copy(self) -> RectangularProbeBuilder:
         builder = RectangularProbeBuilder(self._rng, self._settings)
@@ -44,7 +44,7 @@ class RectangularProbeBuilder(ProbeEnsembleBuilder):
                     height_m=self.height_m.get_value(),
                 ),
                 photon_wavelength_m=geometry_provider.photon_wavelength_m,
-                propagation_distance_m=self.defocus_distance_m.get_value(),
+                propagation_distance_m=self.propagation_distance_m.get_value(),
             ),
             geometry_provider,
         )

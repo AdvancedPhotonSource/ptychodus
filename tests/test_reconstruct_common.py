@@ -46,6 +46,8 @@ from ptychodus.cli._reconstruct_common import (  # noqa: E402
     install_signal_handlers,
     is_main_process,
     load_ptychi_options,
+    resolve_flag,
+    resolve_focus_object_distance_m,
     run_reconstruction,
     save_assembled_diffraction,
 )
@@ -793,3 +795,75 @@ def test_the_value_filter_is_applied_to_the_mean_pattern_before_estimating(
     assert len(seen) == 1
     # The fake mean pattern holds a 9, which the filter's upper bound of 5 zeroes.
     assert seen[0].max() <= 5
+
+
+class TestResolveFlag:
+    """Provenance matters as much as the value: a guessed regime must look guessed."""
+
+    def test_the_command_line_wins(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.INFO):
+            assert resolve_flag(logging.getLogger(), 'Far field', False, True, True, '--x') is False
+
+        assert '--x' in caplog.text
+
+    def test_the_file_wins_over_the_fallback(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.INFO):
+            assert resolve_flag(logging.getLogger(), 'Far field', None, False, True, '--x') is False
+
+        assert 'diffraction file' in caplog.text
+
+    def test_the_fallback_says_it_guessed(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.INFO):
+            assert resolve_flag(logging.getLogger(), 'Far field', None, None, True, '--x') is True
+
+        assert 'built-in default' in caplog.text
+
+
+class TestResolveFocusObjectDistance:
+    """The focus is stated in two frames; the resolver reconciles them."""
+
+    def test_derives_the_negated_defocus(self) -> None:
+        # A probe sampled 800 um past its focus puts the focus 800 um upstream.
+        resolved = resolve_focus_object_distance_m(logging.getLogger(), None, None, 800.0e-6)
+
+        assert resolved == pytest.approx(-800.0e-6)
+
+    def test_a_zero_defocus_derives_the_no_optic_sentinel(self) -> None:
+        assert resolve_focus_object_distance_m(logging.getLogger(), None, None, 0.0) == 0.0
+
+    def test_the_file_beats_the_derivation(self) -> None:
+        resolved = resolve_focus_object_distance_m(logging.getLogger(), None, -21.873e-3, 800.0e-6)
+
+        assert resolved == pytest.approx(-21.873e-3)
+
+    def test_an_explicit_value_beats_both(self) -> None:
+        resolved = resolve_focus_object_distance_m(
+            logging.getLogger(), -9.0e-4, -21.873e-3, 800.0e-6
+        )
+
+        assert resolved == pytest.approx(-9.0e-4)
+
+    def test_an_explicit_value_agreeing_with_the_defocus_is_quiet(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.WARNING):
+            resolve_focus_object_distance_m(logging.getLogger(), -800.0e-6, None, 800.0e-6)
+
+        assert not caplog.records
+
+    def test_an_explicit_value_disagreeing_warns_but_is_honored(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.WARNING):
+            resolved = resolve_focus_object_distance_m(logging.getLogger(), -9.0e-4, None, 800.0e-6)
+
+        assert resolved == pytest.approx(-9.0e-4)
+        assert len(caplog.records) == 1
+
+
+class TestOptionsFallbackFollowsTheRegime:
+    def test_far_field_falls_back_to_lsqml(self) -> None:
+        assert type(load_ptychi_options(None)).__name__ == 'LSQMLOptions'
+
+    def test_near_field_falls_back_to_bh(self) -> None:
+        assert type(load_ptychi_options(None, far_field=False)).__name__ == 'BHOptions'

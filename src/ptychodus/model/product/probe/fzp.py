@@ -10,7 +10,7 @@ from ptychodus.api.simulate.probe import (
     generate_fresnel_zone_plate_probe,
 )
 
-from .builder import ProbeEnsembleBuilder
+from .builder import ProbeEnsembleBuilder, resolve_defocus_distance_m
 from .settings import ProbeSettings
 
 
@@ -70,7 +70,9 @@ class FresnelZonePlateProbeBuilder(ProbeEnsembleBuilder):
                 geometry=geometry_provider.get_probe_geometry(),
                 zone_plate=zone_plate,
                 photon_wavelength_m=geometry_provider.photon_wavelength_m,
-                defocus_distance_m=self.defocus_distance_m.get_value(),
+                defocus_distance_m=resolve_defocus_distance_m(
+                    geometry_provider, self.defocus_distance_m.get_value()
+                ),
             ),
             geometry_provider,
         )

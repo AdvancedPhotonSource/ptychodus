@@ -164,6 +164,11 @@ class MetadataOverrides(_Section):
     probe_energy_eV: float | None = None  # noqa: N815
     probe_photon_count: float | None = None
     tomography_angle_deg: float | None = None
+    # Near field is opt-in: None leaves every existing batch far field, as it was.
+    far_field: bool | None = None
+    # Signed, origin at the object, so a focus upstream is negative. Near field only;
+    # defaults to the negated simulated_probe.fzp_defocus_m.
+    focus_object_distance_m: float | None = None
 
 
 class Diffraction(_Section):

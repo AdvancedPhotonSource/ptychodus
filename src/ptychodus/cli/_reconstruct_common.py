@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import math
 import os
 import signal
 import sys
@@ -35,7 +36,7 @@ from typing import Any, Final
 
 import numpy
 import yaml
-from ptychi.api import LSQMLOptions
+from ptychi.api import BHOptions, LSQMLOptions
 from ptychi.api.options.task import PtychographyTaskOptions
 
 from ptychodus.api.assemble import AssembledDiffractionData, summarize_dataset
@@ -74,6 +75,8 @@ __all__ = [
     'run_reconstruction',
     'save_assembled_diffraction',
 ]
+
+logger = logging.getLogger(__name__)
 
 # The conventional "read it from stdin instead" filename, as argparse hands it over once a
 # bare ``-`` has been through ``type=Path``.
@@ -270,6 +273,105 @@ def resolve_quantity(
     raise ValueError(f'{quantity} is not in the file and has no default; pass {flag}.')
 
 
+def resolve_flag(
+    logger: logging.Logger,
+    quantity: str,
+    override: bool | None,
+    from_file: bool | None,
+    fallback: bool,
+    flag: str,
+    *,
+    level: int = logging.INFO,
+) -> bool:
+    """Pick a boolean from the command line, the file, or a fallback, and say which.
+
+    The boolean sibling of :func:`resolve_quantity`, with the same precedence and the
+    same reason for reporting it: a run that guessed the propagation regime must stay
+    distinguishable from one that read it off the instrument. Unlike a geometry
+    quantity there is always a fallback, so this never raises.
+    """
+    if override is not None:
+        logger.log(level, '%s: %s (from %s)', quantity, override, flag)
+        return override
+
+    if from_file is not None:
+        logger.log(level, '%s: %s (from the diffraction file)', quantity, from_file)
+        return from_file
+
+    logger.log(
+        level,
+        '%s: %s (built-in default for this instrument; the file recorded none). '
+        'Pass %s if this scan differs.',
+        quantity,
+        fallback,
+        flag,
+    )
+    return fallback
+
+
+def resolve_focus_object_distance_m(
+    logger: logging.Logger,
+    override: float | None,
+    from_file: float | None,
+    defocus_distance_m: float,
+    *,
+    rel_tol: float = 1.0e-6,
+    level: int = logging.INFO,
+) -> float:
+    """The signed focus position, which a focusing probe states in the opposite frame.
+
+    A probe built from a focusing optic is sampled `defocus_distance_m` past its
+    focus, so the focus sits that far upstream of the object: the same displacement,
+    negated. Deriving one from the other is what lets a user who already enters the
+    defocus -- which every zone-plate instrument does -- declare near field without
+    entering the distance twice in two sign conventions.
+
+    Precedence is the command line, then the file, then the derivation. An explicit
+    value disagreeing with the defocus beyond `rel_tol` is honored and reported: a
+    caller may be modelling a probe that deliberately does not match the geometry.
+
+    Call this only for a near-field run. In far field the focus position does not
+    enter the sampling, and deriving one would put a nonzero focus on every
+    far-field product built from a focusing optic for no reason.
+    """
+    derived_m = -defocus_distance_m
+
+    if override is not None:
+        if defocus_distance_m != 0.0 and not math.isclose(override, derived_m, rel_tol=rel_tol):
+            logger.warning(
+                'Focus-object distance (m): %g from --focus-object-distance-m, but the '
+                'probe defocus %g implies %g. Using the value given.',
+                override,
+                defocus_distance_m,
+                derived_m,
+            )
+        else:
+            logger.log(
+                level,
+                'Focus-object distance (m): %g (from --focus-object-distance-m)',
+                override,
+            )
+
+        return override
+
+    if from_file is not None:
+        logger.log(
+            level,
+            'Focus-object distance (m): %g (from the diffraction file)',
+            from_file,
+        )
+        return from_file
+
+    logger.log(
+        level,
+        'Focus-object distance (m): %g (from the probe defocus %g). Pass '
+        '--focus-object-distance-m to set it directly.',
+        derived_m,
+        defocus_distance_m,
+    )
+    return derived_m
+
+
 def resolve_crop_region(
     logger: logging.Logger,
     raw_dataset: DiffractionDataset,
@@ -362,7 +464,9 @@ _PTYCHI_OPTIONS_HELP = (
 
 
 def add_ptychi_options_argument(
-    parser: argparse.ArgumentParser, *, default_note: str = 'Defaults to stock LSQML.'
+    parser: argparse.ArgumentParser,
+    *,
+    default_note: str = 'Defaults to stock LSQML, or BH for a near-field reconstruction.',
 ) -> None:
     """Add ``--ptychi-options``, so its help text is written once rather than ten times.
 
@@ -480,8 +584,9 @@ def add_print_ptychi_options_argument(parser: argparse.ArgumentParser) -> None:
         metavar='ALGORITHM',
         help=(
             "Print this algorithm's default pty-chi options as YAML, then exit. "
-            f'Defaults to {_DEFAULT_PRINTED_ALGORITHM}. Redirect to a file, edit it, and '
-            'pass it back with --ptychi-options.'
+            f'Defaults to {_DEFAULT_PRINTED_ALGORITHM}; pass BH for the algorithm a '
+            'near-field run falls back to. Redirect to a file, edit it, and pass it '
+            'back with --ptychi-options.'
         ),
     )
 
@@ -507,10 +612,22 @@ def _decode_ptychi_options(text: str, options_file: Path) -> PtychographyTaskOpt
     return load_task_options(text)
 
 
-def load_ptychi_options(options_file: Path | None) -> PtychographyTaskOptions:
-    """Build a fresh options object, so per-scan edits never leak into the next scan."""
+def load_ptychi_options(
+    options_file: Path | None, *, far_field: bool = True
+) -> PtychographyTaskOptions:
+    """Build a fresh options object, so per-scan edits never leak into the next scan.
+
+    With no file the algorithm follows the propagation regime: BH for near field,
+    which reconstructs a hologram better than stock LSQML does, and LSQML otherwise.
+    This is a fallback, never an override -- an options file names its own algorithm
+    and always wins, because which algorithm to run is the user's choice.
+    """
     if options_file is None:
-        return LSQMLOptions()
+        if far_field:
+            return LSQMLOptions()
+
+        logger.info('No pty-chi options given; using BH for a near-field reconstruction.')
+        return BHOptions()
 
     if options_file == _STDIN_ARGUMENT:
         return _decode_ptychi_options(sys.stdin.read(), options_file)

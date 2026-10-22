@@ -25,7 +25,13 @@ from ptychodus.api.diffraction import (  # noqa: E402
 from ptychodus.api.geometry import PixelGeometry  # noqa: E402
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence  # noqa: E402
 from ptychodus.cli import _reconstruct_standard as rs  # noqa: E402
-from ptychodus.cli._reconstruct_standard import InstrumentProfile  # noqa: E402
+from ptychodus.cli._reconstruct_standard import InstrumentProfile
+from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.probe import ProbeGeometry
+from ptychodus.api.propagate import compute_magnification
+
+DETECTOR_PIXEL_M = 7.5e-5
+# noqa: E402
 
 from diffraction_dataset_fixtures import FailingArray, make_dataset  # noqa: E402
 
@@ -264,3 +270,94 @@ def test_conditioning_profiles_offer_the_detector_map_options() -> None:
     assert args.flat_field_file is None
     assert args.flat_field_file_type == 'NPY'
     assert not args.divide_flat_field
+
+
+class TestNearFieldOptIn:
+    """Near field is declared, never inferred, and no existing run changes."""
+
+    def test_every_profile_defaults_to_far_field(self) -> None:
+        for name, profile in _profiles().items():
+            assert profile.default_far_field is True, name
+
+    def test_the_flag_is_unset_rather_than_false_by_default(self) -> None:
+        # The file may declare the regime, so "the user said nothing" has to stay
+        # distinguishable from "the user asked for far field".
+        for name, profile in _profiles().items():
+            assert _defaults(profile).near_field is None, name
+
+    def test_the_flag_is_accepted_with_a_focus_distance(self) -> None:
+        parser = rs.build_standard_parser(_profiles()['lamni'])
+
+        args = parser.parse_args(
+            [
+                '--diffraction-file',
+                'd',
+                '--position-file',
+                'p',
+                '--output-directory',
+                'o',
+                '--near-field',
+                '--focus-object-distance-m=-9e-4',
+            ]
+        )
+
+        assert args.near_field is True
+        assert args.focus_object_distance_m == pytest.approx(-9e-4)
+
+    def test_a_negative_focus_distance_needs_the_equals_form(self) -> None:
+        """The common case is negative, and argparse reads a bare -9e-4 as an option.
+
+        Its negative-number matcher only admits plain decimals, so scientific notation
+        has to be attached with '='. Pinned because the help text promises it.
+        """
+        parser = rs.build_standard_parser(_profiles()['lamni'])
+        base = [
+            '--diffraction-file',
+            'd',
+            '--position-file',
+            'p',
+            '--output-directory',
+            'o',
+        ]
+
+        assert parser.parse_args(
+            [*base, '--focus-object-distance-m', '-0.0009']
+        ).focus_object_distance_m == pytest.approx(-9e-4)
+
+        with pytest.raises(SystemExit):
+            parser.parse_args([*base, '--focus-object-distance-m', '-9e-4'])
+
+    def test_the_probe_propagation_distance_defaults_to_zero(self) -> None:
+        for name, profile in _profiles().items():
+            assert _defaults(profile).probe_propagation_distance_m == 0.0, name
+
+
+class TestNearFieldProbeGeometry:
+    """The regime decides how the detector grid maps onto the object."""
+
+    def _geometry(self, *, magnification: float) -> ProbeGeometry:
+        return ProbeGeometry.from_near_field(
+            PixelGeometry(width_m=DETECTOR_PIXEL_M, height_m=DETECTOR_PIXEL_M),
+            ImageExtent(width_px=64, height_px=64),
+            magnification=magnification,
+        )
+
+    def test_a_parallel_beam_samples_at_the_detector_pitch(self) -> None:
+        # No focusing optic means M = 1, where the angular spectrum preserves pitch.
+        geometry = self._geometry(magnification=compute_magnification(1.0, 0.0))
+
+        assert geometry.pixel_width_m == pytest.approx(DETECTOR_PIXEL_M)
+
+    def test_a_cone_beam_demagnifies_the_detector_pitch(self) -> None:
+        magnification = compute_magnification(1.0, -1.0e-3)
+        geometry = self._geometry(magnification=magnification)
+
+        assert magnification == pytest.approx(1001.0)
+        assert geometry.pixel_width_m == pytest.approx(DETECTOR_PIXEL_M / magnification)
+
+    def test_an_upstream_focus_magnifies_more_than_a_downstream_one(self) -> None:
+        """The sign is a real geometry choice, not a magnitude to take the absolute of."""
+        upstream = compute_magnification(1.0, -1.0e-3)
+        downstream = compute_magnification(1.0, +1.0e-3)
+
+        assert upstream > downstream

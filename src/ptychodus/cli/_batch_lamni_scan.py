@@ -25,6 +25,7 @@ from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import BadPixels, CropRegion
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import StandardFileLayout, save_product
+from ptychodus.api.propagate import compute_magnification
 from ptychodus.api.object import (
     LayerFillMode,
     Object,
@@ -49,6 +50,8 @@ from ptychodus.cli._batch_lamni_settings import BatchSettings
 from ptychodus.cli._reconstruct_common import (
     CancellationToken,
     invalid_count_threshold,
+    resolve_flag,
+    resolve_focus_object_distance_m,
     resolve_quantity,
     run_reconstruction,
     save_assembled_diffraction,
@@ -155,6 +158,8 @@ def _build_initial_probe(
     photon_wavelength_m: float,
     num_patterns: int,
     rng: numpy.random.Generator,
+    far_field: bool,
+    focus_object_distance_m: float,
 ) -> ProbeEnsemble:
     """The starting probe: the zone-plate model, or one file shared by every scan."""
     initial = settings.initial_probe
@@ -168,7 +173,10 @@ def _build_initial_probe(
                 probe_geometry,
                 zone_plate,
                 photon_wavelength_m=photon_wavelength_m,
-                defocus_distance_m=initial.simulated_probe.fzp_defocus_m,
+                # The same displacement the product states, in the probe's frame.
+                defocus_distance_m=(
+                    initial.simulated_probe.fzp_defocus_m if far_field else -focus_object_distance_m
+                ),
             ).get_array(),
             opr_weights=None,
             pixel_geometry=probe_geometry.get_pixel_geometry(),
@@ -310,6 +318,27 @@ def reconstruct_one_scan(
         level=logging.DEBUG,
     )
 
+    far_field = resolve_flag(
+        logger,
+        'Far field',
+        overrides.far_field,
+        metadata.far_field,
+        True,
+        'metadata_overrides.far_field',
+        level=logging.DEBUG,
+    )
+    focus_object_distance_m = (
+        0.0
+        if far_field
+        else resolve_focus_object_distance_m(
+            logger,
+            overrides.focus_object_distance_m,
+            metadata.focus_object_distance_m,
+            settings.initial_probe.simulated_probe.fzp_defocus_m,
+            level=logging.DEBUG,
+        )
+    )
+
     if metadata.detector_pixel_geometry is None:
         raise ValueError('The diffraction file records no detector pixel size!')
 
@@ -370,12 +399,21 @@ def reconstruct_one_scan(
         )
 
     photon_wavelength_m = energy_eV_to_wavelength_m(photon_energy_eV)
-    probe_geometry = ProbeGeometry.from_far_field(
-        assembled_data.get_pixel_geometry(),
-        assembled_data.get_image_extent(),
-        wavelength_m=photon_wavelength_m,
-        distance_m=detector_distance_m,
-    )
+    if far_field:
+        probe_geometry = ProbeGeometry.from_far_field(
+            assembled_data.get_pixel_geometry(),
+            assembled_data.get_image_extent(),
+            wavelength_m=photon_wavelength_m,
+            distance_m=detector_distance_m,
+        )
+    else:
+        magnification = compute_magnification(detector_distance_m, focus_object_distance_m)
+        logger.debug('Magnification: %g', magnification)
+        probe_geometry = ProbeGeometry.from_near_field(
+            assembled_data.get_pixel_geometry(),
+            assembled_data.get_image_extent(),
+            magnification=magnification,
+        )
 
     rng = numpy.random.default_rng(settings.misc.seed)
     probe_ensemble = _build_initial_probe(
@@ -385,6 +423,8 @@ def reconstruct_one_scan(
         photon_wavelength_m=photon_wavelength_m,
         num_patterns=num_patterns,
         rng=rng,
+        far_field=far_field,
+        focus_object_distance_m=focus_object_distance_m,
     )
     object_ = _build_initial_object(settings, registry, positions, probe_geometry)
     logger.info('Object geometry: %d layer(s)', object_.num_layers)
@@ -405,6 +445,8 @@ def reconstruct_one_scan(
             name=f'scan{request.scan_no:05d}_{request.label}',
             comments=request.text,
             detector_distance_m=detector_distance_m,
+            focus_object_distance_m=focus_object_distance_m,
+            far_field=far_field,
             photon_energy_eV=photon_energy_eV,
             probe_photon_count=probe_photon_count,
             exposure_time_s=float(metadata.exposure_time_s or 0.0),

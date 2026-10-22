@@ -250,8 +250,35 @@ def _align_probe_pixel_geometry(
     )
 
 
+def _raise_pad_for_shift(
+    task_options: PtychographyTaskOptions, near_field_pad_for_shift: int
+) -> None:
+    """Raise `pad_for_shift` from pty-chi's default for a near-field reconstruction.
+
+    Unlike the product-derived fields beside it, this is a tunable with no formula
+    behind it, so a value the caller chose is left alone and only the default is
+    replaced.
+    """
+    forward_model_options = task_options.reconstructor_options.forward_model_options
+    current = forward_model_options.pad_for_shift
+
+    if current != 0:
+        logger.debug("pad_for_shift is %d; leaving the caller's value alone.", current)
+        return
+
+    forward_model_options.pad_for_shift = near_field_pad_for_shift
+    logger.info(
+        'Raised pad_for_shift to %d for a near-field product. Set it explicitly, or pass '
+        'near_field_pad_for_shift, to use a different value.',
+        near_field_pad_for_shift,
+    )
+
+
 def align_task_options_with_product(
-    task_options: PtychographyTaskOptions, product: Product
+    task_options: PtychographyTaskOptions,
+    product: Product,
+    *,
+    near_field_pad_for_shift: int = 50,
 ) -> PtychographyTaskOptions:
     """Return a copy of `task_options` whose product-derived fields agree with `product`.
 
@@ -276,6 +303,18 @@ def align_task_options_with_product(
     field. A caller-supplied distance that disagrees is overwritten with a warning,
     as any other product-derived field would be. A product whose declared regime
     contradicts its own geometry warns separately and is not corrected.
+
+    Two more options follow the regime, and they are different kinds of thing.
+    `fft_shift` is product-derived: a near-field measurement is real-space intensity,
+    so shifting it is wrong whatever the caller asked for, and it is overwritten the
+    same way the distance is. Far field is left alone, since both values are
+    legitimate there depending on where the supplied patterns put the DC component.
+
+    `pad_for_shift` is a tunable rather than a fact about the product. A near-field
+    bright-field probe wants a positive value and there is no formula for it, so a
+    caller's choice is never clobbered: it is raised to `near_field_pad_for_shift`
+    only when it is still at pty-chi's default of zero. Pass that keyword to use a
+    different value.
 
     The probe pixel fields are written from the product's probe pixel geometry
     by :func:`_align_probe_pixel_geometry`, which leaves them ``None`` -- pty-chi
@@ -326,6 +365,11 @@ def align_task_options_with_product(
         'free_space_propagation_distance_m',
         math.inf if metadata.far_field else metadata.detector_distance_m / metadata.magnification,
     )
+
+    if not metadata.far_field:
+        # Real-space intensity: the DC component is not at a corner to be rolled.
+        _overwrite(aligned.data_options, 'fft_shift', False)
+        _raise_pad_for_shift(aligned, near_field_pad_for_shift)
 
     warn_if_propagation_regime_disagrees(product)
 

@@ -479,6 +479,12 @@ class ProbeEditorViewControllerFactory:
         primary_mode_group = 'Primary Mode'
 
         if isinstance(probe_builder, AveragePatternProbeBuilder):
+            dialog_builder.add_length_widget(
+                probe_builder.propagation_distance_m,
+                'Propagation Distance:',
+                default_unit=LengthUnit.MICROMETER,
+                group=primary_mode_group,
+            )
             return True
         elif isinstance(probe_builder, DiskProbeBuilder):
             dialog_builder.add_length_widget(
@@ -487,8 +493,8 @@ class ProbeEditorViewControllerFactory:
                 group=primary_mode_group,
             )
             dialog_builder.add_length_widget(
-                probe_builder.defocus_distance_m,
-                'Defocus Distance:',
+                probe_builder.propagation_distance_m,
+                'Propagation Distance:',
                 default_unit=LengthUnit.MICROMETER,
                 group=primary_mode_group,
             )
@@ -520,8 +526,8 @@ class ProbeEditorViewControllerFactory:
                 group=primary_mode_group,
             )
             dialog_builder.add_length_widget(
-                probe_builder.defocus_distance_m,
-                'Defocus Distance:',
+                probe_builder.propagation_distance_m,
+                'Propagation Distance:',
                 default_unit=LengthUnit.MICROMETER,
                 group=primary_mode_group,
             )

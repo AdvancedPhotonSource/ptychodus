@@ -601,9 +601,6 @@ def _build_lsqml_options(params: PearParameters, num_patterns: int) -> LSQMLOpti
         math.nan if params.near_field_ptycho else math.inf
     )
 
-    if params.near_field_ptycho:
-        data_options.fft_shift = False
-
     object_options = options.object_options
     object_options.optimizable = True
     object_options.optimizer = Optimizers.SGD
@@ -710,9 +707,6 @@ def _build_lsqml_options(params: PearParameters, num_patterns: int) -> LSQMLOpti
     reconstructor_options.forward_model_options.diffraction_pattern_blur_sigma = (
         params.diffraction_pattern_blur
     )
-
-    if params.near_field_ptycho:
-        reconstructor_options.forward_model_options.pad_for_shift = 50
 
     return options
 

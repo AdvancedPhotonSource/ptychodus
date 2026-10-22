@@ -98,6 +98,10 @@ class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Obs
     def far_field(self) -> bool:
         return self._metadata_item.far_field.get_value()
 
+    @property
+    def focus_object_distance_m(self) -> float:
+        return self._metadata_item.focus_object_distance_m.get_value()
+
     def _get_detector_extent(self) -> ImageExtent:
         # No dataset bound yet: degrade to a zero-sized extent so downstream
         # divisions bail out gracefully (they already handle ZeroDivisionError).

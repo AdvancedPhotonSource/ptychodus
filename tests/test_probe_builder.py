@@ -23,6 +23,7 @@ was reconstructed at.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import numpy
@@ -42,6 +43,7 @@ from ptychodus.model.product.probe.builder import (
     FromFileProbeBuilder,
     FromMemoryProbeBuilder,
     ProbeEnsembleBuilder,
+    resolve_defocus_distance_m,
 )
 from ptychodus.model.product.probe import INCOHERENT_MODE_STRATEGY_NAMES
 from ptychodus.model.product.probe.disk import DiskProbeBuilder
@@ -75,9 +77,11 @@ class _StubProbeGeometryProvider(ProbeGeometryProvider):
         *,
         probe_photon_count: float = PROBE_PHOTON_COUNT,
         pixel_size_m: float = PIXEL_SIZE_M,
+        focus_object_distance_m: float = 0.0,
     ) -> None:
         self._probe_photon_count = probe_photon_count
         self._pixel_size_m = pixel_size_m
+        self._focus_object_distance_m = focus_object_distance_m
 
     @property
     def detector_distance_m(self) -> float:
@@ -86,6 +90,10 @@ class _StubProbeGeometryProvider(ProbeGeometryProvider):
     @property
     def far_field(self) -> bool:
         return True
+
+    @property
+    def focus_object_distance_m(self) -> float:
+        return self._focus_object_distance_m
 
     @property
     def probe_photon_count(self) -> float:
@@ -722,3 +730,84 @@ def test_from_memory_builder_is_untouched_when_the_counts_agree() -> None:
         probe_seq = builder.build(provider)
         numpy.testing.assert_array_equal(probe_seq.get_opr_weights(), in_memory.get_opr_weights())
         numpy.testing.assert_array_equal(probe_seq.get_array(), in_memory.get_array())
+
+
+class TestFocusDistanceResolution:
+    """Which of the two frames the focus is stated in wins, and when.
+
+    A focusing builder's defocus and the product's focus-object distance are the
+    same displacement with opposite signs. The product owns the geometry the
+    reconstruction runs on, so it owns this too -- except where it declares no
+    focusing optic, which cannot describe a focused probe.
+    """
+
+    def test_a_silent_product_leaves_the_builder_value_alone(self) -> None:
+        # Zero means no focusing optic, which is every far-field configuration
+        # written before the product carried this at all.
+        assert resolve_defocus_distance_m(_StubProbeGeometryProvider(), 8.0e-4) == 8.0e-4
+
+    def test_the_product_wins_when_it_declares_a_focus(self) -> None:
+        provider = _StubProbeGeometryProvider(focus_object_distance_m=-8.0e-4)
+
+        assert resolve_defocus_distance_m(provider, 0.0) == pytest.approx(8.0e-4)
+
+    def test_the_sign_flips_between_the_two_frames(self) -> None:
+        """A focus upstream of the object is a probe sampled downstream of the focus."""
+        upstream = _StubProbeGeometryProvider(focus_object_distance_m=-8.0e-4)
+        downstream = _StubProbeGeometryProvider(focus_object_distance_m=+8.0e-4)
+
+        assert resolve_defocus_distance_m(upstream, 0.0) > 0.0
+        assert resolve_defocus_distance_m(downstream, 0.0) < 0.0
+
+    def test_agreement_is_quiet(self, caplog: pytest.LogCaptureFixture) -> None:
+        provider = _StubProbeGeometryProvider(focus_object_distance_m=-8.0e-4)
+
+        with caplog.at_level(logging.WARNING, logger='ptychodus.model.product.probe.builder'):
+            resolve_defocus_distance_m(provider, 8.0e-4)
+
+        assert not caplog.records
+
+    def test_disagreement_warns_and_the_product_still_wins(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        provider = _StubProbeGeometryProvider(focus_object_distance_m=-8.0e-4)
+
+        with caplog.at_level(logging.WARNING, logger='ptychodus.model.product.probe.builder'):
+            resolved = resolve_defocus_distance_m(provider, 9.0e-4)
+
+        assert resolved == pytest.approx(8.0e-4)
+        assert len(caplog.records) == 1
+
+
+class TestPropagationDistanceIsSeparateFromDefocus:
+    """The aperture builders propagate a field; they have no focus to defocus from.
+
+    Sharing one key meant editing a disk probe's propagation moved a zone-plate
+    probe's focus, so the two now read different settings.
+    """
+
+    def test_a_disk_probe_ignores_the_focusing_builders_key(self) -> None:
+        settings = _make_settings()
+        settings.defocus_distance_m.set_value(5.0e-5)
+
+        builder = DiskProbeBuilder(_make_rng(), settings)
+
+        assert builder.propagation_distance_m.get_value() == 0.0
+        assert 'defocus_distance_m' not in builder.parameters()
+
+    def test_a_disk_probe_reads_the_propagation_key(self) -> None:
+        settings = _make_settings()
+        settings.propagation_distance_m.set_value(5.0e-5)
+
+        builder = DiskProbeBuilder(_make_rng(), settings)
+
+        assert builder.propagation_distance_m.get_value() == pytest.approx(5.0e-5)
+
+    def test_the_focusing_builders_ignore_the_propagation_key(self) -> None:
+        settings = _make_settings()
+        settings.propagation_distance_m.set_value(5.0e-5)
+
+        builder = KBMirrorProbeBuilder(_make_rng(), settings, PluginChooser())
+
+        assert builder.defocus_distance_m.get_value() == 0.0
+        assert 'propagation_distance_m' not in builder.parameters()

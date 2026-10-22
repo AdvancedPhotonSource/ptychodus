@@ -18,8 +18,8 @@ class DiskProbeBuilder(ProbeEnsembleBuilder):
         self._add_parameter('diameter_m', self.diameter_m)
 
         # from sample to the focal plane
-        self.defocus_distance_m = settings.defocus_distance_m.copy()
-        self._add_parameter('defocus_distance_m', self.defocus_distance_m)
+        self.propagation_distance_m = settings.propagation_distance_m.copy()
+        self._add_parameter('propagation_distance_m', self.propagation_distance_m)
 
     def copy(self) -> DiskProbeBuilder:
         builder = DiskProbeBuilder(self._rng, self._settings)
@@ -37,7 +37,7 @@ class DiskProbeBuilder(ProbeEnsembleBuilder):
                     radius_m=self.diameter_m.get_value() / 2.0,
                 ),
                 photon_wavelength_m=geometry_provider.photon_wavelength_m,
-                propagation_distance_m=self.defocus_distance_m.get_value(),
+                propagation_distance_m=self.propagation_distance_m.get_value(),
             ),
             geometry_provider,
         )

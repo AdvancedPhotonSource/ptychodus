@@ -42,6 +42,7 @@ from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.object import compute_object_geometry
+from ptychodus.api.propagate import compute_magnification
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import (
     DiffractionPrepPipeline,
@@ -55,6 +56,7 @@ from ptychodus.api.reconstruct import prepare_reconstruct_input
 from ptychodus.api.simulate.object import generate_uniform_object
 from ptychodus.api.simulate.probe import (
     generate_average_pattern_probe,
+    propagate_probe,
     generate_coherent_probe_modes,
     generate_fresnel_zone_plate_probe,
     generate_incoherent_probe_modes,
@@ -74,6 +76,8 @@ from ptychodus.cli._reconstruct_common import (
     invalid_count_threshold,
     load_ptychi_options,
     resolve_crop_region,
+    resolve_flag,
+    resolve_focus_object_distance_m,
     resolve_quantity,
     run_reconstruction,
     save_assembled_diffraction,
@@ -101,6 +105,10 @@ class InstrumentProfile:
     default_detector_distance_m: float | None = None
     # None means the file must record a pixel size and it is an error when it does not.
     default_detector_pixel_size_m: float | None = None
+
+    # Near field is opt-in everywhere: no instrument declares it by default, so no
+    # existing run changes behavior.
+    default_far_field: bool = True
 
     default_fzp_preset: str = ''
     default_fzp_defocus_m: float = 0.0
@@ -251,6 +259,39 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
         type=float,
         default=profile.default_fzp_defocus_m,
         help='Defocus from the zone-plate focal plane. Ignored without --fzp-preset.',
+    )
+    parser.add_argument(
+        '--near-field',
+        action='store_true',
+        # None, not False: the file may declare the regime, and "unset" has to stay
+        # distinguishable from "the user asked for far field".
+        default=None,
+        help=(
+            'Reconstruct in the near field: the object is sampled at the detector pitch '
+            'demagnified, rather than through the Fraunhofer relation.'
+        ),
+    )
+    parser.add_argument(
+        '--focus-object-distance-m',
+        type=float,
+        default=None,
+        help=(
+            'Signed position of the beam focus with the origin at the object, so a focus '
+            'upstream is negative. Near field only; defaults to the negated '
+            '--fzp-defocus-m, which states the same displacement in the opposite frame. '
+            'Attach a negative value with "=" -- argparse reads a bare -9e-4 as an '
+            'option name, though -0.0009 is fine.'
+        ),
+    )
+    parser.add_argument(
+        '--probe-propagation-distance-m',
+        type=float,
+        default=0.0,
+        help=(
+            'Propagate the data-derived initial probe this far after back-propagating it, '
+            'to refine where the probe plane sits. Ignored with --fzp-preset or '
+            '--probe-file.'
+        ),
     )
     parser.add_argument(
         '--num-probe-modes',
@@ -550,6 +591,28 @@ def _resolve_detector_pixel_size(
     return from_file
 
 
+def _warn_unused_probe_propagation(
+    logger: logging.Logger, args: argparse.Namespace, source: str
+) -> None:
+    """Say so when the propagation knob was set but the probe did not come from the data.
+
+    It applies to the back-propagated average pattern only, so on an instrument whose
+    profile carries a zone-plate preset it would otherwise be silently inert.
+    """
+    if args.probe_propagation_distance_m == 0.0:
+        return
+
+    # A zone-plate probe has its own way to move; a file-supplied one has none, so
+    # offering --fzp-defocus-m there would be advice the user cannot take.
+    remedy = ' Use --fzp-defocus-m to move a zone-plate probe.' if source == '--fzp-preset' else ''
+    logger.warning(
+        '--probe-propagation-distance-m %g is ignored: the initial probe came from %s.%s',
+        args.probe_propagation_distance_m,
+        source,
+        remedy,
+    )
+
+
 def _build_initial_probe(
     logger: logging.Logger,
     args: argparse.Namespace,
@@ -559,6 +622,8 @@ def _build_initial_probe(
     *,
     photon_wavelength_m: float,
     detector_distance_m: float,
+    far_field: bool,
+    focus_object_distance_m: float,
 ) -> Probe:
     """The probe the reconstruction starts from: a warm start, a zone plate, or the data."""
     if args.probe_file is not None:
@@ -576,16 +641,21 @@ def _build_initial_probe(
                 'Reconstruct with the same --crop-extent-px that produced it.'
             )
 
+        _warn_unused_probe_propagation(logger, args, '--probe-file')
         return Probe(array=array, pixel_geometry=probe_geometry.get_pixel_geometry())
 
     if args.fzp_preset:
+        _warn_unused_probe_propagation(logger, args, '--fzp-preset')
         logger.info('Simulating the initial probe from zone plate preset "%s"', args.fzp_preset)
         zone_plate = registry.fresnel_zone_plates.get_strategy_by_name(args.fzp_preset)
         return generate_fresnel_zone_plate_probe(
             probe_geometry,
             zone_plate,
             photon_wavelength_m=photon_wavelength_m,
-            defocus_distance_m=args.fzp_defocus_m,
+            # The same displacement the product states, in the probe's frame. In far
+            # field the resolver leaves the focus at zero, so this is --fzp-defocus-m
+            # unchanged.
+            defocus_distance_m=(args.fzp_defocus_m if far_field else -focus_object_distance_m),
         )
 
     # No zone-plate preset applies, so the cold start comes from the data:
@@ -593,12 +663,25 @@ def _build_initial_probe(
     # optic at all, which is what lets one script shape serve zone plates, KB
     # mirrors and pinholes alike.
     logger.info('Estimating the initial probe by back-propagating the mean pattern')
-    return generate_average_pattern_probe(
+    probe = generate_average_pattern_probe(
         probe_geometry,
         assembled_data,
         photon_wavelength_m=photon_wavelength_m,
         detector_distance_m=detector_distance_m,
+        far_field=far_field,
     )
+    distance_m = args.probe_propagation_distance_m
+
+    # Skipped at zero: the angular spectrum is the identity there, but only after a
+    # full transform pair, which a detector-sized near-field grid pays for.
+    if distance_m != 0.0:
+        probe = propagate_probe(
+            probe,
+            photon_wavelength_m=photon_wavelength_m,
+            propagation_distance_m=distance_m,
+        )
+
+    return probe
 
 
 def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
@@ -658,6 +741,26 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         metadata.photon_energy_eV,
         None,
         '--photon-energy-eV',
+    )
+    far_field = resolve_flag(
+        logger,
+        'Far field',
+        False if args.near_field else None,
+        metadata.far_field,
+        profile.default_far_field,
+        '--near-field',
+    )
+    # Only meaningful in the near field, where it sets the magnification. In far field
+    # the sampling does not depend on it, so deriving one would be noise.
+    focus_object_distance_m = (
+        0.0
+        if far_field
+        else resolve_focus_object_distance_m(
+            logger,
+            args.focus_object_distance_m,
+            metadata.focus_object_distance_m,
+            args.fzp_defocus_m,
+        )
     )
     detector_pixel_size_m = _resolve_detector_pixel_size(logger, args, metadata, profile)
     raw_pixel_geometry = PixelGeometry(
@@ -755,12 +858,24 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         num_patterns = assembled_data.get_num_patterns()
 
     photon_wavelength_m = energy_eV_to_wavelength_m(photon_energy_eV)
-    probe_geometry = ProbeGeometry.from_far_field(
-        assembled_data.get_pixel_geometry(),
-        assembled_data.get_image_extent(),
-        wavelength_m=photon_wavelength_m,
-        distance_m=detector_distance_m,
-    )
+    # Keyed off the declaration rather than off a magnification of one: a near-field
+    # scan with no focusing optic is a parallel beam at M = 1, and sampling that through
+    # the Fraunhofer relation would still be wrong.
+    if far_field:
+        probe_geometry = ProbeGeometry.from_far_field(
+            assembled_data.get_pixel_geometry(),
+            assembled_data.get_image_extent(),
+            wavelength_m=photon_wavelength_m,
+            distance_m=detector_distance_m,
+        )
+    else:
+        magnification = compute_magnification(detector_distance_m, focus_object_distance_m)
+        logger.info('Magnification: %g', magnification)
+        probe_geometry = ProbeGeometry.from_near_field(
+            assembled_data.get_pixel_geometry(),
+            assembled_data.get_image_extent(),
+            magnification=magnification,
+        )
     logger.info('Probe geometry: %s', probe_geometry)
 
     rng = numpy.random.default_rng(args.seed)
@@ -772,6 +887,8 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         assembled_data,
         photon_wavelength_m=photon_wavelength_m,
         detector_distance_m=detector_distance_m,
+        far_field=far_field,
+        focus_object_distance_m=focus_object_distance_m,
     )
 
     if args.num_probe_modes > 1:
@@ -805,6 +922,8 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             name=profile.product_name,
             comments=f'Reconstructed from {args.diffraction_file.name}',
             detector_distance_m=detector_distance_m,
+            focus_object_distance_m=focus_object_distance_m,
+            far_field=far_field,
             photon_energy_eV=photon_energy_eV,
             probe_photon_count=probe_photon_count,
             exposure_time_s=float(metadata.exposure_time_s or 0.0),
@@ -819,7 +938,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         losses=[],
     )
 
-    options = load_ptychi_options(args.ptychi_options)
+    options = load_ptychi_options(args.ptychi_options, far_field=far_field)
     num_epochs = int(options.reconstructor_options.num_epochs)
 
     output_directory = args.output_directory

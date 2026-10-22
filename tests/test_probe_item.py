@@ -188,6 +188,10 @@ class _ObservableProbeProvider(ProbeGeometryProvider, Observable):
         return True
 
     @property
+    def focus_object_distance_m(self) -> float:
+        return 0.0
+
+    @property
     def probe_photon_count(self) -> float:
         return 1.0
 

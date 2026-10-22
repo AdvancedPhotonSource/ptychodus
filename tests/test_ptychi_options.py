@@ -886,6 +886,67 @@ def test_align_demagnifies_the_near_field_distance_for_a_cone_beam() -> None:
     )
 
 
+def test_align_clears_fft_shift_for_near_field() -> None:
+    """A near-field measurement is real-space intensity; rolling it is always wrong."""
+    product = _with_far_field(_make_reconstruct_input().product, False)
+    options = LSQMLOptions()
+    assert options.data_options.fft_shift
+
+    aligned = align_task_options_with_product(options, product)
+
+    assert aligned.data_options.fft_shift is False
+
+
+def test_align_leaves_fft_shift_alone_for_far_field() -> None:
+    """Both values are legitimate in far field, so neither is the product's to pick."""
+    product = _make_reconstruct_input().product
+
+    for requested in (True, False):
+        options = LSQMLOptions()
+        options.data_options.fft_shift = requested
+
+        aligned = align_task_options_with_product(options, product)
+
+        assert aligned.data_options.fft_shift is requested
+
+
+def test_align_raises_pad_for_shift_from_its_default_for_near_field() -> None:
+    product = _with_far_field(_make_reconstruct_input().product, False)
+    options = LSQMLOptions()
+    assert options.reconstructor_options.forward_model_options.pad_for_shift == 0
+
+    aligned = align_task_options_with_product(options, product)
+
+    assert aligned.reconstructor_options.forward_model_options.pad_for_shift == 50
+
+
+def test_align_keeps_a_chosen_pad_for_shift() -> None:
+    """It is a tunable with no formula behind it, so a caller's value is never clobbered."""
+    product = _with_far_field(_make_reconstruct_input().product, False)
+    options = LSQMLOptions()
+    options.reconstructor_options.forward_model_options.pad_for_shift = 12
+
+    aligned = align_task_options_with_product(options, product)
+
+    assert aligned.reconstructor_options.forward_model_options.pad_for_shift == 12
+
+
+def test_align_honors_the_near_field_pad_for_shift_keyword() -> None:
+    product = _with_far_field(_make_reconstruct_input().product, False)
+
+    aligned = align_task_options_with_product(LSQMLOptions(), product, near_field_pad_for_shift=80)
+
+    assert aligned.reconstructor_options.forward_model_options.pad_for_shift == 80
+
+
+def test_align_never_touches_pad_for_shift_in_far_field() -> None:
+    product = _make_reconstruct_input().product
+
+    aligned = align_task_options_with_product(LSQMLOptions(), product)
+
+    assert aligned.reconstructor_options.forward_model_options.pad_for_shift == 0
+
+
 def test_align_distinguishes_converging_from_diverging_illumination() -> None:
     """The sign of the focus coordinate is a real geometry choice, so it must reach
     the propagation distance rather than being absorbed as a magnitude.

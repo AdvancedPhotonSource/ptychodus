@@ -821,6 +821,17 @@ class ProbeGeometryProvider(ABC):
 
     @property
     @abstractmethod
+    def focus_object_distance_m(self) -> float:
+        """Signed position of the beam focus, with the origin at the object.
+
+        The beamline frame, +z downstream, so a focus upstream of the object -- the
+        ordinary magnifying geometry -- is negative. Zero means no focusing optic.
+        A probe formed by one is sampled this far past its focus, which is the same
+        displacement with the opposite sign.
+        """
+
+    @property
+    @abstractmethod
     def probe_photon_count(self) -> float:
         pass
 

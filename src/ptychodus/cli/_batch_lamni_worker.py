@@ -113,7 +113,11 @@ def reconstruct_scan(payload: dict[str, Any], queue: Queue[Any]) -> None:
         )
         bad_pixels = reader.read(Path(bad_pixels_file))
 
-    options = load_ptychi_options(None)
+    # `far_field` is three-valued in the settings; only an explicit False selects the
+    # near-field fallback, so a batch that says nothing stays on LSQML.
+    options = load_ptychi_options(
+        None, far_field=settings.metadata_overrides.far_field is not False
+    )
 
     if payload['ptychi_options_json'] is not None:
         from ptychodus.plugins.ptychi.task import load_task_options
