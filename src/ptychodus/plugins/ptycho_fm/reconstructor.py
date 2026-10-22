@@ -14,15 +14,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import h5py
-import numpy
-
-from ptychodus.api.preprocess.diffraction import zero_bad_pixels
 from pydantic import BaseModel
 
 from ptychodus.api.reconstruct import ReconstructInput, SubprocessReconstructor
 
 from .options import PtychoFMOptions, default_options
+from .training_file import PtychoFMProductFileReader, save_training_data
 
 __all__ = [
     'build_reconstruct_config',
@@ -88,16 +85,6 @@ def build_train_config(name: str, options: PtychoFMOptions) -> dict[str, Any]:
     return _build_config(name, options, sections=frozenset({'data', 'model', 'training'}))
 
 
-def _verify_spatial_size(shape: tuple[int, ...], img_size: int, what: str) -> None:
-    """Raise unless a trailing ``(height, width)`` is exactly ``img_size`` square."""
-    if tuple(shape) != (img_size, img_size):
-        height, width = shape
-        raise ValueError(
-            f'{what} are {height}x{width}, but PtychoFM requires {img_size}x{img_size} '
-            'to match the encoder input. Adjust the pattern crop or the model image size.'
-        )
-
-
 def _verify_loss_supports_mode(name: str, loss_function: str) -> None:
     """Raise unless ``loss_function`` is meaningful for the training objective.
 
@@ -146,54 +133,9 @@ def build_reconstructor(name: str) -> SubprocessReconstructor:
     def export_training_data(
         file_path: Path, parameters: ReconstructInput, options: BaseModel
     ) -> None:
-        # ptycho_fm.CombinedDataset expects one directory per scan holding
-        # two HDF5 files sharing a common stem:
-        #     <stem>_dp.hdf5    dataset 'dp'    (N, H, W) float
-        #     <stem>_para.hdf5  dataset 'object'              (1, H, W) complex
-        #                                       'probe'                (1, N_modes, H, W) complex
-        #                                       'probe_position_x_m'   (N,) float64
-        #                                       'probe_position_y_m'   (N,) float64
-        #                       'object' carries a 'pixel_height_m' attr; the
-        #                       loader auto-detects meters vs pixels from range.
-        # Patterns and probes are stored at their native spatial size and the
-        # object patch is extracted at the pattern size, so both must already
-        # match the encoder input; nothing downstream resizes them.
-        # file_path is treated as a stem, so the picked filename itself is
-        # never created; the two derived files land next to it.
-        stem = file_path.stem
-        dp_path = file_path.with_name(f'{stem}_dp.hdf5')
-        para_path = file_path.with_name(f'{stem}_para.hdf5')
-
-        dp = zero_bad_pixels(parameters.diffraction_patterns, parameters.bad_pixels)
-        obj = parameters.product.object_
-        object_layer = obj.get_layer(0)
-        pixel_geometry = obj.get_pixel_geometry()
-        probe_array = parameters.product.probes.get_probe_no_opr().get_array()
-
-        img_size = int(_declared(options).model.encoder.img_size)
-        _verify_spatial_size(dp.shape[-2:], img_size, 'Diffraction patterns')
-        _verify_spatial_size(probe_array.shape[-2:], img_size, 'Probe')
-
-        pos_x_m: list[float] = []
-        pos_y_m: list[float] = []
-        for point in parameters.product.probe_positions:
-            pos_x_m.append(point.x_m)
-            pos_y_m.append(point.y_m)
-
-        with h5py.File(dp_path, 'w') as h5_dp:
-            h5_dp.create_dataset('dp', data=dp)
-
-        with h5py.File(para_path, 'w') as h5_para:
-            obj_ds = h5_para.create_dataset('object', data=object_layer[numpy.newaxis, :, :])
-            obj_ds.attrs['pixel_height_m'] = pixel_geometry.height_m
-            obj_ds.attrs['pixel_width_m'] = pixel_geometry.width_m
-            h5_para.create_dataset('probe', data=probe_array[numpy.newaxis, :, :, :])
-            h5_para.create_dataset(
-                'probe_position_x_m', data=numpy.asarray(pos_x_m, dtype=numpy.float64)
-            )
-            h5_para.create_dataset(
-                'probe_position_y_m', data=numpy.asarray(pos_y_m, dtype=numpy.float64)
-            )
+        save_training_data(
+            file_path, parameters, img_size=int(_declared(options).model.encoder.img_size)
+        )
 
     return SubprocessReconstructor(
         name=name,
@@ -203,6 +145,8 @@ def build_reconstructor(name: str) -> SubprocessReconstructor:
         dump_train_options=dump_train_options,
         model_file_filter='PyTorch Checkpoint (*.pth *.pt)',
         model_file_extension='.pth',
-        training_data_file_filter='PtychoFM Training Pair (*.hdf5)',
+        # The same filter the reader registers, so the export and import dialogs
+        # name one format once.
+        training_data_file_filter=PtychoFMProductFileReader.DISPLAY_NAME,
         export_training_data=export_training_data,
     )
