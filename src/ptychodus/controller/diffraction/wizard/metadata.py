@@ -122,6 +122,29 @@ def _format_crop_extent(metadata: DiffractionMetadata) -> str:
     return f'{int(extent.width_px)} × {int(extent.height_px)} px'
 
 
+def _format_focus_object_distance(metadata: DiffractionMetadata) -> str:
+    distance_m = metadata.focus_object_distance_m
+
+    if distance_m is None:
+        return '—'
+
+    # The value is a signed coordinate with the origin at the object, so the sign names
+    # which side of the sample the focus sits on rather than being a minus to read past.
+    if distance_m < 0.0:
+        side = ' (focus upstream)'
+    elif distance_m > 0.0:
+        side = ' (focus downstream)'
+    else:
+        side = ' (no focusing optic)'
+
+    return f'{distance_m / LengthUnit.MILLIMETER.meters_per_unit:.3f} {LengthUnit.MILLIMETER.label}{side}'
+
+
+def _format_far_field(metadata: DiffractionMetadata) -> str:
+    far_field = metadata.far_field
+    return '—' if far_field is None else ('Far field' if far_field else 'Near field')
+
+
 def _format_photon_energy(metadata: DiffractionMetadata) -> str:
     energy_eV = metadata.photon_energy_eV  # noqa: N806
     return '—' if energy_eV is None else f'{energy_eV:.3f} eV'
@@ -196,6 +219,18 @@ class OpenDatasetWizardMetadataViewController:
                 apply=self._apply_detector_distance,
             ),
             _MetadataRow(
+                name='Focus-Object Distance',
+                is_present=lambda m: m.focus_object_distance_m is not None,
+                format_value=_format_focus_object_distance,
+                apply=self._apply_focus_object_distance,
+            ),
+            _MetadataRow(
+                name='Propagation Regime',
+                is_present=lambda m: m.far_field is not None,
+                format_value=_format_far_field,
+                apply=self._apply_far_field,
+            ),
+            _MetadataRow(
                 name='Beam Center',
                 is_present=lambda m: m.beam_center is not None or m.detector_extent is not None,
                 format_value=_format_beam_center,
@@ -266,6 +301,22 @@ class OpenDatasetWizardMetadataViewController:
         distance_m = metadata.detector_distance_m
         if distance_m:
             self._product_settings.detector_distance_m.set_value(distance_m)
+
+    # --- Focus-object distance ---
+
+    def _apply_focus_object_distance(self, metadata: DiffractionMetadata) -> None:
+        distance_m = metadata.focus_object_distance_m
+        # Zero is the no-optic sentinel and a meaningful value, so test against None
+        # rather than truthiness as the distance above does.
+        if distance_m is not None:
+            self._product_settings.focus_object_distance_m.set_value(distance_m)
+
+    # --- Propagation regime ---
+
+    def _apply_far_field(self, metadata: DiffractionMetadata) -> None:
+        far_field = metadata.far_field
+        if far_field is not None:
+            self._product_settings.far_field.set_value(far_field)
 
     # --- Beam center ---
 

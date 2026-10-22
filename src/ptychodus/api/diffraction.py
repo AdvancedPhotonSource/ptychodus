@@ -227,6 +227,8 @@ class DiffractionMetadata:
     pattern_dtype: DiffractionPatternDType
     detector_extent: ImageExtent
     detector_distance_m: float | None = None
+    focus_object_distance_m: float | None = None
+    far_field: bool | None = None
     detector_pixel_geometry: PixelGeometry | None = None
     beam_center: BeamCenter | None = None
     photon_energy_eV: float | None = None  # noqa: N815
@@ -243,6 +245,8 @@ class DiffractionMetadata:
         sz += getsizeof(self.pattern_dtype)
         sz += getsizeof(self.detector_extent)
         sz += getsizeof(self.detector_distance_m)
+        sz += getsizeof(self.focus_object_distance_m)
+        sz += getsizeof(self.far_field)
         sz += getsizeof(self.detector_pixel_geometry)
         sz += getsizeof(self.beam_center)
         sz += getsizeof(self.photon_energy_eV)

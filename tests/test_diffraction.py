@@ -155,6 +155,42 @@ class TestNbytes:
 
         assert metadata.nbytes > 0
 
+    def test_metadata_nbytes_accounts_for_the_propagation_regime(self) -> None:
+        # Every optional field has to be summed, or nbytes drifts from the object it
+        # is reporting on as fields are added.
+        null = DiffractionMetadata.create_null()
+        declared = DiffractionMetadata(
+            num_patterns_per_array=null.num_patterns_per_array,
+            pattern_dtype=null.pattern_dtype,
+            detector_extent=null.detector_extent,
+            focus_object_distance_m=-1.0e-3,
+            far_field=False,
+        )
+
+        assert declared.nbytes > null.nbytes
+
+
+class TestPropagationRegimeDeclaration:
+    def test_defaults_to_undeclared(self) -> None:
+        # None means the file recorded nothing, which is what lets a caller tell a
+        # silent file apart from one that declares far field.
+        metadata = DiffractionMetadata.create_null()
+
+        assert metadata.focus_object_distance_m is None
+        assert metadata.far_field is None
+
+    def test_round_trips_a_near_field_declaration(self) -> None:
+        metadata = DiffractionMetadata(
+            num_patterns_per_array=[1],
+            pattern_dtype=numpy.dtype(numpy.uint16),
+            detector_extent=ImageExtent(width_px=4, height_px=4),
+            focus_object_distance_m=-0.021873,
+            far_field=False,
+        )
+
+        assert metadata.focus_object_distance_m == -0.021873
+        assert metadata.far_field is False
+
 
 class TestCropRegionFromCenterExtent:
     def test_combines_fields(self) -> None:

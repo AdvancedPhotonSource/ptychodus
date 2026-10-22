@@ -16,6 +16,8 @@ File readers are implemented using a Python namespace plugin system. We would be
   - [31-ID-E Ptychography-Laminography (LamNI)](https://www.aps.anl.gov/Beamlines/Beamline-Directory/240) (`*.dat`, `*.h5`, `*.hdf5`)
   - [33-ID-C PtychoProbe, VelociProbe endstation](https://www.aps.anl.gov/Beamlines/Beamline-Directory/241)
   - [34-ID-E Microdiffraction](https://www.aps.anl.gov/Beamlines/Beamline-Directory/204) (`*.json`, `*.mda`, `*.tif`, `*.tiff`)
+- [European Synchrotron Radiation Facility (ESRF)](https://www.esrf.fr/UsersAndScience/Experiments/Beamlines)
+  - [ID16A Nano-imaging](https://www.esrf.fr/UsersAndScience/Experiments/XNP/ID16A) (`*.h5`, `*.hdf5`, near field)
 - [Linac Coherent Light Source (LCLS)](https://lcls.slac.stanford.edu/instruments)
   - [Hutch 1.3 XPP: X-ray Pump Probe](https://lcls.slac.stanford.edu/instruments/xpp)
   - SLAC NumPy Zipped Archive (`*.npz`)
@@ -46,6 +48,7 @@ Several file formats can be used to indicate detector pixels that are usable ("g
 | NumPy Good Pixel Files (`*.npy`) | The same array with the opposite sense, where True indicates a usable pixel. |
 | APS 12-ID-E Valid Pixel Mask Files (`*.h5` `*.hdf5`) | A `valid_pixel_mask` dataset, where a nonzero value indicates a usable pixel. |
 | APS 34-ID-E Microdiffraction Bad Pixel Files (`*.json`) | A `Bad pixels` array of `{"Pixel": [column, row], "Set": int}` objects, one per unusable pixel. The file carries no detector dimensions, so the reader supplies the extent of the EIGER2 CdTe 1M that writes it and rejects a coordinate outside it. |
+| ESRF ID16A Dark Field Files (`*.h5` `*.hdf5`) | A dark frame stack. A pixel is bad when its mean dark level exceeds five times the stack median, or when it saturates in any dark frame. |
 | Coherent X-ray Imaging Files (`*.cxi`) | The `detector_1/mask` of a CXI file, which may hold nothing else. A pixel is bad when any bit other than "signal above background" (`0x1000`) is set. |
 
 Masks are applied in raw detector coordinates. A preprocessed pixel is bad when any raw pixel it combines is bad, and pixels added by padding are always bad. A pixel holding a NaN or infinite value in any frame is zeroed and treated as bad for the whole dataset.
@@ -61,6 +64,7 @@ By default both maps are carried with the patterns, unchanged, for reconstructio
 | NumPy Background Files (`*.npy`) | A 2-D array covering the full, unprocessed detector. |
 | NumPy Flat-Field Response Files (`*.npy`) | A 2-D response map covering the full detector. Mean-one and absolute-efficiency maps are both accepted. |
 | NumPy Flat-Field Correction Factor Files (`*.npy`) | Per-pixel factors to *multiply* a measurement by, the inverse convention; each is read as its reciprocal response, and a non-positive factor marks its pixel bad. |
+| ESRF ID16A Dark Field Files (`*.h5` `*.hdf5`) | The per-pixel mean of the dark frame stack beside an ID16A scan. |
 | Coherent X-ray Imaging Files (`*.cxi`) | The background from `detector_1/data_dark`, averaged if it is a stack; the flat field from `ptychodus/flat_field` or `detector_1/qe_mask`. |
 
 ```{warning}

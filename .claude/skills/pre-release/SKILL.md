@@ -166,7 +166,7 @@ names = {p.display_name
          for p in getattr(registry, a)}
 doc = pathlib.Path('docs/source/readers.md').read_text()
 
-FACILITIES = ['APS', 'CNM', 'LCLS', 'MAX IV', 'NSLS-II', 'SLAC', 'SLS']
+FACILITIES = ['APS', 'CNM', 'ESRF', 'LCLS', 'MAX IV', 'NSLS-II', 'SLAC', 'SLS']
 BEAMLINE = re.compile(r'\b\d+-ID\b')
 
 def tokens(text):
