@@ -601,7 +601,9 @@ _RECONSTRUCTOR_OVERLAYS: Mapping[str, Overlay] = {
     # switch, and never sends the absent value.
     'forward_model_options.pad_for_shift': Overlay(
         'Pad For Shift:',
-        'Number of pixels to pad arrays (with border values) before shifting',
+        'Number of pixels to pad arrays (with border values) before shifting. A '
+        'near-field product raises this from zero on its own; a value set here is '
+        'kept.',
         minimum=0,
         annotation=int,
     ),
@@ -619,7 +621,9 @@ _RECONSTRUCTOR_OVERLAYS: Mapping[str, Overlay] = {
 _DATA_OVERLAYS: Mapping[str, Overlay] = {
     'fft_shift': Overlay(
         'FFT Shift Diffraction Patterns',
-        'When checked, the diffraction patterns will be FFT-shifted',
+        'When checked, the diffraction patterns will be FFT-shifted. Ignored for a '
+        'near-field product, whose patterns are real-space intensity: the regime '
+        'clears this whatever is shown here.',
     ),
     'save_data_on_device': Overlay(
         'Save Data on Device', 'Keep the diffraction data on the compute device (e.g. GPU).'

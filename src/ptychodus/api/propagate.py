@@ -295,6 +295,13 @@ class ProductGeometry:
     Infinite as the aperture vanishes, which is the limit rather than a guard, and
     ``nan`` when the photon energy is zero as well, where the ratio is indeterminate.
     """
+    magnification: float
+    """Cone-beam magnification the focus and detector positions imply.
+
+    See :func:`compute_magnification` for the sign convention and for why no focusing
+    optic gives exactly ``1.0``. Reported alongside the sampling it determines, since
+    the two are what say whether a cone-beam geometry was entered correctly.
+    """
 
 
 def compute_product_geometry(
@@ -417,6 +424,7 @@ def compute_product_geometry(
         fresnel_number=fresnel_number,
         detector_numerical_aperture=math.sqrt(numerical_aperture_sq),
         depth_of_field_m=depth_of_field_m,
+        magnification=magnification,
     )
 
 

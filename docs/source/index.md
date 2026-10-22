@@ -14,6 +14,7 @@
 
 getting_started
 initial_guesses
+near_field
 readers
 reconstruction_drivers
 api

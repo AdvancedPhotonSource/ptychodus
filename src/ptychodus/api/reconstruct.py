@@ -360,6 +360,7 @@ class SubprocessReconstructor(TrainableReconstructor):
     object is still a single kind that needs no special-casing in a list.
 
     The parent-side object holds no GPU state. It stores:
+
     - the module its child code lives in, stamped on by its library,
     - backend-supplied callbacks that dump options and export training data,
     - the loaded-model path (as recorded by ``load_model`` /

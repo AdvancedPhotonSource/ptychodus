@@ -4,7 +4,7 @@ The parent-side ptychodus process must NEVER acquire a GPU context (no
 ``torch.cuda.*`` / ``tf.config.experimental.*`` calls, no tensor-on-GPU
 allocations, no ``ptychi.api.task.PtychographyTask`` construction, no
 ``tf.keras.Model`` fit, no Lightning ``Trainer`` construction). All GPU work
-happens inside a freshly ``spawn``ed child process that lives only for the
+happens inside a child process started with ``spawn`` that lives only for the
 duration of one call (reconstruct / train / enhance) and dies immediately
 after. This gives each call a clean GPU context and fully releases GPU
 memory between calls, which lets ptychodus mix reconstructor backends built

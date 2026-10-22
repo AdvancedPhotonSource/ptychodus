@@ -13,6 +13,7 @@ import pytest
 
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.geometry import GeometryNotDefinedError, ImageExtent, PixelGeometry
+from ptychodus.api.propagate import compute_magnification
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.product.geometry import ProductGeometryProvider
 from ptychodus.model.product.metadata import MetadataRepositoryItem, UniqueNameFactory
@@ -286,3 +287,54 @@ class TestNearFieldSampling:
         geometry._metadata_item.far_field.set_value(False)
 
         observer._update.assert_called_once_with(geometry)
+
+
+class TestReportedMagnification:
+    """The magnification is reported, not just used, because it and the propagation
+    distance are what say whether a cone-beam geometry was entered correctly. A sign
+    error there yields a believable number rather than an error.
+    """
+
+    def test_no_focusing_optic_gives_exactly_one(self) -> None:
+        values = _make_geometry(far_field=False).get_derived_values()
+
+        assert values.magnification == 1.0
+
+    def test_it_matches_compute_magnification(self) -> None:
+        focus_m = -5e-3
+        values = _make_geometry(
+            far_field=False, focus_object_distance_m=focus_m
+        ).get_derived_values()
+
+        assert values.magnification == pytest.approx(
+            compute_magnification(_DETECTOR_DISTANCE_M, focus_m)
+        )
+
+    def test_it_pairs_with_the_propagation_distance(self) -> None:
+        """z = z_d / M is the identity the equivalent parallel-beam geometry rests on."""
+        values = _make_geometry(far_field=False, focus_object_distance_m=-5e-3).get_derived_values()
+
+        assert values.object_plane_propagation_distance_m == pytest.approx(
+            _DETECTOR_DISTANCE_M / values.magnification
+        )
+
+    def test_an_upstream_focus_magnifies_more_than_a_downstream_one(self) -> None:
+        """The sign is the geometry, not a magnitude to take the absolute value of."""
+        upstream = _make_geometry(
+            far_field=False, focus_object_distance_m=-5e-3
+        ).get_derived_values()
+        downstream = _make_geometry(
+            far_field=False, focus_object_distance_m=+5e-3
+        ).get_derived_values()
+
+        assert upstream.magnification > downstream.magnification
+
+    def test_it_is_reported_in_far_field_too(self) -> None:
+        """far_field and magnification are independent: an optic says where the waist
+        sits, not which regime the detector samples.
+        """
+        values = _make_geometry(far_field=True, focus_object_distance_m=-5e-3).get_derived_values()
+
+        assert values.magnification == pytest.approx(
+            compute_magnification(_DETECTOR_DISTANCE_M, -5e-3)
+        )
