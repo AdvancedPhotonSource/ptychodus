@@ -1107,9 +1107,24 @@ def test_transform_product_does_not_mutate_its_input() -> None:
     numpy.testing.assert_array_equal(product.object_.get_array(), array)
 
 
-def test_transform_product_rejects_near_field() -> None:
+def test_transform_product_rejects_cone_beam() -> None:
     """With a focusing optic the object pixel follows the magnification, not the distance."""
     product = _make_product(_grid_scan(4, 1.0e-6, (0.0, 0.0)), focus_object_distance_m=-0.01)
+
+    with pytest.raises(ValueError, match='far-field'):
+        transform_product(product, AffineTransform.from_components(_CALIBRATION_COMPONENTS))
+
+
+def test_transform_product_rejects_parallel_beam_near_field() -> None:
+    """A parallel beam declares no focusing optic, so the focus alone does not identify it.
+
+    Its object pixel is the detector pixel back-projected, which carries no detector
+    distance for a position scale to recover -- the same reason the cone beam is refused,
+    reached by a geometry whose focus-object distance is the far-field default of zero.
+    """
+    base = _make_product(_grid_scan(4, 1.0e-6, (0.0, 0.0)))
+    product = replace(base, metadata=replace(base.metadata, far_field=False))
+    assert product.metadata.focus_object_distance_m == 0.0
 
     with pytest.raises(ValueError, match='far-field'):
         transform_product(product, AffineTransform.from_components(_CALIBRATION_COMPONENTS))

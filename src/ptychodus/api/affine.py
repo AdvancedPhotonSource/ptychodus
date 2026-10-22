@@ -620,6 +620,7 @@ def _calibrate_detector_distance(
     scale: float,
     *,
     focus_object_distance_m: float = 0.0,
+    far_field: bool = True,
 ) -> float:
     """Return the detector distance implied by a fitted isotropic position scale.
 
@@ -630,6 +631,10 @@ def _calibrate_detector_distance(
     was too large by that same factor, and the distance that reproduces the correct pixel is
     ``detector_distance_m / scale``.
 
+    Both near-field geometries break that proportionality, for different reasons, so each is
+    refused rather than calibrated. The regime has to be tested as well as the focus position:
+    a parallel beam declares no focusing optic, so testing the focus alone would admit it.
+
     Args:
         detector_distance_m: Sample-to-detector distance the positions were reconstructed with.
         scale: Isotropic scale from :meth:`AffineTransform.decompose`.
@@ -637,16 +642,27 @@ def _calibrate_detector_distance(
             cone-beam geometry, where the object pixel is set by
             :func:`ptychodus.api.propagate.compute_magnification` rather than by the detector
             distance alone and this relation does not hold.
+        far_field: Declared propagation regime. Near field back-projects the detector pixel
+            onto the object, so the object pixel does not depend on the detector distance at
+            all and no position scale can report one.
 
     Raises:
         ValueError: If ``scale`` is not positive and finite, if ``detector_distance_m`` is not
-            finite, or if ``focus_object_distance_m`` is nonzero.
+            finite, if ``focus_object_distance_m`` is nonzero, or if the product declares
+            near-field propagation.
     """
     if focus_object_distance_m != 0.0:
         raise ValueError(
             'Detector-distance calibration from a position scale is defined for far-field '
             'geometry only; this product has a nonzero focus-object distance '
             f'({focus_object_distance_m} m), where the object pixel follows the magnification.'
+        )
+
+    if not far_field:
+        raise ValueError(
+            'Detector-distance calibration from a position scale is defined for far-field '
+            'geometry only; this product declares near-field propagation, where the object '
+            'pixel is the detector pixel back-projected and carries no distance to recover.'
         )
 
     if not math.isfinite(detector_distance_m):
@@ -798,6 +814,7 @@ def transform_product(
         metadata.detector_distance_m,
         components.scale,
         focus_object_distance_m=metadata.focus_object_distance_m,
+        far_field=metadata.far_field,
     )
     scale_free = AffineTransform.from_components(replace(components, scale=1.0))
 
