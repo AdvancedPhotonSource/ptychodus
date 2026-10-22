@@ -131,8 +131,13 @@ class ProbeTreeModel(QAbstractItemModel):
         self.endInsertRows()
 
     def update_item(self, index: int, item: ProbeRepositoryItem) -> None:
+        # Qt row/column bounds are inclusive, so the last valid column is
+        # len(Column) - 1. Asking index() for one past the end fails
+        # hasIndex and yields an invalid QModelIndex, which makes the
+        # dataChanged range malformed and the signal a no-op.
+        last_column = len(Column) - 1
         top_left = self.index(index, 0)
-        bottom_right = self.index(index, len(Column))
+        bottom_right = self.index(index, last_column)
         self.dataChanged.emit(top_left, bottom_right)
 
         node = self._tree_root.children[index]
@@ -154,9 +159,11 @@ class ProbeTreeModel(QAbstractItemModel):
 
             self.endRemoveRows()
 
-        child_top_left = self.index(0, 0, top_left)
-        child_bottom_right = self.index(num_modes_new, len(Column), top_left)
-        self.dataChanged.emit(child_top_left, child_bottom_right)
+        # Both corners were one past the end here, in row as well as column.
+        if num_modes_new > 0:
+            child_top_left = self.index(0, 0, top_left)
+            child_bottom_right = self.index(num_modes_new - 1, last_column, top_left)
+            self.dataChanged.emit(child_top_left, child_bottom_right)
 
     def remove_item(self, index: int, item: ProbeRepositoryItem) -> None:
         self.beginRemoveRows(QModelIndex(), index, index)
