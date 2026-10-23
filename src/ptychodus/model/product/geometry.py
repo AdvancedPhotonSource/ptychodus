@@ -40,6 +40,10 @@ class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Obs
         # degrade to zero-sized while unbound.
         self._detector_extent: ImageExtent | None = None
         self._detector_pixel_geometry: PixelGeometry | None = None
+        # Also dataset-derived, and kept here rather than in the metadata because it
+        # describes the patterns rather than the experiment: it is re-estimated whenever
+        # they are, and nothing should persist it across a reload. One while unbound.
+        self._mean_amplitude_transmission = 1.0
 
         self._metadata_item.add_observer(self)
         self._scan_item.add_observer(self)
@@ -55,6 +59,16 @@ class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Obs
             return
         self._detector_pixel_geometry = geometry
         self.notify_observers()
+
+    def set_mean_amplitude_transmission(self, transmission: float) -> None:
+        if transmission == self._mean_amplitude_transmission:
+            return
+        self._mean_amplitude_transmission = transmission
+        self.notify_observers()
+
+    @property
+    def mean_amplitude_transmission(self) -> float:
+        return self._mean_amplitude_transmission
 
     def get_derived_values(self) -> ProductGeometry:
         """Beam and sampling quantities implied by the current metadata and detector.

@@ -20,7 +20,7 @@ import numpy
 import yaml
 
 from ptychodus.api.affine import AffineFitResult, estimate_affine_transform
-from ptychodus.api.assemble import assemble_dataset
+from ptychodus.api.assemble import assemble_dataset, estimate_mean_amplitude_transmission
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import BadPixels, CropRegion
 from ptychodus.api.geometry import PixelGeometry
@@ -213,8 +213,9 @@ def _build_initial_object(
     registry: PluginRegistry,
     positions: ProbePositionSequence,
     probe_geometry: ProbeGeometry,
+    mean_amplitude_transmission: float,
 ) -> Object:
-    """The starting object: transparent, or one file shared by every scan."""
+    """The starting object: uniformly absorbing, or one file shared by every scan."""
     initial = settings.initial_object
     num_slices = initial.num_slices
     thickness_m = initial.object_thickness_m or 0.0
@@ -224,8 +225,9 @@ def _build_initial_object(
     )
 
     if initial.object_source == 'simulated':
-        # Unit amplitude and zero phase: a guess that asserts nothing about the sample.
-        object_ = generate_uniform_object(object_geometry)
+        # Uniform and zero phase: a guess that asserts no structure, but carries the
+        # mean transmission the patterns imply so the exit wave predicts their totals.
+        object_ = generate_uniform_object(object_geometry, amplitude=mean_amplitude_transmission)
 
         if num_slices > 1:
             object_ = resize_object_layers(
@@ -426,7 +428,13 @@ def reconstruct_one_scan(
         far_field=far_field,
         focus_object_distance_m=focus_object_distance_m,
     )
-    object_ = _build_initial_object(settings, registry, positions, probe_geometry)
+    object_ = _build_initial_object(
+        settings,
+        registry,
+        positions,
+        probe_geometry,
+        estimate_mean_amplitude_transmission(assembled_data),
+    )
     logger.info('Object geometry: %d layer(s)', object_.num_layers)
 
     probe_photon_count = (

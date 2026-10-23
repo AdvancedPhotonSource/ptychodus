@@ -114,14 +114,19 @@ def generate_paganin_object(
     )
 
 
-def generate_uniform_object(geometry: ObjectGeometry) -> Object:
-    """Generate a transparent object: unit amplitude and zero phase everywhere.
+def generate_uniform_object(geometry: ObjectGeometry, *, amplitude: float = 1.0) -> Object:
+    """Generate a featureless object of uniform *amplitude* and zero phase.
 
-    The starting guess for a reconstruction that asserts nothing about the sample, as
-    distinct from :func:`generate_random_object` with its deviations set to zero -- which
-    computes the same array, but reads as though the result were random.
+    The starting guess for a reconstruction that asserts nothing about the structure of
+    the sample, as distinct from :func:`generate_random_object` with its deviations set
+    to zero -- which computes the same array, but reads as though the result were random.
+
+    The default is a transparent sample. An amplitude below one asserts uniform
+    absorption instead, which is what a measured mean transmission states: the exit wave
+    then predicts the pattern totals the detector recorded rather than the unobstructed
+    beam.
     """
-    array = numpy.ones((1, geometry.height_px, geometry.width_px), dtype=complex)
+    array = numpy.full((1, geometry.height_px, geometry.width_px), amplitude, dtype=complex)
 
     return Object(
         array=array,

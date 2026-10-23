@@ -32,4 +32,4 @@ class GaussianRandomFieldObjectBuilder(ObjectBuilder):
             geometry_provider.get_object_geometry(),
             correlation_length_px=self.correlation_length_px.get_value(),
         )
-        return self._pad_object(object_)
+        return self._rescale_to_mean_transmission(self._pad_object(object_), geometry_provider)

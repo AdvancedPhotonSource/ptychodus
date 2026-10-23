@@ -42,4 +42,4 @@ class RandomObjectBuilder(ObjectBuilder):
             phase_deviation_tr=self.phase_deviation_tr.get_value(),
             blur_deviation_px=self.blur_deviation_px.get_value(),
         )
-        return self._pad_object(object_)
+        return self._rescale_to_mean_transmission(self._pad_object(object_), geometry_provider)

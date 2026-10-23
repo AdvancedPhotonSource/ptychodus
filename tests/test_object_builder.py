@@ -61,12 +61,21 @@ def _make_rng() -> numpy.random.Generator:
 
 
 class _StubObjectGeometryProvider(ObjectGeometryProvider):
-    def __init__(self, photon_wavelength_m: float = 1.0e-10) -> None:
+    def __init__(
+        self,
+        photon_wavelength_m: float = 1.0e-10,
+        mean_amplitude_transmission: float = 1.0,
+    ) -> None:
         self._photon_wavelength_m = photon_wavelength_m
+        self._mean_amplitude_transmission = mean_amplitude_transmission
 
     @property
     def photon_wavelength_m(self) -> float:
         return self._photon_wavelength_m
+
+    @property
+    def mean_amplitude_transmission(self) -> float:
+        return self._mean_amplitude_transmission
 
     @property
     def object_plane_propagation_distance_m(self) -> float:
@@ -376,3 +385,68 @@ class TestPaganinReadsTheExperiment:
         at_20_keV = self._build(6.1992e-11)  # noqa: N806
 
         assert not numpy.allclose(at_6_keV, at_20_keV)
+
+
+# ---------------------------------------------------------------------------
+# Mean amplitude transmission
+# ---------------------------------------------------------------------------
+
+
+def test_generated_object_carries_the_measured_mean_transmission() -> None:
+    """A generated object is scaled to the opacity the data implies.
+
+    A unit-modulus guess asserts a transparent sample and so predicts more signal than
+    the detector recorded. Putting the difference here keeps it out of the probe, which
+    has to go on meaning the incident illumination.
+    """
+    settings = _make_settings()
+    transmission = 0.6
+
+    opaque = RandomObjectBuilder(_make_rng(), settings).build(
+        _StubObjectGeometryProvider(mean_amplitude_transmission=transmission), []
+    )
+    transparent = RandomObjectBuilder(_make_rng(), settings).build(
+        _StubObjectGeometryProvider(), []
+    )
+
+    numpy.testing.assert_allclose(
+        opaque.get_array(), transparent.get_array() * transmission, atol=1e-12
+    )
+
+
+def test_from_file_object_keeps_its_own_transmission() -> None:
+    """Diffraction data constrains the product of probe and object, not either alone,
+    so rescaling a warm-start object would decouple it from the probe it was solved
+    with."""
+    settings = _make_settings()
+    from_file = _make_object(1)
+    builder = _make_from_file_builder(settings, from_file)
+
+    object_ = builder.build(_StubObjectGeometryProvider(mean_amplitude_transmission=0.6), [])
+
+    numpy.testing.assert_allclose(object_.get_array(), from_file.get_array(), atol=1e-12)
+
+
+def test_from_memory_object_keeps_its_own_transmission() -> None:
+    """Reconstruction output flows through this builder once per iteration, so a
+    rescale here would compound on every one."""
+    settings = _make_settings()
+    raw = _make_object(1)
+    builder = FromMemoryObjectBuilder(settings, raw)
+
+    object_ = builder.build(_StubObjectGeometryProvider(mean_amplitude_transmission=0.6), [])
+
+    numpy.testing.assert_allclose(object_.get_array(), raw.get_array(), atol=1e-12)
+
+
+@pytest.mark.parametrize('transmission', [0.0, -0.5, 1.5, float('nan')])
+def test_an_unusable_transmission_leaves_a_generated_object_alone(transmission: float) -> None:
+    """An initial guess degrades rather than stopping a reconstruction."""
+    settings = _make_settings()
+
+    scaled = RandomObjectBuilder(_make_rng(), settings).build(
+        _StubObjectGeometryProvider(mean_amplitude_transmission=transmission), []
+    )
+    unscaled = RandomObjectBuilder(_make_rng(), settings).build(_StubObjectGeometryProvider(), [])
+
+    numpy.testing.assert_allclose(scaled.get_array(), unscaled.get_array(), atol=1e-12)

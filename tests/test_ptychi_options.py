@@ -45,6 +45,7 @@ from ptychi.api import (
     Reconstructors,
 )
 from ptychi.api.options.data import PtychographyDataOptions
+from ptychi.api.options.task import PtychographyTaskOptions
 import torch
 
 from ptychodus.model.processing import ProcessingParameterStore
@@ -70,7 +71,9 @@ from ptychodus.cli._reconstruct_common import (  # noqa: E402
 from ptychodus.plugins.ptychi.algorithms import task_options_classes  # noqa: E402
 from ptychodus.plugins.ptychi.task import (  # noqa: E402
     _initial_opr_mode_weights,
+    align_probe_gauge_with_ptychi,
     align_task_options_with_product,
+    apply_probe_gauge_to_options,
     dump_task_options,
     dump_task_options_yaml,
     load_task_options,
@@ -1172,3 +1175,244 @@ def test_recover_layer_spacing_single_layer_needs_no_readback() -> None:
     object_in = _make_layered_object(1, 0.0)
 
     assert _recover_layer_spacing_m(_StubTask(_StubTaskObject([0.0])), object_in) == []
+
+
+# ---------------------------------------------------------------------------
+# Probe gauge
+# ---------------------------------------------------------------------------
+
+_GAUGE_PHOTONS = 1.0e6
+_GAUGE_N = PROBE_HEIGHT_PX * PROBE_WIDTH_PX
+# A genuinely near-field sampling. The far-field constants above put the Fresnel number
+# nine orders below pty-chi's angular-spectrum threshold, so declaring near field there
+# would still select the Fresnel transform and never exercise the conserving branch.
+_NEAR_FIELD_PIXEL_M = 1.0e-6
+_NEAR_FIELD_DISTANCE_M = 1.0e-3
+
+
+def _gauge_input(
+    *,
+    probe_factor: float = 1.0,
+    object_amplitude: float = 1.0,
+    far_field: bool = True,
+    pixel_m: float = PIXEL_M,
+    distance_m: float = DETECTOR_DISTANCE_M,
+) -> ReconstructInput:
+    """A product whose probe, object and patterns already agree with each other.
+
+    The probe carries `_GAUGE_PHOTONS` photons, the object is uniform, and every pattern
+    totals what an energy-conserving forward model would put on the detector. The gauge
+    measured from it is therefore the propagator's own convention and nothing else, so
+    `anomaly` is exactly one and any departure is the thing under test.
+
+    `probe_factor` scales the probe away from that agreement, standing in for a probe
+    that arrived in some other gauge.
+    """
+    probe_array = numpy.zeros((1, 1, PROBE_HEIGHT_PX, PROBE_WIDTH_PX), dtype=numpy.complex128)
+    probe_array[...] = 1.0
+    probe_array *= numpy.sqrt(_GAUGE_PHOTONS / numpy.sum(numpy.abs(probe_array) ** 2))
+    probe_array *= probe_factor
+
+    obj = Object(
+        array=numpy.full((1, OBJ_HEIGHT_PX, OBJ_WIDTH_PX), object_amplitude, dtype=complex),
+        pixel_geometry=PixelGeometry(width_m=pixel_m, height_m=pixel_m),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
+        layer_spacing_m=[],
+    )
+    probes = ProbeEnsemble(
+        array=probe_array,
+        opr_weights=None,
+        pixel_geometry=PixelGeometry(width_m=pixel_m, height_m=pixel_m),
+    )
+    positions = ProbePositionSequence(
+        [ProbePosition(index=i, x_m=0.0, y_m=0.0) for i in range(NUM_PATTERNS)]
+    )
+    product = Product(
+        metadata=ProductMetadata(
+            name='gauge',
+            comments='',
+            detector_distance_m=distance_m,
+            photon_energy_eV=PHOTON_ENERGY_EV,
+            probe_photon_count=_GAUGE_PHOTONS,
+            exposure_time_s=1.0,
+            mass_attenuation_m2_per_kg=0.0,
+            tomography_angle_deg=0.0,
+            far_field=far_field,
+        ),
+        probe_positions=positions,
+        probes=probes,
+        object_=obj,
+        losses=[],
+    )
+    # What an energy-conserving model would record: the photons the exit wave carries.
+    per_pattern_total = _GAUGE_PHOTONS * object_amplitude**2
+    patterns = numpy.full(
+        (NUM_PATTERNS, PROBE_HEIGHT_PX, PROBE_WIDTH_PX),
+        per_pattern_total / _GAUGE_N,
+        dtype=numpy.float64,
+    )
+    return ReconstructInput(
+        diffraction_patterns=patterns,
+        bad_pixels=numpy.zeros((PROBE_HEIGHT_PX, PROBE_WIDTH_PX), dtype=numpy.bool_),
+        product=product,
+    )
+
+
+def _aligned_for(parameters: ReconstructInput) -> PtychographyTaskOptions:
+    return align_task_options_with_product(LSQMLOptions(), parameters.product)
+
+
+@pytest.mark.parametrize(
+    'kwargs',
+    [
+        pytest.param({}, id='far-field-fft'),
+        pytest.param(
+            {
+                'far_field': False,
+                'pixel_m': _NEAR_FIELD_PIXEL_M,
+                'distance_m': _NEAR_FIELD_DISTANCE_M,
+            },
+            id='near-field-angular-spectrum',
+        ),
+        pytest.param({'far_field': False}, id='near-field-fresnel-transform'),
+    ],
+)
+def test_probe_gauge_of_a_matched_product_is_the_propagator_convention(
+    kwargs: dict[str, object],
+) -> None:
+    """With probe, object and data already in agreement, the only thing left to correct
+    is pty-chi's own propagator normalization -- whichever of the three it builds."""
+    parameters = _gauge_input(**kwargs)  # type: ignore[arg-type]
+    gauge = align_probe_gauge_with_ptychi(_aligned_for(parameters), parameters)
+
+    # Single precision throughout: pty-chi propagates in complex64 unless told not to.
+    assert gauge.anomaly == pytest.approx(1.0, rel=1e-6)
+    assert gauge.sampled_positions == NUM_PATTERNS
+
+
+def test_probe_gauge_in_far_field_undoes_the_unnormalized_fft() -> None:
+    """Far field propagates with a plain FFT, which multiplies intensity by the pixel
+    count; the probe is scaled by the square root of that."""
+    parameters = _gauge_input(far_field=True)
+    gauge = align_probe_gauge_with_ptychi(_aligned_for(parameters), parameters)
+
+    assert gauge.expected_factor == pytest.approx(1.0 / math.sqrt(_GAUGE_N), rel=1e-6)
+
+
+def test_probe_gauge_in_near_field_leaves_an_energy_conserving_probe_alone() -> None:
+    """The angular spectrum conserves energy, which is ptychodus's own convention, so
+    there is nothing to convert -- the case a hardcoded far-field factor would break."""
+    parameters = _gauge_input(
+        far_field=False, pixel_m=_NEAR_FIELD_PIXEL_M, distance_m=_NEAR_FIELD_DISTANCE_M
+    )
+    gauge = align_probe_gauge_with_ptychi(_aligned_for(parameters), parameters)
+
+    assert gauge.expected_factor == pytest.approx(1.0, rel=1e-6)
+    assert gauge.to_ptychi == pytest.approx(1.0, rel=1e-6)
+
+
+def test_probe_gauge_absorbs_the_objects_transmission() -> None:
+    """An object carrying the sample's mean transmission leaves the probe meaning the
+    incident illumination, so the gauge stays at the propagator convention."""
+    parameters = _gauge_input(object_amplitude=0.5)
+    gauge = align_probe_gauge_with_ptychi(_aligned_for(parameters), parameters)
+
+    assert gauge.anomaly == pytest.approx(1.0, rel=1e-6)
+
+
+def test_probe_gauge_corrects_a_probe_already_in_ptychi_gauge() -> None:
+    """A product written before ptychodus converted here holds pty-chi's own probe,
+    smaller by the square root of the pixel count. Such a probe needs no conversion, and
+    the measurement says so by departing from the convention by exactly that factor."""
+    parameters = _gauge_input(probe_factor=1.0 / math.sqrt(_GAUGE_N))
+
+    gauge = align_probe_gauge_with_ptychi(_aligned_for(parameters), parameters)
+
+    assert gauge.anomaly == pytest.approx(math.sqrt(_GAUGE_N), rel=1e-6)
+    assert gauge.to_ptychi == pytest.approx(1.0, rel=1e-6)
+
+
+def test_probe_gauge_warns_when_the_probe_is_in_a_foreign_gauge(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Far enough from the convention and the probe did not come from here at all --
+    another tool, or a mis-scaled file. Reported, and corrected anyway."""
+    parameters = _gauge_input(probe_factor=1.0e-3)
+
+    with caplog.at_level(logging.WARNING, logger='ptychodus.plugins.ptychi.task'):
+        gauge = align_probe_gauge_with_ptychi(_aligned_for(parameters), parameters)
+
+    assert gauge.anomaly == pytest.approx(1.0e3, rel=1e-6)
+    assert 'may already be in' in caplog.text
+
+
+def test_probe_gauge_round_trips_a_probe_exactly() -> None:
+    """In and out are the same scalar, so a reconstruction that changed nothing returns
+    the probe it was given."""
+    parameters = _gauge_input()
+    gauge = align_probe_gauge_with_ptychi(_aligned_for(parameters), parameters)
+    array = parameters.product.probes.get_array()
+
+    numpy.testing.assert_allclose(array * gauge.to_ptychi / gauge.to_ptychi, array, rtol=1e-12)
+
+
+def test_probe_gauge_ignores_a_carried_background() -> None:
+    """The patterns have not been corrected for it, so left in it would inflate the
+    measurement and shrink the probe."""
+    plain = _gauge_input()
+    background = numpy.full((PROBE_HEIGHT_PX, PROBE_WIDTH_PX), 7.0)
+    with_background = dataclasses.replace(
+        plain,
+        diffraction_patterns=plain.diffraction_patterns + background,
+        background=background,
+    )
+
+    expected = align_probe_gauge_with_ptychi(_aligned_for(plain), plain)
+    actual = align_probe_gauge_with_ptychi(_aligned_for(with_background), with_background)
+
+    assert actual.to_ptychi == pytest.approx(expected.to_ptychi, rel=1e-6)
+
+
+def test_probe_gauge_of_unusable_data_falls_back_to_the_convention(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A scan that recorded nothing gives no ratio to measure; the propagator convention
+    is still right whenever probe and object already agree with the data."""
+    plain = _gauge_input()
+    parameters = dataclasses.replace(
+        plain, diffraction_patterns=numpy.zeros_like(plain.diffraction_patterns)
+    )
+
+    with caplog.at_level(logging.WARNING, logger='ptychodus.plugins.ptychi.task'):
+        gauge = align_probe_gauge_with_ptychi(_aligned_for(parameters), parameters)
+
+    assert gauge.to_ptychi == gauge.expected_factor
+    assert gauge.sampled_positions == 0
+    assert 'unusable' in caplog.text
+
+
+def test_power_constraint_target_follows_the_probe_into_ptychi_gauge() -> None:
+    """The constraint measures the probe's power on pty-chi's arrays, so its target has
+    to be stated there too -- otherwise ticking it would pull the probe to a power it
+    never had. Agreement here is what keeps the two mechanisms from fighting."""
+    parameters = _gauge_input()
+    aligned = _aligned_for(parameters)
+    gauge = align_probe_gauge_with_ptychi(aligned, parameters)
+
+    applied = apply_probe_gauge_to_options(aligned, gauge)
+    handed_over = parameters.product.probes.get_array() * gauge.to_ptychi
+
+    assert applied.probe_options.power_constraint.probe_power == pytest.approx(
+        float(numpy.sum(numpy.abs(handed_over) ** 2)), rel=1e-6
+    )
+
+
+def test_applying_the_gauge_leaves_the_original_options_alone() -> None:
+    """The options a run writes out keep the photon count a reader can interpret."""
+    parameters = _gauge_input()
+    aligned = _aligned_for(parameters)
+    gauge = align_probe_gauge_with_ptychi(aligned, parameters)
+
+    apply_probe_gauge_to_options(aligned, gauge)
+
+    assert aligned.probe_options.power_constraint.probe_power == _GAUGE_PHOTONS

@@ -24,6 +24,7 @@ from ptychodus.api.assemble import (
     compute_assembled_patterns_shape,
     compute_dataset_total_counts,
     default_max_workers,
+    estimate_mean_amplitude_transmission,
     preprocess_array,
 )
 from ptychodus.api.diffraction import (
@@ -1060,3 +1061,68 @@ def test_add_bad_pixels_rejects_a_mismatched_shape() -> None:
 
     with pytest.raises(ValueError, match='shape'):
         data.add_bad_pixels(numpy.zeros((2, 2), dtype=bool))
+
+
+# ---------- estimate_mean_amplitude_transmission ----------
+
+
+def _varied_data(
+    totals: list[int], *, probe_photon_counts: numpy.ndarray | None = None
+) -> AssembledDiffractionData:
+    """Patterns whose per-pattern total counts are exactly `totals`."""
+    patterns = numpy.stack([numpy.full((4, 4), total // 16, dtype=numpy.int32) for total in totals])
+    return AssembledDiffractionData(
+        indexes=numpy.arange(len(totals), dtype=numpy.intp),
+        patterns=patterns,
+        pixel_geometry=GEOMETRY,
+        bad_pixels=numpy.zeros((4, 4), dtype=numpy.bool_),
+        probe_photon_counts=probe_photon_counts,
+    )
+
+
+def test_mean_amplitude_transmission_is_one_for_an_unattenuated_scan() -> None:
+    """Every pattern as bright as the brightest means nothing absorbed."""
+    assert estimate_mean_amplitude_transmission(_varied_data([64, 64, 64])) == pytest.approx(1.0)
+
+
+def test_mean_amplitude_transmission_falls_back_to_the_brightest_pattern() -> None:
+    """Without measured flux the brightest frame stands in for the unobstructed beam,
+    so the result is ``sqrt(mean / max)`` over the per-pattern totals."""
+    data = _varied_data([64, 32, 32, 32])  # mean 40, max 64
+
+    assert not data.has_measured_probe_photon_counts()
+    assert estimate_mean_amplitude_transmission(data) == pytest.approx(numpy.sqrt(40 / 64))
+
+
+def test_mean_amplitude_transmission_uses_measured_flux_per_position() -> None:
+    """Measured flux gives the incident count for each pattern, so the transmission is
+    averaged per position rather than against a single brightest frame."""
+    data = _varied_data([64, 32], probe_photon_counts=numpy.array([64, 64]))
+
+    assert data.has_measured_probe_photon_counts()
+    # Per-position intensity transmissions are 1.0 and 0.5; their mean is 0.75.
+    assert estimate_mean_amplitude_transmission(data) == pytest.approx(numpy.sqrt(0.75))
+
+
+def test_mean_amplitude_transmission_of_nothing_assembled_is_transparent() -> None:
+    assert estimate_mean_amplitude_transmission(AssembledDiffractionData.create_null()) == 1.0
+
+
+def test_mean_amplitude_transmission_of_an_all_zero_scan_is_transparent() -> None:
+    """A scan that recorded nothing gives no incident estimate to divide by."""
+    assert estimate_mean_amplitude_transmission(_varied_data([0, 0])) == 1.0
+
+
+def test_mean_amplitude_transmission_ignores_positions_with_no_measured_flux() -> None:
+    """A zero incident count would divide by zero; those positions drop out."""
+    data = _varied_data([64, 32], probe_photon_counts=numpy.array([0, 64]))
+
+    assert estimate_mean_amplitude_transmission(data) == pytest.approx(numpy.sqrt(0.5))
+
+
+def test_mean_amplitude_transmission_never_exceeds_one() -> None:
+    """Measured flux can read below what the detector collected -- a miscalibrated
+    monitor, or scatter outside the recorded aperture. Transmission stays physical."""
+    data = _varied_data([64, 64], probe_photon_counts=numpy.array([32, 32]))
+
+    assert estimate_mean_amplitude_transmission(data) == pytest.approx(1.0)

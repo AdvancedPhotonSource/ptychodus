@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from enum import Enum
 import logging
 
+from ptychodus.api.assemble import estimate_mean_amplitude_transmission
 from ptychodus.api.observer import Observable
 from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.product import LossValue, Product
@@ -185,6 +186,7 @@ class ProductRepositoryItem(ParameterGroup):
         if dataset is None:
             self._geometry.set_detector_extent(None)
             self._geometry.set_detector_pixel_geometry(None)
+            self._geometry.set_mean_amplitude_transmission(1.0)
             return
 
         self._geometry.set_detector_extent(dataset.get_processed_image_extent())
@@ -196,6 +198,16 @@ class ProductRepositoryItem(ParameterGroup):
         dataset.add_observer(self._dataset_observer)
 
         self._auto_estimate_probe_photon_count()
+        self._estimate_mean_amplitude_transmission()
+
+    def _estimate_mean_amplitude_transmission(self) -> None:
+        # Unguarded, unlike the photon count: this is a property of the patterns alone,
+        # carries no user- or file-supplied value to protect, and must follow them
+        # whenever they are reprocessed.
+        if self._dataset is None:
+            return
+        transmission = estimate_mean_amplitude_transmission(self._dataset.get_assembled_data())
+        self._geometry.set_mean_amplitude_transmission(transmission)
 
     def _auto_estimate_probe_photon_count(self) -> None:
         # Guard on the default sentinel so a user- or file-supplied value is
@@ -317,3 +329,4 @@ class _BoundDatasetObserver(DiffractionDatasetObserver):
     def handle_dataset_reloaded(self) -> None:
         self._item._sync_geometry_from_dataset()
         self._item._auto_estimate_probe_photon_count()
+        self._item._estimate_mean_amplitude_transmission()

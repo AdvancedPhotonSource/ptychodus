@@ -89,7 +89,16 @@ GPU work belongs in a spawned child: wrap it with `SubprocessReconstructor` (see
 
 A child entry point takes `(payload, queue)`. The `SubprocessPayload` carries the operation, whatever the dump returned, and whichever of the input, the two directories and the model path that operation fills; ask for those with `require_input()`, `require_directories()` and `require_model_path()` rather than reading the optional fields, so a payload built wrong says so by name. Put results on the queue tagged with a `ReconstructorMessage` member.
 
-### 5. Register the plugin
+### 5. Reconcile conventions at the boundary
+
+Convert the product into the backend's gauge and frame on the way in, and apply the inverse to **every** yielded `ReconstructOutput`, not just the last -- a streaming backend yields many. Two things to reconcile:
+
+- **Scale.** ptychodus stores a probe in photons per pixel, so `sum|P|^2` is the photons incident per exposure. Measure the factor by pushing the probe and the object patches beneath it through the backend's *own* forward propagator and comparing with the mean measured pattern total; do not derive it from the library's FFT normalization, which can vary with geometry. Keep the factor and divide by it on readback, so the round trip is exact rather than a second measurement of a probe the backend has since moved. Scale only the probe: the object rides through untouched, which leaves the product the data constrains unchanged.
+- **Coordinates.** ptychodus stores probe positions in meters; most libraries want object pixels. Map with the object geometry's `map_probe_positions_to_object_x_px` / `_y_px` and invert with `map_coordinates_object_to_probe`.
+
+Both belong in pure functions beside the options alignment, so they are testable without the backend installed and cannot drift from it. [src/ptychodus/plugins/ptychi/task.py](../../src/ptychodus/plugins/ptychi/task.py) is the worked example: `align_probe_gauge_with_ptychi` measures, `apply_probe_gauge_to_options` restates the probe-power target in the same gauge, and `reconstruct_with_ptychi` applies and undoes it.
+
+### 6. Register the plugin
 
 ```python
 def register_plugins(registry: PluginRegistry) -> None:
@@ -102,13 +111,13 @@ def register_plugins(registry: PluginRegistry) -> None:
 
 Nothing else is wired. `ModelCore` takes whatever registered, and `ControllerCore` builds every backend's panel from what it declares — there are no hand-written reconstructor panels left.
 
-### 6. Say where the options are persisted
+### 7. Say where the options are persisted
 
 Add `src/ptychodus/model/processing/_<backend>_sections.py` exporting `sections()`, one `OptionsSection` per settings group, and list it in `_SECTIONS_BY_LIBRARY` in [src/ptychodus/model/processing/core.py](../../src/ptychodus/model/processing/core.py) keyed by the name the backend registers under. Entries are asked per reconstructor — `(name, declared_options) -> sections` — so wrap a table that is the same for every reconstructor a backend offers in `_regardless`; answer the arguments only when the groups differ per reconstructor, as pty-chi's do. A backend absent from that table registers no groups and runs on its declared defaults. The table is **transitional**, retiring with the flat INI layout.
 
 Two guard tests cover the table: every name in it must match a registered library, because a rename would otherwise silently drop the backend's settings, and every name must also appear in the golden fixture's group-prefix table, which is what lets that fixture keep checking the rest of the tree when the backend is not installed.
 
-### 7. Optional-dependency plumbing
+### 8. Optional-dependency plumbing
 
 ```toml
 [project.optional-dependencies]
@@ -123,4 +132,5 @@ See the comment above `[project.optional-dependencies]` for a backend published 
 - `uv run ptychodus` — the backend appears in the reconstructor list with a generated panel. `--log-level 10` shows the version or the "not found" line.
 - Without the extra, the GUI still opens, the backend offers nothing, and no other reconstructor is affected.
 - `uv run pytest tests/test_settings_defaults.py` — the golden INI gains the new groups; regenerate the fixture deliberately and review the diff.
+- Reconstruct, save the product, then warm-start a *different* backend from it: probe power and positions must come through comparable, which is the mixing invariant.
 - `pre-push` — full CI gate green.

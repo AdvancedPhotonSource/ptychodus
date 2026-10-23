@@ -861,7 +861,17 @@ class ProbeGeometryProvider(ABC):
 
 
 class Probe:
-    """Probe (illumination function) stored as a (modes, height, width) complex array."""
+    """Probe (illumination function) stored as a (modes, height, width) complex array.
+
+    Amplitude is in photons per pixel, so ``sum(abs(array)**2)`` is the number of photons
+    the probe carries in one exposure -- a count, not an intensity per unit area. An
+    operation that changes the sampling therefore preserves that plain sum rather than an
+    area-weighted integral: both :func:`resample_probe_ensemble`, which re-expresses a
+    probe on a different pitch, and the propagators in :mod:`ptychodus.api.propagate`,
+    which carry a field to another plane, leave it unchanged. Diffraction patterns are
+    counted the same way, which is what makes the two comparable: a probe illuminating a
+    transparent object yields patterns totalling ``sum(abs(array)**2)``.
+    """
 
     def __init__(
         self,

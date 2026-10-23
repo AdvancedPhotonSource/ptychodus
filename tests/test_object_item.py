@@ -41,6 +41,10 @@ class _ObservableObjectProvider(ObjectGeometryProvider, Observable):
         return 1.0e-10
 
     @property
+    def mean_amplitude_transmission(self) -> float:
+        return 1.0
+
+    @property
     def object_plane_propagation_distance_m(self) -> float:
         return 1.0
 

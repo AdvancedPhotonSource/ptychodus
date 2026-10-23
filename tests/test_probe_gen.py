@@ -295,16 +295,17 @@ def _sample_plane_geometry() -> ProbeGeometry:
 
 
 class TestGenerateAveragePatternProbe:
-    def test_conserves_energy_between_the_two_planes(self) -> None:
-        """Power is invariant across the propagation once each plane is weighted by its
-        own pixel area: ``sum|out|^2 dx_sample^2 == sum|in|^2 dx_detector^2``.
+    def test_conserves_the_photon_count_between_the_two_planes(self) -> None:
+        """``sum|out|^2 == sum|in|^2``: the bare sum is the photon count the field
+        carries, and a pitch change must leave it alone.
 
-        This pins the upstream-plane pitch convention without needing phase, so it holds
-        for the sqrt-of-intensity input the estimator actually takes. The single-FFT
-        propagator's ``pixel_width_m`` names the plane at the smaller z, which for this
-        backward propagation is the *sample* plane. Parameterizing it with the detector
-        pitch instead scales the recovered power by ``(dx_sample / dx_detector)**4``
-        -- here a factor of about 1.4e-14.
+        Field arrays hold photons per pixel, not intensity per unit area, so neither
+        plane is weighted by its own pixel area -- the same contract
+        :func:`resample_probe_ensemble` states for the other way of changing pitch.
+        Because the propagators now preserve this sum whatever their pitch, the
+        parameterization itself is pinned by
+        :meth:`test_matches_an_explicit_back_propagation_on_the_sample_grid` rather
+        than by a scale error showing up here.
         """
         geometry = _sample_plane_geometry()
         rng = numpy.random.default_rng(0)
@@ -319,9 +320,41 @@ class TestGenerateAveragePatternProbe:
             detector_distance_m=_BACKPROP_DISTANCE_M,
         )
 
-        detector_power = patterns[0].sum() * _BACKPROP_DETECTOR_PITCH_M**2
-        sample_power = intensity(result.get_array()[0]).sum() * _BACKPROP_SAMPLE_PITCH_M**2
-        assert sample_power == pytest.approx(detector_power, rel=1e-12)
+        detector_counts = patterns[0].sum()
+        sample_counts = intensity(result.get_array()[0]).sum()
+        assert sample_counts == pytest.approx(detector_counts, rel=1e-12)
+
+    def test_matches_an_explicit_back_propagation_on_the_sample_grid(self) -> None:
+        """Pins which plane's pitch parameterizes the backward propagation.
+
+        The single-FFT propagator's ``pixel_width_m`` names the plane at the smaller z,
+        which for this backward propagation is the *sample* plane. Energy conservation
+        cannot distinguish the two grids -- the propagator preserves the photon sum
+        whatever its pitch -- so the field itself carries the convention. Building the
+        reference on the detector pitch instead makes these disagree.
+        """
+        geometry = _sample_plane_geometry()
+        patterns = self._envelope_patterns()
+
+        result = generate_average_pattern_probe(
+            geometry,
+            _assembled_data(patterns),
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            detector_distance_m=_BACKPROP_DISTANCE_M,
+        )
+
+        reference = FresnelTransformPropagator(
+            PropagatorParameters(
+                wavelength_m=_BACKPROP_WAVELENGTH_M,
+                width_px=_BACKPROP_NUM_PX,
+                height_px=_BACKPROP_NUM_PX,
+                pixel_width_m=_BACKPROP_SAMPLE_PITCH_M,
+                pixel_height_m=_BACKPROP_SAMPLE_PITCH_M,
+                propagation_distance_m=-_BACKPROP_DISTANCE_M,
+            )
+        ).propagate(numpy.sqrt(numpy.mean(patterns, axis=0)).astype(complex))
+
+        numpy.testing.assert_allclose(result.get_array()[0], reference, rtol=1e-10)
 
     def test_recovers_the_forward_models_amplitude_scale(self) -> None:
         """Round-trip through the house forward model (sample -> detector at +z) and
@@ -735,14 +768,14 @@ class TestGenerateFresnelZonePlateProbe:
     def test_conserves_energy_between_the_zone_plate_and_probe_planes(
         self, defocus_distance_m: float
     ) -> None:
-        """Pins the grid each direction actually outputs on, independent of phase.
+        """The probe carries the photon count the zone plate transmits.
 
-        The zone plate's open area is fixed by the optic: the transmission function is
-        unit-modulus on the annulus and zero elsewhere, so its power is just that area.
-        The generator promises the probe plane's pitch in both directions, so the probe's
-        area-weighted power must equal it. Parameterizing the backward branch on the
-        zone-plate pitch instead puts the output on a grid coarser by
-        ``(dx_fzp / dx_probe)**2``, and the powers part company.
+        The transmission function is unit-modulus on the annulus and zero elsewhere, so
+        its bare sum is just the open pixel count, and propagation to the probe plane
+        must preserve it: field arrays hold photons per pixel, so a pitch change leaves
+        the plain sum alone. Which grid each direction outputs on is pinned by
+        :meth:`test_both_directions_invert_to_the_same_transmission_function`, whose
+        inverse only lands back on a clean annulus for the right parameterization.
         """
         geometry = _fzp_probe_geometry()
 
@@ -753,12 +786,9 @@ class TestGenerateFresnelZonePlateProbe:
             defocus_distance_m=defocus_distance_m,
         )
 
-        fzp_pixel_geometry = _fzp_plane_pixel_geometry()
-        open_area_m2 = (
-            _zone_plate_annulus().sum() * fzp_pixel_geometry.width_m * fzp_pixel_geometry.height_m
-        )
-        probe_power = intensity(probe.get_array()[0]).sum() * _FZP_PROBE_PITCH_M**2
-        assert probe_power == pytest.approx(open_area_m2, rel=1e-9)
+        open_pixel_count = _zone_plate_annulus().sum()
+        probe_counts = intensity(probe.get_array()[0]).sum()
+        assert probe_counts == pytest.approx(open_pixel_count, rel=1e-9)
 
     def test_zero_total_distance_raises(self) -> None:
         """``defocus = -f`` collapses the conjugate grid; it must not return NaNs."""
@@ -1104,23 +1134,17 @@ class TestGenerateKbMirrorProbe:
     def test_conserves_energy_between_the_pupil_and_probe_planes(
         self, defocus_distance_m: float
     ) -> None:
-        """Pins the grid each direction outputs on, independent of phase.
+        """The probe carries the photon count the pupil transmits.
 
-        The backward branch reuses the probe-plane pitch, so a sign slip in the pitch
-        selection would show up here as a scale error rather than as a wrong-looking probe.
+        The pupil mask is unit-modulus where open and zero elsewhere, so its bare sum is
+        the open pixel count, and propagation to the probe plane must preserve it: field
+        arrays hold photons per pixel, so a pitch change leaves the plain sum alone. A
+        slip in the pitch selection no longer shows up as a scale error here; it shows
+        up in :meth:`test_focus_width_matches_the_uniform_slit_prediction`, whose focus
+        width is a physical length and so depends on the grid.
         """
         mirrors = _kb_mirrors(1.5e-3, 1.0e-3)
-        pupil_pixel_geometry = compute_far_field_pixel_geometry(
-            _kb_probe_geometry().get_pixel_geometry(),
-            ImageExtent(width_px=_KB_NUM_PX, height_px=_KB_NUM_PX),
-            wavelength_m=_KB_WAVELENGTH_M,
-            propagation_distance_m=mirrors.get_reference_distance_m() + defocus_distance_m,
-        )
-        open_area_m2 = (
-            _kb_pupil_mask(mirrors, defocus_distance_m).sum()
-            * pupil_pixel_geometry.width_m
-            * pupil_pixel_geometry.height_m
-        )
+        open_pixel_count = _kb_pupil_mask(mirrors, defocus_distance_m).sum()
 
         probe = generate_kb_mirror_probe(
             _kb_probe_geometry(),
@@ -1128,9 +1152,9 @@ class TestGenerateKbMirrorProbe:
             photon_wavelength_m=_KB_WAVELENGTH_M,
             defocus_distance_m=defocus_distance_m,
         )
-        probe_power = intensity(probe.get_array()[0]).sum() * _KB_PROBE_PITCH_M**2
+        probe_counts = intensity(probe.get_array()[0]).sum()
 
-        assert probe_power == pytest.approx(open_area_m2, rel=1e-9)
+        assert probe_counts == pytest.approx(open_pixel_count, rel=1e-9)
 
     def test_rejects_a_vanishing_propagation_distance(self) -> None:
         mirrors = _kb_mirrors()

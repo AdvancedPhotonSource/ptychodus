@@ -585,9 +585,12 @@ class FresnelTransformPropagator(Propagator):
         M = parameters.height_px  # noqa: N806
         YY, XX = parameters.get_spatial_coordinates()  # noqa: N806
 
-        # Magnitude only: a signed amplitude prefactor would flip the sign of the
-        # recovered field on the backward branch.
-        C0 = numpy.absolute(Fr) / (1j * ar)  # noqa: N806
+        # Unit modulus, phase only. The array holds photons per pixel rather than
+        # intensity per unit area, so a pitch change must leave the plain sum
+        # |psi|^2 alone; the Fresnel-number magnitude an area-weighted field would
+        # carry here is what the transform below being orthonormal replaces. Phase
+        # only also keeps the backward branch from flipping the recovered sign.
+        C0 = 1.0 / 1j  # noqa: N806
         C1 = numpy.exp(TWO_PI_J * parameters.z)  # noqa: N806
         C2 = numpy.exp((numpy.square(XX / N) + numpy.square(ar * YY / M)) * ipi / Fr)  # noqa: N806
         is_forward = parameters.propagation_distance_m >= 0.0
@@ -598,9 +601,9 @@ class FresnelTransformPropagator(Propagator):
 
     def propagate(self, wavefield: ComplexArrayType) -> ComplexArrayType:
         if self._is_forward:
-            return self._A * fftshift(fft2(ifftshift(wavefield * self._B)))
+            return self._A * fftshift(fft2(ifftshift(wavefield * self._B), norm='ortho'))
         else:
-            return self._B * fftshift(ifft2(ifftshift(wavefield * self._A)))
+            return self._B * fftshift(ifft2(ifftshift(wavefield * self._A), norm='ortho'))
 
 
 class FraunhoferPropagator(Propagator):
@@ -624,14 +627,14 @@ class FraunhoferPropagator(Propagator):
 
         ipi = 1j * numpy.pi
 
-        # Signed phase, magnitude-only prefactor -- see FresnelTransformPropagator.
+        # Signed phase, unit-modulus prefactor -- see FresnelTransformPropagator.
         Fr = parameters.pixel_fresnel_number_x  # noqa: N806
         ar = parameters.pixel_aspect_ratio
         N = parameters.width_px  # noqa: N806
         M = parameters.height_px  # noqa: N806
         YY, XX = parameters.get_spatial_coordinates()  # noqa: N806
 
-        C0 = numpy.absolute(Fr) / (1j * ar)  # noqa: N806
+        C0 = 1.0 / 1j  # noqa: N806
         C1 = numpy.exp(TWO_PI_J * parameters.z)  # noqa: N806
         C2 = numpy.exp((numpy.square(XX / N) + numpy.square(ar * YY / M)) * ipi / Fr)  # noqa: N806
         is_forward = parameters.propagation_distance_m >= 0.0
@@ -641,9 +644,9 @@ class FraunhoferPropagator(Propagator):
 
     def propagate(self, wavefield: ComplexArrayType) -> ComplexArrayType:
         if self._is_forward:
-            return self._A * fftshift(fft2(ifftshift(wavefield)))
+            return self._A * fftshift(fft2(ifftshift(wavefield), norm='ortho'))
         else:
-            return fftshift(ifft2(ifftshift(wavefield * self._A)))
+            return fftshift(ifft2(ifftshift(wavefield * self._A), norm='ortho'))
 
 
 def choose_propagator(parameters: PropagatorParameters) -> tuple[Propagator, PixelGeometry]:

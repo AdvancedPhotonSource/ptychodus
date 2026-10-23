@@ -36,4 +36,4 @@ class STXMObjectBuilder(ObjectBuilder):
             self._dataset.get_assembled_data(),
             geometry_provider.get_probe_positions(),
         )
-        return self._pad_object(object_)
+        return self._rescale_to_mean_transmission(self._pad_object(object_), geometry_provider)

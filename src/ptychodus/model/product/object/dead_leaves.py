@@ -55,4 +55,4 @@ class DeadLeavesObjectBuilder(ObjectBuilder):
             leaf_phase_lower_tr=self.leaf_phase_lower_tr.get_value(),
             leaf_phase_upper_tr=self.leaf_phase_upper_tr.get_value(),
         )
-        return self._pad_object(object_)
+        return self._rescale_to_mean_transmission(self._pad_object(object_), geometry_provider)

@@ -19,7 +19,8 @@ import pytest
 from ptychodus.api.simulate.diffraction import generate_diffraction_data
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeEnsemble
+from ptychodus.api.probe import Probe, ProbeEnsemble
+from ptychodus.api.simulate.probe import rescale_probe_intensity
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.propagate import (
@@ -167,6 +168,32 @@ class TestOutputProperties:
 
         assert pg.width_m == pytest.approx(lambda_z / probe_geometry.width_m)
         assert pg.height_m == pytest.approx(lambda_z / probe_geometry.height_m)
+
+    @pytest.mark.parametrize('far_field', [True, False])
+    def test_round_trips_the_probe_photon_count(self, far_field: bool) -> None:
+        """A probe normalized to ``probe_photon_count`` against a transparent object
+        simulates patterns carrying exactly that many photons.
+
+        The end-to-end statement of the scaling convention: a field array holds photons
+        per pixel, so ``sum|P|^2`` is the photon count, propagation to the detector
+        leaves it alone, and the pattern totals the estimator reads back recover what
+        went in. Parameterized over both regimes because they take different
+        propagators, and only the far-field one changes pitch.
+        """
+        photon_count = 1.0e6
+        coord = numpy.arange(_PROBE_PX) - _PROBE_PX // 2
+        disk = ((coord[:, None] ** 2 + coord[None, :] ** 2) < 12**2).astype(complex)
+        probe = rescale_probe_intensity(
+            Probe(array=disk, pixel_geometry=_pixel_geometry()), photon_count
+        ).get_array()
+
+        metadata = dataclasses.replace(_metadata(), far_field=far_field)
+        product = dataclasses.replace(_make_product([_center_pos()], probe), metadata=metadata)
+
+        result = generate_diffraction_data(product)
+
+        assert result.get_patterns()[0].sum() == pytest.approx(photon_count, rel=1e-9)
+        assert result.get_probe_photon_count() == pytest.approx(photon_count, rel=1e-6)
 
 
 # ---------------------------------------------------------------------------

@@ -46,4 +46,4 @@ class PaganinObjectBuilder(ObjectBuilder):
             propagation_distance_m=geometry_provider.object_plane_propagation_distance_m,
             delta_over_beta=self.delta_over_beta.get_value(),
         )
-        return self._pad_object(object_)
+        return self._rescale_to_mean_transmission(self._pad_object(object_), geometry_provider)

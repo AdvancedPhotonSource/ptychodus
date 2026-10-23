@@ -42,6 +42,7 @@ import json
 import logging
 import math
 from collections.abc import Iterator, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 import numpy
@@ -51,8 +52,10 @@ import ptychi.api
 from ptychi.api import ObjectPosOriginCoordsMethods
 from ptychi.api.options.task import PtychographyTaskOptions
 
+from ptychodus.api.assemble import compute_total_counts
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectPosition
+from ptychodus.api.patch import iter_probe_patches
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import LossValue, Product
@@ -61,12 +64,15 @@ from ptychodus.api.reconstruct import (
     ReconstructOutput,
     warn_if_propagation_regime_disagrees,
 )
-from ptychodus.api.typing import RealArrayType
+from ptychodus.api.typing import ComplexArrayType, RealArrayType
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    'ProbeGauge',
+    'align_probe_gauge_with_ptychi',
     'align_task_options_with_product',
+    'apply_probe_gauge_to_options',
     'dump_task_options',
     'dump_task_options_yaml',
     'load_task_options',
@@ -274,6 +280,248 @@ def _raise_pad_for_shift(
     )
 
 
+@dataclass(frozen=True)
+class ProbeGauge:
+    """The scalar that carries a probe between ptychodus's gauge and pty-chi's.
+
+    ptychodus stores a probe in photons per pixel, so an energy-conserving propagator
+    takes it to a detector total equal to the measured counts. pty-chi's propagators are
+    not energy-conserving and which one it builds depends on the geometry -- an
+    unnormalized FFT in far field, an energy-conserving angular spectrum in near field,
+    a Fresnel transform with its own prefactor between -- so the conversion is a
+    property of the run, not a constant.
+
+    `to_ptychi` multiplies a probe on the way in and divides it on the way out. Only the
+    probe moves: the object is left alone, which is what keeps the pair consistent, since
+    the product of the two is what the data constrains.
+
+    `expected_factor` is what the chosen propagator alone implies, carried for
+    diagnostics. `anomaly` is how far the measurement strays from it -- one for a probe
+    already matched to its data, and far from one when the probe is in a foreign gauge,
+    which is the case a warm start from an older product presents.
+    """
+
+    to_ptychi: float
+    expected_factor: float
+    sampled_positions: int
+
+    @property
+    def anomaly(self) -> float:
+        return self.to_ptychi / self.expected_factor
+
+
+def _build_ptychi_propagator(task_options: PtychographyTaskOptions, probe: ProbeEnsemble) -> Any:
+    """Build the free-space propagator pty-chi's forward model will build.
+
+    Mirrors the selection in its forward model: an infinite distance is far field and
+    takes the plain FFT, and otherwise the Fresnel number decides between the Fresnel
+    transform and the angular spectrum. The probe pixel size is whatever the options
+    state, falling back to the object's, which is the same inheritance pty-chi applies.
+    """
+    from ptychi import propagate
+
+    distance_m = task_options.data_options.free_space_propagation_distance_m
+
+    if math.isinf(distance_m):
+        return propagate.FourierPropagator()
+
+    object_options = task_options.object_options
+    probe_options = task_options.probe_options
+    pixel_width_m = probe_options.pixel_size_m or object_options.pixel_size_m
+    aspect_ratio = probe_options.pixel_size_aspect_ratio or object_options.pixel_size_aspect_ratio
+
+    parameters = propagate.WavefieldPropagatorParameters.create_simple(
+        wavelength_m=task_options.data_options.wavelength_m,
+        width_px=probe.width_px,
+        height_px=probe.height_px,
+        pixel_width_m=pixel_width_m,
+        pixel_height_m=pixel_width_m / aspect_ratio,
+        propagation_distance_m=distance_m,
+    )
+
+    if parameters.is_fresnel_transform_preferrable():
+        return propagate.FresnelTransformPropagator(parameters)
+
+    return propagate.AngularSpectrumPropagator(parameters)
+
+
+def _propagate_intensity(propagator: Any, wavefield: numpy.ndarray) -> numpy.ndarray:
+    """Detector-plane intensity of `wavefield` under a pty-chi propagator."""
+    import torch
+
+    with torch.no_grad():
+        propagated = propagator.propagate_forward(torch.as_tensor(numpy.asarray(wavefield)))
+        return numpy.asarray(torch.abs(propagated).square().numpy())
+
+
+def _measure_propagator_energy_ratio(propagator: Any, probe: ProbeEnsemble) -> float:
+    """Factor by which the propagator scales total intensity, measured rather than
+    derived.
+
+    Each of pty-chi's propagators scales differently and two of them depend on the
+    geometry, so reproducing the formulas here would be three chances to drift out of
+    step with them. One propagation of a flat field answers it for whichever was built,
+    including one added later.
+    """
+    probe_field = numpy.ones((1, probe.height_px, probe.width_px), dtype=complex)
+    return float(numpy.sum(_propagate_intensity(propagator, probe_field)) / probe_field.size)
+
+
+def _measure_predicted_intensity(
+    propagator: Any,
+    product: Product,
+    good_pixels: numpy.ndarray,
+    num_sample_positions: int,
+) -> tuple[float, int]:
+    """Mean detector total pty-chi's forward model would predict, over sampled positions.
+
+    The exit wave is the probe times the object patch beneath it, incoherent modes summed
+    after propagation. Multislice is approximated by the product through the layers --
+    the real model propagates between them -- which a scale estimate tolerates.
+
+    Only the good pixels are summed, because the measured totals it will be compared
+    against are summed the same way; counting the masked ones on one side alone would
+    bias the result by the dead-pixel fraction.
+    """
+    object_array = product.object_.get_layers_flattened()
+    num_positions = len(product.probe_positions)
+
+    if num_positions == 0:
+        return 0.0, 0
+
+    stride = max(1, num_positions // num_sample_positions)
+    total = 0.0
+    sampled = 0
+
+    for index, patch in enumerate(iter_probe_patches(product)):
+        if index % stride != 0:
+            continue
+
+        object_patch = object_array[patch.bounds.y_slice, patch.bounds.x_slice]
+        intensity = _propagate_intensity(propagator, patch.modes * object_patch)
+        total += float(numpy.sum(numpy.sum(intensity, axis=0)[good_pixels]))
+        sampled += 1
+
+    if sampled == 0:
+        return 0.0, 0
+
+    return total / sampled, sampled
+
+
+def _measure_detector_intensity(parameters: ReconstructInput, good_pixels: numpy.ndarray) -> float:
+    """Mean per-pattern total the detector actually recorded, over good pixels.
+
+    A carried background has not been applied to the patterns, so it is subtracted here:
+    left in, it would inflate the measurement and shrink the probe to compensate.
+    """
+    total_counts = compute_total_counts(parameters.diffraction_patterns, parameters.bad_pixels)
+
+    if total_counts.size == 0:
+        return 0.0
+
+    measured = float(numpy.mean(total_counts))
+
+    if parameters.background is not None:
+        measured -= float(numpy.sum(numpy.asarray(parameters.background)[good_pixels]))
+
+    return measured
+
+
+def align_probe_gauge_with_ptychi(
+    task_options: PtychographyTaskOptions,
+    parameters: ReconstructInput,
+    *,
+    num_sample_positions: int = 32,
+) -> ProbeGauge:
+    """Measure the factor that carries this product's probe into pty-chi's gauge.
+
+    Takes options already aligned with the product, because the propagator to replicate
+    is chosen from the propagation distance and pixel geometry that alignment writes.
+
+    The factor is measured rather than derived: pty-chi's propagators normalize
+    differently from each other and two of them depend on the geometry, so one number
+    obtained by pushing this product through the propagator pty-chi will use covers the
+    convention, the sample's own transmission, and a probe that arrived in some other
+    gauge entirely -- a warm start from a product written before ptychodus converted
+    here, or one from another tool.
+
+    Degrades to the propagator's own factor, which is right whenever the probe and
+    object already agree with the data, rather than raising: an initial guess is not
+    worth failing a reconstruction over.
+    """
+    propagator = _build_ptychi_propagator(task_options, parameters.product.probes)
+    energy_ratio = _measure_propagator_energy_ratio(propagator, parameters.product.probes)
+    expected_factor = 1.0 / math.sqrt(energy_ratio) if energy_ratio > 0.0 else 1.0
+
+    good_pixels = numpy.logical_not(parameters.bad_pixels)
+    measured = _measure_detector_intensity(parameters, good_pixels)
+
+    try:
+        predicted, sampled = _measure_predicted_intensity(
+            propagator, parameters.product, good_pixels, num_sample_positions
+        )
+    except ValueError as exc:
+        logger.warning(
+            'Could not sample the probe against the object (%s); scaling the probe by the'
+            ' propagator convention alone.',
+            exc,
+        )
+        predicted, sampled = 0.0, 0
+
+    if predicted <= 0.0 or measured <= 0.0:
+        logger.warning(
+            'Probe gauge measurement is unusable (predicted=%.6g, measured=%.6g); scaling'
+            ' the probe by the propagator convention alone.',
+            predicted,
+            measured,
+        )
+        return ProbeGauge(expected_factor, expected_factor, 0)
+
+    gauge = ProbeGauge(math.sqrt(measured / predicted), expected_factor, sampled)
+    anomaly_warn_factor = 10.0
+
+    if not 1.0 / anomaly_warn_factor < gauge.anomaly < anomaly_warn_factor:
+        logger.warning(
+            'Probe gauge is %.6g where this geometry implies %.6g (a factor of %.3g).'
+            " The probe may already be in pty-chi's gauge -- a product written by an"
+            ' older ptychodus -- or come from another tool. Scaling by the measured'
+            ' value anyway.',
+            gauge.to_ptychi,
+            expected_factor,
+            gauge.anomaly,
+        )
+    else:
+        logger.info(
+            'Probe gauge %.6g (convention %.6g, anomaly %.4g) from %d sampled position(s).',
+            gauge.to_ptychi,
+            expected_factor,
+            gauge.anomaly,
+            sampled,
+        )
+
+    return gauge
+
+
+def apply_probe_gauge_to_options(
+    task_options: PtychographyTaskOptions, gauge: ProbeGauge
+) -> PtychographyTaskOptions:
+    """Restate the probe-power constraint target in the gauge the probe is handed over in.
+
+    `align_task_options_with_product` writes the target as the incident photon count,
+    which is what it means in ptychodus. pty-chi measures the probe's power on its own
+    arrays, so the target has to travel with them or the constraint would pull the probe
+    to a power it never had.
+
+    Applied here rather than during alignment, so the options a run writes out keep the
+    photon count a reader can interpret and edit; the converted value means something
+    only inside pty-chi, and is derived from the data at run time rather than configured.
+    """
+    aligned = copy.deepcopy(task_options)
+    power_constraint = aligned.probe_options.power_constraint
+    power_constraint.probe_power = power_constraint.probe_power * gauge.to_ptychi**2
+    return aligned
+
+
 def align_task_options_with_product(
     task_options: PtychographyTaskOptions,
     product: Product,
@@ -442,6 +690,14 @@ def reconstruct_with_ptychi(
     object_in = product_in.object_
     object_geometry = object_in.get_geometry()
 
+    # ptychodus stores a probe in photons per pixel; pty-chi's propagators do not
+    # preserve that sum. Measured once here and undone on every snapshot below, so what
+    # ptychodus stores stays in its own gauge whatever ran. Only the probe is scaled:
+    # the object rides through untouched, which leaves the product the data constrains
+    # unchanged, and with it the loss history.
+    gauge = align_probe_gauge_with_ptychi(task_options, parameters)
+    task_options = apply_probe_gauge_to_options(task_options, gauge)
+
     # pty-chi stores probe positions in object pixel units; ptychodus stores
     # them in meters. The output path below applies the inverse mapping.
     position_x_px = object_geometry.map_probe_positions_to_object_x_px(product_in.probe_positions)
@@ -453,7 +709,7 @@ def reconstruct_with_ptychi(
         task_options,
         diffraction_data=parameters.diffraction_patterns,
         object_data=object_in.get_array(),
-        probe_data=product_in.probes.get_array(),
+        probe_data=product_in.probes.get_array() * gauge.to_ptychi,
         probe_position_x_px=position_x_px,
         probe_position_y_px=position_y_px,
         opr_mode_weights_data=_initial_opr_mode_weights(product_in.probes),
@@ -487,8 +743,13 @@ def reconstruct_with_ptychi(
                 pixel_geometry=object_in.get_pixel_geometry(),
                 center=object_in.get_center(),
             )
+            # Divided by the same scalar it was multiplied by, so the round trip is
+            # exact rather than a second measurement of a probe pty-chi has since moved.
+            probe_array: ComplexArrayType = numpy.array(
+                task.get_data_to_cpu('probe', as_numpy=True), dtype=complex
+            )
             probe_out = ProbeEnsemble(
-                array=numpy.array(task.get_data_to_cpu('probe', as_numpy=True)),
+                array=probe_array / gauge.to_ptychi,
                 opr_weights=numpy.array(task.get_data_to_cpu('opr_mode_weights', as_numpy=True)),
                 pixel_geometry=product_in.probes.get_pixel_geometry(),
             )

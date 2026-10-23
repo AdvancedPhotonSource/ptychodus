@@ -53,6 +53,7 @@ __all__ = [
     'compute_dataset_total_counts',
     'compute_probe_photon_counts_by_index',
     'default_max_workers',
+    'estimate_mean_amplitude_transmission',
     'preprocess_array',
     'summarize_dataset',
 ]
@@ -86,6 +87,53 @@ def compute_total_counts(
 
     good_pixels = numpy.logical_not(bad_pixels)
     return numpy.sum(patterns[:, good_pixels], axis=-1)
+
+
+def estimate_mean_amplitude_transmission(
+    assembled_data: AssembledDiffractionData,
+    *,
+    roundoff_floor: float = 1.0e-12,
+) -> float:
+    """Mean amplitude transmission of the sample, as the data sees it.
+
+    The incident flux is what the brightest pattern records, while a typical pattern
+    records less because the sample absorbs; the ratio of the two is the sample's mean
+    intensity transmission, and its square root is the amplitude a uniform object of the
+    same opacity would carry. An initial object given this modulus predicts the measured
+    pattern totals, instead of predicting the unobstructed beam at every position.
+
+    Hardware flux measurements, when present, give the incident count per pattern, so the
+    transmission is averaged per position rather than against a single brightest frame.
+
+    Returns ``1.0`` -- a transparent sample, asserting nothing -- when nothing is
+    assembled or the incident estimate is not positive, rather than raising: an initial
+    guess degrades, it does not stop a reconstruction.
+    """
+    total_counts = assembled_data.get_total_counts()
+
+    if total_counts.size == 0:
+        return 1.0
+
+    if assembled_data.has_measured_probe_photon_counts():
+        incident_counts = assembled_data.get_probe_photon_counts()
+        usable = incident_counts > roundoff_floor
+
+        if not usable.any():
+            return 1.0
+
+        transmission = numpy.mean(total_counts[usable] / incident_counts[usable])
+    else:
+        # Without measured flux the per-pattern counts *are* the only incident estimate,
+        # so a per-position ratio would be identically one. The brightest frame stands in
+        # for the unobstructed beam instead.
+        incident = total_counts.max()
+
+        if incident <= roundoff_floor:
+            return 1.0
+
+        transmission = numpy.mean(total_counts) / incident
+
+    return float(numpy.sqrt(numpy.clip(transmission, 0.0, 1.0)))
 
 
 def compute_probe_photon_counts_by_index(

@@ -75,7 +75,7 @@ from ptychi.api import (
     PositionCorrectionTypes,
 )
 
-from ptychodus.api.assemble import assemble_dataset
+from ptychodus.api.assemble import assemble_dataset, estimate_mean_amplitude_transmission
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import CropRegion
 from ptychodus.api.exit_codes import ExitCode
@@ -938,7 +938,11 @@ def main() -> ExitCode:
     object_file = params.path_to_init_object
 
     if object_file is None:
-        object_ = generate_uniform_object(object_geometry)
+        # Uniform, but carrying the mean transmission the patterns imply, so the exit
+        # wave predicts their totals rather than the unobstructed beam.
+        object_ = generate_uniform_object(
+            object_geometry, amplitude=estimate_mean_amplitude_transmission(assembled_data)
+        )
 
         if number_of_slices > 1:
             object_ = resize_object_layers(

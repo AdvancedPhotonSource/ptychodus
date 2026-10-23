@@ -172,6 +172,16 @@ class ObjectGeometryProvider(ABC):
 
     @property
     @abstractmethod
+    def mean_amplitude_transmission(self) -> float:
+        """Modulus a uniform object of the sample's measured opacity would carry.
+
+        A generated object scaled to this predicts the pattern totals the data holds,
+        rather than predicting the unobstructed beam at every scan position. One where
+        no data says otherwise, which asserts a transparent sample.
+        """
+
+    @property
+    @abstractmethod
     def object_plane_propagation_distance_m(self) -> float:
         """Propagation distance of the equivalent parallel-beam geometry, ``z_d / M``.
 
@@ -191,7 +201,14 @@ class ObjectGeometryProvider(ABC):
 
 
 class Object:
-    """Complex transmission function stored as a (layers, height, width) array with spatial metadata."""
+    """Complex transmission function stored as a (layers, height, width) array with spatial metadata.
+
+    The array is dimensionless and nominally unit modulus where the sample is absent, so
+    an exit wave carries the probe's photon count through unchanged and a modulus below
+    one is absorption. Only the product of probe and object is constrained by diffraction
+    data, so rescaling one without the other re-gauges the pair rather than changing what
+    it predicts.
+    """
 
     def __init__(
         self,

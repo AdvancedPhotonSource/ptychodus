@@ -114,6 +114,39 @@ class ObjectBuilder(ParameterGroup):
             self.extra_padding_y.get_value(),
         )
 
+    def _rescale_to_mean_transmission(
+        self, object_: Object, geometry_provider: ObjectGeometryProvider
+    ) -> Object:
+        """Scale a freshly generated object to the sample's measured mean opacity.
+
+        A unit-modulus guess asserts a transparent sample, so the exit wave carries the
+        unobstructed beam and predicts more signal than the detector recorded. Scaling
+        to the measured transmission puts the difference in the object, where absorption
+        belongs, instead of leaving it to be absorbed into the probe -- which would make
+        the probe stop meaning the incident illumination that `probe_photon_count`,
+        and the dose derived from it, are stated in.
+
+        Only generative builders call this. A file- or memory-supplied object already
+        carries the transmission it was reconstructed at, and scaling it would decouple
+        it from a matching probe, because the data constrains the product of the two and
+        not either alone.
+        """
+        transmission = geometry_provider.mean_amplitude_transmission
+
+        if not 0.0 < transmission <= 1.0:
+            logger.warning(
+                'Ignoring out-of-range mean amplitude transmission %r; using a transparent object.',
+                transmission,
+            )
+            return object_
+
+        return Object(
+            array=object_.get_array() * transmission,
+            layer_spacing_m=object_.layer_spacing_m,
+            pixel_geometry=object_.get_pixel_geometry(),
+            center=object_.get_center(),
+        )
+
 
 class FromMemoryObjectBuilder(ObjectBuilder):
     """An object that has already been conditioned.

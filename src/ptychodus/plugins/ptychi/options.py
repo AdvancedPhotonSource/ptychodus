@@ -81,7 +81,20 @@ def default_options(task_options_cls: type[PtychographyTaskOptions]) -> PtyChiOp
     it is stated here rather than left to the settings file: an affine
     constraint starts with no degrees of freedom selected, so that enabling
     the constraint does not silently also enable four corrections.
+
+    LSQML's first-epoch probe rescale is turned off for a related reason. That epoch
+    performs no object or probe update at all -- it only measures intensity, to correct
+    a probe whose power does not match the data -- and ptychodus already hands over a
+    probe scaled to match. Leaving it on would spend an epoch confirming a correction of
+    one. It stays available for anyone who wants pty-chi's own estimate instead, and the
+    two agree where both run.
     """
     task = task_options_cls()
     task.probe_position_options.affine_transform_constraint.degrees_of_freedom = []
+
+    # Only LSQML declares it; every other algorithm's reconstructor options lack the
+    # field, and a backend must not fail to offer itself over a default.
+    if hasattr(task.reconstructor_options, 'rescale_probe_intensity_in_first_epoch'):
+        task.reconstructor_options.rescale_probe_intensity_in_first_epoch = False
+
     return PtyChiOptions(task=task)

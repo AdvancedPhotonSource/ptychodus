@@ -48,4 +48,4 @@ class SiemensStarObjectBuilder(ObjectBuilder):
             spoke_phase_tr=self.spoke_phase_tr.get_value(),
             background_phase_tr=self.background_phase_tr.get_value(),
         )
-        return self._pad_object(object_)
+        return self._rescale_to_mean_transmission(self._pad_object(object_), geometry_provider)

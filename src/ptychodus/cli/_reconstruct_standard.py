@@ -30,6 +30,7 @@ from ptychodus.api.assemble import (
     DetectorCorrections,
     assemble_dataset,
     compute_dataset_total_counts,
+    estimate_mean_amplitude_transmission,
 )
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import (
@@ -61,6 +62,7 @@ from ptychodus.api.simulate.probe import (
     generate_coherent_probe_modes,
     generate_fresnel_zone_plate_probe,
     generate_incoherent_probe_modes,
+    rescale_probe_intensity,
 )
 from ptychodus.cli import (
     DirectoryType,
@@ -625,8 +627,16 @@ def _build_initial_probe(
     detector_distance_m: float,
     far_field: bool,
     focus_object_distance_m: float,
+    probe_photon_count: float,
 ) -> Probe:
-    """The probe the reconstruction starts from: a warm start, a zone plate, or the data."""
+    """The probe the reconstruction starts from: a warm start, a zone plate, or the data.
+
+    A generated probe is normalized to *probe_photon_count*, so its array carries the
+    photons the illumination delivers and is comparable with the patterns it will be
+    refined against. A warm start is left at the intensity it was reconstructed at:
+    rescaling it would decouple it from a matching object, because the data constrains
+    the product of the two and not either alone.
+    """
     if args.probe_file is not None:
         logger.info('Reading the initial probe from %s', args.probe_file)
         probe_reader = registry.probe_file_readers.get_strategy_by_name(args.probe_file_type)
@@ -649,14 +659,17 @@ def _build_initial_probe(
         _warn_unused_probe_propagation(logger, args, '--fzp-preset')
         logger.info('Simulating the initial probe from zone plate preset "%s"', args.fzp_preset)
         zone_plate = registry.fresnel_zone_plates.get_strategy_by_name(args.fzp_preset)
-        return generate_fresnel_zone_plate_probe(
-            probe_geometry,
-            zone_plate,
-            photon_wavelength_m=photon_wavelength_m,
-            # The same displacement the product states, in the probe's frame. In far
-            # field the resolver leaves the focus at zero, so this is --fzp-defocus-m
-            # unchanged.
-            defocus_distance_m=(args.fzp_defocus_m if far_field else -focus_object_distance_m),
+        return rescale_probe_intensity(
+            generate_fresnel_zone_plate_probe(
+                probe_geometry,
+                zone_plate,
+                photon_wavelength_m=photon_wavelength_m,
+                # The same displacement the product states, in the probe's frame. In far
+                # field the resolver leaves the focus at zero, so this is --fzp-defocus-m
+                # unchanged.
+                defocus_distance_m=(args.fzp_defocus_m if far_field else -focus_object_distance_m),
+            ),
+            probe_photon_count,
         )
 
     # No zone-plate preset applies, so the cold start comes from the data:
@@ -682,7 +695,9 @@ def _build_initial_probe(
             propagation_distance_m=distance_m,
         )
 
-    return probe
+    # The mean pattern carries the mean transmitted photons, which is less than the
+    # incident count wherever the sample absorbs; the probe states the illumination.
+    return rescale_probe_intensity(probe, probe_photon_count)
 
 
 def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
@@ -879,6 +894,14 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         )
     logger.info('Probe geometry: %s', probe_geometry)
 
+    # Resolved before the probe is built, because a generated probe is normalized to it.
+    probe_photon_count_override = getattr(args, 'probe_photon_count', None)
+    probe_photon_count = (
+        float(assembled_data.get_probe_photon_count())
+        if probe_photon_count_override is None
+        else float(probe_photon_count_override)
+    )
+
     rng = numpy.random.default_rng(args.seed)
     probe = _build_initial_probe(
         logger,
@@ -890,6 +913,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         detector_distance_m=detector_distance_m,
         far_field=far_field,
         focus_object_distance_m=focus_object_distance_m,
+        probe_photon_count=probe_photon_count,
     )
 
     if args.num_probe_modes > 1:
@@ -908,14 +932,12 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
     )
     logger.info('Object geometry: %s', object_geometry)
 
-    # Deviations = 0 gives a flat unit-amplitude, zero-phase field.
-    object_ = generate_uniform_object(object_geometry)
-
-    probe_photon_count_override = getattr(args, 'probe_photon_count', None)
-    probe_photon_count = (
-        float(assembled_data.get_probe_photon_count())
-        if probe_photon_count_override is None
-        else float(probe_photon_count_override)
+    # Uniform, but not transparent: scaled to the mean transmission the patterns imply,
+    # so the exit wave predicts the totals the detector recorded instead of the
+    # unobstructed beam. Absorption belongs here rather than in the probe, which has to
+    # go on meaning the incident illumination that probe_photon_count states.
+    object_ = generate_uniform_object(
+        object_geometry, amplitude=estimate_mean_amplitude_transmission(assembled_data)
     )
 
     product = Product(
