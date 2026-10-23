@@ -8,6 +8,7 @@ from ptychodus.api.object import Object, ObjectFileReader, ObjectFileWriter
 from ptychodus.api.plugins import PluginChooser
 
 from ...diffraction import AssembledDiffractionDataset
+from ...file_types import FileTypeChooser
 from .builder import FromFileObjectBuilder, ObjectBuilder
 from .dead_leaves import DeadLeavesObjectBuilder
 from .fractal_noise import FractalNoiseObjectBuilder
@@ -31,8 +32,8 @@ class ObjectBuilderFactory(Iterable[str]):
     ) -> None:
         self._rng = rng
         self._settings = settings
-        self._file_reader_chooser = file_reader_chooser
-        self._file_writer_chooser = file_writer_chooser
+        self.file_readers = FileTypeChooser(file_reader_chooser)
+        self.file_writers = FileTypeChooser(file_writer_chooser)
         self._non_diffraction_builders: Mapping[str, Callable[[], ObjectBuilder]] = {
             'random': lambda: RandomObjectBuilder(rng, settings),
             'dead_leaves': lambda: DeadLeavesObjectBuilder(rng, settings),
@@ -85,32 +86,15 @@ class ObjectBuilderFactory(Iterable[str]):
 
         return self.create(name_repaired, dataset=dataset)
 
-    def get_open_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_reader_chooser:
-            yield plugin.display_name
+    def create_object_from_file(self, file_path: Path, file_type: str) -> ObjectBuilder:
+        plugin = self.file_readers.select(file_type)
 
-    def get_open_file_filter(self) -> str:
-        return self._file_reader_chooser.get_current_plugin().display_name
-
-    def create_object_from_file(self, file_path: Path, file_filter: str) -> ObjectBuilder:
-        self._file_reader_chooser.set_current_plugin(file_filter)
-        file_reader = self._file_reader_chooser.get_current_plugin().strategy
-
-        builder = FromFileObjectBuilder(self._settings, file_reader)
+        builder = FromFileObjectBuilder(self._settings, plugin.strategy)
         builder.file_path.set_value(file_path)
-        builder.file_type.set_value(self._file_reader_chooser.get_current_plugin().simple_name)
+        builder.file_type.set_value(plugin.simple_name)
         return builder
 
-    def get_save_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_writer_chooser:
-            yield plugin.display_name
-
-    def get_save_file_filter(self) -> str:
-        return self._file_writer_chooser.get_current_plugin().display_name
-
-    def save_object(self, file_path: Path, file_filter: str, object_: Object) -> None:
-        self._file_writer_chooser.set_current_plugin(file_filter)
-        file_type = self._file_writer_chooser.get_current_plugin().simple_name
-        logger.debug(f'Writing "{file_path}" as "{file_type}"')
-        file_writer = self._file_writer_chooser.get_current_plugin().strategy
-        file_writer.write(file_path, object_)
+    def save_object(self, file_path: Path, file_type: str, object_: Object) -> None:
+        plugin = self.file_writers.select(file_type)
+        logger.debug(f'Writing "{file_path}" as "{plugin.simple_name}"')
+        plugin.strategy.write(file_path, object_)

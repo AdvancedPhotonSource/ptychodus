@@ -1,4 +1,3 @@
-from collections.abc import Iterator
 from pathlib import Path
 import logging
 
@@ -9,6 +8,7 @@ from ptychodus.api.fluorescence import (
 )
 from ptychodus.api.plugins import PluginChooser
 
+from ..file_types import FileTypeChooser
 from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .monitor import EnhanceFluorescenceBackgroundTask, FluorescenceTaskMonitor
@@ -40,28 +40,14 @@ class FluorescenceAPI:
         self._repository = repository
         self._enhancer_chooser = enhancer_chooser
         self._task_monitor = task_monitor
-        self._file_reader_chooser = file_reader_chooser
-        self._file_writer_chooser = file_writer_chooser
+        self.file_readers = FileTypeChooser(file_reader_chooser)
+        self.file_writers = FileTypeChooser(file_writer_chooser)
 
     def get_task_monitor(self) -> FluorescenceTaskMonitor:
         return self._task_monitor
 
     def get_item(self, item_index: int) -> FluorescenceRepositoryItem:
         return self._repository[item_index]
-
-    def get_open_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_reader_chooser:
-            yield plugin.display_name
-
-    def get_open_file_filter(self) -> str:
-        return self._file_reader_chooser.get_current_plugin().display_name
-
-    def get_save_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_writer_chooser:
-            yield plugin.display_name
-
-    def get_save_file_filter(self) -> str:
-        return self._file_writer_chooser.get_current_plugin().display_name
 
     def open_measured_dataset(
         self, file_path: Path, product_index: int, *, file_type: str | None = None
@@ -75,15 +61,11 @@ class FluorescenceAPI:
         # touch the file, so an orphaned item is never inserted.
         product_item = self._product_api.get_item(product_index)
 
-        if file_type is not None:
-            self._file_reader_chooser.set_current_plugin(file_type)
-
-        resolved_type = self._file_reader_chooser.get_current_plugin().simple_name
-        logger.debug(f'Reading "{file_path}" as "{resolved_type}"')
-        file_reader = self._file_reader_chooser.get_current_plugin().strategy
+        plugin = self.file_readers.select(file_type)
+        logger.debug(f'Reading "{file_path}" as "{plugin.simple_name}"')
 
         try:
-            dataset = file_reader.read(file_path)
+            dataset = plugin.strategy.read(file_path)
         except Exception as exc:
             raise RuntimeError(f'Failed to read "{file_path}"') from exc
 
@@ -96,7 +78,7 @@ class FluorescenceAPI:
             product=product_item,
             measured=dataset,
             source_path=file_path,
-            source_file_type=resolved_type,
+            source_file_type=plugin.simple_name,
         )
         return self._repository.insert_item(item)
 
@@ -135,13 +117,9 @@ class FluorescenceAPI:
         if dataset is None:
             raise ValueError(f'Item "{item.get_name()}" has no enhanced dataset to save')
 
-        if file_type is not None:
-            self._file_writer_chooser.set_current_plugin(file_type)
-
-        resolved_type = self._file_writer_chooser.get_current_plugin().simple_name
-        logger.debug(f'Writing "{file_path}" as "{resolved_type}"')
-        writer = self._file_writer_chooser.get_current_plugin().strategy
-        writer.write(file_path, dataset)
+        plugin = self.file_writers.select(file_type)
+        logger.debug(f'Writing "{file_path}" as "{plugin.simple_name}"')
+        plugin.strategy.write(file_path, dataset)
 
     def enhance(
         self,
@@ -171,10 +149,7 @@ class FluorescenceAPI:
         output_file_writer: FluorescenceFileWriter | None = None
 
         if output_file_path is not None:
-            if output_file_type is not None:
-                self._file_writer_chooser.set_current_plugin(output_file_type)
-
-            output_file_writer = self._file_writer_chooser.get_current_plugin().strategy
+            output_file_writer = self.file_writers.select(output_file_type).strategy
 
         product = item.get_product().get_product()
         item.set_state(FluorescenceItemState.ENHANCING)

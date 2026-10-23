@@ -14,6 +14,7 @@ from ptychodus.api.probe import (
 from ptychodus.api.simulate.probe import FresnelZonePlate, KirkpatrickBaezMirrorPair
 
 from ...diffraction import AssembledDiffractionDataset
+from ...file_types import FileTypeChooser
 from .average_pattern import AveragePatternProbeBuilder
 from .builder import FromFileProbeBuilder, ProbeEnsembleBuilder
 from .disk import DiskProbeBuilder
@@ -43,8 +44,8 @@ class ProbeBuilderFactory(Iterable[str]):
         self._settings = settings
         self._fresnel_zone_plate_chooser = fresnel_zone_plate_chooser
         self._kb_mirror_chooser = kb_mirror_chooser
-        self._file_reader_chooser = file_reader_chooser
-        self._file_writer_chooser = file_writer_chooser
+        self.file_readers = FileTypeChooser(file_reader_chooser)
+        self.file_writers = FileTypeChooser(file_writer_chooser)
         self._non_diffraction_builders: Mapping[str, Callable[[], ProbeEnsembleBuilder]] = {
             'disk': lambda: DiskProbeBuilder(rng, settings),
             'fresnel_zone_plate': self._create_fresnel_zone_plate_builder,
@@ -106,14 +107,7 @@ class ProbeBuilderFactory(Iterable[str]):
     def _create_kb_mirror_builder(self) -> ProbeEnsembleBuilder:
         return KBMirrorProbeBuilder(self._rng, self._settings, self._kb_mirror_chooser)
 
-    def get_open_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_reader_chooser:
-            yield plugin.display_name
-
-    def get_open_file_filter(self) -> str:
-        return self._file_reader_chooser.get_current_plugin().display_name
-
-    def read_probe_from_file(self, file_path: Path, file_filter: str) -> ProbeEnsemble:
+    def read_probe_from_file(self, file_path: Path, file_type: str) -> ProbeEnsemble:
         """Read a probe without binding it to a repository item.
 
         This is the probe the builder from `create_probe_from_file` would ingest, read
@@ -121,39 +115,27 @@ class ProbeBuilderFactory(Iterable[str]):
         before deciding how to ingest it. Read errors surface here rather than being
         swallowed by a rebuild.
         """
-        self._file_reader_chooser.set_current_plugin(file_filter)
-        file_type = self._file_reader_chooser.get_current_plugin().simple_name
-        logger.debug(f'Reading "{file_path}" as "{file_type}"')
-        file_reader = self._file_reader_chooser.get_current_plugin().strategy
-        return file_reader.read(file_path)
+        plugin = self.file_readers.select(file_type)
+        logger.debug(f'Reading "{file_path}" as "{plugin.simple_name}"')
+        return plugin.strategy.read(file_path)
 
     def create_probe_from_file(
         self,
         file_path: Path,
-        file_filter: str,
+        file_type: str,
         *,
         opr_weight_policy: OPRWeightPolicy | None = None,
     ) -> ProbeEnsembleBuilder:
-        self._file_reader_chooser.set_current_plugin(file_filter)
-        file_reader = self._file_reader_chooser.get_current_plugin().strategy
+        plugin = self.file_readers.select(file_type)
 
         builder = FromFileProbeBuilder(
-            self._rng, self._settings, file_reader, opr_weight_policy=opr_weight_policy
+            self._rng, self._settings, plugin.strategy, opr_weight_policy=opr_weight_policy
         )
         builder.file_path.set_value(file_path)
-        builder.file_type.set_value(self._file_reader_chooser.get_current_plugin().simple_name)
+        builder.file_type.set_value(plugin.simple_name)
         return builder
 
-    def get_save_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_writer_chooser:
-            yield plugin.display_name
-
-    def get_save_file_filter(self) -> str:
-        return self._file_writer_chooser.get_current_plugin().display_name
-
-    def save_probe(self, file_path: Path, file_filter: str, probe: ProbeEnsemble) -> None:
-        self._file_writer_chooser.set_current_plugin(file_filter)
-        file_type = self._file_writer_chooser.get_current_plugin().simple_name
-        logger.debug(f'Writing "{file_path}" as "{file_type}"')
-        file_writer = self._file_writer_chooser.get_current_plugin().strategy
-        file_writer.write(file_path, probe)
+    def save_probe(self, file_path: Path, file_type: str, probe: ProbeEnsemble) -> None:
+        plugin = self.file_writers.select(file_type)
+        logger.debug(f'Writing "{file_path}" as "{plugin.simple_name}"')
+        plugin.strategy.write(file_path, probe)

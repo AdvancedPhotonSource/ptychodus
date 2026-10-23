@@ -12,6 +12,7 @@ from ptychodus.api.probe_positions import (
     ProbePositionFileWriter,
 )
 
+from ...file_types import FileTypeChooser
 from .builder import (
     FromFileProbePositionsBuilder,
     FromMemoryProbePositionsBuilder,
@@ -36,8 +37,8 @@ class ProbePositionsBuilderFactory(Iterable[str]):
     ) -> None:
         self._rng = rng
         self._settings = settings
-        self._file_reader_chooser = file_reader_chooser
-        self._file_writer_chooser = file_writer_chooser
+        self.file_readers = FileTypeChooser(file_reader_chooser)
+        self.file_writers = FileTypeChooser(file_writer_chooser)
         self._builders: dict[str, Callable[[], ProbePositionsBuilder]] = {
             variant.name.lower(): partial(self._create_cartesian_builder, variant)
             for variant in CartesianProbePositionsVariant
@@ -81,37 +82,20 @@ class ProbePositionsBuilderFactory(Iterable[str]):
     ) -> CartesianProbePositionsBuilder:
         return CartesianProbePositionsBuilder(variant, self._rng, self._settings)
 
-    def get_open_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_reader_chooser:
-            yield plugin.display_name
-
-    def get_open_file_filter(self) -> str:
-        return self._file_reader_chooser.get_current_plugin().display_name
-
     def create_scan_from_memory(self, position_seq: ProbePositionSequence) -> ProbePositionsBuilder:
         return FromMemoryProbePositionsBuilder(self._rng, self._settings, position_seq)
 
     def create_scan_from_file(self, file_path: Path, file_type: str) -> ProbePositionsBuilder:
-        self._file_reader_chooser.set_current_plugin(file_type)
-        file_reader = self._file_reader_chooser.get_current_plugin().strategy
+        plugin = self.file_readers.select(file_type)
 
-        builder = FromFileProbePositionsBuilder(self._rng, self._settings, file_reader)
+        builder = FromFileProbePositionsBuilder(self._rng, self._settings, plugin.strategy)
         builder.file_path.set_value(file_path)
-        builder.file_type.set_value(self._file_reader_chooser.get_current_plugin().simple_name)
+        builder.file_type.set_value(plugin.simple_name)
         return builder
-
-    def get_save_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_writer_chooser:
-            yield plugin.display_name
-
-    def get_save_file_filter(self) -> str:
-        return self._file_writer_chooser.get_current_plugin().display_name
 
     def save_scan(
         self, file_path: Path, file_type: str, position_seq: ProbePositionSequence
     ) -> None:
-        self._file_writer_chooser.set_current_plugin(file_type)
-        file_type = self._file_writer_chooser.get_current_plugin().simple_name
-        logger.debug(f'Writing "{file_path}" as "{file_type}"')
-        file_writer = self._file_writer_chooser.get_current_plugin().strategy
-        file_writer.write(file_path, position_seq)
+        plugin = self.file_writers.select(file_type)
+        logger.debug(f'Writing "{file_path}" as "{plugin.simple_name}"')
+        plugin.strategy.write(file_path, position_seq)

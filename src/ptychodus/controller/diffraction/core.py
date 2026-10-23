@@ -204,8 +204,8 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         file_path, name_filter = self._file_dialog_factory.get_save_file_path(
             self._view,
             'Save Diffraction File',
-            name_filters=[nf for nf in self._diffraction_api.get_save_file_filters()],
-            selected_name_filter=self._diffraction_api.get_save_file_filter(),
+            name_filters=self._diffraction_api.file_writers.get_filters(),
+            selected_name_filter=self._diffraction_api.file_writers.get_filter(),
         )
 
         if file_path:

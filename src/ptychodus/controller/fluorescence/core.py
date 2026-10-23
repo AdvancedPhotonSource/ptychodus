@@ -233,8 +233,8 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
         file_path, name_filter = self._file_dialog_factory.get_open_file_path(
             self._view,
             title,
-            name_filters=list(self._api.get_open_file_filters()),
-            selected_name_filter=self._api.get_open_file_filter(),
+            name_filters=self._api.file_readers.get_filters(),
+            selected_name_filter=self._api.file_readers.get_filter(),
         )
         if not file_path:
             return
@@ -280,8 +280,8 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
         file_path, name_filter = self._file_dialog_factory.get_save_file_path(
             self._view,
             title,
-            name_filters=list(self._api.get_save_file_filters()),
-            selected_name_filter=self._api.get_save_file_filter(),
+            name_filters=self._api.file_writers.get_filters(),
+            selected_name_filter=self._api.file_writers.get_filter(),
         )
         if not file_path:
             return

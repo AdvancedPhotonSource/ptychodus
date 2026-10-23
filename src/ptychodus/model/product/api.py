@@ -10,6 +10,7 @@ from ptychodus.api.probe import OPRWeightPolicy
 from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter
 
 from ..diffraction import AssembledDiffractionDataset
+from ..file_types import FileTypeChooser
 from ..task_manager import TaskManager
 from .item import ProductRepositoryItem, ProductState
 from .item_factory import ProductRepositoryItemFactory
@@ -64,6 +65,8 @@ class ProbePositionsAPI:
         self._settings = settings
         self._repository = repository
         self._builder_factory = builder_factory
+        self.file_readers = builder_factory.file_readers
+        self.file_writers = builder_factory.file_writers
 
     def create_streaming_context(self) -> PositionsStreamingContext:
         return PositionsStreamingContext()
@@ -114,12 +117,6 @@ class ProbePositionsAPI:
 
         item.set_builder(builder)
 
-    def get_open_file_filters(self) -> Iterator[str]:
-        return self._builder_factory.get_open_file_filters()
-
-    def get_open_file_filter(self) -> str:
-        return self._builder_factory.get_open_file_filter()
-
     def open_probe_positions(
         self, index: int, file_path: Path, *, file_type: str | None = None
     ) -> None:
@@ -152,12 +149,6 @@ class ProbePositionsAPI:
 
         destination_item.assign_item(source_item)
 
-    def get_save_file_filters(self) -> Iterator[str]:
-        return self._builder_factory.get_save_file_filters()
-
-    def get_save_file_filter(self) -> str:
-        return self._builder_factory.get_save_file_filter()
-
     def save_scan(self, index: int, file_path: Path, file_type: str) -> None:
         try:
             item = self._repository[index]
@@ -177,6 +168,8 @@ class ProbeAPI:
         self._settings = settings
         self._repository = repository
         self._builder_factory = builder_factory
+        self.file_readers = builder_factory.file_readers
+        self.file_writers = builder_factory.file_writers
 
     def builder_names(self) -> Iterator[str]:
         return iter(self._builder_factory)
@@ -231,12 +224,6 @@ class ProbeAPI:
             return
 
         item.set_builder(builder)
-
-    def get_open_file_filters(self) -> Iterator[str]:
-        return self._builder_factory.get_open_file_filters()
-
-    def get_open_file_filter(self) -> str:
-        return self._builder_factory.get_open_file_filter()
 
     def peek_opr_weights(
         self, file_path: Path, *, file_type: str | None = None
@@ -299,12 +286,6 @@ class ProbeAPI:
 
         destination_item.assign_item(source_item)
 
-    def get_save_file_filters(self) -> Iterator[str]:
-        return self._builder_factory.get_save_file_filters()
-
-    def get_save_file_filter(self) -> str:
-        return self._builder_factory.get_save_file_filter()
-
     def save_probe(self, index: int, file_path: Path, file_type: str) -> None:
         try:
             item = self._repository[index]
@@ -324,6 +305,8 @@ class ObjectAPI:
         self._settings = settings
         self._repository = repository
         self._builder_factory = builder_factory
+        self.file_readers = builder_factory.file_readers
+        self.file_writers = builder_factory.file_writers
 
     def builder_names(self) -> Iterator[str]:
         return iter(self._builder_factory)
@@ -379,12 +362,6 @@ class ObjectAPI:
 
         item.set_builder(builder)
 
-    def get_open_file_filters(self) -> Iterator[str]:
-        return self._builder_factory.get_open_file_filters()
-
-    def get_open_file_filter(self) -> str:
-        return self._builder_factory.get_open_file_filter()
-
     def open_object(self, index: int, file_path: Path, *, file_type: str | None = None) -> None:
         builder = self._builder_factory.create_object_from_file(
             file_path,
@@ -415,12 +392,6 @@ class ObjectAPI:
 
         destination_item.assign_item(source_item)
 
-    def get_save_file_filters(self) -> Iterator[str]:
-        return self._builder_factory.get_save_file_filters()
-
-    def get_save_file_filter(self) -> str:
-        return self._builder_factory.get_save_file_filter()
-
     def save_object(self, index: int, file_path: Path, file_type: str) -> None:
         try:
             item = self._repository[index]
@@ -444,8 +415,8 @@ class ProductAPI:
         self._settings = settings
         self._repository = repository
         self._item_factory = item_factory
-        self._file_reader_chooser = file_reader_chooser
-        self._file_writer_chooser = file_writer_chooser
+        self.file_readers = FileTypeChooser(file_reader_chooser)
+        self.file_writers = FileTypeChooser(file_writer_chooser)
         self._task_manager = task_manager
         self._task_monitor = task_monitor
         self._queue_lock = threading.Lock()
@@ -624,13 +595,6 @@ class ProductAPI:
     def get_item(self, product_index: int) -> ProductRepositoryItem:
         return self._repository[product_index]
 
-    def get_open_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_reader_chooser:
-            yield plugin.display_name
-
-    def get_open_file_filter(self) -> str:
-        return self._file_reader_chooser.get_current_plugin().display_name
-
     def open_product(
         self,
         file_path: Path,
@@ -640,15 +604,11 @@ class ProductAPI:
         block: bool = True,
     ) -> int:
         if file_path.is_file():
-            if file_type is not None:
-                self._file_reader_chooser.set_current_plugin(file_type)
-
-            file_type = self._file_reader_chooser.get_current_plugin().simple_name
-            logger.debug(f'Reading "{file_path}" as "{file_type}"')
-            file_reader = self._file_reader_chooser.get_current_plugin().strategy
+            plugin = self.file_readers.select(file_type)
+            logger.debug(f'Reading "{file_path}" as "{plugin.simple_name}"')
 
             try:
-                product = file_reader.read(file_path)
+                product = plugin.strategy.read(file_path)
             except Exception as exc:
                 raise RuntimeError(f'Failed to read "{file_path}"') from exc
             else:
@@ -667,13 +627,6 @@ class ProductAPI:
 
         item.set_name(new_name)
 
-    def get_save_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_writer_chooser:
-            yield plugin.display_name
-
-    def get_save_file_filter(self) -> str:
-        return self._file_writer_chooser.get_current_plugin().display_name
-
     def save_product(self, index: int, file_path: Path, *, file_type: str | None = None) -> None:
         try:
             item = self._repository[index]
@@ -681,10 +634,6 @@ class ProductAPI:
             logger.warning(f'Failed to save product {index}!')
             return
 
-        if file_type is not None:
-            self._file_writer_chooser.set_current_plugin(file_type)
-
-        file_type = self._file_writer_chooser.get_current_plugin().simple_name
-        logger.debug(f'Writing "{file_path}" as "{file_type}"')
-        writer = self._file_writer_chooser.get_current_plugin().strategy
-        writer.write(file_path, item.get_product())
+        plugin = self.file_writers.select(file_type)
+        logger.debug(f'Writing "{file_path}" as "{plugin.simple_name}"')
+        plugin.strategy.write(file_path, item.get_product())

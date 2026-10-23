@@ -1,4 +1,3 @@
-from collections.abc import Iterator
 from pathlib import Path
 import logging
 
@@ -21,6 +20,7 @@ from ptychodus.api.diffraction import (
 )
 from ptychodus.api.plugins import PluginChooser
 
+from ..file_types import FileTypeChooser
 from ..parameters import PluginChooserParameter
 from .dataset import AssembledDiffractionDataset
 from .repository import DiffractionDatasetRepository
@@ -66,6 +66,7 @@ class DiffractionAPI:
         self._bad_pixels_file_reader_chooser = bad_pixels_file_reader_chooser
         self._file_reader_chooser = file_reader_chooser
         self._file_writer_chooser = file_writer_chooser
+        self.file_writers = FileTypeChooser(file_writer_chooser)
         self._bad_pixels_file_reader_parameter = bad_pixels_file_reader_parameter
         self._file_reader_parameter = file_reader_parameter
         self._background_file_reader_chooser = background_file_reader_chooser
@@ -269,13 +270,6 @@ class DiffractionAPI:
     def get_file_writer_chooser(self) -> PluginChooser[DiffractionFileWriter]:
         return self._file_writer_chooser
 
-    def get_save_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_writer_chooser:
-            yield plugin.display_name
-
-    def get_save_file_filter(self) -> str:
-        return self._file_writer_chooser.get_current_plugin().display_name
-
     def save_patterns(self, file_path: Path, file_type: str, *, dataset_index: int) -> None:
         try:
             dataset = self._repository[dataset_index]
@@ -283,8 +277,7 @@ class DiffractionAPI:
             logger.warning(f'Cannot save patterns: no dataset at index {dataset_index}')
             return
 
-        self._file_writer_chooser.set_current_plugin(file_type)
-        plugin = self._file_writer_chooser.get_current_plugin()
+        plugin = self.file_writers.select(file_type)
         logger.debug(f'Writing "{file_path}" as "{plugin.simple_name}"')
         plugin.strategy.write(file_path, dataset)
 
