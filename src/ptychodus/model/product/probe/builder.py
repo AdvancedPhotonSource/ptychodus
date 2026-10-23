@@ -10,6 +10,7 @@ from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.simulate.probe import (
     GaussianSchellStrategy,
     IncoherentModeStrategy,
+    ProbeDerivativeStrategy,
     ProbeMomentPolynomialStrategy,
     ProbeModeDecayType,
     RandomPhaseRampStrategy,
@@ -200,6 +201,10 @@ class ProbeEnsembleBuilder(ParameterGroup):
             damping_width=self.moment_polynomial_damping_width.get_value(),
         )
 
+    def _create_derivative_strategy(self) -> IncoherentModeStrategy:
+        decay_type, decay_ratio = self._get_imode_decay()
+        return ProbeDerivativeStrategy(decay_type=decay_type, decay_ratio=decay_ratio)
+
     def _create_random_phase_ramp_strategy(self) -> IncoherentModeStrategy:
         decay_type, decay_ratio = self._get_imode_decay()
         return RandomPhaseRampStrategy(self._rng, decay_type=decay_type, decay_ratio=decay_ratio)
@@ -360,7 +365,7 @@ class ProbeEnsembleBuilder(ParameterGroup):
                 self._rng,
                 probe,
                 num_cmodes=num_cmodes_requested,
-                num_diffraction_patterns=geometry_provider.num_scan_points,
+                num_positions=geometry_provider.num_scan_points,
             )
         else:
             probe_seq = ProbeEnsemble.from_probe(probe)
@@ -376,6 +381,7 @@ _IMODE_STRATEGY_FACTORIES: Mapping[
     str, Callable[[ProbeEnsembleBuilder], IncoherentModeStrategy]
 ] = {
     'MomentPolynomial': ProbeEnsembleBuilder._create_moment_polynomial_strategy,
+    'Derivative': ProbeEnsembleBuilder._create_derivative_strategy,
     'RandomPhaseRamp': ProbeEnsembleBuilder._create_random_phase_ramp_strategy,
     'GaussianSchell': ProbeEnsembleBuilder._create_gaussian_schell_strategy,
 }

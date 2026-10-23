@@ -156,7 +156,7 @@ def _build_initial_probe(
     probe_geometry: ProbeGeometry,
     *,
     photon_wavelength_m: float,
-    num_patterns: int,
+    num_positions: int,
     rng: numpy.random.Generator,
     far_field: bool,
     focus_object_distance_m: float,
@@ -204,7 +204,7 @@ def _build_initial_probe(
         rng,
         probe,
         num_cmodes=initial.num_opr_modes,
-        num_diffraction_patterns=num_patterns,
+        num_positions=num_positions,
     )
 
 
@@ -421,7 +421,7 @@ def reconstruct_one_scan(
         registry,
         probe_geometry,
         photon_wavelength_m=photon_wavelength_m,
-        num_patterns=num_patterns,
+        num_positions=len(positions),
         rng=rng,
         far_field=far_field,
         focus_object_distance_m=focus_object_distance_m,

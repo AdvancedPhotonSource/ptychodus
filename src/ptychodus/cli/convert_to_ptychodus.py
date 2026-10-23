@@ -369,6 +369,7 @@ def _build_probe(
     probe_geometry: ProbeGeometry,
     photon_wavelength_m: float,
     rng: numpy.random.Generator,
+    num_positions: int,
 ) -> ProbeEnsemble:
     """Supply the initial probe for a built product, from file or from a model."""
     if args.override_probe is not None:
@@ -413,7 +414,7 @@ def _build_probe(
         rng,
         probe,
         num_cmodes=args.num_opr_modes,
-        num_diffraction_patterns=assembled_data.get_num_patterns(),
+        num_positions=num_positions,
     )
 
 
@@ -458,7 +459,14 @@ def _build_product(
 
     rng = numpy.random.default_rng(args.seed)
     probes = _build_probe(
-        registry, args, assembled_data, geometry, probe_geometry, photon_wavelength_m, rng
+        registry,
+        args,
+        assembled_data,
+        geometry,
+        probe_geometry,
+        photon_wavelength_m,
+        rng,
+        num_positions=len(positions),
     )
     logger.info('Probe: %s', probes.get_array().shape)
 

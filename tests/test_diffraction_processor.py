@@ -1,7 +1,7 @@
 """Unit tests for the diffraction preprocessing pipeline and the settings → plan factory.
 
 These tests lock the intended behavior of `DiffractionPrepPipeline` step ops and
-`PrepPipelineBuilder.get_plan()` so regressions in the op chain (binning, upsample,
+`PrepPipelineBuilder.get_plan()` so regressions in the op chain (binning,
 padding, transpose, value filtering), the processed-extent math, and the load-time
 crop region are caught at the unit level.
 """
@@ -18,7 +18,6 @@ from ptychodus.api.preprocess.diffraction import (
     HorizontalFlipStep,
     PaddingStep,
     TransposeStep,
-    UpsampleStep,
     VerticalFlipStep,
 )
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
@@ -178,58 +177,6 @@ def test_binning_apply_preserves_float_dtype() -> None:
     assert out.dtype == numpy.dtype(numpy.float32)
 
 
-# ---------- Upsample ----------
-
-
-def test_upsample_apply_factor_one_is_identity() -> None:
-    """Factor 1 short-circuits (no FFT, no copy)."""
-    data = numpy.arange(2 * 4 * 4, dtype=numpy.uint16).reshape(2, 4, 4)
-    out = UpsampleStep(factor=1).apply(data)
-    assert out is data
-
-
-def test_upsample_apply_increases_shape() -> None:
-    """3-D stack (N, H, W) -> (N, k*H, k*W)."""
-    data = numpy.ones((2, 4, 6), dtype=numpy.float64)
-    out = UpsampleStep(factor=2).apply(data)
-    assert out.shape == (2, 8, 12)
-
-
-def test_upsample_apply_mask_kronecker_tiles() -> None:
-    """Bad-pixel mask (H, W) -> (k*H, k*W); each True cell becomes a k*k True block."""
-    mask = numpy.zeros((2, 3), dtype=bool)
-    mask[0, 1] = True
-    out = UpsampleStep(factor=2).apply(mask)
-    assert out.shape == (4, 6)
-    assert out.dtype == bool
-    # The (0,1) True cell tiles into the (0:2, 2:4) block.
-    assert out[0:2, 2:4].all()
-    assert out.sum() == 4  # exactly the 2x2 block; everything else is False.
-
-
-def test_upsample_apply_preserves_per_pixel_intensity_scale() -> None:
-    """On a uniform pattern, FFT zero-pad + k**2 scaling reproduces the input value everywhere."""
-    data = numpy.full((1, 8, 8), 7.0, dtype=numpy.float64)
-    out = UpsampleStep(factor=2).apply(data)
-    assert out.shape == (1, 16, 16)
-    numpy.testing.assert_allclose(out, 7.0, atol=1e-9)
-
-
-def test_upsample_apply_floors_at_input_min() -> None:
-    """Sinc-ringing undershoots are clipped to each pattern's pre-upsample min."""
-    # A pattern with a sharp central spike; band-limited interpolation rings around it and would
-    # otherwise dip below the input's 0 floor.
-    data = numpy.zeros((1, 8, 8), dtype=numpy.float64)
-    data[0, 4, 4] = 100.0
-    out = UpsampleStep(factor=2).apply(data)
-    assert float(out.min()) >= 0.0
-
-
-def test_upsample_rejects_zero_factor() -> None:
-    with pytest.raises(ValueError):
-        UpsampleStep(factor=0)
-
-
 # ---------- Padding (B1) ----------
 
 
@@ -377,19 +324,6 @@ def test_binning_apply_to_pixel_geometry_multiplies() -> None:
     assert out.height_m == 8e-5
 
 
-def test_upsample_apply_to_extent_multiplies() -> None:
-    step = UpsampleStep(factor=2)
-    out = step.apply_to_extent(ImageExtent(4, 6))
-    assert (out.width_px, out.height_px) == (8, 12)
-
-
-def test_upsample_apply_to_pixel_geometry_divides() -> None:
-    step = UpsampleStep(factor=2)
-    out = step.apply_to_pixel_geometry(PixelGeometry(width_m=1e-5, height_m=2e-5))
-    assert out.width_m == 5e-6
-    assert out.height_m == 1e-5
-
-
 def test_padding_apply_to_extent_adds_double_pad() -> None:
     step = PaddingStep(pad_x=1, pad_y=2)
     out = step.apply_to_extent(ImageExtent(4, 4))
@@ -468,7 +402,6 @@ def test_pipeline_serializes_and_round_trips() -> None:
     original = _pipeline(
         FilterValuesStep(lower_bound=1, upper_bound=99),
         BinningStep(bin_size_x=2, bin_size_y=2),
-        UpsampleStep(factor=2),
         PaddingStep(pad_x=1, pad_y=1),
         HorizontalFlipStep(),
         VerticalFlipStep(),
@@ -524,71 +457,6 @@ def test_sizer_processed_size_accounts_for_double_sided_padding(
     )
     out_shape = plan.pipeline(array).get_patterns().shape
     assert out_shape == (1, extent.height_px, extent.width_px)
-
-
-def test_sizer_upsample_inserts_step_after_binning_before_padding(
-    settings: tuple[DiffractionSettings, DetectorSettings],
-) -> None:
-    """Canonical residual-pipeline order (crop is a load-time read_region):
-    filter -> binning -> upsample -> padding -> ..."""
-    diff, _ = settings
-    diff.crop_enabled.set_value(True)
-    diff.crop_width_px.set_value(32)
-    diff.crop_height_px.set_value(32)
-    diff.beam_center_x_px.set_value(32)
-    diff.beam_center_y_px.set_value(32)
-    diff.binning_enabled.set_value(True)
-    diff.bin_size_x.set_value(2)
-    diff.bin_size_y.set_value(2)
-    diff.upsample_enabled.set_value(True)
-    diff.upsample_factor.set_value(2)
-    diff.padding_enabled.set_value(True)
-    diff.pad_x.set_value(1)
-    diff.pad_y.set_value(1)
-
-    plan = PrepPipelineBuilder(diff).get_plan(ImageExtent(width_px=64, height_px=64))
-    assert plan.read_region is not None
-    type_order = [type(step) for step in plan.pipeline.steps]
-    bin_idx = type_order.index(BinningStep)
-    upsample_idx = type_order.index(UpsampleStep)
-    pad_idx = type_order.index(PaddingStep)
-    assert bin_idx < upsample_idx < pad_idx
-
-
-def test_sizer_upsample_multiplies_processed_extent_and_divides_pixel_geometry(
-    settings: tuple[DiffractionSettings, DetectorSettings],
-) -> None:
-    """Enabling upsample must double the processed extent and halve the processed pixel size."""
-    diff, _ = settings
-    diff.crop_enabled.set_value(False)
-    diff.binning_enabled.set_value(False)
-    diff.padding_enabled.set_value(False)
-    diff.upsample_enabled.set_value(True)
-    diff.upsample_factor.set_value(2)
-
-    detector_extent = ImageExtent(width_px=32, height_px=32)
-    plan = PrepPipelineBuilder(diff).get_plan(detector_extent)
-    assert plan.read_region is None
-    extent = plan.pipeline.compute_output_extent(detector_extent)
-    assert (extent.width_px, extent.height_px) == (64, 64)
-
-    geo = plan.pipeline.compute_output_pixel_geometry(PixelGeometry(width_m=1e-5, height_m=2e-5))
-    assert (geo.width_m, geo.height_m) == (5e-6, 1e-5)
-
-
-def test_sizer_upsample_factor_one_is_pipeline_noop(
-    settings: tuple[DiffractionSettings, DetectorSettings],
-) -> None:
-    """upsample_enabled=True with factor=1 must not add a no-op step to the pipeline."""
-    diff, _ = settings
-    diff.crop_enabled.set_value(False)
-    diff.binning_enabled.set_value(False)
-    diff.padding_enabled.set_value(False)
-    diff.upsample_enabled.set_value(True)
-    diff.upsample_factor.set_value(1)
-
-    plan = PrepPipelineBuilder(diff).get_plan(ImageExtent(width_px=32, height_px=32))
-    assert not any(isinstance(step, UpsampleStep) for step in plan.pipeline.steps)
 
 
 def test_sizer_processed_extent_reflects_transpose(
@@ -858,13 +726,6 @@ def test_pixel_map_padding_fills_zero() -> None:
     assert out.shape == (6, 4)
     assert out.sum() == 4.0
     assert out[0, 0] == 0.0
-
-
-def test_pixel_map_upsampling_repeats_each_value() -> None:
-    """A map keeps each pixel's value, as the patterns keep per-pixel intensity."""
-    out = _pipeline(UpsampleStep(factor=2)).apply_to_pixel_map(numpy.array([[1.0, 2.0]]))
-
-    numpy.testing.assert_array_equal(out, [[1.0, 1.0, 2.0, 2.0], [1.0, 1.0, 2.0, 2.0]])
 
 
 def test_pixel_map_value_filter_is_a_noop() -> None:

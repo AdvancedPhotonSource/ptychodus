@@ -378,12 +378,14 @@ class ProcessingAPI:
     ) -> tuple[int, int]:
         output_product_index_odd = self.reconstruct(
             product_index=product_index,
+            library=library,
             algorithm=algorithm,
             index_filter=PositionIndexFilter.ODD,
             output_product_suffix='odd',
         )
         output_product_index_even = self.reconstruct(
             product_index=product_index,
+            library=library,
             algorithm=algorithm,
             index_filter=PositionIndexFilter.EVEN,
             output_product_suffix='even',

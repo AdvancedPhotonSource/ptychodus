@@ -171,7 +171,6 @@ class ProcessingController(Observer):
         self._reconstruct_split_action = self._actions_view.actions_menu.addAction(
             'Reconstruct Split'
         )
-        self._reconstruct_split_action.setEnabled(False)  # TODO
         connect_triggered_signal(self._reconstruct_split_action, self._reconstruct_split)
         self._load_model_action = self._actions_view.actions_menu.addAction('Load Model...')
         connect_triggered_signal(self._load_model_action, self._load_model)
@@ -338,7 +337,30 @@ class ProcessingController(Observer):
                 self._sync_model_to_view()
 
     def _reconstruct_split(self) -> None:
-        pass  # TODO
+        input_product_index = self._product_view_controller.get_widget().currentIndex()
+
+        if input_product_index < 0:
+            return
+
+        if not self._has_dataset_or_warn(input_product_index, 'reconstruct split'):
+            return
+
+        if (
+            self._compute_view_controller.is_globus_button_checked()
+            or self._compute_view_controller.is_genesis_button_checked()
+        ):
+            logger.warning('Cannot reconstruct split: only local compute splits a scan.')
+            return
+
+        try:
+            output_product_index_odd, _ = self._processing_api.reconstruct_split(
+                product_index=input_product_index
+            )
+        except Exception as exc:
+            logger.exception(exc)
+            ExceptionDialog.show_exception('Reconstruct Split', exc)
+        else:
+            self._product_view_controller.get_widget().setCurrentIndex(output_product_index_odd)
 
     def _load_model(self) -> None:
         name_filter = self._processing_api.get_model_file_filter()

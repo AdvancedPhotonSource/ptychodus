@@ -5,6 +5,7 @@ import math
 import numpy
 
 from ptychodus.api.constants import LengthUnit
+from ptychodus.api.metrics import SpectralSNRConvention
 
 from ...model.analysis import FourierRingCorrelator
 from ...view.object import FourierRingCorrelationDialog
@@ -12,7 +13,13 @@ from .tree_model import ObjectTreeModel
 
 logger = logging.getLogger(__name__)
 
-_SNR_THRESHOLD: float = 2.0  # equivalent to the classical FRC = 0.5 criterion
+# Equivalent to the classical FRC = 0.5 criterion for a half-split pair, and to FRC = 2/3
+# for a repeat pair.
+_SNR_THRESHOLD: float = 2.0
+_CONVENTION_LABELS: dict[SpectralSNRConvention, str] = {
+    SpectralSNRConvention.HALF_SPLIT: 'Half-split of one scan',
+    SpectralSNRConvention.REPEAT: 'Repeat scans',
+}
 _PLACEHOLDER: str = '—'
 
 
@@ -35,6 +42,11 @@ class FourierRingCorrelationViewController:
         self._dialog.product2_combo_box.setModel(tree_model)
         self._dialog.product2_combo_box.textActivated.connect(self._redraw_plot)
 
+        for convention, label in _CONVENTION_LABELS.items():
+            self._dialog.convention_combo_box.addItem(label, convention)
+
+        self._dialog.convention_combo_box.activated.connect(self._redraw_plot)
+
     def analyze(self, item_index1: int, item_index2: int) -> None:
         self._dialog.product1_combo_box.setCurrentIndex(item_index1)
         self._dialog.product2_combo_box.setCurrentIndex(item_index2)
@@ -45,6 +57,30 @@ class FourierRingCorrelationViewController:
         self._dialog.auc_label.setText(_PLACEHOLDER)
         self._dialog.average_ssnr_label.setText(_PLACEHOLDER)
         self._dialog.resolution_label.setText(_PLACEHOLDER)
+        self._clear_probe_labels()
+
+    def _clear_probe_labels(self) -> None:
+        self._dialog.probe_fidelity_label.setText(_PLACEHOLDER)
+        self._dialog.probe_rms_error_label.setText(_PLACEHOLDER)
+        self._dialog.probe_shift_difference_x_label.setText(_PLACEHOLDER)
+        self._dialog.probe_shift_difference_y_label.setText(_PLACEHOLDER)
+
+    def _update_probe_labels(self, item_index1: int, item_index2: int) -> None:
+        try:
+            comparison = self._correlator.compare_probes(item_index1, item_index2)
+        except ValueError as exc:
+            logger.warning(f'Cannot compare probes: {exc}')
+            self._clear_probe_labels()
+            return
+
+        self._dialog.probe_fidelity_label.setText(_format_scalar(comparison.normalized_fidelity))
+        self._dialog.probe_rms_error_label.setText(_format_scalar(comparison.normalized_rms_error))
+        self._dialog.probe_shift_difference_x_label.setText(
+            _format_scalar(comparison.probe_shift_x_px - comparison.object_shift_x_px)
+        )
+        self._dialog.probe_shift_difference_y_label.setText(
+            _format_scalar(comparison.probe_shift_y_px - comparison.object_shift_y_px)
+        )
 
     def _redraw_plot(self) -> None:
         current_index1 = self._dialog.product1_combo_box.currentIndex()
@@ -55,7 +91,8 @@ class FourierRingCorrelationViewController:
             self._clear_metric_labels()
             return
 
-        frc = self._correlator.correlate(current_index1, current_index2)
+        convention = self._dialog.convention_combo_box.currentData()
+        frc = self._correlator.correlate(current_index1, current_index2, convention=convention)
 
         freq_per_nm = 1.0e-9 * frc.spatial_frequency_per_m
         ssnr = frc.get_spectral_signal_to_noise_ratio()
@@ -117,6 +154,8 @@ class FourierRingCorrelationViewController:
         self._dialog.resolution_label.setText(
             _format_scalar(LengthUnit.NANOMETER.convert(resolution_m), suffix=' nm')
         )
+
+        self._update_probe_labels(current_index1, current_index2)
 
         self._dialog.figure.tight_layout()
         self._dialog.figure_canvas.draw()

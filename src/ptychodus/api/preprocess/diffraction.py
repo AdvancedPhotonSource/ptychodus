@@ -4,7 +4,7 @@ Steps share a single `apply(data) -> ndarray` interface and infer whether the
 input is a 3-D pattern stack or a 2-D boolean bad-pixel mask from
 `data.dtype`. The order of operations is encoded in
 `DiffractionPrepPipeline.steps`; the canonical order emitted by the model-layer
-factory is filter → binning → upsample → padding → hflip → vflip → transpose.
+factory is filter → binning → padding → hflip → vflip → transpose.
 Cropping is hoisted to load time (see :class:`DiffractionPrepPlan`) so readers
 that support partial reads (HDF5) only fetch the crop rectangle from disk.
 
@@ -174,58 +174,6 @@ class BinningStep(DiffractionPrepStep):
         return numpy.promote_types(dtype, numpy.min_scalar_type(needed_max))
 
 
-class UpsampleStep(DiffractionPrepStep):
-    """FFT zero-pad upsampling by an isotropic integer factor.
-
-    Patterns: band-limited (sinc) interpolation via FFT zero-padding, scaled by
-    ``factor**2`` to preserve per-pixel intensity semantics. Residual sinc-ringing
-    undershoots are floored to each pattern's pre-upsample minimum.
-
-    Bad-pixel mask: Kronecker tile via ``numpy.repeat`` — exact for integer factors
-    and equivalent to nearest-neighbor zoom on booleans.
-    """
-
-    type: Literal['upsample'] = 'upsample'
-    factor: int = Field(gt=0)
-
-    def apply(self, data: numpy.ndarray) -> numpy.ndarray:
-        if self.factor == 1:
-            return data
-
-        if _is_mask(data):
-            return numpy.repeat(numpy.repeat(data, self.factor, axis=-2), self.factor, axis=-1)
-
-        pattern_min = data.min(axis=(-2, -1), keepdims=True)
-        h, w = data.shape[-2:]
-        new_h, new_w = h * self.factor, w * self.factor
-
-        spectrum = numpy.fft.fftshift(numpy.fft.fft2(data, axes=(-2, -1)), axes=(-2, -1))
-        padded = numpy.zeros(data.shape[:-2] + (new_h, new_w), dtype=spectrum.dtype)
-        pad_y, pad_x = (new_h - h) // 2, (new_w - w) // 2
-        padded[..., pad_y : pad_y + h, pad_x : pad_x + w] = spectrum
-        upsampled = numpy.fft.ifft2(numpy.fft.ifftshift(padded, axes=(-2, -1)), axes=(-2, -1)).real
-        upsampled *= self.factor * self.factor
-
-        return numpy.clip(upsampled, pattern_min, None).astype(data.dtype, copy=False)
-
-    def apply_to_pixel_map(self, data: numpy.ndarray) -> numpy.ndarray:
-        # Each output pixel keeps its parent's value, matching the per-pixel intensity
-        # the pattern path preserves.
-        return numpy.repeat(numpy.repeat(data, self.factor, axis=-2), self.factor, axis=-1)
-
-    def apply_to_extent(self, extent: ImageExtent) -> ImageExtent:
-        return ImageExtent(
-            width_px=extent.width_px * self.factor,
-            height_px=extent.height_px * self.factor,
-        )
-
-    def apply_to_pixel_geometry(self, geometry: PixelGeometry) -> PixelGeometry:
-        return PixelGeometry(
-            width_m=geometry.width_m / self.factor,
-            height_m=geometry.height_m / self.factor,
-        )
-
-
 class PaddingStep(DiffractionPrepStep):
     """Symmetrically pad the last two axes. Fill 0 for patterns; True for masks.
 
@@ -291,7 +239,6 @@ class TransposeStep(DiffractionPrepStep):
 DiffractionPrepStepUnion: TypeAlias = (
     FilterValuesStep
     | BinningStep
-    | UpsampleStep
     | PaddingStep
     | HorizontalFlipStep
     | VerticalFlipStep

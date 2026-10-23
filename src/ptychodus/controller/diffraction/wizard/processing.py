@@ -343,22 +343,6 @@ class BinningViewController(CheckableGroupBoxParameterViewController):
             super()._update(observable)
 
 
-class UpsampleViewController(CheckableGroupBoxParameterViewController):
-    """UpsampleStep — FFT zero-pad upsampling by an isotropic integer factor."""
-
-    def __init__(self, diffraction_settings: DiffractionSettings) -> None:
-        super().__init__(diffraction_settings.upsample_enabled, 'Upsample')
-        self._factor_view_controller = SpinBoxParameterViewController(
-            diffraction_settings.upsample_factor
-        )
-
-        layout = QGridLayout()
-        layout.addWidget(QLabel('Factor:'), 0, 0)
-        layout.addWidget(self._factor_view_controller.get_widget(), 0, 1)
-        layout.setColumnStretch(1, 1)
-        self.get_widget().set_contents_layout(layout)
-
-
 class PaddingViewController(CheckableGroupBoxParameterViewController):
     def __init__(self, diffraction_settings: DiffractionSettings) -> None:
         super().__init__(diffraction_settings.padding_enabled, 'Pad')
@@ -682,7 +666,6 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
             diffraction_settings, extent_source, summary_service
         )
         self._binning_view_controller = BinningViewController(diffraction_settings, extent_source)
-        self._upsample_view_controller = UpsampleViewController(diffraction_settings)
         self._padding_view_controller = PaddingViewController(diffraction_settings)
         self._transform_view_controller = TransformViewController(diffraction_settings)
         self._summary_view_controller = SummaryPanelViewController(
@@ -709,7 +692,6 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
         left_layout.addWidget(self._total_counts_filter_view_controller.get_widget())
         left_layout.addWidget(self._crop_view_controller.get_widget())
         left_layout.addWidget(self._binning_view_controller.get_widget())
-        left_layout.addWidget(self._upsample_view_controller.get_widget())
         left_layout.addWidget(self._padding_view_controller.get_widget())
         left_layout.addWidget(self._transform_view_controller.get_widget())
 

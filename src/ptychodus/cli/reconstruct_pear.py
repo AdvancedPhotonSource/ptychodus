@@ -926,7 +926,7 @@ def main() -> ExitCode:
         rng,
         probe,
         num_cmodes=max(1, params.number_opr_modes + 1),
-        num_diffraction_patterns=num_patterns,
+        num_positions=len(positions),
     )
 
     # --- initial object ---

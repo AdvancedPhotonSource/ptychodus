@@ -211,9 +211,11 @@ What the routine guarantees, whatever strategy is in play:
 - **Total power is unchanged**, expanding or truncating, and a mode dropped as linearly dependent passes its share to the modes that survive rather than leaving the probe dimmer. The number of modes used to represent a beam is a modeling choice; the illumination is not, and a probe read from file is never rescaled afterward.
 - Orthogonalization is modified Gram-Schmidt in mode order, which is what keeps mode `n` paired with mode `n`. `mode_dependence_floor` sets how much of its own length a mode's orthogonal part must retain to be kept.
 
-Which strategy runs is the `IncoherentModeStrategy` setting, one of `MomentPolynomial`, `RandomPhaseRamp` or `GaussianSchell`; an unrecognized value falls back to the first. In the GUI it is a combo box, and the parameters below it change with the selection so that only the ones the chosen strategy reads are shown — the decay profile for the first two, the source size and coherence length for Gaussian-Schell, which predicts its own spectrum and never consults a decay profile.
+Which strategy runs is the `IncoherentModeStrategy` setting, one of `MomentPolynomial`, `Derivative`, `RandomPhaseRamp` or `GaussianSchell`; an unrecognized value falls back to the first. In the GUI it is a combo box, and the parameters below it change with the selection so that only the ones the chosen strategy reads are shown — the decay profile for the first three, the source size and coherence length for Gaussian-Schell, which predicts its own spectrum and never consults a decay profile.
 
 `ProbeMomentPolynomialStrategy` is the default, and needs no physical parameters at all. It measures the intensity-weighted centroid and variance of the probe it is given — from the incoherent sum of its modes, which is the footprint the illumination actually covers — and uses that width as its own length scale, so one call suits any illumination without being told how the probe was formed. A new mode is the dominant mode times `u**m * v**n`, with `u` and `v` the transverse coordinates centered on the probe and measured in units of its rms width, damped by a Gaussian of that same width so the polynomial does not push the higher orders into the tails. Orders are graded by total degree and skip the constant term. Weights come from `ProbeModeDecayType` and depend on a mode's index rather than its order.
+
+`ProbeDerivativeStrategy` fills with spatial derivatives of the dominant mode, `∂^(m+n) P / ∂x^m ∂y^n`, taken exactly by multiplying its spectrum by `kx^m ky^n`. A probe jittered by a small offset `d` is `P(r − d) ≈ P − d · ∇P`, so these are the modes positional vibration during an exposure produces; the first two are the x and y gradients. It is the Fourier counterpart of the moment polynomials, whose real-space factors correspond to derivatives in angle — source size and angular jitter rather than positional jitter. Orders are graded by total degree and weights come from `ProbeModeDecayType`.
 
 `RandomPhaseRampStrategy` creates each new mode by duplicating the dominant mode and applying random separable phase wraps along the horizontal and vertical axes, so the added modes share the dominant mode's amplitude structure and differ only by a random linear phase ramp in `x` and `y`. It is the only strategy that consumes randomness, and so the only one that takes an `rng`.
 
@@ -243,7 +245,7 @@ For `num_coherent_modes == 1`, no OPR weights are stored and the probe sequence 
 
 For `num_coherent_modes > 1`:
 
-- `opr_weights` is initialized with shape `(num_diffraction_patterns, num_coherent_modes)`.
+- `opr_weights` is initialized with shape `(num_positions, num_coherent_modes)`: one row per probe position, which the index matcher later conditions to one row per diffraction pattern.
 - The first OPR weight is set to `1.0` for every scan point.
 - Other weights are initialized as small random normal values with default scale `1.0e-6`.
 - OPR mode 0 copies the full incoherent-mode probe.
@@ -362,7 +364,7 @@ with ModelCore(Path('settings.ini')) as model:
         model.rng,
         probe_with_incoherent_modes,
         num_cmodes=2,
-        num_diffraction_patterns=len(product.probe_positions),
+        num_positions=len(product.probe_positions),
     )
 
     expanded_product = Product(
@@ -473,7 +475,7 @@ probe_ensemble = generate_coherent_probe_modes(
     rng,
     probe_with_imodes,
     num_cmodes=2,
-    num_diffraction_patterns=len(positions),
+    num_positions=len(positions),
 )
 
 object_geometry = ObjectGeometry(
