@@ -3,10 +3,12 @@
 from __future__ import annotations
 from dataclasses import dataclass, replace
 from enum import Enum, auto
+from typing import TypeVar
 import logging
 import math
 
 import numpy
+import numpy.typing
 import scipy.fft
 from scipy.ndimage import binary_erosion, gaussian_filter
 from scipy.signal.windows import tukey
@@ -17,7 +19,13 @@ from skimage.metrics import (
 )
 from skimage.registration import phase_cross_correlation
 
-from .typing import ComplexArrayType, IntegerArrayType, RealArrayType
+from .typing import (
+    BooleanArrayType,
+    ComplexArrayType,
+    InexactArrayType,
+    IntegerArrayType,
+    RealArrayType,
+)
 from .diffraction import BadPixels, DiffractionPatterns
 from .illumination import IlluminationMap
 from .patch import accumulate_probe_intensity
@@ -35,6 +43,8 @@ from .product import Product
 from .reconstruct import ReconstructionAmbiguities
 
 logger = logging.getLogger(__name__)
+
+_InexactT = TypeVar('_InexactT', bound=numpy.inexact)
 
 
 def _validate_weights(
@@ -57,7 +67,7 @@ def _validate_weights(
 
 def _estimate_phase_offset_and_ramp(
     *,
-    signal: numpy.ndarray,
+    signal: ComplexArrayType,
     weights: RealArrayType | None,
     pixel_width_m: float,
     pixel_height_m: float,
@@ -680,7 +690,7 @@ def _prepare_spectral_image(
     window: RealArrayType | None,
     *,
     subtract_mean: bool,
-) -> numpy.ndarray:
+) -> InexactArrayType:
     """Remove the DC term and apodize an image ahead of its FFT.
 
     The mean is *window-weighted* so that the zeroth Fourier coefficient of the
@@ -1076,7 +1086,7 @@ class ScoringRegion:
         )
         return array_weights
 
-    def crop(self, array: ComplexArrayType | RealArrayType) -> numpy.ndarray:
+    def crop(self, array: numpy.typing.NDArray[_InexactT]) -> numpy.typing.NDArray[_InexactT]:
         """Cut the trailing two axes of ``array`` down to this region's rectangle."""
         values = numpy.asarray(array)
 
@@ -1088,7 +1098,7 @@ class ScoringRegion:
         return values[..., self.row_begin : self.row_end, self.column_begin : self.column_end]
 
 
-def _largest_true_rectangle(mask: numpy.ndarray) -> tuple[int, int, int, int]:
+def _largest_true_rectangle(mask: BooleanArrayType) -> tuple[int, int, int, int]:
     """Find the largest axis-aligned all-true rectangle in a 2D boolean mask.
 
     Returns ``(row_begin, row_end, column_begin, column_end)``; an all-false

@@ -13,6 +13,7 @@ from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.product import Product, ProductFileReader, ProductMetadata
 from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 from ptychodus.api.propagate import compute_far_field_propagation_distance
+from ptychodus.api.typing import ComplexArrayType, NumberArrayType, RealArrayType
 from ptychodus.api.reconstruct import LossValue
 
 from ._matfile import open_matlab_file
@@ -20,7 +21,7 @@ from ._matfile import open_matlab_file
 logger = logging.getLogger(__name__)
 
 
-def _conform_probe(probe_array: numpy.ndarray) -> numpy.ndarray:
+def _conform_probe(probe_array: ComplexArrayType) -> ComplexArrayType:
     """Put the stored probe into ptychodus axis order, always four-dimensional.
 
     MATLAB holds the probe as ``[height, width, incoherent, varying]`` and drops a
@@ -39,8 +40,8 @@ def _conform_probe(probe_array: numpy.ndarray) -> numpy.ndarray:
 
 
 def _conform_opr_weights(
-    probe_evolution: numpy.ndarray, num_varying_modes: int
-) -> numpy.ndarray | None:
+    probe_evolution: NumberArrayType, num_varying_modes: int
+) -> RealArrayType | None:
     """Condition ``outputs.probe_evolution`` into OPR weights, or None if it cannot be.
 
     The format stores the varying probe as a basis plus a weight per scan position, and
@@ -56,20 +57,20 @@ def _conform_opr_weights(
         # fold_slice itself plots these.
         weights = weights.real
 
-    weights = numpy.reshape(weights, (weights.shape[0], -1)).astype(float)
+    real_weights = numpy.reshape(weights, (weights.shape[0], -1)).astype(numpy.float64)
 
-    if weights.shape[1] != num_varying_modes:
+    if real_weights.shape[1] != num_varying_modes:
         logger.warning(
             'Discarding probe_evolution: %d weight columns describe %d probe modes.',
-            weights.shape[1],
+            real_weights.shape[1],
             num_varying_modes,
         )
         return None
 
-    return weights
+    return real_weights
 
 
-def _conform_positions_px(probe_positions: numpy.ndarray) -> numpy.ndarray:
+def _conform_positions_px(probe_positions: RealArrayType) -> RealArrayType:
     """Reduce the stored positions to one ``(N, 2)`` table.
 
     A fly scan records a separate table per probe mode. They describe one trajectory
@@ -81,7 +82,7 @@ def _conform_positions_px(probe_positions: numpy.ndarray) -> numpy.ndarray:
     return probe_positions
 
 
-def _read_losses(fourier_error_out: numpy.ndarray) -> list[LossValue]:
+def _read_losses(fourier_error_out: RealArrayType) -> list[LossValue]:
     """Read the loss history, dropping the iterations that recorded no error.
 
     The engine averages across positions with ``omitnan`` and leaves the entry NaN on

@@ -23,6 +23,7 @@ from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import LossValue, Product, ProductFileReader, ProductMetadata
+from ptychodus.api.typing import RealArrayType
 from ptychodus.api.propagate import compute_far_field_propagation_distance
 
 # Dataset names, flat at the root. `pos_corr` is a group holding the affine history
@@ -37,7 +38,7 @@ _OPR_MODE_WEIGHTS = 'opr_mode_weights'
 
 
 def _read_positions(
-    positions_px: numpy.ndarray, object_extent_px: tuple[int, int], pixel_size_m: float
+    positions_px: RealArrayType, object_extent_px: tuple[int, int], pixel_size_m: float
 ) -> ProbePositionSequence:
     """Convert the stored scan into the object frame ptychodus measures positions in.
 

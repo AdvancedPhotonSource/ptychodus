@@ -218,7 +218,7 @@ class VelociprobeDiffractionDataset(DiffractionDataset):
 
     def get_bad_pixels(self) -> BadPixels:
         extent = self._metadata.detector_extent
-        return numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool_)
+        return numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool)
 
     @overload
     def __getitem__(self, index: int) -> DiffractionArray: ...

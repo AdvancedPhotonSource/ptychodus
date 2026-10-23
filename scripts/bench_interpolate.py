@@ -37,7 +37,7 @@ def _bench_case(
     array_shape: tuple[int, ...],
     patch_shape: tuple[int, int],
     n_calls: int,
-    dtype: numpy.dtype,
+    dtype: numpy.dtype[numpy.inexact],
     label: str,
 ) -> None:
     rng = numpy.random.default_rng(2026)

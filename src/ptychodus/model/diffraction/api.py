@@ -1,7 +1,6 @@
 from pathlib import Path
 import logging
 
-import numpy
 
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.diffraction import (
@@ -15,6 +14,7 @@ from ptychodus.api.diffraction import (
     DiffractionFileWriter,
     DiffractionMetadata,
     FlatField,
+    PixelMap,
     PixelMapFileReader,
     SimpleDiffractionDataset,
 )
@@ -194,7 +194,7 @@ class DiffractionAPI:
         chooser: PluginChooser[PixelMapFileReader],
         file_path: Path,
         file_type: str | None,
-    ) -> numpy.ndarray:
+    ) -> PixelMap:
         if not file_path.is_file():
             raise FileNotFoundError(f'Invalid {description} file path "{file_path}"')
 

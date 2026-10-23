@@ -16,6 +16,7 @@ from ptychodus.api.diffraction import (
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
+from ptychodus.api.typing import RealArrayType
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.product import LossValue, Product, ProductFileReader, ProductMetadata
 from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
@@ -39,7 +40,7 @@ def _get_scalar(npz_file: numpy.lib.npyio.NpzFile, key: str, fallback: float) ->
         return fallback
 
 
-def _coords_in_pixels(scan_x: numpy.ndarray, scan_y: numpy.ndarray) -> bool:
+def _coords_in_pixels(scan_x: RealArrayType, scan_y: RealArrayType) -> bool:
     max_abs = max(float(numpy.max(numpy.abs(scan_x))), float(numpy.max(numpy.abs(scan_y))))
     return max_abs > PIXEL_COORDINATE_THRESHOLD_M
 

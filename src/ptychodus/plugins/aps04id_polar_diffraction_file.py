@@ -11,6 +11,7 @@ from ptychodus.api.diffraction import (
     BeamCenter,
     DiffractionDataset,
     DiffractionFileReader,
+    DiffractionIndexes,
     DiffractionMetadata,
     SimpleDiffractionDataset,
 )
@@ -43,7 +44,7 @@ class PolarDiffractionFileReader(DiffractionFileReader):
     def get_file_extensions(self) -> set[str]:
         return {'.hdf'}
 
-    def _read_pattern_indexes(self, h5_file: h5py.File, num_patterns: int) -> numpy.ndarray:
+    def _read_pattern_indexes(self, h5_file: h5py.File, num_patterns: int) -> DiffractionIndexes:
         """Return per-pattern indexes.
 
         Uses the Eiger detector's NDArrayUniqueId when the file exposes it (this reader

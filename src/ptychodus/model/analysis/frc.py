@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import time
 
-import numpy
 
 from ptychodus.api.illumination import compute_illumination_map
 from ptychodus.api.metrics import (
@@ -19,7 +18,7 @@ from ptychodus.api.metrics import (
     compute_power_spectral_density,
     compute_probe_comparison,
 )
-from ptychodus.api.typing import RealArrayType
+from ptychodus.api.typing import ComplexArrayType, RealArrayType
 from ptychodus.api.product import Product
 
 from ..product import ProductRepository
@@ -107,8 +106,8 @@ class FourierRingCorrelator:
         comparison = compute_object_comparison(
             reference=product1, test=product2, weights=_ambiguity_weights(region)
         )
-        reference: numpy.ndarray = comparison.reference_complex
-        test: numpy.ndarray = comparison.test_complex
+        reference: ComplexArrayType = comparison.reference_complex
+        test: ComplexArrayType = comparison.test_complex
         window = ApodizationWindow.TUKEY if region is None else region.weights
 
         if region is not None:
@@ -147,7 +146,7 @@ class FourierRingCorrelator:
     def compute_power_spectrum(self, product_index: int) -> PowerSpectralDensity:
         product = self._repository[product_index].get_product()
         object_ = product.object_
-        array: numpy.ndarray = object_.get_layers_flattened()
+        array: ComplexArrayType = object_.get_layers_flattened()
         pixel_geometry = object_.get_pixel_geometry()
         region = _scoring_region(product, array.shape)
         window = ApodizationWindow.TUKEY if region is None else region.weights

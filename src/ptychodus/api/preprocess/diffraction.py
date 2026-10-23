@@ -1,8 +1,8 @@
 """Diffraction pattern preprocessing: the step pipeline and standalone helpers.
 
-Steps share a single `apply(data) -> ndarray` interface and infer whether the
-input is a 3-D pattern stack or a 2-D boolean bad-pixel mask from
-`data.dtype`. The order of operations is encoded in
+Steps share a single `apply` interface that returns the kind of array it was
+given, and infer whether the input is a 3-D pattern stack or a 2-D boolean
+bad-pixel mask from `data.dtype`. The order of operations is encoded in
 `DiffractionPrepPipeline.steps`; the canonical order emitted by the model-layer
 factory is filter → binning → padding → hflip → vflip → transpose.
 Cropping is hoisted to load time (see :class:`DiffractionPrepPlan`) so readers
@@ -22,7 +22,7 @@ unchanged.
 from __future__ import annotations
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Annotated, Literal, TypeAlias, cast, overload
+from typing import Annotated, Literal, TypeAlias, TypeVar, cast, overload
 
 import numpy
 from pydantic import BaseModel, ConfigDict, Field
@@ -35,15 +35,25 @@ from ..diffraction import (
     CropRegion,
     DiffractionArray,
     DiffractionPattern,
+    DiffractionPatternDType,
     DiffractionPatterns,
+    PixelMap,
     SimpleDiffractionArray,
 )
 from ..geometry import ImageExtent, PixelGeometry
+from ..typing import AnyArrayType
 from .noise import estimate_noise_floor
 
+# A step rearranges or combines the last two axes and leaves rank and dtype family to the
+# caller, so every `apply` returns exactly what it was handed: a pattern stack, a bad-pixel
+# mask, or a per-pixel map. Binding to `ndarray` rather than to a union of the three keeps
+# that promise without naming them, which is what lets the default `apply_to_pixel_map`
+# below delegate to `apply`.
+_PrepT = TypeVar('_PrepT', bound=numpy.ndarray)
 
-def _is_mask(data: numpy.ndarray) -> bool:
-    return data.dtype == numpy.bool_
+
+def _is_mask(data: AnyArrayType) -> bool:
+    return data.dtype == numpy.bool
 
 
 class DiffractionPrepStep(BaseModel):
@@ -65,10 +75,10 @@ class DiffractionPrepStep(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     @abstractmethod
-    def apply(self, data: numpy.ndarray) -> numpy.ndarray:
+    def apply(self, data: _PrepT) -> _PrepT:
         """Apply this step. Mask vs pattern behavior is inferred from `data.dtype`."""
 
-    def apply_to_pixel_map(self, data: numpy.ndarray) -> numpy.ndarray:
+    def apply_to_pixel_map(self, data: PixelMap) -> PixelMap:
         """Apply this step to a 2-D additive per-pixel map, in floating point.
 
         A map is a per-pixel quantity that adds up the way counts do, so it follows
@@ -85,7 +95,7 @@ class DiffractionPrepStep(BaseModel):
         """Return the pixel geometry this step would produce. Default: identity."""
         return geometry
 
-    def apply_to_dtype(self, dtype: numpy.dtype) -> numpy.dtype:
+    def apply_to_dtype(self, dtype: DiffractionPatternDType) -> DiffractionPatternDType:
         """Return the dtype this step would produce given `dtype`. Default: identity."""
         return dtype
 
@@ -97,7 +107,7 @@ class FilterValuesStep(DiffractionPrepStep):
     lower_bound: int | None = None
     upper_bound: int | None = None
 
-    def apply(self, data: numpy.ndarray) -> numpy.ndarray:
+    def apply(self, data: _PrepT) -> _PrepT:
         if _is_mask(data):
             return data
 
@@ -114,7 +124,7 @@ class FilterValuesStep(DiffractionPrepStep):
 
         return out
 
-    def apply_to_pixel_map(self, data: numpy.ndarray) -> numpy.ndarray:
+    def apply_to_pixel_map(self, data: PixelMap) -> PixelMap:
         return data
 
 
@@ -134,7 +144,7 @@ class BinningStep(DiffractionPrepStep):
     bin_size_x: int = Field(gt=0)
     bin_size_y: int = Field(gt=0)
 
-    def apply(self, data: numpy.ndarray) -> numpy.ndarray:
+    def apply(self, data: _PrepT) -> _PrepT:
         binned_height = data.shape[-2] // self.bin_size_y
         binned_width = data.shape[-1] // self.bin_size_x
         # Drop the trailing partial block so the reshape below is exact.
@@ -144,12 +154,15 @@ class BinningStep(DiffractionPrepStep):
         shape = data.shape[:-2] + (binned_height, self.bin_size_y, binned_width, self.bin_size_x)
         reshaped = whole_blocks.reshape(shape)
         if _is_mask(data):
-            return numpy.logical_or.reduce(reshaped, axis=(-3, -1), keepdims=False)
-        return numpy.sum(
-            reshaped, axis=(-3, -1), keepdims=False, dtype=self.apply_to_dtype(data.dtype)
+            return cast(_PrepT, numpy.logical_or.reduce(reshaped, axis=(-3, -1), keepdims=False))
+        return cast(
+            _PrepT,
+            numpy.sum(
+                reshaped, axis=(-3, -1), keepdims=False, dtype=self.apply_to_dtype(data.dtype)
+            ),
         )
 
-    def apply_to_pixel_map(self, data: numpy.ndarray) -> numpy.ndarray:
+    def apply_to_pixel_map(self, data: PixelMap) -> PixelMap:
         return self.apply(data.astype(numpy.float64))
 
     def apply_to_extent(self, extent: ImageExtent) -> ImageExtent:
@@ -164,13 +177,14 @@ class BinningStep(DiffractionPrepStep):
             height_m=geometry.height_m * self.bin_size_y,
         )
 
-    def apply_to_dtype(self, dtype: numpy.dtype) -> numpy.dtype:
+    def apply_to_dtype(self, dtype: DiffractionPatternDType) -> DiffractionPatternDType:
         if not numpy.issubdtype(dtype, numpy.integer):
             return dtype
         factor = self.bin_size_x * self.bin_size_y
         if factor <= 1:
             return dtype
-        needed_max = int(numpy.iinfo(dtype).max) * factor
+        # issubdtype does not narrow the pattern dtype union for the checker.
+        needed_max = int(numpy.iinfo(cast(numpy.dtype[numpy.integer], dtype)).max) * factor
         return numpy.promote_types(dtype, numpy.min_scalar_type(needed_max))
 
 
@@ -185,13 +199,13 @@ class PaddingStep(DiffractionPrepStep):
     pad_x: int = Field(ge=0)
     pad_y: int = Field(ge=0)
 
-    def apply(self, data: numpy.ndarray) -> numpy.ndarray:
+    def apply(self, data: _PrepT) -> _PrepT:
         leading_pad = ((0, 0),) * (data.ndim - 2)
         pad_width = (*leading_pad, (self.pad_y, self.pad_y), (self.pad_x, self.pad_x))
         fill = True if _is_mask(data) else 0
-        return numpy.pad(data, pad_width, mode='constant', constant_values=fill)
+        return cast(_PrepT, numpy.pad(data, pad_width, mode='constant', constant_values=fill))
 
-    def apply_to_pixel_map(self, data: numpy.ndarray) -> numpy.ndarray:
+    def apply_to_pixel_map(self, data: PixelMap) -> PixelMap:
         pad_width = ((self.pad_y, self.pad_y), (self.pad_x, self.pad_x))
         return numpy.pad(data, pad_width, mode='constant', constant_values=0.0)
 
@@ -207,7 +221,7 @@ class HorizontalFlipStep(DiffractionPrepStep):
 
     type: Literal['hflip'] = 'hflip'
 
-    def apply(self, data: numpy.ndarray) -> numpy.ndarray:
+    def apply(self, data: _PrepT) -> _PrepT:
         return numpy.flip(data, axis=-1)
 
 
@@ -216,7 +230,7 @@ class VerticalFlipStep(DiffractionPrepStep):
 
     type: Literal['vflip'] = 'vflip'
 
-    def apply(self, data: numpy.ndarray) -> numpy.ndarray:
+    def apply(self, data: _PrepT) -> _PrepT:
         return numpy.flip(data, axis=-2)
 
 
@@ -225,9 +239,9 @@ class TransposeStep(DiffractionPrepStep):
 
     type: Literal['transpose'] = 'transpose'
 
-    def apply(self, data: numpy.ndarray) -> numpy.ndarray:
+    def apply(self, data: _PrepT) -> _PrepT:
         axes = tuple(range(data.ndim - 2)) + (data.ndim - 1, data.ndim - 2)
-        return numpy.transpose(data, axes=axes)
+        return cast(_PrepT, numpy.transpose(data, axes=axes))
 
     def apply_to_extent(self, extent: ImageExtent) -> ImageExtent:
         return ImageExtent(width_px=extent.height_px, height_px=extent.width_px)
@@ -256,7 +270,7 @@ class DiffractionPrepPipeline(BaseModel):
     # JSON object, so shape-based union resolution would silently deserialize one as another.
     steps: tuple[Annotated[DiffractionPrepStepUnion, Field(discriminator='type')], ...] = ()
 
-    def _apply(self, data: numpy.ndarray) -> numpy.ndarray:
+    def _apply(self, data: _PrepT) -> _PrepT:
         for step in self.steps:
             data = step.apply(data)
         return data
@@ -277,7 +291,7 @@ class DiffractionPrepPipeline(BaseModel):
 
         return self._apply(bad_pixels)
 
-    def apply_to_pixel_map(self, pixel_map: numpy.ndarray) -> numpy.ndarray:
+    def apply_to_pixel_map(self, pixel_map: PixelMap) -> PixelMap:
         """Run every step over a 2-D additive per-pixel map, returning float64.
 
         Pixels the pipeline combines are summed and padded pixels are zero, which is
@@ -287,7 +301,7 @@ class DiffractionPrepPipeline(BaseModel):
         if pixel_map.ndim != 2:
             raise ValueError(f'Invalid pixel map dimensions! (shape={pixel_map.shape})')
 
-        data = pixel_map.astype(numpy.float64)
+        data: PixelMap = pixel_map.astype(numpy.float64)
 
         for step in self.steps:
             data = step.apply_to_pixel_map(data)
@@ -311,7 +325,7 @@ class DiffractionPrepPipeline(BaseModel):
             geometry = step.apply_to_pixel_geometry(geometry)
         return geometry
 
-    def compute_output_dtype(self, dtype: numpy.dtype) -> numpy.dtype:
+    def compute_output_dtype(self, dtype: DiffractionPatternDType) -> DiffractionPatternDType:
         """Return the dtype the pipeline would produce, sized for every step's promotion."""
         for step in self.steps:
             dtype = step.apply_to_dtype(dtype)

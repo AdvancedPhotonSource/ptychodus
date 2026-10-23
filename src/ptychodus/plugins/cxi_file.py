@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Final
 
 import h5py
-import numpy
 
 from ptychodus.api.diffraction import (
     BadPixels,
@@ -18,6 +17,7 @@ from ptychodus.api.diffraction import (
     DiffractionDataset,
     DiffractionFileReader,
     DiffractionFileWriter,
+    PixelMap,
     PixelMapFileReader,
     SimpleDiffractionDataset,
 )
@@ -126,7 +126,7 @@ class CXIBackgroundFileReader(PixelMapFileReader):
     def get_file_extensions(self) -> set[str]:
         return {'.cxi'}
 
-    def read(self, file_path: Path) -> numpy.ndarray:
+    def read(self, file_path: Path) -> PixelMap:
         return load_cxi_background(file_path)
 
 
@@ -137,7 +137,7 @@ class CXIFlatFieldFileReader(PixelMapFileReader):
     def get_file_extensions(self) -> set[str]:
         return {'.cxi'}
 
-    def read(self, file_path: Path) -> numpy.ndarray:
+    def read(self, file_path: Path) -> PixelMap:
         return load_cxi_flat_field(file_path)
 
 

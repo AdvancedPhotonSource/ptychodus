@@ -6,6 +6,8 @@ padding, transpose, value filtering), the processed-extent math, and the load-ti
 crop region are caught at the unit level.
 """
 
+from typing import cast
+
 import numpy
 import pytest
 
@@ -391,7 +393,8 @@ def test_pipeline_compute_output_dtype_folds_over_steps() -> None:
     )
     out = pipeline.compute_output_dtype(numpy.dtype(numpy.uint16))
     assert numpy.issubdtype(out, numpy.unsignedinteger)
-    assert numpy.iinfo(out).max >= 65535 * 16
+    # issubdtype does not narrow the pattern dtype union for the checker.
+    assert numpy.iinfo(cast(numpy.dtype[numpy.integer], out)).max >= 65535 * 16
 
 
 # ---------- Serialization ----------

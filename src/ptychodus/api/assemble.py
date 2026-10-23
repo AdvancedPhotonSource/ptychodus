@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from itertools import accumulate
+from typing import cast, TypeVar
 import concurrent.futures
 import logging
 import os
@@ -35,6 +36,7 @@ from .preprocess.diffraction import (
     zero_bad_pixels,
 )
 from .probe_positions import ProbePositionSequence
+from .typing import RealArrayType
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +58,10 @@ __all__ = [
 ]
 
 
-def _read_only(array: numpy.ndarray) -> numpy.ndarray:
+_ArrayT = TypeVar('_ArrayT', bound=numpy.ndarray)
+
+
+def _read_only(array: _ArrayT) -> _ArrayT:
     """Return `array` as non-writeable, through a view rather than in place.
 
     Downgrading the view leaves the base writable, so taking a read-only handle on a
@@ -64,7 +69,7 @@ def _read_only(array: numpy.ndarray) -> numpy.ndarray:
     """
     view = array[...]
     view.flags.writeable = False
-    return view
+    return cast(_ArrayT, view)
 
 
 def compute_total_counts(
@@ -184,7 +189,7 @@ class AssembledDiffractionData:
             indexes=numpy.zeros(1, dtype=numpy.intp),
             patterns=numpy.zeros((1, 1, 1), dtype=numpy.intp),
             pixel_geometry=PixelGeometry(0, 0),
-            bad_pixels=numpy.zeros((1, 1), dtype=numpy.bool_),
+            bad_pixels=numpy.zeros((1, 1), dtype=numpy.bool),
         )
 
     def get_patterns_shape(self) -> tuple[int, int, int]:
@@ -407,7 +412,7 @@ class DetectorCorrections:
     def applies_flat_field(self) -> bool:
         return self.divide_flat_field and self.flat_field is not None
 
-    def apply_to_dtype(self, dtype: numpy.dtype) -> numpy.dtype:
+    def apply_to_dtype(self, dtype: DiffractionPatternDType) -> DiffractionPatternDType:
         """Return the pattern dtype after correction: floating once anything is applied."""
         if not (self.applies_background or self.applies_flat_field):
             return dtype
@@ -445,7 +450,10 @@ class DetectorCorrections:
         if background is None and flat_field is None:
             return patterns
 
-        corrected = patterns.astype(self.apply_to_dtype(patterns.dtype))
+        # Past the early return at least one map applies, so apply_to_dtype has promoted to
+        # floating. The union it is declared to return cannot say that, and the in-place
+        # divide below is rejected on an integer array.
+        corrected = cast(RealArrayType, patterns.astype(self.apply_to_dtype(patterns.dtype)))
 
         if background is not None:
             neutral_background = numpy.nan_to_num(background, nan=0.0, posinf=0.0, neginf=0.0)
@@ -1071,7 +1079,7 @@ def _embed_in_detector(
     if read_region is None:
         return pixels
 
-    embedded = numpy.zeros(detector_extent.get_shape(), dtype=numpy.bool_)
+    embedded = numpy.zeros(detector_extent.get_shape(), dtype=numpy.bool)
     read_region.apply_to(embedded)[...] = pixels
     return embedded
 

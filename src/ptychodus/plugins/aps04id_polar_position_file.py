@@ -40,7 +40,9 @@ import yaml
 
 from ptychodus.api.constants import LengthUnit
 from ptychodus.api.io import resolve_external_link_path
+from ptychodus.api.diffraction import DiffractionIndexes
 from ptychodus.api.plugins import PluginRegistry
+from ptychodus.api.typing import RealArrayType
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
     ProbePositionFileReader,
@@ -149,7 +151,7 @@ class PolarPositionFileReader(ProbePositionFileReader):
         # not a physical guarantee -- a transposed scan is corrected by the [Scan] affine.
         logger.info(f'Step scan ({plan_name}) positions: x from "{motor_x}", y from "{motor_y}".')
 
-        coordinates: list[numpy.ndarray] = []
+        coordinates: list[RealArrayType] = []
 
         for motor in (motor_x, motor_y):
             value = primary.get(f'{motor}/value')
@@ -186,7 +188,7 @@ class PolarPositionFileReader(ProbePositionFileReader):
 
     def _read_trigger_indexes(
         self, h5_file: h5py.File, file_path: Path, n_frames: int
-    ) -> numpy.ndarray:
+    ) -> DiffractionIndexes:
         """Return per-frame trigger indexes.
 
         Uses the eiger detector's NDArrayUniqueId when reachable -- either directly in
@@ -206,7 +208,7 @@ class PolarPositionFileReader(ProbePositionFileReader):
         )
         return numpy.arange(1, n_frames + 1, dtype=int)
 
-    def _try_read_uid_here(self, h5_file: h5py.File, n_frames: int) -> numpy.ndarray | None:
+    def _try_read_uid_here(self, h5_file: h5py.File, n_frames: int) -> DiffractionIndexes | None:
         try:
             uid = h5_file[self.NDARRAY_UNIQUE_ID_PATH][()]
         except KeyError:
@@ -225,7 +227,7 @@ class PolarPositionFileReader(ProbePositionFileReader):
 
     def _try_read_uid_via_external_link(
         self, h5_file: h5py.File, file_path: Path, n_frames: int
-    ) -> numpy.ndarray | None:
+    ) -> DiffractionIndexes | None:
         link = h5_file.get(self.EIGER_EXTERNAL_LINK, getlink=True)
         if not isinstance(link, h5py.ExternalLink):
             return None

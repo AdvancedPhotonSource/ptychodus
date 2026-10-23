@@ -94,6 +94,7 @@ from ptychodus.api.object import (
 )
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.plugins import PluginRegistry
+from ptychodus.api.typing import ComplexArrayType
 from ptychodus.api.preprocess.diffraction import (
     DiffractionPrepPipeline,
     DiffractionPrepStepUnion,
@@ -574,7 +575,7 @@ def _cluster_burst_positions(
     )
 
 
-def _set_num_incoherent_modes(array: numpy.ndarray, num_modes: int) -> numpy.ndarray:
+def _set_num_incoherent_modes(array: ComplexArrayType, num_modes: int) -> ComplexArrayType:
     """Pad with copies of the last mode, or truncate, to reach *num_modes*."""
     if array.shape[0] >= num_modes:
         return array[:num_modes]

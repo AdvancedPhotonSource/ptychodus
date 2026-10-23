@@ -1,6 +1,6 @@
 """Sub-pixel array interpolation utilities."""
 
-from typing import Any, Final, Generic, TypeVar, overload
+from typing import Final, Generic, TypeVar, overload
 import math
 
 import numpy.typing
@@ -16,7 +16,7 @@ __all__ = [
 ]
 
 
-InexactDType = TypeVar('InexactDType', bound=numpy.inexact[Any])
+_InexactT = TypeVar('_InexactT', bound=numpy.inexact)
 
 # An offset this close to a whole pixel is treated as landing on it. A coordinate that
 # is an exact integer in real arithmetic reaches here a few ULP away from one, and
@@ -139,16 +139,16 @@ def _axis_terms(frac: float) -> tuple[tuple[slice, float], ...]:
     return ((slice(None), 1.0),)
 
 
-class BarycentricArrayInterpolator(Generic[InexactDType]):
+class BarycentricArrayInterpolator(Generic[_InexactT]):
     """Extract patches from an array using bilinear (barycentric) sub-pixel interpolation."""
 
-    def __init__(self, array: numpy.typing.NDArray[InexactDType]) -> None:
+    def __init__(self, array: numpy.typing.NDArray[_InexactT]) -> None:
         super().__init__()
         self._array = array
 
     def get_patch(
         self, center_x: float, center_y: float, width: int, height: int
-    ) -> numpy.typing.NDArray[InexactDType]:
+    ) -> numpy.typing.NDArray[_InexactT]:
         x_support, x_frac = _calculate_support_frac(center_x, width, self._array.shape[-1])
         y_support, y_frac = _calculate_support_frac(center_y, height, self._array.shape[-2])
 
@@ -176,7 +176,7 @@ class BarycentricArrayInterpolator(Generic[InexactDType]):
         self,
         center_x: float,
         center_y: float,
-        patch: numpy.typing.NDArray[InexactDType],
+        patch: numpy.typing.NDArray[_InexactT],
     ) -> None:
         """Bilinear-scatter *patch* back into the underlying array (transpose of get_patch)."""
         x_support, x_frac = _calculate_support_frac(

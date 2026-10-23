@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import TypeVar
 import math
 
 from scipy.fft import fft2, fftfreq, fftshift, ifft2, ifftshift
@@ -14,7 +14,7 @@ from .constants import TWO_PI_J, energy_eV_to_J, energy_eV_to_wavelength_m
 from .typing import ComplexArrayType, RealArrayType
 from .geometry import ImageExtent, PixelGeometry
 
-_InexactT = TypeVar('_InexactT', bound=numpy.inexact[Any])
+_InexactT = TypeVar('_InexactT', bound=numpy.inexact)
 
 
 def intensity(wavefield: ComplexArrayType) -> RealArrayType:

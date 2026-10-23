@@ -7,26 +7,32 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from sys import getsizeof
 from pathlib import Path
-from typing import overload, Any, TypeAlias
+from typing import cast, overload, TypeAlias, TypeVar
 
 import numpy
 
 from .files import FileReader, FileWriter
 from .geometry import ImageExtent, PixelGeometry
 
-BadPixels: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.bool_]]
-DetectorBackground: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.floating[Any]]]
+BadPixels: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.bool]]
+PixelMap: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.floating]]
+"""Any per-pixel detector quantity on the detector extent, in floating point.
+
+The shape a background, a flat field or an unlabeled map read from a file all
+share. Where the quantity is known, prefer the alias that names it.
+"""
+DetectorBackground: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.floating]]
 """Additive per-pixel signal present without the sample, in counts per frame."""
-FlatField: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.floating[Any]]]
+FlatField: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.floating]]
 """Per-pixel response to uniform illumination; a measurement is corrected by dividing by it."""
-DiffractionPatternDType: TypeAlias = numpy.dtype[numpy.integer[Any] | numpy.floating[Any]]
+DiffractionPatternDType: TypeAlias = numpy.dtype[numpy.integer | numpy.floating]
 DiffractionPatternCounts: TypeAlias = numpy.ndarray[tuple[int], DiffractionPatternDType]
 DiffractionPattern: TypeAlias = numpy.ndarray[tuple[int, int], DiffractionPatternDType]
 DiffractionPatterns: TypeAlias = numpy.ndarray[tuple[int, int, int], DiffractionPatternDType]
-DiffractionIndexes: TypeAlias = numpy.ndarray[tuple[int], numpy.dtype[numpy.integer[Any]]]
-DiffractionPatternPhotonFluxes: TypeAlias = numpy.ndarray[
-    tuple[int], numpy.dtype[numpy.floating[Any]]
-]
+DiffractionIndexes: TypeAlias = numpy.ndarray[tuple[int], numpy.dtype[numpy.integer]]
+DiffractionPatternPhotonFluxes: TypeAlias = numpy.ndarray[tuple[int], numpy.dtype[numpy.floating]]
+
+_ArrayT = TypeVar('_ArrayT', bound=numpy.ndarray)
 
 
 @dataclass(frozen=True)
@@ -132,10 +138,10 @@ class CropRegion:
             y_range=(y_start, y_start + height),
         )
 
-    def apply_to(self, data: numpy.ndarray) -> numpy.ndarray:
+    def apply_to(self, data: _ArrayT) -> _ArrayT:
         """Slice the last two axes of `data` to this region; leading axes pass through."""
         leading = (slice(None),) * (data.ndim - 2)
-        return data[(*leading, self.y_slice, self.x_slice)]
+        return cast(_ArrayT, data[(*leading, self.y_slice, self.x_slice)])
 
 
 class DiffractionArray(ABC):
@@ -337,7 +343,7 @@ class DiffractionDataset(Sequence[DiffractionArray], ABC):
 
 
 def validate_pixel_map(
-    pixel_map: numpy.ndarray | None, expected_shape: tuple[int, ...], *, name: str
+    pixel_map: BadPixels | PixelMap | None, expected_shape: tuple[int, ...], *, name: str
 ) -> None:
     """Raise ValueError unless a per-pixel map is absent or has `expected_shape`.
 
@@ -370,7 +376,7 @@ class SimpleDiffractionDataset(DiffractionDataset):
         extent = metadata.detector_extent
 
         if bad_pixels is None:
-            bad_pixels = numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool_)
+            bad_pixels = numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool)
 
         validate_pixel_map(bad_pixels, extent.get_shape(), name='Bad pixels')
         validate_pixel_map(background, extent.get_shape(), name='Background')
@@ -426,7 +432,7 @@ class BadPixelsFileReader(FileReader[BadPixels]):
     """Plugin interface for reading bad-pixel mask files."""
 
 
-class PixelMapFileReader(FileReader[numpy.ndarray]):
+class PixelMapFileReader(FileReader[PixelMap]):
     """Plugin interface for reading a per-pixel detector map, such as a background or flat field.
 
     The map read is two-dimensional and floating point.

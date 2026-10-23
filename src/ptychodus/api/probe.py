@@ -904,7 +904,7 @@ class Probe:
         return self._pixel_geometry
 
     @property
-    def dtype(self) -> numpy.dtype:
+    def dtype(self) -> numpy.dtype[numpy.complexfloating]:
         return self._array.dtype
 
     @property
@@ -1065,7 +1065,7 @@ class ProbeEnsemble:
         return self._pixel_geometry
 
     @property
-    def dtype(self) -> numpy.dtype:
+    def dtype(self) -> numpy.dtype[numpy.complexfloating]:
         return self._array.dtype
 
     @property

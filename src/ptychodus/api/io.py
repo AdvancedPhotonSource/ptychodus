@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from enum import IntFlag, StrEnum
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import TypeVar
+from typing import cast, TypeVar
 import logging
 import re
 import warnings
@@ -40,8 +40,10 @@ from .diffraction import (
     DiffractionMetadata,
     DiffractionPatterns,
     FlatField,
+    PixelMap,
     Polarization,
 )
+from .typing import AnyArrayType, ComplexArrayType, NumberArrayType, RealArrayType
 from .preprocess.diffraction import inpaint_bad_pixels, zero_bad_pixels
 from .fluorescence import ElementMap, FluorescenceDataset
 from .geometry import ImageExtent, PixelGeometry
@@ -352,7 +354,7 @@ def load_product(file: Path) -> Product:
         focus_object_distance_m = float(
             h5_file.attrs.get(ProductFileKeys.FOCUS_OBJECT_DISTANCE, 0.0)
         )
-        # HDF5 hands back numpy.bool_; cast at the boundary as the floats above do.
+        # HDF5 hands back numpy.bool; cast at the boundary as the floats above do.
         far_field = bool(h5_file.attrs.get(ProductFileKeys.FAR_FIELD, True))
 
         polarization: Polarization | None = None
@@ -457,7 +459,7 @@ def load_product(file: Path) -> Product:
         # The all-or-nothing invariant on ProbePositionSequence means save_product only
         # writes probe_photon_counts when every position had a count; a present
         # dataset therefore aligns 1:1 with probe_position_indexes and needs no dict.
-        position_photon_counts_array: numpy.ndarray | None = None
+        position_photon_counts_array: RealArrayType | None = None
         h5_position_photon_counts = h5_file.get(ProductFileKeys.PROBE_PHOTON_COUNTS)
         if isinstance(h5_position_photon_counts, h5py.Dataset):
             position_photon_counts_array = h5_position_photon_counts[()]
@@ -890,7 +892,7 @@ def _open_cxi_entry(h5_file: h5py.File, entry: str | None) -> h5py.Group:
     return h5_file[numbered[0][1]]
 
 
-def _read_cxi_array(group: h5py.Group, key: str) -> numpy.ndarray | None:
+def _read_cxi_array(group: h5py.Group, key: str) -> AnyArrayType | None:
     item = group.get(key)
     return numpy.asarray(item[()]) if isinstance(item, h5py.Dataset) else None
 
@@ -977,7 +979,9 @@ def _read_cxi_photon_energy_eV(entry: h5py.Group) -> float | None:  # noqa: N802
     return None
 
 
-def _read_cxi_basis_vectors(entry: h5py.Group) -> numpy.ndarray | None:
+def _read_cxi_basis_vectors(
+    entry: h5py.Group,
+) -> RealArrayType | None:
     """Return the detector basis as a (2, 3) array, rows for the slow and fast axes.
 
     A per-frame stack contributes its first frame, and a basis stored transposed,
@@ -988,19 +992,19 @@ def _read_cxi_basis_vectors(entry: h5py.Group) -> numpy.ndarray | None:
     if basis is None:
         return None
 
-    basis = basis.astype(numpy.float64)
+    vectors = basis.astype(numpy.float64)
 
-    if basis.ndim == 3:
-        basis = basis[0]
+    if vectors.ndim == 3:
+        vectors = vectors[0]
 
-    if basis.shape == (3, 2):
-        basis = basis.T
+    if vectors.shape == (3, 2):
+        vectors = vectors.T
 
-    if basis.shape != (2, 3) or not numpy.isfinite(basis).all():
-        logger.warning('Ignoring basis_vectors of shape %s.', basis.shape)
+    if vectors.shape != (2, 3) or not numpy.isfinite(vectors).all():
+        logger.warning('Ignoring basis_vectors of shape %s.', vectors.shape)
         return None
 
-    return basis
+    return vectors
 
 
 def _read_cxi_detector_pixel_geometry(entry: h5py.Group) -> PixelGeometry | None:
@@ -1090,7 +1094,7 @@ def _read_cxi_bad_pixels(
 
 def _read_cxi_pixel_map(
     entry: h5py.Group, keys: Sequence[str], extent: ImageExtent | None
-) -> numpy.ndarray | None:
+) -> PixelMap | None:
     """Read the first map found under `keys`, averaging a stack over its leading axes."""
     for key in keys:
         pixel_map = _read_cxi_array(entry, key)
@@ -1098,28 +1102,30 @@ def _read_cxi_pixel_map(
         if pixel_map is None:
             continue
 
-        pixel_map = pixel_map.astype(numpy.float64)
+        values = pixel_map.astype(numpy.float64)
 
-        if pixel_map.ndim > 2:
+        if values.ndim > 2:
             with warnings.catch_warnings():
                 # An all-NaN pixel stays NaN, which marks it bad downstream.
                 warnings.simplefilter('ignore', RuntimeWarning)
-                pixel_map = numpy.nanmean(pixel_map.reshape(-1, *pixel_map.shape[-2:]), axis=0)
+                values = numpy.nanmean(values.reshape(-1, *values.shape[-2:]), axis=0)
 
-        if pixel_map.ndim != 2 or (extent is not None and pixel_map.shape != extent.get_shape()):
-            logger.warning('Ignoring %s of shape %s.', key, pixel_map.shape)
+        if values.ndim != 2 or (extent is not None and values.shape != extent.get_shape()):
+            logger.warning('Ignoring %s of shape %s.', key, values.shape)
             return None
 
-        return pixel_map
+        return cast(PixelMap, values)
 
     return None
 
 
-def _read_cxi_background(entry: h5py.Group, extent: ImageExtent | None) -> numpy.ndarray | None:
+def _read_cxi_background(
+    entry: h5py.Group, extent: ImageExtent | None
+) -> DetectorBackground | None:
     return _read_cxi_pixel_map(entry, (CXIFileKeys.DETECTOR_DATA_DARK,), extent)
 
 
-def _read_cxi_flat_field(entry: h5py.Group, extent: ImageExtent | None) -> numpy.ndarray | None:
+def _read_cxi_flat_field(entry: h5py.Group, extent: ImageExtent | None) -> FlatField | None:
     return _read_cxi_pixel_map(
         entry, (CXIFileKeys.FLAT_FIELD, CXIFileKeys.DETECTOR_QE_MASK), extent
     )
@@ -1307,9 +1313,9 @@ def _read_cxi_probe_positions(entry: h5py.Group) -> ProbePositionSequence:
     )
 
 
-def _as_complex_image(array: numpy.ndarray, name: str) -> numpy.ndarray:
+def _as_complex_image(array: AnyArrayType, name: str) -> ComplexArrayType:
     if numpy.iscomplexobj(array):
-        return array
+        return cast(ComplexArrayType, array)
 
     logger.warning('%s is real-valued; reading it as a complex image with no phase.', name)
     return array.astype(numpy.complex64)
@@ -1771,9 +1777,9 @@ def _write_cxi_image(
     name: str,
     *,
     title: str,
-    array: numpy.ndarray,
+    array: NumberArrayType,
     axis_name: str,
-    axis_values: numpy.ndarray,
+    axis_values: NumberArrayType,
     pixel_geometry: PixelGeometry | None,
 ) -> h5py.Dataset:
     """Write one image group: 2-D when `array` holds one plane, else with a named axis."""

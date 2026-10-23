@@ -186,7 +186,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
     def _create_default_bad_pixels(self) -> BadPixels:
         extent = self._dataset.get_metadata().detector_extent
-        return numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool_)
+        return numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool)
 
     def get_name(self) -> str:
         return self._name

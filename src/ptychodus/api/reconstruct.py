@@ -25,7 +25,13 @@ import numpy
 from pydantic import BaseModel
 
 from .assemble import AssembledDiffractionData
-from .diffraction import BadPixels, DetectorBackground, DiffractionPatterns, FlatField
+from .diffraction import (
+    BadPixels,
+    DetectorBackground,
+    DiffractionPatternPhotonFluxes,
+    DiffractionPatterns,
+    FlatField,
+)
 from .geometry import ImageExtent
 from .object import Object
 from .probe import ProbeEnsemble
@@ -789,7 +795,7 @@ def prepare_reconstruct_input(
 
     pattern_keep = numpy.fromiter(
         (index_filter(int(i)) for i in pattern_indexes),
-        dtype=numpy.bool_,
+        dtype=numpy.bool,
         count=pattern_indexes.size,
     )
     filtered_pattern_indexes = pattern_indexes[pattern_keep]
@@ -812,7 +818,7 @@ def prepare_reconstruct_input(
 
     pos_keep = numpy.fromiter(
         (index_filter(int(i)) for i in pos_indexes_all),
-        dtype=numpy.bool_,
+        dtype=numpy.bool,
         count=n_positions,
     )
     pos_indexes = pos_indexes_all[pos_keep]
@@ -839,7 +845,7 @@ def prepare_reconstruct_input(
     # reader did not supply a count) propagate through bincount -> mean, marking the
     # anchor invalid so the subsequent interp yields NaN for any pattern index derived
     # from it.
-    mean_photon_counts: numpy.ndarray | None = None
+    mean_photon_counts: RealArrayType | None = None
     if pos_photon_counts is not None:
         mean_photon_counts = numpy.bincount(inverse, weights=pos_photon_counts) / counts
 
@@ -870,7 +876,7 @@ def prepare_reconstruct_input(
     # because in_range_mask already trimmed to [lo, hi].
     x_coords = numpy.interp(in_range_pattern_indexes, unique_pos_indexes, mean_x)
     y_coords = numpy.interp(in_range_pattern_indexes, unique_pos_indexes, mean_y)
-    photon_counts: numpy.ndarray | None = None
+    photon_counts: DiffractionPatternPhotonFluxes | None = None
     if mean_photon_counts is not None:
         photon_counts = numpy.interp(
             in_range_pattern_indexes, unique_pos_indexes, mean_photon_counts

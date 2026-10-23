@@ -4,11 +4,11 @@ from pathlib import Path
 
 import numpy
 
-from ptychodus.api.diffraction import PixelMapFileReader
+from ptychodus.api.diffraction import PixelMap, PixelMapFileReader
 from ptychodus.api.plugins import PluginRegistry
 
 
-def _read_pixel_map(file_path: Path) -> numpy.ndarray:
+def _read_pixel_map(file_path: Path) -> PixelMap:
     pixel_map = numpy.load(file_path)
 
     if pixel_map.ndim != 2:
@@ -33,7 +33,7 @@ class NPYPixelMapFileReader(PixelMapFileReader):
     def get_file_extensions(self) -> set[str]:
         return {'.npy'}
 
-    def read(self, file_path: Path) -> numpy.ndarray:
+    def read(self, file_path: Path) -> PixelMap:
         return _read_pixel_map(file_path)
 
 
@@ -51,7 +51,7 @@ class NPYFlatFieldCorrectionFileReader(PixelMapFileReader):
     def get_file_extensions(self) -> set[str]:
         return {'.npy'}
 
-    def read(self, file_path: Path) -> numpy.ndarray:
+    def read(self, file_path: Path) -> PixelMap:
         factors = _read_pixel_map(file_path)
         return numpy.divide(1.0, factors, out=numpy.zeros_like(factors), where=factors > 0.0)
 

@@ -39,6 +39,7 @@ from ptychodus.api.diffraction import (
     DiffractionMetadata,
 )
 from ptychodus.api.exit_codes import ExitCode
+from ptychodus.api.typing import BooleanArrayType, RealArrayType
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.object import compute_object_geometry
@@ -376,7 +377,7 @@ def _add_pattern_filter_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _mad_bounds(values: numpy.ndarray, k: float) -> tuple[float, float]:
+def _mad_bounds(values: RealArrayType, k: float) -> tuple[float, float]:
     """Symmetric MAD interval about the median, excluding non-positive values.
 
     Reproduces the beamline script's ``_mad_mask(x, k, require_positive=True)``, zero-MAD
@@ -390,7 +391,7 @@ def _mad_bounds(values: numpy.ndarray, k: float) -> tuple[float, float]:
 def _select_patterns(
     logger: logging.Logger,
     assembled_data: AssembledDiffractionData,
-    keep: numpy.ndarray,
+    keep: BooleanArrayType,
     reason: str,
 ) -> AssembledDiffractionData:
     """Return the patterns `keep` selects, as a new AssembledDiffractionData.

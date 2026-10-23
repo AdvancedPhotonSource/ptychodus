@@ -13,7 +13,7 @@ from pathlib import Path
 import h5py
 import numpy
 
-from ptychodus.api.diffraction import PixelMapFileReader
+from ptychodus.api.diffraction import PixelMap, PixelMapFileReader
 
 from ._scan import detector_group
 
@@ -27,7 +27,7 @@ class ESRFID16ADarkFileReader(PixelMapFileReader):
     def get_file_extensions(self) -> set[str]:
         return {'.h5', '.hdf5'}
 
-    def read(self, file_path: Path) -> numpy.ndarray:
+    def read(self, file_path: Path) -> PixelMap:
         with h5py.File(file_path, 'r') as h5_file:
             frames = detector_group(h5_file)['data']
 

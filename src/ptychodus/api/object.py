@@ -14,7 +14,7 @@ from scipy.ndimage import gaussian_filter
 from skimage.registration import phase_cross_correlation
 from skimage.restoration import unwrap_phase
 
-from .typing import ComplexArrayType, RealArrayType
+from .typing import ComplexArrayType, InexactArrayType, RealArrayType
 from .constants import format_length
 from .files import FileReader, FileWriter
 from .fourier import fourier_shift_2d
@@ -235,7 +235,7 @@ class Object:
         return self._array
 
     @property
-    def dtype(self) -> numpy.dtype:
+    def dtype(self) -> numpy.dtype[numpy.complexfloating]:
         return self._array.dtype
 
     @property
@@ -331,7 +331,7 @@ class RegistrationQuantity(Enum):
     def is_shift_exact(self) -> bool:
         return self is RegistrationQuantity.COMPLEX
 
-    def extract(self, array: ComplexArrayType) -> numpy.ndarray:
+    def extract(self, array: ComplexArrayType) -> InexactArrayType:
         """Map a complex object array onto the quantity used for registration."""
         values = numpy.asarray(array)
 
@@ -358,7 +358,9 @@ class RegistrationQuantity(Enum):
                 )
 
 
-def _logarithmic_gradient(values: ComplexArrayType) -> tuple[numpy.ndarray, numpy.ndarray]:
+def _logarithmic_gradient(
+    values: ComplexArrayType,
+) -> tuple[ComplexArrayType, ComplexArrayType]:
     """Forward differences of ``log(O)`` along each axis, computed wrap-free.
 
     ``log(O[i + 1] / O[i])`` is the log-amplitude difference plus the phase
@@ -380,7 +382,7 @@ def _logarithmic_gradient(values: ComplexArrayType) -> tuple[numpy.ndarray, nump
     return gradient_y, gradient_x
 
 
-def _remove_gaussian_background(image: numpy.ndarray, sigma_px: float) -> numpy.ndarray:
+def _remove_gaussian_background(image: InexactArrayType, sigma_px: float) -> InexactArrayType:
     if sigma_px <= 0.0:
         return image
 

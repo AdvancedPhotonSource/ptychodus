@@ -20,6 +20,7 @@ import numpy
 
 from ptychodus.api.constants import LengthUnit
 from ptychodus.api.plugins import PluginRegistry
+from ptychodus.api.typing import RealArrayType
 from ptychodus.api.probe_positions import (
     ProbePosition,
     ProbePositionFileReader,
@@ -44,7 +45,7 @@ class BionanoprobeMAPSPositionFileReader(ProbePositionFileReader):
     def get_file_extensions(self) -> set[str]:
         return {'.h5', '.hdf5'}
 
-    def _read_axis(self, h5_file: h5py.File, path: str) -> numpy.ndarray:
+    def _read_axis(self, h5_file: h5py.File, path: str) -> RealArrayType:
         try:
             dataset = h5_file[path]
         except KeyError:

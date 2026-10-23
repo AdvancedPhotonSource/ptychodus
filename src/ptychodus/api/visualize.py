@@ -4,7 +4,6 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Any
 from typing import Final, cast
 import logging
 
@@ -304,7 +303,7 @@ class ComplexComponent(Enum):
     def extract_component(
         self,
         array: NumberArrayType,
-        dtype: numpy.dtype[numpy.floating[Any]] = numpy.dtype(numpy.single),
+        dtype: numpy.dtype[numpy.floating] = numpy.dtype(numpy.single),
     ) -> RealArrayType:
         match self:
             case ComplexComponent.REAL:

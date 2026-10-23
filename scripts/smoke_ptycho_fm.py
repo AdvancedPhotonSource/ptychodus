@@ -138,7 +138,7 @@ def _reconstruct_input(pattern_size: int) -> ReconstructInput:
     patterns = rng.poisson(50.0, (N_PATTERNS, pattern_size, pattern_size)).astype(numpy.float32)
     return ReconstructInput(
         diffraction_patterns=patterns,
-        bad_pixels=numpy.zeros((pattern_size, pattern_size), dtype=numpy.bool_),
+        bad_pixels=numpy.zeros((pattern_size, pattern_size), dtype=numpy.bool),
         product=_product(pattern_size),
     )
 

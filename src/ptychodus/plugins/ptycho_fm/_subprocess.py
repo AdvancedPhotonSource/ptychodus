@@ -41,6 +41,7 @@ import numpy
 from ptychodus.api.preprocess.diffraction import zero_bad_pixels
 from ptychodus.api.object import Object
 from ptychodus.api.product import LossValue, Product
+from ptychodus.api.typing import ComplexArrayType, NumberArrayType, RealArrayType
 from ptychodus.api.reconstruct import (
     ReconstructOutput,
     ReconstructorMessage,
@@ -64,7 +65,7 @@ def _select_device() -> Any:
     return torch.device('cpu')
 
 
-def _pad_probe_to_modes(probe: numpy.ndarray, target_modes: int) -> numpy.ndarray:
+def _pad_probe_to_modes(probe: ComplexArrayType, target_modes: int) -> ComplexArrayType:
     """Zero-pad a complex probe ``(N_modes, H, W)`` up to ``target_modes`` along axis 0.
 
     ptycho_fm pads the incoherent-mode axis of a 4D ``(OPR, N_modes, H, W)``
@@ -82,7 +83,7 @@ def _pad_probe_to_modes(probe: numpy.ndarray, target_modes: int) -> numpy.ndarra
     return numpy.concatenate([probe, padding], axis=0)
 
 
-def _zero_pad_2d_to(image: numpy.ndarray, target_size: int) -> numpy.ndarray:
+def _zero_pad_2d_to(image: NumberArrayType, target_size: int) -> NumberArrayType:
     """Center a 2D array inside a ``(target_size, target_size)`` zero-padded canvas."""
     h, w = image.shape
     if h == target_size and w == target_size:
@@ -103,7 +104,7 @@ def _zero_pad_2d_to(image: numpy.ndarray, target_size: int) -> numpy.ndarray:
     )
 
 
-def _build_positions_top_left(parameters: Any) -> numpy.ndarray:
+def _build_positions_top_left(parameters: Any) -> RealArrayType:
     """Convert ptychodus probe positions to top-left-origin object-pixel coords.
 
     Returns an ``(N, 2)`` float32 array of ``[y_px, x_px]`` centres, matching

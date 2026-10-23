@@ -32,7 +32,7 @@ import threading
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from types import FrameType
-from typing import Any, Final
+from typing import Any, cast, Final
 
 import numpy
 import yaml
@@ -45,6 +45,7 @@ from ptychodus.api.diffraction import (
     BeamCenter,
     CropRegion,
     DiffractionDataset,
+    DiffractionPatternDType,
 )
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.io import StandardFileLayout, save_diffraction_data, save_product
@@ -441,7 +442,7 @@ def resolve_crop_region(
     return region
 
 
-def invalid_count_threshold(dtype: numpy.dtype) -> int | None:
+def invalid_count_threshold(dtype: DiffractionPatternDType) -> int | None:
     """Count at and above which a pixel is invalid rather than merely bright.
 
     Dectris detectors flag dead, masked and saturated pixels with the maximum value the
@@ -450,7 +451,8 @@ def invalid_count_threshold(dtype: numpy.dtype) -> int | None:
     the real beam as noise and silently returns the detector midpoint instead.
     """
     if numpy.issubdtype(dtype, numpy.integer):
-        return int(numpy.iinfo(dtype).max)
+        # issubdtype does not narrow the pattern dtype union for the checker.
+        return int(numpy.iinfo(cast(numpy.dtype[numpy.integer], dtype)).max)
 
     return None
 
