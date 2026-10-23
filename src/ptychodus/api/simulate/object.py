@@ -14,17 +14,27 @@ from ..interpolate import lerp
 from ..assemble import AssembledDiffractionData
 from ..object import Object, ObjectGeometry, resample_object_layers
 from ..probe_positions import ProbePosition
-from ..typing import IntegerArrayType, RealArrayType
+from ..typing import BooleanArrayType, IntegerArrayType, RealArrayType
 
 logger = logging.getLogger(__name__)
 
 
-def generate_stxm_object(
+def _interpolate_stxm_intensity(
     geometry: ObjectGeometry,
     assembled_data: AssembledDiffractionData,
     probe_positions: Iterable[ProbePosition],
-) -> Object:
-    """Generate an STXM-like object by interpolating per-position diffraction counts onto the object grid."""
+) -> tuple[RealArrayType, BooleanArrayType]:
+    """Per-position diffraction counts on the object grid, and which pixels the scan covered.
+
+    Linear interpolation holds inside the convex hull of the scan positions; beyond it
+    every pixel takes its nearest measured neighbour, so the border continues the
+    measured edge rather than stepping to a level nothing observed.
+
+    The returned mask marks the linearly interpolated pixels. Those beyond the hull are
+    plausible but are not measurements of anything, so a caller summarizing the map --
+    taking a mean to normalize by, say -- must weigh the mask rather than the whole
+    canvas.
+    """
     coordinates_px: list[float] = list()
     values: list[float] = list()
 
@@ -46,9 +56,47 @@ def generate_stxm_object(
     points = numpy.reshape(coordinates_px, (-1, 2))
     YY, XX = numpy.mgrid[: geometry.height_px, : geometry.width_px]  # noqa: N806
     query_points = numpy.transpose((YY.flat, XX.flat))
-    intensity = griddata(points, values, query_points, method='linear', fill_value=0.0).reshape(
-        XX.shape
-    )
+
+    # griddata fills with NaN outside the hull unless told otherwise, which is what
+    # distinguishes the two regions here.
+    intensity = griddata(points, values, query_points, method='linear').reshape(XX.shape)
+    scanned = numpy.logical_not(numpy.isnan(intensity))
+
+    if not scanned.all():
+        nearest = griddata(points, values, query_points, method='nearest').reshape(XX.shape)
+        intensity = numpy.where(scanned, intensity, nearest)
+
+    return intensity, scanned
+
+
+def generate_stxm_object(
+    geometry: ObjectGeometry,
+    assembled_data: AssembledDiffractionData,
+    probe_positions: Iterable[ProbePosition],
+) -> Object:
+    """Generate an STXM-like object by interpolating per-position diffraction counts onto
+    the object grid.
+
+    The counts are divided by their mean over the scanned region, so the result is a
+    dimensionless contrast map of unit root-mean-square modulus rather than an amplitude
+    in units of the square root of a photon count. A caller that knows the sample's mean
+    opacity supplies the absolute level by scaling this; a position recording the
+    unobstructed beam then comes out at unit modulus.
+
+    The mean excludes pixels beyond the scan, which are extrapolated rather than
+    measured and would otherwise drag it toward whatever the edge of the scan happened
+    to be.
+    """
+    intensity, scanned = _interpolate_stxm_intensity(geometry, assembled_data, probe_positions)
+    mean_intensity = float(numpy.mean(intensity[scanned])) if scanned.any() else 0.0
+
+    if mean_intensity > 0.0:
+        intensity = intensity / mean_intensity
+    else:
+        logger.warning(
+            'Mean STXM intensity over the scanned region is %r; leaving the object unnormalized.',
+            mean_intensity,
+        )
 
     return Object(
         array=numpy.sqrt(intensity[numpy.newaxis, :, :]).astype('complex'),
@@ -75,6 +123,10 @@ def generate_paganin_object(
     projected thickness T(x,y) of a homogeneous, weakly-absorbing sample with
     refractive-index decrement delta and extinction coefficient beta. The
     transmission function follows as ``filtered ** ((1 + i * delta/beta) / 2)``.
+
+    The mean is taken over the scanned region alone. Pixels beyond it are
+    extrapolated from the edge of the scan rather than measured, so including
+    them would set I_0 partly from values nothing observed.
     """
     if propagation_distance_m <= 0.0:
         raise ValueError('Propagation distance must be strictly positive!')
@@ -82,10 +134,8 @@ def generate_paganin_object(
     if delta_over_beta <= 0.0:
         raise ValueError('delta/beta ratio must be strictly positive!')
 
-    stxm = generate_stxm_object(geometry, assembled_data, probe_positions)
-    intensity = numpy.square(numpy.abs(stxm.get_array()[0]))
-
-    mean_intensity = float(numpy.mean(intensity))
+    intensity, scanned = _interpolate_stxm_intensity(geometry, assembled_data, probe_positions)
+    mean_intensity = float(numpy.mean(intensity[scanned])) if scanned.any() else 0.0
 
     if mean_intensity <= 0.0:
         raise ValueError('Mean STXM intensity must be positive!')

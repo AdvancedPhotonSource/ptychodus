@@ -54,8 +54,12 @@ from ptychodus.api.simulate.object import (
     generate_stxm_object,
     generate_uniform_object,
 )
+from ptychodus.api.simulate.object import _interpolate_stxm_intensity
 from ptychodus.api.probe_positions import ProbePosition
-from ptychodus.api.assemble import AssembledDiffractionData
+from ptychodus.api.assemble import (
+    AssembledDiffractionData,
+    estimate_mean_amplitude_transmission,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -653,14 +657,93 @@ class TestStxmObject:
         assert obj.get_center().x_m == pytest.approx(1.0e-6)
         assert obj.get_center().y_m == pytest.approx(-2.0e-6)
 
-    def test_constant_counts_yield_constant_intensity_interior(self) -> None:
+    def test_constant_counts_yield_unit_contrast_interior(self) -> None:
+        """A flat scan is featureless, so every pixel sits at the mean: unit contrast,
+        whatever the count level happens to be."""
         geometry = _make_geometry(64, 64)
         positions = _make_probe_positions_grid(geometry, (5, 5))
         data = _make_assembled_data([200] * len(positions))
         obj = generate_stxm_object(geometry, data, positions)
         intensity = numpy.square(numpy.abs(obj.get_array()[0]))
         interior = intensity[20:44, 20:44]
-        numpy.testing.assert_allclose(interior, 200.0, rtol=1e-6)
+        numpy.testing.assert_allclose(interior, 1.0, rtol=1e-6)
+
+    def test_scale_is_independent_of_the_count_magnitude(self) -> None:
+        """The object is a dimensionless contrast map, so brightening the whole scan by
+        four orders of magnitude leaves it unchanged -- it used to scale as the square
+        root of the counts, reaching a modulus of ~1e3 on a real scan."""
+        geometry = _make_geometry(64, 64)
+        positions = _make_probe_positions_grid(geometry, (5, 5))
+        shape = [100 + 10 * i for i in range(len(positions))]
+
+        dim = generate_stxm_object(geometry, _make_assembled_data(shape), positions)
+        bright = generate_stxm_object(
+            geometry, _make_assembled_data([c * 10_000 for c in shape]), positions
+        )
+
+        numpy.testing.assert_allclose(bright.get_array(), dim.get_array(), rtol=1e-6)
+        assert numpy.abs(dim.get_array()).max() < 10.0
+
+    def test_mean_intensity_over_the_scanned_region_is_one(self) -> None:
+        """What normalization means here, stated directly. The mean is taken over the
+        scanned pixels only; the extrapolated border is excluded from it."""
+        geometry = _make_geometry(64, 64)
+        positions = _make_probe_positions_grid(geometry, (5, 5))
+        counts = [100 + 17 * i for i in range(len(positions))]
+        _, scanned = _interpolate_stxm_intensity(geometry, _make_assembled_data(counts), positions)
+
+        obj = generate_stxm_object(geometry, _make_assembled_data(counts), positions)
+        intensity = numpy.square(numpy.abs(obj.get_array()[0]))
+
+        assert scanned.any() and not scanned.all(), 'Test precondition: there is a border'
+        assert numpy.mean(intensity[scanned]) == pytest.approx(1.0, rel=1e-9)
+
+    def test_border_takes_the_nearest_measured_value(self) -> None:
+        """Outside the scan every pixel takes the count of the scan position nearest it,
+        so the border continues the measurement instead of stepping to a level nothing
+        observed -- zero, the old fill, being a fully opaque wall."""
+        geometry = _make_geometry(64, 64)
+        positions = _make_probe_positions_grid(geometry, (5, 5))
+        counts = [100 + 40 * i for i in range(len(positions))]
+        intensity, scanned = _interpolate_stxm_intensity(
+            geometry, _make_assembled_data(counts), positions
+        )
+
+        mapped = [geometry.map_coordinates_probe_to_object(p) for p in positions]
+        outside = numpy.argwhere(numpy.logical_not(scanned))
+        assert len(outside) > 0, 'Test precondition: there is a border'
+
+        for row, column in (outside[0], outside[len(outside) // 2], outside[-1]):
+            nearest = min(
+                range(len(positions)),
+                key=lambda i: (mapped[i].y_px - row) ** 2 + (mapped[i].x_px - column) ** 2,
+            )
+            assert intensity[row, column] == pytest.approx(counts[nearest])
+
+        # Not the old constant fill, and not the mean either.
+        assert intensity[numpy.logical_not(scanned)].min() > 0.0
+
+    def test_a_zero_count_position_stays_inside_the_scanned_mask(self) -> None:
+        """The mask says where the interpolation had data, not where the data was
+        nonzero -- a fully absorbing position is a measurement like any other, and the
+        `intensity > 0` test it replaces would have discarded it."""
+        geometry = _make_geometry(64, 64)
+        positions = _make_probe_positions_grid(geometry, (5, 5))
+        dark = len(positions) // 2
+        counts = [100] * len(positions)
+        counts[dark] = 0
+        intensity, scanned = _interpolate_stxm_intensity(
+            geometry, _make_assembled_data(counts), positions
+        )
+
+        mapped = geometry.map_coordinates_probe_to_object(positions[dark])
+        row, column = round(mapped.y_px), round(mapped.x_px)
+
+        assert scanned[row, column]
+        # The interpolant passes through the measured points, so the pixel nearest the
+        # dark position is near zero while its neighbours are not.
+        assert intensity[row, column] < 20.0
+        assert intensity[scanned].max() == pytest.approx(100.0)
 
     def test_monotonic_ramp_yields_monotonic_intensity(self) -> None:
         geometry = _make_geometry(64, 64)
@@ -674,6 +757,33 @@ class TestStxmObject:
         row = intensity[32, 20:44]
         assert numpy.all(numpy.diff(row) >= -1e-6)
         assert row[-1] > row[0]
+
+    def test_an_unobstructed_position_ends_at_unit_modulus(self) -> None:
+        """Ties this normalization to the one the builders apply on top of it.
+
+        `generate_stxm_object` divides out the scanned mean and
+        `estimate_mean_amplitude_transmission` supplies the absolute level, so a
+        position recording the unobstructed beam has to come out transparent once both
+        have been applied -- neither function knows about the other, and only together
+        do they say what a modulus means.
+
+        The agreement is close rather than exact: the generator takes a spatial mean
+        over the pixels inside the hull while the transmission estimate takes a plain
+        mean of the per-pattern counts, and the pixel grid does not tile the hull
+        symmetrically. A ramp on a regular grid brings the two within a tenth of a
+        percent, which is far inside the factor this is guarding against.
+        """
+        geometry = _make_geometry(64, 64)
+        positions = _make_probe_positions_grid(geometry, (5, 5))
+        column_counts = [200, 400, 600, 800, 1000]
+        counts = [column_counts[i % 5] for i in range(len(positions))]
+        data = _make_assembled_data(counts)
+
+        obj = generate_stxm_object(geometry, data, positions)
+        scaled = obj.get_array() * estimate_mean_amplitude_transmission(data)
+
+        _, scanned = _interpolate_stxm_intensity(geometry, data, positions)
+        assert numpy.abs(scaled[0][scanned]).max() == pytest.approx(1.0, rel=5e-3)
 
     def test_skips_missing_indexes(self) -> None:
         geometry = _make_geometry(32, 32)
@@ -818,10 +928,7 @@ class TestPaganinObject:
             propagation_distance_m=1.0e-14,
             delta_over_beta=delta_over_beta,
         )
-        stxm_intensity = numpy.square(
-            numpy.abs(generate_stxm_object(geometry, data, positions).get_array()[0])
-        )
-        interior = stxm_intensity > 0  # exclude boundary pixels filled by griddata
+        _, interior = _interpolate_stxm_intensity(geometry, data, positions)
         array = obj.get_array()[0]
         amplitude = numpy.abs(array)
         phase = numpy.angle(array)
@@ -844,11 +951,9 @@ class TestPaganinObject:
             propagation_distance_m=1.0e-30,
             delta_over_beta=delta_over_beta,
         )
-        stxm_intensity = numpy.square(
-            numpy.abs(generate_stxm_object(geometry, data, positions).get_array()[0])
-        )
-        interior = stxm_intensity > 0  # boundary pixels are clipped to small_value
-        normalized = stxm_intensity / stxm_intensity.mean()
+        stxm_intensity, interior = _interpolate_stxm_intensity(geometry, data, positions)
+        # Normalized the way the generator does it: over the scanned region alone.
+        normalized = stxm_intensity / stxm_intensity[interior].mean()
         exponent = 0.5 * (1.0 + 1j * delta_over_beta)
         expected = numpy.power(normalized.astype(complex), exponent)
         numpy.testing.assert_allclose(
