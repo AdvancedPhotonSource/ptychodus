@@ -10,7 +10,6 @@ from ptychodus.api.preprocess.diffraction import (
     HorizontalFlipStep,
     PaddingStep,
     TransposeStep,
-    UpsampleStep,
     VerticalFlipStep,
 )
 from ptychodus.api.geometry import ImageExtent, Interval
@@ -53,7 +52,7 @@ class PrepPipelineBuilder:
         plan must pass an extent.
 
         Pipeline canonical order after the load-time crop:
-        filter → binning → upsample → padding → hflip → vflip → transpose.
+        filter → binning → padding → hflip → vflip → transpose.
         """
         s = self._settings
         steps: list[DiffractionPrepStepUnion] = []
@@ -126,11 +125,7 @@ class PrepPipelineBuilder:
                     )
             steps.append(BinningStep(bin_size_x=bin_x, bin_size_y=bin_y))
 
-        # Upsample / padding / flips / transpose: no clamping needed.
-        if s.upsample_enabled.get_value():
-            factor = s.upsample_factor.get_value()
-            if factor > 1:
-                steps.append(UpsampleStep(factor=factor))
+        # Padding / flips / transpose: no clamping needed.
         if s.padding_enabled.get_value():
             steps.append(PaddingStep(pad_x=s.pad_x.get_value(), pad_y=s.pad_y.get_value()))
         if s.hflip.get_value():

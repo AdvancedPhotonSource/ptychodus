@@ -346,6 +346,17 @@ class IncoherentModeStrategyViewController(ParameterViewController, Observer):
             ),
         ]
 
+        derivative_decay_rows: list[tuple[str, ParameterViewController]] = [
+            (
+                'Decay Type:',
+                DecayTypeParameterViewController(probe_builder.incoherent_mode_decay_type),
+            ),
+            (
+                'Decay Ratio:',
+                DecimalSliderParameterViewController(probe_builder.incoherent_mode_decay_ratio),
+            ),
+        ]
+
         self._pages: dict[str, QWidget] = {
             'MomentPolynomial': self._build_page(
                 [
@@ -358,6 +369,7 @@ class IncoherentModeStrategyViewController(ParameterViewController, Observer):
                     ),
                 ]
             ),
+            'Derivative': self._build_page(derivative_decay_rows),
             'RandomPhaseRamp': self._build_page(more_decay_rows),
             'GaussianSchell': self._build_page(
                 [

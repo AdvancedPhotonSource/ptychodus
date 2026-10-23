@@ -898,7 +898,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         rng,
         probe,
         num_cmodes=args.num_opr_modes,
-        num_diffraction_patterns=num_patterns,
+        num_positions=len(positions),
     )
     logger.info('Probe: %s', probe_ensemble.get_array().shape)
 

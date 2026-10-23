@@ -547,11 +547,12 @@ class TestIncoherentModeStrategySettings:
         assert numpy.all(numpy.isfinite(powers))
 
     def test_the_decay_driven_strategies_follow_the_decay_settings(self) -> None:
-        """Both read the decay profile, so both land on the same weights."""
+        """Each reads the decay profile, so all land on the same weights."""
         expected = [4 / 7, 2 / 7, 1 / 7]
 
         numpy.testing.assert_allclose(self._mode_powers('MomentPolynomial'), expected, rtol=1e-9)
         numpy.testing.assert_allclose(self._mode_powers('RandomPhaseRamp'), expected, rtol=1e-9)
+        numpy.testing.assert_allclose(self._mode_powers('Derivative'), expected, rtol=1e-9)
 
     def test_gaussian_schell_predicts_its_own_spectrum(self) -> None:
         """It ignores the decay profile, so its weights must differ from the others."""

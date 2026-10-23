@@ -730,7 +730,15 @@ class ReconstructorLibrary(Iterable[Reconstructor], ABC):
 
 
 class PositionIndexFilter(Enum):
-    """Filter scan points by scan index."""
+    """Filter scan points by scan index.
+
+    ``ODD`` and ``EVEN`` split a scan into two interleaved halves by index parity. How
+    the halves sit on the sample follows from how the scan is numbered: a raster
+    numbered by a running count is split into a checkerboard when a line holds an odd
+    number of points, and into alternating columns when it holds an even number. Line-
+    major indexes (``line * stride + column`` with an even stride) always split into
+    columns, so each half keeps the full step along the lines and doubles it across them.
+    """
 
     ALL = auto()
     ODD = auto()
@@ -761,11 +769,18 @@ def prepare_reconstruct_input(
       interpolated from neighboring anchors;
     - pattern indexes outside the position-index range are dropped (no extrapolation).
 
-    Positions whose index has no matching pattern naturally do not appear in the output. The OPR
-    caveat below is unchanged from the prior implementation; interpolation makes the misalignment
-    worse because interpolated entries have no natural OPR row at all.
+    Positions whose index has no matching pattern naturally do not appear in the output.
+
+    OPR weights carry one row per probe position, and are conditioned exactly as the
+    coordinates are: filtered, averaged over duplicate indexes and interpolated at the
+    pattern indexes. The output therefore holds one weight row per output pattern, in the
+    same order as the output positions.
+
+    Raises:
+        ValueError: If the OPR weights do not have one row per probe position, if the
+            index filter eliminates every pattern or position, or if no position index
+            overlaps the pattern indexes.
     """
-    # TODO also filter OPR weights
     pattern_indexes = assembled_data.get_indexes()
     valid_patterns = assembled_data.get_patterns()
 
@@ -786,6 +801,14 @@ def prepare_reconstruct_input(
     pos_y_all = product.probe_positions.get_coordinates_y_m()
 
     pos_photon_counts_all = product.probe_positions.get_probe_photon_counts()
+    opr_weights_all = product.probes.get_opr_weights_or_none()
+
+    if opr_weights_all is not None and opr_weights_all.shape[0] != n_positions:
+        raise ValueError(
+            f'OPR weights have {opr_weights_all.shape[0]} rows but the product has'
+            f' {n_positions} probe positions; each row belongs to one probe position.'
+            ' Choose an OPR weight policy (Average or Reinitialize) to conform them.'
+        )
 
     pos_keep = numpy.fromiter(
         (index_filter(int(i)) for i in pos_indexes_all),
@@ -853,6 +876,25 @@ def prepare_reconstruct_input(
             in_range_pattern_indexes, unique_pos_indexes, mean_photon_counts
         )
 
+    probes = product.probes
+    if opr_weights_all is not None:
+        opr_weights = opr_weights_all[pos_keep]
+        opr_weights_out = numpy.empty(
+            (in_range_pattern_indexes.size, opr_weights.shape[1]), dtype=opr_weights.dtype
+        )
+
+        for column in range(opr_weights.shape[1]):
+            mean_weight = numpy.bincount(inverse, weights=opr_weights[:, column]) / counts
+            opr_weights_out[:, column] = numpy.interp(
+                in_range_pattern_indexes, unique_pos_indexes, mean_weight
+            )
+
+        probes = ProbeEnsemble(
+            array=probes.get_array(),
+            opr_weights=opr_weights_out,
+            pixel_geometry=probes.get_pixel_geometry(),
+        )
+
     n_averaged = pos_indexes.size - unique_pos_indexes.size
     n_interpolated = int((~exact_match).sum())
     logger.debug(
@@ -880,11 +922,7 @@ def prepare_reconstruct_input(
     product = Product(
         metadata=product.metadata,
         probe_positions=ProbePositionSequence(point_list),
-        # OPR weight rows are still array-indexed by the original scan
-        # ordering, not by the merged-and-interpolated subset. Correct only
-        # when matched positions are contiguous from zero with no
-        # interpolation; latent misalignment otherwise.
-        probes=product.probes,
+        probes=probes,
         object_=product.object_,
         losses=product.losses,
     )

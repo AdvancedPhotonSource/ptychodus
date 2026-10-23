@@ -25,7 +25,7 @@ from ..propagate import (
     compute_far_field_pixel_geometry,
     intensity,
 )
-from ..assemble import AssembledDiffractionData
+from ..assemble import AssembledDiffractionData, DetectorCorrections
 
 
 logger = logging.getLogger(__name__)
@@ -147,6 +147,12 @@ def generate_average_pattern_probe(
     check. The sample grid is the detector grid demagnified, which pins the magnification
     at ``dx_det / dx_probe`` and the equivalent parallel-beam distance at ``z_d / M``.
 
+    A detector background or flat field the patterns still carry unapplied is removed
+    from the mean as ``(mean - background) / flat_field``, clipped at zero, before the
+    square root. Otherwise a flat background would back-propagate into a bright spot at
+    the probe center. Maps already applied to the patterns are not carried, so they are
+    never removed twice. Bad pixels, including those the maps make unusable, are zero.
+
     Raises ValueError if the diffraction-pattern shape is inconsistent with *geometry*,
     if the detector distance is zero, or -- far field only -- if the implied
     sample-plane pixel size disagrees with *geometry*.
@@ -157,7 +163,15 @@ def generate_average_pattern_probe(
             'the Fresnel-transform output pixel size lambda*z/(N*dx_det) vanishes at z=0.'
         )
 
-    detector_intensity = numpy.mean(assembled_data.get_patterns(), axis=0)
+    corrections = DetectorCorrections(
+        background=assembled_data.get_background(),
+        flat_field=assembled_data.get_flat_field(),
+        subtract_background=True,
+        divide_flat_field=True,
+    )
+    mean_intensity = numpy.mean(assembled_data.get_patterns(), axis=0)
+    detector_intensity = corrections.apply(mean_intensity[numpy.newaxis])[0]
+    detector_intensity[corrections.apply_to_bad_pixels(assembled_data.get_bad_pixels())] = 0.0
     height_px, width_px = detector_intensity.shape[-2:]
 
     if (width_px, height_px) != (geometry.width_px, geometry.height_px):
@@ -1174,6 +1188,76 @@ class ProbeMomentPolynomialStrategy(IncoherentModeStrategy):
         )
 
 
+def _spectral_axis(size: int, order: int) -> RealArrayType:
+    """Return the FFT-ordered frequency indexes along one axis raised to *order*.
+
+    The indexes are integers, which fixes each mode only up to a scale that the caller
+    renormalizes. For an odd order the unpaired Nyquist bin of an even-length axis is
+    zeroed: it has no sign, so keeping it would make the derivative of a field that is
+    real in that direction come out complex.
+    """
+    frequency = numpy.fft.fftfreq(size) * size
+    values = numpy.power(frequency, order)
+
+    if order % 2 == 1 and size % 2 == 0:
+        values[size // 2] = 0.0
+
+    return values
+
+
+class ProbeDerivativeStrategy(IncoherentModeStrategy):
+    """Fill with spatial derivatives of the dominant mode, the modes that scan jitter makes.
+
+    A probe displaced by a small random offset ``d`` is ``P(r - d) ~ P - d . grad P``, so
+    positional vibration during an exposure adds incoherent power along the first
+    derivatives of the dominant mode, and larger excursions reach the higher ones. A fill
+    mode is the derivative ``d^(m+n) P / dx^m dy^n``, taken exactly by multiplying the
+    dominant mode's spectrum by ``kx^m ky^n``. Orders are graded by total degree and skip
+    the constant term, which would only reproduce the dominant mode. Circular products
+    ``(kx + i ky)^a (kx - i ky)^b`` span the same space within each degree, so they would
+    change the basis but not what orthogonalization keeps.
+
+    This is the Fourier counterpart of :class:`ProbeMomentPolynomialStrategy`, whose
+    real-space polynomials correspond to derivatives in angle: source size and angular
+    jitter rather than positional jitter.
+
+    Weights come from a decay profile, as nothing in the construction predicts how power
+    divides among the orders.
+    """
+
+    def __init__(
+        self,
+        *,
+        decay_type: ProbeModeDecayType = ProbeModeDecayType.EXPONENTIAL,
+        decay_ratio: float = 0.5,
+    ) -> None:
+        _validate_decay_ratio(decay_type, decay_ratio)
+        self._decay_type = decay_type
+        self._decay_ratio = decay_ratio
+
+    def get_imode_weights(self, num_imodes: int) -> RealArrayType:
+        return numpy.asarray(
+            self._decay_type.get_weights(num_imodes, self._decay_ratio), dtype=float
+        )
+
+    def build_fill_imodes(self, probe: Probe, first_imode: int, num_fill: int) -> ComplexArrayType:
+        dominant_mode = probe.get_array()[0, :, :].astype(complex)
+        height_px, width_px = dominant_mode.shape
+        spectrum = numpy.fft.fft2(dominant_mode)
+        orders = _graded_polynomial_orders(num_fill + 1)[1:]
+
+        return numpy.stack(
+            [
+                numpy.fft.ifft2(
+                    spectrum
+                    * _spectral_axis(height_px, order_y)[:, numpy.newaxis]
+                    * _spectral_axis(width_px, order_x)[numpy.newaxis, :]
+                )
+                for order_x, order_y in orders
+            ]
+        )
+
+
 DEFAULT_INCOHERENT_MODE_STRATEGY = ProbeMomentPolynomialStrategy()
 """The strategy :func:`generate_incoherent_probe_modes` uses when none is named."""
 
@@ -1310,15 +1394,21 @@ def generate_coherent_probe_modes(
     probe: Probe,
     *,
     num_cmodes: int,
-    num_diffraction_patterns: int,
+    num_positions: int,
     small_value: float = 1.0e-6,
     normalize_cmodes: bool = True,
 ) -> ProbeEnsemble:
-    """Build an OPR ProbeEnsemble with *num_cmodes* coherent modes and random per-scan weights."""
+    """Build an OPR ProbeEnsemble with *num_cmodes* coherent modes and random weights.
+
+    The weights hold one row per probe position, so *num_positions* is the length of
+    the product's position sequence, duplicates and surplus points included. Pairing
+    rows with diffraction patterns is left to the index matcher, which conditions them
+    as it does the coordinates.
+    """
     opr_weights: RealArrayType | None = None
 
     if num_cmodes > 1:
-        opr_weights = small_value * rng.normal(size=(num_diffraction_patterns, num_cmodes))
+        opr_weights = small_value * rng.normal(size=(num_positions, num_cmodes))
         opr_weights[:, 0] = 1.0
 
     array_in = probe.get_array()

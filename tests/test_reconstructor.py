@@ -1121,6 +1121,97 @@ class TestPrepareReconstructInputMerge:
         assert result.bad_pixels is data.get_bad_pixels()
 
 
+def _product_with_tagged_opr_weights(position_indexes: list[int]) -> Product:
+    """Positions at x = row number, with OPR weight rows (1, row number) tagging each row."""
+    points = [
+        ProbePosition(index=i, x_m=float(row), y_m=0.0) for row, i in enumerate(position_indexes)
+    ]
+    rows = numpy.arange(len(position_indexes), dtype=float)
+    weights = numpy.stack([numpy.ones_like(rows), rows], axis=1)
+    probes = _make_probes(num_coherent_modes=2)
+    return Product(
+        metadata=_metadata(),
+        probe_positions=ProbePositionSequence(points),
+        probes=ProbeEnsemble(
+            array=probes.get_array(),
+            opr_weights=weights,
+            pixel_geometry=probes.get_pixel_geometry(),
+        ),
+        object_=_make_object(),
+        losses=[],
+    )
+
+
+class TestPrepareReconstructInputOPRWeights:
+    """OPR rows belong to probe positions and are conditioned exactly like the coordinates."""
+
+    @staticmethod
+    def _row_tags(result: ReconstructInput) -> list[float]:
+        return result.product.probes.get_opr_weights()[:, 1].tolist()
+
+    def test_oversampled_positions_give_one_averaged_row_per_pattern(self) -> None:
+        """Two positioner records per pattern and a surplus point past the last pattern."""
+        data = _make_assembled_data([0, 1, 2, 3, 4])
+        product = _product_with_tagged_opr_weights([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5])
+
+        result = prepare_reconstruct_input(data, product)
+
+        assert len(result.diffraction_patterns) == 5
+        assert self._row_tags(result) == [0.5, 2.5, 4.5, 6.5, 8.5]
+        # Weight rows and coordinates were averaged together, so they still agree.
+        assert self._row_tags(result) == [p.x_m for p in result.product.probe_positions]
+
+    @pytest.mark.parametrize(
+        ('index_filter', 'expected'),
+        [(PositionIndexFilter.ODD, [2.5, 6.5]), (PositionIndexFilter.EVEN, [0.5, 4.5, 8.5])],
+    )
+    def test_a_split_keeps_the_rows_of_its_own_indexes(
+        self, index_filter: PositionIndexFilter, expected: list[float]
+    ) -> None:
+        data = _make_assembled_data([0, 1, 2, 3, 4])
+        product = _product_with_tagged_opr_weights([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5])
+
+        result = prepare_reconstruct_input(data, product, index_filter)
+
+        assert self._row_tags(result) == expected
+
+    def test_a_pattern_without_a_position_gets_interpolated_weights(self) -> None:
+        data = _make_assembled_data([0, 1, 2])
+        product = _product_with_tagged_opr_weights([0, 2])
+
+        result = prepare_reconstruct_input(data, product)
+
+        assert self._row_tags(result) == [0.0, 0.5, 1.0]
+
+    def test_the_row_count_must_match_the_position_count(self) -> None:
+        data = _make_assembled_data([0, 1, 2])
+        product = _product_with_tagged_opr_weights([0, 1, 2])
+        probes = product.probes
+        short = dataclasses.replace(
+            product,
+            probes=ProbeEnsemble(
+                array=probes.get_array(),
+                opr_weights=probes.get_opr_weights()[:2],
+                pixel_geometry=probes.get_pixel_geometry(),
+            ),
+        )
+
+        with pytest.raises(ValueError, match='one probe position'):
+            prepare_reconstruct_input(data, short)
+
+    def test_the_output_feeds_back_in_unchanged(self) -> None:
+        """A reconstructor's own output has one row per position, so it conditions to itself."""
+        data = _make_assembled_data([0, 1, 2, 3, 4])
+        product = _product_with_tagged_opr_weights([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5])
+        first = prepare_reconstruct_input(data, product)
+
+        second = prepare_reconstruct_input(data, first.product)
+
+        numpy.testing.assert_array_equal(
+            second.product.probes.get_opr_weights(), first.product.probes.get_opr_weights()
+        )
+
+
 class TestNullReconstructor:
     """NullReconstructor must remain instantiable as new abstract methods are added."""
 

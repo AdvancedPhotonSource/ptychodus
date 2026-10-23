@@ -66,8 +66,8 @@ class SummaryPanelViewController(Observer):
 
     The displayed frame is a live preview: the value filter from the current
     :class:`DiffractionPrepPlan` is applied to the cached mean_pattern on every
-    settings change. Only that one step is previewed. Binning, upsample,
-    padding, and the flip/transpose steps change the frame's extent and
+    settings change. Only that one step is previewed. Binning, padding, and
+    the flip/transpose steps change the frame's extent and
     orientation, so applying them here would stop the pane reading as a view of
     the detector; crop is likewise shown as an overlay rather than applied. The
     frame therefore stays at full detector extent in raw detector coordinates,

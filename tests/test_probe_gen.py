@@ -15,6 +15,7 @@ from ptychodus.api.simulate.probe import (
     propagate_probe,
     DEFAULT_INCOHERENT_MODE_STRATEGY,
     FresnelZonePlate,
+    ProbeDerivativeStrategy,
     ProbeModeDecayType,
     ProbeMomentPolynomialStrategy,
     _gram_schmidt,
@@ -140,9 +141,7 @@ class TestGenerateCoherentProbeModes:
         num_cmodes = 2
         probe = self._make_multimode_probe(num_imodes=num_imodes)
 
-        result = generate_coherent_probe_modes(
-            rng, probe, num_cmodes=num_cmodes, num_diffraction_patterns=8
-        )
+        result = generate_coherent_probe_modes(rng, probe, num_cmodes=num_cmodes, num_positions=8)
 
         array = result.get_array()
         assert array.shape == (num_cmodes, num_imodes, probe.height_px, probe.width_px)
@@ -157,7 +156,7 @@ class TestGenerateCoherentProbeModes:
         rng = numpy.random.default_rng(12)
         probe = self._make_multimode_probe(num_imodes=3)
 
-        result = generate_coherent_probe_modes(rng, probe, num_cmodes=2, num_diffraction_patterns=8)
+        result = generate_coherent_probe_modes(rng, probe, num_cmodes=2, num_positions=8)
 
         weights = result.get_opr_weights()
         assert weights.shape == (8, 2)
@@ -167,7 +166,7 @@ class TestGenerateCoherentProbeModes:
         rng = numpy.random.default_rng(13)
         probe = self._make_multimode_probe(num_imodes=3)
 
-        result = generate_coherent_probe_modes(rng, probe, num_cmodes=1, num_diffraction_patterns=8)
+        result = generate_coherent_probe_modes(rng, probe, num_cmodes=1, num_positions=8)
 
         assert result.get_array().shape[0] == 1
         assert result.get_opr_weights_or_none() is None
@@ -267,7 +266,12 @@ _BACKPROP_SAMPLE_PITCH_M = (
 )
 
 
-def _assembled_data(patterns: numpy.ndarray) -> AssembledDiffractionData:
+def _assembled_data(
+    patterns: numpy.ndarray,
+    *,
+    background: numpy.ndarray | None = None,
+    flat_field: numpy.ndarray | None = None,
+) -> AssembledDiffractionData:
     num_patterns, height_px, width_px = patterns.shape
     return AssembledDiffractionData(
         indexes=numpy.arange(num_patterns),
@@ -276,6 +280,8 @@ def _assembled_data(patterns: numpy.ndarray) -> AssembledDiffractionData:
             width_m=_BACKPROP_DETECTOR_PITCH_M, height_m=_BACKPROP_DETECTOR_PITCH_M
         ),
         bad_pixels=numpy.zeros((height_px, width_px), dtype=bool),
+        background=background,
+        flat_field=flat_field,
     )
 
 
@@ -361,6 +367,56 @@ class TestGenerateAveragePatternProbe:
         )
         assert result.get_pixel_geometry() == geometry.get_pixel_geometry()
         assert result.get_array().shape[-2:] == (_BACKPROP_NUM_PX, _BACKPROP_NUM_PX)
+
+    def _envelope_patterns(self) -> numpy.ndarray:
+        coord = numpy.arange(_BACKPROP_NUM_PX) - _BACKPROP_NUM_PX // 2
+        envelope = numpy.exp(-(coord[:, None] ** 2 + coord[None, :] ** 2) / 100)
+        return numpy.stack([envelope, 2.0 * envelope])
+
+    def _estimate(self, patterns: numpy.ndarray, **maps: numpy.ndarray) -> numpy.ndarray:
+        result = generate_average_pattern_probe(
+            _sample_plane_geometry(),
+            _assembled_data(patterns, **maps),
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            detector_distance_m=_BACKPROP_DISTANCE_M,
+        )
+        return result.get_array()[0]
+
+    def test_a_carried_background_is_subtracted(self) -> None:
+        """A flat background left in the mean would back-propagate into a central spike."""
+        patterns = self._envelope_patterns()
+        background = numpy.full(patterns.shape[-2:], 3.0)
+
+        numpy.testing.assert_allclose(
+            self._estimate(patterns + background, background=background),
+            self._estimate(patterns),
+            atol=1e-12,
+        )
+
+    def test_a_carried_flat_field_is_divided_out(self) -> None:
+        patterns = self._envelope_patterns()
+        rng = numpy.random.default_rng(3)
+        flat_field = rng.uniform(0.5, 1.5, patterns.shape[-2:])
+
+        numpy.testing.assert_allclose(
+            self._estimate(patterns * flat_field, flat_field=flat_field),
+            self._estimate(patterns),
+            atol=1e-12,
+        )
+
+    def test_a_pixel_with_an_unusable_flat_field_is_zero(self) -> None:
+        """A response at or below the floor marks the pixel bad, so it contributes nothing."""
+        patterns = numpy.ones((1, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
+        flat_field = numpy.ones(patterns.shape[-2:])
+        flat_field[5, 7] = 0.0
+        expected_patterns = patterns.copy()
+        expected_patterns[:, 5, 7] = 0.0
+
+        numpy.testing.assert_allclose(
+            self._estimate(patterns, flat_field=flat_field),
+            self._estimate(expected_patterns),
+            atol=1e-12,
+        )
 
     def test_zero_detector_distance_raises(self) -> None:
         """Previously returned an all-NaN probe in silence: at z=0 the implied and
@@ -1617,6 +1673,7 @@ def _all_strategies() -> list[IncoherentModeStrategy]:
             coherence_length_y_m=1.2e-7,
         ),
         ProbeMomentPolynomialStrategy(),
+        ProbeDerivativeStrategy(),
     ]
 
 
@@ -1765,6 +1822,69 @@ class TestProbeMomentPolynomialStrategy:
 
         with pytest.raises(ValueError, match='no transverse extent'):
             generate_incoherent_probe_modes(Probe(array=spike, pixel_geometry=pixel_geometry), 3)
+
+
+class TestProbeDerivativeStrategy:
+    def _gaussian_probe(self, num_px: int = 64) -> tuple[Probe, numpy.ndarray, numpy.ndarray]:
+        pixel_geometry = PixelGeometry(width_m=1e-8, height_m=1e-8)
+        coordinate = numpy.arange(num_px) - num_px // 2
+        y, x = numpy.meshgrid(coordinate, coordinate, indexing='ij')
+        gaussian = numpy.exp(-(x**2 + y**2) / (2 * 4.0**2)).astype(complex)
+        return Probe(array=gaussian, pixel_geometry=pixel_geometry), x, y
+
+    @staticmethod
+    def _overlap(a: numpy.ndarray, b: numpy.ndarray) -> float:
+        a = a.ravel() / numpy.linalg.norm(a)
+        b = b.ravel() / numpy.linalg.norm(b)
+        return float(abs(numpy.vdot(a, b)))
+
+    def test_first_fill_modes_are_the_gradient(self) -> None:
+        """A Gaussian's derivatives are x*G and y*G, in that graded order."""
+        probe, x, y = self._gaussian_probe()
+        gaussian = probe.get_array()[0]
+
+        fill = ProbeDerivativeStrategy().build_fill_imodes(probe, 1, 2)
+
+        assert self._overlap(fill[0], x * gaussian) == pytest.approx(1.0, abs=1e-9)
+        assert self._overlap(fill[1], y * gaussian) == pytest.approx(1.0, abs=1e-9)
+
+    def test_second_order_mode_is_the_mixed_derivative(self) -> None:
+        probe, x, y = self._gaussian_probe()
+        gaussian = probe.get_array()[0]
+
+        fill = ProbeDerivativeStrategy().build_fill_imodes(probe, 1, 4)
+
+        # Orders run (1,0), (0,1), (2,0), (1,1): the fourth is d2/dxdy, i.e. x*y*G.
+        assert self._overlap(fill[3], x * y * gaussian) == pytest.approx(1.0, abs=1e-9)
+
+    def test_a_real_probe_has_derivatives_of_uniform_phase(self) -> None:
+        """Each derivative of a real field is real up to a global phase (a power of i).
+
+        The unpaired Nyquist bin is dropped for odd orders; kept, it would give the mode a
+        component of a different phase, i.e. a genuinely complex field.
+        """
+        probe, _, _ = self._gaussian_probe()
+
+        fill = ProbeDerivativeStrategy().build_fill_imodes(probe, 1, 5)
+
+        for mode in fill:
+            peak = mode.ravel()[numpy.argmax(numpy.abs(mode))]
+            numpy.testing.assert_allclose(
+                (mode * numpy.conj(peak) / abs(peak)).imag, 0.0, atol=1e-12 * abs(peak)
+            )
+
+    def test_decay_settings_set_the_weights(self) -> None:
+        strategy = ProbeDerivativeStrategy(
+            decay_type=ProbeModeDecayType.EXPONENTIAL, decay_ratio=0.5
+        )
+        numpy.testing.assert_allclose(
+            strategy.get_imode_weights(4), [1.0, 0.5, 0.25, 0.125], rtol=1e-12
+        )
+
+    @pytest.mark.parametrize('override', [{'decay_ratio': 0.0}, {'decay_ratio': -1.0}])
+    def test_rejects_invalid_arguments(self, override: dict) -> None:
+        with pytest.raises(ValueError):
+            ProbeDerivativeStrategy(**override)
 
 
 class TestGramSchmidt:
