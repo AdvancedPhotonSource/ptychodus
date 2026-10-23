@@ -11,7 +11,7 @@ from ....model.diffraction import (
     DiffractionSummaryService,
 )
 from ....model.product import ProductSettings
-from ....model.visualization import VisualizationEngine
+from ...rendering import VisualizationEngine
 from ....view.widgets import ExceptionDialog
 
 from ...data import FileDialogFactory

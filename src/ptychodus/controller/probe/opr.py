@@ -24,7 +24,7 @@ from ptychodus.api.probe import OPRModeSeries, ProbeEnsemble
 from ptychodus.api.typing import ComplexArrayType, IntegerArrayType, RealArrayType
 
 from ...model.analysis import OPRModeAnalyzer
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
 from ...view.probe import OPRModeDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory

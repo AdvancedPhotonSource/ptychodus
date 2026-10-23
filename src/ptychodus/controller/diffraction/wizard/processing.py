@@ -35,7 +35,7 @@ from ....model.diffraction import (
     DiffractionSettings,
     DiffractionSummaryService,
 )
-from ....model.visualization import VisualizationEngine
+from ...rendering import VisualizationEngine
 from ....view.diffraction import OpenDatasetWizardPage
 from ....view.widgets import ExceptionDialog
 

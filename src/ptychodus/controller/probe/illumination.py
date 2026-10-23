@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QButtonGroup
 from ptychodus.api.typing import RealArrayType
 
 from ...model.analysis import IlluminationMap, IlluminationMapper
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
 from ...view.probe import IlluminationDialog, IlluminationParametersView, IlluminationQuantityView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory

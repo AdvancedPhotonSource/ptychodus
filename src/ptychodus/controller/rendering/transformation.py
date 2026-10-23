@@ -1,5 +1,6 @@
 from ptychodus.api.parameters import Parameter
-from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
+from ptychodus.api.plugins import PluginChooser
+from ptychodus.model.parameters import PluginChooserParameter
 from ptychodus.api.visualize import ScalarTransformation
 
 

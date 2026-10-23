@@ -5,7 +5,7 @@ from PyQt5.QtCore import QRectF
 from ptychodus.api.geometry import Box2D
 
 from ...model.analysis import FourierAnalysisResult, FourierAnalyzer
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
 from ...view.object import FourierAnalysisDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory

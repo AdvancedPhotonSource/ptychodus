@@ -22,7 +22,7 @@ from ...model.diffraction import (
 )
 from .detector_extent import DetectorExtentSource
 from ...model.product import ProductRepository, ProductSettings
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
 from ...view.diffraction import DiffractionView
 from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate, TaskStatusView
 from ..data import FileDialogFactory

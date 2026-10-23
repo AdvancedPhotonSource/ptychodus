@@ -1,4 +1,4 @@
-from .core import VisualizationEngine
+from .engine import VisualizationEngine
 
 __all__ = [
     'VisualizationEngine',

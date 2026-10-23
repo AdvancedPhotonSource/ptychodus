@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import QAction, QActionGroup, QStatusBar
 from ptychodus.api.typing import NumberArrayType
 from ptychodus.api.geometry import PixelGeometry
 
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
 from ...view.visualization import ImageItem, ImageMouseTool, VisualizationWidget
 from ..data import FileDialogFactory
 from .controller import VisualizationController

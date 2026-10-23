@@ -1,4 +1,4 @@
-"""Tests for the model/visualization parameters built on PluginChooserParameter.
+"""Tests for the controller/rendering parameters built on PluginChooserParameter.
 
 ScalarTransformationParameter, ColormapParameter, and
 CylindricalColorModelParameter were each a hand-written copy of the same
@@ -7,16 +7,18 @@ that ``Parameter.set_value`` declares. They are now thin subclasses of
 PluginChooserParameter, so these tests pin the contract they used to break plus
 the accessors callers rely on.
 
-No Qt is required — this is pure model-layer behavior.
+No Qt is required. The package sits under ``controller/`` because only the GUI
+drives it, but it is plain array-to-color transformation, so it stays importable --
+and therefore testable -- on an install without PyQt5.
 """
 
 from __future__ import annotations
 
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.visualize import CylindricalColorModel, ScalarTransformation
-from ptychodus.model.visualization.color_model import CylindricalColorModelParameter
-from ptychodus.model.visualization.colormap import ColormapParameter
-from ptychodus.model.visualization.transformation import ScalarTransformationParameter
+from ptychodus.controller.rendering.color_model import CylindricalColorModelParameter
+from ptychodus.controller.rendering.colormap import ColormapParameter
+from ptychodus.controller.rendering.transformation import ScalarTransformationParameter
 
 
 class _Counter(Observer):

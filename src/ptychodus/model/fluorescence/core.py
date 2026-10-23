@@ -8,12 +8,12 @@ from ptychodus.api.fluorescence import (
     UpscalingStrategy,
 )
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
+from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
 
+from ..parameters import PluginChooserParameter
 from ..product import ProductAPI, ProductRepository
 from ..task_manager import TaskManager
-from ..visualization import VisualizationEngine
 from .api import FluorescenceAPI
 from .monitor import FluorescenceTaskMonitor
 from .ptychozoon import PtychozoonFluorescenceEnhancer
@@ -97,7 +97,6 @@ class FluorescenceCore(Observer):
         # binding both would make them fight over the same parameter.
         file_writer_chooser.set_current_plugin(self.settings.file_type.get_value())
 
-        self.visualization_engine = VisualizationEngine(is_complex=False)
         self.task_monitor = FluorescenceTaskMonitor(task_manager)
         self.repository = FluorescenceRepository(product_repository)
         self.fluorescence_api = FluorescenceAPI(

@@ -19,8 +19,9 @@ from ptychodus.api.diffraction import (
     PixelMapFileReader,
     SimpleDiffractionDataset,
 )
-from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
+from ptychodus.api.plugins import PluginChooser
 
+from ..parameters import PluginChooserParameter
 from .dataset import AssembledDiffractionDataset
 from .repository import DiffractionDatasetRepository
 from .settings import DiffractionSettings

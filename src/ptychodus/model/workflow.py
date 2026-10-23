@@ -9,7 +9,7 @@ from ptychodus.api.diffraction import CropRegion, Polarization
 from ptychodus.api.affine import AffineTransform
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import ReconstructInput
-from ptychodus.api.settings import PathPrefixChange, SettingsRegistry
+from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.workflow import (
     DiffractionWorkflowAPI,
     ProductWorkflowAPI,
@@ -407,7 +407,5 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         )
         return self.get_product(product_index)
 
-    def save_settings(
-        self, file_path: Path, change_path_prefix: PathPrefixChange | None = None
-    ) -> None:
-        self._settings_registry.save_settings(file_path, change_path_prefix)
+    def save_settings(self, file_path: Path) -> None:
+        self._settings_registry.save_settings(file_path)

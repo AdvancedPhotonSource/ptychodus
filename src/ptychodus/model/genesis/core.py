@@ -3,9 +3,10 @@ import logging
 import queue
 import threading
 
-from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
+from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
 
+from ..parameters import PluginChooserParameter
 from ..processing import ProcessingAPI
 from ..product import ProductAPI
 from ..task_manager import TaskManager

@@ -12,7 +12,6 @@ from ptychodus.api.diffraction import CropRegion, Polarization
 from ptychodus.api.affine import AffineTransform
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import ReconstructInput
-from ptychodus.api.settings import PathPrefixChange
 
 
 class RemoteComputeProvider(Enum):
@@ -307,9 +306,7 @@ class WorkflowAPI(ABC):
         pass
 
     @abstractmethod
-    def save_settings(
-        self, file_path: Path, change_path_prefix: PathPrefixChange | None = None
-    ) -> None:
+    def save_settings(self, file_path: Path) -> None:
         """Save the current settings to file, optionally remapping path prefixes."""
         pass
 

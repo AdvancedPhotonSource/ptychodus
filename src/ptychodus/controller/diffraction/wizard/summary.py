@@ -29,7 +29,7 @@ from ....model.diffraction import (
     DiffractionSummaryService,
     PrepPipelineBuilder,
 )
-from ....model.visualization import VisualizationEngine
+from ...rendering import VisualizationEngine
 from ....view.image import ImageView
 from ....view.widgets import ExceptionDialog, TaskStatusView
 
@@ -57,12 +57,10 @@ class SummaryPanelViewController(Observer):
     fresh :class:`DiffractionSummary` when the service's run-id advances.
 
     - mean_pattern renders in an :class:`ImageView` backed by its own dedicated
-      :class:`VisualizationEngine` (``ModelCore.summary_visualization_engine``,
-      distinct from ``pattern_visualization_engine`` used by the main diffraction
-      pane) with a live crop-rectangle overlay driven by the crop settings. The
-      two engines are kept separate so autoscaling the mean_pattern's color
-      range does not disturb whatever range the user set on the main pane, and
-      vice versa.
+      :class:`VisualizationEngine`, with a live crop-rectangle overlay driven by
+      the crop settings. That engine is separate from the one behind the main
+      diffraction pane so autoscaling the mean_pattern's color range does not
+      disturb whatever range the user set on the main pane, and vice versa.
     - total_counts is plotted on a log-y matplotlib axes with live threshold
       lines driven by the total-counts settings.
 

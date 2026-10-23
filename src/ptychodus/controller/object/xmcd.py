@@ -3,7 +3,7 @@ import logging
 from ptychodus.api.xmcd import XMCDResult
 
 from ...model.analysis import XMCDAnalyzer
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
 from ...view.object import XMCDDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory

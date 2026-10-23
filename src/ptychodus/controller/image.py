@@ -11,7 +11,7 @@ from ptychodus.api.typing import NumberArrayType
 from ptychodus.api.geometry import Interval, PixelGeometry
 from ptychodus.api.observer import Observable, Observer
 
-from ..model.visualization import VisualizationEngine
+from .rendering import VisualizationEngine
 from ..view.image import (
     ImageDataRangeGroupBox,
     ImageDisplayRangeDialog,

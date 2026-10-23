@@ -4,7 +4,7 @@ import logging
 from PyQt5.QtWidgets import QStatusBar
 
 from ...model.analysis import ResidualAnalyzer
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
 from ...view.product import ProductVisualizationView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory

@@ -2,10 +2,11 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.plugins import Plugin, PluginChooser, PluginChooserParameter
+from ptychodus.api.plugins import Plugin, PluginChooser
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.workflow import FileBasedWorkflow, WorkflowAPI
 
+from ..parameters import PluginChooserParameter
 from ..task_manager import TaskManager
 from .buffer import PendingFileBuffer
 from .repository import AutomationDatasetRepository

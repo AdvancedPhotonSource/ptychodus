@@ -1,10 +1,11 @@
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
-from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
+from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.reconstruct import ReconstructorLibrary, SubprocessReconstructor
 from ptychodus.api.settings import SettingsRegistry
 
+from ..parameters import PluginChooserParameter
 from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .api import ProcessingAPI, ProcessingAlgorithmParameter

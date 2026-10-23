@@ -7,9 +7,10 @@ from ptychodus.api.diffraction import (
     DiffractionFileWriter,
     PixelMapFileReader,
 )
-from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
+from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
 
+from ..parameters import PluginChooserParameter
 from ..task_manager import TaskManager
 from .api import DiffractionAPI
 from .monitor import DiffractionTaskMonitor

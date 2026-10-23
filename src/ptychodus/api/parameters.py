@@ -106,18 +106,6 @@ class PathParameter(ParameterBase[Path]):
     def set_value_from_string(self, value: str) -> None:
         self.set_value(Path(value))
 
-    def change_path_prefix(self, find_path_prefix: Path, replacement_path_prefix: Path) -> Path:
-        value = self.get_value()
-
-        try:
-            relative_path = value.resolve().relative_to(find_path_prefix)
-        except ValueError:
-            pass
-        else:
-            return replacement_path_prefix / relative_path
-
-        return value
-
     def get_value_as_string(self) -> str:
         return str(self._value)
 

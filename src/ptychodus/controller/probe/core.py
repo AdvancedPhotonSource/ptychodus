@@ -16,7 +16,7 @@ from ...model.analysis import (
 )
 from ...model.product import ProbeAPI, ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
 from ...view.probe import OPRWeightPolicyDialog
 from ...view.repository import RepositoryTreeView
 from ...view.widgets import (

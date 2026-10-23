@@ -9,7 +9,7 @@ from ..view import ViewCore
 from .agent import AgentChatController, AgentController
 from .automation import AutomationController
 from .data import FileDialogFactory
-from .diffraction import DiffractionController
+from .diffraction.core import DiffractionController
 from .fluorescence import FluorescenceController
 from .fluorescence.enhance_dialog import FluorescenceEnhanceDialogController
 from .genesis import GenesisController
@@ -26,6 +26,7 @@ from .processing.generated import GeneratedViewControllerFactory
 from .product import ProductController
 from .product.core import ProductRepositoryTableModel
 from .product.visualization import ProductVisualizationController
+from .rendering import VisualizationEngine
 from .task_status import TaskStatusController
 from .settings import SettingsController
 
@@ -70,11 +71,14 @@ class ControllerCore:
             self._file_dialog_factory,
         )
         self._diffraction_image_controller = ImageController(
-            model.pattern_visualization_engine,
+            VisualizationEngine(is_complex=False),
             view.diffraction_image_view.image_view,
             self._status_bar,
             self._file_dialog_factory,
         )
+        # Its own engine, not the pattern one above: autoscaling the wizard's mean-pattern
+        # color range must not disturb whatever range the user set on the main pane.
+        summary_visualization_engine = VisualizationEngine(is_complex=False)
         self._diffraction_controller = DiffractionController(
             model.diffraction_core.detector_settings,
             model.diffraction_core.diffraction_settings,
@@ -90,7 +94,7 @@ class ControllerCore:
             view.diffraction_image_view.status_view,
             self._diffraction_image_controller,
             model.diffraction_core.summary_service,
-            model.summary_visualization_engine,
+            summary_visualization_engine,
             self._status_bar,
             self._file_dialog_factory,
         )
@@ -109,8 +113,8 @@ class ControllerCore:
         if is_developer_mode_enabled:
             self._product_visualization_controller = ProductVisualizationController(
                 model.analysis_core.residual_analyzer,
-                model.analysis_core.residual_real_space_visualization_engine,
-                model.analysis_core.residual_reciprocal_space_visualization_engine,
+                VisualizationEngine(is_complex=False),
+                VisualizationEngine(is_complex=False),
                 self._product_controller,
                 view.product_visualization_view,
                 self._status_bar,
@@ -125,35 +129,44 @@ class ControllerCore:
             is_developer_mode_enabled=is_developer_mode_enabled,
         )
         self._probe_image_controller = ImageController(
-            model.probe_visualization_engine,
+            VisualizationEngine(is_complex=True),
             view.probe_image_view,
             self._status_bar,
             self._file_dialog_factory,
         )
+        # Complex so the propagation dialog can render a single incoherent mode's
+        # wavefield; Real up front because the dialog opens on the mode-summed
+        # intensity, for which the is_complex default of 'Complex' paints a flat hue.
+        probe_propagator_visualization_engine = VisualizationEngine(is_complex=True)
+        probe_propagator_visualization_engine.set_renderer('Real')
+        # Complex so the dialog can render the composed mode and the deviation from its
+        # across-scan mean as wavefields: OPR moves amplitude and phase together, and the
+        # default 'Complex' renderer shows both at once.
+        opr_mode_visualization_engine = VisualizationEngine(is_complex=True)
         self._probe_controller = ProbeController(
             model.product_core.probe_repository,
             model.product_core.probe_api,
             self._probe_image_controller,
             model.analysis_core.probe_propagator,
             model.analysis_core.probe_propagator_settings,
-            model.analysis_core.probe_propagator_visualization_engine,
+            probe_propagator_visualization_engine,
             model.analysis_core.illumination_mapper,
-            model.analysis_core.illumination_visualization_engine,
+            VisualizationEngine(is_complex=False),
             model.analysis_core.probe_overlap_analyzer,
-            model.analysis_core.probe_overlap_visualization_engine,
+            VisualizationEngine(is_complex=False),
             model.analysis_core.opr_mode_analyzer,
-            model.analysis_core.opr_mode_visualization_engine,
+            opr_mode_visualization_engine,
             view.probe_view,
             self._file_dialog_factory,
         )
         self._object_image_controller = ImageController(
-            model.object_visualization_engine,
+            VisualizationEngine(is_complex=True),
             view.object_image_view,
             self._status_bar,
             self._file_dialog_factory,
         )
         self._fluorescence_image_controller = ImageController(
-            model.fluorescence_core.visualization_engine,
+            VisualizationEngine(is_complex=False),
             view.fluorescence_image_view,
             self._status_bar,
             self._file_dialog_factory,
@@ -178,11 +191,11 @@ class ControllerCore:
             self._object_image_controller,
             model.analysis_core.fourier_ring_correlator,
             model.analysis_core.fourier_analyzer,
-            model.analysis_core.fourier_real_space_visualization_engine,
-            model.analysis_core.fourier_reciprocal_space_visualization_engine,
+            VisualizationEngine(is_complex=True),
+            VisualizationEngine(is_complex=True),
             model.analysis_core.xmcd_analyzer,
-            model.analysis_core.xmcd_structural_visualization_engine,
-            model.analysis_core.xmcd_magnetic_visualization_engine,
+            VisualizationEngine(is_complex=True),
+            VisualizationEngine(is_complex=True),
             view.object_view,
             self._file_dialog_factory,
         )

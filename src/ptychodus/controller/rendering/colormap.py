@@ -1,7 +1,8 @@
 from matplotlib.colors import Colormap
 
 from ptychodus.api.parameters import Parameter
-from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
+from ptychodus.api.plugins import PluginChooser
+from ptychodus.model.parameters import PluginChooserParameter
 from ptychodus.api.visualize import (
     cyclic_colormap_names,
     get_colormap_by_name,

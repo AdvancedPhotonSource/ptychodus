@@ -23,7 +23,8 @@ from ptychodus.api.reconstruct import (
     TrainableReconstructor,
 )
 from ptychodus.api.parameters import StringParameter
-from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
+from ptychodus.api.plugins import PluginChooser
+from ptychodus.model.parameters import PluginChooserParameter
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.processing.api import ProcessingAlgorithmParameter
 

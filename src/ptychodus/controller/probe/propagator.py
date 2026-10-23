@@ -10,7 +10,7 @@ from ptychodus.api.propagate import PropagatedWavefield, intensity
 from ptychodus.api.typing import NumberArrayType, RealArrayType
 
 from ...model.analysis import ProbePropagatorSettings, ProbePropagator
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
 from ...view.probe import ProbePropagationDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory

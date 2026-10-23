@@ -9,7 +9,7 @@ from ptychodus.api.observer import SequenceObserver
 from ...model.analysis import FourierAnalyzer, FourierRingCorrelator, XMCDAnalyzer
 from ...model.product import ObjectAPI, ObjectRepository
 from ...model.product.object import ObjectRepositoryItem
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
 from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory

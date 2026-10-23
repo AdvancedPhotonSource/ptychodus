@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 from collections.abc import Iterator, Mapping, Sequence
-from dataclasses import dataclass
 from pathlib import Path
 import configparser
 import logging
 
 from .observer import Observable
-from .parameters import (
-    ParameterGroup,
-    PathParameter,
-)
+from .parameters import ParameterGroup
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +15,6 @@ logger = logging.getLogger(__name__)
 def get_ptychodus_dir() -> Path:
     """Return the user's Ptychodus configuration directory (``~/.ptychodus``)."""
     return Path.home() / '.ptychodus'
-
-
-@dataclass(frozen=True)
-class PathPrefixChange:
-    """Instruction to replace a path prefix when saving settings (for portability)."""
-
-    find_path_prefix: Path
-    replacement_path_prefix: Path
 
 
 def _warn_unrecognized_keys(
@@ -117,9 +105,7 @@ class SettingsRegistry(Observable):
     def get_save_file_filter(self) -> str:
         return self._file_filter_list[0]
 
-    def save_settings(
-        self, file_path: Path, change_path_prefix: PathPrefixChange | None = None
-    ) -> None:
+    def save_settings(self, file_path: Path) -> None:
         config = configparser.ConfigParser(interpolation=None)
         setattr(config, 'optionxform', lambda option: option)
 
@@ -127,16 +113,7 @@ class SettingsRegistry(Observable):
             config.add_section(group_name)
 
             for parameter_name, parameter in group.parameters().items():
-                value_string = parameter.get_value_as_string()
-
-                if change_path_prefix and isinstance(parameter, PathParameter):
-                    modified_path = parameter.change_path_prefix(
-                        change_path_prefix.find_path_prefix,
-                        change_path_prefix.replacement_path_prefix,
-                    )
-                    value_string = str(modified_path)
-
-                config.set(group_name, parameter_name, value_string)
+                config.set(group_name, parameter_name, parameter.get_value_as_string())
 
         logger.debug(f'Writing settings to "{file_path}"')
 

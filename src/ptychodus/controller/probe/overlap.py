@@ -6,7 +6,7 @@ import numpy
 from ptychodus.api.constants import LengthUnit
 
 from ...model.analysis import ProbeOverlapAnalyzer, ProbeOverlapMetrics
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
 from ...view.probe import ProbeOverlapDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory

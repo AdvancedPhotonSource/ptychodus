@@ -34,7 +34,6 @@ from .memory import MemoryPresenter
 from .processing import ProcessingCore
 from .product import PositionsStreamingContext, ProductCore
 from .task_manager import TaskManager
-from .visualization import VisualizationEngine
 from .workflow import ConcreteWorkflowAPI
 
 logger = logging.getLogger(__name__)
@@ -127,11 +126,6 @@ class ModelCore:
             self.settings_registry,
             self._task_manager,
         )
-        self.pattern_visualization_engine = VisualizationEngine(is_complex=False)
-        self.summary_visualization_engine = VisualizationEngine(is_complex=False)
-        self.probe_visualization_engine = VisualizationEngine(is_complex=True)
-        self.object_visualization_engine = VisualizationEngine(is_complex=True)
-
         self.processing_core = ProcessingCore(
             self._task_manager,
             self.settings_registry,

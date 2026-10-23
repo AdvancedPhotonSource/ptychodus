@@ -14,7 +14,6 @@ from PyQt5.QtWidgets import (
 )
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.plugins import PluginChooserParameter
 from ptychodus.api.reconstruct import (
     ReconstructorLibrary,
     SubprocessReconstructor,
@@ -23,6 +22,7 @@ from ptychodus.api.reconstruct import (
 
 from ...model.genesis import GenesisCore
 from ...model.globus import GlobusCore
+from ...model.parameters import PluginChooserParameter
 from ...model.processing import ProcessingAPI, ProcessingAlgorithmParameter
 from ...model.product import ProductRepository
 from ...view.processing import ProcessingActionsView, ProcessingStatusView

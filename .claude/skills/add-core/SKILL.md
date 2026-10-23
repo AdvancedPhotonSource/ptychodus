@@ -86,13 +86,13 @@ Create `src/ptychodus/controller/<feature>/` with the `*ViewController` that bri
 
 ## PluginChooser binding for settings-driven selection
 
-If your feature has a "current selected implementation" (e.g. current file reader), bind a `PluginChooser` to a `StringParameter` in your settings:
+If your feature has a "current selected implementation" (e.g. current file reader), wrap the `PluginChooser` in a `PluginChooserParameter` over the backing `StringParameter`:
 
 ```python
-self.file_reader_chooser.synchronize_with_parameter(self.settings.file_type)
+self.file_reader_parameter = PluginChooserParameter(file_reader_chooser, self.settings.file_type)
 ```
 
-`synchronize_with_parameter` in [src/ptychodus/api/plugins.py](../../src/ptychodus/api/plugins.py) sets up the two-way binding: parameter value ↔ current plugin.
+`PluginChooserParameter` in [src/ptychodus/model/parameters.py](../../src/ptychodus/model/parameters.py) owns the two-way binding and the translation between the two name spaces: its own value space is display names, while the settings parameter stores the canonical simple name. The chooser itself holds no settings.
 
 ## Verify
 

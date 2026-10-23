@@ -19,9 +19,9 @@ from ptychodus.api.reconstruct import (
 
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parameters import Parameter, StringParameter
-from ptychodus.api.plugins import PluginChooserParameter
 
 from ..naming import split_name_counter
+from ..parameters import PluginChooserParameter
 from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .parameter_store import ProcessingParameterStore
