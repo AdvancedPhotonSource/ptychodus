@@ -508,7 +508,7 @@ Ptychodus has a Pty-Chi adapter in `ptychodus.plugins.ptychi`. When using the no
 
 ### Probe And Object Sampling
 
-Pty-Chi 2.1.0 and later allow the probe to be sampled differently from the object: `probe_options.pixel_size_m` and `probe_options.pixel_size_aspect_ratio` each fall back to the matching `object_options` value when left at `None`, and Pty-Chi Fourier-rescales the object onto the probe grid whenever the two disagree.
+Pty-Chi allows the probe to be sampled differently from the object: `probe_options.pixel_size_m` and `probe_options.pixel_size_aspect_ratio` each fall back to the matching `object_options` value when left at `None`, and Pty-Chi Fourier-rescales the object onto the probe grid whenever the two disagree.
 
 The adapter derives both fields from `product.probes.get_pixel_geometry()`, alongside the object fields it derives from `product.object_.get_pixel_geometry()`. When a probe value matches the object's it is left at `None` — stating the inheritance explicitly and keeping Pty-Chi's no-resampling path — and width and aspect ratio are decided independently, matching how Pty-Chi inherits them. A product whose probe carries no pixel geometry leaves both fields unset.
 

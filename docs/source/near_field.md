@@ -82,9 +82,9 @@ Far field only cares about `z_d`. The magnification cancels there — the equiva
 
 ## Which Propagator Runs
 
-The propagator is selected from the geometry. Ptychodus exposes no switch, and a near-field geometry always lands on the angular spectrum, which is exact at every Fresnel number and preserves pitch. That is *why* the object pixel equals the detector pixel in the parallel-beam case, rather than it being a separate convention.
+The propagator is selected from the geometry. Ptychodus exposes no switch, and a near-field geometry lands on the angular spectrum in every realistic case, which is exact at every Fresnel number and preserves pitch. That is *why* the object pixel equals the detector pixel in the parallel-beam case, rather than it being a separate convention.
 
-Two selections exist for two purposes, and conflating them is the easy mistake. Ptychodus chooses a propagator for probe simulation and the propagation-analysis panel; a reconstruction backend chooses its own, internally. The crossover is the same in both, and the threshold is small enough that near field never reaches it. [Reconstructing With pty-chi](#reconstructing-with-pty-chi) gives the measured numbers for that backend.
+Two selections exist for two purposes, and conflating them is the easy mistake. Ptychodus chooses a propagator for probe simulation and the propagation-analysis panel; a reconstruction backend chooses its own, internally. The crossover is the same in both — exactly so since pty-chi 2.2.0, which brought its threshold into line with the one `choose_propagator` already applied — and the threshold is small enough that near field stays clear of it. [Reconstructing With pty-chi](#reconstructing-with-pty-chi) gives the measured numbers for that backend.
 
 ## Setting It Up In The GUI
 
@@ -137,7 +137,7 @@ Nothing below is configured by hand. A near-field product resolves it all on the
 | Option | Near field | Why |
 | --- | --- | --- |
 | `free_space_propagation_distance_m` | `z_d / M` | The equivalent parallel-beam distance, finite rather than infinite. |
-| `fft_shift` | cleared | The measurement is real-space intensity; there is no DC corner to roll. |
+| `fft_shift` | cleared | The measurement is real-space intensity; there is no DC corner to roll. Far field sets it instead, for the plain FFT it compares against. |
 | `forward_model_options.pad_for_shift` | raised from `0` to `50` | A bright-field probe wants a margin to shift into. Only the default is replaced, never a value you chose. |
 
 ### Algorithm
@@ -150,15 +150,15 @@ A high-count hologram suits the Gaussian noise model, which is pty-chi's default
 
 ### Propagator
 
-Inside the reconstruction pty-chi picks `FourierPropagator` at infinite distance, and otherwise compares the per-pixel Fresnel number `dx**2 / (lambda z)` against `1 / (2 sqrt(H W))`, taking the Fresnel transform below that threshold and the angular spectrum above it. For the illustrative instrument above, where that threshold is about `1e-3`:
+Inside the reconstruction pty-chi picks `FourierPropagator` at infinite distance, and otherwise asks, per axis, whether the conjugate-plane pitch `lambda |z| / (N dx)` is coarser than the source pitch — taking the Fresnel transform when either axis says yes and the angular spectrum when neither does. For square pixels that reduces to the per-pixel Fresnel number `dx**2 / (lambda |z|)` against `1 / N`. The distance enters as a magnitude, so propagating backward selects the same propagator as propagating forward. For the illustrative instrument above:
 
-| Geometry | Per-pixel `Fr` | Selected |
-| --- | --- | --- |
-| Parallel beam, 75 µm over 2 m | ≈ 20 | angular spectrum |
-| Cone beam, 37 nm over 1 mm | ≈ 0.01 | angular spectrum |
-| Far field | — | `FourierPropagator`, distance is infinite |
+| Geometry | Per-pixel `Fr` | Threshold `1 / N` | Selected |
+| --- | --- | --- | --- |
+| Parallel beam, 75 µm over 2 m | ≈ 23 | ≈ 2e-3 | angular spectrum |
+| Cone beam, 37 nm over 1 mm | ≈ 0.011 | ≈ 2e-3 | angular spectrum |
+| Far field | — | — | `FourierPropagator`, distance is infinite |
 
-Both sit orders of magnitude above the threshold, and that is the general case rather than a property of these numbers: the Fresnel transform is reached only at distances long enough that the far-field grid is coarser than the source grid, where one would declare far field anyway.
+The parallel-beam case clears the threshold by four orders of magnitude. The cone beam clears it by about six times, which is comfortable but finite: the equivalent parallel-beam geometry divides the pixel and the distance by the same magnification, so `Fr` falls as `1 / M`, and a high enough magnification does reach the Fresnel transform — on this instrument near an `M` of `1.2e4`. That is an order of magnitude beyond a zone-plate cone beam, and well inside the regime where the conjugate grid is coarser than the source grid and the sampling would be in question anyway.
 
 ```{warning}
 The **Forward Model:** combo in the Autodiff panel is not a propagator selector. It maps to pty-chi's `ForwardModels` enum, whose members are `base` and `planar_ptychography`, and it appears on that one algorithm's page only.
@@ -166,7 +166,7 @@ The **Forward Model:** combo in the Autodiff panel is not a propagator selector.
 
 ### Supplying Your Own Options
 
-`--print-ptychi-options` names the fields ptychodus always derives from the data, which an options file must leave alone. `fft_shift` and `pad_for_shift` are not in that list because they are derived only for a near-field product; set them for a far-field run as you like.
+`--print-ptychi-options` names the fields ptychodus always derives from the data, which an options file must leave alone. `fft_shift` is among them: it states where the detector plane keeps its DC component, which the regime settles in both directions. `pad_for_shift` is not, because it is derived only for a near-field product; set it for a far-field run as you like.
 
 ## Known Limitations
 

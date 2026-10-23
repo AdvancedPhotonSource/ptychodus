@@ -577,8 +577,9 @@ _RECONSTRUCTOR_OVERLAYS: Mapping[str, Overlay] = {
     ),
     'allow_nondeterministic_algorithms': Overlay(
         'Allow Nondeterministic Algorithms',
-        'Allow nondeterministic algorithms, which can be faster but cause larger '
-        'run-to-run variation.',
+        'Allow nondeterministic algorithms in the patch-placement path PyTorch runs, '
+        'where they can be faster but cause larger run-to-run variation. The path taken '
+        'on CUDA instead reduces deterministically, so this has no effect there.',
     ),
     'UseDoublePrecision': Overlay(
         'Use Double Precision', 'Floating point precision to use for computation'
@@ -619,12 +620,6 @@ _RECONSTRUCTOR_OVERLAYS: Mapping[str, Overlay] = {
 }
 
 _DATA_OVERLAYS: Mapping[str, Overlay] = {
-    'fft_shift': Overlay(
-        'FFT Shift Diffraction Patterns',
-        'When checked, the diffraction patterns will be FFT-shifted. Ignored for a '
-        'near-field product, whose patterns are real-space intensity: the regime '
-        'clears this whatever is shown here.',
-    ),
     'save_data_on_device': Overlay(
         'Save Data on Device', 'Keep the diffraction data on the compute device (e.g. GPU).'
     ),
@@ -781,11 +776,18 @@ def _reconstructor_policy(extras: set[str], *, ignores_batching: bool = False) -
 
 def _data_policy() -> FlatteningPolicy:
     return FlatteningPolicy(
-        # All but two are filled from the product at reconstruct time.
+        # All but one are filled from the product at reconstruct time. `fft_shift` is
+        # among them rather than a choice: it states whether the detector plane pty-chi
+        # compares against has DC at a corner, which the propagation regime settles.
         hidden=frozenset(
-            {'data', 'free_space_propagation_distance_m', 'wavelength_m', 'valid_pixel_mask'}
+            {
+                'data',
+                'fft_shift',
+                'free_space_propagation_distance_m',
+                'wavelength_m',
+                'valid_pixel_mask',
+            }
         ),
-        renames={'fft_shift': 'FFTShiftDiffractionPatterns'},
         overlays=_DATA_OVERLAYS,
     )
 

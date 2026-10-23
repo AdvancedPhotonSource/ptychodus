@@ -70,6 +70,7 @@ from ptychodus.cli._reconstruct_common import (  # noqa: E402
 )
 from ptychodus.plugins.ptychi.algorithms import task_options_classes  # noqa: E402
 from ptychodus.plugins.ptychi.task import (  # noqa: E402
+    _build_ptychi_propagator,
     _initial_opr_mode_weights,
     align_probe_gauge_with_ptychi,
     align_task_options_with_product,
@@ -688,6 +689,8 @@ _PRODUCT_DERIVED_FIELDS = [
     ('object_options.position_origin_coords', [0.0, 0.0]),
     ('data_options.wavelength_m', _make_reconstruct_input().product.metadata.photon_wavelength_m),
     ('data_options.free_space_propagation_distance_m', numpy.inf),
+    # True for this far-field product; a near-field one clears it.
+    ('data_options.fft_shift', True),
     ('probe_options.power_constraint.probe_power', PROBE_PHOTON_COUNT),
     # None means "inherit the object value": the test product's probe and object
     # sampling agree, and writing None is what keeps pty-chi's no-resampling
@@ -900,8 +903,9 @@ def test_align_clears_fft_shift_for_near_field() -> None:
     assert aligned.data_options.fft_shift is False
 
 
-def test_align_leaves_fft_shift_alone_for_far_field() -> None:
-    """Both values are legitimate in far field, so neither is the product's to pick."""
+def test_align_sets_fft_shift_for_far_field() -> None:
+    """ptychodus stores patterns DC-centered, so far field must roll them to the corner
+    the plain FFT compares against -- not a choice a caller gets to make differently."""
     product = _make_reconstruct_input().product
 
     for requested in (True, False):
@@ -910,7 +914,7 @@ def test_align_leaves_fft_shift_alone_for_far_field() -> None:
 
         aligned = align_task_options_with_product(options, product)
 
-        assert aligned.data_options.fft_shift is requested
+        assert aligned.data_options.fft_shift is True
 
 
 def test_align_raises_pad_for_shift_from_its_default_for_near_field() -> None:
@@ -1288,6 +1292,102 @@ def test_probe_gauge_of_a_matched_product_is_the_propagator_convention(
     # Single precision throughout: pty-chi propagates in complex64 unless told not to.
     assert gauge.anomaly == pytest.approx(1.0, rel=1e-6)
     assert gauge.sampled_positions == NUM_PATTERNS
+
+
+def _gauge_input_matched_per_pixel(
+    *,
+    far_field: bool = True,
+    pixel_m: float = PIXEL_M,
+    distance_m: float = DETECTOR_DISTANCE_M,
+) -> ReconstructInput:
+    """A matched product whose patterns agree with the forward model pixel by pixel.
+
+    `_gauge_input` matches only the per-pattern total, which is all the unmasked gauge
+    reads. Masking makes the comparison spatial, so this builds the patterns by actually
+    propagating the exit wave and rolling the result into the detector frame, then scales
+    them to the photons an energy-conserving model would record. Every pixel then carries
+    the same predicted-to-measured ratio, so the gauge is the same over any subset of
+    them -- which is the invariant a masked test is there to pin.
+
+    The probe is a centered Gaussian rather than the uniform one `_gauge_input` uses: a
+    uniform probe transforms to a single bright pixel, leaving a mask nothing to bite on.
+    """
+    y, x = numpy.mgrid[0:PROBE_HEIGHT_PX, 0:PROBE_WIDTH_PX]
+    envelope = numpy.exp(-(((x - PROBE_WIDTH_PX / 2) ** 2 + (y - PROBE_HEIGHT_PX / 2) ** 2) / 4.0))
+    probe_array = numpy.zeros((1, 1, PROBE_HEIGHT_PX, PROBE_WIDTH_PX), dtype=numpy.complex128)
+    probe_array[0, 0] = envelope
+    probe_array *= numpy.sqrt(_GAUGE_PHOTONS / numpy.sum(numpy.abs(probe_array) ** 2))
+
+    parameters = _gauge_input(far_field=far_field, pixel_m=pixel_m, distance_m=distance_m)
+    product = parameters.product
+    probes = ProbeEnsemble(
+        array=probe_array,
+        opr_weights=None,
+        pixel_geometry=product.probes.get_pixel_geometry(),
+    )
+    product = dataclasses.replace(product, probes=probes)
+
+    propagator, corner_ordered = _build_ptychi_propagator(
+        align_task_options_with_product(LSQMLOptions(), product), probes
+    )
+    import torch
+
+    with torch.no_grad():
+        propagated = propagator.propagate_forward(torch.as_tensor(probe_array[0]))
+        intensity = numpy.sum(numpy.abs(propagated.numpy()) ** 2, axis=0)
+
+    if corner_ordered:
+        intensity = numpy.fft.fftshift(intensity, axes=(-2, -1))
+
+    pattern = intensity * (_GAUGE_PHOTONS / numpy.sum(intensity))
+    patterns = numpy.repeat(pattern[numpy.newaxis], NUM_PATTERNS, axis=0)
+
+    return ReconstructInput(
+        diffraction_patterns=patterns,
+        bad_pixels=numpy.zeros((PROBE_HEIGHT_PX, PROBE_WIDTH_PX), dtype=numpy.bool_),
+        product=product,
+    )
+
+
+@pytest.mark.parametrize(
+    'kwargs',
+    [
+        pytest.param({}, id='far-field-fft'),
+        pytest.param(
+            {
+                'far_field': False,
+                'pixel_m': _NEAR_FIELD_PIXEL_M,
+                'distance_m': _NEAR_FIELD_DISTANCE_M,
+            },
+            id='near-field-angular-spectrum',
+        ),
+    ],
+)
+def test_probe_gauge_is_unchanged_by_which_pixels_are_masked(
+    kwargs: dict[str, object],
+) -> None:
+    """Bad pixels drop the same content from both sides of the gauge, whatever the
+    propagator's output ordering.
+
+    The predicted plane is summed over a mask written in detector coordinates, so a
+    propagator that returns DC at a corner -- the plain FFT far field does -- has to be
+    rolled before it is indexed. Left unrolled, the two sides exclude different pixels
+    and a perfectly matched product reports a probe that needs rescaling.
+    """
+    clean = _gauge_input_matched_per_pixel(**kwargs)  # type: ignore[arg-type]
+    bad_pixels = numpy.zeros((PROBE_HEIGHT_PX, PROBE_WIDTH_PX), dtype=numpy.bool_)
+    # Off-center and asymmetric, so it covers different content under either ordering.
+    bad_pixels[1:4, 2:6] = True
+    masked = dataclasses.replace(clean, bad_pixels=bad_pixels)
+
+    gauge = align_probe_gauge_with_ptychi(_aligned_for(masked), masked)
+
+    assert gauge.anomaly == pytest.approx(1.0, rel=1e-5)
+    # Guard the degrade path, which also reports an anomaly of exactly one.
+    assert gauge.sampled_positions == NUM_PATTERNS
+    assert gauge.to_ptychi == pytest.approx(
+        align_probe_gauge_with_ptychi(_aligned_for(clean), clean).to_ptychi, rel=1e-5
+    )
 
 
 def test_probe_gauge_in_far_field_undoes_the_unnormalized_fft() -> None:

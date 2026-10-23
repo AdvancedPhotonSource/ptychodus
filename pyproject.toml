@@ -62,10 +62,10 @@ globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]
 gui = ["PyQt5"]
 # pty-chi pins torch to a CUDA-matched index in its own pyproject, but uv does not
 # inherit `tool.uv.sources` from a dependency, so ptychodus has to pin it again below.
-ptychi = ["ptychi==2.1.*", "torch>=2.4", "torchvision"]
-ptychi-cuda128 = ["ptychi==2.1.*", "torch>=2.4", "torchvision"]
-ptychi-cuda130 = ["ptychi==2.1.*", "torch>=2.4", "torchvision"]
-ptychi-cuda132 = ["ptychi==2.1.*", "torch>=2.4", "torchvision"]
+ptychi = ["ptychi==2.2.*", "torch>=2.4", "torchvision"]
+ptychi-cuda128 = ["ptychi==2.2.*", "torch>=2.4", "torchvision"]
+ptychi-cuda130 = ["ptychi==2.2.*", "torch>=2.4", "torchvision"]
+ptychi-cuda132 = ["ptychi==2.2.*", "torch>=2.4", "torchvision"]
 ptychozoon = ["ptychozoon"]
 store = [
     "fastapi>=0.115",

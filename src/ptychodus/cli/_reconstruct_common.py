@@ -490,6 +490,7 @@ def add_ptychi_options_argument(
 _DATA_DERIVED_OPTION_FIELDS: Final = (
     'data_options.wavelength_m',
     'data_options.free_space_propagation_distance_m',
+    'data_options.fft_shift',
     'object_options.pixel_size_m',
     'object_options.pixel_size_aspect_ratio',
     'object_options.slice_spacings_m',

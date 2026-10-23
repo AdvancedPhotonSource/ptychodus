@@ -310,20 +310,27 @@ class ProbeGauge:
         return self.to_ptychi / self.expected_factor
 
 
-def _build_ptychi_propagator(task_options: PtychographyTaskOptions, probe: ProbeEnsemble) -> Any:
+def _build_ptychi_propagator(
+    task_options: PtychographyTaskOptions, probe: ProbeEnsemble
+) -> tuple[Any, bool]:
     """Build the free-space propagator pty-chi's forward model will build.
 
     Mirrors the selection in its forward model: an infinite distance is far field and
     takes the plain FFT, and otherwise the Fresnel number decides between the Fresnel
     transform and the angular spectrum. The probe pixel size is whatever the options
     state, falling back to the object's, which is the same inheritance pty-chi applies.
+
+    Returns the propagator and whether its detector plane comes back in corner order.
+    Only the plain FFT does: it leaves the DC component at a corner, which is why pty-chi
+    rolls the patterns to meet it. Every other propagator is centered in and centered
+    out, so its plane is already in the frame a detector mask is written in.
     """
     from ptychi import propagate
 
     distance_m = task_options.data_options.free_space_propagation_distance_m
 
     if math.isinf(distance_m):
-        return propagate.FourierPropagator()
+        return propagate.FourierPropagator(), True
 
     object_options = task_options.object_options
     probe_options = task_options.probe_options
@@ -340,9 +347,9 @@ def _build_ptychi_propagator(task_options: PtychographyTaskOptions, probe: Probe
     )
 
     if parameters.is_fresnel_transform_preferrable():
-        return propagate.FresnelTransformPropagator(parameters)
+        return propagate.FresnelTransformPropagator(parameters), False
 
-    return propagate.AngularSpectrumPropagator(parameters)
+    return propagate.AngularSpectrumPropagator(parameters), False
 
 
 def _propagate_intensity(propagator: Any, wavefield: numpy.ndarray) -> numpy.ndarray:
@@ -372,6 +379,8 @@ def _measure_predicted_intensity(
     product: Product,
     good_pixels: numpy.ndarray,
     num_sample_positions: int,
+    *,
+    corner_ordered: bool,
 ) -> tuple[float, int]:
     """Mean detector total pty-chi's forward model would predict, over sampled positions.
 
@@ -381,7 +390,8 @@ def _measure_predicted_intensity(
 
     Only the good pixels are summed, because the measured totals it will be compared
     against are summed the same way; counting the masked ones on one side alone would
-    bias the result by the dead-pixel fraction.
+    bias the result by the dead-pixel fraction. That only holds while both sides index
+    the same frame, so a corner-ordered plane is rolled to meet the mask first.
     """
     object_array = product.object_.get_layers_flattened()
     num_positions = len(product.probe_positions)
@@ -398,8 +408,12 @@ def _measure_predicted_intensity(
             continue
 
         object_patch = object_array[patch.bounds.y_slice, patch.bounds.x_slice]
-        intensity = _propagate_intensity(propagator, patch.modes * object_patch)
-        total += float(numpy.sum(numpy.sum(intensity, axis=0)[good_pixels]))
+        intensity = numpy.sum(_propagate_intensity(propagator, patch.modes * object_patch), axis=0)
+
+        if corner_ordered:
+            intensity = numpy.fft.fftshift(intensity, axes=(-2, -1))
+
+        total += float(numpy.sum(intensity[good_pixels]))
         sampled += 1
 
     if sampled == 0:
@@ -449,7 +463,8 @@ def align_probe_gauge_with_ptychi(
     object already agree with the data, rather than raising: an initial guess is not
     worth failing a reconstruction over.
     """
-    propagator = _build_ptychi_propagator(task_options, parameters.product.probes)
+    propagator, corner_ordered = _build_ptychi_propagator(task_options, parameters.product.probes)
+    # Summed over the whole plane rather than a mask, so the ordering cannot reach it.
     energy_ratio = _measure_propagator_energy_ratio(propagator, parameters.product.probes)
     expected_factor = 1.0 / math.sqrt(energy_ratio) if energy_ratio > 0.0 else 1.0
 
@@ -458,7 +473,11 @@ def align_probe_gauge_with_ptychi(
 
     try:
         predicted, sampled = _measure_predicted_intensity(
-            propagator, parameters.product, good_pixels, num_sample_positions
+            propagator,
+            parameters.product,
+            good_pixels,
+            num_sample_positions,
+            corner_ordered=corner_ordered,
         )
     except ValueError as exc:
         logger.warning(
@@ -553,10 +572,10 @@ def align_task_options_with_product(
     contradicts its own geometry warns separately and is not corrected.
 
     Two more options follow the regime, and they are different kinds of thing.
-    `fft_shift` is product-derived: a near-field measurement is real-space intensity,
-    so shifting it is wrong whatever the caller asked for, and it is overwritten the
-    same way the distance is. Far field is left alone, since both values are
-    legitimate there depending on where the supplied patterns put the DC component.
+    `fft_shift` is product-derived in both directions: ptychodus stores patterns with
+    the DC component centered, so far field must roll it to the corner the plain FFT
+    puts it at, and a near-field measurement is real-space intensity that must not be
+    rolled at all. Neither is a choice, so both are overwritten the way the distance is.
 
     `pad_for_shift` is a tunable rather than a fact about the product. A near-field
     bright-field probe wants a positive value and there is no formula for it, so a
@@ -614,9 +633,11 @@ def align_task_options_with_product(
         math.inf if metadata.far_field else metadata.detector_distance_m / metadata.magnification,
     )
 
+    # Far field compares against a plain FFT, whose DC sits at a corner; near field is
+    # real-space intensity with no DC corner to roll to.
+    _overwrite(aligned.data_options, 'fft_shift', metadata.far_field)
+
     if not metadata.far_field:
-        # Real-space intensity: the DC component is not at a corner to be rolled.
-        _overwrite(aligned.data_options, 'fft_shift', False)
         _raise_pad_for_shift(aligned, near_field_pad_for_shift)
 
     warn_if_propagation_regime_disagrees(product)
