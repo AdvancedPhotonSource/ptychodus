@@ -109,7 +109,6 @@ class IlluminationViewController:
     def __init__(
         self,
         mapper: IlluminationMapper,
-        engine: VisualizationEngine,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
@@ -119,6 +118,7 @@ class IlluminationViewController:
         self._dialog = IlluminationDialog()
 
         self._parameters_controller = IlluminationParametersController(self._dialog.parameters_view)
+        engine = VisualizationEngine(is_complex=False)
         self._visualization_widget_controller = VisualizationWidgetController(
             engine,
             self._dialog.visualization_widget,

@@ -112,7 +112,6 @@ class OPRModeViewController:
     def __init__(
         self,
         analyzer: OPRModeAnalyzer,
-        engine: VisualizationEngine,
         file_dialog_factory: FileDialogFactory,
         parent: QWidget,
     ) -> None:
@@ -178,13 +177,16 @@ class OPRModeViewController:
             self._frame_rate_spin_box,
             parent,
         )
+        # Complex so the dialog can render the composed mode and the deviation from its
+        # across-scan mean as wavefields: OPR moves amplitude and phase together, and the
+        # default 'Complex' renderer shows both at once.
+        self._engine = VisualizationEngine(is_complex=True)
         self._image_controller = ImageController(
-            engine,
+            self._engine,
             self._dialog.probe_view,
             self._dialog.status_bar,
             file_dialog_factory,
         )
-        self._engine = engine
         self._series_marker = _BlittedMarker(self._dialog.series_plot_view.figure_canvas)
         self._grid_marker = _BlittedMarker(self._dialog.scan_grid_plot_view.figure_canvas)
 

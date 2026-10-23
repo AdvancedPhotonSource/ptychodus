@@ -35,7 +35,6 @@ from ....model.diffraction import (
     DiffractionSettings,
     DiffractionSummaryService,
 )
-from ...rendering import VisualizationEngine
 from ....view.diffraction import OpenDatasetWizardPage
 from ....view.widgets import ExceptionDialog
 
@@ -647,7 +646,6 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
         extent_source: DetectorExtentSource,
         api: DiffractionAPI,
         summary_service: DiffractionSummaryService,
-        summary_visualization_engine: VisualizationEngine,
         status_bar: QStatusBar,
         file_dialog_factory: FileDialogFactory,
         get_pending_dataset_index: Callable[[], int],
@@ -671,7 +669,6 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
         self._summary_view_controller = SummaryPanelViewController(
             diffraction_settings,
             summary_service,
-            summary_visualization_engine,
             extent_source,
             status_bar,
             file_dialog_factory,

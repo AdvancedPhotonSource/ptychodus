@@ -14,7 +14,6 @@ from .fluorescence import FluorescenceController
 from .fluorescence.enhance_dialog import FluorescenceEnhanceDialogController
 from .genesis import GenesisController
 from .globus import GlobusController
-from .image import ImageController
 from .memory import MemoryController
 from .object import ObjectController
 from .probe import ProbeController
@@ -26,7 +25,6 @@ from .processing.generated import GeneratedViewControllerFactory
 from .product import ProductController
 from .product.core import ProductRepositoryTableModel
 from .product.visualization import ProductVisualizationController
-from .rendering import VisualizationEngine
 from .task_status import TaskStatusController
 from .settings import SettingsController
 
@@ -70,15 +68,6 @@ class ControllerCore:
             view.settings_table_view,
             self._file_dialog_factory,
         )
-        self._diffraction_image_controller = ImageController(
-            VisualizationEngine(is_complex=False),
-            view.diffraction_image_view.image_view,
-            self._status_bar,
-            self._file_dialog_factory,
-        )
-        # Its own engine, not the pattern one above: autoscaling the wizard's mean-pattern
-        # color range must not disturb whatever range the user set on the main pane.
-        summary_visualization_engine = VisualizationEngine(is_complex=False)
         self._diffraction_controller = DiffractionController(
             model.diffraction_core.detector_settings,
             model.diffraction_core.diffraction_settings,
@@ -91,10 +80,8 @@ class ControllerCore:
             model.analysis_core.diffraction_simulator,
             model.analysis_core.diffraction_simulator_settings,
             view.diffraction_view,
-            view.diffraction_image_view.status_view,
-            self._diffraction_image_controller,
+            view.diffraction_image_view,
             model.diffraction_core.summary_service,
-            summary_visualization_engine,
             self._status_bar,
             self._file_dialog_factory,
         )
@@ -113,8 +100,6 @@ class ControllerCore:
         if is_developer_mode_enabled:
             self._product_visualization_controller = ProductVisualizationController(
                 model.analysis_core.residual_analyzer,
-                VisualizationEngine(is_complex=False),
-                VisualizationEngine(is_complex=False),
                 self._product_controller,
                 view.product_visualization_view,
                 self._status_bar,
@@ -128,46 +113,16 @@ class ControllerCore:
             self._file_dialog_factory,
             is_developer_mode_enabled=is_developer_mode_enabled,
         )
-        self._probe_image_controller = ImageController(
-            VisualizationEngine(is_complex=True),
-            view.probe_image_view,
-            self._status_bar,
-            self._file_dialog_factory,
-        )
-        # Complex so the propagation dialog can render a single incoherent mode's
-        # wavefield; Real up front because the dialog opens on the mode-summed
-        # intensity, for which the is_complex default of 'Complex' paints a flat hue.
-        probe_propagator_visualization_engine = VisualizationEngine(is_complex=True)
-        probe_propagator_visualization_engine.set_renderer('Real')
-        # Complex so the dialog can render the composed mode and the deviation from its
-        # across-scan mean as wavefields: OPR moves amplitude and phase together, and the
-        # default 'Complex' renderer shows both at once.
-        opr_mode_visualization_engine = VisualizationEngine(is_complex=True)
         self._probe_controller = ProbeController(
             model.product_core.probe_repository,
             model.product_core.probe_api,
-            self._probe_image_controller,
+            view.probe_image_view,
             model.analysis_core.probe_propagator,
             model.analysis_core.probe_propagator_settings,
-            probe_propagator_visualization_engine,
             model.analysis_core.illumination_mapper,
-            VisualizationEngine(is_complex=False),
             model.analysis_core.probe_overlap_analyzer,
-            VisualizationEngine(is_complex=False),
             model.analysis_core.opr_mode_analyzer,
-            opr_mode_visualization_engine,
             view.probe_view,
-            self._file_dialog_factory,
-        )
-        self._object_image_controller = ImageController(
-            VisualizationEngine(is_complex=True),
-            view.object_image_view,
-            self._status_bar,
-            self._file_dialog_factory,
-        )
-        self._fluorescence_image_controller = ImageController(
-            VisualizationEngine(is_complex=False),
-            view.fluorescence_image_view,
             self._status_bar,
             self._file_dialog_factory,
         )
@@ -181,22 +136,20 @@ class ControllerCore:
             model.product_core.product_repository,
             self._product_table_model,
             view.fluorescence_view,
-            self._fluorescence_image_controller,
+            view.fluorescence_image_view,
             self._fluorescence_enhance_dialog_controller,
+            self._status_bar,
             self._file_dialog_factory,
         )
         self._object_controller = ObjectController(
             model.product_core.object_repository,
             model.product_core.object_api,
-            self._object_image_controller,
+            view.object_image_view,
             model.analysis_core.fourier_ring_correlator,
             model.analysis_core.fourier_analyzer,
-            VisualizationEngine(is_complex=True),
-            VisualizationEngine(is_complex=True),
             model.analysis_core.xmcd_analyzer,
-            VisualizationEngine(is_complex=True),
-            VisualizationEngine(is_complex=True),
             view.object_view,
+            self._status_bar,
             self._file_dialog_factory,
         )
         self._processing_controller = ProcessingController(

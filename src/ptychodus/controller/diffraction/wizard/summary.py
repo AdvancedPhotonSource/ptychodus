@@ -85,7 +85,6 @@ class SummaryPanelViewController(Observer):
         self,
         diffraction_settings: DiffractionSettings,
         summary_service: DiffractionSummaryService,
-        summary_visualization_engine: VisualizationEngine,
         extent_source: DetectorExtentSource,
         status_bar: QStatusBar,
         file_dialog_factory: FileDialogFactory,
@@ -108,7 +107,7 @@ class SummaryPanelViewController(Observer):
         # --- mean_pattern image view (top) ---
         self._image_view = ImageView()
         self._image_controller = ImageController(
-            summary_visualization_engine,
+            VisualizationEngine(is_complex=False),
             self._image_view,
             status_bar,
             file_dialog_factory,

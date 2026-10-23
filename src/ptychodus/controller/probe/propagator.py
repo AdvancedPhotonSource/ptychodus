@@ -33,7 +33,6 @@ class ProbePropagationViewController:
         self,
         propagator: ProbePropagator,
         settings: ProbePropagatorSettings,
-        engine: VisualizationEngine,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
@@ -83,6 +82,12 @@ class ProbePropagationViewController:
         probe_view.intensity_button.setChecked(True)
         probe_view.intensity_button.toggled.connect(self._handle_visualization_mode_toggled)
         self._mode_spin_box.valueChanged.connect(self._refresh_views)
+
+        # Complex so a single incoherent mode's wavefield can be rendered; Real up front
+        # because the dialog opens on the mode-summed intensity, for which the is_complex
+        # default of 'Complex' paints a flat hue.
+        engine = VisualizationEngine(is_complex=True)
+        engine.set_renderer('Real')
 
         # All three views share one engine, so the XY ribbon's colorize and data-range
         # controls drive the color axis for the Z planes too.

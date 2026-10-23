@@ -18,8 +18,6 @@ class FourierAnalysisViewController:
     def __init__(
         self,
         analyzer: FourierAnalyzer,
-        real_space_visualization_engine: VisualizationEngine,
-        reciprocal_space_visualization_engine: VisualizationEngine,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
@@ -31,13 +29,13 @@ class FourierAnalysisViewController:
         self._dialog.setWindowTitle('Fourier Analysis')
 
         self._real_space_image_controller = ImageController(
-            real_space_visualization_engine,
+            VisualizationEngine(is_complex=True),
             self._dialog.real_space_view,
             self._dialog.status_bar,
             file_dialog_factory,
         )
         self._reciprocal_space_image_controller = ImageController(
-            reciprocal_space_visualization_engine,
+            VisualizationEngine(is_complex=True),
             self._dialog.reciprocal_space_view,
             self._dialog.status_bar,
             file_dialog_factory,

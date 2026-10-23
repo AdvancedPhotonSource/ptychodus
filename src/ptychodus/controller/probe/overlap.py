@@ -33,7 +33,6 @@ class ProbeOverlapViewController:
     def __init__(
         self,
         analyzer: ProbeOverlapAnalyzer,
-        engine: VisualizationEngine,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
@@ -42,6 +41,7 @@ class ProbeOverlapViewController:
         self._metrics: ProbeOverlapMetrics | None = None
         self._dialog = ProbeOverlapDialog()
 
+        engine = VisualizationEngine(is_complex=False)
         self._visualization_widget_controller = VisualizationWidgetController(
             engine,
             self._dialog.visualization_widget,

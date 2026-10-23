@@ -18,8 +18,6 @@ class ProductVisualizationController:
     def __init__(
         self,
         analyzer: ResidualAnalyzer,
-        real_space_engine: VisualizationEngine,
-        reciprocal_space_engine: VisualizationEngine,
         product_controller: ProductController,
         view: ProductVisualizationView,
         status_bar: QStatusBar,
@@ -30,13 +28,13 @@ class ProductVisualizationController:
         self._view = view
 
         self._real_image_controller = ImageController(
-            real_space_engine,
+            VisualizationEngine(is_complex=False),
             view.real_space_image_view,
             status_bar,
             file_dialog_factory,
         )
         self._reciprocal_image_controller = ImageController(
-            reciprocal_space_engine,
+            VisualizationEngine(is_complex=False),
             view.reciprocal_space_image_view,
             status_bar,
             file_dialog_factory,

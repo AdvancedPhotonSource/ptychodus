@@ -11,7 +11,6 @@ from ....model.diffraction import (
     DiffractionSummaryService,
 )
 from ....model.product import ProductSettings
-from ...rendering import VisualizationEngine
 from ....view.widgets import ExceptionDialog
 
 from ...data import FileDialogFactory
@@ -33,7 +32,6 @@ class OpenDatasetWizardController:
         api: DiffractionAPI,
         repository: DiffractionDatasetRepository,
         summary_service: DiffractionSummaryService,
-        summary_visualization_engine: VisualizationEngine,
         status_bar: QStatusBar,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
@@ -56,7 +54,6 @@ class OpenDatasetWizardController:
             extent_source,
             api,
             summary_service,
-            summary_visualization_engine,
             status_bar,
             file_dialog_factory,
             self._get_pending_dataset_index,

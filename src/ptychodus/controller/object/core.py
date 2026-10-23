@@ -2,7 +2,7 @@ from __future__ import annotations
 import logging
 
 from PyQt5.QtCore import QModelIndex, QStringListModel
-from PyQt5.QtWidgets import QAbstractItemView, QDialog
+from PyQt5.QtWidgets import QAbstractItemView, QDialog, QStatusBar
 
 from ptychodus.api.observer import SequenceObserver
 
@@ -10,6 +10,7 @@ from ...model.analysis import FourierAnalyzer, FourierRingCorrelator, XMCDAnalyz
 from ...model.product import ObjectAPI, ObjectRepository
 from ...model.product.object import ObjectRepositoryItem
 from ..rendering import VisualizationEngine
+from ...view.image import ImageView
 from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
@@ -29,21 +30,23 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         self,
         repository: ObjectRepository,
         api: ObjectAPI,
-        image_controller: ImageController,
+        image_view: ImageView,
         correlator: FourierRingCorrelator,
         fourier_analyzer: FourierAnalyzer,
-        fourier_real_space_visualization_engine: VisualizationEngine,
-        fourier_reciprocal_space_visualization_engine: VisualizationEngine,
         xmcd_analyzer: XMCDAnalyzer,
-        xmcd_structural_visualization_engine: VisualizationEngine,
-        xmcd_magnetic_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
+        status_bar: QStatusBar,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._repository = repository
         self._api = api
-        self._image_controller = image_controller
+        self._image_controller = ImageController(
+            VisualizationEngine(is_complex=True),
+            image_view,
+            status_bar,
+            file_dialog_factory,
+        )
         self._view = view
         self._file_dialog_factory = file_dialog_factory
         self._tree_model = ObjectTreeModel(repository, api, create_brush_for_editable_cell(view))
@@ -54,14 +57,10 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         )
         self._fourier_view_controller = FourierAnalysisViewController(
             fourier_analyzer,
-            fourier_real_space_visualization_engine,
-            fourier_reciprocal_space_visualization_engine,
             file_dialog_factory,
         )
         self._xmcd_view_controller = XMCDViewController(
             xmcd_analyzer,
-            xmcd_structural_visualization_engine,
-            xmcd_magnetic_visualization_engine,
             file_dialog_factory,
             self._tree_model,
         )
