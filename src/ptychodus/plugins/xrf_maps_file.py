@@ -8,6 +8,7 @@ from ptychodus.api.fluorescence import (
     FluorescenceFileReader,
     FluorescenceFileWriter,
 )
+from ptychodus.api.files import FileFormat
 from ptychodus.api.io import load_fluorescence_data, save_fluorescence_data
 from ptychodus.api.plugins import PluginRegistry
 
@@ -30,10 +31,10 @@ class XRFMapsFileIO(FluorescenceFileReader, FluorescenceFileWriter):
 
 class NPZFluorescenceFileWriter(FluorescenceFileWriter):
     def get_file_description(self) -> str:
-        return 'NumPy Zipped Archive'
+        return FileFormat.NPZ.description
 
     def get_file_extensions(self) -> set[str]:
-        return {'.npz'}
+        return FileFormat.NPZ.extensions
 
     def write(self, file_path: Path, dataset: FluorescenceDataset) -> None:
         contents = {emap.name: emap.counts_per_second for emap in dataset}

@@ -5,6 +5,7 @@ import numpy
 from PyQt5.QtWidgets import QSpinBox
 
 from ptychodus.api.constants import LengthUnit, format_length
+from ptychodus.api.files import FileFormat
 from ptychodus.api.probe import ProbeSizeMetrics
 from ptychodus.api.propagate import PropagatedWavefield, intensity
 from ptychodus.api.typing import NumberArrayType, RealArrayType
@@ -25,7 +26,7 @@ from .metrics import compute_xy_metrics
 
 logger = logging.getLogger(__name__)
 
-_SAVE_FILE_FILTER = 'NumPy Zipped Archive (*.npz)'
+_SAVE_FILE_FILTER = FileFormat.NPZ.file_filter
 
 
 class ProbePropagationViewController:

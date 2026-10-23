@@ -2,16 +2,17 @@ from pathlib import Path
 
 import numpy
 
+from ptychodus.api.files import FileFormat
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeEnsemble, ProbeFileReader, ProbeFileWriter
 
 
 class CSVProbeFileReader(ProbeFileReader):
     def get_file_description(self) -> str:
-        return 'Comma-Separated Values Files'
+        return FileFormat.CSV.description
 
     def get_file_extensions(self) -> set[str]:
-        return {'.csv'}
+        return FileFormat.CSV.extensions
 
     def read(self, file_path: Path) -> ProbeEnsemble:
         array_flat = numpy.genfromtxt(file_path, delimiter=',', dtype=complex)
@@ -26,10 +27,10 @@ class CSVProbeFileReader(ProbeFileReader):
 
 class CSVProbeFileWriter(ProbeFileWriter):
     def get_file_description(self) -> str:
-        return 'Comma-Separated Values Files'
+        return FileFormat.CSV.description
 
     def get_file_extensions(self) -> set[str]:
-        return {'.csv'}
+        return FileFormat.CSV.extensions
 
     def write(self, file_path: Path, probes: ProbeEnsemble) -> None:
         array = probes.get_probe_no_opr().get_array()

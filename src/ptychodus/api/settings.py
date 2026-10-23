@@ -6,7 +6,7 @@ from pathlib import Path
 import configparser
 import logging
 
-from .files import FileHandler
+from .files import FileFormat, FileHandler
 from .observer import Observable
 from .parameters import ParameterGroup
 
@@ -53,10 +53,10 @@ class SettingsRegistry(Observable, FileHandler):
         self._parameter_group = ParameterGroup()
 
     def get_file_description(self) -> str:
-        return 'Initialization Files'
+        return FileFormat.INI.description
 
     def get_file_extensions(self) -> set[str]:
-        return {'.ini'}
+        return FileFormat.INI.extensions
 
     def create_group(self, name: str) -> ParameterGroup:
         return self._parameter_group.create_group(name)

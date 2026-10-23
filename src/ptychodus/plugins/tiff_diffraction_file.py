@@ -20,6 +20,7 @@ from ptychodus.api.diffraction import (
     DiffractionPatterns,
     SimpleDiffractionDataset,
 )
+from ptychodus.api.files import FileFormat
 from ptychodus.api.plugins import PluginRegistry
 
 logger = logging.getLogger(__name__)
@@ -66,7 +67,7 @@ class TiffDiffractionFileReader(DiffractionFileReader):
         return self._description
 
     def get_file_extensions(self) -> set[str]:
-        return {'.tif', '.tiff'}
+        return FileFormat.TIFF.extensions
 
     def _get_file_series(self, file_path: Path) -> tuple[Mapping[int, Path], str]:
         """Collect the members of one numbered TIFF series, keyed by frame number.
@@ -151,7 +152,7 @@ def register_plugins(registry: PluginRegistry) -> None:
     # One reader per registration: the series logic is stateless, so the instruments
     # that write this format differ only in the name the filter shows.
     registry.diffraction_file_readers.register_plugin(
-        TiffDiffractionFileReader('Tagged Image File Format Files'),
+        TiffDiffractionFileReader(FileFormat.TIFF.description),
         simple_name='TIFF',
     )
     registry.diffraction_file_readers.register_plugin(
@@ -166,6 +167,6 @@ def register_plugins(registry: PluginRegistry) -> None:
 
 if __name__ == '__main__':
     file_path = Path(sys.argv[1])
-    reader = TiffDiffractionFileReader('Tagged Image File Format Files')
+    reader = TiffDiffractionFileReader(FileFormat.TIFF.description)
     tiff_file = reader.read(file_path)
     print(tiff_file)

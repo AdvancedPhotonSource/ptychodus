@@ -14,6 +14,7 @@ from ptychodus.api.diffraction import (
     SimpleDiffractionArray,
     SimpleDiffractionDataset,
 )
+from ptychodus.api.files import FileFormat
 from ptychodus.api.plugins import PluginRegistry
 
 logger = logging.getLogger(__name__)
@@ -23,10 +24,10 @@ class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
     SIMPLE_NAME: Final[str] = 'NPY'
 
     def get_file_description(self) -> str:
-        return 'NumPy Binary Files'
+        return FileFormat.NPY.description
 
     def get_file_extensions(self) -> set[str]:
-        return {'.npy'}
+        return FileFormat.NPY.extensions
 
     def read(self, file_path: Path) -> DiffractionDataset:
         data = numpy.load(file_path)

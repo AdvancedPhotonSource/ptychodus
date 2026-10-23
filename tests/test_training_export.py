@@ -10,7 +10,7 @@ import pytest
 from ptychodus.api.reconstruct import SubprocessReconstructor
 from ptychodus.model.processing.api import ProcessingAPI
 
-_CXI_FILTER = 'Coherent X-ray Imaging Files (*.cxi)'
+_CXI_FILTER = 'Coherent X-ray Imaging Files (*.cxi *.h5 *.hdf5)'
 
 
 def _reconstructor(

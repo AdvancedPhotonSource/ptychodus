@@ -3,7 +3,7 @@
 File readers are implemented using a Python namespace plugin system. We would be happy to add file readers to support more ptychography instruments.
 
 - [Advanced Light Source (ALS)](https://als.lbl.gov/beamlines)
-  - [7.0.1.2 COSMIC Imaging](https://als.lbl.gov/beamlines/7-0-1-2/) (`*.cxi`, through the Coherent X-ray Imaging reader)
+  - [7.0.1.2 COSMIC Imaging](https://als.lbl.gov/beamlines/7-0-1-2/) (`*.cxi`, `*.h5`, `*.hdf5`, through the Coherent X-ray Imaging reader)
 - [Advanced Photon Source (APS)](https://www.aps.anl.gov/Beamlines/Beamline-Directory)
   - [2-ID-D Microfluorescence and Bionanoprobe (BNP)](https://www.aps.anl.gov/Beamlines/Beamline-Directory/5) (`*.mda`, `*.h5`, `*.hdf5`)
   - [2-ID-D Microprobe](https://www.aps.anl.gov/Beamlines/Beamline-Directory/5)
@@ -28,7 +28,7 @@ File readers are implemented using a Python namespace plugin system. We would be
 - [Swiss Light Source (SLS)](https://www.psi.ch/en/sls/beamlines-at-sls)
   - [X12SA cSAXS: Coherent Small-Angle X-ray Scattering](https://www.psi.ch/en/node/508)
 - Common File Formats
-  - [Coherent X-ray Imaging](https://www.cxidb.org/cxi.html) (`*.cxi`); see [CXI Files](#cxi-files)
+  - [Coherent X-ray Imaging](https://www.cxidb.org/cxi.html) (`*.cxi`, `*.h5`, `*.hdf5`); see [CXI Files](#cxi-files)
   - Comma-Separated Values (`*.csv`)
   - EPICS Multi-Dimensional Archive (`*.mda`)
   - [fold_slice](https://github.com/yijiang1/fold_slice) (`*.mat`, `*.h5`)
@@ -51,7 +51,7 @@ Several file formats can be used to indicate detector pixels that are usable ("g
 | APS 12-ID-E Valid Pixel Mask Files (`*.h5` `*.hdf5`) | A `valid_pixel_mask` dataset, where a nonzero value indicates a usable pixel. |
 | APS 34-ID-E Microdiffraction Bad Pixel Files (`*.json`) | A `Bad pixels` array of `{"Pixel": [column, row], "Set": int}` objects, one per unusable pixel. The file carries no detector dimensions, so the reader supplies the extent of the EIGER2 CdTe 1M that writes it and rejects a coordinate outside it. |
 | ESRF ID16A Dark Field Files (`*.h5` `*.hdf5`) | A dark frame stack. A pixel is bad when its mean dark level exceeds five times the stack median, or when it saturates in any dark frame. |
-| Coherent X-ray Imaging Files (`*.cxi`) | The `detector_1/mask` of a CXI file, which may hold nothing else. A pixel is bad when any bit other than "signal above background" (`0x1000`) is set. |
+| Coherent X-ray Imaging Files (`*.cxi` `*.h5` `*.hdf5`) | The `detector_1/mask` of a CXI file, which may hold nothing else. A pixel is bad when any bit other than "signal above background" (`0x1000`) is set. |
 
 Masks are applied in raw detector coordinates. A preprocessed pixel is bad when any raw pixel it combines is bad, and pixels added by padding are always bad. A pixel holding a NaN or infinite value in any frame is zeroed and treated as bad for the whole dataset.
 
@@ -67,7 +67,7 @@ By default both maps are carried with the patterns, unchanged, for reconstructio
 | NumPy Flat-Field Response Files (`*.npy`) | A 2-D response map covering the full detector. Mean-one and absolute-efficiency maps are both accepted. |
 | NumPy Flat-Field Correction Factor Files (`*.npy`) | Per-pixel factors to *multiply* a measurement by, the inverse convention; each is read as its reciprocal response, and a non-positive factor marks its pixel bad. |
 | ESRF ID16A Dark Field Files (`*.h5` `*.hdf5`) | The per-pixel mean of the dark frame stack beside an ID16A scan. |
-| Coherent X-ray Imaging Files (`*.cxi`) | The background from `detector_1/data_dark`, averaged if it is a stack; the flat field from `ptychodus/flat_field` or `detector_1/qe_mask`. |
+| Coherent X-ray Imaging Files (`*.cxi` `*.h5` `*.hdf5`) | The background from `detector_1/data_dark`, averaged if it is a stack; the flat field from `ptychodus/flat_field` or `detector_1/qe_mask`. |
 
 ```{warning}
 Some photon-counting detectors apply a flat-field correction in their electronics and record the correction factors alongside the data. Do not apply such a map again.
@@ -75,7 +75,7 @@ Some photon-counting detectors apply a flat-field correction in their electronic
 
 ## CXI Files
 
-Ptychodus reads and writes version 1.6 of the [Coherent X-ray Imaging format](https://www.cxidb.org/cxi.html). The reader recognizes the layout of a file by its contents, so it takes no options; a writer is chosen by layout.
+Ptychodus reads and writes version 1.6 of the [Coherent X-ray Imaging format](https://www.cxidb.org/cxi.html). The reader recognizes the layout of a file by its contents, so it takes no options; a writer is chosen by layout. A CXI file is an HDF5 file, and instruments name one either way, so the readers accept `*.h5` and `*.hdf5` alongside `*.cxi`; a writer still adds `*.cxi` when the path it is given has no suffix.
 
 | Layout | Written as |
 | --- | --- |

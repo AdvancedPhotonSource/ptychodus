@@ -6,6 +6,7 @@ import h5py
 import numpy
 
 from ptychodus.api.diffraction import BadPixels, BadPixelsFileReader
+from ptychodus.api.files import FileFormat
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.plugins import PluginRegistry
 
@@ -15,7 +16,7 @@ class NPYBadPixelsFileReader(BadPixelsFileReader):
         return 'NumPy Bad Pixel Files'
 
     def get_file_extensions(self) -> set[str]:
-        return {'.npy'}
+        return FileFormat.NPY.extensions
 
     def read(self, file_path: Path) -> BadPixels:
         return numpy.load(file_path)
@@ -26,7 +27,7 @@ class NPYGoodPixelsFileReader(BadPixelsFileReader):
         return 'NumPy Good Pixel Files'
 
     def get_file_extensions(self) -> set[str]:
-        return {'.npy'}
+        return FileFormat.NPY.extensions
 
     def read(self, file_path: Path) -> BadPixels:
         return numpy.logical_not(numpy.load(file_path))

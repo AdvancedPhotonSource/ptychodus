@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Final
 
 
+from ptychodus.api.files import FileFormat
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter
 from ptychodus.api.io import load_product, save_product
@@ -14,7 +15,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
         return 'Ptychodus Product Files'
 
     def get_file_extensions(self) -> set[str]:
-        return {'.h5', '.hdf5'}
+        return FileFormat.HDF5.extensions
 
     def read(self, file_path: Path) -> Product:
         return load_product(file_path)

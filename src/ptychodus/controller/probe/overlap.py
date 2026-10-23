@@ -4,6 +4,7 @@ import math
 import numpy
 
 from ptychodus.api.constants import LengthUnit
+from ptychodus.api.files import FileFormat
 
 from ...model.analysis import ProbeOverlapAnalyzer, ProbeOverlapMetrics
 from ..rendering import VisualizationEngine
@@ -17,7 +18,7 @@ from ..visualization import (
 
 logger = logging.getLogger(__name__)
 
-_SAVE_FILE_FILTER = 'NumPy Zipped Archive (*.npz)'
+_SAVE_FILE_FILTER = FileFormat.NPZ.file_filter
 _PLACEHOLDER = '—'
 
 

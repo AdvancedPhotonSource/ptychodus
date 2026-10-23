@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy
 
 from ptychodus.api.diffraction import PixelMap, PixelMapFileReader
+from ptychodus.api.files import FileFormat
 from ptychodus.api.plugins import PluginRegistry
 
 
@@ -31,7 +32,7 @@ class NPYPixelMapFileReader(PixelMapFileReader):
         return self._description
 
     def get_file_extensions(self) -> set[str]:
-        return {'.npy'}
+        return FileFormat.NPY.extensions
 
     def read(self, file_path: Path) -> PixelMap:
         return _read_pixel_map(file_path)
@@ -49,7 +50,7 @@ class NPYFlatFieldCorrectionFileReader(PixelMapFileReader):
         return 'NumPy Flat-Field Correction Factor Files'
 
     def get_file_extensions(self) -> set[str]:
-        return {'.npy'}
+        return FileFormat.NPY.extensions
 
     def read(self, file_path: Path) -> PixelMap:
         factors = _read_pixel_map(file_path)

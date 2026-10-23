@@ -5,6 +5,7 @@ import time
 
 from pydantic import BaseModel
 
+from ptychodus.api.files import FileFormat
 from ptychodus.api.io import save_cxi_reconstruct_input
 from ptychodus.api.reconstruct import (
     NullReconstructor,
@@ -528,7 +529,7 @@ class ProcessingAPI:
         if native_filter:
             filters[native_filter] = None
 
-        filters['Coherent X-ray Imaging Files (*.cxi)'] = _CXI_FILE_TYPE
+        filters[FileFormat.CXI.file_filter] = _CXI_FILE_TYPE
         return filters
 
     def get_model_file_filter(

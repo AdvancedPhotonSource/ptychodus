@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from ptychodus.api.files import FileFormat
 from ptychodus.api.probe import OPRModeSeries, ProbeEnsemble
 from ptychodus.api.typing import ComplexArrayType, IntegerArrayType, RealArrayType
 
@@ -32,7 +33,7 @@ from ..image import ImageController
 
 logger = logging.getLogger(__name__)
 
-_SAVE_FILE_FILTER = 'NumPy Zipped Archive (*.npz)'
+_SAVE_FILE_FILTER = FileFormat.NPZ.file_filter
 
 # Positions sampled when fixing the color scale. A locked scale is what keeps playback
 # from flickering, and sampling is what keeps locking it cheap on a long scan; a position

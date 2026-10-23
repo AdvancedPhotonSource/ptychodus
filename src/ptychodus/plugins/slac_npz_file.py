@@ -15,6 +15,7 @@ from ptychodus.api.diffraction import (
     SimpleDiffractionArray,
     SimpleDiffractionDataset,
 )
+from ptychodus.api.files import FileFormat
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.typing import RealArrayType
 from ptychodus.api.probe import ProbeEnsemble
@@ -50,7 +51,7 @@ class SLACDiffractionFileReader(DiffractionFileReader):
         return 'SLAC NumPy Zipped Archive'
 
     def get_file_extensions(self) -> set[str]:
-        return {'.npz'}
+        return FileFormat.NPZ.extensions
 
     def read(self, file_path: Path) -> DiffractionDataset:
         with numpy.load(file_path) as npz_file:
@@ -84,7 +85,7 @@ class SLACProductFileReader(ProductFileReader):
         return 'SLAC NumPy Zipped Archive'
 
     def get_file_extensions(self) -> set[str]:
-        return {'.npz'}
+        return FileFormat.NPZ.extensions
 
     def read(self, file_path: Path) -> Product:
         with numpy.load(file_path) as npz_file:

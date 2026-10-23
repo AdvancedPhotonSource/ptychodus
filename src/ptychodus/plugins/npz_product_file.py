@@ -19,6 +19,7 @@ import numpy
 from numpy.lib.npyio import NpzFile
 
 from ptychodus.api.diffraction import Polarization
+from ptychodus.api.files import FileFormat
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.plugins import PluginRegistry
@@ -103,7 +104,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
         return 'Ptychodus NumPy Zipped Archive'
 
     def get_file_extensions(self) -> set[str]:
-        return {'.npz'}
+        return FileFormat.NPZ.extensions
 
     def _read_polarization(self, npz_file: NpzFile, file_path: Path) -> Polarization | None:
         raw = _read_array(npz_file, self.POLARIZATION)

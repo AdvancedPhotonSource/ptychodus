@@ -2,16 +2,17 @@ from pathlib import Path
 
 import numpy
 
+from ptychodus.api.files import FileFormat
 from ptychodus.api.object import Object, ObjectFileReader, ObjectFileWriter
 from ptychodus.api.plugins import PluginRegistry
 
 
 class NPYObjectFileReader(ObjectFileReader):
     def get_file_description(self) -> str:
-        return 'NumPy Binary Files'
+        return FileFormat.NPY.description
 
     def get_file_extensions(self) -> set[str]:
-        return {'.npy'}
+        return FileFormat.NPY.extensions
 
     def read(self, file_path: Path) -> Object:
         array = numpy.load(file_path)
@@ -29,10 +30,10 @@ class NPYObjectFileReader(ObjectFileReader):
 
 class NPYObjectFileWriter(ObjectFileWriter):
     def get_file_description(self) -> str:
-        return 'NumPy Binary Files'
+        return FileFormat.NPY.description
 
     def get_file_extensions(self) -> set[str]:
-        return {'.npy'}
+        return FileFormat.NPY.extensions
 
     def write(self, file_path: Path, object_: Object) -> None:
         array = object_.get_array()

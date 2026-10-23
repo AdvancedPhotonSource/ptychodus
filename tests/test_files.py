@@ -1,9 +1,11 @@
-"""Unit tests for ptychodus.api.files.FileHandler.
+"""Unit tests for ptychodus.api.files.FileHandler and FileFormat.
 
 The base contributes exactly one piece of behavior: composing a Qt name filter from
 a description and a set of extensions. These tests pin that composition, including
 the sort that keeps the filter -- and so the name a plugin registers under -- stable
-however the extension set happens to iterate.
+however the extension set happens to iterate. FileFormat states that same pair once
+for a format several handlers share, so the tests also pin that a member composes
+its filter exactly as a handler declaring it would.
 """
 
 from __future__ import annotations
@@ -12,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from ptychodus.api.files import FileHandler, FileReader, FileWriter
+from ptychodus.api.files import FileFormat, FileHandler, FileReader, FileWriter
 
 
 class _Handler(FileHandler):
@@ -90,3 +92,32 @@ def test_a_writer_must_still_describe_itself() -> None:
 
     with pytest.raises(TypeError, match='get_file_description'):
         _Writer()  # type: ignore[abstract]
+
+
+@pytest.mark.parametrize('file_format', list(FileFormat))
+def test_every_format_declares_extensions_with_a_leading_dot(file_format: FileFormat) -> None:
+    """A dotless extension compares false against every PurePath.suffix."""
+    extensions = file_format.extensions
+    assert extensions
+    assert all(extension.startswith('.') for extension in sorted(extensions))
+
+
+@pytest.mark.parametrize('file_format', list(FileFormat))
+def test_a_format_filters_exactly_as_a_handler_declaring_it(file_format: FileFormat) -> None:
+    """The two paths to a filter agree, so a dialog naming a format directly and a
+    handler registering under it cannot show different text for the same format."""
+    handler = _Handler(file_format.description, file_format.extensions)
+    assert file_format.file_filter == handler.get_file_filter()
+
+
+def test_a_format_hands_out_a_copy_of_its_extensions() -> None:
+    """A handler returns this set to its caller, so mutating it must not move the format."""
+    extensions = FileFormat.CXI.extensions
+    extensions.add('.bogus')
+    assert '.bogus' not in FileFormat.CXI.extensions
+
+
+def test_cxi_accepts_the_hdf5_extensions() -> None:
+    """A CXI file is an HDF5 file, and instruments name it either way."""
+    assert FileFormat.HDF5.extensions <= FileFormat.CXI.extensions
+    assert FileFormat.CXI.file_filter == 'Coherent X-ray Imaging Files (*.cxi *.h5 *.hdf5)'

@@ -1,5 +1,6 @@
 import logging
 
+from ptychodus.api.files import FileFormat
 from ptychodus.api.xmcd import XMCDResult
 
 from ...model.analysis import XMCDAnalyzer
@@ -12,7 +13,7 @@ from .tree_model import ObjectTreeModel
 
 logger = logging.getLogger(__name__)
 
-_SAVE_FILE_FILTER = 'NumPy Zipped Archive (*.npz)'
+_SAVE_FILE_FILTER = FileFormat.NPZ.file_filter
 
 
 class XMCDViewController:

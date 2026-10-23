@@ -21,6 +21,7 @@ from ptychodus.api.diffraction import (
     PixelMapFileReader,
     SimpleDiffractionDataset,
 )
+from ptychodus.api.files import FileFormat
 from ptychodus.api.io import (
     CXIVariant,
     load_cxi_background,
@@ -44,10 +45,10 @@ class CXIDiffractionFileReader(DiffractionFileReader):
         self._tree_builder = H5DiffractionFileTreeBuilder()
 
     def get_file_description(self) -> str:
-        return 'Coherent X-ray Imaging Files'
+        return FileFormat.CXI.description
 
     def get_file_extensions(self) -> set[str]:
-        return {'.cxi'}
+        return FileFormat.CXI.extensions
 
     def read(self, file_path: Path) -> DiffractionDataset:
         with h5py.File(file_path, 'r') as h5_file:
@@ -71,7 +72,7 @@ class CXIDiffractionFileReader(DiffractionFileReader):
 
 
 _VARIANT_DESCRIPTIONS: Final[Mapping[CXIVariant, str]] = {
-    CXIVariant.STANDARD: 'Coherent X-ray Imaging Files',
+    CXIVariant.STANDARD: FileFormat.CXI.description,
     CXIVariant.SHARP: 'Coherent X-ray Imaging Files, SHARP layout',
     CXIVariant.CDTOOLS: 'Coherent X-ray Imaging Files, cdtools layout',
 }
@@ -85,7 +86,7 @@ class CXIDiffractionFileWriter(DiffractionFileWriter):
         return _VARIANT_DESCRIPTIONS[self._variant]
 
     def get_file_extensions(self) -> set[str]:
-        return {'.cxi'}
+        return FileFormat.CXI.extensions
 
     def write(self, file_path: Path, dataset: DiffractionDataset) -> None:
         save_cxi_diffraction(file_path, dataset, variant=self._variant)
@@ -99,7 +100,7 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
         return _VARIANT_DESCRIPTIONS[self._variant]
 
     def get_file_extensions(self) -> set[str]:
-        return {'.cxi'}
+        return FileFormat.CXI.extensions
 
     def read(self, file_path: Path) -> Product:
         return load_cxi_product(file_path)
@@ -110,10 +111,10 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
 
 class CXIBadPixelsFileReader(BadPixelsFileReader):
     def get_file_description(self) -> str:
-        return 'Coherent X-ray Imaging Files'
+        return FileFormat.CXI.description
 
     def get_file_extensions(self) -> set[str]:
-        return {'.cxi'}
+        return FileFormat.CXI.extensions
 
     def read(self, file_path: Path) -> BadPixels:
         return load_cxi_bad_pixels(file_path)
@@ -121,10 +122,10 @@ class CXIBadPixelsFileReader(BadPixelsFileReader):
 
 class CXIBackgroundFileReader(PixelMapFileReader):
     def get_file_description(self) -> str:
-        return 'Coherent X-ray Imaging Files'
+        return FileFormat.CXI.description
 
     def get_file_extensions(self) -> set[str]:
-        return {'.cxi'}
+        return FileFormat.CXI.extensions
 
     def read(self, file_path: Path) -> PixelMap:
         return load_cxi_background(file_path)
@@ -132,10 +133,10 @@ class CXIBackgroundFileReader(PixelMapFileReader):
 
 class CXIFlatFieldFileReader(PixelMapFileReader):
     def get_file_description(self) -> str:
-        return 'Coherent X-ray Imaging Files'
+        return FileFormat.CXI.description
 
     def get_file_extensions(self) -> set[str]:
-        return {'.cxi'}
+        return FileFormat.CXI.extensions
 
     def read(self, file_path: Path) -> PixelMap:
         return load_cxi_flat_field(file_path)

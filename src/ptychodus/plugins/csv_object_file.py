@@ -2,16 +2,17 @@ from pathlib import Path
 
 import numpy
 
+from ptychodus.api.files import FileFormat
 from ptychodus.api.object import Object, ObjectFileReader, ObjectFileWriter
 from ptychodus.api.plugins import PluginRegistry
 
 
 class CSVObjectFileReader(ObjectFileReader):
     def get_file_description(self) -> str:
-        return 'Comma-Separated Values Files'
+        return FileFormat.CSV.description
 
     def get_file_extensions(self) -> set[str]:
-        return {'.csv'}
+        return FileFormat.CSV.extensions
 
     def read(self, file_path: Path) -> Object:
         array = numpy.genfromtxt(file_path, delimiter=',', dtype=complex)
@@ -20,10 +21,10 @@ class CSVObjectFileReader(ObjectFileReader):
 
 class CSVObjectFileWriter(ObjectFileWriter):
     def get_file_description(self) -> str:
-        return 'Comma-Separated Values Files'
+        return FileFormat.CSV.description
 
     def get_file_extensions(self) -> set[str]:
-        return {'.csv'}
+        return FileFormat.CSV.extensions
 
     def write(self, file_path: Path, object_: Object) -> None:
         array = object_.get_array()

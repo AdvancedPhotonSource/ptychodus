@@ -3,6 +3,7 @@ import logging
 
 from PyQt5.QtWidgets import QButtonGroup
 
+from ptychodus.api.files import FileFormat
 from ptychodus.api.typing import RealArrayType
 
 from ...model.analysis import IlluminationMap, IlluminationMapper
@@ -17,7 +18,7 @@ from ..visualization import (
 
 logger = logging.getLogger(__name__)
 
-_SAVE_FILE_FILTER = 'NumPy Zipped Archive (*.npz)'
+_SAVE_FILE_FILTER = FileFormat.NPZ.file_filter
 
 
 class IlluminationParametersController:
