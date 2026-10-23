@@ -1,8 +1,7 @@
 """Argument-parsing and logging helpers shared by the packaged ptychodus commands.
 
-Everything here is dependency-free on purpose: ``convert-to-ptychodus`` and
-``ptychodus-system-check`` run on a bare install, so this module must not reach anything
-behind an optional extra.
+Everything here is dependency-free on purpose: ``ptychodus-system-check`` runs on a
+bare install, so this module must not reach anything behind an optional extra.
 """
 
 from __future__ import annotations

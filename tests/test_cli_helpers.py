@@ -61,7 +61,7 @@ def test_log_level_argument_defaults_to_info() -> None:
 
 
 def test_module_imports_nothing_from_an_optional_extra() -> None:
-    """``convert-to-ptychodus`` runs on a bare install, so this module must stay light."""
+    """``ptychodus-system-check`` runs on a bare install, so this module must stay light."""
     import ptychodus.cli
 
     source = Path(ptychodus.cli.__file__).read_text()

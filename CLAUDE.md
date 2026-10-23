@@ -18,7 +18,7 @@ uv run mypy src/ptychodus src/ptychodus_store scripts tests  # types (wider than
 
 Container builds: `scripts/podman/build` (Dockerfiles live in [containers/](containers/); tags are `ptychodus:<version>-<variant>` over the `DEFAULT_VARIANTS` the script declares — a CPU build, one per supported CUDA, ROCm and XPU); launcher `scripts/podman/ptychodus` auto-detects the GPU family and, on NVIDIA, the newest built CUDA variant the host driver supports. Docs: `make -C docs html`.
 
-Other entry points (`convert-to-ptychodus`, `ptychodus-store` and the rest) are listed in [pyproject.toml](pyproject.toml) `[project.scripts]`; their modules live in [src/ptychodus/cli/](src/ptychodus/cli/). Unpackaged operator tooling — the podman wrapper and the per-facility HPC token/submit helpers — lives in the top-level [scripts/](scripts/) and is run from a checkout, e.g. `python scripts/genesis/ptychodus_iri_tokens.py`. The store service has its own docs: [src/ptychodus_store/README.md](src/ptychodus_store/README.md).
+Other entry points (`ptychodus-bdp`, `ptychodus-store` and the rest) are listed in [pyproject.toml](pyproject.toml) `[project.scripts]`; their modules live in [src/ptychodus/cli/](src/ptychodus/cli/). Unpackaged operator tooling — the podman wrapper and the per-facility HPC token/submit helpers — lives in the top-level [scripts/](scripts/) and is run from a checkout, e.g. `python scripts/genesis/ptychodus_iri_tokens.py`. The store service has its own docs: [src/ptychodus_store/README.md](src/ptychodus_store/README.md).
 
 ### Testing
 
