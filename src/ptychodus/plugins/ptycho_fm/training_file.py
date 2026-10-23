@@ -199,7 +199,12 @@ def _read_positions(
 
 class PtychoFMProductFileReader(ProductFileReader):
     SIMPLE_NAME: Final[str] = 'PtychoFM'
-    DISPLAY_NAME: Final[str] = 'PtychoFM Training Pair (*.hdf5)'
+
+    def get_file_description(self) -> str:
+        return 'PtychoFM Training Pair'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.hdf5'}
 
     def read(self, file_path: Path) -> Product:
         _, parameter_path = resolve_training_pair(file_path)

@@ -4,13 +4,13 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from typing import overload
 
 from scipy.sparse.linalg import LinearOperator
 import numpy
 
 from .typing import RealArrayType
+from .files import FileReader, FileWriter
 from .interpolate import BarycentricArrayInterpolator
 from .product import Product
 
@@ -150,22 +150,12 @@ class FluorescenceEnhancer(ABC):
         pass
 
 
-class FluorescenceFileReader(ABC):
+class FluorescenceFileReader(FileReader[FluorescenceDataset]):
     """Plugin interface for reading fluorescence datasets."""
 
-    @abstractmethod
-    def read(self, file_path: Path) -> FluorescenceDataset:
-        """Read a fluorescence dataset from file."""
-        pass
 
-
-class FluorescenceFileWriter(ABC):
+class FluorescenceFileWriter(FileWriter[FluorescenceDataset]):
     """Plugin interface for writing fluorescence datasets."""
-
-    @abstractmethod
-    def write(self, file_path: Path, dataset: FluorescenceDataset) -> None:
-        """Write a fluorescence dataset to file."""
-        pass
 
 
 class UpscalingStrategy(ABC):

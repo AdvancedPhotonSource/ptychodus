@@ -15,6 +15,12 @@ logger = logging.getLogger(__name__)
 
 
 class CSSIPositionFileReader(ProbePositionFileReader):
+    def get_file_description(self) -> str:
+        return 'APS 9-ID-D CSSI Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
+
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()
 
@@ -39,5 +45,4 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         CSSIPositionFileReader(),
         simple_name='APS_CSSI',
-        display_name='APS 9-ID-D CSSI Files (*.h5 *.hdf5)',
     )

@@ -147,6 +147,6 @@ def build_reconstructor(name: str) -> SubprocessReconstructor:
         model_file_extension='.pth',
         # The same filter the reader registers, so the export and import dialogs
         # name one format once.
-        training_data_file_filter=PtychoFMProductFileReader.DISPLAY_NAME,
+        training_data_file_filter=PtychoFMProductFileReader().get_file_filter(),
         export_training_data=export_training_data,
     )

@@ -37,6 +37,12 @@ class PolarDiffractionFileReader(DiffractionFileReader):
         self._data_path = '/entry/externals/eiger'
         self._tree_builder = H5DiffractionFileTreeBuilder()
 
+    def get_file_description(self) -> str:
+        return 'APS 4-ID-B,G,H POLAR Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.hdf'}
+
     def _read_pattern_indexes(self, h5_file: h5py.File, num_patterns: int) -> numpy.ndarray:
         """Return per-pattern indexes.
 
@@ -165,5 +171,4 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         PolarDiffractionFileReader(),
         simple_name='APS_Polar',
-        display_name='APS 4-ID-B,G,H POLAR Files (*.hdf)',
     )

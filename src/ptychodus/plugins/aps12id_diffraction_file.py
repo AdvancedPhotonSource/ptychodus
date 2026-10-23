@@ -76,6 +76,12 @@ class APS12IDDiffractionFileReader(DiffractionFileReader):
     ENERGY_PATH: Final[str] = '/entry/instrument/NDAttributes/monoE'
     EXPOSURE_PATH: Final[str] = '/entry/instrument/NDAttributes/ExposureTime'
 
+    def get_file_description(self) -> str:
+        return 'APS 12-ID-E Ptycho-SAXS Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
+
     def read(self, file_path: Path) -> DiffractionDataset:
         tree_builder = H5DiffractionFileTreeBuilder()
 
@@ -151,5 +157,4 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         APS12IDDiffractionFileReader(),
         simple_name='APS_PtychoSAXS',
-        display_name='APS 12-ID-E Ptycho-SAXS Files (*.h5 *.hdf5)',
     )

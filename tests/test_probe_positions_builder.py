@@ -59,6 +59,12 @@ class _StubPositionFileReader(ProbePositionFileReader):
     def __init__(self, positions: ProbePositionSequence) -> None:
         self._positions = positions
 
+    def get_file_description(self) -> str:
+        return 'Stub Position Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.csv'}
+
     def read(self, file_path: Path) -> ProbePositionSequence:
         return self._positions
 

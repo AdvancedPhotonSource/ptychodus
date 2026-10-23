@@ -64,7 +64,6 @@ def _read_positions(
 
 class PEARProductFileReader(ProductFileReader):
     SIMPLE_NAME: Final[str] = 'PEAR'
-    DISPLAY_NAME: Final[str] = 'PEAR Reconstruction Files (*.h5 *.hdf5)'
 
     def __init__(
         self,
@@ -82,6 +81,12 @@ class PEARProductFileReader(ProductFileReader):
         """
         self._detector_pixel_size_m = detector_pixel_size_m
         self._photon_energy_eV = photon_energy_eV
+
+    def get_file_description(self) -> str:
+        return 'PEAR Reconstruction Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
 
     def _compute_detector_distance_m(
         self, object_pixel_size_m: float, probe_extent: ImageExtent
@@ -183,5 +188,4 @@ def register_plugins(registry: PluginRegistry) -> None:
         # they are what turns the recorded sample pixel size into a real distance.
         PEARProductFileReader(detector_pixel_size_m=75e-6, photon_energy_eV=8000.0),
         simple_name=PEARProductFileReader.SIMPLE_NAME,
-        display_name=PEARProductFileReader.DISPLAY_NAME,
     )

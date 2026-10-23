@@ -45,6 +45,12 @@ def _coords_in_pixels(scan_x: numpy.ndarray, scan_y: numpy.ndarray) -> bool:
 
 
 class SLACDiffractionFileReader(DiffractionFileReader):
+    def get_file_description(self) -> str:
+        return 'SLAC NumPy Zipped Archive'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.npz'}
+
     def read(self, file_path: Path) -> DiffractionDataset:
         with numpy.load(file_path) as npz_file:
             patterns = numpy.transpose(npz_file['diffraction'], [2, 0, 1])
@@ -73,6 +79,12 @@ class SLACDiffractionFileReader(DiffractionFileReader):
 
 
 class SLACProductFileReader(ProductFileReader):
+    def get_file_description(self) -> str:
+        return 'SLAC NumPy Zipped Archive'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.npz'}
+
     def read(self, file_path: Path) -> Product:
         with numpy.load(file_path) as npz_file:
             scan_x = numpy.asarray(npz_file['xcoords_start'])
@@ -146,15 +158,12 @@ class SLACProductFileReader(ProductFileReader):
 
 def register_plugins(registry: PluginRegistry) -> None:
     SIMPLE_NAME: Final[str] = 'SLAC_NPZ'  # noqa: N806
-    DISPLAY_NAME: Final[str] = 'SLAC NumPy Zipped Archive (*.npz)'  # noqa: N806
 
     registry.diffraction_file_readers.register_plugin(
         SLACDiffractionFileReader(),
         simple_name=SIMPLE_NAME,
-        display_name=DISPLAY_NAME,
     )
     registry.register_product_file_reader_with_adapters(
         SLACProductFileReader(),
         simple_name=SIMPLE_NAME,
-        display_name=DISPLAY_NAME,
     )

@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 class LCLSPositionFileReader(ProbePositionFileReader):
     SIMPLE_NAME: Final[str] = 'LCLS_XPP'  # noqa: N806
-    DISPLAY_NAME: Final[str] = 'LCLS XPP X-ray Pump Probe Files (*.h5 *.hdf5)'  # noqa: N806
 
     def __init__(
         self,
@@ -35,6 +34,12 @@ class LCLSPositionFileReader(ProbePositionFileReader):
         self._tomography_angle_deg = tomography_angle_deg
         self._ipm2_low_threshold = ipm2_low_threshold
         self._ipm2_high_threshold = ipm2_high_threshold
+
+    def get_file_description(self) -> str:
+        return 'LCLS XPP X-ray Pump Probe Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
 
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()
@@ -72,14 +77,15 @@ class LCLSPositionFileReader(ProbePositionFileReader):
 
 def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
-        H5DiffractionFileReader(data_path='/jungfrau1M/image_img'),
+        H5DiffractionFileReader(
+            data_path='/jungfrau1M/image_img',
+            description='LCLS XPP X-ray Pump Probe Files',
+        ),
         simple_name=LCLSPositionFileReader.SIMPLE_NAME,
-        display_name=LCLSPositionFileReader.DISPLAY_NAME,
     )
     registry.probe_position_file_readers.register_plugin(
         LCLSPositionFileReader(),
         simple_name=LCLSPositionFileReader.SIMPLE_NAME,
-        display_name=LCLSPositionFileReader.DISPLAY_NAME,
     )
 
 

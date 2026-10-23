@@ -14,6 +14,7 @@ import scipy.ndimage
 from scipy.fft import fft2
 
 from .constants import format_length
+from .files import FileReader, FileWriter
 from .fourier import fourier_shift_2d
 from .geometry import ImageExtent, PixelGeometry
 from .interpolate import resample_along_axis
@@ -1662,19 +1663,9 @@ def conform_opr_weights(
             )
 
 
-class ProbeFileReader(ABC):
+class ProbeFileReader(FileReader[ProbeEnsemble]):
     """Plugin interface for reading probe sequences."""
 
-    @abstractmethod
-    def read(self, file_path: Path) -> ProbeEnsemble:
-        """Read a probe sequence from file."""
-        pass
 
-
-class ProbeFileWriter(ABC):
+class ProbeFileWriter(FileWriter[ProbeEnsemble]):
     """Plugin interface for writing probe sequences."""
-
-    @abstractmethod
-    def write(self, file_path: Path, probes: ProbeEnsemble) -> None:
-        """Write a probe sequence to file."""
-        pass

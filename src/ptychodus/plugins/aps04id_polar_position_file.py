@@ -82,6 +82,12 @@ class PolarPositionFileReader(ProbePositionFileReader):
     PLAN_NAME_PATH: Final[str] = '/entry/plan_name'
     DEFAULT_MOTORS: Final[tuple[str, str]] = ('huber_hp_nanox', 'huber_hp_nanoy')
 
+    def get_file_description(self) -> str:
+        return 'APS 4-ID-B,G,H POLAR Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.hdf'}
+
     def read(self, file_path: Path) -> ProbePositionSequence:
         with h5py.File(file_path, 'r') as h5_file:
             plan_name = self._read_plan_name(h5_file)
@@ -236,5 +242,4 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         PolarPositionFileReader(),
         simple_name='APS_Polar',
-        display_name='APS 4-ID-B,G,H POLAR Files (*.hdf)',
     )

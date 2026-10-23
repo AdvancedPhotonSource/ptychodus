@@ -47,8 +47,6 @@ from ptychodus.api.probe_positions import (
 logger = logging.getLogger(__name__)
 
 _SIMPLE_NAME: Final[str] = 'APS_PtychoSAXS_TIFF'
-_DIFFRACTION_DISPLAY_NAME: Final[str] = 'APS 12-ID-E Ptycho-SAXS Files (*.tif *.tiff)'
-_POSITION_DISPLAY_NAME: Final[str] = 'APS 12-ID-E Ptycho-SAXS Files (*.dat)'
 
 # Pilatus pitch at this instrument; TIFF frames carry no detector geometry.
 _DETECTOR_PIXEL_SIZE_M: Final[float] = 172e-6
@@ -83,6 +81,12 @@ def _series(file_path: Path) -> list[tuple[int, int, Path]]:
 
 
 class APS12IDTIFFDiffractionFileReader(DiffractionFileReader):
+    def get_file_description(self) -> str:
+        return 'APS 12-ID-E Ptycho-SAXS Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.tif', '.tiff'}
+
     def read(self, file_path: Path) -> DiffractionDataset:
         series = _series(file_path)
         contents_tree = DiffractionDatasetLayoutNode.create_root()
@@ -116,6 +120,12 @@ class APS12IDTIFFDiffractionFileReader(DiffractionFileReader):
 
 
 class APS12IDTIFFPositionFileReader(ProbePositionFileReader):
+    def get_file_description(self) -> str:
+        return 'APS 12-ID-E Ptycho-SAXS Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.dat'}
+
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = []
         scale = LengthUnit.NANOMETER.meters_per_unit
@@ -149,10 +159,8 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         APS12IDTIFFDiffractionFileReader(),
         simple_name=_SIMPLE_NAME,
-        display_name=_DIFFRACTION_DISPLAY_NAME,
     )
     registry.probe_position_file_readers.register_plugin(
         APS12IDTIFFPositionFileReader(),
         simple_name=_SIMPLE_NAME,
-        display_name=_POSITION_DISPLAY_NAME,
     )

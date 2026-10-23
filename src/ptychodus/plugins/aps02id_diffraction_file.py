@@ -82,8 +82,15 @@ class APS2IDDiffractionFileReader(DiffractionFileReader):
     # different detector is in use.
     DETECTOR_PIXEL_SIZE_M: Final[float] = 75e-6
 
-    def __init__(self, *, line_index_stride: int | None = None) -> None:
+    def __init__(self, *, description: str, line_index_stride: int | None = None) -> None:
+        self._description = description
         self._line_index_stride = line_index_stride
+
+    def get_file_description(self) -> str:
+        return self._description
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
 
     def _get_file_series(self, file_path: Path) -> tuple[Mapping[int, Path], str]:
         """Collect the frames of one scan, keyed by frame number.
@@ -225,20 +232,20 @@ class APS2IDDiffractionFileReader(DiffractionFileReader):
 
 def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
-        APS2IDDiffractionFileReader(),
+        APS2IDDiffractionFileReader(description='APS 2-ID-D Microprobe Files'),
         simple_name='APS_2IDD',
-        display_name='APS 2-ID-D Microprobe Files (*.h5 *.hdf5)',
     )
     # The XFM fly scan drives the positioner over more points per line than the Eiger
     # records, so the patterns are numbered line-major to pair with positions numbered
     # the same way; see RASTER_LINE_INDEX_STRIDE.
     registry.diffraction_file_readers.register_plugin(
-        APS2IDDiffractionFileReader(line_index_stride=RASTER_LINE_INDEX_STRIDE),
+        APS2IDDiffractionFileReader(
+            description='APS 2-ID-E Microprobe Files',
+            line_index_stride=RASTER_LINE_INDEX_STRIDE,
+        ),
         simple_name='APS_2IDE',
-        display_name='APS 2-ID-E Microprobe Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_readers.register_plugin(
-        APS2IDDiffractionFileReader(),
+        APS2IDDiffractionFileReader(description='APS 2-ID-D Bionanoprobe Files'),
         simple_name='APS_BNP',
-        display_name='APS 2-ID-D Bionanoprobe Files (*.h5 *.hdf5)',
     )

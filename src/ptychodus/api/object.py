@@ -5,7 +5,6 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
-from pathlib import Path
 import logging
 import math
 
@@ -17,6 +16,7 @@ from skimage.restoration import unwrap_phase
 
 from .typing import ComplexArrayType, RealArrayType
 from .constants import format_length
+from .files import FileReader, FileWriter
 from .fourier import fourier_shift_2d
 from .geometry import PixelGeometry
 from .interpolate import resample_along_axis
@@ -1294,19 +1294,9 @@ def compute_object_geometry(
     )
 
 
-class ObjectFileReader(ABC):
+class ObjectFileReader(FileReader[Object]):
     """Plugin interface for reading objects."""
 
-    @abstractmethod
-    def read(self, file_path: Path) -> Object:
-        """Read an object from file."""
-        pass
 
-
-class ObjectFileWriter(ABC):
+class ObjectFileWriter(FileWriter[Object]):
     """Plugin interface for writing objects."""
-
-    @abstractmethod
-    def write(self, file_path: Path, object_: Object) -> None:
-        """Write an object to file."""
-        pass

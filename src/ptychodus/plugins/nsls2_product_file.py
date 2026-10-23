@@ -14,7 +14,12 @@ from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 
 class NSLSIIProductFileReader(ProductFileReader):
     SIMPLE_NAME: Final[str] = 'NSLS_II_MATLAB'
-    DISPLAY_NAME: Final[str] = 'NSLS-II 3-ID HXN MATLAB Files (*.mat)'
+
+    def get_file_description(self) -> str:
+        return 'NSLS-II 3-ID HXN MATLAB Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.mat'}
 
     def read(self, file_path: Path) -> Product:
         point_list: list[ProbePosition] = list()
@@ -75,5 +80,4 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.register_product_file_reader_with_adapters(
         NSLSIIProductFileReader(),
         simple_name=NSLSIIProductFileReader.SIMPLE_NAME,
-        display_name=NSLSIIProductFileReader.DISPLAY_NAME,
     )

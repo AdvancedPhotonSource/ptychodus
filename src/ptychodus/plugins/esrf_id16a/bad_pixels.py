@@ -29,6 +29,12 @@ class ESRFID16ADarkBadPixelsFileReader(BadPixelsFileReader):
     def __init__(self, *, hot_pixel_factor: float = 5.0) -> None:
         self._hot_pixel_factor = hot_pixel_factor
 
+    def get_file_description(self) -> str:
+        return 'ESRF ID16A Dark Field Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
+
     def read(self, file_path: Path) -> BadPixels:
         with h5py.File(file_path, 'r') as h5_file:
             frames = detector_group(h5_file)['data']

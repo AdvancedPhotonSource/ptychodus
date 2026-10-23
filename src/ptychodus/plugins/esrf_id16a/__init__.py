@@ -26,28 +26,22 @@ __all__ = [
 
 _SIMPLE_NAME: Final[str] = 'ESRF_ID16A_NFP'
 _DARK_SIMPLE_NAME: Final[str] = 'ESRF_ID16A_Dark'
-_DISPLAY_NAME: Final[str] = 'ESRF ID16A Near-Field Ptychography Files (*.h5 *.hdf5)'
-_DARK_DISPLAY_NAME: Final[str] = 'ESRF ID16A Dark Field Files (*.h5 *.hdf5)'
 
 
 def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         ESRFID16ANearFieldDiffractionFileReader(),
         simple_name=_SIMPLE_NAME,
-        display_name=_DISPLAY_NAME,
     )
     registry.probe_position_file_readers.register_plugin(
         ESRFID16ANearFieldPositionFileReader(),
         simple_name=_SIMPLE_NAME,
-        display_name=_DISPLAY_NAME,
     )
     registry.background_file_readers.register_plugin(
         ESRFID16ADarkFileReader(),
         simple_name=_DARK_SIMPLE_NAME,
-        display_name=_DARK_DISPLAY_NAME,
     )
     registry.bad_pixels_file_readers.register_plugin(
         ESRFID16ADarkBadPixelsFileReader(),
         simple_name=_DARK_SIMPLE_NAME,
-        display_name=_DARK_DISPLAY_NAME,
     )

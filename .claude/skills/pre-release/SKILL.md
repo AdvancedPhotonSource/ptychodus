@@ -136,7 +136,7 @@ print(f'--- {len(missing)} missing ---')
 
 ### Section 3 — Reader plugins represented in `docs/source/readers.md`
 
-`docs/source/readers.md` is a curated bullet list of user-facing names, not a 1:1 file mapping. Cross-check it against the plugin registry rather than against filenames: every plugin already declares a user-facing `display_name` in its `register_plugins` hook, and those strings are the authoritative source.
+`docs/source/readers.md` is a curated bullet list of user-facing names, not a 1:1 file mapping. Cross-check it against the plugin registry rather than against filenames: every file reader already declares a user-facing description and extension set, from which registration derives its `display_name`, and those strings are the authoritative source.
 
 Drive the check from `PluginRegistry.load_plugins()` so it reuses the exact discovery path the application uses. This matters because `pkgutil.iter_modules` is non-recursive: it yields `aps33id_velociprobe` as a *package* and calls the `register_plugins` in its `__init__.py`. A flat `ls src/ptychodus/plugins/*.py` misses that package entirely, and a hand-maintained keyword table drifts silently as new plugins land — do not reintroduce either.
 

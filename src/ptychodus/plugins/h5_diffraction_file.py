@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from pathlib import Path
 import logging
 
@@ -205,17 +206,36 @@ class H5DiffractionFileTreeBuilder:
 
 
 class H5DiffractionFileReader(DiffractionFileReader):
-    def __init__(self, data_path: str, detector_pixel_size_m: float | None = None) -> None:
+    def __init__(
+        self,
+        data_path: str,
+        detector_pixel_size_m: float | None = None,
+        *,
+        description: str,
+        extensions: Iterable[str] = ('.h5', '.hdf5'),
+    ) -> None:
         """Read patterns from one HDF5 dataset.
 
         `detector_pixel_size_m` stands in for a pitch the file does not record. These
         layouts carry no geometry at all, and a dataset with no pitch cannot be turned
         into a probe geometry downstream, so a registration aimed at a known instrument
         supplies its detector's pitch here.
+
+        One dataset path serves several instruments, so the registration names the one
+        it means. `extensions` covers the layouts that use a narrower set than the two
+        HDF5 suffixes.
         """
         self._data_path = data_path
         self._detector_pixel_size_m = detector_pixel_size_m
+        self._description = description
+        self._extensions = set(extensions)
         self._tree_builder = H5DiffractionFileTreeBuilder()
+
+    def get_file_description(self) -> str:
+        return self._description
+
+    def get_file_extensions(self) -> set[str]:
+        return set(self._extensions)
 
     def read(self, file_path: Path) -> DiffractionDataset:
         with h5py.File(file_path, 'r') as h5_file:
@@ -257,6 +277,12 @@ class H5DiffractionFileWriter(DiffractionFileWriter):
     def __init__(self, data_path: str) -> None:
         self._data_path = data_path
 
+    def get_file_description(self) -> str:
+        return 'fold_slice Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
+
     def write(self, file_path: Path, dataset: DiffractionDataset) -> None:
         data = numpy.concatenate([array.get_patterns() for array in dataset])
 
@@ -266,12 +292,16 @@ class H5DiffractionFileWriter(DiffractionFileWriter):
 
 def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
-        H5DiffractionFileReader(data_path='/exchange/data'),
+        H5DiffractionFileReader(
+            data_path='/exchange/data',
+            description='APS 9-ID-D CSSI Files',
+        ),
         simple_name='APS_CSSI',
-        display_name='APS 9-ID-D CSSI Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_readers.register_plugin(
-        H5DiffractionFileReader(data_path='/entry/data/data'),
+        H5DiffractionFileReader(
+            data_path='/entry/data/data',
+            description='CNM/APS 26-ID-C Hard X-ray Nanoprobe Files',
+        ),
         simple_name='CNM_APS_HXN',
-        display_name='CNM/APS 26-ID-C Hard X-ray Nanoprobe Files (*.h5 *.hdf5)',
     )

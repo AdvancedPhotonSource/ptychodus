@@ -33,6 +33,12 @@ logger = logging.getLogger(__name__)
 
 
 class ESRFID16ANearFieldPositionFileReader(ProbePositionFileReader):
+    def get_file_description(self) -> str:
+        return 'ESRF ID16A Near-Field Ptychography Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
+
     def read(self, file_path: Path) -> ProbePositionSequence:
         scale = LengthUnit.MICROMETER.meters_per_unit
         point_list: list[ProbePosition] = []

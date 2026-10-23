@@ -1,15 +1,14 @@
 """Probe position (scan point) data structures and file I/O plugin interfaces."""
 
 from __future__ import annotations
-from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import pairwise
-from pathlib import Path
 from typing import overload
 
 import numpy
 
+from .files import FileReader, FileWriter
 from .typing import IntegerArrayType, RealArrayType
 
 
@@ -182,22 +181,12 @@ class ProbePositionParseError(Exception):
     pass
 
 
-class ProbePositionFileReader(ABC):
+class ProbePositionFileReader(FileReader[ProbePositionSequence]):
     """Plugin interface for reading probe position files."""
 
-    @abstractmethod
-    def read(self, file_path: Path) -> ProbePositionSequence:
-        """Read probe positions from file."""
-        pass
 
-
-class ProbePositionFileWriter(ABC):
+class ProbePositionFileWriter(FileWriter[ProbePositionSequence]):
     """Plugin interface for writing probe position files."""
-
-    @abstractmethod
-    def write(self, file_path: Path, positions: ProbePositionSequence) -> None:
-        """Write probe positions to file."""
-        pass
 
 
 def calculate_scan_geometry(positions: Iterable[ProbePosition]) -> ScanGeometry | None:

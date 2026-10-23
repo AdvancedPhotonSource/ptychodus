@@ -21,6 +21,12 @@ from ._scan import detector_group
 class ESRFID16ADarkFileReader(PixelMapFileReader):
     """Mean of an ID16A dark stack, as a background map on the full detector."""
 
+    def get_file_description(self) -> str:
+        return 'ESRF ID16A Dark Field Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
+
     def read(self, file_path: Path) -> numpy.ndarray:
         with h5py.File(file_path, 'r') as h5_file:
             frames = detector_group(h5_file)['data']

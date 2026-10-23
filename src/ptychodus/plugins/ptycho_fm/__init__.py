@@ -22,12 +22,14 @@ def register_plugins(registry: PluginRegistry) -> None:
         # The pattern half is a lone '/dp' dataset, which the generic reader already
         # covers. No pitch: a training pair outlives the instrument that produced it
         # and records nothing about the detector.
-        H5DiffractionFileReader(data_path='/dp'),
+        H5DiffractionFileReader(
+            data_path='/dp',
+            description='PtychoFM Training Pair',
+            extensions={'.hdf5'},
+        ),
         simple_name=PtychoFMProductFileReader.SIMPLE_NAME,
-        display_name=PtychoFMProductFileReader.DISPLAY_NAME,
     )
     registry.register_product_file_reader_with_adapters(
         PtychoFMProductFileReader(),
         simple_name=PtychoFMProductFileReader.SIMPLE_NAME,
-        display_name=PtychoFMProductFileReader.DISPLAY_NAME,
     )

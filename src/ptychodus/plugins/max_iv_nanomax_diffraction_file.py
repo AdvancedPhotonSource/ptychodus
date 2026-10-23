@@ -29,6 +29,12 @@ class NanoMAXDiffractionFileReader(DiffractionFileReader):
     def __init__(self) -> None:
         self._tree_builder = H5DiffractionFileTreeBuilder()
 
+    def get_file_description(self) -> str:
+        return 'MAX IV NanoMAX Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
+
     def read(self, file_path: Path) -> DiffractionDataset:
         with h5py.File(file_path, 'r') as h5_file:
             contents_tree = self._tree_builder.build(h5_file)
@@ -71,5 +77,4 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         NanoMAXDiffractionFileReader(),
         simple_name='MAX_IV_NanoMAX',
-        display_name='MAX IV NanoMAX Files (*.h5 *.hdf5)',
     )

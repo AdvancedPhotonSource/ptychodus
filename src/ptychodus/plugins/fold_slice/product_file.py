@@ -100,7 +100,6 @@ def _read_losses(fourier_error_out: numpy.ndarray) -> list[LossValue]:
 
 class FoldSliceProductFileReader(ProductFileReader):
     SIMPLE_NAME: Final[str] = 'fold_slice_mat'
-    DISPLAY_NAME: Final[str] = 'fold_slice Files (*.mat)'
 
     def __init__(self, detector_pixel_size_m: float | None = None) -> None:
         """Read a fold_slice reconstruction.
@@ -111,6 +110,12 @@ class FoldSliceProductFileReader(ProductFileReader):
         the product unusable anywhere the object sampling has to be re-derived.
         """
         self._detector_pixel_size_m = detector_pixel_size_m
+
+    def get_file_description(self) -> str:
+        return 'fold_slice Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.mat'}
 
     def _compute_detector_distance_m(
         self,

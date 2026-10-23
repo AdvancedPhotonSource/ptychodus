@@ -47,6 +47,12 @@ class ISNDiffractionFileReader(DiffractionFileReader):
     WAVELENGTH_PATH: Final[str] = '/entry/instrument/NDAttributes/Wavelength'
     COUNT_TIME_PATH: Final[str] = '/entry/instrument/NDAttributes/CountTime'
 
+    def get_file_description(self) -> str:
+        return 'APS 19-ID-E In-situ Nanoprobe Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
+
     def _get_file_series(self, file_path: Path) -> tuple[Mapping[int, Path], str]:
         """Collect the frames of one scan, keyed by frame number.
 
@@ -148,5 +154,4 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         ISNDiffractionFileReader(),
         simple_name='APS_ISN',
-        display_name='APS 19-ID-E In-situ Nanoprobe Files (*.h5 *.hdf5)',
     )

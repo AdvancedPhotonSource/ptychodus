@@ -329,7 +329,7 @@ def test_npy_reader_returns_a_float_map(tmp_path: Path) -> None:
     path = tmp_path / 'map.npy'
     numpy.save(path, numpy.array([[1, 2], [3, 4]], dtype=numpy.uint16))
 
-    pixel_map = NPYPixelMapFileReader().read(path)
+    pixel_map = NPYPixelMapFileReader('NumPy Background Files').read(path)
 
     assert pixel_map.dtype == numpy.float64
     numpy.testing.assert_array_equal(pixel_map, [[1, 2], [3, 4]])
@@ -340,7 +340,7 @@ def test_npy_reader_rejects_a_stack(tmp_path: Path) -> None:
     numpy.save(path, numpy.zeros((2, 2, 2)))
 
     with pytest.raises(ValueError, match='2-D'):
-        NPYPixelMapFileReader().read(path)
+        NPYPixelMapFileReader('NumPy Background Files').read(path)
 
 
 def test_correction_factors_read_as_their_reciprocal_response(tmp_path: Path) -> None:

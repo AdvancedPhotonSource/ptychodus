@@ -28,6 +28,12 @@ class ISNPositionFileReader(ProbePositionFileReader):
     X_POSITION_PATH: Final[str] = '/entry/data/X_Position'
     Y_POSITION_PATH: Final[str] = '/entry/data/Y_Position'
 
+    def get_file_description(self) -> str:
+        return 'APS 19-ID-E In-situ Nanoprobe Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
+
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()
 
@@ -57,5 +63,4 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         ISNPositionFileReader(),
         simple_name='APS_ISN',
-        display_name='APS 19-ID-E In-situ Nanoprobe Files (*.h5 *.hdf5)',
     )

@@ -54,6 +54,15 @@
    :show-inheritance:
 ```
 
+## Files
+
+```{eval-rst}
+.. automodule:: ptychodus.api.files
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Fluorescence
 
 ```{eval-rst}

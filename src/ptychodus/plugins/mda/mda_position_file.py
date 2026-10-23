@@ -544,9 +544,22 @@ class MDAPositionFileReader(ProbePositionFileReader):
     at least the stride is rejected rather than allowed to collide with the next line.
     """
 
-    def __init__(self, scale_to_meters: float, *, line_index_stride: int | None = None) -> None:
+    def __init__(
+        self,
+        scale_to_meters: float,
+        *,
+        description: str,
+        line_index_stride: int | None = None,
+    ) -> None:
         self._scale_to_meters = scale_to_meters
+        self._description = description
         self._line_index_stride = line_index_stride
+
+    def get_file_description(self) -> str:
+        return self._description
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.mda'}
 
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()
@@ -593,6 +606,12 @@ class MDAPositionFileReader(ProbePositionFileReader):
 class MDAFlatScanPositionFileReader(ProbePositionFileReader):
     def __init__(self, scale_to_meters: float) -> None:
         self._scale_to_meters = scale_to_meters
+
+    def get_file_description(self) -> str:
+        return 'CNM/APS 26-ID-C Hard X-ray Nanoprobe Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.mda'}
 
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()
@@ -701,6 +720,12 @@ class MDADetectorChannelPositionFileReader(ProbePositionFileReader):
         self._y_description = y_description
         self._x_index_fallback = x_index_fallback
         self._y_index_fallback = y_index_fallback
+
+    def get_file_description(self) -> str:
+        return 'APS 19-ID-E In-situ Nanoprobe Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.mda'}
 
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()

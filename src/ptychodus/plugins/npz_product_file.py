@@ -64,7 +64,6 @@ def _read_text(npz_file: NpzFile, key: str, default: str) -> str:
 
 class NPZProductFileIO(ProductFileReader, ProductFileWriter):
     SIMPLE_NAME: Final[str] = 'NPZ'
-    DISPLAY_NAME: Final[str] = 'Ptychodus NumPy Zipped Archive (*.npz)'
 
     NAME: Final[str] = 'name'
     COMMENTS: Final[str] = 'comments'
@@ -99,6 +98,12 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
 
     LOSS_EPOCHS: Final[str] = 'loss_epochs'
     LOSS_VALUES: Final[str] = 'loss_values'
+
+    def get_file_description(self) -> str:
+        return 'Ptychodus NumPy Zipped Archive'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.npz'}
 
     def _read_polarization(self, npz_file: NpzFile, file_path: Path) -> Polarization | None:
         raw = _read_array(npz_file, self.POLARIZATION)
@@ -277,10 +282,8 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.register_product_file_reader_with_adapters(
         npz_product_file_io,
         simple_name=NPZProductFileIO.SIMPLE_NAME,
-        display_name=NPZProductFileIO.DISPLAY_NAME,
     )
     registry.product_file_writers.register_plugin(
         npz_product_file_io,
         simple_name=NPZProductFileIO.SIMPLE_NAME,
-        display_name=NPZProductFileIO.DISPLAY_NAME,
     )

@@ -54,6 +54,12 @@ class ESRFID16ANearFieldDiffractionFileReader(DiffractionFileReader):
     def __init__(self, *, cross_check_rtol: float = 1.0e-3) -> None:
         self._cross_check_rtol = cross_check_rtol
 
+    def get_file_description(self) -> str:
+        return 'ESRF ID16A Near-Field Ptychography Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
+
     def read(self, file_path: Path) -> DiffractionDataset:
         frame_files = series_files(file_path)
         sample_x0_mm = read_sample_x0_mm(file_path)

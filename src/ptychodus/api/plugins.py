@@ -24,6 +24,7 @@ from .diffraction import (
     DiffractionFileWriter,
     PixelMapFileReader,
 )
+from .files import FileHandler
 from .fluorescence import (
     DeconvolutionStrategy,
     FluorescenceFileReader,
@@ -53,36 +54,42 @@ T = TypeVar('T')
 logger = logging.getLogger(__name__)
 
 
-class ProductProbePositionFileReader(ProbePositionFileReader):
-    """Adapter that extracts the probe positions from a ProductFileReader."""
+class _ProductReaderAdapter(FileHandler):
+    """Base for the adapters that expose one part of a ProductFileReader's output.
+
+    An adapter reads the same files as the reader it wraps, so it describes itself
+    as that reader does rather than carrying a format of its own.
+    """
 
     def __init__(self, reader: ProductFileReader) -> None:
         super().__init__()
         self._reader = reader
+
+    def get_file_description(self) -> str:
+        return self._reader.get_file_description()
+
+    def get_file_extensions(self) -> set[str]:
+        return self._reader.get_file_extensions()
+
+
+class ProductProbePositionFileReader(_ProductReaderAdapter, ProbePositionFileReader):
+    """Adapter that extracts the probe positions from a ProductFileReader."""
 
     def read(self, file_path: Path) -> ProbePositionSequence:
         product = self._reader.read(file_path)
         return product.probe_positions
 
 
-class ProductProbeFileReader(ProbeFileReader):
+class ProductProbeFileReader(_ProductReaderAdapter, ProbeFileReader):
     """Adapter that extracts the probe sequence from a ProductFileReader."""
-
-    def __init__(self, reader: ProductFileReader) -> None:
-        super().__init__()
-        self._reader = reader
 
     def read(self, file_path: Path) -> ProbeEnsemble:
         product = self._reader.read(file_path)
         return product.probes
 
 
-class ProductObjectFileReader(ObjectFileReader):
+class ProductObjectFileReader(_ProductReaderAdapter, ObjectFileReader):
     """Adapter that extracts the object from a ProductFileReader."""
-
-    def __init__(self, reader: ProductFileReader) -> None:
-        super().__init__()
-        self._reader = reader
 
     def read(self, file_path: Path) -> Object:
         product = self._reader.read(file_path)
@@ -116,8 +123,37 @@ class PluginChooser(Iterable[Plugin[T]], Observable):
         """Return a sorted, comma-separated list of registered plugin simple names."""
         return ', '.join(sorted(plugin.simple_name for plugin in self._registered_plugins))
 
-    def register_plugin(self, strategy: T, *, display_name: str, simple_name: str = '') -> None:
-        """Register *strategy* under *display_name*; *simple_name* defaults to a stripped form."""
+    def register_plugin(
+        self, strategy: T, *, display_name: str | None = None, simple_name: str = ''
+    ) -> None:
+        """Register *strategy* under *display_name*; *simple_name* defaults to a stripped form.
+
+        A FileHandler names itself, so its *display_name* is always its own file
+        filter and the two cannot drift apart. Any other strategy must supply one.
+
+        Both mistakes below warn rather than raise, for the reason the duplicate
+        simple name does: load_plugins catches only AttributeError, so raising here
+        would abort startup over one bad registration.
+        """
+        if isinstance(strategy, FileHandler):
+            # Honoring an override is how a registration drifted from the format it
+            # names, which is what deriving the filter exists to prevent.
+            if display_name is not None:
+                logger.warning(
+                    f'Ignoring display name "{display_name}" for '
+                    f'{type(strategy).__name__}: a file handler is named by its own '
+                    f'file filter, "{strategy.get_file_filter()}".'
+                )
+
+            display_name = strategy.get_file_filter()
+        elif display_name is None:
+            # There is no name to register under, so there is nothing to recover.
+            logger.warning(
+                f'Skipping {type(strategy).__name__}: it is not a FileHandler, so it '
+                'cannot name itself and no display_name was given.'
+            )
+            return
+
         if not simple_name:
             simple_name = re.sub(r'\W+', '', display_name)
 
@@ -243,23 +279,19 @@ class PluginRegistry:
         self.reconstructor_libraries = PluginChooser[ReconstructorLibrary]()
 
     def register_product_file_reader_with_adapters(
-        self, strategy: ProductFileReader, *, display_name: str, simple_name: str = ''
+        self, strategy: ProductFileReader, *, simple_name: str = ''
     ) -> None:
         """Register *strategy* as a product reader, and as probe-position, probe, and object readers via adapters."""
         self.probe_position_file_readers.register_plugin(
-            ProductProbePositionFileReader(strategy),
-            display_name=display_name,
-            simple_name=simple_name,
+            ProductProbePositionFileReader(strategy), simple_name=simple_name
         )
         self.probe_file_readers.register_plugin(
-            ProductProbeFileReader(strategy), display_name=display_name, simple_name=simple_name
+            ProductProbeFileReader(strategy), simple_name=simple_name
         )
         self.object_file_readers.register_plugin(
-            ProductObjectFileReader(strategy), display_name=display_name, simple_name=simple_name
+            ProductObjectFileReader(strategy), simple_name=simple_name
         )
-        self.product_file_readers.register_plugin(
-            strategy, display_name=display_name, simple_name=simple_name
-        )
+        self.product_file_readers.register_plugin(strategy, simple_name=simple_name)
 
     @classmethod
     def load_plugins(cls) -> PluginRegistry:

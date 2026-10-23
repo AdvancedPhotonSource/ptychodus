@@ -239,6 +239,12 @@ class VelociprobeDiffractionFileReader(DiffractionFileReader):
         self._tree_builder = H5DiffractionFileTreeBuilder()
         self.stage_rotation_deg = 0.0  # TODO This is a hack; remove when able!
 
+    def get_file_description(self) -> str:
+        return 'APS 33-ID-C VelociProbe Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
+
     def read(self, file_path: Path) -> DiffractionDataset:
         with h5py.File(file_path, 'r') as h5_file:
             h5_dataset = h5_file['/entry/data/data_000001']

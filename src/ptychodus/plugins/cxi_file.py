@@ -5,6 +5,7 @@ flavor per :class:`~ptychodus.api.io.CXIVariant`, so the file suits the program 
 reads it next.
 """
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Final
 
@@ -42,6 +43,12 @@ class CXIDiffractionFileReader(DiffractionFileReader):
     def __init__(self) -> None:
         self._tree_builder = H5DiffractionFileTreeBuilder()
 
+    def get_file_description(self) -> str:
+        return 'Coherent X-ray Imaging Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.cxi'}
+
     def read(self, file_path: Path) -> DiffractionDataset:
         with h5py.File(file_path, 'r') as h5_file:
             contents_tree = self._tree_builder.build(h5_file)
@@ -63,9 +70,22 @@ class CXIDiffractionFileReader(DiffractionFileReader):
         )
 
 
+_VARIANT_DESCRIPTIONS: Final[Mapping[CXIVariant, str]] = {
+    CXIVariant.STANDARD: 'Coherent X-ray Imaging Files',
+    CXIVariant.SHARP: 'Coherent X-ray Imaging Files, SHARP layout',
+    CXIVariant.CDTOOLS: 'Coherent X-ray Imaging Files, cdtools layout',
+}
+
+
 class CXIDiffractionFileWriter(DiffractionFileWriter):
     def __init__(self, variant: CXIVariant) -> None:
         self._variant = variant
+
+    def get_file_description(self) -> str:
+        return _VARIANT_DESCRIPTIONS[self._variant]
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.cxi'}
 
     def write(self, file_path: Path, dataset: DiffractionDataset) -> None:
         save_cxi_diffraction(file_path, dataset, variant=self._variant)
@@ -75,6 +95,12 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
     def __init__(self, variant: CXIVariant = CXIVariant.STANDARD) -> None:
         self._variant = variant
 
+    def get_file_description(self) -> str:
+        return _VARIANT_DESCRIPTIONS[self._variant]
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.cxi'}
+
     def read(self, file_path: Path) -> Product:
         return load_cxi_product(file_path)
 
@@ -83,68 +109,71 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
 
 
 class CXIBadPixelsFileReader(BadPixelsFileReader):
+    def get_file_description(self) -> str:
+        return 'Coherent X-ray Imaging Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.cxi'}
+
     def read(self, file_path: Path) -> BadPixels:
         return load_cxi_bad_pixels(file_path)
 
 
 class CXIBackgroundFileReader(PixelMapFileReader):
+    def get_file_description(self) -> str:
+        return 'Coherent X-ray Imaging Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.cxi'}
+
     def read(self, file_path: Path) -> numpy.ndarray:
         return load_cxi_background(file_path)
 
 
 class CXIFlatFieldFileReader(PixelMapFileReader):
+    def get_file_description(self) -> str:
+        return 'Coherent X-ray Imaging Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.cxi'}
+
     def read(self, file_path: Path) -> numpy.ndarray:
         return load_cxi_flat_field(file_path)
 
 
 def register_plugins(registry: PluginRegistry) -> None:
     simple_name: Final[str] = 'CXI'
-    display_name: Final[str] = 'Coherent X-ray Imaging Files (*.cxi)'
 
     registry.diffraction_file_readers.register_plugin(
-        CXIDiffractionFileReader(), simple_name=simple_name, display_name=display_name
+        CXIDiffractionFileReader(), simple_name=simple_name
     )
     registry.bad_pixels_file_readers.register_plugin(
-        CXIBadPixelsFileReader(), simple_name=simple_name, display_name=display_name
+        CXIBadPixelsFileReader(), simple_name=simple_name
     )
     registry.background_file_readers.register_plugin(
-        CXIBackgroundFileReader(), simple_name=simple_name, display_name=display_name
+        CXIBackgroundFileReader(), simple_name=simple_name
     )
     registry.flat_field_file_readers.register_plugin(
-        CXIFlatFieldFileReader(), simple_name=simple_name, display_name=display_name
+        CXIFlatFieldFileReader(), simple_name=simple_name
     )
 
     # The product reader returns an empty probe and object for a file that has neither,
     # so the positions it yields serve as a positions reader for raw-data files too.
-    registry.register_product_file_reader_with_adapters(
-        CXIProductFileIO(), simple_name=simple_name, display_name=display_name
-    )
+    registry.register_product_file_reader_with_adapters(CXIProductFileIO(), simple_name=simple_name)
 
     writers = (
-        (CXIVariant.STANDARD, simple_name, display_name),
-        (
-            CXIVariant.SHARP,
-            'CXI_SHARP',
-            'Coherent X-ray Imaging Files, SHARP layout (*.cxi)',
-        ),
-        (
-            CXIVariant.CDTOOLS,
-            'CXI_cdtools',
-            'Coherent X-ray Imaging Files, cdtools layout (*.cxi)',
-        ),
+        (CXIVariant.STANDARD, simple_name),
+        (CXIVariant.SHARP, 'CXI_SHARP'),
+        (CXIVariant.CDTOOLS, 'CXI_cdtools'),
     )
 
-    for variant, variant_simple_name, variant_display_name in writers:
+    for variant, variant_simple_name in writers:
         registry.diffraction_file_writers.register_plugin(
-            CXIDiffractionFileWriter(variant),
-            simple_name=variant_simple_name,
-            display_name=variant_display_name,
+            CXIDiffractionFileWriter(variant), simple_name=variant_simple_name
         )
 
         # Product images are the same in the standard and cdtools layouts.
         if variant != CXIVariant.CDTOOLS:
             registry.product_file_writers.register_plugin(
-                CXIProductFileIO(variant),
-                simple_name=variant_simple_name,
-                display_name=variant_display_name,
+                CXIProductFileIO(variant), simple_name=variant_simple_name
             )

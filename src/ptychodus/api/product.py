@@ -1,13 +1,12 @@
 """Product data structure bundling the probe positions, probe sequence, object and metadata."""
 
-from abc import ABC, abstractmethod
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from sys import getsizeof
 
 from .constants import energy_eV_to_J, energy_eV_to_wavelength_m
 from .diffraction import Polarization
+from .files import FileReader, FileWriter
 from .object import Object
 from .probe import Probe, ProbeEnsemble
 from .probe_positions import ProbePosition, ProbePositionSequence
@@ -119,19 +118,9 @@ class Product:
             yield position, self.probes.get_probe(index)
 
 
-class ProductFileReader(ABC):
+class ProductFileReader(FileReader[Product]):
     """Plugin interface for reading data products."""
 
-    @abstractmethod
-    def read(self, file_path: Path) -> Product:
-        """Read a data product from file."""
-        pass
 
-
-class ProductFileWriter(ABC):
+class ProductFileWriter(FileWriter[Product]):
     """Plugin interface for writing data products."""
-
-    @abstractmethod
-    def write(self, file_path: Path, product: Product) -> None:
-        """Write a data product to file."""
-        pass

@@ -34,10 +34,15 @@ class BionanoprobeMAPSPositionFileReader(ProbePositionFileReader):
     """Reader for the ``MAPS`` axis vectors in a pre-APS-U Bionanoprobe XRF map."""
 
     SIMPLE_NAME: Final[str] = 'APS_BNP_MAPS'
-    DISPLAY_NAME: Final[str] = 'APS 2-ID-D Bionanoprobe MAPS Files (*.h5 *.hdf5)'
 
     X_AXIS_PATH: Final[str] = 'MAPS/x_axis'
     Y_AXIS_PATH: Final[str] = 'MAPS/y_axis'
+
+    def get_file_description(self) -> str:
+        return 'APS 2-ID-D Bionanoprobe MAPS Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
 
     def _read_axis(self, h5_file: h5py.File, path: str) -> numpy.ndarray:
         try:
@@ -89,5 +94,4 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         BionanoprobeMAPSPositionFileReader(),
         simple_name=BionanoprobeMAPSPositionFileReader.SIMPLE_NAME,
-        display_name=BionanoprobeMAPSPositionFileReader.DISPLAY_NAME,
     )

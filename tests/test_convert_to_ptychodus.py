@@ -105,16 +105,34 @@ def _make_product() -> Product:
 
 
 class _StubObjectFileReader(ObjectFileReader):
+    def get_file_description(self) -> str:
+        return 'Stub Object Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.npy'}
+
     def read(self, file_path: Path) -> Object:
         return _make_object(2.0 + 0.0j, with_geometry=False)
 
 
 class _StubProbeFileReader(ProbeFileReader):
+    def get_file_description(self) -> str:
+        return 'Stub Probe Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.npy'}
+
     def read(self, file_path: Path) -> ProbeEnsemble:
         return _make_probes(3.0 + 0.0j, with_geometry=False)
 
 
 class _StubProbePositionFileReader(ProbePositionFileReader):
+    def get_file_description(self) -> str:
+        return 'Stub Position Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.csv'}
+
     def read(self, file_path: Path) -> ProbePositionSequence:
         return _make_positions(5.0)
 
@@ -123,14 +141,10 @@ class _StubProbePositionFileReader(ProbePositionFileReader):
 def registry() -> PluginRegistry:
     """A registry holding only the stub readers, so no real plugin can answer instead."""
     registry = PluginRegistry()
-    registry.object_file_readers.register_plugin(
-        _StubObjectFileReader(), display_name=PLUGIN_NAME, simple_name=PLUGIN_NAME
-    )
-    registry.probe_file_readers.register_plugin(
-        _StubProbeFileReader(), display_name=PLUGIN_NAME, simple_name=PLUGIN_NAME
-    )
+    registry.object_file_readers.register_plugin(_StubObjectFileReader(), simple_name=PLUGIN_NAME)
+    registry.probe_file_readers.register_plugin(_StubProbeFileReader(), simple_name=PLUGIN_NAME)
     registry.probe_position_file_readers.register_plugin(
-        _StubProbePositionFileReader(), display_name=PLUGIN_NAME, simple_name=PLUGIN_NAME
+        _StubProbePositionFileReader(), simple_name=PLUGIN_NAME
     )
     return registry
 

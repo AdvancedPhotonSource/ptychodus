@@ -7,6 +7,12 @@ from ptychodus.api.probe import ProbeEnsemble, ProbeFileReader, ProbeFileWriter
 
 
 class CSVProbeFileReader(ProbeFileReader):
+    def get_file_description(self) -> str:
+        return 'Comma-Separated Values Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.csv'}
+
     def read(self, file_path: Path) -> ProbeEnsemble:
         array_flat = numpy.genfromtxt(file_path, delimiter=',', dtype=complex)
         num_modes, remainder = divmod(array_flat.shape[0], array_flat.shape[1])
@@ -19,6 +25,12 @@ class CSVProbeFileReader(ProbeFileReader):
 
 
 class CSVProbeFileWriter(ProbeFileWriter):
+    def get_file_description(self) -> str:
+        return 'Comma-Separated Values Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.csv'}
+
     def write(self, file_path: Path, probes: ProbeEnsemble) -> None:
         array = probes.get_probe_no_opr().get_array()
         array_flat = array.reshape(-1, array.shape[-1])
@@ -29,10 +41,8 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_file_readers.register_plugin(
         CSVProbeFileReader(),
         simple_name='CSV',
-        display_name='Comma-Separated Values Files (*.csv)',
     )
     registry.probe_file_writers.register_plugin(
         CSVProbeFileWriter(),
         simple_name='CSV',
-        display_name='Comma-Separated Values Files (*.csv)',
     )

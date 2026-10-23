@@ -67,6 +67,12 @@ def read_fold_slice_parameters(file_path: Path) -> FoldSliceParameters:
 
 
 class FoldSlicePositionFileReader(ProbePositionFileReader):
+    def get_file_description(self) -> str:
+        return 'fold_slice Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
+
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()
 

@@ -9,7 +9,12 @@ from ptychodus.api.io import load_product, save_product
 
 class H5ProductFileIO(ProductFileReader, ProductFileWriter):
     SIMPLE_NAME: Final[str] = 'HDF5'
-    DISPLAY_NAME: Final[str] = 'Ptychodus Product Files (*.h5 *.hdf5)'
+
+    def get_file_description(self) -> str:
+        return 'Ptychodus Product Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
 
     def read(self, file_path: Path) -> Product:
         return load_product(file_path)
@@ -24,10 +29,8 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.register_product_file_reader_with_adapters(
         h5_product_file_io,
         simple_name=H5ProductFileIO.SIMPLE_NAME,
-        display_name=H5ProductFileIO.DISPLAY_NAME,
     )
     registry.product_file_writers.register_plugin(
         h5_product_file_io,
         simple_name=H5ProductFileIO.SIMPLE_NAME,
-        display_name=H5ProductFileIO.DISPLAY_NAME,
     )

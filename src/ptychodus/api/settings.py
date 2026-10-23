@@ -6,6 +6,7 @@ from pathlib import Path
 import configparser
 import logging
 
+from .files import FileHandler
 from .observer import Observable
 from .parameters import ParameterGroup
 
@@ -44,13 +45,18 @@ def _warn_unrecognized_keys(
         )
 
 
-class SettingsRegistry(Observable):
+class SettingsRegistry(Observable, FileHandler):
     """Central registry of ParameterGroups that can be saved to and loaded from settings files."""
 
     def __init__(self) -> None:
         super().__init__()
         self._parameter_group = ParameterGroup()
-        self._file_filter_list: list[str] = ['Initialization Files (*.ini)']
+
+    def get_file_description(self) -> str:
+        return 'Initialization Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.ini'}
 
     def create_group(self, name: str) -> ParameterGroup:
         return self._parameter_group.create_group(name)
@@ -65,10 +71,10 @@ class SettingsRegistry(Observable):
         return len(self._parameter_group.groups())
 
     def get_open_file_filters(self) -> Sequence[str]:
-        return self._file_filter_list
+        return [self.get_file_filter()]
 
     def get_open_file_filter(self) -> str:
-        return self._file_filter_list[0]
+        return self.get_file_filter()
 
     def open_settings(self, file_path: Path) -> None:
         config = configparser.ConfigParser(interpolation=None)
@@ -100,10 +106,10 @@ class SettingsRegistry(Observable):
         self.notify_observers()
 
     def get_save_file_filters(self) -> Sequence[str]:
-        return self._file_filter_list
+        return [self.get_file_filter()]
 
     def get_save_file_filter(self) -> str:
-        return self._file_filter_list[0]
+        return self.get_file_filter()
 
     def save_settings(self, file_path: Path) -> None:
         config = configparser.ConfigParser(interpolation=None)

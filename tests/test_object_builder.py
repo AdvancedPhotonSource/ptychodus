@@ -105,6 +105,12 @@ class _StubObjectFileReader(ObjectFileReader):
     def __init__(self, object_: Object) -> None:
         self._object = object_
 
+    def get_file_description(self) -> str:
+        return 'Stub Object Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.npy'}
+
     def read(self, file_path: Path) -> Object:
         return self._object
 

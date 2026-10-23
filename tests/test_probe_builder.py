@@ -156,6 +156,12 @@ class _StubProbeFileReader(ProbeFileReader):
     def __init__(self, probe_seq: ProbeEnsemble) -> None:
         self._probe_seq = probe_seq
 
+    def get_file_description(self) -> str:
+        return 'Stub Probe Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.npy'}
+
     def read(self, file_path: Path) -> ProbeEnsemble:
         return self._probe_seq
 

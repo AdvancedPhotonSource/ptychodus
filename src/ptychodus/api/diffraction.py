@@ -11,6 +11,7 @@ from typing import overload, Any, TypeAlias
 
 import numpy
 
+from .files import FileReader, FileWriter
 from .geometry import ImageExtent, PixelGeometry
 
 BadPixels: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.bool_]]
@@ -413,37 +414,20 @@ class SimpleDiffractionDataset(DiffractionDataset):
         return len(self._array_list)
 
 
-class DiffractionFileReader(ABC):
+class DiffractionFileReader(FileReader[DiffractionDataset]):
     """Plugin interface for reading diffraction files."""
 
-    @abstractmethod
-    def read(self, file_path: Path) -> DiffractionDataset:
-        """Read a diffraction dataset from file."""
-        pass
 
-
-class DiffractionFileWriter(ABC):
+class DiffractionFileWriter(FileWriter[DiffractionDataset]):
     """Plugin interface for writing diffraction files."""
 
-    @abstractmethod
-    def write(self, file_path: Path, dataset: DiffractionDataset) -> None:
-        """Write a diffraction dataset to file."""
-        pass
 
-
-class BadPixelsFileReader(ABC):
+class BadPixelsFileReader(FileReader[BadPixels]):
     """Plugin interface for reading bad-pixel mask files."""
 
-    @abstractmethod
-    def read(self, file_path: Path) -> BadPixels:
-        """Read a bad-pixel mask from file."""
-        pass
 
+class PixelMapFileReader(FileReader[numpy.ndarray]):
+    """Plugin interface for reading a per-pixel detector map, such as a background or flat field.
 
-class PixelMapFileReader(ABC):
-    """Plugin interface for reading a per-pixel detector map, such as a background or flat field."""
-
-    @abstractmethod
-    def read(self, file_path: Path) -> numpy.ndarray:
-        """Read a two-dimensional floating-point map from file."""
-        pass
+    The map read is two-dimensional and floating point.
+    """

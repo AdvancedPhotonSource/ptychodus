@@ -21,7 +21,12 @@ logger = logging.getLogger(__name__)
 
 class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
     SIMPLE_NAME: Final[str] = 'NPY'
-    DISPLAY_NAME: Final[str] = 'NumPy Binary Files (*.npy)'
+
+    def get_file_description(self) -> str:
+        return 'NumPy Binary Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.npy'}
 
     def read(self, file_path: Path) -> DiffractionDataset:
         data = numpy.load(file_path)
@@ -60,10 +65,8 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         npy_diffraction_file_io,
         simple_name=NPYDiffractionFileIO.SIMPLE_NAME,
-        display_name=NPYDiffractionFileIO.DISPLAY_NAME,
     )
     registry.diffraction_file_writers.register_plugin(
         npy_diffraction_file_io,
         simple_name=NPYDiffractionFileIO.SIMPLE_NAME,
-        display_name=NPYDiffractionFileIO.DISPLAY_NAME,
     )

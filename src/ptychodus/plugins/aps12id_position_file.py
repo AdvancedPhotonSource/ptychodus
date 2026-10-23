@@ -16,6 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 class APS12IDPositionFileReader(ProbePositionFileReader):
+    def get_file_description(self) -> str:
+        return 'APS 12-ID-E Ptycho-SAXS Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.dat'}
+
     def read(self, file_path: Path) -> ProbePositionSequence:
         stem_parts = file_path.stem.split('_')
         stem_prefix = '_'.join(stem_parts[:-2])
@@ -74,5 +80,4 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         APS12IDPositionFileReader(),
         simple_name='APS_PtychoSAXS',
-        display_name='APS 12-ID-E Ptycho-SAXS Files (*.dat)',
     )

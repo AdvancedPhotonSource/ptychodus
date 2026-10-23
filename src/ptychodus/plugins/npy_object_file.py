@@ -7,6 +7,12 @@ from ptychodus.api.plugins import PluginRegistry
 
 
 class NPYObjectFileReader(ObjectFileReader):
+    def get_file_description(self) -> str:
+        return 'NumPy Binary Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.npy'}
+
     def read(self, file_path: Path) -> Object:
         array = numpy.load(file_path)
         # A multilayer array needs one spacing per gap or the constructor rejects it. The
@@ -22,6 +28,12 @@ class NPYObjectFileReader(ObjectFileReader):
 
 
 class NPYObjectFileWriter(ObjectFileWriter):
+    def get_file_description(self) -> str:
+        return 'NumPy Binary Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.npy'}
+
     def write(self, file_path: Path, object_: Object) -> None:
         array = object_.get_array()
         numpy.save(file_path, array)
@@ -31,10 +43,8 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.object_file_readers.register_plugin(
         NPYObjectFileReader(),
         simple_name='NPY',
-        display_name='NumPy Binary Files (*.npy)',
     )
     registry.object_file_writers.register_plugin(
         NPYObjectFileWriter(),
         simple_name='NPY',
-        display_name='NumPy Binary Files (*.npy)',
     )

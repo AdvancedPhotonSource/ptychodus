@@ -137,7 +137,12 @@ class LamNIPositionFileReader(ProbePositionFileReader):
     """Reader for APS 31-ID-E LamNI scan-position files, sensing the layout by header."""
 
     SIMPLE_NAME: Final[str] = 'APS_LamNI'
-    DISPLAY_NAME: Final[str] = 'APS 31-ID-E LamNI Position Files (*.dat)'
+
+    def get_file_description(self) -> str:
+        return 'APS 31-ID-E LamNI Position Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.dat'}
 
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()
