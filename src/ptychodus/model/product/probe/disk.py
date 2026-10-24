@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy
 
 from ptychodus.api.probe import ProbeEnsemble, ProbeGeometryProvider
-from ptychodus.api.simulate.probe import propagate_probe, generate_disk_probe
+from ptychodus.api.simulate.probe import generate_disk_probe
 
 from .builder import ProbeEnsembleBuilder
 from .settings import ProbeSettings
@@ -16,6 +16,10 @@ class DiskProbeBuilder(ProbeEnsembleBuilder):
 
         self.diameter_m = settings.disk_diameter_m.copy()
         self._add_parameter('diameter_m', self.diameter_m)
+
+        # from the focus to the sample, setting the curvature of the beam at the aperture
+        self.defocus_distance_m = settings.defocus_distance_m.copy()
+        self._add_parameter('defocus_distance_m', self.defocus_distance_m)
 
         # from sample to the focal plane
         self.propagation_distance_m = settings.propagation_distance_m.copy()
@@ -30,14 +34,14 @@ class DiskProbeBuilder(ProbeEnsembleBuilder):
         return builder
 
     def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
-        return self._rescale_to_photon_count(
-            propagate_probe(
-                generate_disk_probe(
-                    geometry_provider.get_probe_geometry(),
-                    radius_m=self.diameter_m.get_value() / 2.0,
-                ),
-                photon_wavelength_m=geometry_provider.photon_wavelength_m,
-                propagation_distance_m=self.propagation_distance_m.get_value(),
-            ),
-            geometry_provider,
+        probe = generate_disk_probe(
+            geometry_provider.get_probe_geometry(),
+            radius_m=self.diameter_m.get_value() / 2.0,
         )
+        probe = self._shape_parametric_field(
+            probe,
+            geometry_provider,
+            defocus_distance_m=self.defocus_distance_m.get_value(),
+            propagation_distance_m=self.propagation_distance_m.get_value(),
+        )
+        return self._rescale_to_photon_count(probe, geometry_provider)

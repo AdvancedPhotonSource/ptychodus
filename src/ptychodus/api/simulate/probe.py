@@ -79,6 +79,99 @@ def propagate_probe(
     )
 
 
+def apply_defocus_phase(
+    probe: Probe,
+    *,
+    photon_wavelength_m: float,
+    defocus_distance_m: float,
+    significant_amplitude_ratio: float = 1.0e-2,
+    min_fresnel_number: float = 1.0,
+) -> Probe:
+    """Give every incoherent mode the curvature of a beam sampled past its focus.
+
+    The propagators here use ``exp(+ikz)``, so a probe sampled a signed distance *z*
+    past its focus carries ``exp(+i pi (x^2 + y^2) / (lambda z))``: *z* > 0 lies
+    downstream of the focus and the wave diverges, *z* < 0 lies upstream and it
+    converges. ``x`` and ``y`` are measured in meters from the pixel ``(N - 1) / 2``,
+    the center the amplitude generators use, so the curvature adds no tilt; each axis
+    keeps its own pixel size. The factor is a pure phase, so the power is unchanged,
+    and *z* = 0 returns *probe* itself.
+
+    Two sampling checks run over the pixels whose combined amplitude is at least
+    *significant_amplitude_ratio* times the peak; lowering it lets a fainter tail
+    count. A warning is logged for each axis on which the local frequency
+    ``|x| / (lambda |z|)`` exceeds the Nyquist limit ``1 / (2 dx)``, where the phase
+    aliases. Another is logged when the Fresnel number ``R^2 / (lambda |z|)`` of that
+    region falls below *min_fresnel_number*: a hard-edged aperture with curvature is a
+    geometric-optics model, which holds only at a large Fresnel number.
+    """
+    if defocus_distance_m == 0.0:
+        return probe
+
+    coords = _probe_geometry(probe).get_transverse_coordinates()
+    phase = numpy.pi * (numpy.square(coords.x_m) + numpy.square(coords.y_m))
+    phase /= photon_wavelength_m * defocus_distance_m
+    array = probe.get_array()
+    pixel_geometry = probe.get_pixel_geometry()
+
+    _warn_about_defocus_sampling(
+        numpy.sqrt(numpy.sum(intensity(array), axis=-3)),
+        coords,
+        pixel_geometry,
+        wavelength_defocus_m2=photon_wavelength_m * abs(defocus_distance_m),
+        significant_amplitude_ratio=significant_amplitude_ratio,
+        min_fresnel_number=min_fresnel_number,
+    )
+
+    return Probe(array=array * numpy.exp(1j * phase), pixel_geometry=pixel_geometry)
+
+
+def _warn_about_defocus_sampling(
+    amplitude: RealArrayType,
+    coords: ProbeTransverseCoordinates,
+    pixel_geometry: PixelGeometry,
+    *,
+    wavelength_defocus_m2: float,
+    significant_amplitude_ratio: float,
+    min_fresnel_number: float,
+) -> None:
+    """Warn when a defocus phase aliases, or when its region is too small to curve."""
+    peak_amplitude = amplitude.max()
+
+    if not peak_amplitude > 0.0:
+        return
+
+    is_significant = amplitude >= significant_amplitude_ratio * peak_amplitude
+
+    for axis, position_m, pixel_size_m in (
+        ('x', coords.x_m, pixel_geometry.width_m),
+        ('y', coords.y_m, pixel_geometry.height_m),
+    ):
+        local_frequency_per_m = numpy.abs(position_m[is_significant]).max() / wavelength_defocus_m2
+        nyquist_frequency_per_m = 0.5 / pixel_size_m
+
+        if local_frequency_per_m > nyquist_frequency_per_m:
+            logger.warning(
+                'Defocus phase is aliased along %s: its local frequency reaches %g/m, '
+                'beyond the %g/m Nyquist limit. Use a finer probe pixel size or a larger '
+                'defocus distance.',
+                axis,
+                local_frequency_per_m,
+                nyquist_frequency_per_m,
+            )
+
+    radius_m = coords.position_r_m[is_significant].max()
+    fresnel_number = radius_m**2 / wavelength_defocus_m2
+
+    if fresnel_number < min_fresnel_number:
+        logger.warning(
+            'Defocused probe has Fresnel number %.3g, below %.3g; a curved aperture is a '
+            'geometric-optics model and diffraction dominates here.',
+            fresnel_number,
+            min_fresnel_number,
+        )
+
+
 def generate_disk_probe(
     geometry: ProbeGeometry,
     *,

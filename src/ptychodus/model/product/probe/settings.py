@@ -81,12 +81,14 @@ class ProbeSettings(Observable, Observer):
         self.central_beamstop_diameter_m = self._group.create_real_parameter(
             'CentralBeamstopDiameterInMeters', 60e-6, minimum=0.0
         )
-        # Read by the focusing builders only. It is the object plane's position relative
-        # to the focus, i.e. the negated [Products] FocusObjectDistanceInMeters, which
-        # wins over it whenever the product states one.
+        # The object plane's position relative to the focus, read by every builder that
+        # models the beam's curvature at the sample: a focusing optic is propagated to
+        # it, and a parametric aperture takes the matching quadratic phase. It is the
+        # negated [Products] FocusObjectDistanceInMeters, which wins over it whenever
+        # the product states one.
         self.defocus_distance_m = self._group.create_real_parameter('DefocusDistanceInMeters', 0.0)
-        # Read by the builders that form a field and then propagate it, which have no
-        # focus for a defocus to be measured from.
+        # Moves the plane of a field a builder has already formed, after any defocus
+        # curvature; independent of the defocus, which it never changes.
         self.propagation_distance_m = self._group.create_real_parameter(
             'PropagationDistanceInMeters', 0.0
         )

@@ -32,6 +32,7 @@ import pytest
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.probe import (
     OPRWeightPolicy,
+    Probe,
     ProbeFileReader,
     ProbeGeometry,
     ProbeGeometryProvider,
@@ -46,9 +47,24 @@ from ptychodus.model.product.probe.builder import (
     resolve_defocus_distance_m,
 )
 from ptychodus.model.product.probe import INCOHERENT_MODE_STRATEGY_NAMES
+from ptychodus.api.simulate.probe import (
+    generate_disk_probe,
+    generate_rectangular_probe,
+    generate_super_gaussian_probe,
+    propagate_probe,
+    rescale_probe_intensity,
+)
+from ptychodus.model.diffraction.dataset import AssembledDiffractionDataset
+from ptychodus.model.diffraction.monitor import DiffractionTaskMonitor
+from ptychodus.model.diffraction.settings import DetectorSettings, DiffractionSettings
+from ptychodus.model.product.probe.builder_factory import ProbeBuilderFactory
 from ptychodus.model.product.probe.disk import DiskProbeBuilder
 from ptychodus.model.product.probe.kb_mirror import KBMirrorProbeBuilder
+from ptychodus.model.product.probe.rect import RectangularProbeBuilder
 from ptychodus.model.product.probe.settings import ProbeSettings
+from ptychodus.model.product.probe.super_gaussian import SuperGaussianProbeBuilder
+
+from test_diffraction_loader import InlineTaskManager
 
 NUM_SCAN_POINTS = 7
 PROBE_PHOTON_COUNT = 1.0e6
@@ -786,29 +802,66 @@ class TestFocusDistanceResolution:
         assert len(caplog.records) == 1
 
 
-class TestPropagationDistanceIsSeparateFromDefocus:
-    """The aperture builders propagate a field; they have no focus to defocus from.
+def _every_builder(settings: ProbeSettings) -> list[ProbeEnsembleBuilder]:
+    """One of each builder the factory offers, all reading the same settings."""
+    registry = SettingsRegistry()
+    task_manager = InlineTaskManager()
+    dataset = AssembledDiffractionDataset(
+        DiffractionSettings(registry),
+        DetectorSettings(registry),
+        task_manager,
+        DiffractionTaskMonitor(task_manager),
+    )
+    factory = ProbeBuilderFactory(
+        _make_rng(), settings, PluginChooser(), PluginChooser(), PluginChooser(), PluginChooser()
+    )
+    return [factory.create(name, dataset=dataset) for name in factory]
 
-    Sharing one key meant editing a disk probe's propagation moved a zone-plate
-    probe's focus, so the two now read different settings.
+
+class TestPropagationDistanceIsSeparateFromDefocus:
+    """Defocus and propagation are two settings that never stand in for each other.
+
+    Defocus is the curvature of the beam a builder models; propagation moves the
+    plane of a field already formed. Sharing one key once let editing a disk probe's
+    propagation move a zone-plate probe's focus, so every builder reads each key on
+    its own, whichever of the two it offers.
     """
 
-    def test_a_disk_probe_ignores_the_focusing_builders_key(self) -> None:
-        settings = _make_settings()
-        settings.defocus_distance_m.set_value(5.0e-5)
+    def test_every_builder_offers_at_least_one_of_the_two(self) -> None:
+        builders = _every_builder(_make_settings())
 
-        builder = DiskProbeBuilder(_make_rng(), settings)
+        assert any('defocus_distance_m' in builder.parameters() for builder in builders)
+        assert any('propagation_distance_m' in builder.parameters() for builder in builders)
 
-        assert builder.propagation_distance_m.get_value() == 0.0
-        assert 'defocus_distance_m' not in builder.parameters()
-
-    def test_a_disk_probe_reads_the_propagation_key(self) -> None:
+    def test_setting_the_propagation_never_moves_a_defocus(self) -> None:
         settings = _make_settings()
         settings.propagation_distance_m.set_value(5.0e-5)
 
-        builder = DiskProbeBuilder(_make_rng(), settings)
+        for builder in _every_builder(settings):
+            parameters = builder.parameters()
 
-        assert builder.propagation_distance_m.get_value() == pytest.approx(5.0e-5)
+            if 'defocus_distance_m' in parameters:
+                assert parameters['defocus_distance_m'].get_value() == 0.0, builder.get_name()
+
+            if 'propagation_distance_m' in parameters:
+                assert parameters['propagation_distance_m'].get_value() == pytest.approx(5.0e-5), (
+                    builder.get_name()
+                )
+
+    def test_setting_the_defocus_never_moves_a_propagation(self) -> None:
+        settings = _make_settings()
+        settings.defocus_distance_m.set_value(5.0e-5)
+
+        for builder in _every_builder(settings):
+            parameters = builder.parameters()
+
+            if 'propagation_distance_m' in parameters:
+                assert parameters['propagation_distance_m'].get_value() == 0.0, builder.get_name()
+
+            if 'defocus_distance_m' in parameters:
+                assert parameters['defocus_distance_m'].get_value() == pytest.approx(5.0e-5), (
+                    builder.get_name()
+                )
 
     def test_the_focusing_builders_ignore_the_propagation_key(self) -> None:
         settings = _make_settings()
@@ -818,3 +871,138 @@ class TestPropagationDistanceIsSeparateFromDefocus:
 
         assert builder.defocus_distance_m.get_value() == 0.0
         assert 'propagation_distance_m' not in builder.parameters()
+
+
+_ParametricProbeBuilder = DiskProbeBuilder | RectangularProbeBuilder | SuperGaussianProbeBuilder
+# Past the 1 mm the disk needs to stay unaliased on the stub's 100 nm grid, and short
+# of the 2.5 mm where its Fresnel number drops below one.
+_PARAMETRIC_DEFOCUS_M = 2.0e-3
+
+
+def _make_parametric_builder(name: str, settings: ProbeSettings) -> _ParametricProbeBuilder:
+    builder: _ParametricProbeBuilder
+
+    match name:
+        case 'disk':
+            builder = DiskProbeBuilder(_make_rng(), settings)
+        case 'rectangular':
+            builder = RectangularProbeBuilder(_make_rng(), settings)
+        case 'super_gaussian':
+            builder = SuperGaussianProbeBuilder(_make_rng(), settings)
+            # The 400 um default would fill the grid edge to edge; at 0.6 um the 1 %
+            # tail still stays unaliased at the test defocus.
+            builder.fwhm_m.set_value(0.6e-6)
+        case _:
+            raise ValueError(name)
+
+    return builder
+
+
+def _flat_amplitude(builder: _ParametricProbeBuilder) -> Probe:
+    """The builder's amplitude as its generator alone produces it."""
+    geometry = _StubProbeGeometryProvider().get_probe_geometry()
+
+    if isinstance(builder, DiskProbeBuilder):
+        return generate_disk_probe(geometry, radius_m=builder.diameter_m.get_value() / 2.0)
+    elif isinstance(builder, RectangularProbeBuilder):
+        return generate_rectangular_probe(
+            geometry, width_m=builder.width_m.get_value(), height_m=builder.height_m.get_value()
+        )
+    else:
+        return generate_super_gaussian_probe(
+            geometry,
+            annular_radius_m=builder.annular_radius_m.get_value(),
+            fwhm_m=builder.fwhm_m.get_value(),
+            order_parameter=builder.order_parameter.get_value(),
+        )
+
+
+_PARAMETRIC_BUILDER_NAMES = ['disk', 'rectangular', 'super_gaussian']
+
+
+class TestParametricProbeDefocus:
+    """Disk, rectangle and super-Gaussian take a defocus phase, then propagate."""
+
+    @pytest.mark.parametrize('name', _PARAMETRIC_BUILDER_NAMES)
+    def test_zero_defocus_and_propagation_is_the_bare_amplitude(self, name: str) -> None:
+        builder = _make_parametric_builder(name, _make_settings())
+        expected = rescale_probe_intensity(_flat_amplitude(builder), PROBE_PHOTON_COUNT)
+
+        probe = builder.build(_StubProbeGeometryProvider())
+
+        numpy.testing.assert_array_equal(probe.get_array()[0], expected.get_array())
+
+    @pytest.mark.parametrize('name', ['disk', 'rectangular'])
+    def test_skipping_the_zero_propagation_changes_only_round_off(self, name: str) -> None:
+        """Disk and rectangle once ran a zero-distance FFT round trip; now they skip it."""
+        builder = _make_parametric_builder(name, _make_settings())
+        round_tripped = propagate_probe(
+            _flat_amplitude(builder),
+            photon_wavelength_m=_StubProbeGeometryProvider().photon_wavelength_m,
+            propagation_distance_m=0.0,
+        )
+        expected = rescale_probe_intensity(round_tripped, PROBE_PHOTON_COUNT)
+
+        probe = builder.build(_StubProbeGeometryProvider())
+
+        numpy.testing.assert_allclose(
+            probe.get_array()[0], expected.get_array(), rtol=0.0, atol=1.0e-9
+        )
+
+    def test_the_super_gaussian_propagates(self) -> None:
+        settings = _make_settings()
+        settings.propagation_distance_m.set_value(5.0e-5)
+        builder = _make_parametric_builder('super_gaussian', settings)
+        provider = _StubProbeGeometryProvider()
+        propagated = propagate_probe(
+            _flat_amplitude(builder),
+            photon_wavelength_m=provider.photon_wavelength_m,
+            propagation_distance_m=5.0e-5,
+        )
+        expected = rescale_probe_intensity(propagated, PROBE_PHOTON_COUNT)
+
+        probe = builder.build(provider)
+
+        numpy.testing.assert_allclose(probe.get_array()[0], expected.get_array(), atol=1e-9)
+
+    @pytest.mark.parametrize('name', _PARAMETRIC_BUILDER_NAMES)
+    def test_the_builder_defocus_curves_the_probe(self, name: str) -> None:
+        flat = _make_parametric_builder(name, _make_settings()).build(_StubProbeGeometryProvider())
+        builder = _make_parametric_builder(name, _make_settings())
+        builder.defocus_distance_m.set_value(_PARAMETRIC_DEFOCUS_M)
+
+        curved = builder.build(_StubProbeGeometryProvider())
+
+        assert not numpy.allclose(curved.get_array(), flat.get_array())
+        numpy.testing.assert_allclose(numpy.abs(curved.get_array()), numpy.abs(flat.get_array()))
+
+    @pytest.mark.parametrize('name', _PARAMETRIC_BUILDER_NAMES)
+    def test_a_declared_focus_stands_in_for_the_builder_defocus(self, name: str) -> None:
+        builder = _make_parametric_builder(name, _make_settings())
+        builder.defocus_distance_m.set_value(_PARAMETRIC_DEFOCUS_M)
+        from_builder = builder.build(_StubProbeGeometryProvider())
+
+        builder.defocus_distance_m.set_value(0.0)
+        from_product = builder.build(
+            _StubProbeGeometryProvider(focus_object_distance_m=-_PARAMETRIC_DEFOCUS_M)
+        )
+
+        numpy.testing.assert_allclose(from_product.get_array(), from_builder.get_array())
+
+    @pytest.mark.parametrize('name', _PARAMETRIC_BUILDER_NAMES)
+    def test_the_declared_focus_wins_a_disagreement(
+        self, name: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        expected_builder = _make_parametric_builder(name, _make_settings())
+        expected_builder.defocus_distance_m.set_value(_PARAMETRIC_DEFOCUS_M)
+        expected = expected_builder.build(_StubProbeGeometryProvider())
+        builder = _make_parametric_builder(name, _make_settings())
+        builder.defocus_distance_m.set_value(1.5e-3)
+
+        with caplog.at_level(logging.WARNING, logger='ptychodus.model.product.probe.builder'):
+            probe = builder.build(
+                _StubProbeGeometryProvider(focus_object_distance_m=-_PARAMETRIC_DEFOCUS_M)
+            )
+
+        numpy.testing.assert_allclose(probe.get_array(), expected.get_array())
+        assert 'disagrees' in caplog.text

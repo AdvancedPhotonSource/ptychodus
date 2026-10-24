@@ -23,6 +23,14 @@ class SuperGaussianProbeBuilder(ProbeEnsembleBuilder):
         self.order_parameter = settings.super_gaussian_order_parameter.copy()
         self._add_parameter('order_parameter', self.order_parameter)
 
+        # from the focus to the sample, setting the curvature of the beam at the profile
+        self.defocus_distance_m = settings.defocus_distance_m.copy()
+        self._add_parameter('defocus_distance_m', self.defocus_distance_m)
+
+        # from sample to the focal plane
+        self.propagation_distance_m = settings.propagation_distance_m.copy()
+        self._add_parameter('propagation_distance_m', self.propagation_distance_m)
+
     def copy(self) -> SuperGaussianProbeBuilder:
         builder = SuperGaussianProbeBuilder(self._rng, self._settings)
 
@@ -32,12 +40,16 @@ class SuperGaussianProbeBuilder(ProbeEnsembleBuilder):
         return builder
 
     def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
-        return self._rescale_to_photon_count(
-            generate_super_gaussian_probe(
-                geometry_provider.get_probe_geometry(),
-                annular_radius_m=self.annular_radius_m.get_value(),
-                fwhm_m=self.fwhm_m.get_value(),
-                order_parameter=self.order_parameter.get_value(),
-            ),
-            geometry_provider,
+        probe = generate_super_gaussian_probe(
+            geometry_provider.get_probe_geometry(),
+            annular_radius_m=self.annular_radius_m.get_value(),
+            fwhm_m=self.fwhm_m.get_value(),
+            order_parameter=self.order_parameter.get_value(),
         )
+        probe = self._shape_parametric_field(
+            probe,
+            geometry_provider,
+            defocus_distance_m=self.defocus_distance_m.get_value(),
+            propagation_distance_m=self.propagation_distance_m.get_value(),
+        )
+        return self._rescale_to_photon_count(probe, geometry_provider)

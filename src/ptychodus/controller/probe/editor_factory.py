@@ -505,6 +505,12 @@ class ProbeEditorViewControllerFactory:
                 group=primary_mode_group,
             )
             dialog_builder.add_length_widget(
+                probe_builder.defocus_distance_m,
+                'Defocus Distance:',
+                default_unit=LengthUnit.MICROMETER,
+                group=primary_mode_group,
+            )
+            dialog_builder.add_length_widget(
                 probe_builder.propagation_distance_m,
                 'Propagation Distance:',
                 default_unit=LengthUnit.MICROMETER,
@@ -538,6 +544,12 @@ class ProbeEditorViewControllerFactory:
                 group=primary_mode_group,
             )
             dialog_builder.add_length_widget(
+                probe_builder.defocus_distance_m,
+                'Defocus Distance:',
+                default_unit=LengthUnit.MICROMETER,
+                group=primary_mode_group,
+            )
+            dialog_builder.add_length_widget(
                 probe_builder.propagation_distance_m,
                 'Propagation Distance:',
                 default_unit=LengthUnit.MICROMETER,
@@ -559,6 +571,18 @@ class ProbeEditorViewControllerFactory:
             dialog_builder.add_decimal_line_edit(
                 probe_builder.order_parameter,
                 'Order Parameter:',
+                group=primary_mode_group,
+            )
+            dialog_builder.add_length_widget(
+                probe_builder.defocus_distance_m,
+                'Defocus Distance:',
+                default_unit=LengthUnit.MICROMETER,
+                group=primary_mode_group,
+            )
+            dialog_builder.add_length_widget(
+                probe_builder.propagation_distance_m,
+                'Propagation Distance:',
+                default_unit=LengthUnit.MICROMETER,
                 group=primary_mode_group,
             )
             return True

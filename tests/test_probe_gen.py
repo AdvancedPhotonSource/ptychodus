@@ -12,6 +12,7 @@ from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import HermiteMode, ImageExtent, LegendreMode, PixelGeometry
 from ptychodus.api.probe import Probe, ProbeGeometry
 from ptychodus.api.simulate.probe import (
+    apply_defocus_phase,
     propagate_probe,
     DEFAULT_INCOHERENT_MODE_STRATEGY,
     FresnelZonePlate,
@@ -27,10 +28,12 @@ from ptychodus.api.simulate.probe import (
     generate_mirror_figure_error,
     generate_average_pattern_probe,
     generate_coherent_probe_modes,
+    generate_disk_probe,
     generate_fresnel_zone_plate_probe,
     generate_hermite_probe,
     RandomPhaseRampStrategy,
     generate_incoherent_probe_modes,
+    generate_rectangular_probe,
 )
 from ptychodus.api.propagate import (
     AngularSpectrumPropagator,
@@ -848,6 +851,296 @@ class TestPropagateProbe:
         back = propagate_probe(forward, photon_wavelength_m=1e-10, propagation_distance_m=-5e-5)
 
         numpy.testing.assert_allclose(back.get_array(), probe.get_array(), atol=1e-9)
+
+
+_DEFOCUS_WAVELENGTH_M = 1.0e-10
+# A 0.5 um disk on a 256 x 10 nm grid at 0.2 mm: unaliased, with Fresnel number 12.5,
+# so its focus is well resolved without wrapping the grid.
+_DEFOCUS_NUM_PX = 256
+_DEFOCUS_PITCH_M = 1.0e-8
+_DEFOCUS_DISK_RADIUS_M = 5.0e-7
+_DEFOCUS_DISTANCE_M = 2.0e-4
+
+
+def _defocus_geometry(
+    width_px: int = _DEFOCUS_NUM_PX,
+    height_px: int = _DEFOCUS_NUM_PX,
+    *,
+    pixel_width_m: float = _DEFOCUS_PITCH_M,
+    pixel_height_m: float = _DEFOCUS_PITCH_M,
+) -> ProbeGeometry:
+    return ProbeGeometry(
+        width_px=width_px,
+        height_px=height_px,
+        pixel_width_m=pixel_width_m,
+        pixel_height_m=pixel_height_m,
+    )
+
+
+def _peak_and_rms_width(probe: Probe) -> tuple[float, float]:
+    """Peak intensity and second-moment radius about the grid center."""
+    pixel_geometry = probe.get_pixel_geometry()
+    coords = _defocus_geometry(
+        probe.width_px,
+        probe.height_px,
+        pixel_width_m=pixel_geometry.width_m,
+        pixel_height_m=pixel_geometry.height_m,
+    ).get_transverse_coordinates()
+    image = numpy.sum(intensity(probe.get_array()), axis=0)
+    rms_width_m = numpy.sqrt(numpy.sum(image * numpy.square(coords.position_r_m)) / image.sum())
+    return float(image.max()), float(rms_width_m)
+
+
+def _fit_phase_curvature(probe: Probe, is_bright: numpy.ndarray) -> float:
+    """Fit ``a`` in ``phase = a r^2 + bx x + by y + c`` over the bright pixels, r in pixels.
+
+    Neighbour products give the wrapped phase gradient, which is the unwrapped one
+    wherever the phase is sampled finely enough; the fit is then linear in the
+    gradients, and the tilt terms absorb any offset of the curvature's center.
+    """
+    array = probe.get_array()[0]
+    height_px, width_px = array.shape
+    x_px = numpy.arange(width_px) - (width_px - 1) / 2
+    y_px = numpy.arange(height_px) - (height_px - 1) / 2
+
+    gradient_x = numpy.angle(array[:, 1:] * numpy.conj(array[:, :-1]))
+    gradient_y = numpy.angle(array[1:, :] * numpy.conj(array[:-1, :]))
+    is_bright_x = is_bright[:, 1:] & is_bright[:, :-1]
+    is_bright_y = is_bright[1:, :] & is_bright[:-1, :]
+    midpoint_x = numpy.broadcast_to(0.5 * (x_px[1:] + x_px[:-1]), gradient_x.shape)[is_bright_x]
+    midpoint_y = numpy.broadcast_to(
+        0.5 * (y_px[1:, numpy.newaxis] + y_px[:-1, numpy.newaxis]), gradient_y.shape
+    )[is_bright_y]
+
+    design = numpy.zeros((midpoint_x.size + midpoint_y.size, 3))
+    design[: midpoint_x.size, 0] = 2.0 * midpoint_x
+    design[: midpoint_x.size, 1] = 1.0
+    design[midpoint_x.size :, 0] = 2.0 * midpoint_y
+    design[midpoint_x.size :, 2] = 1.0
+    gradients = numpy.concatenate([gradient_x[is_bright_x], gradient_y[is_bright_y]])
+    solution, *_ = numpy.linalg.lstsq(design, gradients, rcond=None)
+    return float(solution[0])
+
+
+class TestApplyDefocusPhase:
+    """A probe sampled a signed distance z past its focus carries exp(+i pi r^2 / (lambda z)).
+
+    The sign is pinned against the codebase's own propagators rather than derived:
+    curvature that claims a focus behind the probe must focus there when propagated
+    back, and must match the curvature a zone plate produces past its focus.
+    """
+
+    @pytest.mark.parametrize('defocus_distance_m', [_DEFOCUS_DISTANCE_M, -_DEFOCUS_DISTANCE_M])
+    def test_propagating_back_by_the_defocus_reaches_the_focus(
+        self, defocus_distance_m: float, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        disk = generate_disk_probe(_defocus_geometry(), radius_m=_DEFOCUS_DISK_RADIUS_M)
+
+        with caplog.at_level('WARNING', logger='ptychodus.api.simulate.probe'):
+            defocused = apply_defocus_phase(
+                disk,
+                photon_wavelength_m=_DEFOCUS_WAVELENGTH_M,
+                defocus_distance_m=defocus_distance_m,
+            )
+
+        assert caplog.text == ''
+
+        aperture_peak, aperture_width_m = _peak_and_rms_width(defocused)
+        toward_peak, toward_width_m = _peak_and_rms_width(
+            propagate_probe(
+                defocused,
+                photon_wavelength_m=_DEFOCUS_WAVELENGTH_M,
+                propagation_distance_m=-defocus_distance_m,
+            )
+        )
+        away_peak, away_width_m = _peak_and_rms_width(
+            propagate_probe(
+                defocused,
+                photon_wavelength_m=_DEFOCUS_WAVELENGTH_M,
+                propagation_distance_m=+defocus_distance_m,
+            )
+        )
+
+        assert toward_peak > 100.0 * aperture_peak
+        assert toward_width_m < 0.5 * aperture_width_m
+        assert away_peak < aperture_peak
+        assert away_width_m > 1.5 * aperture_width_m
+
+    @pytest.mark.parametrize('defocus_distance_m', [1.0e-4, -1.0e-4])
+    def test_matches_the_curvature_of_a_zone_plate_past_its_focus(
+        self, defocus_distance_m: float
+    ) -> None:
+        geometry = _fzp_probe_geometry()
+        zone_plate_probe = generate_fresnel_zone_plate_probe(
+            geometry,
+            _FZP_ZONE_PLATE,
+            photon_wavelength_m=_FZP_WAVELENGTH_M,
+            defocus_distance_m=defocus_distance_m,
+        )
+        # The geometric cone of the zone plate at this defocus.
+        cone_radius_m = _FZP_ZONE_PLATE.get_numerical_aperture(_FZP_WAVELENGTH_M) * abs(
+            defocus_distance_m
+        )
+        disk_probe = apply_defocus_phase(
+            generate_disk_probe(geometry, radius_m=cone_radius_m),
+            photon_wavelength_m=_FZP_WAVELENGTH_M,
+            defocus_distance_m=defocus_distance_m,
+        )
+
+        zone_plate_amplitude = numpy.abs(zone_plate_probe.get_array()[0])
+        zone_plate_curvature = _fit_phase_curvature(
+            zone_plate_probe, zone_plate_amplitude > 0.3 * zone_plate_amplitude.max()
+        )
+        disk_curvature = _fit_phase_curvature(
+            disk_probe, numpy.abs(disk_probe.get_array()[0]) > 0.5
+        )
+
+        assert numpy.sign(zone_plate_curvature) == numpy.sign(defocus_distance_m)
+        assert numpy.sign(disk_curvature) == numpy.sign(defocus_distance_m)
+
+    def test_zero_defocus_returns_the_probe_unchanged(self) -> None:
+        probe = _make_single_mode_probe()
+
+        assert (
+            apply_defocus_phase(
+                probe, photon_wavelength_m=_DEFOCUS_WAVELENGTH_M, defocus_distance_m=0.0
+            )
+            is probe
+        )
+
+    def test_every_mode_takes_the_same_phase_and_keeps_its_power(self) -> None:
+        rng = numpy.random.default_rng(3)
+        array = rng.normal(size=(3, 32, 32)) + 1j * rng.normal(size=(3, 32, 32))
+        probe = Probe(array=array, pixel_geometry=PIXEL_GEOMETRY)
+
+        defocused = apply_defocus_phase(
+            probe, photon_wavelength_m=_DEFOCUS_WAVELENGTH_M, defocus_distance_m=1.0e-3
+        ).get_array()
+
+        numpy.testing.assert_allclose(
+            numpy.sum(intensity(defocused), axis=(-2, -1)),
+            numpy.sum(intensity(array), axis=(-2, -1)),
+        )
+        factor = defocused / array
+        numpy.testing.assert_allclose(factor[1], factor[0])
+        numpy.testing.assert_allclose(factor[2], factor[0])
+
+    def test_honors_a_non_square_pixel_on_a_non_square_grid(self) -> None:
+        width_px, height_px = 32, 24
+        pixel_width_m, pixel_height_m = 1.0e-8, 2.0e-8
+        geometry = _defocus_geometry(
+            width_px, height_px, pixel_width_m=pixel_width_m, pixel_height_m=pixel_height_m
+        )
+        flat = Probe(
+            array=numpy.ones((height_px, width_px), dtype=complex),
+            pixel_geometry=geometry.get_pixel_geometry(),
+        )
+
+        defocused = apply_defocus_phase(
+            flat, photon_wavelength_m=_DEFOCUS_WAVELENGTH_M, defocus_distance_m=1.0e-3
+        ).get_array()[0]
+
+        x_m = (numpy.arange(width_px) - (width_px - 1) / 2) * pixel_width_m
+        y_m = (numpy.arange(height_px) - (height_px - 1) / 2) * pixel_height_m
+        r2_m2 = numpy.square(x_m[numpy.newaxis, :]) + numpy.square(y_m[:, numpy.newaxis])
+        expected = numpy.exp(1j * numpy.pi * r2_m2 / (_DEFOCUS_WAVELENGTH_M * 1.0e-3))
+        numpy.testing.assert_allclose(defocused, expected, atol=1e-12)
+
+    def test_centers_the_curvature_between_the_middle_pixels(self) -> None:
+        """Centered anywhere but (N - 1) / 2, the curvature would add a tilt and lose
+        the point symmetry of the grid."""
+        flat = Probe(
+            array=numpy.ones((16, 20), dtype=complex),
+            pixel_geometry=PixelGeometry(width_m=1.0e-8, height_m=1.5e-8),
+        )
+
+        defocused = apply_defocus_phase(
+            flat, photon_wavelength_m=_DEFOCUS_WAVELENGTH_M, defocus_distance_m=1.0e-3
+        ).get_array()
+
+        numpy.testing.assert_allclose(defocused, defocused[..., ::-1, ::-1], rtol=1e-12)
+
+    @staticmethod
+    def _defocus_rectangle(
+        caplog: pytest.LogCaptureFixture, *, width_m: float, height_m: float
+    ) -> str:
+        """Defocus a rectangle 20 um downstream on a 64 x 10 nm grid; return the log."""
+        rectangle = generate_rectangular_probe(
+            _defocus_geometry(64, 64), width_m=width_m, height_m=height_m
+        )
+
+        with caplog.at_level('WARNING', logger='ptychodus.api.simulate.probe'):
+            apply_defocus_phase(
+                rectangle, photon_wavelength_m=_DEFOCUS_WAVELENGTH_M, defocus_distance_m=2.0e-5
+            )
+
+        return caplog.text
+
+    def test_warns_about_aliasing_along_x_alone(self, caplog: pytest.LogCaptureFixture) -> None:
+        # Nyquist is 5e7/m; the 0.5 um edge reaches 1.2e8/m and the 50 nm edge 1.2e7/m.
+        text = self._defocus_rectangle(caplog, width_m=5.0e-7, height_m=5.0e-8)
+
+        assert 'aliased along x' in text
+        assert 'aliased along y' not in text
+
+    def test_warns_about_aliasing_along_y_alone(self, caplog: pytest.LogCaptureFixture) -> None:
+        text = self._defocus_rectangle(caplog, width_m=5.0e-8, height_m=5.0e-7)
+
+        assert 'aliased along y' in text
+        assert 'aliased along x' not in text
+
+    def test_warns_about_a_small_fresnel_number(self, caplog: pytest.LogCaptureFixture) -> None:
+        # R^2 / (lambda z) = (100 nm)^2 / (1e-10 m * 1 mm) = 0.1
+        disk = generate_disk_probe(_defocus_geometry(64, 64), radius_m=1.0e-7)
+
+        with caplog.at_level('WARNING', logger='ptychodus.api.simulate.probe'):
+            apply_defocus_phase(
+                disk, photon_wavelength_m=_DEFOCUS_WAVELENGTH_M, defocus_distance_m=-1.0e-3
+            )
+
+        assert 'Fresnel number' in caplog.text
+        assert 'aliased' not in caplog.text
+
+    def test_fresnel_number_threshold_is_caller_adjustable(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        disk = generate_disk_probe(_defocus_geometry(), radius_m=_DEFOCUS_DISK_RADIUS_M)
+
+        with caplog.at_level('WARNING', logger='ptychodus.api.simulate.probe'):
+            apply_defocus_phase(
+                disk,
+                photon_wavelength_m=_DEFOCUS_WAVELENGTH_M,
+                defocus_distance_m=_DEFOCUS_DISTANCE_M,
+                min_fresnel_number=100.0,
+            )
+
+        assert 'Fresnel number' in caplog.text
+
+    def test_significance_threshold_decides_which_pixels_must_be_sampled(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A faint pixel far out aliases, but only counts once the threshold admits it."""
+        disk = generate_disk_probe(_defocus_geometry(128, 128), radius_m=1.0e-7)
+        array = disk.get_array().copy()
+        array[0, 64, 0] = 1.0e-3  # x = -0.635 um: 1.3e8/m at 50 um, beyond the 5e7/m limit
+        probe = Probe(array=array, pixel_geometry=disk.get_pixel_geometry())
+
+        with caplog.at_level('WARNING', logger='ptychodus.api.simulate.probe'):
+            apply_defocus_phase(
+                probe, photon_wavelength_m=_DEFOCUS_WAVELENGTH_M, defocus_distance_m=5.0e-5
+            )
+
+        assert caplog.text == ''
+
+        with caplog.at_level('WARNING', logger='ptychodus.api.simulate.probe'):
+            apply_defocus_phase(
+                probe,
+                photon_wavelength_m=_DEFOCUS_WAVELENGTH_M,
+                defocus_distance_m=5.0e-5,
+                significant_amplitude_ratio=1.0e-4,
+            )
+
+        assert 'aliased along x' in caplog.text
 
 
 _KB_NUM_PX = 256
