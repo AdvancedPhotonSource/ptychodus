@@ -23,7 +23,7 @@ from ptychodus_store.routers.schemas import (
 
 async def _edges_for(session: AsyncSession, uuid: UUID) -> list[DerivedFromEdge]:
     edges = await repo.outgoing_edges(session, uuid)
-    return [DerivedFromEdge(kind=e.target_kind, uuid=e.target_uuid) for e in edges]  # type: ignore[arg-type]
+    return [DerivedFromEdge(kind=e.target_kind, uuid=e.target_uuid) for e in edges]
 
 
 async def diffraction_to_read(session: AsyncSession, row: Diffraction) -> DiffractionRead:

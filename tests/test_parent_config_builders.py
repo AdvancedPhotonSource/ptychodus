@@ -19,7 +19,8 @@ Each probe runs in its own spawned process so a framework loaded by an earlier
 test cannot mask a failure here.
 
 The module also pins the rejections those builders perform in the parent, which
-need no optional dependency and so run in-process.
+run in-process. PtychoFM's options re-declare upstream's config models, so its
+tests skip where ptycho_fm is not installed; PtychoPINN's need no backend.
 """
 
 from __future__ import annotations
@@ -208,6 +209,7 @@ def test_ptycho_fm_rejects_diffraction_losses_when_supervised(loss_function: str
     They do not raise on their own -- they compute a different quantity -- so
     the parent has to turn the combination away before a child is spawned.
     """
+    pytest.importorskip('ptycho_fm')
     from ptychodus.plugins.ptycho_fm.reconstructor import _verify_loss_supports_mode
 
     with pytest.raises(ValueError, match=loss_function):
@@ -217,6 +219,7 @@ def test_ptycho_fm_rejects_diffraction_losses_when_supervised(loss_function: str
 
 
 def test_ptycho_fm_accepts_object_space_loss_when_supervised() -> None:
+    pytest.importorskip('ptycho_fm')
     from ptychodus.plugins.ptycho_fm.reconstructor import _verify_loss_supports_mode
 
     for name in ('Supervised', 'Unsupervised'):
@@ -231,6 +234,7 @@ def test_ptycho_fm_maps_the_uncoupled_mode_to_null() -> None:
     started declaring, so what is checked here is that the declared value
     reaches the child unchanged rather than that a builder converts it.
     """
+    pytest.importorskip('ptycho_fm')
     from ptychodus.plugins.ptycho_fm.options import default_options
     from ptychodus.plugins.ptycho_fm.reconstructor import (
         build_reconstruct_config,

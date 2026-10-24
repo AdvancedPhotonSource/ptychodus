@@ -144,7 +144,9 @@ def test_lsmr_recovers_a_scaled_object() -> None:
 # Recorded from the implementation that predates the bounds-checked interpolation
 # support. The sub-pixel gather is the part of the operator most sensitive to a
 # change in how the interpolation window is resolved, so these values are what
-# establish that such a change left in-bounds results untouched.
+# establish that such a change left in-bounds results untouched. A window change
+# moves them in the second or third digit; the tolerance only absorbs the last-ulp
+# differences between numpy builds, which reorder the same sums.
 _MIXED_OFFSET_POSITIONS = [(x, y) for y in (9.4, 11.5, 13.7) for x in (9.1, 11.5, 13.2)]
 _RECORDED_MATVEC = [
     0.05467424994413332,
@@ -164,7 +166,7 @@ def test_matvec_reproduces_recorded_values() -> None:
     rng = numpy.random.default_rng(2026)
     x = rng.standard_normal(_CANVAS_PX * _CANVAS_PX)
 
-    numpy.testing.assert_allclose(operator.matvec(x), _RECORDED_MATVEC, rtol=0.0, atol=0.0)
+    numpy.testing.assert_allclose(operator.matvec(x), _RECORDED_MATVEC, rtol=1.0e-12, atol=0.0)
 
 
 def _make_opr_product(opr_weights: numpy.ndarray) -> Product:

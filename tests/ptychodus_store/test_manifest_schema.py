@@ -49,7 +49,7 @@ def test_fluorescence_manifest_defaults() -> None:
 
 def test_derived_from_ref_rejects_campaign() -> None:
     with pytest.raises(ValidationError):
-        DerivedFromRef(kind='campaign', uuid=uuid4())  # type: ignore[arg-type]
+        DerivedFromRef(kind='campaign', uuid=uuid4())
 
 
 def test_manifest_extra_rejects_hdf5_owned_keys() -> None:

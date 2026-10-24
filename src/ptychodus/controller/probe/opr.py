@@ -5,7 +5,7 @@ import logging
 import numpy
 
 from matplotlib.axes import Axes
-from matplotlib.backend_bases import DrawEvent
+from matplotlib.backend_bases import Event
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.lines import Line2D
 
@@ -86,7 +86,7 @@ class _BlittedMarker:
         self._artist = artist
         self._background = None
 
-    def _handle_draw(self, event: DrawEvent) -> None:
+    def _handle_draw(self, event: Event) -> None:
         # Any full draw invalidates the cache: a resize, a toolbar zoom, or a rebuild of
         # the figure. Recapture it, then put the animated artist back on top.
         self._background = self._canvas.copy_from_bbox(self._canvas.figure.bbox)

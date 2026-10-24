@@ -1315,8 +1315,8 @@ class TestKirkpatrickBaezMirror:
             # Pydantic coerces each mapping into a KirkpatrickBaezMirror; that
             # coercion is what the nested-validation message under test comes from.
             KirkpatrickBaezMirrorPair(
-                horizontal={**sound, 'focus_distance_m': 0.0},  # type: ignore[arg-type]
-                vertical=sound,  # type: ignore[arg-type]
+                horizontal={**sound, 'focus_distance_m': 0.0},
+                vertical=sound,
             )
 
     def test_reference_distance_is_the_mean_of_the_two_mirrors(self) -> None:

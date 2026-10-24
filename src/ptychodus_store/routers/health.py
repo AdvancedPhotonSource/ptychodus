@@ -26,4 +26,4 @@ async def health(request: Request, session: SessionDep) -> HealthRead:
         watcher_state = 'dead'
 
     status = 'ok' if db_state == 'ok' and watcher_state != 'dead' else 'degraded'
-    return HealthRead(status=status, db=db_state, watcher=watcher_state)  # type: ignore[arg-type]
+    return HealthRead(status=status, db=db_state, watcher=watcher_state)
