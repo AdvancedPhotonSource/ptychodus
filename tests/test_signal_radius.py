@@ -1,4 +1,4 @@
-"""Unit tests for ptychodus.api.preprocess.diffraction.estimate_signal_radius.
+"""Unit tests for estimate_signal_radius and the suggest_crop_region path built on it.
 
 The synthetic patterns are a Gaussian decay over a Poisson background, whose crossing of
 the threshold the estimator reports is known in closed form:
@@ -8,13 +8,18 @@ the threshold the estimator reports is known in closed form:
 import numpy
 import pytest
 
+from ptychodus.api.assemble import DetectorCorrections, suggest_crop_region
 from ptychodus.api.diffraction import BeamCenter
-from ptychodus.api.preprocess.diffraction import estimate_signal_radius
+from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.preprocess.diffraction import FilterValuesStep, estimate_signal_radius
 
 _SHAPE = (256, 256)
 _PEAK = 1000.0
 _BACKGROUND = 5.0
 _SIGMA = 10.0
+_DETECTOR = ImageExtent(width_px=_SHAPE[1], height_px=_SHAPE[0])
+_CENTER = BeamCenter(x_px=128, y_px=128)
+_NO_BAD_PIXELS = numpy.zeros(_SHAPE, dtype=bool)
 
 
 def _gaussian_pattern(center: BeamCenter, *, sigma: float = _SIGMA, seed: int = 0) -> numpy.ndarray:
@@ -130,3 +135,98 @@ def test_a_negative_mad_threshold_is_an_error() -> None:
 
     with pytest.raises(ValueError, match='non-negative'):
         estimate_signal_radius(_gaussian_pattern(center), center, mad_threshold=-1.0)
+
+
+# --- suggest_crop_region ---------------------------------------------------------------
+
+
+def _clean_radius() -> int:
+    return estimate_signal_radius(_gaussian_pattern(_CENTER), _CENTER).radius_px
+
+
+def test_a_suggestion_rounds_the_radius_up_to_a_power_of_two() -> None:
+    suggestion = suggest_crop_region(
+        _gaussian_pattern(_CENTER), _CENTER, _DETECTOR, bad_pixels=_NO_BAD_PIXELS
+    )
+
+    assert suggestion.signal.radius_px == _clean_radius()
+    assert suggestion.region.width_px == 64
+    assert (suggestion.region.center_x_px, suggestion.region.center_y_px) == (128, 128)
+    assert not suggestion.is_capped
+
+
+def test_a_background_is_subtracted_before_estimating() -> None:
+    # A gradient across the detector. Left in, it spreads the pixel values the noise floor
+    # is estimated from, so the threshold -- and with it the radius -- lands far off.
+    background = numpy.tile(numpy.linspace(0.0, 300.0, _SHAPE[1]), (_SHAPE[0], 1))
+    pattern = _gaussian_pattern(_CENTER) + background
+
+    kept = suggest_crop_region(pattern, _CENTER, _DETECTOR, bad_pixels=_NO_BAD_PIXELS)
+    subtracted = suggest_crop_region(
+        pattern,
+        _CENTER,
+        _DETECTOR,
+        bad_pixels=_NO_BAD_PIXELS,
+        corrections=DetectorCorrections(background=background, subtract_background=True),
+    )
+
+    assert abs(kept.signal.radius_px - _clean_radius()) > 10
+    assert subtracted.signal.radius_px == _clean_radius()
+
+
+def test_the_value_filter_zeroes_invalid_markers_before_estimating() -> None:
+    pattern = _gaussian_pattern(_CENTER)
+    pattern[:, 230:236] = 4294967295.0  # a Dectris dead-pixel marker, wide enough to survive
+
+    unfiltered = suggest_crop_region(pattern, _CENTER, _DETECTOR, bad_pixels=_NO_BAD_PIXELS)
+    filtered = suggest_crop_region(
+        pattern,
+        _CENTER,
+        _DETECTOR,
+        bad_pixels=_NO_BAD_PIXELS,
+        value_filter=FilterValuesStep(upper_bound=4294967295),
+    )
+
+    assert unfiltered.signal.radius_px > _clean_radius() + 50
+    assert filtered.signal.radius_px == _clean_radius()
+
+
+def test_unusable_flat_field_entries_are_widened_into_the_mask() -> None:
+    pattern = _gaussian_pattern(_CENTER)
+    pattern[:, 230:236] = 1.0e6
+    flat_field = numpy.ones(_SHAPE)
+    flat_field[:, 230:236] = numpy.nan
+
+    suggestion = suggest_crop_region(
+        pattern,
+        _CENTER,
+        _DETECTOR,
+        bad_pixels=_NO_BAD_PIXELS,
+        corrections=DetectorCorrections(flat_field=flat_field, divide_flat_field=True),
+    )
+
+    assert suggestion.signal.radius_px == _clean_radius()
+
+
+def test_a_signal_past_the_largest_square_that_fits_is_capped() -> None:
+    center = BeamCenter(x_px=20, y_px=128)
+    suggestion = suggest_crop_region(
+        _gaussian_pattern(center), center, _DETECTOR, bad_pixels=_NO_BAD_PIXELS
+    )
+
+    assert suggestion.region.width_px == 32
+    assert suggestion.is_capped
+
+
+def test_a_suggestion_without_signal_is_an_error() -> None:
+    pattern = numpy.random.default_rng(1).poisson(_BACKGROUND, size=_SHAPE).astype(numpy.float64)
+
+    with pytest.raises(ValueError, match='No signal rises above the noise floor'):
+        suggest_crop_region(pattern, _CENTER, _DETECTOR, bad_pixels=_NO_BAD_PIXELS)
+
+
+def test_a_beam_center_on_the_detector_edge_is_an_error() -> None:
+    center = BeamCenter(x_px=0, y_px=128)
+
+    with pytest.raises(ValueError, match='is not inside the'):
+        suggest_crop_region(_gaussian_pattern(center), center, _DETECTOR, bad_pixels=_NO_BAD_PIXELS)

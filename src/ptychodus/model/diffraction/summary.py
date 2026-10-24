@@ -6,14 +6,20 @@ from typing import Final, Self
 import logging
 
 from ptychodus.api.assemble import (
+    CropSuggestion,
     DetectorCorrections,
     DiffractionSummary,
     DiffractionTotalCounts,
     compute_dataset_total_counts,
+    suggest_crop_region,
     summarize_dataset,
 )
-from ptychodus.api.diffraction import BadPixels, CropRegion, DiffractionDataset
-from ptychodus.api.preprocess.diffraction import DiffractionPrepPipeline, DiffractionPrepPlan
+from ptychodus.api.diffraction import BadPixels, BeamCenter, CropRegion, DiffractionDataset
+from ptychodus.api.preprocess.diffraction import (
+    DiffractionPrepPipeline,
+    DiffractionPrepPlan,
+    estimate_beam_center,
+)
 
 from ..task_manager import ForegroundTaskManager, TaskManager
 from ..task_monitor import TaskProgressMonitor
@@ -109,7 +115,7 @@ class SummarizeBackgroundTask:
             bad_pixels = (
                 self._source.get_bad_pixels() if self._bad_pixels is None else self._bad_pixels
             )
-            self._service._publish(summary, bad_pixels)
+            self._service._publish(summary, self._source, bad_pixels)
 
 
 class TotalCountsBackgroundTask:
@@ -194,6 +200,7 @@ class DiffractionSummaryService:
         self._pipeline_builder = PrepPipelineBuilder(diffraction_settings)
         self.task_monitor = DiffractionSummaryTaskMonitor(task_manager)
         self._last_summary: DiffractionSummary | None = None
+        self._last_source: DiffractionDataset | None = None
         self._last_bad_pixels: BadPixels | None = None
         self._last_run_id = 0
         self._last_total_counts: DiffractionTotalCounts | None = None
@@ -203,9 +210,47 @@ class DiffractionSummaryService:
     def get_last_summary(self) -> DiffractionSummary | None:
         return self._last_summary
 
-    def get_last_bad_pixels(self) -> BadPixels | None:
-        """The raw-detector bad-pixel mask the last published summary was computed with."""
-        return self._last_bad_pixels
+    def estimate_beam_center(self) -> BeamCenter:
+        """Estimate the beam center from the last summary's mean pattern.
+
+        The pattern is cut by the configured value filter first, as every pattern the
+        pipeline processes is. Raises ``ValueError`` when no summary has been published.
+        """
+        summary, _, _ = self._require_last_summary()
+        value_filter = self._pipeline_builder.get_value_filter()
+        mean_pattern = summary.mean_pattern
+        return estimate_beam_center(
+            mean_pattern if value_filter is None else value_filter.apply(mean_pattern)
+        )
+
+    def suggest_crop_region(self, beam_center: BeamCenter) -> CropSuggestion:
+        """Suggest the power-of-two crop about `beam_center` holding the last summary's signal.
+
+        The mean pattern is prepared as a load would prepare it -- the configured value
+        filter, then the detector corrections the current settings name -- over the mask
+        the summary was computed with. Raises ``ValueError`` when no summary has been
+        published or no signal rises above the noise floor, and the map loaders' errors
+        when a configured map file cannot be read.
+        """
+        summary, source, bad_pixels = self._require_last_summary()
+        return suggest_crop_region(
+            summary.mean_pattern,
+            beam_center,
+            source.get_metadata().detector_extent,
+            bad_pixels=bad_pixels,
+            value_filter=self._pipeline_builder.get_value_filter(),
+            corrections=self._load_corrections(source),
+        )
+
+    def _require_last_summary(self) -> tuple[DiffractionSummary, DiffractionDataset, BadPixels]:
+        summary = self._last_summary
+        source = self._last_source
+        bad_pixels = self._last_bad_pixels
+
+        if summary is None or source is None or bad_pixels is None:
+            raise ValueError('No summary has been computed yet.')
+
+        return summary, source, bad_pixels
 
     def get_last_run_id(self) -> int:
         """Monotonic counter incremented every time a summary is published.
@@ -372,7 +417,9 @@ class DiffractionSummaryService:
             self._detector_settings.bad_pixels_file_type.get_value(),
         )
 
-    def _publish(self, summary: DiffractionSummary, bad_pixels: BadPixels) -> None:
+    def _publish(
+        self, summary: DiffractionSummary, source: DiffractionDataset, bad_pixels: BadPixels
+    ) -> None:
         """Called on the background thread inside ``SummarizeBackgroundTask`` to
         publish a winning summary. The monitor's ``__exit__`` fires immediately
         after (on the same thread) and its foreground-queued notification is
@@ -380,6 +427,7 @@ class DiffractionSummaryService:
         read ``get_last_summary()``.
         """
         self._last_summary = summary
+        self._last_source = source
         self._last_bad_pixels = bad_pixels
         self._last_run_id += 1
 

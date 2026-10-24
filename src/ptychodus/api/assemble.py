@@ -15,6 +15,7 @@ import numpy
 from .constants import format_bytes
 from .diffraction import (
     BadPixels,
+    BeamCenter,
     CropRegion,
     DetectorBackground,
     DiffractionArray,
@@ -32,6 +33,9 @@ from .diffraction import (
 from .geometry import ImageExtent, PixelGeometry
 from .preprocess.diffraction import (
     DiffractionPrepPipeline,
+    FilterValuesStep,
+    SignalRadius,
+    estimate_signal_radius,
     inpaint_bad_pixels,
     zero_bad_pixels,
 )
@@ -42,6 +46,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     'AssembledDiffractionData',
+    'CropSuggestion',
     'DetectorCorrections',
     'DiffractionSummary',
     'DiffractionTotalCounts',
@@ -55,6 +60,7 @@ __all__ = [
     'default_max_workers',
     'estimate_mean_amplitude_transmission',
     'preprocess_array',
+    'suggest_crop_region',
     'summarize_dataset',
 ]
 
@@ -1564,3 +1570,62 @@ def compute_dataset_total_counts(
         indexes=indexes[counted],
         total_counts=total_counts[counted],
     )
+
+
+@dataclass(frozen=True)
+class CropSuggestion:
+    """A crop sized to the signal in a pattern, and the radius estimate it was sized from."""
+
+    signal: SignalRadius
+    region: CropRegion
+
+    @property
+    def is_capped(self) -> bool:
+        """True when the signal reaches past the largest power-of-two square that fits."""
+        return 2 * self.signal.radius_px > self.region.width_px
+
+
+def suggest_crop_region(
+    mean_pattern: DiffractionPattern,
+    beam_center: BeamCenter,
+    detector_extent: ImageExtent,
+    *,
+    bad_pixels: BadPixels,
+    value_filter: FilterValuesStep | None = None,
+    corrections: DetectorCorrections | None = None,
+) -> CropSuggestion:
+    """Suggest the power-of-two square about `beam_center` that holds the signal in a pattern.
+
+    `mean_pattern` is a raw-detector frame such as :attr:`DiffractionSummary.mean_pattern`.
+    It is prepared as assembly prepares every pattern -- cut by `value_filter`, then
+    corrected by `corrections` -- and `bad_pixels` is widened by the pixels the correction
+    maps leave unusable, so the estimate sees what will be reconstructed. The maps must be
+    on the raw detector grid. The radius comes from :func:`estimate_signal_radius` and the
+    square from :meth:`CropRegion.from_smallest_pow2`.
+
+    Raises ``ValueError`` when no signal rises above the noise floor, or when `beam_center`
+    is not inside the detector.
+    """
+    pattern = mean_pattern if value_filter is None else value_filter.apply(mean_pattern)
+
+    if corrections is not None:
+        pattern = corrections.apply(pattern[numpy.newaxis])[0]
+        bad_pixels = corrections.apply_to_bad_pixels(bad_pixels)
+
+    signal = estimate_signal_radius(pattern, beam_center, bad_pixels=bad_pixels)
+
+    if signal.radius_px < 1:
+        raise ValueError(
+            'No signal rises above the noise floor about the beam center '
+            f'({beam_center.x_px}, {beam_center.y_px}).'
+        )
+
+    region = CropRegion.from_smallest_pow2(beam_center, signal.radius_px, detector_extent)
+
+    if region.width_px < 1:
+        raise ValueError(
+            f'The beam center ({beam_center.x_px}, {beam_center.y_px}) is not inside the '
+            f'{detector_extent.width_px}x{detector_extent.height_px} detector.'
+        )
+
+    return CropSuggestion(signal=signal, region=region)

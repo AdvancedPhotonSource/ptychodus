@@ -27,6 +27,7 @@ from ptychodus.api.assemble import (
 )
 from ptychodus.api.diffraction import (
     BadPixels,
+    BeamCenter,
     CropRegion,
     DiffractionDatasetLayoutNode,
     DiffractionMetadata,
@@ -408,7 +409,7 @@ def test_prep_pipeline_has_no_counts_filter_step() -> None:
 
 def _summary_service(
     source: SimpleDiffractionDataset,
-) -> tuple[DiffractionSummaryService, DetectorSettings]:
+) -> tuple[DiffractionSummaryService, DetectorSettings, DiffractionSettings]:
     """A service over a one-dataset repository, running its tasks inline."""
     registry = SettingsRegistry()
     detector_settings = DetectorSettings(registry)
@@ -440,7 +441,7 @@ def _summary_service(
         detector_settings,
         diffraction_settings,
     )
-    return service, detector_settings
+    return service, detector_settings, diffraction_settings
 
 
 def test_service_measures_counts_without_a_detector_pixel_geometry() -> None:
@@ -450,7 +451,7 @@ def test_service_measures_counts_without_a_detector_pixel_geometry() -> None:
     DetectorSettings; the counts pass never saw that fallback, so it raised for
     every dataset whose reader leaves detector_pixel_geometry unset.
     """
-    service, _ = _summary_service(_known_counts_dataset(pixel_geometry=None))
+    service, _, _ = _summary_service(_known_counts_dataset(pixel_geometry=None))
 
     assert service.compute_total_counts(0, force=True)
 
@@ -461,7 +462,7 @@ def test_service_measures_counts_without_a_detector_pixel_geometry() -> None:
 
 
 def test_service_caches_counts_against_the_processing_settings() -> None:
-    service, _ = _summary_service(_known_counts_dataset(pixel_geometry=None))
+    service, _, _ = _summary_service(_known_counts_dataset(pixel_geometry=None))
     assert service.compute_total_counts(0)
     assert not service.compute_total_counts(0)
     assert not service.is_total_counts_stale(0)
@@ -469,7 +470,7 @@ def test_service_caches_counts_against_the_processing_settings() -> None:
 
 def test_detector_correction_settings_invalidate_cached_counts() -> None:
     """Subtracting a background changes the counts, so the cache must not survive it."""
-    service, detector_settings = _summary_service(_known_counts_dataset(pixel_geometry=None))
+    service, detector_settings, _ = _summary_service(_known_counts_dataset(pixel_geometry=None))
     service.compute_total_counts(0)
 
     detector_settings.subtract_background.set_value(True)
@@ -477,17 +478,107 @@ def test_detector_correction_settings_invalidate_cached_counts() -> None:
     assert service.is_total_counts_stale(0)
 
 
+_BEAM_CENTER = BeamCenter(x_px=64, y_px=64)
+_DEAD_PIXEL_MARKER = 4294967295
+
+
+def _beam_dataset(
+    *,
+    background: numpy.ndarray | None = None,
+    marker_columns: slice | None = None,
+) -> SimpleDiffractionDataset:
+    """Three 128x128 frames of a Gaussian beam over a Poisson floor, centered at (64, 64).
+
+    `background` is both added to every frame and carried by the dataset, as a reader
+    that records a dark frame would; `marker_columns` are set to the Dectris dead-pixel
+    marker in every frame.
+    """
+    y = numpy.arange(128, dtype=numpy.float64).reshape(-1, 1) - _BEAM_CENTER.y_px
+    x = numpy.arange(128, dtype=numpy.float64).reshape(1, -1) - _BEAM_CENTER.x_px
+    expected = 1000.0 * numpy.exp(-(x**2 + y**2) / (2.0 * 8.0**2)) + 5.0
+
+    if background is not None:
+        expected = expected + background
+
+    patterns = numpy.random.default_rng(0).poisson(expected, size=(3, 128, 128))
+    patterns = patterns.astype(numpy.uint32)
+
+    if marker_columns is not None:
+        patterns[:, :, marker_columns] = _DEAD_PIXEL_MARKER
+
+    array = SimpleDiffractionArray('beam', numpy.arange(3, dtype=numpy.intp), patterns)
+    metadata = DiffractionMetadata(
+        num_patterns_per_array=[3],
+        pattern_dtype=numpy.dtype(numpy.uint32),
+        detector_extent=ImageExtent(width_px=128, height_px=128),
+    )
+    return SimpleDiffractionDataset(
+        metadata, DiffractionDatasetLayoutNode.create_root(), [array], background=background
+    )
+
+
+def test_service_estimates_need_a_summary() -> None:
+    service, _, _ = _summary_service(_beam_dataset())
+
+    with pytest.raises(ValueError, match='No summary'):
+        service.estimate_beam_center()
+
+    with pytest.raises(ValueError, match='No summary'):
+        service.suggest_crop_region(_BEAM_CENTER)
+
+
+def test_service_suggestion_subtracts_the_background_the_settings_ask_for() -> None:
+    """Left in, a gradient swamps the noise floor; subtracted, the radius is the crossing.
+
+    The crossing is where the beam, 1000 * exp(-r**2 / (2 * 8**2)), meets the threshold.
+    The background's own shot noise stays after subtraction, so it is judged against the
+    threshold the estimate reports rather than against a background-free dataset's.
+    """
+    gradient = numpy.tile(numpy.linspace(0.0, 300.0, 128), (128, 1))
+    service, detector_settings, _ = _summary_service(_beam_dataset(background=gradient))
+    service.compute(0)
+    kept = service.suggest_crop_region(_BEAM_CENTER).signal
+
+    detector_settings.subtract_background.set_value(True)
+    subtracted = service.suggest_crop_region(_BEAM_CENTER).signal
+
+    crossing = 8.0 * numpy.sqrt(2.0 * numpy.log(1000.0 / subtracted.threshold))
+    assert subtracted.noise_floor.median == pytest.approx(5.0, abs=1.0)
+    assert abs(subtracted.radius_px - crossing) <= 2.0
+    assert subtracted.radius_px > kept.radius_px + 10
+
+
+def test_service_estimates_apply_the_configured_value_filter() -> None:
+    """Dead-pixel markers swamp both estimates unless the pipeline's value cut is applied."""
+    clean_service, _, _ = _summary_service(_beam_dataset())
+    clean_service.compute(0)
+    clean_radius = clean_service.suggest_crop_region(_BEAM_CENTER).signal.radius_px
+
+    service, _, diffraction_settings = _summary_service(
+        _beam_dataset(marker_columns=slice(110, 116))
+    )
+    service.compute(0)
+    unfiltered_center = service.estimate_beam_center()
+
+    diffraction_settings.value_upper_bound_enabled.set_value(True)
+    diffraction_settings.value_upper_bound.set_value(_DEAD_PIXEL_MARKER)
+
+    assert unfiltered_center != _BEAM_CENTER
+    assert service.estimate_beam_center() == _BEAM_CENTER
+    assert service.suggest_crop_region(_BEAM_CENTER).signal.radius_px == clean_radius
+
+
 # ---------- Error attribution ----------
 
 
 def test_counts_pass_labels_the_monitor_with_its_own_actor() -> None:
-    service, _ = _summary_service(_known_counts_dataset(pixel_geometry=None))
+    service, _, _ = _summary_service(_known_counts_dataset(pixel_geometry=None))
     service.compute_total_counts(0, force=True)
     assert service.task_monitor.actor == 'Refresh Counts'
 
 
 def test_summarize_pass_labels_the_monitor_with_its_own_actor() -> None:
-    service, _ = _summary_service(_known_counts_dataset(pixel_geometry=None))
+    service, _, _ = _summary_service(_known_counts_dataset(pixel_geometry=None))
     service.compute_total_counts(0, force=True)
     service.compute(0)
     assert service.task_monitor.actor == 'Compute Summary'
@@ -508,7 +599,7 @@ def test_a_failing_pass_leaves_the_error_and_the_actor_describing_it() -> None:
         DiffractionDatasetLayoutNode.create_root(),
         [good[0], good[0]],
     )
-    service, _ = _summary_service(source)
+    service, _, _ = _summary_service(source)
 
     # The monitor's default label, and the one the dialog used to report for
     # every failure regardless of which pass raised.

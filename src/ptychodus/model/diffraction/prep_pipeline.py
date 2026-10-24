@@ -43,6 +43,21 @@ class PrepPipelineBuilder:
     def __init__(self, settings: DiffractionSettings) -> None:
         self._settings = settings
 
+    def get_value_filter(self) -> FilterValuesStep | None:
+        """The value cut the pipeline opens with, or None when neither bound is enabled.
+
+        Extent-neutral, so it applies equally to a raw-detector frame such as a summary
+        pattern.
+        """
+        s = self._settings
+        lower = s.value_lower_bound.get_value() if s.value_lower_bound_enabled.get_value() else None
+        upper = s.value_upper_bound.get_value() if s.value_upper_bound_enabled.get_value() else None
+
+        if lower is None and upper is None:
+            return None
+
+        return FilterValuesStep(lower_bound=lower, upper_bound=upper)
+
     def get_plan(self, detector_extent: ImageExtent | None = None) -> DiffractionPrepPlan:
         """Snapshot live diffraction settings as a load-time crop plus a pipeline.
 
@@ -60,10 +75,9 @@ class PrepPipelineBuilder:
         # Value filter: extent-neutral, no clamping. Commutes with the load-time
         # crop, so keeping it in the residual pipeline (post-crop) is equivalent
         # to filtering the full frames.
-        lower = s.value_lower_bound.get_value() if s.value_lower_bound_enabled.get_value() else None
-        upper = s.value_upper_bound.get_value() if s.value_upper_bound_enabled.get_value() else None
-        if lower is not None or upper is not None:
-            steps.append(FilterValuesStep(lower_bound=lower, upper_bound=upper))
+        value_filter = self.get_value_filter()
+        if value_filter is not None:
+            steps.append(value_filter)
 
         # Crop hoisted to load time as read_region -- passed to
         # DiffractionArray.get_patterns() so HDF5 readers slice at the file

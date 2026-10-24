@@ -24,10 +24,9 @@ from PyQt5.QtWidgets import (
     QWizardPage,
 )
 
-from ptychodus.api.diffraction import BeamCenter, CropRegion
+from ptychodus.api.diffraction import BeamCenter
 from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.preprocess.diffraction import estimate_beam_center, estimate_signal_radius
 from ptychodus.api.preprocess.noise import RobustStatistics, compute_robust_statistics
 
 from ....model.diffraction import (
@@ -244,11 +243,8 @@ class CropViewController(CheckableGroupBoxParameterViewController):
         self._suggest_extent_button.setEnabled(has_summary and not monitor.is_processing)
 
     def _on_estimate_clicked(self) -> None:
-        summary = self._summary_service.get_last_summary()
-        if summary is None:
-            return
         try:
-            center = estimate_beam_center(summary.mean_pattern)
+            center = self._summary_service.estimate_beam_center()
         except Exception as exc:
             logger.exception(exc)
             ExceptionDialog.show_exception('Estimate Beam Center', exc)
@@ -257,41 +253,25 @@ class CropViewController(CheckableGroupBoxParameterViewController):
         self._diffraction_settings.beam_center_y_px.set_value(int(center.y_px))
 
     def _on_suggest_extent_clicked(self) -> None:
-        summary = self._summary_service.get_last_summary()
-        extent = self._extent_source.get_extent()
-        if summary is None or extent is None:
-            return
         center = BeamCenter(
             x_px=self._diffraction_settings.beam_center_x_px.get_value(),
             y_px=self._diffraction_settings.beam_center_y_px.get_value(),
         )
         try:
-            signal = estimate_signal_radius(
-                summary.mean_pattern,
-                center,
-                bad_pixels=self._summary_service.get_last_bad_pixels(),
-            )
-            if signal.radius_px < 1:
-                raise ValueError(
-                    'No signal rises above the noise floor about the beam center '
-                    f'({center.x_px}, {center.y_px}).'
-                )
-            region = CropRegion.from_smallest_pow2(center, signal.radius_px, extent)
-            if region.width_px < 1:
-                raise ValueError(
-                    f'The beam center ({center.x_px}, {center.y_px}) is not inside the '
-                    f'{extent.width_px}x{extent.height_px} detector.'
-                )
+            suggestion = self._summary_service.suggest_crop_region(center)
         except Exception as exc:
             logger.exception(exc)
             ExceptionDialog.show_exception('Suggest Extent', exc)
             return
+        signal = suggestion.signal
+        region = suggestion.region
         logger.info(
-            'Signal radius %d px (threshold %g above background %g); suggesting a %d px crop',
+            'Signal radius %d px (threshold %g above background %g); suggesting a %d px crop%s',
             signal.radius_px,
             signal.threshold,
             signal.noise_floor.median,
             region.width_px,
+            ', the largest that fits' if suggestion.is_capped else '',
         )
         self._diffraction_settings.crop_width_px.set_value(region.width_px)
         self._diffraction_settings.crop_height_px.set_value(region.height_px)

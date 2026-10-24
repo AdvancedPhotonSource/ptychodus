@@ -26,7 +26,7 @@ import pytest
 
 pytest.importorskip('ptychi')
 
-from ptychodus.api.assemble import AssembledDiffractionData
+from ptychodus.api.assemble import AssembledDiffractionData, CropSuggestion, DetectorCorrections
 from ptychodus.api.diffraction import BeamCenter, CropRegion
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.preprocess.diffraction import FilterValuesStep, SignalRadius
@@ -810,6 +810,31 @@ def _signal_radius(radius_px: int) -> SignalRadius:
     )
 
 
+class _FakeSuggest:
+    """Stands in for suggest_crop_region with a fixed radius, recording what it was handed."""
+
+    def __init__(self, radius_px: int) -> None:
+        self._radius_px = radius_px
+        self.calls: list[dict[str, Any]] = []
+
+    def __call__(
+        self,
+        mean_pattern: numpy.ndarray,
+        beam_center: BeamCenter,
+        detector_extent: ImageExtent,
+        **kwargs: Any,
+    ) -> CropSuggestion:
+        self.calls.append({'mean_pattern': mean_pattern, **kwargs})
+
+        if self._radius_px < 1:
+            raise ValueError('No signal rises above the noise floor about the beam center.')
+
+        return CropSuggestion(
+            signal=_signal_radius(self._radius_px),
+            region=CropRegion.from_smallest_pow2(beam_center, self._radius_px, detector_extent),
+        )
+
+
 class _CountingSummarize:
     def __init__(self) -> None:
         self.num_calls = 0
@@ -823,11 +848,7 @@ def test_an_auto_extent_is_the_power_of_two_holding_the_signal(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', _CountingSummarize())
-    monkeypatch.setattr(
-        _reconstruct_common,
-        'estimate_signal_radius',
-        lambda pattern, beam_center, bad_pixels=None: _signal_radius(20),
-    )
+    monkeypatch.setattr(_reconstruct_common, 'suggest_crop_region', _FakeSuggest(20))
     dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), BeamCenter(x_px=200, y_px=300))
 
     region = _resolve(dataset, crop_extent_px='auto')
@@ -845,11 +866,7 @@ def test_an_auto_extent_shares_one_summary_with_the_beam_center_estimate(
     monkeypatch.setattr(
         _reconstruct_common, 'estimate_beam_center', lambda pattern: BeamCenter(x_px=256, y_px=256)
     )
-    monkeypatch.setattr(
-        _reconstruct_common,
-        'estimate_signal_radius',
-        lambda pattern, beam_center, bad_pixels=None: _signal_radius(40),
-    )
+    monkeypatch.setattr(_reconstruct_common, 'suggest_crop_region', _FakeSuggest(40))
     dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), beam_center=None)
 
     region = _resolve(dataset, crop_extent_px='auto')
@@ -859,30 +876,44 @@ def test_an_auto_extent_shares_one_summary_with_the_beam_center_estimate(
     assert region.width_px == 128
 
 
+def test_an_auto_extent_hands_the_filter_and_corrections_over_unapplied(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """suggest_crop_region applies both, so the extent path must not cut the mean itself."""
+    suggest = _FakeSuggest(20)
+    monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', _CountingSummarize())
+    monkeypatch.setattr(_reconstruct_common, 'suggest_crop_region', suggest)
+    value_filter = FilterValuesStep(lower_bound=0, upper_bound=5)
+    corrections = DetectorCorrections(subtract_background=True)
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), BeamCenter(x_px=256, y_px=256))
+
+    _resolve(dataset, crop_extent_px='auto', value_filter=value_filter, corrections=corrections)
+
+    (call,) = suggest.calls
+    assert call['value_filter'] is value_filter
+    assert call['corrections'] is corrections
+    # The fake mean pattern holds a 9, which the filter would have zeroed.
+    assert call['mean_pattern'].max() == 9
+
+
 def test_an_auto_extent_filling_the_detector_reads_the_whole_frame(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', _CountingSummarize())
-    monkeypatch.setattr(
-        _reconstruct_common,
-        'estimate_signal_radius',
-        lambda pattern, beam_center, bad_pixels=None: _signal_radius(1000),
-    )
+    monkeypatch.setattr(_reconstruct_common, 'suggest_crop_region', _FakeSuggest(1000))
     dataset = _FakeDataset(ImageExtent(width_px=256, height_px=256), BeamCenter(x_px=128, y_px=128))
 
     assert _resolve(dataset, crop_extent_px='auto') is None
 
 
-def test_an_auto_extent_without_signal_is_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_an_auto_extent_without_signal_is_an_error_naming_the_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', _CountingSummarize())
-    monkeypatch.setattr(
-        _reconstruct_common,
-        'estimate_signal_radius',
-        lambda pattern, beam_center, bad_pixels=None: _signal_radius(0),
-    )
+    monkeypatch.setattr(_reconstruct_common, 'suggest_crop_region', _FakeSuggest(0))
     dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), BeamCenter(x_px=256, y_px=256))
 
-    with pytest.raises(ValueError, match='No signal rises above the noise floor'):
+    with pytest.raises(ValueError, match='noise floor.*Give --crop-extent-px explicitly'):
         _resolve(dataset, crop_extent_px='auto')
 
 

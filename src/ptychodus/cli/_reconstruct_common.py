@@ -43,6 +43,7 @@ from ptychodus.api.assemble import (
     AssembledDiffractionData,
     DetectorCorrections,
     DiffractionSummary,
+    suggest_crop_region,
     summarize_dataset,
 )
 from ptychodus.api.diffraction import (
@@ -55,11 +56,7 @@ from ptychodus.api.diffraction import (
 )
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.io import StandardFileLayout, save_diffraction_data, save_product
-from ptychodus.api.preprocess.diffraction import (
-    FilterValuesStep,
-    estimate_beam_center,
-    estimate_signal_radius,
-)
+from ptychodus.api.preprocess.diffraction import FilterValuesStep, estimate_beam_center
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
 from ptychodus.plugins.ptychi.algorithms import task_options_classes
@@ -389,14 +386,24 @@ def _estimate_crop_region(
     beam_center: BeamCenter,
     detector_extent: ImageExtent,
     bad_pixels: BadPixels,
+    value_filter: FilterValuesStep | None,
     corrections: DetectorCorrections | None,
 ) -> CropRegion:
     """The power-of-two square about `beam_center` holding the signal in `mean_pattern`."""
-    if corrections is not None:
-        mean_pattern = corrections.apply(mean_pattern[numpy.newaxis])[0]
-        bad_pixels = corrections.apply_to_bad_pixels(bad_pixels)
+    try:
+        suggestion = suggest_crop_region(
+            mean_pattern,
+            beam_center,
+            detector_extent,
+            bad_pixels=bad_pixels,
+            value_filter=value_filter,
+            corrections=corrections,
+        )
+    except ValueError as exc:
+        raise ValueError(f'{exc} Give --crop-extent-px explicitly.') from exc
 
-    signal = estimate_signal_radius(mean_pattern, beam_center, bad_pixels=bad_pixels)
+    signal = suggestion.signal
+    region = suggestion.region
     logger.info(
         'Signal radius: %d px (ring mean above background %g by more than %g)',
         signal.radius_px,
@@ -404,22 +411,7 @@ def _estimate_crop_region(
         signal.threshold,
     )
 
-    if signal.radius_px < 1:
-        raise ValueError(
-            'No signal rises above the noise floor about the beam center '
-            f'({beam_center.x_px}, {beam_center.y_px}), so no crop extent can be suggested. '
-            'Give --crop-extent-px explicitly.'
-        )
-
-    region = CropRegion.from_smallest_pow2(beam_center, signal.radius_px, detector_extent)
-
-    if region.width_px < 1:
-        raise ValueError(
-            f'The beam center ({beam_center.x_px}, {beam_center.y_px}) is not inside the '
-            f'{detector_extent.width_px}x{detector_extent.height_px} detector.'
-        )
-
-    if 2 * signal.radius_px > region.width_px:
+    if suggestion.is_capped:
         logger.warning(
             'The signal reaches %d px from the beam center, past the largest power-of-two '
             'square that fits on the detector; cropping to %d px',
@@ -461,17 +453,13 @@ def resolve_crop_region(
     metadata = raw_dataset.get_metadata()
     summary: DiffractionSummary | None = None
 
-    def get_mean_pattern() -> DiffractionPattern:
+    def get_summary() -> DiffractionSummary:
         nonlocal summary
 
         if summary is None:
             summary = summarize_dataset(raw_dataset, bad_pixels=bad_pixels)
 
-        return (
-            summary.mean_pattern
-            if value_filter is None
-            else value_filter.apply(summary.mean_pattern)
-        )
+        return summary
 
     # Beam center precedence: command line, then the file, then an estimate from the data.
     # The estimate is logged as such -- a wrong center crops the wrong part of the
@@ -487,7 +475,10 @@ def resolve_crop_region(
         # file. summarize_dataset inpaints the bad pixels that estimate_beam_center requires
         # the caller to have handled.
         logger.info('Summarizing the %s to estimate the beam center', subject)
-        beam_center = estimate_beam_center(get_mean_pattern())
+        mean_pattern = get_summary().mean_pattern
+        beam_center = estimate_beam_center(
+            mean_pattern if value_filter is None else value_filter.apply(mean_pattern)
+        )
         center_source = f'an estimate over the whole {subject}'
 
     logger.info('Beam center: (%d, %d) from %s', beam_center.x_px, beam_center.y_px, center_source)
@@ -498,10 +489,11 @@ def resolve_crop_region(
 
         region = _estimate_crop_region(
             logger,
-            get_mean_pattern(),
+            get_summary().mean_pattern,
             beam_center,
             metadata.detector_extent,
             raw_dataset.get_bad_pixels() if bad_pixels is None else bad_pixels,
+            value_filter,
             corrections,
         )
         crop_extent_px = region.width_px
