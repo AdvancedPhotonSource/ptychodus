@@ -106,7 +106,10 @@ class SummarizeBackgroundTask:
             if monitor.is_stopping:
                 # Preserve any prior summary; a cancelled run publishes nothing.
                 return
-            self._service._publish(summary)
+            bad_pixels = (
+                self._source.get_bad_pixels() if self._bad_pixels is None else self._bad_pixels
+            )
+            self._service._publish(summary, bad_pixels)
 
 
 class TotalCountsBackgroundTask:
@@ -191,6 +194,7 @@ class DiffractionSummaryService:
         self._pipeline_builder = PrepPipelineBuilder(diffraction_settings)
         self.task_monitor = DiffractionSummaryTaskMonitor(task_manager)
         self._last_summary: DiffractionSummary | None = None
+        self._last_bad_pixels: BadPixels | None = None
         self._last_run_id = 0
         self._last_total_counts: DiffractionTotalCounts | None = None
         self._last_total_counts_key: _TotalCountsKey | None = None
@@ -198,6 +202,10 @@ class DiffractionSummaryService:
 
     def get_last_summary(self) -> DiffractionSummary | None:
         return self._last_summary
+
+    def get_last_bad_pixels(self) -> BadPixels | None:
+        """The raw-detector bad-pixel mask the last published summary was computed with."""
+        return self._last_bad_pixels
 
     def get_last_run_id(self) -> int:
         """Monotonic counter incremented every time a summary is published.
@@ -364,7 +372,7 @@ class DiffractionSummaryService:
             self._detector_settings.bad_pixels_file_type.get_value(),
         )
 
-    def _publish(self, summary: DiffractionSummary) -> None:
+    def _publish(self, summary: DiffractionSummary, bad_pixels: BadPixels) -> None:
         """Called on the background thread inside ``SummarizeBackgroundTask`` to
         publish a winning summary. The monitor's ``__exit__`` fires immediately
         after (on the same thread) and its foreground-queued notification is
@@ -372,6 +380,7 @@ class DiffractionSummaryService:
         read ``get_last_summary()``.
         """
         self._last_summary = summary
+        self._last_bad_pixels = bad_pixels
         self._last_run_id += 1
 
     def _publish_total_counts(

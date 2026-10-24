@@ -49,7 +49,9 @@ The remaining arguments fall into four groups.
 `--crop-extent-px`, `--beam-center-x-px`, `--beam-center-y-px`
 : Cut a square region out of each raw frame about the beam centre. The centre comes from the
   data file when it records one, and is estimated from the patterns otherwise. Cropping is
-  usually what decides reconstruction time, since it sets the array size.
+  usually what decides reconstruction time, since it sets the array size. `--crop-extent-px auto`
+  (`crop_extent_px: auto` in a batch settings file) picks the smallest power-of-two side that
+  holds the mean pattern's signal above its noise floor, capped at the largest that fits.
 
 `--detector-distance-m`, `--photon-energy-eV`, `--detector-pixel-size-m`, `--probe-photon-count`, `--tomography-angle-deg`
 : Override metadata the data file records wrongly or not at all. Each is used only when given.

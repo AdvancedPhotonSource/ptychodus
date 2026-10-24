@@ -24,9 +24,10 @@ from PyQt5.QtWidgets import (
     QWizardPage,
 )
 
+from ptychodus.api.diffraction import BeamCenter, CropRegion
 from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.preprocess.diffraction import estimate_beam_center
+from ptychodus.api.preprocess.diffraction import estimate_beam_center, estimate_signal_radius
 from ptychodus.api.preprocess.noise import RobustStatistics, compute_robust_statistics
 
 from ....model.diffraction import (
@@ -143,6 +144,17 @@ class CropViewController(CheckableGroupBoxParameterViewController):
         self._estimate_button = QPushButton('Estimate Beam Center')
         self._estimate_button.clicked.connect(self._on_estimate_clicked)
         self._estimate_button.setEnabled(False)
+        self._suggest_extent_button = QPushButton('Suggest Extent')
+        self._suggest_extent_button.setToolTip(
+            'Smallest power-of-two square about the center that holds the signal above the '
+            'noise floor of the summary mean pattern'
+        )
+        self._suggest_extent_button.clicked.connect(self._on_suggest_extent_clicked)
+        self._suggest_extent_button.setEnabled(False)
+
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self._estimate_button)
+        button_layout.addWidget(self._suggest_extent_button)
 
         layout = QGridLayout()
         layout.addWidget(QLabel('Center:'), 0, 0)
@@ -151,7 +163,7 @@ class CropViewController(CheckableGroupBoxParameterViewController):
         layout.addWidget(QLabel('Extent:'), 1, 0)
         layout.addWidget(self._width_spin_box, 1, 1)
         layout.addWidget(self._height_spin_box, 1, 2)
-        layout.addWidget(self._estimate_button, 2, 0, 1, 3)
+        layout.addLayout(button_layout, 2, 0, 1, 3)
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
         self.get_widget().set_contents_layout(layout)
@@ -229,6 +241,7 @@ class CropViewController(CheckableGroupBoxParameterViewController):
         monitor = self._summary_service.task_monitor
         has_summary = self._summary_service.get_last_summary() is not None
         self._estimate_button.setEnabled(has_summary and not monitor.is_processing)
+        self._suggest_extent_button.setEnabled(has_summary and not monitor.is_processing)
 
     def _on_estimate_clicked(self) -> None:
         summary = self._summary_service.get_last_summary()
@@ -242,6 +255,46 @@ class CropViewController(CheckableGroupBoxParameterViewController):
             return
         self._diffraction_settings.beam_center_x_px.set_value(int(center.x_px))
         self._diffraction_settings.beam_center_y_px.set_value(int(center.y_px))
+
+    def _on_suggest_extent_clicked(self) -> None:
+        summary = self._summary_service.get_last_summary()
+        extent = self._extent_source.get_extent()
+        if summary is None or extent is None:
+            return
+        center = BeamCenter(
+            x_px=self._diffraction_settings.beam_center_x_px.get_value(),
+            y_px=self._diffraction_settings.beam_center_y_px.get_value(),
+        )
+        try:
+            signal = estimate_signal_radius(
+                summary.mean_pattern,
+                center,
+                bad_pixels=self._summary_service.get_last_bad_pixels(),
+            )
+            if signal.radius_px < 1:
+                raise ValueError(
+                    'No signal rises above the noise floor about the beam center '
+                    f'({center.x_px}, {center.y_px}).'
+                )
+            region = CropRegion.from_smallest_pow2(center, signal.radius_px, extent)
+            if region.width_px < 1:
+                raise ValueError(
+                    f'The beam center ({center.x_px}, {center.y_px}) is not inside the '
+                    f'{extent.width_px}x{extent.height_px} detector.'
+                )
+        except Exception as exc:
+            logger.exception(exc)
+            ExceptionDialog.show_exception('Suggest Extent', exc)
+            return
+        logger.info(
+            'Signal radius %d px (threshold %g above background %g); suggesting a %d px crop',
+            signal.radius_px,
+            signal.threshold,
+            signal.noise_floor.median,
+            region.width_px,
+        )
+        self._diffraction_settings.crop_width_px.set_value(region.width_px)
+        self._diffraction_settings.crop_height_px.set_value(region.height_px)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._summary_service.task_monitor:

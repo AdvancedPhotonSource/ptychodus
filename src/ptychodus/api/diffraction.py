@@ -118,6 +118,25 @@ class CropRegion:
         size = 1 << ((2 * max_radius).bit_length() - 1)
         return cls.from_center_extent(center, ImageExtent(width_px=size, height_px=size))
 
+    @classmethod
+    def from_smallest_pow2(
+        cls, center: BeamCenter, radius_px: int, detector_extent: ImageExtent
+    ) -> CropRegion:
+        """Smallest power-of-two square centered at `center` whose half-side reaches `radius_px`.
+
+        The side is the smallest power of two at least ``2 * radius_px`` (1 for a radius of
+        0), capped at the :meth:`from_largest_pow2` square, so a radius running off the
+        detector yields the largest square that fits rather than one that overhangs. A
+        `center` on or outside the detector boundary yields the same zero-size region.
+        """
+        largest = cls.from_largest_pow2(center, detector_extent)
+        size = min(1 << max(0, 2 * radius_px - 1).bit_length(), largest.width_px)
+
+        if size < 1:
+            return largest
+
+        return cls.from_center_extent(center, ImageExtent(width_px=size, height_px=size))
+
     def clamp_to_detector_extent(self, detector_extent: ImageExtent) -> CropRegion:
         """Return a new region shrunk and shifted so its window fits inside `detector_extent`.
 

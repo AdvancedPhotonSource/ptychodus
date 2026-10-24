@@ -12,8 +12,8 @@ The free functions at the end of the module are helpers used *alongside* the
 pipeline rather than steps within it, and they deliberately stay that way.
 `zero_bad_pixels` and `inpaint_bad_pixels` are interchangeable bad-pixel
 repairs that run in raw detector coordinates before the pipeline, and
-`estimate_beam_center` takes a whole frame at once. A step that repaired or
-dropped frames would also break the index/pattern 1:1 invariant that
+`estimate_beam_center` and `estimate_signal_radius` take a whole frame at
+once. A step that repaired or dropped frames would also break the index/pattern 1:1 invariant that
 `prepare_reconstruct_input` relies on, because
 `DiffractionPrepPipeline.__call__` passes the original indexes through
 unchanged.
@@ -41,8 +41,8 @@ from ..diffraction import (
     SimpleDiffractionArray,
 )
 from ..geometry import ImageExtent, PixelGeometry
-from ..typing import AnyArrayType
-from .noise import estimate_noise_floor
+from ..typing import AnyArrayType, RealArrayType
+from .noise import RobustStatistics, estimate_noise_floor
 
 # A step rearranges or combines the last two axes and leaves rank and dtype family to the
 # caller, so every `apply` returns exactly what it was handed: a pattern stack, a bad-pixel
@@ -521,4 +521,90 @@ def estimate_beam_center(
     return BeamCenter(
         x_px=int(round(refined_center_x)),
         y_px=int(round(refined_center_y)),
+    )
+
+
+@dataclass(frozen=True)
+class SignalRadius:
+    """How far from the beam center a diffraction pattern rises above its noise floor.
+
+    `radius_px` is the outermost ring whose background-subtracted mean exceeds
+    `threshold`, or 0 when none does. `radial_profile` holds those means, one per
+    one-pixel-wide ring indexed by its radius, NaN where a ring had too few good pixels
+    to be judged.
+    """
+
+    radius_px: int
+    radial_profile: RealArrayType
+    noise_floor: RobustStatistics
+    threshold: float
+
+
+def estimate_signal_radius(
+    pattern: DiffractionPattern,
+    beam_center: BeamCenter,
+    *,
+    bad_pixels: BadPixels | None = None,
+    mad_threshold: float = 4.5,
+    min_ring_pixels: int = 16,
+) -> SignalRadius:
+    """Estimate the radius about `beam_center` beyond which the signal is below the noise floor.
+
+    Pipeline: 3x3 median filter -> Otsu-based noise-floor estimate over the good pixels
+    -> mean of each one-pixel-wide ring, less the background -> the outermost ring whose
+    mean exceeds ``mad_threshold * MAD``. Taking the outermost ring rather than the first
+    one to fall below the threshold steps over a beamstop shadow near the center and
+    keeps isolated high-angle rings, which are signal. Rings run out to the farthest
+    detector corner, so a beam near an edge is judged on the partial rings it has.
+
+    Corrections are the caller's, as for :func:`estimate_beam_center`: pass a pattern
+    with background and flat field already applied and interior bad pixels repaired.
+    Pixels flagged in `bad_pixels` -- typically the border-touching regions
+    :func:`inpaint_bad_pixels` zeroes rather than fills -- are left out of every ring.
+    The radius is in the pattern's own pixels.
+
+    ``mad_threshold`` scales the noise MAD into the threshold a ring mean must exceed;
+    larger values report a smaller radius. A ring with fewer than ``min_ring_pixels``
+    good pixels is not judged, so a corner sliver or a ring crossing a detector gap
+    cannot set the radius. When the noise MAD is zero, as on a mostly-empty
+    photon-counting frame, any ring with a mean above the background counts as signal.
+    """
+    if mad_threshold < 0.0:
+        raise ValueError(f'mad_threshold must be non-negative, got {mad_threshold}.')
+
+    height, width = pattern.shape[-2:]
+    filtered_pattern = ndimage.median_filter(pattern.astype(numpy.float64), size=3)
+    good_pixels = (
+        numpy.ones((height, width), dtype=bool)
+        if bad_pixels is None
+        else numpy.logical_not(bad_pixels)
+    )
+
+    if not numpy.any(good_pixels):
+        raise ValueError('Every pixel is bad, so no noise floor can be estimated.')
+
+    good_values = filtered_pattern[good_pixels]
+    noise_floor = estimate_noise_floor(good_values)
+    threshold = mad_threshold * noise_floor.median_absolute_deviation
+
+    pixel_y = numpy.arange(height).reshape(-1, 1) - beam_center.y_px
+    pixel_x = numpy.arange(width).reshape(1, -1) - beam_center.x_px
+    ring_index = numpy.hypot(pixel_x, pixel_y).astype(numpy.intp)[good_pixels]
+
+    num_rings = int(ring_index.max()) + 1 if ring_index.size > 0 else 0
+    ring_sums = numpy.bincount(ring_index, weights=good_values, minlength=num_rings)
+    ring_counts = numpy.bincount(ring_index, minlength=num_rings)
+
+    radial_profile = numpy.full(num_rings, numpy.nan)
+    judged = ring_counts >= min_ring_pixels
+    radial_profile[judged] = ring_sums[judged] / ring_counts[judged] - noise_floor.median
+
+    # NaN compares False, so unjudged rings never count as signal.
+    (signal_rings,) = numpy.nonzero(radial_profile > threshold)
+
+    return SignalRadius(
+        radius_px=int(signal_rings[-1]) if signal_rings.size > 0 else 0,
+        radial_profile=radial_profile,
+        noise_floor=noise_floor,
+        threshold=float(threshold),
     )

@@ -16,6 +16,7 @@ from ptychodus.cli import (
     DirectoryType,
     add_log_level_argument,
     positive_int,
+    positive_int_or_auto,
 )
 
 
@@ -33,6 +34,17 @@ def test_positive_int_rejects_zero_and_below(text: str) -> None:
 def test_positive_int_rejects_non_numeric() -> None:
     with pytest.raises(ValueError):
         positive_int('nope')
+
+
+def test_positive_int_or_auto_accepts_auto_and_positive_counts() -> None:
+    assert positive_int_or_auto('auto') == 'auto'
+    assert positive_int_or_auto('128') == 128
+
+
+@pytest.mark.parametrize('text', ['0', '-1', 'nope', 'AUTO'])
+def test_positive_int_or_auto_rejects_anything_else(text: str) -> None:
+    with pytest.raises(argparse.ArgumentTypeError):
+        positive_int_or_auto(text)
 
 
 def test_directory_type_accepts_a_missing_path_when_it_may_not_exist(tmp_path: Path) -> None:

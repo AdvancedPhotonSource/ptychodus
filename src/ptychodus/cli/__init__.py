@@ -6,7 +6,7 @@ bare install, so this module must not reach anything behind an optional extra.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 import argparse
 import logging
 import sys
@@ -23,6 +23,7 @@ __all__ = [
     'add_log_level_argument',
     'configure_logging',
     'positive_int',
+    'positive_int_or_auto',
     'read_detector_corrections',
     'verify_all_arguments_parsed',
 ]
@@ -49,6 +50,17 @@ def positive_int(text: str) -> int:
         raise argparse.ArgumentTypeError(f'"{text}" must be at least 1!')
 
     return value
+
+
+def positive_int_or_auto(text: str) -> int | Literal['auto']:
+    """An argparse type for a positive count, or the word ``auto`` to have one estimated."""
+    if text == 'auto':
+        return 'auto'
+
+    try:
+        return positive_int(text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f'"{text}" must be a positive integer or "auto"!') from exc
 
 
 def verify_all_arguments_parsed(parser: argparse.ArgumentParser, argv: list[str]) -> None:

@@ -29,7 +29,8 @@ pytest.importorskip('ptychi')
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.diffraction import BeamCenter, CropRegion
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.preprocess.diffraction import FilterValuesStep
+from ptychodus.api.preprocess.diffraction import FilterValuesStep, SignalRadius
+from ptychodus.api.preprocess.noise import RobustStatistics
 from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
@@ -680,6 +681,9 @@ class _FakeDataset:
     def get_metadata(self) -> _FakeMetadata:
         return self._metadata
 
+    def get_bad_pixels(self) -> numpy.ndarray:
+        return numpy.zeros(self._metadata.detector_extent.get_shape(), dtype=bool)
+
 
 def _resolve(dataset: _FakeDataset, **kwargs: object) -> CropRegion | None:
     defaults: dict[str, object] = {
@@ -795,6 +799,91 @@ def test_the_value_filter_is_applied_to_the_mean_pattern_before_estimating(
     assert len(seen) == 1
     # The fake mean pattern holds a 9, which the filter's upper bound of 5 zeroes.
     assert seen[0].max() <= 5
+
+
+def _signal_radius(radius_px: int) -> SignalRadius:
+    return SignalRadius(
+        radius_px=radius_px,
+        radial_profile=numpy.zeros(1),
+        noise_floor=RobustStatistics(median=0.0, median_absolute_deviation=1.0),
+        threshold=4.5,
+    )
+
+
+class _CountingSummarize:
+    def __init__(self) -> None:
+        self.num_calls = 0
+
+    def __call__(self, dataset: object, bad_pixels: object = None) -> _FakeSummary:
+        self.num_calls += 1
+        return _FakeSummary()
+
+
+def test_an_auto_extent_is_the_power_of_two_holding_the_signal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', _CountingSummarize())
+    monkeypatch.setattr(
+        _reconstruct_common,
+        'estimate_signal_radius',
+        lambda pattern, beam_center, bad_pixels=None: _signal_radius(20),
+    )
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), BeamCenter(x_px=200, y_px=300))
+
+    region = _resolve(dataset, crop_extent_px='auto')
+
+    assert region == CropRegion.from_center_extent(
+        BeamCenter(x_px=200, y_px=300), ImageExtent(width_px=64, height_px=64)
+    )
+
+
+def test_an_auto_extent_shares_one_summary_with_the_beam_center_estimate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    summarize = _CountingSummarize()
+    monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', summarize)
+    monkeypatch.setattr(
+        _reconstruct_common, 'estimate_beam_center', lambda pattern: BeamCenter(x_px=256, y_px=256)
+    )
+    monkeypatch.setattr(
+        _reconstruct_common,
+        'estimate_signal_radius',
+        lambda pattern, beam_center, bad_pixels=None: _signal_radius(40),
+    )
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), beam_center=None)
+
+    region = _resolve(dataset, crop_extent_px='auto')
+
+    assert summarize.num_calls == 1
+    assert region is not None
+    assert region.width_px == 128
+
+
+def test_an_auto_extent_filling_the_detector_reads_the_whole_frame(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', _CountingSummarize())
+    monkeypatch.setattr(
+        _reconstruct_common,
+        'estimate_signal_radius',
+        lambda pattern, beam_center, bad_pixels=None: _signal_radius(1000),
+    )
+    dataset = _FakeDataset(ImageExtent(width_px=256, height_px=256), BeamCenter(x_px=128, y_px=128))
+
+    assert _resolve(dataset, crop_extent_px='auto') is None
+
+
+def test_an_auto_extent_without_signal_is_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', _CountingSummarize())
+    monkeypatch.setattr(
+        _reconstruct_common,
+        'estimate_signal_radius',
+        lambda pattern, beam_center, bad_pixels=None: _signal_radius(0),
+    )
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), BeamCenter(x_px=256, y_px=256))
+
+    with pytest.raises(ValueError, match='No signal rises above the noise floor'):
+        _resolve(dataset, crop_extent_px='auto')
 
 
 class TestResolveFlag:

@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -172,7 +172,8 @@ class MetadataOverrides(_Section):
 
 
 class Diffraction(_Section):
-    crop_extent_px: int | None = Field(default=None, ge=1)
+    # 'auto' suggests the smallest power of two holding the signal above the noise floor.
+    crop_extent_px: Annotated[int, Field(ge=1)] | Literal['auto'] | None = None
     beam_center_x_px: int | None = None
     beam_center_y_px: int | None = None
     min_total_counts: int | None = None

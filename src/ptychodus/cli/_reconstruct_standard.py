@@ -70,6 +70,7 @@ from ptychodus.cli import (
     add_log_level_argument,
     configure_logging,
     positive_int,
+    positive_int_or_auto,
     read_detector_corrections,
 )
 from ptychodus.cli._reconstruct_common import (
@@ -166,9 +167,11 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
     if profile.conditions_patterns:
         parser.add_argument(
             '--crop-extent-px',
-            type=positive_int,
+            type=positive_int_or_auto,
             default=None,
-            help='Square crop side in raw detector pixels, about the beam center. Omit to skip.',
+            help='Square crop side in raw detector pixels, about the beam center, or "auto" '
+            'for the smallest power of two holding the signal above the noise floor. '
+            'Omit to skip.',
         )
         parser.add_argument(
             '--beam-center-x-px',
@@ -823,6 +826,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             beam_center_y_px=args.beam_center_y_px,
             bad_pixels=bad_pixels,
             value_filter=value_filter,
+            corrections=corrections,
         )
         lower_counts, upper_counts = _total_counts_bounds(
             logger, args, raw_dataset, pipeline, bad_pixels, read_region, corrections
