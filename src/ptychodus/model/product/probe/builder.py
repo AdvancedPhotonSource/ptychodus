@@ -2,11 +2,11 @@ from __future__ import annotations
 from abc import abstractmethod
 from collections.abc import Callable, Mapping
 import logging
-import math
 
 import numpy
 
 from ptychodus.api.parameters import ParameterGroup
+from ptychodus.api.product import reconcile_defocus_distance_m
 from ptychodus.api.simulate.probe import (
     GaussianSchellStrategy,
     IncoherentModeStrategy,
@@ -41,38 +41,14 @@ def resolve_defocus_distance_m(
     *,
     rel_tol: float = 1.0e-6,
 ) -> float:
-    """How far past its focus a focusing optic's probe is sampled.
+    """How far past its focus a builder's probe is sampled, deferring to the product.
 
-    The same displacement is stated twice, in opposite frames: as the product's
-    signed focus position, and as the builder's own defocus. The product wins
-    wherever it names one, because the product is what the reconstruction geometry
-    is computed from -- a probe built against a different focus than the geometry
-    would disagree with the object pixel size it is reconstructed on.
-
-    A product leaving the focus at zero means no focusing optic, which cannot
-    describe a focused probe, so the builder's own value is used instead. A
-    disagreement beyond `rel_tol` is reported rather than silently resolved; widen
-    it only where the two are expected to differ in their last digits.
+    See :func:`ptychodus.api.product.reconcile_defocus_distance_m`, which this applies
+    to the product's focus-object distance and the builder's own defocus.
     """
-    focus_object_distance_m = geometry_provider.focus_object_distance_m
-
-    if focus_object_distance_m == 0.0:
-        return builder_defocus_distance_m
-
-    from_product_m = -focus_object_distance_m
-
-    if builder_defocus_distance_m != 0.0 and not math.isclose(
-        builder_defocus_distance_m, from_product_m, rel_tol=rel_tol
-    ):
-        logger.warning(
-            'Probe defocus %g m disagrees with the focus-object distance %g m the product '
-            'declares, which implies %g m; using the product.',
-            builder_defocus_distance_m,
-            focus_object_distance_m,
-            from_product_m,
-        )
-
-    return from_product_m
+    return reconcile_defocus_distance_m(
+        geometry_provider.focus_object_distance_m, builder_defocus_distance_m, rel_tol=rel_tol
+    )
 
 
 class ProbeEnsembleBuilder(ParameterGroup):

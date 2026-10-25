@@ -32,9 +32,14 @@ class AveragePatternProbeBuilder(ProbeEnsembleBuilder):
         return builder
 
     def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
+        assembled_data = self._dataset.get_assembled_data()
         probe = generate_average_pattern_probe(
             geometry_provider.get_probe_geometry(),
-            self._dataset.get_assembled_data(),
+            assembled_data.get_mean_pattern(),
+            detector_pixel_geometry=assembled_data.get_pixel_geometry(),
+            bad_pixels=assembled_data.get_bad_pixels(),
+            background=assembled_data.get_background(),
+            flat_field=assembled_data.get_flat_field(),
             photon_wavelength_m=geometry_provider.photon_wavelength_m,
             detector_distance_m=geometry_provider.detector_distance_m,
             far_field=geometry_provider.far_field,

@@ -38,7 +38,7 @@ from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import DiffractionPrepPipeline, FilterValuesStep
 from ptychodus.api.probe import ProbeGeometry, ProbeEnsemble, resample_probe_ensemble
 from ptychodus.api.probe_positions import ProbePositionSequence
-from ptychodus.api.product import Product, ProductMetadata
+from ptychodus.api.product import Product, ProductMetadata, reconcile_defocus_distance_m
 from ptychodus.api.reconstruct import prepare_reconstruct_input
 from ptychodus.api.simulate.object import generate_uniform_object
 from ptychodus.api.simulate.probe import (
@@ -173,9 +173,10 @@ def _build_initial_probe(
                 probe_geometry,
                 zone_plate,
                 photon_wavelength_m=photon_wavelength_m,
-                # The same displacement the product states, in the probe's frame.
-                defocus_distance_m=(
-                    initial.simulated_probe.fzp_defocus_m if far_field else -focus_object_distance_m
+                # The same displacement the product states, in the probe's frame. In far
+                # field the resolver leaves the focus at zero, so this is fzp_defocus_m.
+                defocus_distance_m=reconcile_defocus_distance_m(
+                    focus_object_distance_m, initial.simulated_probe.fzp_defocus_m
                 ),
             ).get_array(),
             opr_weights=None,

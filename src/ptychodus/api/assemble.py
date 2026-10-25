@@ -123,15 +123,18 @@ def estimate_incident_counts(total_counts: RealArrayType, *, quantile: float = 0
 def estimate_mean_amplitude_transmission(
     assembled_data: AssembledDiffractionData,
     *,
+    incident_quantile: float = 0.99,
     roundoff_floor: float = 1.0e-12,
 ) -> float:
     """Mean amplitude transmission of the sample, as the data sees it.
 
-    The incident flux is what the brightest pattern records, while a typical pattern
+    The incident flux is what the brightest patterns record, while a typical pattern
     records less because the sample absorbs; the ratio of the two is the sample's mean
     intensity transmission, and its square root is the amplitude a uniform object of the
     same opacity would carry. An initial object given this modulus predicts the measured
-    pattern totals, instead of predicting the unobstructed beam at every position.
+    pattern totals, instead of predicting the unobstructed beam at every position. The
+    incident flux is the *incident_quantile* of the totals, by
+    :func:`estimate_incident_counts`, so a single anomalous frame cannot set it.
 
     Hardware flux measurements, when present, give the incident count per pattern, so the
     transmission is averaged per position rather than against a single brightest frame.
@@ -155,9 +158,11 @@ def estimate_mean_amplitude_transmission(
         transmission = numpy.mean(total_counts[usable] / incident_counts[usable])
     else:
         # Without measured flux the per-pattern counts *are* the only incident estimate,
-        # so a per-position ratio would be identically one. The brightest frame stands in
-        # for the unobstructed beam instead.
-        incident = total_counts.max()
+        # so a per-position ratio would be identically one. The brightest frames stand
+        # in for the unobstructed beam instead.
+        incident = estimate_incident_counts(
+            total_counts.astype(numpy.float64), quantile=incident_quantile
+        )
 
         if incident <= roundoff_floor:
             return 1.0

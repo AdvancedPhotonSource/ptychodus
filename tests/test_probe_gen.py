@@ -8,7 +8,9 @@ import numpy.testing
 import pytest
 from pydantic import ValidationError
 
+from ptychodus.api.accumulate import compute_diffraction_moments
 from ptychodus.api.assemble import AssembledDiffractionData
+from ptychodus.api.diffraction import DetectorBackground
 from ptychodus.api.geometry import HermiteMode, ImageExtent, LegendreMode, PixelGeometry
 from ptychodus.api.probe import Probe, ProbeGeometry
 from ptychodus.api.simulate.probe import (
@@ -288,6 +290,21 @@ def _assembled_data(
     )
 
 
+def _average_pattern_probe(
+    geometry: ProbeGeometry, data: AssembledDiffractionData, **kwargs: Any
+) -> Probe:
+    """Estimate from assembled data, carrying its unapplied maps, as the builder does."""
+    return generate_average_pattern_probe(
+        geometry,
+        data.get_mean_pattern(),
+        detector_pixel_geometry=data.get_pixel_geometry(),
+        bad_pixels=data.get_bad_pixels(),
+        background=data.get_background(),
+        flat_field=data.get_flat_field(),
+        **kwargs,
+    )
+
+
 def _sample_plane_geometry() -> ProbeGeometry:
     return ProbeGeometry(
         width_px=_BACKPROP_NUM_PX,
@@ -316,7 +333,7 @@ class TestGenerateAveragePatternProbe:
         envelope = numpy.exp(-(coord[:, None] ** 2 + coord[None, :] ** 2) / 100)
         patterns = (envelope * rng.uniform(0.5, 1.5, envelope.shape))[numpy.newaxis]
 
-        result = generate_average_pattern_probe(
+        result = _average_pattern_probe(
             geometry,
             _assembled_data(patterns),
             photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
@@ -339,7 +356,7 @@ class TestGenerateAveragePatternProbe:
         geometry = _sample_plane_geometry()
         patterns = self._envelope_patterns()
 
-        result = generate_average_pattern_probe(
+        result = _average_pattern_probe(
             geometry,
             _assembled_data(patterns),
             photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
@@ -381,7 +398,7 @@ class TestGenerateAveragePatternProbe:
         )
         patterns = intensity(forward.propagate(probe))[numpy.newaxis]
 
-        result = generate_average_pattern_probe(
+        result = _average_pattern_probe(
             geometry,
             _assembled_data(patterns),
             photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
@@ -395,7 +412,7 @@ class TestGenerateAveragePatternProbe:
     def test_returns_the_declared_sample_plane_geometry(self) -> None:
         geometry = _sample_plane_geometry()
         patterns = numpy.ones((2, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
-        result = generate_average_pattern_probe(
+        result = _average_pattern_probe(
             geometry,
             _assembled_data(patterns),
             photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
@@ -410,7 +427,7 @@ class TestGenerateAveragePatternProbe:
         return numpy.stack([envelope, 2.0 * envelope])
 
     def _estimate(self, patterns: numpy.ndarray, **maps: numpy.ndarray) -> numpy.ndarray:
-        result = generate_average_pattern_probe(
+        result = _average_pattern_probe(
             _sample_plane_geometry(),
             _assembled_data(patterns, **maps),
             photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
@@ -440,26 +457,103 @@ class TestGenerateAveragePatternProbe:
             atol=1e-12,
         )
 
-    def test_a_pixel_with_an_unusable_flat_field_is_zero(self) -> None:
-        """A response at or below the floor marks the pixel bad, so it contributes nothing."""
+    def test_a_pixel_with_an_unusable_flat_field_is_inpainted(self) -> None:
+        """A response at or below the floor marks the pixel bad, and its value is filled
+        from its neighbours rather than zeroed, which would punch a hole that rings."""
         patterns = numpy.ones((1, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
         flat_field = numpy.ones(patterns.shape[-2:])
         flat_field[5, 7] = 0.0
-        expected_patterns = patterns.copy()
-        expected_patterns[:, 5, 7] = 0.0
+        corrupted = patterns.copy()
+        corrupted[:, 5, 7] = 1.0e6
 
         numpy.testing.assert_allclose(
-            self._estimate(patterns, flat_field=flat_field),
-            self._estimate(expected_patterns),
-            atol=1e-12,
+            self._estimate(corrupted, flat_field=flat_field),
+            self._estimate(patterns),
+            atol=1e-9,
         )
+
+    def test_a_defocus_propagates_the_waist_by_that_distance(self) -> None:
+        patterns = self._envelope_patterns()
+        geometry = _sample_plane_geometry()
+        kwargs: dict[str, Any] = dict(
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M, detector_distance_m=_BACKPROP_DISTANCE_M
+        )
+        waist = _average_pattern_probe(geometry, _assembled_data(patterns), **kwargs)
+
+        defocused = _average_pattern_probe(
+            geometry, _assembled_data(patterns), defocus_distance_m=2.0e-6, **kwargs
+        )
+        unchanged = _average_pattern_probe(
+            geometry, _assembled_data(patterns), defocus_distance_m=0.0, **kwargs
+        )
+
+        expected = propagate_probe(
+            waist, photon_wavelength_m=_BACKPROP_WAVELENGTH_M, propagation_distance_m=2.0e-6
+        )
+        numpy.testing.assert_allclose(defocused.get_array(), expected.get_array(), atol=1e-12)
+        numpy.testing.assert_array_equal(unchanged.get_array(), waist.get_array())
+
+    def test_the_bright_field_threshold_removes_a_pedestal(self) -> None:
+        """An offset no background map accounts for is removed with the noise around the
+        bright field, which is what keeps it out of the back-propagated probe."""
+        coord = numpy.arange(_BACKPROP_NUM_PX) - _BACKPROP_NUM_PX // 2
+        bright_field = 1000.0 * (numpy.hypot(coord[:, None], coord[None, :]) <= 12)
+        rng = numpy.random.default_rng(8)
+        noisy = rng.poisson(bright_field + 0.1, size=(20, *bright_field.shape)).astype(float)
+        offset = noisy + 25.0
+
+        with_pedestal = self._estimate(offset)
+        thresholded = _average_pattern_probe(
+            _sample_plane_geometry(),
+            _assembled_data(offset),
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            detector_distance_m=_BACKPROP_DISTANCE_M,
+            bright_field_mad_threshold=4.5,
+        ).get_array()[0]
+        reference = self._estimate(bright_field[numpy.newaxis])
+
+        def error(probe: numpy.ndarray) -> float:
+            return float(numpy.linalg.norm(probe - reference) / numpy.linalg.norm(reference))
+
+        assert error(thresholded) < 0.05
+        assert error(with_pedestal) > 4 * error(thresholded)
+
+    def test_accumulated_moments_give_the_same_probe_as_the_assembled_maps(self) -> None:
+        patterns = self._envelope_patterns() * 100.0
+        background: DetectorBackground = numpy.full((_BACKPROP_NUM_PX, _BACKPROP_NUM_PX), 3.0)
+        raw = patterns + background
+        data = _assembled_data(raw, background=background)
+        moments = compute_diffraction_moments(
+            data.get_indexes(),
+            raw,
+            bad_pixels=data.get_bad_pixels(),
+            background=background,
+        )
+        assert moments is not None
+
+        from_moments = generate_average_pattern_probe(
+            _sample_plane_geometry(),
+            moments.mean_pattern(),
+            detector_pixel_geometry=data.get_pixel_geometry(),
+            bad_pixels=moments.bad_pixels,
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            detector_distance_m=_BACKPROP_DISTANCE_M,
+        )
+        from_maps = _average_pattern_probe(
+            _sample_plane_geometry(),
+            data,
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            detector_distance_m=_BACKPROP_DISTANCE_M,
+        )
+
+        numpy.testing.assert_allclose(from_moments.get_array(), from_maps.get_array(), atol=1e-9)
 
     def test_zero_detector_distance_raises(self) -> None:
         """Previously returned an all-NaN probe in silence: at z=0 the implied and
         declared pitches are both 0, so the existing isclose() guard passed."""
         patterns = numpy.ones((1, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
         with pytest.raises(ValueError, match='Detector distance must be nonzero'):
-            generate_average_pattern_probe(
+            _average_pattern_probe(
                 _sample_plane_geometry(),
                 _assembled_data(patterns),
                 photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
@@ -493,7 +587,7 @@ class TestGenerateAveragePatternProbeNearField:
         patterns = numpy.ones((1, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
         geometry = _near_field_sample_geometry()
 
-        result = generate_average_pattern_probe(
+        result = _average_pattern_probe(
             geometry,
             _assembled_data(patterns),
             photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
@@ -512,7 +606,7 @@ class TestGenerateAveragePatternProbeNearField:
         patterns = numpy.ones((1, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
 
         assert _NEAR_FIELD_SAMPLE_PITCH_M != pytest.approx(_BACKPROP_SAMPLE_PITCH_M)
-        generate_average_pattern_probe(
+        _average_pattern_probe(
             _near_field_sample_geometry(),
             _assembled_data(patterns),
             photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
@@ -527,7 +621,7 @@ class TestGenerateAveragePatternProbeNearField:
         patterns = rng.random((3, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
         geometry = _near_field_sample_geometry()
 
-        result = generate_average_pattern_probe(
+        result = _average_pattern_probe(
             geometry,
             _assembled_data(patterns),
             photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
@@ -555,7 +649,7 @@ class TestGenerateAveragePatternProbeNearField:
         patterns = numpy.ones((1, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
 
         with pytest.raises(ValueError, match='does not match'):
-            generate_average_pattern_probe(
+            _average_pattern_probe(
                 _near_field_sample_geometry(),
                 _assembled_data(patterns),
                 photon_wavelength_m=_BACKPROP_WAVELENGTH_M,

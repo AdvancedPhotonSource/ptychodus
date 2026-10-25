@@ -53,7 +53,7 @@ from ptychodus.api.preprocess.diffraction import (
 from ptychodus.api.preprocess.noise import compute_robust_statistics
 from ptychodus.api.probe import Probe, ProbeGeometry, ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePositionSequence
-from ptychodus.api.product import Product, ProductMetadata
+from ptychodus.api.product import Product, ProductMetadata, reconcile_defocus_distance_m
 from ptychodus.api.reconstruct import prepare_reconstruct_input
 from ptychodus.api.simulate.object import generate_uniform_object
 from ptychodus.api.simulate.probe import (
@@ -670,7 +670,9 @@ def _build_initial_probe(
                 # The same displacement the product states, in the probe's frame. In far
                 # field the resolver leaves the focus at zero, so this is --fzp-defocus-m
                 # unchanged.
-                defocus_distance_m=(args.fzp_defocus_m if far_field else -focus_object_distance_m),
+                defocus_distance_m=reconcile_defocus_distance_m(
+                    focus_object_distance_m, args.fzp_defocus_m
+                ),
             ),
             probe_photon_count,
         )
@@ -682,7 +684,11 @@ def _build_initial_probe(
     logger.info('Estimating the initial probe by back-propagating the mean pattern')
     probe = generate_average_pattern_probe(
         probe_geometry,
-        assembled_data,
+        assembled_data.get_mean_pattern(),
+        detector_pixel_geometry=assembled_data.get_pixel_geometry(),
+        bad_pixels=assembled_data.get_bad_pixels(),
+        background=assembled_data.get_background(),
+        flat_field=assembled_data.get_flat_field(),
         photon_wavelength_m=photon_wavelength_m,
         detector_distance_m=detector_distance_m,
         far_field=far_field,

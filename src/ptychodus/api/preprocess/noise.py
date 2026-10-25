@@ -194,13 +194,18 @@ def subtract_noise_floor(
     bad_pixels: BooleanArrayType | None = None,
     mad_threshold: float = 4.5,
     fall_back_to_border: bool = False,
+    keep_filtered: bool = True,
 ) -> tuple[RealArrayType, RobustStatistics]:
-    """Remove the noise floor from a median-filtered image, keeping only significant signal.
+    """Remove the noise floor from an image, keeping only significant signal.
 
     The image is filtered and its noise floor estimated as by
     :func:`estimate_filtered_noise_floor`. The background median is subtracted
-    everywhere, and pixels below ``median + mad_threshold * MAD`` are set to zero, so a
-    pixel either keeps its full height above the background or drops out.
+    everywhere, and pixels whose filtered value is below ``median + mad_threshold * MAD``
+    are set to zero, so a pixel either keeps its full height above the background or
+    drops out. With *keep_filtered*, the heights kept are the filtered ones, which no hot
+    pixel survives; without it they are the image's own, so fine structure and sharp
+    edges that a median filter would erode are kept, and the filter only decides which
+    pixels are signal.
 
     Keeping the full height is what makes the result fit to weigh with: a profile's
     centroid, second moments, half maximum and encircled energy are those of the
@@ -222,5 +227,6 @@ def subtract_noise_floor(
         image, bad_pixels=bad_pixels, fall_back_to_border=fall_back_to_border
     )
     significant = filtered >= statistics.get_significance_threshold(mad_threshold)
-    signal = numpy.where(significant, filtered - statistics.median, 0.0)
+    heights = filtered if keep_filtered else image.astype(numpy.float64)
+    signal = numpy.where(significant, heights - statistics.median, 0.0)
     return numpy.clip(signal, 0.0, None), statistics

@@ -6,8 +6,12 @@ Behaviors verified:
   - it works over a leading batch axis, and a masked pixel carries no weight
   - an empty image has a zero total and NaN moments rather than raising
   - subtract_noise_floor removes a pedestal and keeps the full height of the signal above it
+  - with keep_filtered=False the measured heights survive, only the mask is filtered
   - estimate_beam_center ignores a hot pixel once it is masked
+  - reconcile_defocus_distance_m lets a declared focus win, and flips the sign
 """
+
+import logging
 
 import numpy
 import pytest
@@ -15,6 +19,7 @@ import pytest
 from ptychodus.api.diffraction import BadPixels
 from ptychodus.api.moments import compute_intensity_moments
 from ptychodus.api.preprocess.diffraction import estimate_beam_center
+from ptychodus.api.product import reconcile_defocus_distance_m
 from ptychodus.api.preprocess.noise import (
     estimate_filtered_noise_floor,
     subtract_noise_floor,
@@ -127,6 +132,20 @@ def test_subtracting_the_floor_removes_a_pedestal_and_keeps_the_signal() -> None
     assert numpy.median(cleaned[numpy.hypot(x, y) < 15.0]) == pytest.approx(1000.0, rel=0.02)
 
 
+def test_unfiltered_heights_keep_the_measured_values_under_the_mask() -> None:
+    rng = numpy.random.default_rng(6)
+    pattern = rng.normal(10.0, 1.0, size=(48, 48))
+    pattern[12:36, 12:36] += rng.uniform(500.0, 1500.0, size=(24, 24))
+
+    filtered, statistics = subtract_noise_floor(pattern)
+    measured, _ = subtract_noise_floor(pattern, keep_filtered=False)
+
+    interior = (slice(13, 35), slice(13, 35))
+    numpy.testing.assert_allclose(measured[interior], pattern[interior] - statistics.median)
+    assert not numpy.allclose(filtered[interior], measured[interior])
+    assert numpy.count_nonzero(measured[:8, :]) == 0
+
+
 def test_a_masked_pixel_stays_out_of_the_noise_statistics() -> None:
     rng = numpy.random.default_rng(2)
     pattern = rng.normal(10.0, 1.0, size=(64, 64))
@@ -154,3 +173,16 @@ def test_beam_center_ignores_a_masked_hot_pixel() -> None:
     center = estimate_beam_center(pattern, bad_pixels=bad_pixels)
 
     assert (center.x_px, center.y_px) == (round(47.5 + 6.0), round(47.5 - 4.0))
+
+
+def test_a_declared_focus_wins_and_flips_sign(caplog: pytest.LogCaptureFixture) -> None:
+    assert reconcile_defocus_distance_m(0.0, 8.0e-4) == 8.0e-4
+    assert reconcile_defocus_distance_m(-8.0e-4, 0.0) == pytest.approx(8.0e-4)
+    assert reconcile_defocus_distance_m(8.0e-4, 0.0) == pytest.approx(-8.0e-4)
+
+    with caplog.at_level(logging.WARNING, logger='ptychodus.api.product'):
+        assert reconcile_defocus_distance_m(-8.0e-4, 8.0e-4) == pytest.approx(8.0e-4)
+        assert not caplog.records
+        assert reconcile_defocus_distance_m(-8.0e-4, 9.0e-4) == pytest.approx(8.0e-4)
+
+    assert len(caplog.records) == 1

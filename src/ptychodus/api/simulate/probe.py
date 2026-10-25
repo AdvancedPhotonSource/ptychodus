@@ -25,7 +25,10 @@ from ..propagate import (
     compute_far_field_pixel_geometry,
     intensity,
 )
-from ..assemble import AssembledDiffractionData, DetectorCorrections
+from ..assemble import DetectorCorrections
+from ..diffraction import BadPixels, DetectorBackground, DiffractionPattern, FlatField
+from ..preprocess.diffraction import inpaint_bad_pixels
+from ..preprocess.noise import subtract_noise_floor
 
 
 logger = logging.getLogger(__name__)
@@ -222,14 +225,20 @@ def generate_super_gaussian_probe(
 
 def generate_average_pattern_probe(
     geometry: ProbeGeometry,
-    assembled_data: AssembledDiffractionData,
+    mean_pattern: DiffractionPattern | RealArrayType,
     *,
+    detector_pixel_geometry: PixelGeometry,
+    bad_pixels: BadPixels,
     photon_wavelength_m: float,
     detector_distance_m: float,
     far_field: bool = True,
+    background: DetectorBackground | None = None,
+    flat_field: FlatField | None = None,
+    defocus_distance_m: float = 0.0,
+    bright_field_mad_threshold: float | None = None,
     rtol: float = 1.0e-3,
 ) -> Probe:
-    """Back-propagate the square root of the mean diffraction pattern to estimate the probe.
+    """Back-propagate the square root of a mean diffraction pattern to estimate the probe.
 
     Far field back-propagates with the single-FFT Fresnel transform, whose output pitch
     is ``lambda * |z| / (N * dx_det)``; that pitch must match what *geometry* declares
@@ -240,11 +249,26 @@ def generate_average_pattern_probe(
     check. The sample grid is the detector grid demagnified, which pins the magnification
     at ``dx_det / dx_probe`` and the equivalent parallel-beam distance at ``z_d / M``.
 
-    A detector background or flat field the patterns still carry unapplied is removed
-    from the mean as ``(mean - background) / flat_field``, clipped at zero, before the
-    square root. Otherwise a flat background would back-propagate into a bright spot at
-    the probe center. Maps already applied to the patterns are not carried, so they are
-    never removed twice. Bad pixels, including those the maps make unusable, are zero.
+    A *background* or *flat_field* the mean still carries is removed as ``(mean -
+    background) / flat_field``, clipped at zero, before the square root. Otherwise a
+    flat background would back-propagate into a bright spot at the probe center. Pass
+    only maps the mean has not had applied, so none is removed twice. Bad pixels,
+    including those the maps make unusable, are inpainted from their neighbours rather
+    than zeroed: a zeroed pixel inside the bright field punches a hole in it that rings
+    through the back-propagated probe.
+
+    With *bright_field_mad_threshold*, the far-field mean keeps only its bright field:
+    :func:`ptychodus.api.preprocess.noise.subtract_noise_floor` removes the background
+    pedestal -- diffuse scattering, or an offset no background map accounts for -- and
+    zeroes what lies within that many MADs of it. The median filter only decides which
+    pixels belong to the bright field; those that do keep their measured values, so its
+    edge is not eroded. The near-field mean is a hologram
+    rather than a bright field and is left whole.
+
+    The returned probe is the field in the plane the patterns' geometry describes, or,
+    for a nonzero *defocus_distance_m*, that field propagated the signed distance
+    further by :func:`propagate_probe`. A flat-phase square root back-propagates to the
+    beam at its waist, so the defocus is how far past the focus the object sits.
 
     Raises ValueError if the diffraction-pattern shape is inconsistent with *geometry*,
     if the detector distance is zero, or -- far field only -- if the implied
@@ -257,14 +281,23 @@ def generate_average_pattern_probe(
         )
 
     corrections = DetectorCorrections(
-        background=assembled_data.get_background(),
-        flat_field=assembled_data.get_flat_field(),
+        background=background,
+        flat_field=flat_field,
         subtract_background=True,
         divide_flat_field=True,
     )
-    mean_intensity = numpy.mean(assembled_data.get_patterns(), axis=0)
-    detector_intensity = corrections.apply(mean_intensity[numpy.newaxis])[0]
-    detector_intensity[corrections.apply_to_bad_pixels(assembled_data.get_bad_pixels())] = 0.0
+    usable_bad_pixels = corrections.apply_to_bad_pixels(bad_pixels)
+    corrected = corrections.apply(numpy.asarray(mean_pattern)[numpy.newaxis])[0]
+    detector_intensity = inpaint_bad_pixels(corrected.astype(numpy.float64), usable_bad_pixels)
+
+    if far_field and bright_field_mad_threshold is not None:
+        detector_intensity, _ = subtract_noise_floor(
+            detector_intensity,
+            bad_pixels=usable_bad_pixels,
+            mad_threshold=bright_field_mad_threshold,
+            keep_filtered=False,
+        )
+
     height_px, width_px = detector_intensity.shape[-2:]
 
     if (width_px, height_px) != (geometry.width_px, geometry.height_px):
@@ -273,7 +306,6 @@ def generate_average_pattern_probe(
             f'geometry ({geometry.width_px}x{geometry.height_px} px); resample patterns first.'
         )
 
-    detector_pixel_geometry = assembled_data.get_pixel_geometry()
     probe_pixel_geometry = geometry.get_pixel_geometry()
 
     if far_field:
@@ -322,8 +354,18 @@ def generate_average_pattern_probe(
         propagator = AngularSpectrumPropagator(propagator_parameters)
 
     array = propagator.propagate(numpy.sqrt(detector_intensity).astype(complex))
+    probe = Probe(array=array, pixel_geometry=probe_pixel_geometry)
 
-    return Probe(array=array, pixel_geometry=probe_pixel_geometry)
+    # Skipped at zero: the angular spectrum is the identity there, but only after a full
+    # transform pair.
+    if defocus_distance_m != 0.0:
+        probe = propagate_probe(
+            probe,
+            photon_wavelength_m=photon_wavelength_m,
+            propagation_distance_m=defocus_distance_m,
+        )
+
+    return probe
 
 
 class FresnelZonePlate(BaseModel):

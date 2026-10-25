@@ -8,6 +8,7 @@ from enum import Enum, auto
 from pathlib import Path
 import logging
 import math
+from typing import cast
 
 import numpy
 from scipy.fft import fft2
@@ -18,6 +19,7 @@ from .fourier import fourier_shift_2d
 from .geometry import ImageExtent, PixelGeometry
 from .interpolate import resample_along_axis
 from .moments import compute_intensity_moments
+from .preprocess.diffraction import inpaint_bad_pixels
 from .preprocess.noise import subtract_noise_floor
 from .propagate import (
     PropagatedWavefield,
@@ -25,7 +27,7 @@ from .propagate import (
     compute_near_field_pixel_geometry,
     intensity,
 )
-from .typing import ComplexArrayType, RealArrayType
+from .typing import BooleanArrayType, ComplexArrayType, RealArrayType
 
 logger = logging.getLogger(__name__)
 
@@ -388,6 +390,181 @@ def estimate_probe_size(
         rms_major_axis_length_m=float(rms_major_m),
         rms_minor_axis_length_m=float(rms_minor_m),
         encircled_energy_diameter_m=float(2.0 * encircled_radius),
+    )
+
+
+@dataclass(frozen=True)
+class ProbeExtent:
+    """A probe's angular spread, and the real-space sizes it implies at the object.
+
+    `spread_major_per_m` and `spread_minor_per_m` are the 1-sigma widths of the far-field
+    intensity, in cycles per meter, along its principal axes, the major tilted
+    `major_axis_tilt_rad` from x. The object sits `defocus_distance_m` past the focus.
+
+    Two kinds of size follow from them. A **beam** width is the probe's own second
+    moment, ``sigma**2 = sigma_0**2 + (lambda * z * sigma_q)**2`` with the
+    transform-limited waist ``sigma_0 = 1 / (4 pi sigma_q)``: exact for a Gaussian beam
+    at any defocus. An **aperture** width is the geometric shadow of the cone,
+    ``lambda * |z| * sigma_q``, which is what the hard-edged disk and rectangle
+    generators take as their size; it leaves out the diffraction tails around the
+    shadow, which carry second moment but are not part of the aperture. At zero defocus
+    there is no shadow, and the aperture width falls back to the waist.
+    """
+
+    spread_major_per_m: float
+    spread_minor_per_m: float
+    major_axis_tilt_rad: float
+    photon_wavelength_m: float
+    defocus_distance_m: float
+
+    def _beam_width_m(self, spread_per_m: float) -> float:
+        waist_m = 1.0 / (4.0 * math.pi * spread_per_m)
+        return math.hypot(
+            waist_m, self.photon_wavelength_m * self.defocus_distance_m * spread_per_m
+        )
+
+    def _aperture_width_m(self, spread_per_m: float) -> float:
+        if self.defocus_distance_m == 0.0:
+            return 1.0 / (4.0 * math.pi * spread_per_m)
+
+        return self.photon_wavelength_m * abs(self.defocus_distance_m) * spread_per_m
+
+    def _along_x_and_y(self, along_major_m: float, along_minor_m: float) -> tuple[float, float]:
+        cos_tilt = math.cos(self.major_axis_tilt_rad)
+        sin_tilt = math.sin(self.major_axis_tilt_rad)
+        return (
+            math.hypot(along_major_m * cos_tilt, along_minor_m * sin_tilt),
+            math.hypot(along_major_m * sin_tilt, along_minor_m * cos_tilt),
+        )
+
+    def _isotropic(self, along_major_m: float, along_minor_m: float) -> float:
+        return math.sqrt((along_major_m**2 + along_minor_m**2) / 2.0)
+
+    @property
+    def beam_sigma_x_m(self) -> float:
+        major = self._beam_width_m(self.spread_major_per_m)
+        minor = self._beam_width_m(self.spread_minor_per_m)
+        return self._along_x_and_y(major, minor)[0]
+
+    @property
+    def beam_sigma_y_m(self) -> float:
+        major = self._beam_width_m(self.spread_major_per_m)
+        minor = self._beam_width_m(self.spread_minor_per_m)
+        return self._along_x_and_y(major, minor)[1]
+
+    @property
+    def beam_sigma_m(self) -> float:
+        """The isotropic beam width with the same mean variance, ``sqrt((a**2 + b**2) / 2)``."""
+        return self._isotropic(
+            self._beam_width_m(self.spread_major_per_m),
+            self._beam_width_m(self.spread_minor_per_m),
+        )
+
+    @property
+    def gaussian_fwhm_m(self) -> float:
+        """A Gaussian's full width at half maximum is ``2 sqrt(2 ln 2) sigma``."""
+        return 2.0 * math.sqrt(2.0 * math.log(2.0)) * self.beam_sigma_m
+
+    @property
+    def disk_diameter_m(self) -> float:
+        """A uniform disk of diameter ``D`` has ``sigma = D / 4`` along any axis."""
+        return 4.0 * self._isotropic(
+            self._aperture_width_m(self.spread_major_per_m),
+            self._aperture_width_m(self.spread_minor_per_m),
+        )
+
+    @property
+    def rectangle_width_m(self) -> float:
+        """A uniform rectangle of width ``W`` has ``sigma_x = W / sqrt(12)``."""
+        major = self._aperture_width_m(self.spread_major_per_m)
+        minor = self._aperture_width_m(self.spread_minor_per_m)
+        return math.sqrt(12.0) * self._along_x_and_y(major, minor)[0]
+
+    @property
+    def rectangle_height_m(self) -> float:
+        """A uniform rectangle of height ``H`` has ``sigma_y = H / sqrt(12)``."""
+        major = self._aperture_width_m(self.spread_major_per_m)
+        minor = self._aperture_width_m(self.spread_minor_per_m)
+        return math.sqrt(12.0) * self._along_x_and_y(major, minor)[1]
+
+
+def estimate_probe_extent(
+    mean_pattern: RealArrayType,
+    probe_geometry: ProbeGeometry,
+    *,
+    photon_wavelength_m: float,
+    defocus_distance_m: float,
+    bad_pixels: BooleanArrayType | None = None,
+    mad_threshold: float = 4.5,
+) -> ProbeExtent:
+    """Estimate the probe's real-space size from the second moments of its far-field intensity.
+
+    The mean diffraction pattern is the probe's power spectrum, attenuated and blurred
+    by the sample but not reshaped by it, so its second moments are the probe's angular
+    spread. They are measured by :func:`estimate_probe_size` on the pattern's
+    reciprocal-space grid, ``dq = 1 / (N * dx)`` with ``dx`` the probe pixel size, which
+    first removes the background and the noise around the bright field. The returned
+    :class:`ProbeExtent` turns that spread into the sizes the parametric probes take at
+    an object *defocus_distance_m* past the focus.
+
+    At zero defocus only the transform-limited waist is left, which describes a Gaussian
+    focus but only approximates the Airy-like focus of a hard-edged aperture; a warning
+    says so.
+
+    A bright field with a central stop -- a zone plate's annulus -- has more spread for
+    its outer radius than a full disk: the disk diameter reads ``sqrt(1 + (r_i /
+    r_o)**2)`` times the outer diameter, about 5% more at a stop of a third.
+
+    Pixels flagged in *bad_pixels* are inpainted before the moments are taken.
+    *mad_threshold* sets the noise rejection, as for :func:`estimate_probe_size`.
+
+    Raises:
+        ValueError: if *mean_pattern* does not have the probe's shape, or no signal
+            rises above the noise floor.
+    """
+    height_px, width_px = mean_pattern.shape[-2:]
+
+    if (width_px, height_px) != (probe_geometry.width_px, probe_geometry.height_px):
+        raise ValueError(
+            f'Mean pattern shape ({width_px}x{height_px} px) does not match the probe '
+            f'({probe_geometry.width_px}x{probe_geometry.height_px} px)!'
+        )
+
+    pattern = mean_pattern
+
+    if bad_pixels is not None:
+        # A float64 pattern inpaints to float64; the overload only promises the family.
+        pattern = cast(
+            RealArrayType, inpaint_bad_pixels(mean_pattern.astype(numpy.float64), bad_pixels)
+        )
+
+    spread = estimate_probe_size(
+        pattern,
+        PixelGeometry(
+            width_m=1.0 / (width_px * probe_geometry.pixel_width_m),
+            height_m=1.0 / (height_px * probe_geometry.pixel_height_m),
+        ),
+        mad_threshold=mad_threshold,
+    )
+    # The reported RMS lengths are 2 sigma, here in cycles per meter.
+    sigma_q_major = spread.rms_major_axis_length_m / 2.0
+    sigma_q_minor = spread.rms_minor_axis_length_m / 2.0
+
+    if not sigma_q_minor > 0.0:
+        raise ValueError('No signal rises above the noise floor of the mean pattern!')
+
+    if defocus_distance_m == 0.0:
+        logger.warning(
+            'No defocus: the probe extent is the transform-limited waist of a Gaussian beam, '
+            'which only approximates the focus of a hard-edged aperture.'
+        )
+
+    return ProbeExtent(
+        spread_major_per_m=sigma_q_major,
+        spread_minor_per_m=sigma_q_minor,
+        major_axis_tilt_rad=spread.major_axis_tilt_rad,
+        photon_wavelength_m=photon_wavelength_m,
+        defocus_distance_m=defocus_distance_m,
     )
 
 

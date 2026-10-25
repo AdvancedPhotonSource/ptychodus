@@ -3,6 +3,8 @@
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from sys import getsizeof
+import logging
+import math
 
 from .constants import energy_eV_to_J, energy_eV_to_wavelength_m
 from .diffraction import Polarization
@@ -11,6 +13,48 @@ from .object import Object
 from .probe import Probe, ProbeEnsemble
 from .probe_positions import ProbePosition, ProbePositionSequence
 from .propagate import compute_magnification
+
+logger = logging.getLogger(__name__)
+
+
+def reconcile_defocus_distance_m(
+    focus_object_distance_m: float,
+    defocus_distance_m: float,
+    *,
+    rel_tol: float = 1.0e-6,
+) -> float:
+    """How far past its focus a probe is sampled, given the two frames that state it.
+
+    The same displacement is stated twice, in opposite frames: as a product's signed
+    focus position *focus_object_distance_m*, and as a probe's own defocus
+    *defocus_distance_m*. The defocus is the negated focus position, so a focus upstream
+    of the object is a probe sampled downstream of it. The product wins wherever it
+    names a focus, because the product is what the reconstruction geometry is computed
+    from -- a probe built against a different focus than the geometry would disagree
+    with the object pixel size it is reconstructed on.
+
+    A focus position of zero means no focusing optic, which cannot describe a focused
+    probe, so *defocus_distance_m* is returned unchanged. A disagreement beyond
+    *rel_tol* is reported rather than silently resolved; widen it only where the two are
+    expected to differ in their last digits.
+    """
+    if focus_object_distance_m == 0.0:
+        return defocus_distance_m
+
+    from_product_m = -focus_object_distance_m
+
+    if defocus_distance_m != 0.0 and not math.isclose(
+        defocus_distance_m, from_product_m, rel_tol=rel_tol
+    ):
+        logger.warning(
+            'Probe defocus %g m disagrees with the focus-object distance %g m the product '
+            'declares, which implies %g m; using the product.',
+            defocus_distance_m,
+            focus_object_distance_m,
+            from_product_m,
+        )
+
+    return from_product_m
 
 
 @dataclass(frozen=True)
@@ -40,6 +84,15 @@ class ProductMetadata:
     def magnification(self) -> float:
         """See :func:`ptychodus.api.propagate.compute_magnification`."""
         return compute_magnification(self.detector_distance_m, self.focus_object_distance_m)
+
+    @property
+    def defocus_distance_m(self) -> float:
+        """How far past the focus the object sits, the negated `focus_object_distance_m`.
+
+        Zero when the product declares no focusing optic. See
+        :func:`reconcile_defocus_distance_m` for combining it with a probe's own defocus.
+        """
+        return -self.focus_object_distance_m
 
     @property
     def photon_energy_J(self) -> float:  # noqa: N802
