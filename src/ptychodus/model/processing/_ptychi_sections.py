@@ -638,88 +638,90 @@ def _forward_models() -> type:
     return ForwardModels
 
 
-_ALGORITHM_OVERLAYS: Mapping[str, Overlay] = {
-    # Reconstructor-branch additions, which ptychodus files under the algorithm.
-    'loss_function': Overlay('Loss Function:', 'Loss function to optimize'),
-    'forward_model_class': Overlay(
-        'Forward Model:',
-        'Forward model class',
-        annotation=_forward_models(),
-    ),
-    'exit_wave_update_relaxation': Overlay(
-        'Exit Wave Update Relaxation:', 'Relaxation multiplier for the exit wave update'
-    ),
-    'chunk_length': Overlay('Chunk Length:'),
-    'beta': Overlay('Beta:'),
-    'method': Overlay(
-        'BH Method:',
-        'Reconstruction algorithm: GD (gradient descent, for batched updates) or '
-        'CG (conjugate gradients, faster with a single batch).',
-        # Declared upstream as a bare string, so the two it accepts are named here.
-        choices=('GD', 'CG'),
-    ),
-    'noise_model': Overlay('Noise Model:', 'Noise model to use'),
-    'gaussian_noise_std': Overlay(
-        'Gaussian Noise Deviation:',
-        'Standard deviation of the Gaussian noise (used only with the Gaussian noise model).',
-    ),
-    'single_slice_solve_obj_prb_step_size_jointly': Overlay(
-        'Solve Object/Probe Step Size Jointly (Single Slice)',
-        'When checked, object and probe step lengths are solved simultaneously in '
-        'single-slice mode',
-    ),
-    'multislice_solve_obj_prb_step_size_jointly': Overlay(
-        'Solve Object/Probe Step Size Jointly (Multislice)',
-        'When checked, object and probe step lengths are solved simultaneously in multislice mode',
-    ),
-    'solve_step_sizes_only_using_first_probe_mode': Overlay(
-        'Solve Step Sizes Only Using First Probe Mode',
-        'When checked, the step sizes will be calculated using only the first probe mode',
-    ),
-    'momentum_acceleration_gain': Overlay(
-        'Momentum Acceleration Gain:',
-        'Gain of momentum acceleration for object and probe; 0 disables it.',
-    ),
-    'optimal_step_size_scaler': Overlay(
-        'Optimal Step Size Scaler:',
-        'Scaler applied to the solved optimal step size.',
-    ),
-    'AutoMomentumAccelerationGradientMixingFactor': Overlay(
-        'Use Gradient Mixing Factor',
-        'Mixing factor of the current gradient into the accumulated velocity; set to 1 to '
-        'reproduce PtychoShelves.',
-    ),
-    # Named once for both branches that persist it, which agree on the floor.
-    'MomentumAccelerationGradientMixingFactor': Overlay('Mixing Factor:', minimum=0.0),
-    'rescale_probe_intensity_in_first_epoch': Overlay(
-        'Rescale Probe Intensity In First Epoch',
-        'When checked, the probe intensity will be rescaled on the first epoch',
-    ),
-    'preconditioning_damping_factor': Overlay(
-        'Preconditioning Damping Factor:', 'Damping factor for preconditioning the object update'
-    ),
-    'momentum_acceleration_memory': Overlay(
-        'Position Momentum Memory:',
-        'Number of previous epochs used to estimate friction in probe-position momentum '
-        'acceleration.',
-    ),
-    'AutoMomentumGradientMixingFactor': Overlay(
-        'Use Position Gradient Mixing Factor',
-        'Mixing factor of the current position update into the accumulated velocity; set to '
-        '1 to reproduce foldslice.',
-    ),
-    # Branch additions other than the reconstructor's.
-    'amplitude_clamp_limit': Overlay(
-        'Amplitude Clamp Limit:',
-        'Maximum object amplitude; larger values are clamped to this limit.',
-    ),
-    'alpha': Overlay('Alpha:', maximum=1.0),
-    'multimodal_update': Overlay(
-        'Multimodal Update',
-        'Compute the object update direction summed over all probe modes rather than only '
-        'the first mode.',
-    ),
-}
+def _algorithm_overlays() -> Mapping[str, Overlay]:
+    return {
+        # Reconstructor-branch additions, which ptychodus files under the algorithm.
+        'loss_function': Overlay('Loss Function:', 'Loss function to optimize'),
+        'forward_model_class': Overlay(
+            'Forward Model:',
+            'Forward model class',
+            annotation=_forward_models(),
+        ),
+        'exit_wave_update_relaxation': Overlay(
+            'Exit Wave Update Relaxation:', 'Relaxation multiplier for the exit wave update'
+        ),
+        'chunk_length': Overlay('Chunk Length:'),
+        'beta': Overlay('Beta:'),
+        'method': Overlay(
+            'BH Method:',
+            'Reconstruction algorithm: GD (gradient descent, for batched updates) or '
+            'CG (conjugate gradients, faster with a single batch).',
+            # Declared upstream as a bare string, so the two it accepts are named here.
+            choices=('GD', 'CG'),
+        ),
+        'noise_model': Overlay('Noise Model:', 'Noise model to use'),
+        'gaussian_noise_std': Overlay(
+            'Gaussian Noise Deviation:',
+            'Standard deviation of the Gaussian noise (used only with the Gaussian noise model).',
+        ),
+        'single_slice_solve_obj_prb_step_size_jointly': Overlay(
+            'Solve Object/Probe Step Size Jointly (Single Slice)',
+            'When checked, object and probe step lengths are solved simultaneously in '
+            'single-slice mode',
+        ),
+        'multislice_solve_obj_prb_step_size_jointly': Overlay(
+            'Solve Object/Probe Step Size Jointly (Multislice)',
+            'When checked, object and probe step lengths are solved simultaneously in multislice mode',
+        ),
+        'solve_step_sizes_only_using_first_probe_mode': Overlay(
+            'Solve Step Sizes Only Using First Probe Mode',
+            'When checked, the step sizes will be calculated using only the first probe mode',
+        ),
+        'momentum_acceleration_gain': Overlay(
+            'Momentum Acceleration Gain:',
+            'Gain of momentum acceleration for object and probe; 0 disables it.',
+        ),
+        'optimal_step_size_scaler': Overlay(
+            'Optimal Step Size Scaler:',
+            'Scaler applied to the solved optimal step size.',
+        ),
+        'AutoMomentumAccelerationGradientMixingFactor': Overlay(
+            'Use Gradient Mixing Factor',
+            'Mixing factor of the current gradient into the accumulated velocity; set to 1 to '
+            'reproduce PtychoShelves.',
+        ),
+        # Named once for both branches that persist it, which agree on the floor.
+        'MomentumAccelerationGradientMixingFactor': Overlay('Mixing Factor:', minimum=0.0),
+        'rescale_probe_intensity_in_first_epoch': Overlay(
+            'Rescale Probe Intensity In First Epoch',
+            'When checked, the probe intensity will be rescaled on the first epoch',
+        ),
+        'preconditioning_damping_factor': Overlay(
+            'Preconditioning Damping Factor:',
+            'Damping factor for preconditioning the object update',
+        ),
+        'momentum_acceleration_memory': Overlay(
+            'Position Momentum Memory:',
+            'Number of previous epochs used to estimate friction in probe-position momentum '
+            'acceleration.',
+        ),
+        'AutoMomentumGradientMixingFactor': Overlay(
+            'Use Position Gradient Mixing Factor',
+            'Mixing factor of the current position update into the accumulated velocity; set to '
+            '1 to reproduce foldslice.',
+        ),
+        # Branch additions other than the reconstructor's.
+        'amplitude_clamp_limit': Overlay(
+            'Amplitude Clamp Limit:',
+            'Maximum object amplitude; larger values are clamped to this limit.',
+        ),
+        'alpha': Overlay('Alpha:', maximum=1.0),
+        'multimodal_update': Overlay(
+            'Multimodal Update',
+            'Compute the object update direction summed over all probe modes rather than only '
+            'the first mode.',
+        ),
+    }
 
 
 def _precision() -> BoolEnum:
@@ -938,6 +940,7 @@ def _algorithm_sections(algorithm: str, task: Any) -> Sequence[OptionsSection]:
         ),
         ('opr_mode_weight_options', OPRModeWeightsOptions, 'OPR', {}, {}),
     )
+    algorithm_overlays = _algorithm_overlays()
     sections: list[OptionsSection] = []
 
     for path, base, prefix, branch_overlays, structural in branches:
@@ -954,7 +957,7 @@ def _algorithm_sections(algorithm: str, task: Any) -> Sequence[OptionsSection]:
                     base_prefix=prefix,
                     hidden=_only_extras(root, base),
                     renames=_RECONSTRUCTOR_EXTRA_NAMES if path == 'reconstructor_options' else {},
-                    overlays={**_ALGORITHM_OVERLAYS, **branch_overlays},
+                    overlays={**algorithm_overlays, **branch_overlays},
                     structural=structural,
                 ),
             )
