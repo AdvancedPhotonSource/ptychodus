@@ -314,6 +314,45 @@ def _sample_plane_geometry() -> ProbeGeometry:
     )
 
 
+def _round_trip_probe(probe: Probe, defocus_distance_m: float) -> Probe:
+    """The probe estimated from the far-field intensity of *probe* by the house model."""
+    forward = FresnelTransformPropagator(
+        PropagatorParameters(
+            wavelength_m=_BACKPROP_WAVELENGTH_M,
+            width_px=_BACKPROP_NUM_PX,
+            height_px=_BACKPROP_NUM_PX,
+            pixel_width_m=_BACKPROP_SAMPLE_PITCH_M,
+            pixel_height_m=_BACKPROP_SAMPLE_PITCH_M,
+            propagation_distance_m=_BACKPROP_DISTANCE_M,
+        )
+    )
+    patterns = intensity(forward.propagate(probe.get_array()[0]))[numpy.newaxis]
+    return _average_pattern_probe(
+        _sample_plane_geometry(),
+        _assembled_data(patterns),
+        photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
+        detector_distance_m=_BACKPROP_DISTANCE_M,
+        defocus_distance_m=defocus_distance_m,
+    )
+
+
+def _gaussian_waist() -> Probe:
+    coord = numpy.arange(_BACKPROP_NUM_PX) - _BACKPROP_NUM_PX // 2
+    array = numpy.exp(-(coord[:, None] ** 2 + coord[None, :] ** 2) / 50).astype(complex)
+    return Probe(
+        array=array,
+        pixel_geometry=PixelGeometry(
+            width_m=_BACKPROP_SAMPLE_PITCH_M, height_m=_BACKPROP_SAMPLE_PITCH_M
+        ),
+    )
+
+
+def _probe_overlap(estimate: Probe, truth: Probe) -> float:
+    a = estimate.get_array()[0].ravel()
+    b = truth.get_array()[0].ravel()
+    return float(abs(numpy.vdot(a, b)) / (numpy.linalg.norm(a) * numpy.linalg.norm(b)))
+
+
 class TestGenerateAveragePatternProbe:
     def test_conserves_the_photon_count_between_the_two_planes(self) -> None:
         """``sum|out|^2 == sum|in|^2``: the bare sum is the photon count the field
@@ -344,43 +383,34 @@ class TestGenerateAveragePatternProbe:
         sample_counts = intensity(result.get_array()[0]).sum()
         assert sample_counts == pytest.approx(detector_counts, rel=1e-12)
 
-    def test_matches_an_explicit_back_propagation_on_the_sample_grid(self) -> None:
-        """Pins which plane's pitch parameterizes the backward propagation.
+    def test_a_flat_phase_waist_returns_through_the_forward_model(self) -> None:
+        """The root of a waist's far field is its flat-phase spectrum, which transforms
+        back to the waist. Undoing the Fresnel transform's detector-plane phase as well
+        -- which the intensity never recorded -- carries it the whole detector distance
+        out of focus instead: an overlap near 0.07 rather than 1."""
+        waist = _gaussian_waist()
 
-        The single-FFT propagator's ``pixel_width_m`` names the plane at the smaller z,
-        which for this backward propagation is the *sample* plane. Energy conservation
-        cannot distinguish the two grids -- the propagator preserves the photon sum
-        whatever its pitch -- so the field itself carries the convention. Building the
-        reference on the detector pitch instead makes these disagree.
-        """
-        geometry = _sample_plane_geometry()
-        patterns = self._envelope_patterns()
+        assert _probe_overlap(_round_trip_probe(waist, 0.0), waist) > 0.999
 
-        result = _average_pattern_probe(
-            geometry,
-            _assembled_data(patterns),
-            photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
-            detector_distance_m=_BACKPROP_DISTANCE_M,
-        )
-
-        reference = FresnelTransformPropagator(
-            PropagatorParameters(
-                wavelength_m=_BACKPROP_WAVELENGTH_M,
-                width_px=_BACKPROP_NUM_PX,
-                height_px=_BACKPROP_NUM_PX,
-                pixel_width_m=_BACKPROP_SAMPLE_PITCH_M,
-                pixel_height_m=_BACKPROP_SAMPLE_PITCH_M,
-                propagation_distance_m=-_BACKPROP_DISTANCE_M,
+    @pytest.mark.parametrize('defocus_m', [2.0e-3, -2.0e-3])
+    def test_a_defocused_probe_returns_with_its_curvature(self, defocus_m: float) -> None:
+        def defocused(distance_m: float) -> Probe:
+            return propagate_probe(
+                _gaussian_waist(),
+                photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
+                propagation_distance_m=distance_m,
             )
-        ).propagate(numpy.sqrt(numpy.mean(patterns, axis=0)).astype(complex))
 
-        numpy.testing.assert_allclose(result.get_array()[0], reference, rtol=1e-10)
+        estimate = _round_trip_probe(defocused(defocus_m), defocus_m)
+
+        assert _probe_overlap(estimate, defocused(defocus_m)) > 0.999
+        # The intensities agree at either sign; the curvature tells them apart.
+        assert _probe_overlap(estimate, defocused(-defocus_m)) < 0.9
 
     def test_recovers_the_forward_models_amplitude_scale(self) -> None:
         """Round-trip through the house forward model (sample -> detector at +z) and
-        back. Phase is lost to the sqrt-of-intensity step so the field itself cannot
-        return, but the recovered probe must carry the same total power as the original
-        -- which is false by four orders of magnitude on the wrong grid.
+        back: the recovered probe must carry the same total power as the original --
+        which is false by four orders of magnitude on the wrong grid.
         """
         geometry = _sample_plane_geometry()
         coord = numpy.arange(_BACKPROP_NUM_PX) - _BACKPROP_NUM_PX // 2
@@ -575,6 +605,45 @@ def _near_field_sample_geometry(magnification: float = _NEAR_FIELD_MAGNIFICATION
         pixel_width_m=pitch_m,
         pixel_height_m=pitch_m,
     )
+
+
+class TestGenerateAveragePatternProbeWithoutDetectorPitch:
+    """In far field one detector pixel is a frequency step of the probe grid, so the
+    detector pitch only cross-checks the grid; near field needs it for the magnification."""
+
+    def test_far_field_without_the_pitch_matches_far_field_with_a_consistent_one(self) -> None:
+        rng = numpy.random.default_rng(7)
+        mean_pattern = rng.uniform(0.0, 100.0, size=(_BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
+        common: dict[str, Any] = dict(
+            bad_pixels=numpy.zeros(mean_pattern.shape, dtype=bool),
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            detector_distance_m=_BACKPROP_DISTANCE_M,
+            defocus_distance_m=1.0e-4,
+        )
+
+        checked = generate_average_pattern_probe(
+            _sample_plane_geometry(),
+            mean_pattern,
+            detector_pixel_geometry=PixelGeometry(
+                width_m=_BACKPROP_DETECTOR_PITCH_M, height_m=_BACKPROP_DETECTOR_PITCH_M
+            ),
+            **common,
+        )
+        unchecked = generate_average_pattern_probe(_sample_plane_geometry(), mean_pattern, **common)
+
+        numpy.testing.assert_array_equal(unchecked.get_array(), checked.get_array())
+        assert unchecked.get_pixel_geometry() == checked.get_pixel_geometry()
+
+    def test_near_field_without_the_pitch_is_rejected(self) -> None:
+        with pytest.raises(ValueError, match='detector pitch'):
+            generate_average_pattern_probe(
+                _near_field_sample_geometry(),
+                numpy.ones((_BACKPROP_NUM_PX, _BACKPROP_NUM_PX)),
+                bad_pixels=numpy.zeros((_BACKPROP_NUM_PX, _BACKPROP_NUM_PX), dtype=bool),
+                photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
+                detector_distance_m=_BACKPROP_DISTANCE_M,
+                far_field=False,
+            )
 
 
 class TestGenerateAveragePatternProbeNearField:
