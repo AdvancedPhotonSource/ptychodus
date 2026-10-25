@@ -7,8 +7,10 @@ estimate is therefore pinned against that model rather than derived.
 Behaviors verified:
   - a defocus beyond the depth of focus is recovered with its sign, pairing patterns
     with positions by index rather than by order
-  - the depth of focus is that of the bright field, ``1 / (lambda * q_max**2)``
-  - a probe at focus and a featureless sample are not resolved
+  - the depth of focus is the disk's ``lambda / NA**2 = 1 / (lambda * q_max**2)``, and
+    the Fresnel number is the defocus in units of it
+  - a probe at focus and a featureless sample are not resolved, and the depth-of-focus
+    threshold is what rejects the probe at focus
   - too few bright-field bins give None; moments without binned patterns, or frames
     that do not match the probe, are rejected
 """
@@ -27,6 +29,7 @@ from ptychodus.api.probe import Probe, ProbeEnsemble, ProbeGeometry
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.simulate.diffraction import generate_diffraction_data
+from ptychodus.api.preprocess.diffraction import BinningStep
 from ptychodus.api.simulate.probe import propagate_probe
 
 _PIXEL_SIZE_M = 50e-9
@@ -102,7 +105,7 @@ def _positions() -> list[ProbePosition]:
 
 @cache
 def _moments(
-    defocus_m: float, *, featureless: bool = False, bin_factor: int = 2
+    defocus_m: float, *, featureless: bool = False, bin_size_px: int = 2
 ) -> DiffractionMoments:
     probe = _probe(defocus_m)
     product = Product(
@@ -123,7 +126,7 @@ def _moments(
         numpy.array(data.get_indexes()),
         numpy.array(data.get_patterns()),
         bad_pixels=numpy.array(data.get_bad_pixels()),
-        bin_factor=bin_factor,
+        binning=BinningStep(bin_size_x=bin_size_px, bin_size_y=bin_size_px),
     )
     assert moments is not None
     return moments
@@ -152,12 +155,15 @@ def test_a_defocus_is_recovered_with_its_sign(defocus_m: float) -> None:
     assert estimate.is_resolved()
 
 
-def test_the_depth_of_focus_is_that_of_the_bright_field() -> None:
+def test_the_depth_of_focus_is_that_of_the_disk() -> None:
     estimate = _estimate(_moments(2.0e-3))
 
     assert estimate is not None
-    # The bright field is the disk's half-maximum, a pixel's worth of edge either way.
-    assert estimate.depth_of_focus_m == pytest.approx(_DEPTH_OF_FOCUS_M, rel=0.15)
+    # Second moments of the noisy pattern after its noise floor: measured within 4%.
+    assert estimate.depth_of_focus_m == pytest.approx(_DEPTH_OF_FOCUS_M, rel=0.08)
+    assert estimate.fresnel_number == pytest.approx(
+        abs(estimate.defocus_distance_m) / estimate.depth_of_focus_m
+    )
 
 
 def test_a_probe_at_focus_is_not_resolved() -> None:
@@ -166,8 +172,10 @@ def test_a_probe_at_focus_is_not_resolved() -> None:
     # Its images differ by phase contrast, not by a shift, so the fit finds a slope
     # with little scatter -- but no larger than the depth of focus.
     assert estimate is not None
-    assert abs(estimate.defocus_distance_m) < estimate.depth_of_focus_m
+    assert estimate.fresnel_number < 1.0
+    assert estimate.significance > 3.0
     assert not estimate.is_resolved()
+    assert estimate.is_resolved(minimum_defocus_dof=0.5 * estimate.fresnel_number)
 
 
 def test_a_featureless_sample_is_not_resolved() -> None:
@@ -182,7 +190,7 @@ def test_a_featureless_sample_is_not_resolved() -> None:
 
 def test_too_few_bright_field_bins_give_none() -> None:
     # Bins of 8 pixels leave a disk of radius 8 with no bin away from its edge.
-    assert _estimate(_moments(2.0e-3, bin_factor=8)) is None
+    assert _estimate(_moments(2.0e-3, bin_size_px=8)) is None
 
 
 def test_moments_without_binned_patterns_are_rejected() -> None:
@@ -199,7 +207,7 @@ def test_moments_without_binned_patterns_are_rejected() -> None:
         center_of_mass_y_px=moments.center_of_mass_y_px,
     )
 
-    with pytest.raises(ValueError, match='bin factor'):
+    with pytest.raises(ValueError, match='binning step'):
         _estimate(unbinned)
 
 

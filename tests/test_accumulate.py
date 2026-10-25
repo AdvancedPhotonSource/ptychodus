@@ -9,8 +9,8 @@ Behaviors verified:
   - the inpainted mean equals the mean of the inpainted frames
   - select, normalize_by_monitor and estimate_incident_counts on snapshots
   - compute_diffraction_moments applies carried detector corrections first
-  - binned patterns: sums over whole bins, scaled up for their bad pixels and NaN when
-    none is good, carried through every chunking, merge, selection and normalization
+  - binned patterns are the prep pipeline's BinningStep, with a bin touching any bad pixel
+    NaN, carried through every chunking, merge, selection and normalization
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -29,11 +29,11 @@ from ptychodus.api.accumulate import (
 from ptychodus.api.assemble import estimate_incident_counts
 from ptychodus.api.diffraction import BadPixels
 from ptychodus.api.moments import FrameStatistics, compute_intensity_moments
-from ptychodus.api.preprocess.diffraction import inpaint_bad_pixels
+from ptychodus.api.preprocess.diffraction import BinningStep, inpaint_bad_pixels
 
 _SHAPE = (24, 32)
 # 32 columns leave a partial bin of 2, which binning leaves out.
-_BIN_FACTOR = 3
+_BINNING = BinningStep(bin_size_x=3, bin_size_y=2)
 
 
 def _patterns(num_patterns: int, *, seed: int = 0) -> numpy.ndarray:
@@ -58,7 +58,7 @@ def _accumulate(
     indexes: numpy.ndarray, patterns: numpy.ndarray, *, chunk_size: int, step: int
 ) -> DiffractionMoments:
     accumulator = DiffractionMomentAccumulator(
-        *_SHAPE, bad_pixels=_bad_pixels(), chunk_size=chunk_size, bin_factor=_BIN_FACTOR
+        *_SHAPE, bad_pixels=_bad_pixels(), chunk_size=chunk_size, binning=_BINNING
     )
 
     for start in range(0, len(indexes), step):
@@ -85,7 +85,7 @@ def _assert_same_moments(actual: DiffractionMoments, expected: DiffractionMoment
     numpy.testing.assert_array_equal(actual.minimum_frame, expected.minimum_frame)
     numpy.testing.assert_array_equal(actual.maximum_frame, expected.maximum_frame)
     numpy.testing.assert_allclose(actual.mean_frame, expected.mean_frame, rtol=1e-12)
-    assert actual.bin_factor == expected.bin_factor
+    assert actual.binning == expected.binning
 
     for got, want in zip(_sorted_rows(actual), _sorted_rows(expected)):
         numpy.testing.assert_allclose(got, want, rtol=1e-12, atol=1e-12)
@@ -192,7 +192,7 @@ def test_order_and_threads_do_not_change_the_result() -> None:
     expected = _accumulate(indexes, patterns, chunk_size=8, step=60)
     permutation = numpy.random.default_rng(5).permutation(60)
     accumulator = DiffractionMomentAccumulator(
-        *_SHAPE, bad_pixels=_bad_pixels(), chunk_size=8, bin_factor=_BIN_FACTOR
+        *_SHAPE, bad_pixels=_bad_pixels(), chunk_size=8, binning=_BINNING
     )
 
     with ThreadPoolExecutor(max_workers=4) as executor:
@@ -210,10 +210,10 @@ def test_merging_workers_equals_one_pass_also_through_a_pickled_snapshot() -> No
     indexes = numpy.arange(50)
     expected = _accumulate(indexes, patterns, chunk_size=16, step=50)
     first = DiffractionMomentAccumulator(
-        *_SHAPE, bad_pixels=_bad_pixels(), chunk_size=16, bin_factor=_BIN_FACTOR
+        *_SHAPE, bad_pixels=_bad_pixels(), chunk_size=16, binning=_BINNING
     )
     second = DiffractionMomentAccumulator(
-        *_SHAPE, bad_pixels=_bad_pixels(), chunk_size=16, bin_factor=_BIN_FACTOR
+        *_SHAPE, bad_pixels=_bad_pixels(), chunk_size=16, binning=_BINNING
     )
     first.add(indexes[:21], patterns[:21])
     second.add(indexes[21:], patterns[21:])
@@ -235,15 +235,15 @@ def test_merging_requires_the_same_bad_pixels() -> None:
         first.merge(second)
 
 
-def test_merging_requires_the_same_bin_factor() -> None:
-    first = DiffractionMomentAccumulator(*_SHAPE, bin_factor=2)
-    second = DiffractionMomentAccumulator(*_SHAPE, bin_factor=4)
+def test_merging_requires_the_same_binning() -> None:
+    first = DiffractionMomentAccumulator(*_SHAPE, binning=BinningStep(bin_size_x=2, bin_size_y=2))
+    second = DiffractionMomentAccumulator(*_SHAPE, binning=BinningStep(bin_size_x=2, bin_size_y=4))
     second.add(numpy.arange(3), _patterns(3))
 
-    with pytest.raises(ValueError, match='same bin factor'):
+    with pytest.raises(ValueError, match='same binning'):
         first.merge(second)
 
-    with pytest.raises(ValueError, match='same bin factor'):
+    with pytest.raises(ValueError, match='same binning'):
         DiffractionMomentAccumulator(*_SHAPE).merge(second)
 
 
@@ -392,27 +392,26 @@ def test_an_empty_stack_has_no_moments() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_binned_patterns_sum_whole_bins_and_scale_up_partly_bad_ones() -> None:
+def test_binned_patterns_are_the_pipelines_binning_with_flagged_bins_nan() -> None:
     patterns = _patterns(5)
     bad_pixels = _bad_pixels()
-    bad_pixels[0:3, 0:3] = True  # one wholly bad bin
-    accumulator = DiffractionMomentAccumulator(*_SHAPE, bad_pixels=bad_pixels, bin_factor=3)
+    accumulator = DiffractionMomentAccumulator(*_SHAPE, bad_pixels=bad_pixels, binning=_BINNING)
     accumulator.add(numpy.arange(5), patterns)
     moments = accumulator.get_moments()
     assert moments is not None and moments.binned_patterns is not None
 
     binned = moments.binned_patterns
-    assert binned.shape == (5, 8, 10)
+    expected = _BINNING.apply(numpy.where(bad_pixels, 0, patterns)).astype(numpy.float64)
+    flagged = _BINNING.apply(bad_pixels)
+    expected[:, flagged] = numpy.nan
+
+    assert binned.shape == (5, 12, 10)
     assert binned.dtype == numpy.float32
-    assert numpy.isnan(binned[:, 0, 0]).all()
-    # A whole good bin is its plain sum.
-    numpy.testing.assert_allclose(
-        binned[:, 4, 4], patterns[:, 12:15, 12:15].sum(axis=(-2, -1)), rtol=1e-6
-    )
-    # Bin (3, 5) loses pixel (10, 15), so its eight good pixels are scaled by 9 / 8.
-    good = numpy.logical_not(bad_pixels[9:12, 15:18])
-    expected = patterns[:, 9:12, 15:18][:, good].sum(axis=-1) * 9.0 / 8.0
-    numpy.testing.assert_allclose(binned[:, 3, 5], expected, rtol=1e-6)
+    numpy.testing.assert_allclose(binned, expected, rtol=1e-6)
+    # Bin (5, 5) holds the bad pixel (10, 15) among five good ones, and is flagged whole.
+    assert flagged[5, 5]
+    assert numpy.isnan(binned[:, 5, 5]).all()
+    assert numpy.count_nonzero(flagged) == 1 + 4
 
 
 def test_an_unbinned_accumulator_keeps_no_binned_patterns() -> None:
@@ -421,16 +420,13 @@ def test_an_unbinned_accumulator_keeps_no_binned_patterns() -> None:
     moments = accumulator.get_moments()
 
     assert moments is not None
-    assert moments.bin_factor is None
+    assert moments.binning is None
     assert moments.binned_patterns is None
 
 
-def test_a_bin_factor_must_fit_the_frames() -> None:
-    with pytest.raises(ValueError, match='does not fit'):
-        DiffractionMomentAccumulator(*_SHAPE, bin_factor=25)
-
-    with pytest.raises(ValueError, match='does not fit'):
-        DiffractionMomentAccumulator(*_SHAPE, bin_factor=0)
+def test_a_binning_must_leave_a_whole_bin() -> None:
+    with pytest.raises(ValueError, match='no whole bin'):
+        DiffractionMomentAccumulator(*_SHAPE, binning=BinningStep(bin_size_x=33, bin_size_y=1))
 
 
 def test_select_and_the_monitor_carry_the_binned_patterns() -> None:
@@ -461,7 +457,7 @@ def test_compute_diffraction_moments_bins_too() -> None:
     expected = _accumulate(indexes, patterns, chunk_size=30, step=30)
 
     moments = compute_diffraction_moments(
-        indexes, patterns, bad_pixels=_bad_pixels(), chunk_size=7, bin_factor=_BIN_FACTOR
+        indexes, patterns, bad_pixels=_bad_pixels(), chunk_size=7, binning=_BINNING
     )
 
     assert moments is not None

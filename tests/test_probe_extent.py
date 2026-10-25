@@ -11,6 +11,8 @@ Behaviors verified:
   - the sign of the defocus does not change the extent
   - a background pedestal and a masked hot pixel do not change it
   - zero defocus warns that only the transform-limited waist is left
+  - the depth of focus is the disk's lambda / NA**2, and the Fresnel number is both the
+    defocus in depths of focus and R**2 / (lambda |z|) of the shadow radius
 """
 
 from typing import Any
@@ -164,6 +166,28 @@ def test_zero_defocus_warns_that_only_the_waist_is_left(
     waist_m = 1.0 / (4.0 * math.pi * sigma_q)
     assert extent.beam_sigma_m == pytest.approx(waist_m, rel=0.03)
     assert extent.disk_diameter_m == pytest.approx(4.0 * waist_m, rel=0.03)
+
+
+@pytest.mark.parametrize('defocus_m', [5.0e-4, -2.0e-4])
+def test_the_depth_of_focus_and_fresnel_number_are_the_disks(defocus_m: float) -> None:
+    qx, qy = _frequency_grid()
+    edge_q = 20.0 * _DQ
+    amplitude = (numpy.hypot(qx, qy) <= edge_q).astype(numpy.float64)
+
+    extent = estimate_probe_extent(
+        _mean_pattern(_defocused_probe(amplitude, defocus_m)),
+        _GEOMETRY,
+        photon_wavelength_m=_WAVELENGTH_M,
+        defocus_distance_m=defocus_m,
+    )
+
+    # lambda / NA**2 with NA = lambda * edge_q.
+    assert extent.depth_of_focus_m == pytest.approx(1.0 / (_WAVELENGTH_M * edge_q**2), rel=0.02)
+    assert extent.fresnel_number == pytest.approx(abs(defocus_m) / extent.depth_of_focus_m)
+    shadow_radius_m = extent.disk_diameter_m / 2.0
+    assert extent.fresnel_number == pytest.approx(
+        shadow_radius_m**2 / (_WAVELENGTH_M * abs(defocus_m)), rel=1e-12
+    )
 
 
 def test_a_mismatched_pattern_is_rejected() -> None:

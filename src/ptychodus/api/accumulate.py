@@ -27,8 +27,9 @@ from .diffraction import (
     DiffractionPatterns,
     FlatField,
 )
+from .geometry import ImageExtent
 from .moments import FrameStatistics, compute_intensity_moments
-from .preprocess.diffraction import inpaint_bad_pixels
+from .preprocess.diffraction import BinningStep, inpaint_bad_pixels
 from .typing import IntegerArrayType, RealArrayType
 
 __all__ = [
@@ -51,11 +52,9 @@ class DiffractionMoments:
     midpoint ``(N - 1) / 2``, x along columns and y along rows; a frame with no signal
     has a NaN centroid.
 
-    With a `bin_factor`, `binned_patterns` holds every pattern summed over square bins
-    of that many pixels a side, row-aligned with `indexes`; rows and columns past the
-    last whole bin are left out. A bin's sum covers its good pixels and is divided by
-    their fraction, so a partly bad bin is not dimmer than its neighbours, and a bin
-    with no good pixel is NaN.
+    With a `binning` step, `binned_patterns` holds every pattern binned by it, as float32
+    and row-aligned with `indexes`. Binning follows :class:`BinningStep`: bad pixels
+    count as zero, a bin touching any of them is flagged, and a flagged bin is NaN.
     """
 
     num_patterns: int
@@ -67,7 +66,7 @@ class DiffractionMoments:
     total_counts: RealArrayType
     center_of_mass_x_px: RealArrayType
     center_of_mass_y_px: RealArrayType
-    bin_factor: int | None = None
+    binning: BinningStep | None = None
     binned_patterns: RealArrayType | None = None
 
     def mean_pattern(self) -> RealArrayType:
@@ -161,9 +160,8 @@ class DiffractionMomentAccumulator:
     different patterns -- separate processes included, since snapshots pickle --
     combine into one result equal to a single pass over all of them.
 
-    A *bin_factor* also keeps every pattern binned, as float32, which costs
-    ``4 / bin_factor**2`` bytes per detector pixel per pattern; see
-    :class:`DiffractionMoments`.
+    A *binning* step also keeps every pattern binned, as float32, which costs four
+    bytes per bin per pattern; see :class:`DiffractionMoments`.
     """
 
     def __init__(
@@ -173,13 +171,16 @@ class DiffractionMomentAccumulator:
         *,
         bad_pixels: BadPixels | None = None,
         chunk_size: int = 256,
-        bin_factor: int | None = None,
+        binning: BinningStep | None = None,
     ) -> None:
         if chunk_size < 1:
             raise ValueError('Chunks must hold at least one pattern!')
 
-        if bin_factor is not None and not 1 <= bin_factor <= min(height, width):
-            raise ValueError(f'A bin factor of {bin_factor} does not fit the frames!')
+        if binning is not None:
+            binned_extent = binning.apply_to_extent(ImageExtent(width_px=width, height_px=height))
+
+            if binned_extent.width_px < 1 or binned_extent.height_px < 1:
+                raise ValueError(f'{binning!r} leaves no whole bin in the frames!')
 
         self._shape = (height, width)
         self._bad_pixels: BadPixels = (
@@ -193,12 +194,8 @@ class DiffractionMomentAccumulator:
             )
 
         self._chunk_size = chunk_size
-        self._bin_factor = bin_factor
-        self._bin_good_fraction: RealArrayType | None = None
-
-        if bin_factor is not None:
-            good = numpy.logical_not(self._bad_pixels).astype(numpy.float64)
-            self._bin_good_fraction = _bin_frames(good, bin_factor) / bin_factor**2
+        self._binning = binning
+        self._binned_bad_pixels = None if binning is None else binning.apply(self._bad_pixels)
 
         self._frame_statistics = FrameStatistics(height, width)
         self._lock = threading.Lock()
@@ -240,8 +237,8 @@ class DiffractionMomentAccumulator:
         if not numpy.array_equal(moments.bad_pixels, self._bad_pixels):
             raise ValueError('Only accumulations with the same bad pixels can be merged!')
 
-        if moments.bin_factor != self._bin_factor:
-            raise ValueError('Only accumulations with the same bin factor can be merged!')
+        if moments.binning != self._binning:
+            raise ValueError('Only accumulations with the same binning can be merged!')
 
         self._frame_statistics.merge(
             FrameStatistics.from_frames(
@@ -288,9 +285,9 @@ class DiffractionMomentAccumulator:
                 total_counts=numpy.concatenate(self._total_counts),
                 center_of_mass_x_px=numpy.concatenate(self._center_of_mass_x_px),
                 center_of_mass_y_px=numpy.concatenate(self._center_of_mass_y_px),
-                bin_factor=self._bin_factor,
+                binning=self._binning,
                 binned_patterns=(
-                    None if self._bin_factor is None else numpy.concatenate(self._binned_patterns)
+                    None if self._binning is None else numpy.concatenate(self._binned_patterns)
                 ),
             )
 
@@ -309,14 +306,11 @@ class DiffractionMomentAccumulator:
         moments = compute_intensity_moments(repaired)
         binned_patterns: RealArrayType | None = None
 
-        if self._bin_factor is not None and self._bin_good_fraction is not None:
-            good = numpy.logical_not(self._bad_pixels)
-            binned_sums = _bin_frames(numpy.where(good, patterns, 0.0), self._bin_factor)
-
-            with numpy.errstate(divide='ignore', invalid='ignore'):
-                binned = binned_sums / self._bin_good_fraction
-
-            binned_patterns = numpy.where(self._bin_good_fraction > 0.0, binned, numpy.nan)
+        if self._binning is not None and self._binned_bad_pixels is not None:
+            zeroed = numpy.where(self._bad_pixels, 0.0, patterns.astype(numpy.float64))
+            binned_patterns = numpy.where(
+                self._binned_bad_pixels, numpy.nan, self._binning.apply(zeroed)
+            )
 
         self._fold_rows(
             indexes,
@@ -348,16 +342,6 @@ class DiffractionMomentAccumulator:
                 self._binned_patterns.append(numpy.asarray(binned_patterns, dtype=numpy.float32))
 
 
-def _bin_frames(frames: RealArrayType, bin_factor: int) -> RealArrayType:
-    """Sum the last two axes over square bins, leaving out any partial bin at the far edges."""
-    height, width = frames.shape[-2:]
-    num_rows = height // bin_factor
-    num_columns = width // bin_factor
-    trimmed = frames[..., : num_rows * bin_factor, : num_columns * bin_factor]
-    blocks = trimmed.reshape(*frames.shape[:-2], num_rows, bin_factor, num_columns, bin_factor)
-    return numpy.sum(blocks, axis=(-3, -1), dtype=numpy.float64)
-
-
 def compute_diffraction_moments(
     indexes: DiffractionIndexes,
     patterns: DiffractionPatterns,
@@ -366,14 +350,14 @@ def compute_diffraction_moments(
     background: DetectorBackground | None = None,
     flat_field: FlatField | None = None,
     chunk_size: int = 256,
-    bin_factor: int | None = None,
+    binning: BinningStep | None = None,
 ) -> DiffractionMoments | None:
     """Accumulate the statistics of an in-memory pattern stack, in one chunked pass.
 
     A *background* or *flat_field* the patterns still carry is applied first, as
     ``(pattern - background) / flat_field`` clipped at zero, and the pixels those maps
     make unusable join *bad_pixels*. Rows come out in the order of *patterns*. A
-    *bin_factor* keeps the binned patterns as well; see :class:`DiffractionMoments`.
+    *binning* step keeps the binned patterns as well; see :class:`DiffractionMoments`.
     Returns None for an empty stack.
     """
     corrections = DetectorCorrections(
@@ -388,7 +372,7 @@ def compute_diffraction_moments(
         width,
         bad_pixels=corrections.apply_to_bad_pixels(bad_pixels),
         chunk_size=chunk_size,
-        bin_factor=bin_factor,
+        binning=binning,
     )
 
     for start in range(0, patterns.shape[0], chunk_size):

@@ -411,6 +411,13 @@ class ProbeExtent:
     generators take as their size; it leaves out the diffraction tails around the
     shadow, which carry second moment but are not part of the aperture. At zero defocus
     there is no shadow, and the aperture width falls back to the waist.
+
+    Two measures say how far from focus the object sits. The **depth of focus**
+    ``lambda / NA**2`` depends on the spread alone, and the **Fresnel number** is the
+    defocus in units of it. The Fresnel number is also ``R**2 / (lambda |z|)`` for the
+    shadow radius ``R``, half of `disk_diameter_m`: below one, a curved hard-edged
+    aperture is no longer the geometric-optics model it stands for, and the probe is
+    within a few Rayleigh ranges ``1 / (4 pi lambda sigma_q**2)`` of its waist.
     """
 
     spread_major_per_m: float
@@ -488,6 +495,18 @@ class ProbeExtent:
         major = self._aperture_width_m(self.spread_major_per_m)
         minor = self._aperture_width_m(self.spread_minor_per_m)
         return math.sqrt(12.0) * self._along_x_and_y(major, minor)[1]
+
+    @property
+    def depth_of_focus_m(self) -> float:
+        """``lambda / NA**2 = 1 / (lambda q_max**2)``, with ``q_max = 2 sigma_q`` the radius
+        of the uniform disk of the same mean spread, as for `disk_diameter_m`."""
+        spread_per_m = self._isotropic(self.spread_major_per_m, self.spread_minor_per_m)
+        return 1.0 / (self.photon_wavelength_m * (2.0 * spread_per_m) ** 2)
+
+    @property
+    def fresnel_number(self) -> float:
+        """The defocus in depths of focus, ``|z| / depth_of_focus_m``; zero at focus."""
+        return abs(self.defocus_distance_m) / self.depth_of_focus_m
 
 
 def estimate_probe_extent(
