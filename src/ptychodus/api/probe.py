@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
@@ -22,6 +22,7 @@ from .interpolate import resample_along_axis
 from .moments import compute_intensity_moments
 from .preprocess.diffraction import inpaint_bad_pixels
 from .preprocess.noise import subtract_noise_floor
+from .probe_positions import ProbePosition
 from .propagate import (
     PropagatedWavefield,
     compute_far_field_pixel_geometry,
@@ -1280,6 +1281,33 @@ class ProbeEnsemble:
         position: one probe then describes the whole scan.
         """
         return None if self._opr_weights is None else self._opr_weights.shape[0]
+
+    def iter_position_probes(
+        self, positions: Sequence[ProbePosition]
+    ) -> Iterator[tuple[ProbePosition, Probe]]:
+        """Yield ``(scan_position, probe)`` pairs for every scan position, in order.
+
+        Without OPR weights one probe describes the whole scan and is yielded at every
+        position. With them each position takes its own weight row, and weights carrying
+        more rows than the scan has positions are left unused -- a scan that is a prefix
+        of the one that solved the probe still pairs row for row.
+
+        Raises:
+            ValueError: when the OPR weights describe fewer positions than the scan
+                holds, which leaves later positions with no row to take. Reconcile the
+                weights with an OPR weight policy before pairing them with this scan.
+        """
+        num_positions = len(positions)
+        num_opr_positions = self.num_opr_positions
+
+        if num_opr_positions is not None and num_opr_positions < num_positions:
+            raise ValueError(
+                f'Probe carries OPR weights for {num_opr_positions} probe position(s)'
+                f' but the product has {num_positions}!'
+            )
+
+        for index, position in enumerate(positions):
+            yield position, self.get_probe(index)
 
     def get_probe(self, position_index: int) -> Probe:
         """Return the probe at scan position ``position_index``.

@@ -34,7 +34,7 @@ import numpy
 
 from .fourier import fourier_shift_2d
 from .object import ObjectGeometry
-from .probe import PatchBounds
+from .probe import PatchBounds, ProbeEnsemble
 from .probe_positions import ProbePosition
 from .product import Product
 from .typing import ComplexArrayType, RealArrayType
@@ -42,7 +42,9 @@ from .typing import ComplexArrayType, RealArrayType
 __all__ = [
     'ProbePatch',
     'accumulate_probe_intensity',
+    'accumulate_probe_intensity_on',
     'iter_probe_patches',
+    'iter_probe_patches_on',
 ]
 
 
@@ -84,21 +86,25 @@ def _validate_patch_bounds(bounds: PatchBounds, geometry: ObjectGeometry, index:
         )
 
 
-def iter_probe_patches(product: Product) -> Iterator[ProbePatch]:
+def iter_probe_patches_on(
+    probes: ProbeEnsemble,
+    positions: Sequence[ProbePosition],
+    object_geometry: ObjectGeometry,
+) -> Iterator[ProbePatch]:
     """Yield the object-canvas placement and sub-pixel-shifted probe of every scan position.
 
     The bounds are exact-width integer slices, so a patch can be read or accumulated
-    with a plain assignment and the object array is never interpolated.
+    with a plain assignment and the object array is never interpolated. The probe at
+    each position is paired as :meth:`ProbeEnsemble.iter_position_probes` pairs it.
 
     Raises:
         ValueError: for a position whose footprint leaves the canvas. The slices are
             unclipped, and an unchecked negative lower bound is a valid Python slice
             that wraps around to the far edge of the array.
     """
-    object_geometry = product.object_.get_geometry()
-    probe_geometry = product.probes.get_geometry()
+    probe_geometry = probes.get_geometry()
 
-    for scan_point, probe in product.iter_position_probes():
+    for scan_point, probe in probes.iter_position_probes(positions):
         object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
         bounds = probe_geometry.resolve_patch_bounds(object_point.x_px, object_point.y_px)
         _validate_patch_bounds(bounds, object_geometry, scan_point.index)
@@ -108,6 +114,13 @@ def iter_probe_patches(product: Product) -> Iterator[ProbePatch]:
             bounds=bounds,
             modes=fourier_shift_2d(probe.get_array(), dx=bounds.dx, dy=bounds.dy),
         )
+
+
+def iter_probe_patches(product: Product) -> Iterator[ProbePatch]:
+    """:func:`iter_probe_patches_on` over the product's probe, positions and object canvas."""
+    return iter_probe_patches_on(
+        product.probes, product.probe_positions, product.object_.get_geometry()
+    )
 
 
 def _resolve_weight_rows(
@@ -134,8 +147,10 @@ def _resolve_weight_rows(
     return rows, is_single
 
 
-def accumulate_probe_intensity(
-    product: Product,
+def accumulate_probe_intensity_on(
+    probes: ProbeEnsemble,
+    positions: Sequence[ProbePosition],
+    object_geometry: ObjectGeometry,
     *,
     weights: RealArrayType | Sequence[RealArrayType] | None = None,
     normalize: bool = False,
@@ -147,7 +162,9 @@ def accumulate_probe_intensity(
     depends on the positions only through where each contribution lands.
 
     Args:
-        product: Supplies the scan positions, the probe at each, and the canvas size.
+        probes: The probe, paired with each position as for :func:`iter_probe_patches_on`.
+        positions: The scan positions.
+        object_geometry: The canvas.
         weights: Per-position scale factors, ``(N,)`` for one canvas or ``(K, N)`` for
             ``K`` canvases accumulated in a single pass. The default weights every
             position equally.
@@ -163,13 +180,12 @@ def accumulate_probe_intensity(
         ValueError: when ``weights`` does not describe every position, or when a
             position's footprint leaves the canvas.
     """
-    object_geometry = product.object_.get_geometry()
     canvas_shape = (object_geometry.height_px, object_geometry.width_px)
-    weight_rows, is_single = _resolve_weight_rows(weights, len(product.probe_positions))
+    weight_rows, is_single = _resolve_weight_rows(weights, len(positions))
     num_canvases = 1 if weight_rows is None else weight_rows.shape[0]
     canvases: RealArrayType = numpy.zeros((num_canvases, *canvas_shape))
 
-    for index, probe_patch in enumerate(iter_probe_patches(product)):
+    for index, probe_patch in enumerate(iter_probe_patches_on(probes, positions, object_geometry)):
         patch = probe_patch.get_normalized_intensity() if normalize else probe_patch.get_intensity()
         bounds = probe_patch.bounds
 
@@ -180,3 +196,19 @@ def accumulate_probe_intensity(
                 canvas[bounds.y_slice, bounds.x_slice] += weight * patch
 
     return canvases[0] if is_single else canvases
+
+
+def accumulate_probe_intensity(
+    product: Product,
+    *,
+    weights: RealArrayType | Sequence[RealArrayType] | None = None,
+    normalize: bool = False,
+) -> RealArrayType:
+    """:func:`accumulate_probe_intensity_on` over the product's probe, positions and canvas."""
+    return accumulate_probe_intensity_on(
+        product.probes,
+        product.probe_positions,
+        product.object_.get_geometry(),
+        weights=weights,
+        normalize=normalize,
+    )

@@ -175,11 +175,15 @@ def estimate_mean_amplitude_transmission(
 def compute_probe_photon_counts_by_index(
     assembled_data: AssembledDiffractionData,
     positions: ProbePositionSequence,
+    *,
+    fall_back_to_totals: bool = True,
 ) -> dict[int, float]:
     """Merge diffraction-side and position-side per-pattern counts, keyed by scan index.
 
-    Precedence: measured diffraction-side counts, then position-side counts, then
-    per-pattern total counts as fallback.
+    Precedence: measured diffraction-side counts, then position-side counts, then, with
+    *fall_back_to_totals*, per-pattern total counts. Leave the fallback off wherever the
+    counts normalize those very totals, as a monitor does: a total divided by itself is
+    one. Without it, a pattern with no measured count is left out.
     """
     indexes = assembled_data.get_indexes()
     position_counts = positions.get_probe_photon_counts()
@@ -197,6 +201,13 @@ def compute_probe_photon_counts_by_index(
     if position_counts is not None:
         for position, count in zip(positions, position_counts):
             position_counts_by_index[int(position.index)] = float(count)
+
+    if not fall_back_to_totals:
+        return {
+            int(idx): position_counts_by_index[int(idx)]
+            for idx in indexes
+            if int(idx) in position_counts_by_index
+        }
 
     total_counts = assembled_data.get_total_counts()
     return {

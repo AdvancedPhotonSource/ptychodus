@@ -53,10 +53,11 @@ from ptychodus.api.simulate.object import (
     generate_siemens_star_object,
     generate_stxm_dpc_object,
     generate_uniform_object,
+    compute_stxm_dpc_signals,
+    interpolate_scan_values,
     STXMDPCSignals,
 )
-from ptychodus.api.simulate.object import _interpolate_stxm_intensity
-from ptychodus.api.probe_positions import ProbePosition
+from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.assemble import (
     AssembledDiffractionData,
     estimate_mean_amplitude_transmission,
@@ -642,6 +643,20 @@ def _make_stxm_signals(counts: list[int]) -> STXMDPCSignals:
     )
 
 
+def _stxm_map(
+    geometry: ObjectGeometry, data: AssembledDiffractionData, positions: list[ProbePosition]
+) -> tuple[numpy.ndarray, numpy.ndarray]:
+    """Each position's total counts mapped linearly onto the grid, with the hull."""
+    totals = dict(zip(data.get_indexes().tolist(), data.get_total_counts().tolist()))
+    kept = [position for position in positions if position.index in totals]
+    grids, supported = interpolate_scan_values(
+        geometry,
+        ProbePositionSequence(kept),
+        numpy.array([totals[position.index] for position in kept]),
+    )
+    return grids[0], supported
+
+
 def _generate_stxm_dpc(
     geometry: ObjectGeometry, counts: list[int], positions: list[ProbePosition]
 ) -> Object:
@@ -708,7 +723,7 @@ class TestStxmDpcObject:
         geometry = _make_geometry(64, 64)
         positions = _make_probe_positions_grid(geometry, (5, 5))
         counts = [100 + 17 * i for i in range(len(positions))]
-        _, scanned = _interpolate_stxm_intensity(geometry, _make_assembled_data(counts), positions)
+        _, scanned = _stxm_map(geometry, _make_assembled_data(counts), positions)
 
         obj = _generate_stxm_dpc(geometry, counts, positions)
         intensity = numpy.square(numpy.abs(obj.get_array()[0]))
@@ -723,9 +738,7 @@ class TestStxmDpcObject:
         geometry = _make_geometry(64, 64)
         positions = _make_probe_positions_grid(geometry, (5, 5))
         counts = [100 + 40 * i for i in range(len(positions))]
-        intensity, scanned = _interpolate_stxm_intensity(
-            geometry, _make_assembled_data(counts), positions
-        )
+        intensity, scanned = _stxm_map(geometry, _make_assembled_data(counts), positions)
 
         mapped = [geometry.map_coordinates_probe_to_object(p) for p in positions]
         outside = numpy.argwhere(numpy.logical_not(scanned))
@@ -750,9 +763,7 @@ class TestStxmDpcObject:
         dark = len(positions) // 2
         counts = [100] * len(positions)
         counts[dark] = 0
-        intensity, scanned = _interpolate_stxm_intensity(
-            geometry, _make_assembled_data(counts), positions
-        )
+        intensity, scanned = _stxm_map(geometry, _make_assembled_data(counts), positions)
 
         mapped = geometry.map_coordinates_probe_to_object(positions[dark])
         row, column = round(mapped.y_px), round(mapped.x_px)
@@ -799,7 +810,7 @@ class TestStxmDpcObject:
         obj = _generate_stxm_dpc(geometry, counts, positions)
         scaled = obj.get_array() * estimate_mean_amplitude_transmission(data)
 
-        _, scanned = _interpolate_stxm_intensity(geometry, data, positions)
+        _, scanned = _stxm_map(geometry, data, positions)
         assert numpy.abs(scaled[0][scanned]).max() == pytest.approx(1.0, rel=5e-3)
 
     def test_zero_mean_intensity_raises(self) -> None:
@@ -839,7 +850,7 @@ class TestPaganinObject:
         geometry, data, positions = _paganin_common_inputs()
         obj = generate_paganin_object(
             geometry,
-            data,
+            compute_stxm_dpc_signals(data),
             positions,
             photon_wavelength_m=1.0e-10,
             propagation_distance_m=1.0,
@@ -861,7 +872,7 @@ class TestPaganinObject:
         data = _make_assembled_data([500] * len(positions))
         obj = generate_paganin_object(
             geometry,
-            data,
+            compute_stxm_dpc_signals(data),
             positions,
             photon_wavelength_m=1.0e-10,
             propagation_distance_m=1.0,
@@ -877,7 +888,7 @@ class TestPaganinObject:
         with pytest.raises(ValueError, match='Propagation distance'):
             generate_paganin_object(
                 geometry,
-                data,
+                compute_stxm_dpc_signals(data),
                 positions,
                 photon_wavelength_m=1.0e-10,
                 propagation_distance_m=0.0,
@@ -889,7 +900,7 @@ class TestPaganinObject:
         with pytest.raises(ValueError, match='delta/beta'):
             generate_paganin_object(
                 geometry,
-                data,
+                compute_stxm_dpc_signals(data),
                 positions,
                 photon_wavelength_m=1.0e-10,
                 propagation_distance_m=1.0,
@@ -903,7 +914,7 @@ class TestPaganinObject:
         with pytest.raises(ValueError, match='Mean STXM intensity'):
             generate_paganin_object(
                 geometry,
-                data,
+                compute_stxm_dpc_signals(data),
                 positions,
                 photon_wavelength_m=1.0e-10,
                 propagation_distance_m=1.0,
@@ -913,10 +924,10 @@ class TestPaganinObject:
     def test_low_pass_behavior(self) -> None:
         """Paganin filter should suppress high frequencies relative to raw STXM."""
         geometry, data, positions = _paganin_common_inputs()
-        stxm_intensity, scanned = _interpolate_stxm_intensity(geometry, data, positions)
+        stxm_intensity, scanned = _stxm_map(geometry, data, positions)
         paganin_obj = generate_paganin_object(
             geometry,
-            data,
+            compute_stxm_dpc_signals(data),
             positions,
             photon_wavelength_m=1.0e-10,
             propagation_distance_m=10.0,
@@ -945,13 +956,13 @@ class TestPaganinObject:
         # log(amplitude) has meaningful magnitude.
         obj = generate_paganin_object(
             geometry,
-            data,
+            compute_stxm_dpc_signals(data),
             positions,
             photon_wavelength_m=1.0e-10,
             propagation_distance_m=1.0e-14,
             delta_over_beta=delta_over_beta,
         )
-        _, interior = _interpolate_stxm_intensity(geometry, data, positions)
+        _, interior = _stxm_map(geometry, data, positions)
         array = obj.get_array()[0]
         amplitude = numpy.abs(array)
         phase = numpy.angle(array)
@@ -968,13 +979,13 @@ class TestPaganinObject:
         delta_over_beta = 50.0
         obj = generate_paganin_object(
             geometry,
-            data,
+            compute_stxm_dpc_signals(data),
             positions,
             photon_wavelength_m=1.0e-10,
             propagation_distance_m=1.0e-30,
             delta_over_beta=delta_over_beta,
         )
-        stxm_intensity, interior = _interpolate_stxm_intensity(geometry, data, positions)
+        stxm_intensity, interior = _stxm_map(geometry, data, positions)
         # Normalized the way the generator does it: over the scanned region alone.
         normalized = stxm_intensity / stxm_intensity[interior].mean()
         exponent = 0.5 * (1.0 + 1j * delta_over_beta)

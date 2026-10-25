@@ -1,7 +1,7 @@
 """Object (transmission function) generation functions: STXM differential phase contrast, Paganin phase retrieval, random fields, simplex/fractal noise, dead-leaves models, and Siemens star resolution targets."""
 
 from __future__ import annotations
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final
 import logging
@@ -9,7 +9,7 @@ import math
 
 from scipy.fft import fft2, fftfreq, ifft2
 from scipy.interpolate import griddata
-from scipy.ndimage import gaussian_filter, map_coordinates
+from scipy.ndimage import gaussian_filter
 import numpy
 
 from ..accumulate import DiffractionMoments, compute_diffraction_moments
@@ -18,8 +18,9 @@ from ..constants import TWO_PI_J
 from ..geometry import ImageExtent, PixelGeometry
 from ..interpolate import interpolate_at_indexes, lerp
 from ..object import Object, ObjectGeometry, resample_object_layers
-from ..probe import Probe
-from ..probe_positions import ProbePosition
+from ..patch import accumulate_probe_intensity_on, iter_probe_patches_on
+from ..probe import Probe, ProbeEnsemble
+from ..probe_positions import ProbePosition, ProbePositionSequence
 from ..typing import BooleanArrayType, IntegerArrayType, RealArrayType
 
 __all__ = [
@@ -35,78 +36,78 @@ __all__ = [
     'generate_simplex_noise_object',
     'generate_stxm_dpc_object',
     'generate_uniform_object',
+    'interpolate_scan_values',
     'pad_object',
 ]
 
 logger = logging.getLogger(__name__)
 
 
-def _interpolate_scan_channels(
-    geometry: ObjectGeometry, points_px: RealArrayType, channels: RealArrayType
+def interpolate_scan_values(
+    geometry: ObjectGeometry,
+    positions: ProbePositionSequence,
+    values: RealArrayType,
+    *,
+    probes: ProbeEnsemble | None = None,
+    support_fraction: float = 0.05,
 ) -> tuple[RealArrayType, BooleanArrayType]:
-    """Interpolate per-position channels onto the object grid.
+    """Map per-position values onto the object grid, with the region the scan supports.
 
-    *points_px* holds one ``(y, x)`` object-pixel row per position and *channels* one
-    row of ``k`` finite values per position; the result is ``(k, height, width)``.
+    *values* holds one row of ``k`` finite values per position, shape ``(n,)`` or
+    ``(n, k)``; the grids come back ``(k, height, width)``. Linear interpolation holds
+    inside the convex hull of the positions, and beyond it every pixel takes its nearest
+    position's value, so the border continues the measured edge rather than stepping to
+    a level nothing observed.
 
-    Linear interpolation holds inside the convex hull of the positions; beyond it every
-    pixel takes its nearest position's value, so the border continues the measured edge
-    rather than stepping to a level nothing observed. The returned mask marks the
-    linearly interpolated pixels, which are the only ones the scan measured.
+    Interpolation is the right map for a value measured under a probe: such a value is
+    already the probe-averaged field sampled at its position, so interpolating the
+    samples recovers that once-blurred field. Weighting the map by the probe as well
+    would blur it a second time.
+
+    The returned support is where the scan measured anything. Without *probes* it is
+    the hull. With *probes*, placed as the forward model places them and with their
+    incoherent modes summed, it is where the illumination reaches *support_fraction* of
+    its peak, which follows the probe's footprint past the outermost positions and into
+    the gaps of a sparse scan rather than the outline of the positions alone.
+
+    Raises:
+        ValueError: if *support_fraction* is outside ``(0, 1]``, the probe illuminates
+            nothing on the canvas, or a probe's footprint leaves the canvas.
     """
+    rows = numpy.reshape(values, (len(positions), -1)).astype(numpy.float64)
+    points_yx_px = numpy.column_stack(
+        (
+            geometry.map_probe_positions_to_object_y_px(positions),
+            geometry.map_probe_positions_to_object_x_px(positions),
+        )
+    )
     YY, XX = numpy.mgrid[: geometry.height_px, : geometry.width_px]  # noqa: N806
     query_points = numpy.transpose((YY.flat, XX.flat))
 
     # griddata fills with NaN outside the hull unless told otherwise, which is what
     # distinguishes the two regions here.
-    interpolated = griddata(points_px, channels, query_points, method='linear')
-    scanned = numpy.logical_not(numpy.isnan(interpolated[:, 0]))
+    interpolated = griddata(points_yx_px, rows, query_points, method='linear')
+    inside_hull = numpy.logical_not(numpy.isnan(interpolated[:, 0]))
 
-    if not scanned.all():
-        nearest = griddata(points_px, channels, query_points, method='nearest')
-        interpolated = numpy.where(scanned[:, numpy.newaxis], interpolated, nearest)
+    if not inside_hull.all():
+        nearest = griddata(points_yx_px, rows, query_points, method='nearest')
+        interpolated = numpy.where(inside_hull[:, numpy.newaxis], interpolated, nearest)
 
-    grids = numpy.moveaxis(interpolated.reshape(*XX.shape, channels.shape[1]), -1, 0)
-    return grids, scanned.reshape(XX.shape)
+    grids = numpy.moveaxis(interpolated.reshape(*XX.shape, rows.shape[1]), -1, 0)
 
+    if probes is None:
+        return grids, inside_hull.reshape(XX.shape)
 
-def _interpolate_stxm_intensity(
-    geometry: ObjectGeometry,
-    assembled_data: AssembledDiffractionData,
-    probe_positions: Iterable[ProbePosition],
-) -> tuple[RealArrayType, BooleanArrayType]:
-    """Per-position diffraction counts on the object grid, and which pixels the scan covered.
+    if not 0.0 < support_fraction <= 1.0:
+        raise ValueError('Support fraction must lie in (0, 1]!')
 
-    Linear interpolation holds inside the convex hull of the scan positions; beyond it
-    every pixel takes its nearest measured neighbour, so the border continues the
-    measured edge rather than stepping to a level nothing observed.
+    illumination = accumulate_probe_intensity_on(probes, positions, geometry)
+    peak = float(illumination.max())
 
-    The returned mask marks the linearly interpolated pixels. Those beyond the hull are
-    plausible but are not measurements of anything, so a caller summarizing the map --
-    taking a mean to normalize by, say -- must weigh the mask rather than the whole
-    canvas.
-    """
-    coordinates_px: list[float] = list()
-    values: list[float] = list()
+    if not peak > 0.0:
+        raise ValueError('The probe illuminates nothing on the object canvas!')
 
-    assembled_indexes = assembled_data.get_indexes().tolist()
-    assembled_total_counts = assembled_data.get_total_counts().tolist()
-    total_counts_lut = dict(zip(assembled_indexes, assembled_total_counts))
-
-    for scan_point in probe_positions:
-        try:
-            value = total_counts_lut[scan_point.index]
-        except KeyError:
-            logger.debug(f'Skipping missing scan point index={scan_point.index}!')
-        else:
-            object_point = geometry.map_coordinates_probe_to_object(scan_point)
-            coordinates_px.append(object_point.y_px)
-            coordinates_px.append(object_point.x_px)
-            values.append(value)
-
-    points = numpy.reshape(coordinates_px, (-1, 2))
-    grids, scanned = _interpolate_scan_channels(geometry, points, numpy.reshape(values, (-1, 1)))
-    return grids[0], scanned
+    return grids, illumination >= support_fraction * peak
 
 
 @dataclass(frozen=True)
@@ -138,6 +139,7 @@ def compute_stxm_dpc_signals(
     assembled_data: AssembledDiffractionData,
     *,
     max_patterns_per_chunk: int = 256,
+    monitor_counts_by_index: Mapping[int, float] | None = None,
 ) -> STXMDPCSignals:
     """Measure each pattern's transmitted total and its intensity centroid.
 
@@ -157,7 +159,9 @@ def compute_stxm_dpc_signals(
     sample's phase gradient read as absorption. When measured incident photon counts are
     attached, each total is scaled by ``mean(M) / M_j`` so beam decay does not read as
     absorption; a count at or below zero cannot normalize anything and leaves its total
-    unscaled.
+    unscaled. *monitor_counts_by_index* supplies those counts keyed by scan index -- as
+    :func:`ptychodus.api.assemble.compute_probe_photon_counts_by_index` merges them from
+    both sides with its fallback off -- in place of the assembled data's own.
 
     The centroid is also taken over the whole inpainted frame. The centre-of-mass
     theorem then holds up to whatever scatters off the detector, so the crop sets both
@@ -196,7 +200,12 @@ def compute_stxm_dpc_signals(
             center_of_mass_y_px=empty.copy(),
         )
 
-    if assembled_data.has_measured_probe_photon_counts():
+    if monitor_counts_by_index:
+        moments = moments.normalize_by_monitor(
+            numpy.fromiter(monitor_counts_by_index.keys(), dtype=numpy.intp),
+            numpy.fromiter(monitor_counts_by_index.values(), dtype=numpy.float64),
+        )
+    elif assembled_data.has_measured_probe_photon_counts():
         moments = moments.normalize_by_monitor(
             indexes, assembled_data.get_probe_photon_counts().astype(numpy.float64)
         )
@@ -204,63 +213,82 @@ def compute_stxm_dpc_signals(
     return STXMDPCSignals.from_moments(moments)
 
 
+def _pair_signals_with_positions(
+    signals: STXMDPCSignals, probe_positions: Iterable[ProbePosition]
+) -> tuple[BooleanArrayType, ProbePositionSequence]:
+    """The signals a position pairs with, and those positions, in signal order.
+
+    Signals pair with positions by index: duplicate positions average, a signal between
+    positions takes an interpolated one, and a signal outside the range of position
+    indexes is left out.
+
+    Raises:
+        ValueError: when no position pairs with any signal.
+    """
+    positions = list(probe_positions)
+    position_indexes = numpy.array([position.index for position in positions], dtype=int)
+    position_xy_m = numpy.array(
+        [(position.x_m, position.y_m) for position in positions], dtype=float
+    ).reshape(-1, 2)
+    paired, xy_m = interpolate_at_indexes(position_indexes, position_xy_m, signals.indexes)
+    num_skipped = int(numpy.count_nonzero(~paired))
+
+    if num_skipped > 0:
+        logger.debug(f'Skipping {num_skipped} STXM-DPC signals outside the position indexes.')
+
+    if not paired.any():
+        raise ValueError('No probe position pairs with any STXM-DPC signal index!')
+
+    paired_positions = ProbePositionSequence(
+        [
+            ProbePosition(index=int(index), x_m=float(x_m), y_m=float(y_m))
+            for index, (x_m, y_m) in zip(signals.indexes[paired], xy_m)
+        ]
+    )
+    return paired, paired_positions
+
+
 def _compute_probe_shadow_gradient(
     transmission: RealArrayType,
-    probe: Probe,
-    points_px: RealArrayType,
-    pixel_geometry: PixelGeometry,
+    probes: ProbeEnsemble,
+    positions: ProbePositionSequence,
+    geometry: ObjectGeometry,
 ) -> RealArrayType:
     """The probe-phase gradient each position's centroid sees, in rad/m, as ``(n, 2)`` (x, y).
 
     A centroid measures the ``|psi|**2``-weighted mean of the exit-wave phase gradient,
     which includes the probe's own. Under transmission ``T`` that share is
-    ``(T * J)(r) / (T * I)(r)`` correlated over the probe window at position ``r``,
-    where ``I = sum_m |P_m|**2`` and ``J = sum_m Im(conj(P_m) grad P_m)`` --
+    ``sum(T * J) / sum(T * I)`` over the probe's footprint at that position, where
+    ``I = sum_m |P_m|**2`` and ``J = sum_m Im(conj(P_m) grad P_m)`` --
     ``|P|**2 grad(phase P)`` without unwrapping -- summed over the incoherent modes as
     the centre-of-mass theorem requires of a mixed state.
 
-    *points_px* holds ``(x, y)`` object-pixel rows. Derivatives are spectral, which a
-    far-field probe supports because it is periodic on its FFT grid by construction.
+    Each footprint is placed as the forward model places it, an exact-width slice of
+    the canvas with the probe Fourier-shifted by the residual sub-pixel offset.
+    Derivatives are spectral, which a far-field probe supports because it is periodic on
+    its FFT grid by construction.
     """
-    modes = probe.get_array()
-    probe_height_px, probe_width_px = modes.shape[-2:]
-    kx = 2 * numpy.pi * fftfreq(probe_width_px, d=pixel_geometry.width_m)
-    ky = 2 * numpy.pi * fftfreq(probe_height_px, d=pixel_geometry.height_m)
-    spectrum = fft2(modes)
-    d_dx = numpy.asarray(ifft2(1j * kx[numpy.newaxis, numpy.newaxis, :] * spectrum))
-    d_dy = numpy.asarray(ifft2(1j * ky[numpy.newaxis, :, numpy.newaxis] * spectrum))
-    conjugate = numpy.conj(modes)
-    kernels = (
-        numpy.sum(numpy.imag(conjugate * d_dx), axis=0),
-        numpy.sum(numpy.imag(conjugate * d_dy), axis=0),
-        numpy.sum(numpy.square(numpy.abs(modes)), axis=0),
-    )
+    probe_geometry = probes.get_geometry()
+    pixel_geometry = probes.get_pixel_geometry()
+    kx = 2 * numpy.pi * fftfreq(probe_geometry.width_px, d=pixel_geometry.width_m)
+    ky = 2 * numpy.pi * fftfreq(probe_geometry.height_px, d=pixel_geometry.height_m)
+    shadow = numpy.zeros((len(positions), 2))
 
-    # Zero-pad by the probe extent on every side so the circular correlation never
-    # wraps over the positions sampled below.
-    padded = numpy.pad(transmission, ((probe_height_px,), (probe_width_px,)))
-    transmission_spectrum = fft2(padded)
-    # A window centred at (x, y) under the (N - 1) / 2 convention starts at this corner,
-    # expressed in the padded frame.
-    corner_y = points_px[:, 1] - (probe_height_px - 1) / 2 + probe_height_px
-    corner_x = points_px[:, 0] - (probe_width_px - 1) / 2 + probe_width_px
+    for index, patch in enumerate(iter_probe_patches_on(probes, positions, geometry)):
+        modes = patch.modes
+        spectrum = fft2(modes)
+        d_dx = numpy.asarray(ifft2(1j * kx[numpy.newaxis, numpy.newaxis, :] * spectrum))
+        d_dy = numpy.asarray(ifft2(1j * ky[numpy.newaxis, :, numpy.newaxis] * spectrum))
+        conjugate = numpy.conj(modes)
+        local = transmission[patch.bounds.y_slice, patch.bounds.x_slice]
+        weight = numpy.sum(local * numpy.sum(numpy.square(numpy.abs(modes)), axis=0))
 
-    sampled = list()
+        if weight > 0.0:
+            shadow[index, 0] = numpy.sum(local * numpy.sum(numpy.imag(conjugate * d_dx), axis=0))
+            shadow[index, 1] = numpy.sum(local * numpy.sum(numpy.imag(conjugate * d_dy), axis=0))
+            shadow[index] /= weight
 
-    for kernel in kernels:
-        embedded = numpy.zeros(padded.shape)
-        embedded[:probe_height_px, :probe_width_px] = kernel
-        correlation = numpy.real(
-            numpy.asarray(ifft2(transmission_spectrum * numpy.conj(fft2(embedded))))
-        )
-        sampled.append(map_coordinates(correlation, [corner_y, corner_x], order=1))
-
-    flux_x, flux_y, weight = sampled
-    positive = weight > 0.0
-    safe_weight = numpy.where(positive, weight, 1.0)
-    shadow_x = numpy.where(positive, flux_x / safe_weight, 0.0)
-    shadow_y = numpy.where(positive, flux_y / safe_weight, 0.0)
-    return numpy.column_stack((shadow_x, shadow_y))
+    return shadow
 
 
 def _integrate_gradient(
@@ -308,15 +336,24 @@ def generate_stxm_dpc_object(
     *,
     detector_extent: ImageExtent,
     probe: Probe | None = None,
+    correct_shadow: bool = True,
+    incident_counts: float | None = None,
     regularization_fov_fraction: float = 0.0,
     reference_quantile: float = 0.95,
 ) -> Object:
     """Generate a coarse complex object from far-field data by STXM differential phase contrast.
 
-    The amplitude is the STXM one: per-position totals interpolated onto the object
-    grid and divided by their mean over the scanned region, so the result is a
-    dimensionless contrast map, and a position recording the unobstructed beam comes out
-    at unit modulus once a caller scales it to the sample's mean opacity.
+    The amplitude is the STXM one: per-position totals mapped onto the object grid. With
+    *incident_counts*, the unattenuated incident count, they are divided by it, so the
+    modulus is the sample's amplitude transmission. Without it they are divided by their
+    mean over the supported region, a dimensionless contrast map that a position
+    recording the unobstructed beam brings to unit modulus once a caller scales it to the
+    sample's mean opacity.
+
+    The totals and the gradients are mapped by :func:`interpolate_scan_values`, linearly
+    between the positions. A given `probe`, whose incoherent modes are summed, sets the
+    supported region -- where the gradient is integrated and the transmission is
+    referenced -- to its illumination rather than the hull of the positions.
 
     The phase comes from the far-field centre-of-mass theorem: a pattern's intensity
     centroid is the ``|psi|**2``-weighted mean of the exit wave's phase gradient under
@@ -361,15 +398,16 @@ def generate_stxm_dpc_object(
     RMS intensity width ``sigma`` defocused by ``dz``, ignoring it rescales the phase by
     ``1 +/- 4 * pi * (beta / delta) * sigma**2 / (wavelength * |dz|)``: of order one for
     micron-scale defocused hard X-ray probes at moderate ``beta / delta``, and nothing
-    for a pure phase object. Given a `probe`, whose incoherent modes are summed, that
-    term is estimated against the STXM transmission and subtracted. The estimate is
-    first order, because that transmission is itself blurred by the probe.
+    for a pure phase object. Given a `probe` and *correct_shadow*, that term is
+    estimated against the STXM transmission and subtracted. The estimate is first order,
+    because that transmission is itself blurred by the probe.
 
     Raises:
         ValueError: for a detector extent that is not positive, a negative
             regularization, a reference quantile outside [0, 1], a probe whose pixels
-            differ from the object's, when no probe position pairs with any signal, or
-            when the mean STXM intensity over the scanned region is not positive.
+            differ from the object's, an incident count that is not positive, when no
+            probe position pairs with any signal, or when the mean STXM intensity over
+            the supported region is not positive.
     """
     if detector_extent.width_px <= 0 or detector_extent.height_px <= 0:
         raise ValueError(f'Detector extent must be positive, not {detector_extent}!')
@@ -394,28 +432,11 @@ def generate_stxm_dpc_object(
                 f' ({pixel_geometry})!'
             )
 
-    positions = list(probe_positions)
-    position_indexes = numpy.array([position.index for position in positions], dtype=int)
-    position_xy_m = numpy.array(
-        [(position.x_m, position.y_m) for position in positions], dtype=float
-    ).reshape(-1, 2)
-    paired, xy_m = interpolate_at_indexes(position_indexes, position_xy_m, signals.indexes)
-    num_skipped = int(numpy.count_nonzero(~paired))
+    if incident_counts is not None and not incident_counts > 0.0:
+        raise ValueError(f'Incident counts must be positive, not {incident_counts}!')
 
-    if num_skipped > 0:
-        logger.debug(f'Skipping {num_skipped} STXM-DPC signals outside the position indexes.')
-
-    if not paired.any():
-        raise ValueError('No probe position pairs with any STXM-DPC signal index!')
-
-    # Object pixels under the (N - 1) / 2 centred convention of ObjectGeometry.
-    points_x_px = (xy_m[:, 0] - geometry.center_x_m) / geometry.pixel_width_m + (
-        geometry.width_px - 1
-    ) / 2
-    points_y_px = (xy_m[:, 1] - geometry.center_y_m) / geometry.pixel_height_m + (
-        geometry.height_px - 1
-    ) / 2
-    points_yx_px = numpy.column_stack((points_y_px, points_x_px))
+    paired, positions = _pair_signals_with_positions(signals, probe_positions)
+    probes = None if probe is None else ProbeEnsemble.from_probe(probe)
 
     total_counts = signals.total_counts[paired]
     centroid_x_px = signals.center_of_mass_x_px[paired]
@@ -430,9 +451,9 @@ def generate_stxm_dpc_object(
 
     radians_per_px_x = 2 * numpy.pi / (detector_extent.width_px * geometry.pixel_width_m)
     radians_per_px_y = 2 * numpy.pi / (detector_extent.height_px * geometry.pixel_height_m)
-    grids, scanned = _interpolate_scan_channels(
+    grids, scanned = interpolate_scan_values(
         geometry,
-        points_yx_px,
+        positions,
         numpy.column_stack(
             (
                 total_counts,
@@ -440,22 +461,22 @@ def generate_stxm_dpc_object(
                 radians_per_px_y * deviation_y_px,
             )
         ),
+        probes=probes,
     )
     intensity, gradient_x, gradient_y = grids
 
-    mean_intensity = float(numpy.mean(intensity[scanned])) if scanned.any() else 0.0
+    if incident_counts is None:
+        incident_counts = float(numpy.mean(intensity[scanned])) if scanned.any() else 0.0
 
-    if mean_intensity <= 0.0:
-        raise ValueError('Mean STXM intensity must be positive!')
+        if incident_counts <= 0.0:
+            raise ValueError('Mean STXM intensity must be positive!')
 
-    transmission = intensity / mean_intensity
+    transmission = intensity / incident_counts
 
-    if probe is not None:
-        shadow = _compute_probe_shadow_gradient(
-            transmission, probe, numpy.column_stack((points_x_px, points_y_px)), pixel_geometry
-        )
+    if probes is not None and correct_shadow:
+        shadow = _compute_probe_shadow_gradient(transmission, probes, positions, geometry)
         shadow -= numpy.mean(shadow, axis=0)
-        shadow_grids, _ = _interpolate_scan_channels(geometry, points_yx_px, shadow)
+        shadow_grids, _ = interpolate_scan_values(geometry, positions, shadow, probes=probes)
         gradient_x = gradient_x - shadow_grids[0]
         gradient_y = gradient_y - shadow_grids[1]
 
@@ -488,9 +509,10 @@ def generate_stxm_dpc_object(
 
 def generate_paganin_object(
     geometry: ObjectGeometry,
-    assembled_data: AssembledDiffractionData,
+    signals: STXMDPCSignals,
     probe_positions: Iterable[ProbePosition],
     *,
+    probe: Probe | None = None,
     photon_wavelength_m: float,
     propagation_distance_m: float,
     delta_over_beta: float,
@@ -499,13 +521,15 @@ def generate_paganin_object(
     """Generate a complex object via Paganin single-material phase retrieval on an STXM-like intensity image.
 
     See D. Paganin et al., J. Microsc. 206, 33 (2002). The intensity image
-    I(x,y) is built from per-position diffraction-pattern counts, normalized
-    by its mean to approximate I/I_0, then low-pass filtered to recover the
-    projected thickness T(x,y) of a homogeneous, weakly-absorbing sample with
-    refractive-index decrement delta and extinction coefficient beta. The
-    transmission function follows as ``filtered ** ((1 + i * delta/beta) / 2)``.
+    I(x,y) is the per-position totals of `signals`, mapped onto the object grid as
+    :func:`generate_stxm_dpc_object` maps them, and normalized by its mean over the
+    supported region -- the illumination of a given `probe`, or the hull of the
+    positions -- to approximate I/I_0. It is then low-pass filtered to recover the projected thickness
+    T(x,y) of a homogeneous, weakly-absorbing sample with refractive-index decrement
+    delta and extinction coefficient beta. The transmission function follows as
+    ``filtered ** ((1 + i * delta/beta) / 2)``.
 
-    The mean is taken over the scanned region alone. Pixels beyond it are
+    The mean is taken over the supported region alone. Pixels beyond it are
     extrapolated from the edge of the scan rather than measured, so including
     them would set I_0 partly from values nothing observed.
     """
@@ -515,7 +539,14 @@ def generate_paganin_object(
     if delta_over_beta <= 0.0:
         raise ValueError('delta/beta ratio must be strictly positive!')
 
-    intensity, scanned = _interpolate_stxm_intensity(geometry, assembled_data, probe_positions)
+    paired, positions = _pair_signals_with_positions(signals, probe_positions)
+    grids, scanned = interpolate_scan_values(
+        geometry,
+        positions,
+        signals.total_counts[paired],
+        probes=None if probe is None else ProbeEnsemble.from_probe(probe),
+    )
+    intensity = grids[0]
     mean_intensity = float(numpy.mean(intensity[scanned])) if scanned.any() else 0.0
 
     if mean_intensity <= 0.0:

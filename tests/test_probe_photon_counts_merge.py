@@ -127,6 +127,22 @@ class TestComputeProbePhotonCountsByIndex:
         assert result[2] == pytest.approx(200.0)
         assert result[5] == pytest.approx(5 * 16)
 
+    def test_without_the_fallback_only_measured_counts_are_returned(self) -> None:
+        """A monitor normalizes the totals, so a total must never stand in for its count."""
+        data = _make_assembled_data([1, 2, 5])
+        covered = _make_product([(1, 1.0, 0.0, 100.0), (2, 2.0, 0.0, 200.0)])
+        uncovered = _make_product([(1, 1.0, 0.0, None), (2, 2.0, 0.0, None)])
+
+        assert compute_probe_photon_counts_by_index(
+            data, covered.probe_positions, fall_back_to_totals=False
+        ) == {1: 100.0, 2: 200.0}
+        assert (
+            compute_probe_photon_counts_by_index(
+                data, uncovered.probe_positions, fall_back_to_totals=False
+            )
+            == {}
+        )
+
     def test_returns_total_counts_when_neither_side_supplies_measurements(self) -> None:
         # No measured counts anywhere: every index falls through to total_counts,
         # preserving the pre-refactor illumination-map weighting behavior.

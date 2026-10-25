@@ -2,7 +2,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from collections.abc import Callable, Sequence
 import logging
-
+import math
 
 from ptychodus.api.object import (
     Object,
@@ -12,7 +12,7 @@ from ptychodus.api.object import (
 )
 from ptychodus.api.simulate.object import generate_layers, pad_object
 from ptychodus.api.parameters import ParameterGroup
-from ptychodus.api.probe import ProbeEnsemble
+from ptychodus.api.probe import Probe, ProbeEnsemble
 
 from .settings import ObjectSettings
 
@@ -30,6 +30,8 @@ class ObjectBuilder(ParameterGroup):
         self._add_parameter('extra_padding_x', self.extra_padding_x)
         self.extra_padding_y = settings.extra_padding_y.copy()
         self._add_parameter('extra_padding_y', self.extra_padding_y)
+
+        self._probe_supplier: Callable[[], ProbeEnsemble] | None = None
 
     def get_name(self) -> str:
         return self._name.get_value()
@@ -56,10 +58,45 @@ class ObjectBuilder(ParameterGroup):
         """Accept the source of the probe that shares this builder's product.
 
         The item holding a builder binds it, so a builder copied into another product
-        reads that product's probe rather than the one it was copied from. Builders that
-        do not use the probe ignore it.
+        reads that product's probe rather than the one it was copied from. A copy starts
+        unbound. Builders that do not use the probe ignore it.
         """
-        pass
+        self._probe_supplier = supplier
+
+    def _get_probe_on_object_pixels(
+        self, geometry_provider: ObjectGeometryProvider, *, consequence: str
+    ) -> Probe | None:
+        """The bound probe, if there is one on the object's pixels, or None.
+
+        A geometry edit can rebuild the object before the probe catches up, so a probe
+        on other pixels degrades the object rather than failing it: the warning names
+        *consequence*, what the builder does without the probe. A missing or still empty
+        probe gives None without one.
+        """
+        if self._probe_supplier is None:
+            return None
+
+        probe = self._probe_supplier().get_probe_no_opr()
+
+        if probe.get_array().size == 0:
+            return None
+
+        probe_pixel_geometry = probe.get_pixel_geometry()
+        object_pixel_geometry = geometry_provider.get_object_geometry().get_pixel_geometry()
+
+        if not (
+            math.isclose(probe_pixel_geometry.width_m, object_pixel_geometry.width_m, rel_tol=1e-6)
+            and math.isclose(
+                probe_pixel_geometry.height_m, object_pixel_geometry.height_m, rel_tol=1e-6
+            )
+        ):
+            logger.warning(
+                f'Probe pixels ({probe_pixel_geometry}) differ from object pixels'
+                f' ({object_pixel_geometry}); {consequence}.'
+            )
+            return None
+
+        return probe
 
     @abstractmethod
     def _build_raw(self, geometry_provider: ObjectGeometryProvider) -> Object:

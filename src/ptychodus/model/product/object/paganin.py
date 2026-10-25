@@ -7,12 +7,20 @@ from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.simulate.object import generate_paganin_object
 
 from .builder import ObjectBuilder
+from .stxm_dpc import compute_monitored_signals
 from .settings import ObjectSettings
 
 logger = logging.getLogger(__name__)
 
 
 class PaganinObjectBuilder(ObjectBuilder):
+    """Paganin phase retrieval on the STXM intensity of the product's diffraction data.
+
+    The product's probe, when it is on the object's pixels, sets the region the mean
+    intensity I_0 is taken over to its illumination. The object reads the probe when it is built and is
+    not rebuilt when the probe changes, so rebuild it after changing the probe.
+    """
+
     def __init__(self, settings: ObjectSettings) -> None:
         super().__init__(settings, 'paganin')
         self._settings = settings
@@ -45,8 +53,11 @@ class PaganinObjectBuilder(ObjectBuilder):
 
         object_ = generate_paganin_object(
             geometry_provider.get_object_geometry(),
-            assembled_data,
+            compute_monitored_signals(assembled_data, geometry_provider),
             geometry_provider.get_probe_positions(),
+            probe=self._get_probe_on_object_pixels(
+                geometry_provider, consequence='using the hull of the positions'
+            ),
             photon_wavelength_m=geometry_provider.photon_wavelength_m,
             propagation_distance_m=geometry_provider.object_plane_propagation_distance_m,
             delta_over_beta=self.delta_over_beta.get_value(),

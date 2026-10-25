@@ -1,12 +1,15 @@
 from __future__ import annotations
-from collections.abc import Callable
 import logging
-import math
 
+from ptychodus.api.assemble import AssembledDiffractionData, compute_probe_photon_counts_by_index
 from ptychodus.api.geometry import GeometryNotDefinedError
 from ptychodus.api.object import Object, ObjectGeometryProvider
-from ptychodus.api.probe import Probe, ProbeEnsemble
-from ptychodus.api.simulate.object import compute_stxm_dpc_signals, generate_stxm_dpc_object
+from ptychodus.api.probe_positions import ProbePositionSequence
+from ptychodus.api.simulate.object import (
+    STXMDPCSignals,
+    compute_stxm_dpc_signals,
+    generate_stxm_dpc_object,
+)
 
 from .builder import ObjectBuilder
 from .settings import ObjectSettings
@@ -14,11 +17,35 @@ from .settings import ObjectSettings
 logger = logging.getLogger(__name__)
 
 
+def compute_monitored_signals(
+    assembled_data: AssembledDiffractionData, geometry_provider: ObjectGeometryProvider
+) -> STXMDPCSignals:
+    """STXM-DPC signals normalized by measured incident counts from either side.
+
+    Counts recorded with the patterns take precedence, then counts recorded with the
+    probe positions; a pattern with neither is left unnormalized.
+    """
+    positions = ProbePositionSequence(geometry_provider.get_probe_positions())
+    return compute_stxm_dpc_signals(
+        assembled_data,
+        monitor_counts_by_index=compute_probe_photon_counts_by_index(
+            assembled_data, positions, fall_back_to_totals=False
+        ),
+    )
+
+
 class STXMDPCObjectBuilder(ObjectBuilder):
+    """STXM amplitude and DPC phase from the product's diffraction data.
+
+    The product's probe, when it is on the object's pixels, sets the supported region to
+    its illumination and, with shadow correction on, removes the probe's own phase
+    gradient from the centroids. The object reads the probe when it is built
+    and is not rebuilt when the probe changes, so rebuild it after changing the probe.
+    """
+
     def __init__(self, settings: ObjectSettings) -> None:
         super().__init__(settings, 'stxm_dpc')
         self._settings = settings
-        self._probe_supplier: Callable[[], ProbeEnsemble] | None = None
 
         # The wavelength, detector distance and regime are the experiment's, read from
         # the provider at build time.
@@ -27,9 +54,6 @@ class STXMDPCObjectBuilder(ObjectBuilder):
         self.shadow_correction = settings.dpc_shadow_correction.copy()
         self._add_parameter('shadow_correction', self.shadow_correction)
 
-    def bind_probe_supplier(self, supplier: Callable[[], ProbeEnsemble] | None) -> None:
-        self._probe_supplier = supplier
-
     def copy(self) -> STXMDPCObjectBuilder:
         builder = STXMDPCObjectBuilder(self._settings)
 
@@ -37,37 +61,6 @@ class STXMDPCObjectBuilder(ObjectBuilder):
             builder.parameters()[key].set_value(value.get_value())
 
         return builder
-
-    def _get_shadow_probe(self, geometry_provider: ObjectGeometryProvider) -> Probe | None:
-        """The probe to correct the shadow term with, or None to build uncorrected.
-
-        A geometry edit can rebuild the object before the probe catches up, so a probe
-        on other pixels degrades the guess rather than failing it.
-        """
-        if not self.shadow_correction.get_value():
-            return None
-
-        if self._probe_supplier is None:
-            logger.warning('No probe to correct the STXM-DPC shadow term with; skipping it.')
-            return None
-
-        probe = self._probe_supplier().get_probe_no_opr()
-        probe_pixel_geometry = probe.get_pixel_geometry()
-        object_pixel_geometry = geometry_provider.get_object_geometry().get_pixel_geometry()
-
-        if not (
-            math.isclose(probe_pixel_geometry.width_m, object_pixel_geometry.width_m, rel_tol=1e-6)
-            and math.isclose(
-                probe_pixel_geometry.height_m, object_pixel_geometry.height_m, rel_tol=1e-6
-            )
-        ):
-            logger.warning(
-                f'Probe pixels ({probe_pixel_geometry}) differ from object pixels'
-                f' ({object_pixel_geometry}); skipping the STXM-DPC shadow correction.'
-            )
-            return None
-
-        return probe
 
     @property
     def reads_diffraction_data(self) -> bool:
@@ -85,12 +78,23 @@ class STXMDPCObjectBuilder(ObjectBuilder):
         if assembled_data is None:
             # Not yet bound; the build is retried once the product has data.
             raise GeometryNotDefinedError('No diffraction data to estimate the object from.')
+
+        correct_shadow = self.shadow_correction.get_value()
+        probe = self._get_probe_on_object_pixels(
+            geometry_provider,
+            consequence='using the hull of the positions and skipping the shadow correction',
+        )
+
+        if correct_shadow and self._probe_supplier is None:
+            logger.warning('No probe to correct the STXM-DPC shadow term with; skipping it.')
+
         object_ = generate_stxm_dpc_object(
             geometry_provider.get_object_geometry(),
-            compute_stxm_dpc_signals(assembled_data),
+            compute_monitored_signals(assembled_data, geometry_provider),
             geometry_provider.get_probe_positions(),
             detector_extent=assembled_data.get_image_extent(),
-            probe=self._get_shadow_probe(geometry_provider),
+            probe=probe,
+            correct_shadow=correct_shadow,
             regularization_fov_fraction=self.regularization_fov_fraction.get_value(),
         )
         return self._rescale_to_mean_transmission(self._pad_object(object_), geometry_provider)

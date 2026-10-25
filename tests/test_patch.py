@@ -10,7 +10,12 @@ from ptychodus.api.fourier import fourier_shift_2d
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.interpolate import BarycentricArrayInterpolator
 from ptychodus.api.object import Object, ObjectCenter, compute_object_geometry
-from ptychodus.api.patch import accumulate_probe_intensity, iter_probe_patches
+from ptychodus.api.patch import (
+    accumulate_probe_intensity,
+    accumulate_probe_intensity_on,
+    iter_probe_patches,
+    iter_probe_patches_on,
+)
 from ptychodus.api.probe import ProbeGeometry, ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
@@ -289,3 +294,23 @@ def test_fewer_opr_weight_rows_than_positions_is_rejected() -> None:
 
     with pytest.raises(ValueError, match=r'2 probe position\(s\).*has 4'):
         list(iter_probe_patches(_make_opr_product(4, weights)))
+
+
+def test_the_unpacked_forms_equal_the_product_forms() -> None:
+    product = _make_product(_SUBPIXEL, num_modes=2)
+    geometry = product.object_.get_geometry()
+
+    by_product = list(iter_probe_patches(product))
+    unpacked = list(iter_probe_patches_on(product.probes, product.probe_positions, geometry))
+
+    assert [patch.bounds for patch in unpacked] == [patch.bounds for patch in by_product]
+    for left, right in zip(unpacked, by_product):
+        numpy.testing.assert_array_equal(left.modes, right.modes)
+
+    weights = numpy.array([[1.0, 2.0, 3.0], [0.5, 0.5, 0.5]])
+    numpy.testing.assert_array_equal(
+        accumulate_probe_intensity_on(
+            product.probes, product.probe_positions, geometry, weights=weights
+        ),
+        accumulate_probe_intensity(product, weights=weights),
+    )

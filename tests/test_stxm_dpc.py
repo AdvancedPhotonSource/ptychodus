@@ -26,9 +26,9 @@ from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.simulate.diffraction import generate_diffraction_data
 from ptychodus.api.simulate.object import (
     STXMDPCSignals,
-    _interpolate_stxm_intensity,
     compute_stxm_dpc_signals,
     generate_stxm_dpc_object,
+    interpolate_scan_values,
 )
 from ptychodus.api.simulate.probe import propagate_probe
 from ptychodus.model.product.object import (
@@ -37,6 +37,8 @@ from ptychodus.model.product.object import (
     ObjectSettings,
     STXMDPCObjectBuilder,
 )
+from ptychodus.model.product.object.paganin import PaganinObjectBuilder
+from ptychodus.model.product.object.stxm_dpc import compute_monitored_signals
 
 _LOGGER_NAME = 'ptychodus.api.simulate.object'
 _PIXEL_SIZE_M = 50e-9
@@ -56,8 +58,8 @@ _GEOMETRY = ObjectGeometry(
 _INTERIOR = (slice(34, 94), slice(34, 94))
 
 # Measured on the fixtures below with whole-frame centroids, with headroom: 0.016 rad for
-# the flat-phase scan, and 0.061 rad uncorrected versus 0.012 rad corrected for the
-# defocused one.
+# the flat-phase scan, and 0.061 rad uncorrected versus 0.012 rad corrected (with the
+# probe's illumination as the support) for the defocused one.
 _PHASE_TOLERANCE_RAD = 0.03
 _SHADOW_UNCORRECTED_MINIMUM_RAD = 0.04
 _SHADOW_CORRECTED_TOLERANCE_RAD = 0.02
@@ -261,9 +263,14 @@ def test_empty_beam_is_the_phase_reference(absorbing_scan: _Scan) -> None:
 
 
 def test_amplitude_is_the_normalized_stxm_map(phase_scan: _Scan) -> None:
-    intensity, scanned = _interpolate_stxm_intensity(
-        _GEOMETRY, phase_scan.data, phase_scan.positions
+    signals = compute_stxm_dpc_signals(phase_scan.data)
+    totals = dict(zip(signals.indexes.tolist(), signals.total_counts.tolist()))
+    grids, scanned = interpolate_scan_values(
+        _GEOMETRY,
+        ProbePositionSequence(phase_scan.positions),
+        numpy.array([totals[position.index] for position in phase_scan.positions]),
     )
+    intensity = grids[0]
     expected = numpy.sqrt(intensity / numpy.mean(intensity[scanned]))
 
     recovered = _recover(phase_scan.data, phase_scan.positions)
@@ -682,3 +689,103 @@ def test_item_binds_its_probe_supplier_to_every_builder(phase_scan: _Scan) -> No
 
     item.set_builder(copied)
     assert copied._probe_supplier is supplier
+
+
+# ---------------------------------------------------------------------------
+# Mapping, support, scale and monitor counts
+# ---------------------------------------------------------------------------
+
+
+def test_a_probe_sets_the_support_but_not_the_values(phase_scan: _Scan) -> None:
+    positions = ProbePositionSequence(phase_scan.positions)
+    values = numpy.arange(len(positions), dtype=float)
+    probes = _ensemble(phase_scan.probe)
+
+    linear, hull = interpolate_scan_values(_GEOMETRY, positions, values)
+    same, illuminated = interpolate_scan_values(_GEOMETRY, positions, values, probes=probes)
+
+    numpy.testing.assert_array_equal(same, linear)
+    # The footprint reaches past the outermost positions, and not to the far corners.
+    assert numpy.count_nonzero(illuminated & ~hull) > 0
+    assert not illuminated[0, 0] and not illuminated[-1, -1]
+
+    with pytest.raises(ValueError, match='Support fraction'):
+        interpolate_scan_values(_GEOMETRY, positions, values, probes=probes, support_fraction=0.0)
+
+
+def test_incident_counts_give_an_absolute_transmission(absorbing_scan: _Scan) -> None:
+    signals = compute_stxm_dpc_signals(absorbing_scan.data)
+    incident = float(numpy.max(signals.total_counts))
+    relative = _recover(absorbing_scan.data, absorbing_scan.positions, signals=signals)
+    absolute = _recover(
+        absorbing_scan.data, absorbing_scan.positions, signals=signals, incident_counts=incident
+    )
+
+    # Only the scale differs, and the brightest total is the incident beam.
+    ratio = numpy.abs(absolute.get_array()) / numpy.abs(relative.get_array())
+    assert numpy.allclose(ratio, ratio.flat[0])
+    assert numpy.max(numpy.abs(absolute.get_array())) <= 1.0 + 1e-6
+
+    with pytest.raises(ValueError, match='Incident counts'):
+        _recover(absorbing_scan.data, absorbing_scan.positions, incident_counts=0.0)
+
+
+def _with_position_monitor(scan: _Scan, decay: numpy.ndarray) -> list[ProbePosition]:
+    return [
+        ProbePosition(
+            index=position.index, x_m=position.x_m, y_m=position.y_m, probe_photon_count=float(m)
+        )
+        for position, m in zip(scan.positions, decay)
+    ]
+
+
+def test_position_side_counts_normalize_the_builders_signals(absorbing_scan: _Scan) -> None:
+    data = absorbing_scan.data
+    decay = numpy.linspace(1.0, 0.6, data.get_patterns().shape[0])
+    decayed = _with(data, patterns=data.get_patterns() * decay[:, numpy.newaxis, numpy.newaxis])
+    reference = compute_stxm_dpc_signals(data)
+
+    unmonitored = compute_monitored_signals(decayed, _StubProvider(absorbing_scan.positions))
+    monitored = compute_monitored_signals(
+        decayed, _StubProvider(_with_position_monitor(absorbing_scan, 1.0e6 * decay))
+    )
+
+    def spread(signals: STXMDPCSignals) -> float:
+        ratio = signals.total_counts / reference.total_counts
+        return float(numpy.std(ratio / numpy.mean(ratio)))
+
+    assert spread(unmonitored) > 0.05
+    assert spread(monitored) < 1e-3
+
+
+def test_paganin_builds_on_the_monitored_totals(absorbing_scan: _Scan) -> None:
+    data = absorbing_scan.data
+    decay = numpy.linspace(1.0, 0.6, data.get_patterns().shape[0])
+    decayed = _with(data, patterns=data.get_patterns() * decay[:, numpy.newaxis, numpy.newaxis])
+    builder = PaganinObjectBuilder(_settings())
+
+    clean = builder.build(
+        _StubProvider(absorbing_scan.positions, assembled_data=data), []
+    ).get_array()
+    monitored = builder.build(
+        _StubProvider(
+            _with_position_monitor(absorbing_scan, 1.0e6 * decay), assembled_data=decayed
+        ),
+        [],
+    ).get_array()
+
+    numpy.testing.assert_allclose(numpy.abs(monitored), numpy.abs(clean), rtol=1e-3)
+
+
+def test_a_bound_probe_sets_the_builders_support(phase_scan: _Scan) -> None:
+    provider = _StubProvider(phase_scan.positions, assembled_data=phase_scan.data)
+    builder = STXMDPCObjectBuilder(_settings())
+    unbound = builder.build(provider, []).get_array()
+
+    builder.bind_probe_supplier(lambda: _ensemble(phase_scan.probe))
+    bound = builder.build(provider, []).get_array()
+
+    # Shadow correction is off, so only the support differs: amplitudes agree and the
+    # phase, integrated and referenced over another region, does not.
+    numpy.testing.assert_allclose(numpy.abs(bound), numpy.abs(unbound), rtol=1e-6)
+    assert not numpy.allclose(numpy.angle(bound), numpy.angle(unbound))
