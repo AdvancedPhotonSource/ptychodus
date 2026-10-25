@@ -10,7 +10,6 @@ import logging
 import math
 
 import numpy
-import scipy.ndimage
 from scipy.fft import fft2
 
 from .constants import format_length
@@ -18,7 +17,8 @@ from .files import FileReader, FileWriter
 from .fourier import fourier_shift_2d
 from .geometry import ImageExtent, PixelGeometry
 from .interpolate import resample_along_axis
-from .preprocess.noise import estimate_noise_floor
+from .moments import compute_intensity_moments
+from .preprocess.noise import subtract_noise_floor
 from .propagate import (
     PropagatedWavefield,
     compute_far_field_pixel_geometry,
@@ -241,18 +241,16 @@ def estimate_probe_size(
 
     The pipeline is:
 
-    1. **Pre-filter and noise floor.** The input is passed through a 3x3
-       median filter to suppress hot pixels and other isolated outliers
-       (matching :func:`ptychodus.api.preprocess.diffraction.estimate_beam_center`).
-       Background and noise scale are then estimated via
-       :func:`ptychodus.api.preprocess.noise.estimate_noise_floor`, which uses Otsu's
-       method on the filtered image to identify the background class when
-       the histogram is bimodal and falls back to median / median-absolute-
-       deviation over the outermost ring of pixels when it is not. The
-       filtered image is then shifted down by ``background + mad_threshold
-       * MAD`` and clipped to non-negative values. Larger ``mad_threshold``
-       is more aggressive at suppressing noise tails but increasingly
-       truncates real signal in the wings.
+    1. **Pre-filter and noise floor.** The input is cleaned by
+       :func:`ptychodus.api.preprocess.noise.subtract_noise_floor`: a 3x3
+       median filter suppresses hot pixels and other isolated outliers, Otsu's
+       method identifies the background class when the histogram is bimodal
+       and the outermost ring of pixels stands in for it when it is not, the
+       background is subtracted, and pixels below ``background + mad_threshold
+       * MAD`` are set to zero. Pixels above the threshold keep their full
+       height, so every width below is that of the measured profile, truncated
+       only where it sinks into the noise. Larger ``mad_threshold`` is more
+       aggressive at suppressing noise but truncates more of the wings.
     2. **Principal axes.** The centroid and intensity-weighted 2x2 covariance
        are computed on the cleaned image (in physical metres). Its eigenvectors
        define the major/minor axes; the tilt of each is reported in radians,
@@ -289,9 +287,9 @@ def estimate_probe_size(
             metres.
         energy_fraction: Fraction of cleaned total power that defines the
             encircled-energy diameter; must be in ``(0, 1]``.
-        mad_threshold: Soft-threshold level, in units of border-MAD, applied
-            above the estimated background. ``0.0`` disables thresholding
-            (background is still subtracted).
+        mad_threshold: Significance threshold, in units of MAD, above the
+            estimated background; pixels below it are set to zero. ``0.0``
+            keeps every pixel above the background.
 
     Raises:
         ValueError: If ``probe_intensity`` is not 2D, ``energy_fraction`` is
@@ -315,23 +313,12 @@ def estimate_probe_size(
 
     height_px, width_px = probe_intensity.shape
 
-    filtered = scipy.ndimage.median_filter(probe_intensity.astype(numpy.float64), size=3)
-
-    border = numpy.concatenate(
-        [
-            filtered[0, :].ravel(),
-            filtered[-1, :].ravel(),
-            filtered[1:-1, 0].ravel(),
-            filtered[1:-1, -1].ravel(),
-        ]
+    cleaned, _ = subtract_noise_floor(
+        probe_intensity, mad_threshold=mad_threshold, fall_back_to_border=True
     )
-    robust_statistics = estimate_noise_floor(filtered, fallback_values=border)
-    threshold = robust_statistics.get_significance_threshold(mad_threshold)
+    moments = compute_intensity_moments(cleaned)
 
-    cleaned = numpy.clip(filtered - threshold, 0.0, None)
-    total_power = cleaned.sum()
-
-    if total_power <= 0.0:
+    if not moments.total > 0.0:
         return ProbeSizeMetrics(
             major_axis_tilt_rad=0.0,
             minor_axis_tilt_rad=0.0,
@@ -342,19 +329,15 @@ def estimate_probe_size(
             encircled_energy_diameter_m=0.0,
         )
 
+    pixel_width_m = pixel_geometry.width_m
+    pixel_height_m = pixel_geometry.height_m
     y_idx, x_idx = numpy.mgrid[:height_px, :width_px]  # noqa: N806
-    x_m = (x_idx - (width_px - 1) / 2.0) * pixel_geometry.width_m
-    y_m = (y_idx - (height_px - 1) / 2.0) * pixel_geometry.height_m
+    dx = (x_idx - (width_px - 1) / 2.0 - moments.centroid_x_px) * pixel_width_m
+    dy = (y_idx - (height_px - 1) / 2.0 - moments.centroid_y_px) * pixel_height_m
 
-    centroid_x = (cleaned * x_m).sum() / total_power
-    centroid_y = (cleaned * y_m).sum() / total_power
-
-    dx = x_m - centroid_x
-    dy = y_m - centroid_y
-
-    mxx = (cleaned * dx * dx).sum() / total_power
-    myy = (cleaned * dy * dy).sum() / total_power
-    mxy = (cleaned * dx * dy).sum() / total_power
+    mxx = moments.covariance_xx_px2 * pixel_width_m**2
+    myy = moments.covariance_yy_px2 * pixel_height_m**2
+    mxy = moments.covariance_xy_px2 * pixel_width_m * pixel_height_m
     covariance = numpy.array([[mxx, mxy], [mxy, myy]])
 
     eigenvalues, eigenvectors = numpy.linalg.eigh(covariance)

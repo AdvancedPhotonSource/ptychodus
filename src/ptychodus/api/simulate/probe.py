@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
 from enum import IntEnum, auto
 import logging
 import math
@@ -16,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from ..constants import TWO_PI, TWO_PI_J
 from ..typing import ComplexArrayType, RealArrayType
 from ..geometry import HermiteMode, ImageExtent, LegendreMode, PixelGeometry, ZernikeMode
+from ..moments import compute_intensity_moments
 from ..probe import Probe, ProbeGeometry, ProbeEnsemble, ProbeTransverseCoordinates
 from ..propagate import (
     AngularSpectrumPropagator,
@@ -1142,53 +1142,6 @@ class GaussianSchellStrategy(IncoherentModeStrategy):
         )
 
 
-@dataclass(frozen=True)
-class _ProbeMoments:
-    """Intensity-weighted centroid and variance of a probe, in meters."""
-
-    center_x_m: float
-    center_y_m: float
-    variance_x_m2: float
-    variance_y_m2: float
-
-
-def _compute_probe_moments(
-    probe_intensity: RealArrayType, coordinates: ProbeTransverseCoordinates
-) -> _ProbeMoments:
-    """Return the plain intensity-weighted first and second moments of a probe.
-
-    No filtering, thresholding or background subtraction: the caller wants the length
-    scale of the distribution it passed in, not an estimate of where a cleaned-up beam
-    would sit.
-
-    Raises ValueError when the total intensity is non-positive, or when either variance
-    vanishes, since neither a centroid nor a width is defined in those cases.
-    """
-    total = probe_intensity.sum()
-
-    if total <= 0.0:
-        raise ValueError('Cannot take moments of a probe with non-positive total intensity!')
-
-    center_x_m = (coordinates.x_m * probe_intensity).sum() / total
-    center_y_m = (coordinates.y_m * probe_intensity).sum() / total
-    variance_x_m2 = (numpy.square(coordinates.x_m - center_x_m) * probe_intensity).sum() / total
-    variance_y_m2 = (numpy.square(coordinates.y_m - center_y_m) * probe_intensity).sum() / total
-
-    if variance_x_m2 <= 0.0 or variance_y_m2 <= 0.0:
-        raise ValueError(
-            'Probe intensity has no transverse extent on at least one axis, so it sets no '
-            'length scale; a probe confined to a single row or column cannot seed '
-            'polynomial modes.'
-        )
-
-    return _ProbeMoments(
-        center_x_m=float(center_x_m),
-        center_y_m=float(center_y_m),
-        variance_x_m2=float(variance_x_m2),
-        variance_y_m2=float(variance_y_m2),
-    )
-
-
 def _graded_polynomial_orders(num_orders: int) -> list[tuple[int, int]]:
     """Return *num_orders* polynomial order pairs, graded by increasing total degree.
 
@@ -1259,14 +1212,33 @@ class ProbeMomentPolynomialStrategy(IncoherentModeStrategy):
 
     def build_fill_imodes(self, probe: Probe, first_imode: int, num_fill: int) -> ComplexArrayType:
         array_in = probe.get_array()
+        pixel_geometry = probe.get_pixel_geometry()
         coords = _probe_geometry(probe).get_transverse_coordinates()
-        moments = _compute_probe_moments(numpy.sum(intensity(array_in), axis=-3), coords)
+
+        # The plain intensity moments, with no filtering, thresholding or background
+        # subtraction: the length scale of the distribution as given.
+        moments = compute_intensity_moments(numpy.sum(intensity(array_in), axis=-3))
+
+        if not moments.total > 0.0:
+            raise ValueError('Cannot take moments of a probe with non-positive total intensity!')
+
+        variance_x_m2 = moments.covariance_xx_px2 * pixel_geometry.width_m**2
+        variance_y_m2 = moments.covariance_yy_px2 * pixel_geometry.height_m**2
+
+        if not (variance_x_m2 > 0.0 and variance_y_m2 > 0.0):
+            raise ValueError(
+                'Probe intensity has no transverse extent on at least one axis, so it sets no '
+                'length scale; a probe confined to a single row or column cannot seed '
+                'polynomial modes.'
+            )
 
         # Dimensionless offsets: a polynomial in meters would span tens of decades
         # between its lowest and highest order for no gain, since scaling a mode by a
         # constant leaves the orthogonalized result unchanged.
-        u = (coords.x_m - moments.center_x_m) / math.sqrt(moments.variance_x_m2)
-        v = (coords.y_m - moments.center_y_m) / math.sqrt(moments.variance_y_m2)
+        u = (coords.x_m - moments.centroid_x_px * pixel_geometry.width_m) / math.sqrt(variance_x_m2)
+        v = (coords.y_m - moments.centroid_y_px * pixel_geometry.height_m) / math.sqrt(
+            variance_y_m2
+        )
         damping = numpy.exp(
             -(numpy.square(u) + numpy.square(v)) / (2.0 * numpy.square(self._damping_width))
         )

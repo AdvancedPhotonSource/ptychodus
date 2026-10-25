@@ -31,6 +31,7 @@ from .diffraction import (
     validate_pixel_map,
 )
 from .geometry import ImageExtent, PixelGeometry
+from .moments import FrameStatistics
 from .preprocess.diffraction import (
     DiffractionPrepPipeline,
     FilterValuesStep,
@@ -58,6 +59,7 @@ __all__ = [
     'compute_dataset_total_counts',
     'compute_probe_photon_counts_by_index',
     'default_max_workers',
+    'estimate_incident_counts',
     'estimate_mean_amplitude_transmission',
     'preprocess_array',
     'suggest_crop_region',
@@ -93,6 +95,29 @@ def compute_total_counts(
 
     good_pixels = numpy.logical_not(bad_pixels)
     return numpy.sum(patterns[:, good_pixels], axis=-1)
+
+
+def estimate_incident_counts(total_counts: RealArrayType, *, quantile: float = 0.99) -> float:
+    """Estimate the unattenuated incident count from per-pattern totals.
+
+    A pattern recorded through empty beam -- or, failing that, through the most
+    transparent part of the sample -- is among the brightest, so a high quantile of the
+    totals stands in for the incident flux. A quantile just below one keeps a single
+    saturated, cosmic-ray or otherwise anomalous frame from setting it; ``1.0`` takes
+    the brightest frame itself. NaN totals are ignored, and no finite total gives 0.
+
+    Raises:
+        ValueError: if *quantile* is outside ``[0, 1]``.
+    """
+    if not 0.0 <= quantile <= 1.0:
+        raise ValueError(f'quantile must lie in [0, 1], got {quantile}')
+
+    finite = total_counts[numpy.isfinite(total_counts)]
+
+    if finite.size == 0:
+        return 0.0
+
+    return float(numpy.quantile(finite, quantile))
 
 
 def estimate_mean_amplitude_transmission(
@@ -1271,52 +1296,6 @@ def assemble_dataset(
     return data
 
 
-class _FrameStatistics:
-    """Thread-safe running minimum/mean/maximum over chunks of patterns.
-
-    Each chunk is reduced outside the lock; the lock is held only long enough to
-    fold that chunk's three frames into the running totals.
-    """
-
-    def __init__(self, height: int, width: int) -> None:
-        self._lock = threading.Lock()
-        self._sum_frame = numpy.zeros((height, width), dtype=numpy.float64)
-        self._minimum_frame: DiffractionPattern | None = None
-        self._maximum_frame: DiffractionPattern | None = None
-        self._num_patterns = 0
-
-    def add(self, patterns: DiffractionPatterns) -> None:
-        """Fold a non-empty chunk of patterns into the running statistics."""
-        chunk_minimum = patterns.min(axis=0)
-        chunk_maximum = patterns.max(axis=0)
-        chunk_sum = patterns.sum(axis=0, dtype=numpy.float64)
-        num_patterns = patterns.shape[0]
-
-        with self._lock:
-            self._sum_frame += chunk_sum
-            self._num_patterns += num_patterns
-
-            if self._minimum_frame is None or self._maximum_frame is None:
-                self._minimum_frame = chunk_minimum
-                self._maximum_frame = chunk_maximum
-            else:
-                self._minimum_frame = numpy.minimum(self._minimum_frame, chunk_minimum)
-                self._maximum_frame = numpy.maximum(self._maximum_frame, chunk_maximum)
-
-    def get_frames(
-        self,
-    ) -> tuple[DiffractionPattern, DiffractionPattern, DiffractionPattern] | None:
-        """Return the `(minimum, mean, maximum)` frames, or None if nothing was added.
-
-        The mean divides by the number of patterns actually folded in, not by the
-        number metadata reserves, so skipped arrays do not bias it toward zero.
-        """
-        if self._minimum_frame is None or self._maximum_frame is None:
-            return None
-
-        return self._minimum_frame, self._sum_frame / self._num_patterns, self._maximum_frame
-
-
 @dataclass(frozen=True)
 class DiffractionSummary:
     """Per-pixel and per-pattern statistics for a diffraction dataset.
@@ -1377,7 +1356,7 @@ def summarize_dataset(
     indexes = -numpy.ones(num_patterns_total, dtype=numpy.intp)
     total_counts = numpy.zeros(num_patterns_total, dtype=numpy.float64)
 
-    statistics = _FrameStatistics(height, width)
+    statistics = FrameStatistics(height, width)
     offsets = compute_array_offsets(metadata)
     nonfinite_union = _NonfinitePixelUnion()
 

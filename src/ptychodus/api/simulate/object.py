@@ -1,5 +1,6 @@
 """Object (transmission function) generation functions: STXM differential phase contrast, Paganin phase retrieval, random fields, simplex/fractal noise, dead-leaves models, and Siemens star resolution targets."""
 
+from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Final
@@ -11,13 +12,12 @@ from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter, map_coordinates
 import numpy
 
-from ..assemble import AssembledDiffractionData, DetectorCorrections
+from ..accumulate import DiffractionMoments, compute_diffraction_moments
+from ..assemble import AssembledDiffractionData
 from ..constants import TWO_PI_J
 from ..geometry import ImageExtent, PixelGeometry
 from ..interpolate import interpolate_at_indexes, lerp
 from ..object import Object, ObjectGeometry, resample_object_layers
-from ..preprocess.diffraction import inpaint_bad_pixels
-from ..preprocess.noise import estimate_noise_floor
 from ..probe import Probe
 from ..probe_positions import ProbePosition
 from ..typing import BooleanArrayType, IntegerArrayType, RealArrayType
@@ -115,7 +115,7 @@ class STXMDPCSignals:
 
     Rows pair with probe positions by `indexes`, never by order. Centroids are in
     detector pixels, x along columns and y along rows, about the detector midpoint. A
-    pattern whose aperture held no signal keeps its total and has a NaN centroid.
+    pattern with no signal keeps its total and has a NaN centroid.
     """
 
     indexes: IntegerArrayType
@@ -123,155 +123,85 @@ class STXMDPCSignals:
     center_of_mass_x_px: RealArrayType
     center_of_mass_y_px: RealArrayType
 
-
-def _find_dpc_aperture(
-    mean_pattern: RealArrayType,
-    good_pixels: BooleanArrayType,
-    *,
-    energy_fraction: float,
-    margin_px: float,
-) -> BooleanArrayType:
-    """The circular aperture holding `energy_fraction` of the mean pattern's signal.
-
-    The pedestal, estimated as the noise-floor median of the good pixels, is removed
-    first so that a uniform floor does not inflate the circle. The circle is centred on
-    the signal's centroid and widened by `margin_px`.
-    """
-    pedestal = estimate_noise_floor(mean_pattern[good_pixels]).median if good_pixels.any() else 0.0
-    signal = numpy.clip(mean_pattern - pedestal, 0.0, None)
-    total = float(numpy.sum(signal))
-
-    if not total > 0.0:
-        logger.warning('Mean pattern holds no signal; using the whole detector as the aperture.')
-        return numpy.ones(mean_pattern.shape, dtype=numpy.bool)
-
-    yy, xx = numpy.indices(mean_pattern.shape, dtype=numpy.float64)
-    center_x = numpy.sum(signal * xx) / total
-    center_y = numpy.sum(signal * yy) / total
-    radius = numpy.hypot(xx - center_x, yy - center_y)
-
-    order = numpy.argsort(radius, axis=None, kind='stable')
-    enclosed = numpy.cumsum(signal.ravel()[order])
-    position = min(int(numpy.searchsorted(enclosed, energy_fraction * total)), order.size - 1)
-    enclosing_radius = radius.ravel()[order[position]]
-
-    return radius <= enclosing_radius + margin_px
+    @classmethod
+    def from_moments(cls, moments: DiffractionMoments) -> STXMDPCSignals:
+        """The per-pattern rows of accumulated diffraction moments."""
+        return cls(
+            indexes=moments.indexes.copy(),
+            total_counts=moments.total_counts.copy(),
+            center_of_mass_x_px=moments.center_of_mass_x_px.copy(),
+            center_of_mass_y_px=moments.center_of_mass_y_px.copy(),
+        )
 
 
 def compute_stxm_dpc_signals(
     assembled_data: AssembledDiffractionData,
     *,
-    aperture_energy_fraction: float = 0.99,
-    aperture_margin_px: float = 4.0,
     max_patterns_per_chunk: int = 256,
 ) -> STXMDPCSignals:
     """Measure each pattern's transmitted total and its intensity centroid.
 
-    A detector background or flat field the patterns still carry is applied first, as
-    ``(pattern - background) / flat_field`` clipped at zero, and the pixels those maps
-    make unusable join the bad pixels.
+    One pass of :func:`ptychodus.api.accumulate.compute_diffraction_moments`, so the
+    same signals accumulate online, a chunk at a time, from a stream. A detector
+    background or flat field the patterns still carry is applied first, as ``(pattern -
+    background) / flat_field`` clipped at zero, and the pixels those maps make unusable
+    join the bad pixels.
 
-    The total sums the whole corrected frame, with its bad pixels inpainted as for the
-    centroid below; it is the absorption signal. Summing only the good pixels instead
-    would let a beam that walks across a dead region with the sample's phase gradient
-    read as absorption. When measured incident photon counts are attached, each total is
-    scaled by ``mean(M) / M_j`` so beam decay does not read as absorption. A count at or
-    below zero cannot normalize anything and leaves its total unscaled.
+    Bad pixels are inpainted in each frame from that frame's own neighbours, so a shifted
+    disk edge next to a hole carries into the fill. A bad region touching the detector
+    border is zeroed instead and so acts as dropped, and a wide gap across the edge of
+    the bright field is poorly constrained either way.
 
-    The centroid is taken inside a circular aperture rather than over the whole
-    detector, because its noise variance grows as ``sum(I_p * r_p**2)`` and the shot
-    noise of sparse high-q pixels would dominate it. The circle holds
-    `aperture_energy_fraction` of the corrected mean pattern's signal above its
-    pedestal, widened by `aperture_margin_px`. The centre-of-mass theorem is exact only
-    when the aperture holds all of the scattered intensity, so the fraction states the
-    truncation directly: deflections that carry signal past the margin are
-    underestimated. Hard X-ray phase gradients usually shift a pattern by less than a
-    pixel, so the default margin is generous.
+    The total sums the whole inpainted frame; it is the absorption signal. Summing only
+    the good pixels instead would let a beam that walks across a dead region with the
+    sample's phase gradient read as absorption. When measured incident photon counts are
+    attached, each total is scaled by ``mean(M) / M_j`` so beam decay does not read as
+    absorption; a count at or below zero cannot normalize anything and leaves its total
+    unscaled.
 
-    Bad pixels are inpainted in each frame from that frame's own neighbours, so a
-    shifted disk edge next to a hole carries into the fill. A bad region touching the
-    detector border is zeroed instead and so acts as dropped, and a wide gap across the
-    edge of the bright field is poorly constrained either way.
+    The centroid is also taken over the whole inpainted frame. The centre-of-mass
+    theorem then holds up to whatever scatters off the detector, so the crop sets both
+    how much deflected signal is lost and how much high-angle shot noise enters: the
+    centroid's noise variance grows as ``sum(I_p * r_p**2)``, dominated by sparse pixels
+    far from the bright field. For photon-counting detectors, whose dark pixels hold
+    mostly zeros after the value filter, that noise is small; data from an integrating
+    detector with read noise should be cropped tightly, as the crop suggestion does.
 
-    `max_patterns_per_chunk` bounds the working memory. It changes the result by
-    rounding alone, since every reduction runs within one pattern.
+    `max_patterns_per_chunk` bounds the working memory and sets how many frames share
+    one biharmonic fill. It changes the result by rounding alone, since every per-pattern
+    reduction runs within one pattern.
 
     Raises:
         ValueError: if a tunable is out of range.
     """
-    if not 0.0 < aperture_energy_fraction <= 1.0:
-        raise ValueError('Aperture energy fraction must lie in (0, 1]!')
-
-    if aperture_margin_px < 0.0:
-        raise ValueError('Aperture margin must not be negative!')
-
     if max_patterns_per_chunk < 1:
         raise ValueError('Chunks must hold at least one pattern!')
 
-    corrections = DetectorCorrections(
+    indexes = numpy.asarray(assembled_data.get_indexes())
+    moments = compute_diffraction_moments(
+        indexes,
+        assembled_data.get_patterns(),
+        bad_pixels=assembled_data.get_bad_pixels(),
         background=assembled_data.get_background(),
         flat_field=assembled_data.get_flat_field(),
-        subtract_background=True,
-        divide_flat_field=True,
-    )
-    bad_pixels = corrections.apply_to_bad_pixels(assembled_data.get_bad_pixels())
-    good_pixels = numpy.logical_not(bad_pixels)
-
-    mean_pattern = corrections.apply(assembled_data.get_mean_pattern()[numpy.newaxis])[0]
-    mean_pattern = inpaint_bad_pixels(mean_pattern.astype(numpy.float64), bad_pixels)
-    aperture = _find_dpc_aperture(
-        mean_pattern,
-        good_pixels,
-        energy_fraction=aperture_energy_fraction,
-        margin_px=aperture_margin_px,
+        chunk_size=max_patterns_per_chunk,
     )
 
-    height_px, width_px = mean_pattern.shape
-    yy, xx = numpy.indices((height_px, width_px), dtype=numpy.float64)
-    aperture_x_px = (xx - (width_px - 1) / 2)[aperture]
-    aperture_y_px = (yy - (height_px - 1) / 2)[aperture]
-
-    patterns = assembled_data.get_patterns()
-    num_patterns = patterns.shape[0]
-    total_counts = numpy.zeros(num_patterns, dtype=numpy.float64)
-    center_of_mass_x_px = numpy.full(num_patterns, numpy.nan)
-    center_of_mass_y_px = numpy.full(num_patterns, numpy.nan)
-
-    for start in range(0, num_patterns, max_patterns_per_chunk):
-        stop = min(start + max_patterns_per_chunk, num_patterns)
-        corrected = corrections.apply(patterns[start:stop]).astype(numpy.float64)
-        repaired = inpaint_bad_pixels(corrected, bad_pixels)
-        total_counts[start:stop] = numpy.sum(repaired, axis=(-2, -1))
-
-        inside = repaired[:, aperture]
-        weight = numpy.sum(inside, axis=-1)
-        moment_x = numpy.sum(inside * aperture_x_px, axis=-1)
-        moment_y = numpy.sum(inside * aperture_y_px, axis=-1)
-        has_weight = weight > 0.0
-        safe_weight = numpy.where(has_weight, weight, 1.0)
-        center_of_mass_x_px[start:stop] = numpy.where(has_weight, moment_x / safe_weight, numpy.nan)
-        center_of_mass_y_px[start:stop] = numpy.where(has_weight, moment_y / safe_weight, numpy.nan)
+    if moments is None:
+        empty = numpy.zeros(0, dtype=numpy.float64)
+        return STXMDPCSignals(
+            indexes=indexes.copy(),
+            total_counts=empty,
+            center_of_mass_x_px=empty.copy(),
+            center_of_mass_y_px=empty.copy(),
+        )
 
     if assembled_data.has_measured_probe_photon_counts():
-        monitor = assembled_data.get_probe_photon_counts().astype(numpy.float64)
-        usable = numpy.isfinite(monitor) & (monitor > 0.0)
+        moments = moments.normalize_by_monitor(
+            indexes, assembled_data.get_probe_photon_counts().astype(numpy.float64)
+        )
 
-        if usable.any():
-            total_counts[usable] *= numpy.mean(monitor[usable]) / monitor[usable]
-            logger.info('Normalizing STXM totals by the measured incident photon counts.')
-
-        if not usable.all():
-            logger.warning(
-                f'{int(numpy.count_nonzero(~usable))} incident photon counts are not positive;'
-                ' leaving those totals unnormalized.'
-            )
-
-    return STXMDPCSignals(
-        indexes=numpy.asarray(assembled_data.get_indexes()).copy(),
-        total_counts=total_counts,
-        center_of_mass_x_px=center_of_mass_x_px,
-        center_of_mass_y_px=center_of_mass_y_px,
-    )
+    return STXMDPCSignals.from_moments(moments)
 
 
 def _compute_probe_shadow_gradient(
@@ -422,7 +352,7 @@ def generate_stxm_dpc_object(
 
     Resolution is the probe's and the scan step's, because each centroid averages the
     gradient under ``|P|**2``. The theorem needs all of the scattered intensity, so
-    gradients that deflect signal beyond the measuring aperture are underestimated.
+    gradients that deflect signal beyond the detector frame are underestimated.
 
     A centroid also carries the probe's own phase gradient, weighted by the sample's
     transmission. Without a `probe`, that shadow term is ignored, which assumes a probe

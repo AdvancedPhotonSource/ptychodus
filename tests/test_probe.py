@@ -169,6 +169,25 @@ class TestEstimateProbeSize:
         numpy.testing.assert_allclose(metrics.rms_minor_axis_length_m, b_px * PIXEL_M, rtol=0.05)
         numpy.testing.assert_allclose(metrics.major_axis_tilt_rad, 0.0, atol=0.05)
 
+    @pytest.mark.parametrize('peak', [300.0, 2000.0])
+    def test_noisy_gaussian_over_a_pedestal_keeps_its_widths(self, peak: float) -> None:
+        """Pixels above the noise floor keep their full height above the background, so
+        the half maximum is that of the measured profile at any signal level, and the
+        second moments lose only the wings that sink into the noise.
+        """
+        sigma_px = 10.0
+        expected = _gaussian_2d(128, 128, sigma_px, sigma_px, tilt_rad=0.0)
+        rng = numpy.random.default_rng(0)
+        intensity = rng.poisson(peak * expected + 20.0).astype(numpy.float64)
+
+        metrics = estimate_probe_size(intensity, PIXEL_GEOMETRY)
+
+        expected_fwhm = 2.0 * numpy.sqrt(2.0 * numpy.log(2.0)) * sigma_px * PIXEL_M
+        numpy.testing.assert_allclose(metrics.fwhm_major_axis_length_m, expected_fwhm, rtol=0.03)
+        numpy.testing.assert_allclose(metrics.fwhm_minor_axis_length_m, expected_fwhm, rtol=0.03)
+        assert 0.93 * 2.0 * sigma_px * PIXEL_M < metrics.rms_minor_axis_length_m
+        assert metrics.rms_major_axis_length_m < 1.01 * 2.0 * sigma_px * PIXEL_M
+
     def test_zero_signal_returns_all_zeros(self) -> None:
         """When the cleaned image has no power, all metrics fall through to 0.0."""
         metrics = estimate_probe_size(numpy.zeros((64, 64)), PIXEL_GEOMETRY)

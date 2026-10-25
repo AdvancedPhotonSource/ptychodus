@@ -15,6 +15,7 @@ import numpy.testing
 import pytest
 from scipy.ndimage import gaussian_filter
 
+from ptychodus.api.accumulate import DiffractionMomentAccumulator
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter, ObjectGeometry, ObjectGeometryProvider
@@ -25,7 +26,6 @@ from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.simulate.diffraction import generate_diffraction_data
 from ptychodus.api.simulate.object import (
     STXMDPCSignals,
-    _find_dpc_aperture,
     _interpolate_stxm_intensity,
     compute_stxm_dpc_signals,
     generate_stxm_dpc_object,
@@ -55,8 +55,9 @@ _GEOMETRY = ObjectGeometry(
 # Well inside every scan below, so neither the hull nor the mirror padding reaches it.
 _INTERIOR = (slice(34, 94), slice(34, 94))
 
-# Measured on the fixtures below, with headroom: 0.017 rad for the flat-phase scan, and
-# 0.062 rad uncorrected versus 0.012 rad corrected for the defocused one.
+# Measured on the fixtures below with whole-frame centroids, with headroom: 0.016 rad for
+# the flat-phase scan, and 0.061 rad uncorrected versus 0.012 rad corrected for the
+# defocused one.
 _PHASE_TOLERANCE_RAD = 0.03
 _SHADOW_UNCORRECTED_MINIMUM_RAD = 0.04
 _SHADOW_CORRECTED_TOLERANCE_RAD = 0.02
@@ -321,7 +322,7 @@ def test_inpainted_bad_pixels_preserve_the_phase(phase_scan: _Scan) -> None:
     center_x = numpy.sum(mean_pattern * xx) / total
     radius = numpy.hypot(yy - center_y, xx - center_x)
     # The focused probe's beam is about a pixel wide here, so the holes go on its flank,
-    # inside the aperture: a dozen scattered dead pixels and a small cluster.
+    # inside the bright field: a dozen scattered dead pixels and a small cluster.
     candidates = numpy.argwhere((radius >= 3.0) & (radius < 7.0))
     chosen = candidates[numpy.random.default_rng(3).choice(len(candidates), 12, replace=False)]
     bad_pixels = numpy.zeros(mean_pattern.shape, dtype=bool)
@@ -371,49 +372,25 @@ def test_chunk_size_does_not_change_the_signals(phase_scan: _Scan) -> None:
     )
 
 
-def _aperture_radius(aperture: numpy.ndarray) -> float:
-    return float(numpy.sqrt(numpy.count_nonzero(aperture) / numpy.pi))
-
-
-def test_aperture_holds_the_requested_signal_fraction(phase_scan: _Scan) -> None:
-    mean_pattern = phase_scan.data.get_mean_pattern().astype(numpy.float64)
-    good_pixels = numpy.ones(mean_pattern.shape, dtype=bool)
-    radii = list()
-
-    for fraction in (0.9, 0.99, 0.999):
-        aperture = _find_dpc_aperture(
-            mean_pattern, good_pixels, energy_fraction=fraction, margin_px=0.0
-        )
-        assert numpy.sum(mean_pattern[aperture]) >= fraction * numpy.sum(mean_pattern) * (1 - 1e-6)
-        radii.append(_aperture_radius(aperture))
-
-    assert radii == sorted(radii)
-    assert radii[-1] < mean_pattern.shape[0] / 2
-
-
-def test_aperture_ignores_an_uncorrected_pedestal(phase_scan: _Scan) -> None:
-    mean_pattern = phase_scan.data.get_mean_pattern().astype(numpy.float64)
-    good_pixels = numpy.ones(mean_pattern.shape, dtype=bool)
-
-    clean = _find_dpc_aperture(mean_pattern, good_pixels, energy_fraction=0.99, margin_px=4.0)
-    offset = _find_dpc_aperture(
-        mean_pattern + 0.01 * mean_pattern.max(), good_pixels, energy_fraction=0.99, margin_px=4.0
+def test_signals_are_one_pass_of_the_accumulator(phase_scan: _Scan) -> None:
+    data = phase_scan.data
+    indexes = numpy.asarray(data.get_indexes())
+    accumulator = DiffractionMomentAccumulator(
+        *data.get_bad_pixels().shape, bad_pixels=data.get_bad_pixels(), chunk_size=7
     )
 
-    assert _aperture_radius(offset) == pytest.approx(_aperture_radius(clean), abs=1.0)
+    for start in range(0, indexes.size, 5):
+        accumulator.add(indexes[start : start + 5], data.get_patterns()[start : start + 5])
 
+    moments = accumulator.get_moments()
+    assert moments is not None
+    expected = compute_stxm_dpc_signals(data)
 
-def test_aperture_without_signal_is_the_whole_detector(caplog: pytest.LogCaptureFixture) -> None:
-    with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
-        aperture = _find_dpc_aperture(
-            numpy.zeros((16, 16)),
-            numpy.ones((16, 16), dtype=bool),
-            energy_fraction=0.99,
-            margin_px=4.0,
-        )
-
-    assert aperture.all()
-    assert len(_warnings(caplog)) == 1
+    numpy.testing.assert_array_equal(moments.indexes, expected.indexes)
+    numpy.testing.assert_allclose(moments.total_counts, expected.total_counts, rtol=1e-12)
+    numpy.testing.assert_allclose(
+        moments.center_of_mass_x_px, expected.center_of_mass_x_px, rtol=1e-12, atol=1e-12
+    )
 
 
 # ---------------------------------------------------------------------------

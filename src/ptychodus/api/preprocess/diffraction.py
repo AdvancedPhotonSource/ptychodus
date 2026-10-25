@@ -41,8 +41,9 @@ from ..diffraction import (
     SimpleDiffractionArray,
 )
 from ..geometry import ImageExtent, PixelGeometry
+from ..moments import compute_intensity_moments
 from ..typing import AnyArrayType, RealArrayType
-from .noise import RobustStatistics, estimate_noise_floor
+from .noise import RobustStatistics, estimate_filtered_noise_floor, subtract_noise_floor
 
 # A step rearranges or combines the last two axes and leaves rank and dtype family to the
 # caller, so every `apply` returns exactly what it was handed: a pattern stack, a bad-pixel
@@ -444,6 +445,7 @@ def inpaint_bad_pixels(
 def estimate_beam_center(
     pattern: DiffractionPattern,
     *,
+    bad_pixels: BadPixels | None = None,
     mad_threshold: float = 4.5,
 ) -> BeamCenter:
     """Estimate the direct-beam pixel of a diffraction pattern.
@@ -454,48 +456,31 @@ def estimate_beam_center(
     bright asymmetric peaks outside the central region cannot bias the
     result.
 
-    Bad pixels must already be handled by the caller (e.g. via
-    :func:`inpaint_bad_pixels`) before invoking this function.
+    Pixels flagged in `bad_pixels` are left out of the noise floor and carry no
+    weight in either centroid. Without a mask, bad pixels must already be handled
+    by the caller (e.g. via :func:`inpaint_bad_pixels`).
 
     Falls back to the geometric center if every pixel is rejected as noise.
     """
     height, width = pattern.shape[-2:]
     geometric_center = BeamCenter(x_px=width // 2, y_px=height // 2)
 
-    working_pattern = pattern.astype(numpy.float64, copy=True)
-    filtered_pattern = ndimage.median_filter(working_pattern, size=3)
-
-    # Convert intensities to non-negative weights by subtracting the background
-    # and rejecting pixels below background + mad_threshold * MAD. Otsu's
-    # threshold is used to identify the background pool when the histogram is
-    # bimodal; for unimodal noise-only inputs the helper falls back to
-    # median/MAD over the whole frame.
-    robust_statistics = estimate_noise_floor(filtered_pattern)
-    background_intensity = robust_statistics.median
-    significance_threshold = robust_statistics.get_significance_threshold(mad_threshold)
-    centroid_weights = filtered_pattern - background_intensity
-    centroid_weights[filtered_pattern < significance_threshold] = 0.0
-    numpy.clip(centroid_weights, 0.0, None, out=centroid_weights)
-
-    # Pixel-coordinate axes centered on the array midpoint, so symmetric weight
-    # distributions sum to ~0 rather than relying on catastrophic cancellation.
-    midpoint_y = (height - 1) / 2.0
-    midpoint_x = (width - 1) / 2.0
-    centered_y_axis = numpy.arange(height, dtype=numpy.float64).reshape(-1, 1) - midpoint_y
-    centered_x_axis = numpy.arange(width, dtype=numpy.float64).reshape(1, -1) - midpoint_x
+    # Non-negative weights: the background subtracted, and pixels below
+    # background + mad_threshold * MAD rejected as noise.
+    centroid_weights, _ = subtract_noise_floor(
+        pattern, bad_pixels=bad_pixels, mad_threshold=mad_threshold
+    )
 
     # Pass 1: global intensity-weighted centroid.
-    coarse_total_weight = float(centroid_weights.sum())
+    coarse = compute_intensity_moments(centroid_weights, bad_pixels=bad_pixels)
 
-    if coarse_total_weight <= 0.0:
+    if not coarse.total > 0.0:
         return geometric_center
 
-    coarse_center_y = midpoint_y + float(
-        (centroid_weights * centered_y_axis).sum() / coarse_total_weight
-    )
-    coarse_center_x = midpoint_x + float(
-        (centroid_weights * centered_x_axis).sum() / coarse_total_weight
-    )
+    midpoint_y = (height - 1) / 2.0
+    midpoint_x = (width - 1) / 2.0
+    coarse_center_y = midpoint_y + float(coarse.centroid_y_px)
+    coarse_center_x = midpoint_x + float(coarse.centroid_x_px)
 
     # Pass 2: re-centroid inside a square window around the pass-1 estimate.
     half_window_size = min(height, width) // 4
@@ -504,16 +489,11 @@ def estimate_beam_center(
     in_central_window = (numpy.abs(pixel_y - coarse_center_y) <= half_window_size) & (
         numpy.abs(pixel_x - coarse_center_x) <= half_window_size
     )
-    windowed_weights = centroid_weights * in_central_window
-    refined_total_weight = float(windowed_weights.sum())
+    refined = compute_intensity_moments(centroid_weights * in_central_window, bad_pixels=bad_pixels)
 
-    if refined_total_weight > 0.0:
-        refined_center_y = midpoint_y + float(
-            (windowed_weights * centered_y_axis).sum() / refined_total_weight
-        )
-        refined_center_x = midpoint_x + float(
-            (windowed_weights * centered_x_axis).sum() / refined_total_weight
-        )
+    if refined.total > 0.0:
+        refined_center_y = midpoint_y + float(refined.centroid_y_px)
+        refined_center_x = midpoint_x + float(refined.centroid_x_px)
     else:
         refined_center_y = coarse_center_y
         refined_center_x = coarse_center_x
@@ -564,7 +544,11 @@ def estimate_signal_radius(
     The radius is in the pattern's own pixels.
 
     ``mad_threshold`` scales the noise MAD into the threshold a ring mean must exceed;
-    larger values report a smaller radius. A ring with fewer than ``min_ring_pixels``
+    larger values report a smaller radius. The MAD is that of single filtered pixels,
+    although a ring mean averages many of them and is far less noisy, so the test is
+    deliberately conservative: a threshold scaled down by the ring's pixel count would
+    also pass a slightly misjudged background or an uncorrected gradient in every ring,
+    and run the radius out to the detector edge. A ring with fewer than ``min_ring_pixels``
     good pixels is not judged, so a corner sliver or a ring crossing a detector gap
     cannot set the radius. When the noise MAD is zero, as on a mostly-empty
     photon-counting frame, any ring with a mean above the background counts as signal.
@@ -573,7 +557,6 @@ def estimate_signal_radius(
         raise ValueError(f'mad_threshold must be non-negative, got {mad_threshold}.')
 
     height, width = pattern.shape[-2:]
-    filtered_pattern = ndimage.median_filter(pattern.astype(numpy.float64), size=3)
     good_pixels = (
         numpy.ones((height, width), dtype=bool)
         if bad_pixels is None
@@ -583,8 +566,8 @@ def estimate_signal_radius(
     if not numpy.any(good_pixels):
         raise ValueError('Every pixel is bad, so no noise floor can be estimated.')
 
+    filtered_pattern, noise_floor = estimate_filtered_noise_floor(pattern, bad_pixels=bad_pixels)
     good_values = filtered_pattern[good_pixels]
-    noise_floor = estimate_noise_floor(good_values)
     threshold = mad_threshold * noise_floor.median_absolute_deviation
 
     pixel_y = numpy.arange(height).reshape(-1, 1) - beam_center.y_px
