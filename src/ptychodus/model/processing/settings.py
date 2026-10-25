@@ -8,7 +8,7 @@ from ptychodus.api.settings import SettingsRegistry
 # is a better answer than whichever algorithm that library happens to list
 # first -- the one is a choice ptychodus made, the other is an accident of
 # registration order.
-_DEFAULT_ALGORITHM: Final = 'LSQML'
+_DEFAULT_ALGORITHM: Final = 'Kickstart'
 
 
 class ProcessingSettings(Observable, Observer):
@@ -24,7 +24,7 @@ class ProcessingSettings(Observable, Observer):
         # a file carrying the two keys in either order still lands correctly.
         # The simple name, which is what a chooser writes back and so what
         # a saved file holds; the display name resolves too.
-        self.library = self._group.create_string_parameter('Library', 'PtyChi')
+        self.library = self._group.create_string_parameter('Library', 'Ptychodus')
         self.algorithm = self._group.create_string_parameter('Algorithm', _DEFAULT_ALGORITHM)
         self.default_algorithm = _DEFAULT_ALGORITHM
         # Device identifiers, comma separated; empty means every device the

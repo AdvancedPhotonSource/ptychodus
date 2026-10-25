@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 def compute_monitored_signals(
     assembled_data: AssembledDiffractionData, geometry_provider: ObjectGeometryProvider
 ) -> STXMDPCSignals:
-    """STXM-DPC signals normalized by measured incident counts from either side.
+    """STXM-DPC signals normalized by measured incident photon counts from either side.
 
     Counts recorded with the patterns take precedence, then counts recorded with the
     probe positions; a pattern with neither is left unnormalized.

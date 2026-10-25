@@ -49,6 +49,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parameters import (
     BooleanParameter,
@@ -229,26 +230,30 @@ def _whole_number_editor(
 
 
 def _real_number_editor(
-    parameter: RealParameter, unit: Unit | None, *, tool_tip: str = ''
+    parameter: RealParameter,
+    unit: Unit | None,
+    *,
+    display_unit: LengthUnit | None = None,
+    tool_tip: str = '',
 ) -> ParameterViewController:
     """A unit ladder where the field names a unit, else a slider or a line edit.
 
     A bounded real slides between its ends; an unbounded one has nothing to
     slide between and gets a line edit. A real naming a unit gets neither: a
-    length is read and written in whichever SI prefix suits its magnitude, and
-    a slider over the whole range would make the small end unreachable.
+    length is read and written in whichever SI prefix suits its magnitude --
+    *display_unit* where the value is zero and suggests none -- and a slider
+    over the whole range would make the small end unreachable.
     """
     # Only the base unit of each quantity, because each of these controllers
     # holds one: a field declaring degrees handed to the one that reads turns
     # would be rescaled by a factor nobody asked for.
-    ladders: Final = {
-        Unit.METER: LengthParameterViewController,
-        Unit.TURN: AngleParameterViewController,
-    }
-    ladder = None if unit is None else ladders.get(unit)
+    if unit is Unit.METER:
+        return LengthParameterViewController(
+            parameter, default_unit=display_unit or LengthUnit.METER, tool_tip=tool_tip
+        )
 
-    if ladder is not None:
-        return ladder(parameter, tool_tip=tool_tip)
+    if unit is Unit.TURN:
+        return AngleParameterViewController(parameter, tool_tip=tool_tip)
 
     if parameter.get_minimum() is not None and parameter.get_maximum() is not None:
         return DecimalSliderParameterViewController(parameter, tool_tip=tool_tip)
@@ -299,7 +304,9 @@ def _editor(field: DescribedField) -> ParameterViewController | None:
         return _whole_number_editor(parameter, tool_tip=tool_tip)
 
     if isinstance(parameter, RealParameter):
-        return _real_number_editor(parameter, described.unit, tool_tip=tool_tip)
+        return _real_number_editor(
+            parameter, described.unit, display_unit=described.display_unit, tool_tip=tool_tip
+        )
 
     if isinstance(parameter, StringParameter):
         if choices:
@@ -488,16 +495,19 @@ def _build_layout(
     return layout
 
 
-def _group_label(group_name: str, library_name: str) -> str:
-    """Strip the backend's own name off a group, leaving what distinguishes it.
+def _group_label(group_name: str, library_name: str, reconstructor_name: str = '') -> str:
+    """Strip the backend's or the algorithm's own name off a group, leaving what
+    distinguishes it.
 
     A group is named for the settings section it persists as, which carries
-    the backend name because an INI is flat. A panel already knows which
-    backend it belongs to, so repeating it in every box title says nothing.
+    the backend name -- or, in a library of several algorithms, the algorithm's --
+    because an INI is flat. A panel already knows which backend and algorithm it
+    belongs to, so repeating either in every box title says nothing.
     """
     stripped = group_name
+    prefixes = (library_name, library_name.replace('-', ''), reconstructor_name)
 
-    for prefix in (library_name, library_name.replace('-', '')):
+    for prefix in filter(None, prefixes):
         if stripped.casefold().startswith(prefix.casefold()):
             stripped = stripped[len(prefix) :]
             break
@@ -527,7 +537,7 @@ class GeneratedViewControllerFactory(ReconstructorViewControllerFactory):
         layout = QVBoxLayout()
 
         for group in groups:
-            layout.addWidget(self._build_group(group, controllers))
+            layout.addWidget(self._build_group(group, reconstructor_name, controllers))
 
         layout.addStretch()
 
@@ -536,7 +546,10 @@ class GeneratedViewControllerFactory(ReconstructorViewControllerFactory):
         return widget
 
     def _build_group(
-        self, group: DescribedGroup, controllers: list[ParameterViewController]
+        self,
+        group: DescribedGroup,
+        reconstructor_name: str,
+        controllers: list[ParameterViewController],
     ) -> QWidget:
         fields = list(group.fields)
         gate = fields[0] if fields and _switches_section(fields[0]) else None
@@ -546,6 +559,6 @@ class GeneratedViewControllerFactory(ReconstructorViewControllerFactory):
             # title than the section name and leaves the group switchable.
             return _checkable_box(_box(gate, gate.parameter, _split(fields[1:])), controllers)
 
-        box = QGroupBox(_group_label(group.name, self._library_name))
+        box = QGroupBox(_group_label(group.name, self._library_name, reconstructor_name))
         box.setLayout(_build_layout(_split(fields), controllers))
         return box

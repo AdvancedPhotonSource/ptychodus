@@ -59,7 +59,7 @@ __all__ = [
     'compute_dataset_total_counts',
     'compute_probe_photon_counts_by_index',
     'default_max_workers',
-    'estimate_incident_counts',
+    'estimate_incident_photon_count',
     'estimate_mean_amplitude_transmission',
     'preprocess_array',
     'suggest_crop_region',
@@ -97,8 +97,8 @@ def compute_total_counts(
     return numpy.sum(patterns[:, good_pixels], axis=-1)
 
 
-def estimate_incident_counts(total_counts: RealArrayType, *, quantile: float = 0.99) -> float:
-    """Estimate the unattenuated incident count from per-pattern totals.
+def estimate_incident_photon_count(total_counts: RealArrayType, *, quantile: float = 0.99) -> float:
+    """Estimate the unattenuated incident photon count from per-pattern totals.
 
     A pattern recorded through empty beam -- or, failing that, through the most
     transparent part of the sample -- is among the brightest, so a high quantile of the
@@ -134,9 +134,9 @@ def estimate_mean_amplitude_transmission(
     same opacity would carry. An initial object given this modulus predicts the measured
     pattern totals, instead of predicting the unobstructed beam at every position. The
     incident flux is the *incident_quantile* of the totals, by
-    :func:`estimate_incident_counts`, so a single anomalous frame cannot set it.
+    :func:`estimate_incident_photon_count`, so a single anomalous frame cannot set it.
 
-    Hardware flux measurements, when present, give the incident count per pattern, so the
+    Hardware flux measurements, when present, give the incident photon count per pattern, so the
     transmission is averaged per position rather than against a single brightest frame.
 
     Returns ``1.0`` -- a transparent sample, asserting nothing -- when nothing is
@@ -149,18 +149,18 @@ def estimate_mean_amplitude_transmission(
         return 1.0
 
     if assembled_data.has_measured_probe_photon_counts():
-        incident_counts = assembled_data.get_probe_photon_counts()
-        usable = incident_counts > roundoff_floor
+        incident_photon_counts = assembled_data.get_probe_photon_counts()
+        usable = incident_photon_counts > roundoff_floor
 
         if not usable.any():
             return 1.0
 
-        transmission = numpy.mean(total_counts[usable] / incident_counts[usable])
+        transmission = numpy.mean(total_counts[usable] / incident_photon_counts[usable])
     else:
         # Without measured flux the per-pattern counts *are* the only incident estimate,
         # so a per-position ratio would be identically one. The brightest frames stand
         # in for the unobstructed beam instead.
-        incident = estimate_incident_counts(
+        incident = estimate_incident_photon_count(
             total_counts.astype(numpy.float64), quantile=incident_quantile
         )
 

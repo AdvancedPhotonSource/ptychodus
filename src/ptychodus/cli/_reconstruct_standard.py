@@ -715,7 +715,7 @@ def _build_initial_probe(
     )
 
     # The mean pattern carries the mean transmitted photons, which is less than the
-    # incident count wherever the sample absorbs; the probe states the illumination.
+    # incident photon count wherever the sample absorbs; the probe states the illumination.
     return rescale_probe_intensity(probe, probe_photon_count)
 
 

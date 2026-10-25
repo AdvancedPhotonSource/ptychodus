@@ -1,5 +1,14 @@
 # API Reference
 
+## Accumulate
+
+```{eval-rst}
+.. automodule:: ptychodus.api.accumulate
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Affine
 
 ```{eval-rst}
@@ -117,10 +126,28 @@
    :show-inheritance:
 ```
 
+## Kickstart
+
+```{eval-rst}
+.. automodule:: ptychodus.api.kickstart
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Metrics
 
 ```{eval-rst}
 .. automodule:: ptychodus.api.metrics
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+## Moments
+
+```{eval-rst}
+.. automodule:: ptychodus.api.moments
    :members:
    :undoc-members:
    :show-inheritance:
@@ -139,6 +166,15 @@
 
 ```{eval-rst}
 .. automodule:: ptychodus.api.observer
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+## Parallax
+
+```{eval-rst}
+.. automodule:: ptychodus.api.parallax
    :members:
    :undoc-members:
    :show-inheritance:

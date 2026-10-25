@@ -713,12 +713,15 @@ def test_a_probe_sets_the_support_but_not_the_values(phase_scan: _Scan) -> None:
         interpolate_scan_values(_GEOMETRY, positions, values, probes=probes, support_fraction=0.0)
 
 
-def test_incident_counts_give_an_absolute_transmission(absorbing_scan: _Scan) -> None:
+def test_the_incident_photon_count_gives_an_absolute_transmission(absorbing_scan: _Scan) -> None:
     signals = compute_stxm_dpc_signals(absorbing_scan.data)
     incident = float(numpy.max(signals.total_counts))
     relative = _recover(absorbing_scan.data, absorbing_scan.positions, signals=signals)
     absolute = _recover(
-        absorbing_scan.data, absorbing_scan.positions, signals=signals, incident_counts=incident
+        absorbing_scan.data,
+        absorbing_scan.positions,
+        signals=signals,
+        incident_photon_count=incident,
     )
 
     # Only the scale differs, and the brightest total is the incident beam.
@@ -726,8 +729,8 @@ def test_incident_counts_give_an_absolute_transmission(absorbing_scan: _Scan) ->
     assert numpy.allclose(ratio, ratio.flat[0])
     assert numpy.max(numpy.abs(absolute.get_array())) <= 1.0 + 1e-6
 
-    with pytest.raises(ValueError, match='Incident counts'):
-        _recover(absorbing_scan.data, absorbing_scan.positions, incident_counts=0.0)
+    with pytest.raises(ValueError, match='incident photon count must be positive'):
+        _recover(absorbing_scan.data, absorbing_scan.positions, incident_photon_count=0.0)
 
 
 def _with_position_monitor(scan: _Scan, decay: numpy.ndarray) -> list[ProbePosition]:

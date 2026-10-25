@@ -421,6 +421,31 @@ Expanding a single slice into several is the degenerate case, since there is no 
 
 The layers are phase screens at depths `0` through the total thickness, so `n_slices` layers leave `n_slices - 1` gaps and `Object.get_total_thickness_m()` -- the sum of those gaps -- is the full thickness. {py:func}`ptychodus.api.object.compute_uniform_layer_spacing_m` builds an even grid on that convention.
 
+## Kickstart
+
+**Kickstart** is a reconstructor that makes a coarse probe and object from the diffraction patterns and probe positions alone, to warm-start another backend. Select the **Ptychodus** reconstructor library and its **Kickstart** algorithm; it needs nothing beyond ptychodus. It runs one pass over the patterns, accumulating their statistics with {py:class}`ptychodus.api.accumulate.DiffractionMomentAccumulator`, and estimates everything from those with {py:func}`ptychodus.api.kickstart.estimate_product_from_moments`. The data must be far field.
+
+1. **Incident photon count.** Per-pattern totals are normalized by the incident photon counts the probe positions carry, when they carry them, so a beam decay does not read as absorption. The unattenuated incident photon count `I0` is the `IncidentPhotonCountQuantile` of the totals.
+2. **Defocus.** Decided by the table below, which logs the parallax estimate whichever row applies.
+3. **Probe.** The square root of the mean pattern, with only its bright field kept (`ProbeBrightFieldMadThreshold`), is taken as the beam's flat-phase angular spectrum and transformed back to the waist, then propagated by the defocus, as the `average_pattern` builder does. It is a single mode, scaled so `sum|P|**2 = I0`; to start from several incoherent modes, duplicate the product and add them in the probe editor, which offers every mode strategy.
+4. **Object.** The `stxm_dpc` object, with that probe setting the support and correcting its own shadow, and the transmission referenced to `I0` rather than to its mean. It is resliced into the input object's layers.
+
+| Stated defocus | Parallax | Defocus used |
+| --- | --- | --- |
+| nonzero | resolved, agreeing | the stated one |
+| nonzero | resolved, disagreeing | the stated one, with a warning |
+| nonzero | not resolved | the stated one |
+| zero | resolved | the parallax |
+| zero | not resolved | none: a flat-phase probe, with a warning |
+
+The stated defocus is the product's `focus_object_distance_m`, negated, whenever the product names a focus, and `DefocusDistanceInMeters` otherwise. A stated and a parallax defocus disagree when their signs differ or they differ by more than `ParallaxRtol` of the stated one.
+
+**Parallax.** A defocused probe lights each point of its bright field through a different point of the sample, so the image one bright-field detector pixel records as the probe scans is the sample shifted by `-lambda * z * q`. Kickstart keeps every pattern binned into bins of `ParallaxBinSizeInPixels` detector pixels a side, maps each bright-field bin's values onto the object grid, registers the images against their mean, and fits the shifts to that line, which gives the defocus with its sign ({py:func}`ptychodus.api.parallax.estimate_defocus_from_parallax`). Larger bins cost less memory but leave fewer bins inside the bright field; at least four must remain away from its edge.
+
+A parallax defocus is **resolved** when it reaches `ParallaxMinSignificance` standard errors and `ParallaxMinDefocusDof` depths of focus. The depth of focus is `lambda / NA**2`, from the second moments of the mean pattern. Within about that distance of the focus the bright-field images are differently weighted phase-contrast images rather than shifted copies of one image, and registering them still finds a slope that its scatter cannot reveal, so a probe at focus would otherwise report a defocus of about half a depth of focus. The same threshold read the other way is a Fresnel number: the defocus in depths of focus equals `R**2 / (lambda |z|)` for the radius `R` of the probe's shadow, the geometric-optics measure the parametric probe builders warn on below one. Both appear in the log.
+
+**Warm-starting.** Kickstart's output is an ordinary product in ptychodus's conventions -- the probe in photons per pixel, the positions in meters -- so another backend can start from it: run Kickstart, then select the other backend and reconstruct from the product it produced.
+
 ## Low-Level Generator API
 
 The workflow API is usually simpler, but the low-level functions can be used directly when the caller already has geometry objects and wants arrays without registering a product.

@@ -148,6 +148,7 @@ def render_settings() -> str:
 _GROUP_PREFIX_BY_BACKEND = {
     'PtychoFM': 'PtychoFM',
     'PtychoPINN': 'PtychoPINN',
+    'Ptychodus': 'Kickstart',
     'pty-chi': 'PtyChi',
 }
 

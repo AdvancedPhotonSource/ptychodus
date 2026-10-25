@@ -19,6 +19,7 @@ from typing import Any
 from PyQt5.QtCore import QModelIndex, Qt
 from PyQt5.QtWidgets import QApplication, QComboBox
 
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.parameters import (
     BooleanParameter,
     IntegerParameter,
@@ -67,6 +68,7 @@ def _field(
     annotation: Any = None,
     spelling: EnumSpelling = EnumSpelling.BY_NAME,
     unit: Unit | None = None,
+    display_unit: LengthUnit | None = None,
 ) -> DescribedField:
     return DescribedField(
         FlatParameter(
@@ -80,6 +82,7 @@ def _field(
             spelling=spelling,
             gates_group=gates_group,
             unit=unit,
+            display_unit=display_unit,
         ),
         parameter,
     )
@@ -260,6 +263,12 @@ class TestTitlingAGroup:
     def test_a_group_naming_another_backend_is_left_alone(self) -> None:
         assert _group_label('PtychoFMInference', 'pty-chi') == 'PtychoFMInference'
 
+    def test_the_algorithm_name_is_stripped_where_the_backend_name_is_absent(self) -> None:
+        assert _group_label('KickstartProbe', 'Ptychodus', 'Kickstart') == 'Probe'
+
+    def test_a_group_that_is_only_the_algorithm_name_keeps_it(self) -> None:
+        assert _group_label('Kickstart', 'Ptychodus', 'Kickstart') == 'Kickstart'
+
 
 class TestWhichEditorAFieldGets:
     def test_a_bounded_real_slides(self, qapp: QApplication) -> None:
@@ -280,6 +289,23 @@ class TestWhichEditorAFieldGets:
         editor = _editor(field)
 
         assert isinstance(editor, LengthParameterViewController)
+
+    def test_a_zero_length_reads_in_its_declared_display_unit(self, qapp: QApplication) -> None:
+        def shown_unit(display_unit: LengthUnit | None) -> str:
+            field = _field(
+                'defocus_m',
+                RealParameter(0.0, None, minimum=-1.0, maximum=1.0),
+                unit=Unit.METER,
+                display_unit=display_unit,
+            )
+            editor = _editor(field)
+            assert editor is not None
+            combo_box = editor.get_widget().findChild(QComboBox)
+            assert combo_box is not None
+            return combo_box.currentText()
+
+        assert shown_unit(LengthUnit.MICROMETER) == LengthUnit.MICROMETER.label
+        assert shown_unit(None) == LengthUnit.METER.label
 
     def test_an_angle_held_in_turns_does_too(self, qapp: QApplication) -> None:
         field = _field('phase_tr', RealParameter(0.25, None), unit=Unit.TURN)

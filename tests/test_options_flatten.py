@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 import pytest
 
+from ptychodus.api.constants import LengthUnit
 from ptychodus.model.processing.flatten import (
     BitField,
     BoolEnum,
@@ -598,6 +599,33 @@ class TestSwitchLeaves:
         )
         produced = flatten_options(Options(), policy)
         assert not any(p.gates_group for p in produced)
+
+
+class DisplayUnits(BaseModel):
+    defocus_m: float = Field(0.0, json_schema_extra={'display_unit': 'MICROMETER'})
+    pitch_m: float = 1e-6
+
+
+class TestDisplayUnitsOnFlattenedKeys:
+    def test_a_declared_display_unit_is_carried(self) -> None:
+        produced = {p.path: p for p in flatten_options(DisplayUnits(), FlatteningPolicy())}
+
+        assert produced['defocus_m'].display_unit is LengthUnit.MICROMETER
+        assert produced['pitch_m'].display_unit is None
+
+    def test_a_display_unit_on_a_field_not_held_in_meters_is_rejected(self) -> None:
+        class Misdeclared(BaseModel):
+            angle_deg: float = Field(0.0, json_schema_extra={'display_unit': 'MICROMETER'})
+
+        with pytest.raises(ValueError, match='not held in meters'):
+            flatten_options(Misdeclared(), FlatteningPolicy())
+
+    def test_an_unknown_display_unit_is_rejected(self) -> None:
+        class Misspelled(BaseModel):
+            defocus_m: float = Field(0.0, json_schema_extra={'display_unit': 'MICRON'})
+
+        with pytest.raises(ValueError, match='unknown display unit'):
+            flatten_options(Misspelled(), FlatteningPolicy())
 
 
 class TestUnitsOnFlattenedKeys:

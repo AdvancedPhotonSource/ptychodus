@@ -328,14 +328,14 @@ def generate_stxm_dpc_object(
     detector_extent: ImageExtent,
     probe: Probe | None = None,
     correct_shadow: bool = True,
-    incident_counts: float | None = None,
+    incident_photon_count: float | None = None,
     regularization_fov_fraction: float = 0.0,
     reference_quantile: float = 0.95,
 ) -> Object:
     """Generate a coarse complex object from far-field data by STXM differential phase contrast.
 
     The amplitude is the STXM one: per-position totals mapped onto the object grid. With
-    *incident_counts*, the unattenuated incident count, they are divided by it, so the
+    *incident_photon_count*, the unattenuated incident photon count, they are divided by it, so the
     modulus is the sample's amplitude transmission. Without it they are divided by their
     mean over the supported region, a dimensionless contrast map that a position
     recording the unobstructed beam brings to unit modulus once a caller scales it to the
@@ -396,7 +396,7 @@ def generate_stxm_dpc_object(
     Raises:
         ValueError: for a detector extent that is not positive, a negative
             regularization, a reference quantile outside [0, 1], a probe whose pixels
-            differ from the object's, an incident count that is not positive, when no
+            differ from the object's, an incident photon count that is not positive, when no
             probe position pairs with any signal, or when the mean STXM intensity over
             the supported region is not positive.
     """
@@ -423,8 +423,10 @@ def generate_stxm_dpc_object(
                 f' ({pixel_geometry})!'
             )
 
-    if incident_counts is not None and not incident_counts > 0.0:
-        raise ValueError(f'Incident counts must be positive, not {incident_counts}!')
+    if incident_photon_count is not None and not incident_photon_count > 0.0:
+        raise ValueError(
+            f'The incident photon count must be positive, not {incident_photon_count}!'
+        )
 
     paired, positions = _pair_signals_with_positions(signals, probe_positions)
     probes = None if probe is None else ProbeEnsemble.from_probe(probe)
@@ -456,13 +458,13 @@ def generate_stxm_dpc_object(
     )
     intensity, gradient_x, gradient_y = grids
 
-    if incident_counts is None:
-        incident_counts = float(numpy.mean(intensity[scanned])) if scanned.any() else 0.0
+    if incident_photon_count is None:
+        incident_photon_count = float(numpy.mean(intensity[scanned])) if scanned.any() else 0.0
 
-        if incident_counts <= 0.0:
+        if incident_photon_count <= 0.0:
             raise ValueError('Mean STXM intensity must be positive!')
 
-    transmission = intensity / incident_counts
+    transmission = intensity / incident_photon_count
 
     if probes is not None and correct_shadow:
         shadow = _compute_probe_shadow_gradient(transmission, probes, positions, geometry)

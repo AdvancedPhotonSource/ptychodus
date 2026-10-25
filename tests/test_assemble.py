@@ -1114,7 +1114,7 @@ def test_mean_amplitude_transmission_is_not_set_by_one_anomalous_frame() -> None
 
 
 def test_mean_amplitude_transmission_uses_measured_flux_per_position() -> None:
-    """Measured flux gives the incident count for each pattern, so the transmission is
+    """Measured flux gives the incident photon count for each pattern, so the transmission is
     averaged per position rather than against a single brightest frame."""
     data = _varied_data([64, 32], probe_photon_counts=numpy.array([64, 64]))
 
@@ -1133,7 +1133,7 @@ def test_mean_amplitude_transmission_of_an_all_zero_scan_is_transparent() -> Non
 
 
 def test_mean_amplitude_transmission_ignores_positions_with_no_measured_flux() -> None:
-    """A zero incident count would divide by zero; those positions drop out."""
+    """A zero incident photon count would divide by zero; those positions drop out."""
     data = _varied_data([64, 32], probe_photon_counts=numpy.array([0, 64]))
 
     assert estimate_mean_amplitude_transmission(data) == pytest.approx(numpy.sqrt(0.5))

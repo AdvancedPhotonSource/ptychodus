@@ -29,6 +29,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Final
 
+from ptychodus.api.constants import LengthUnit
+
 __all__ = [
     'BitField',
     'BoolEnum',
@@ -420,6 +422,11 @@ class FlatParameter:
     # key whose name declares none, and for a key an adapter owns, since the
     # declared field's unit need not be the one that key persists.
     unit: Unit | None = None
+    # The length unit a panel shows the value in until the value suggests one of its
+    # own -- what a zero reads as. A model ptychodus owns declares it inline, as
+    # ``json_schema_extra={'display_unit': 'MICROMETER'}`` naming a LengthUnit member,
+    # on a field held in meters. None leaves the panel's own default.
+    display_unit: LengthUnit | None = None
     # True for a key this reconstructor accepts and persists but does not read,
     # so a panel has nothing to offer for it. Described rather than hidden: the
     # key exists in every settings file whatever any one reconstructor makes of
@@ -581,6 +588,28 @@ def _bounds(info: Any) -> tuple[Any, Any]:
     return minimum, maximum
 
 
+def _display_unit(info: Any, unit: Unit | None, path: str) -> LengthUnit | None:
+    """The length unit a field declares to be shown in, or None where it declares none.
+
+    Raises:
+        ValueError: if the declared name is no LengthUnit member, or the field is not
+            held in meters, where a length unit would mislabel the value.
+    """
+    extra = info.json_schema_extra
+    name = extra.get('display_unit') if isinstance(extra, Mapping) else None
+
+    if name is None:
+        return None
+
+    if unit is not Unit.METER:
+        raise ValueError(f'{path} declares a display unit but is not held in meters!')
+
+    try:
+        return LengthUnit[name]
+    except KeyError:
+        raise ValueError(f'{path} declares an unknown display unit {name!r}!') from None
+
+
 def _stated_or_declared(stated: Any, declared: Any) -> Any:
     """Return the bound an overlay states, else the one the field declares.
 
@@ -622,6 +651,10 @@ def _leaf(
     # persists the raw one, so the settings file looks right and the value
     # handed to the backend is not.
     declared_minimum, declared_maximum = (None, None) if role else _bounds(info)
+    # Read off the declared field, so an adapter's key reports none: an adapter may
+    # persist a pair of radians as a pair of degrees, and inheriting the field's unit
+    # would label the key with the one it is not in.
+    unit = None if role else Unit.of(path.rsplit('.', 1)[-1])
     return FlatParameter(
         ini_key=key,
         path=path,
@@ -640,10 +673,7 @@ def _leaf(
         # single declared field persists as, and which of them gates the rest
         # is the adapter's own business.
         gates_group=not role and path.rsplit('.', 1)[-1] in policy.collapse_onto_prefix,
-        # Read off the declared field, so an adapter's key reports none: an
-        # adapter may persist a pair of radians as a pair of degrees, and
-        # inheriting the field's unit would label the key with the one it is
-        # not in.
-        unit=None if role else Unit.of(path.rsplit('.', 1)[-1]),
+        unit=unit,
+        display_unit=None if role else _display_unit(info, unit, path),
         panel_hidden=policy.is_panel_hidden(path),
     )

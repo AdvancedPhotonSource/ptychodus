@@ -7,7 +7,7 @@ Behaviors verified:
     interleaving or merge, including a merge from a pickled snapshot
   - snapshots are unaffected by later additions, and an empty accumulator gives None
   - the inpainted mean equals the mean of the inpainted frames
-  - select, normalize_by_monitor and estimate_incident_counts on snapshots
+  - select, normalize_by_monitor and estimate_incident_photon_count on snapshots
   - compute_diffraction_moments applies carried detector corrections first
   - binned patterns are the prep pipeline's BinningStep, with a bin touching any bad pixel
     NaN, carried through every chunking, merge, selection and normalization
@@ -26,7 +26,7 @@ from ptychodus.api.accumulate import (
     DiffractionMoments,
     compute_diffraction_moments,
 )
-from ptychodus.api.assemble import estimate_incident_counts
+from ptychodus.api.assemble import estimate_incident_photon_count
 from ptychodus.api.diffraction import BadPixels
 from ptychodus.api.moments import FrameStatistics, compute_intensity_moments
 from ptychodus.api.preprocess.diffraction import BinningStep, inpaint_bad_pixels
@@ -330,19 +330,19 @@ def test_monitor_indexes_must_be_unique() -> None:
         moments.normalize_by_monitor(numpy.array([0, 0, 1, 2]), numpy.ones(4))
 
 
-def test_incident_counts_are_a_high_quantile_of_the_totals() -> None:
+def test_incident_photon_count_is_a_high_quantile_of_the_totals() -> None:
     totals = numpy.concatenate([numpy.full(99, 100.0), [1.0e6]])
 
-    assert estimate_incident_counts(totals, quantile=0.99) == pytest.approx(
+    assert estimate_incident_photon_count(totals, quantile=0.99) == pytest.approx(
         numpy.quantile(totals, 0.99)
     )
-    assert estimate_incident_counts(totals, quantile=0.95) == pytest.approx(100.0)
-    assert estimate_incident_counts(totals, quantile=1.0) == 1.0e6
-    assert estimate_incident_counts(numpy.array([numpy.nan, 5.0]), quantile=1.0) == 5.0
-    assert estimate_incident_counts(numpy.array([numpy.nan])) == 0.0
+    assert estimate_incident_photon_count(totals, quantile=0.95) == pytest.approx(100.0)
+    assert estimate_incident_photon_count(totals, quantile=1.0) == 1.0e6
+    assert estimate_incident_photon_count(numpy.array([numpy.nan, 5.0]), quantile=1.0) == 5.0
+    assert estimate_incident_photon_count(numpy.array([numpy.nan])) == 0.0
 
     with pytest.raises(ValueError):
-        estimate_incident_counts(totals, quantile=1.5)
+        estimate_incident_photon_count(totals, quantile=1.5)
 
 
 # ---------------------------------------------------------------------------

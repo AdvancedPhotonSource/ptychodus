@@ -18,7 +18,7 @@ from typing import cast
 
 import numpy
 
-from .assemble import DetectorCorrections, estimate_incident_counts
+from .assemble import DetectorCorrections, estimate_incident_photon_count
 from .diffraction import (
     BadPixels,
     DetectorBackground,
@@ -101,7 +101,7 @@ class DiffractionMoments:
 
         Binned patterns, when kept, are scaled by the same factor.
 
-        *monitor_counts* are measured incident counts, such as an upstream ion chamber
+        *monitor_counts* are measured incident photon counts, such as an upstream ion chamber
         records, keyed by *monitor_indexes*; each must be unique. A count that is not a
         positive finite number cannot normalize anything and leaves its total unscaled,
         with a warning, as does a pattern whose index has no count.
@@ -142,9 +142,9 @@ class DiffractionMoments:
             self, total_counts=self.total_counts * scale, binned_patterns=binned_patterns
         )
 
-    def estimate_incident_counts(self, *, quantile: float = 0.99) -> float:
-        """The unattenuated incident count; see :func:`estimate_incident_counts`."""
-        return estimate_incident_counts(self.total_counts, quantile=quantile)
+    def estimate_incident_photon_count(self, *, quantile: float = 0.99) -> float:
+        """The unattenuated incident photon count; see :func:`estimate_incident_photon_count`."""
+        return estimate_incident_photon_count(self.total_counts, quantile=quantile)
 
 
 class DiffractionMomentAccumulator:
