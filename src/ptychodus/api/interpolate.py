@@ -7,10 +7,16 @@ import numpy.typing
 import numpy
 from scipy.interpolate import PchipInterpolator
 
-from ptychodus.api.typing import InexactArrayType, RealArrayType
+from ptychodus.api.typing import (
+    BooleanArrayType,
+    InexactArrayType,
+    IntegerArrayType,
+    RealArrayType,
+)
 
 __all__ = [
     'BarycentricArrayInterpolator',
+    'interpolate_at_indexes',
     'lerp',
     'resample_along_axis',
 ]
@@ -86,6 +92,61 @@ def resample_along_axis(
         numpy.arange(float(values.shape[axis])), values, axis=axis, extrapolate=False
     )(indexes)
     return numpy.where(numpy.isnan(interpolated), fill_value, interpolated)
+
+
+def interpolate_at_indexes(
+    source_indexes: IntegerArrayType,
+    values: RealArrayType,
+    target_indexes: IntegerArrayType,
+) -> tuple[BooleanArrayType, RealArrayType]:
+    """Resample values keyed by integer index onto other indexes.
+
+    Values sharing a source index are averaged into one anchor. A target inside the
+    closed range of the anchor indexes takes the anchor value where one sits at its
+    index and is linearly interpolated between the neighbouring anchors otherwise. A
+    target outside that range is not extrapolated; it is left out. A NaN anchor value
+    propagates into every target interpolated from it.
+
+    *values* holds one row per source index: shape ``(n,)``, or ``(n, k)`` for ``k``
+    columns resampled independently.
+
+    Returns the mask over *target_indexes* marking those in range, and the values at
+    them in target order, shaped ``(m,)`` or ``(m, k)`` to match *values*. An empty
+    source leaves every target out of range.
+
+    Raises:
+        ValueError: if *values* does not have one row per source index.
+    """
+    if values.shape[0] != source_indexes.size:
+        raise ValueError(
+            f'Expected one row of values per source index; got {values.shape[0]} rows'
+            f' for {source_indexes.size} indexes.'
+        )
+
+    if source_indexes.size == 0:
+        return (
+            numpy.zeros(target_indexes.shape, dtype=numpy.bool),
+            numpy.empty((0, *values.shape[1:]), dtype=numpy.float64),
+        )
+
+    # numpy.unique sorts ascending, which is the order numpy.interp needs its anchors in.
+    unique_indexes, inverse = numpy.unique(source_indexes, return_inverse=True)
+    inverse = inverse.ravel()
+    counts = numpy.bincount(inverse)
+
+    in_range = (target_indexes >= unique_indexes[0]) & (target_indexes <= unique_indexes[-1])
+    in_range_targets = target_indexes[in_range]
+
+    columns = values.reshape(values.shape[0], -1)
+    resampled = numpy.empty((in_range_targets.size, columns.shape[1]), dtype=numpy.float64)
+
+    for column in range(columns.shape[1]):
+        anchor_values = numpy.bincount(inverse, weights=columns[:, column]) / counts
+        # numpy.interp returns the anchor value exactly at a coincident index, and the
+        # range mask above rules out the extrapolation it would otherwise clamp.
+        resampled[:, column] = numpy.interp(in_range_targets, unique_indexes, anchor_values)
+
+    return in_range, resampled.reshape((in_range_targets.size, *values.shape[1:]))
 
 
 def _calculate_support_frac(x: float, n: int, extent: int) -> tuple[slice, float]:

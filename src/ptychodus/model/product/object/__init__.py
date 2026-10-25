@@ -9,7 +9,7 @@ from .paganin import PaganinObjectBuilder
 from .random import RandomObjectBuilder
 from .settings import ObjectSettings
 from .siemens_star import SiemensStarObjectBuilder
-from .stxm import STXMObjectBuilder
+from .stxm_dpc import STXMDPCObjectBuilder
 
 __all__ = [
     'DeadLeavesObjectBuilder',
@@ -24,6 +24,6 @@ __all__ = [
     'ObjectSettings',
     'PaganinObjectBuilder',
     'RandomObjectBuilder',
-    'STXMObjectBuilder',
+    'STXMDPCObjectBuilder',
     'SiemensStarObjectBuilder',
 ]

@@ -10,7 +10,7 @@ from ...model.product.object import (
     ObjectRepositoryItem,
     PaganinObjectBuilder,
     RandomObjectBuilder,
-    STXMObjectBuilder,
+    STXMDPCObjectBuilder,
     SiemensStarObjectBuilder,
 )
 from ..parameters import ParameterViewBuilder, ParameterViewController
@@ -226,13 +226,23 @@ class ObjectEditorViewControllerFactory:
                 group=additional_layers_group,
             )
             return dialog_builder.build_dialog(title, parent)
-        elif isinstance(object_builder, STXMObjectBuilder):
+        elif isinstance(object_builder, STXMDPCObjectBuilder):
             dialog_builder = ParameterViewBuilder()
             dialog_builder.add_spin_box(
                 object_builder.extra_padding_x, 'Extra Padding X:', group=first_layer_group
             )
             dialog_builder.add_spin_box(
                 object_builder.extra_padding_y, 'Extra Padding Y:', group=first_layer_group
+            )
+            dialog_builder.add_decimal_line_edit(
+                object_builder.regularization_fov_fraction,
+                'Regularization [FOV fraction]:',
+                group=first_layer_group,
+            )
+            dialog_builder.add_check_box(
+                object_builder.shadow_correction,
+                'Probe Shadow Correction:',
+                group=first_layer_group,
             )
             dialog_builder.add_view_controller(
                 MultisliceViewController(item),

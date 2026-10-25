@@ -401,8 +401,14 @@ Use `WorkflowProductAPI.generate_object(name, parameters)`. Object geometry is d
 `dead_leaves`
 : Generates a layered random disk texture. Parameters include `leaf_radius_lower_px`, `leaf_radius_upper_px`, `leaf_radius_power_law_exponent`, `leaf_amplitude_lower`, `leaf_amplitude_upper`, `leaf_phase_lower_tr`, and `leaf_phase_upper_tr`.
 
-`stxm`
-: Generates an STXM-like object from assembled diffraction data by interpolating per-position diffraction counts onto the object grid. This requires assembled diffraction data and probe positions.
+`stxm_dpc`
+: Generates a coarse complex object from far-field diffraction data by STXM differential phase contrast. It requires assembled diffraction data, probe positions and far-field metadata; near-field data is rejected, because the center-of-mass theorem it rests on relates a *far-field* centroid to the phase gradient of the exit wave. Parameters are `shadow_correction` and `regularization_fov_fraction`, described below.
+
+- **Amplitude.** The per-position totals, divided by their mean over the scanned region, as STXM gives them. Totals have any detector background or flat field the data still carries applied, their bad pixels inpainted, and are normalized by measured incident photon counts when those are attached, so beam decay does not read as absorption.
+- **Phase.** Each pattern's intensity centroid, taken inside a circle holding 99% of the mean pattern's signal, is the intensity-weighted mean phase gradient under the probe. The mean centroid is subtracted, which removes the beam-center offset and any net phase wedge across the sample. The gradient is integrated by a least-squares FFT Poisson solve and referenced to zero over the most transparent 5% of the scan — the empty beam, when the scan includes one. Resolution is set by the probe size and the scan step.
+- **Orientation.** The centroids are taken to lie in the frame the forward model simulates, with the detector's x and y along the scan's. A detector rotated or flipped relative to the scan should be oriented with the probe-position affine transform or the diffraction `hflip`, `vflip` and `transpose` steps, which the reconstruction needs in any case.
+- **Probe shadow.** A centroid also measures the probe's own phase gradient, weighted by the sample's transmission. For a single material under a probe of RMS width σ defocused by Δz, ignoring that term rescales the phase by roughly `1 ± 4π(β/δ)σ²/(λ|Δz|)`, which is of order one for micron-scale defocused hard X-ray probes at moderate β/δ and nothing for a pure phase object. `shadow_correction` subtracts a first-order estimate using the product's current probe. The object does not rebuild when the probe changes, so rebuild it after changing the probe.
+- **Regularization.** Integrating noisy gradients leaves its error as drift across the field of view. `regularization_fov_fraction` adds a Tikhonov term that damps phase variations longer than that fraction of the object canvas's larger dimension, halving them at exactly that length. 0 disables it, and values beyond about 2 have little effect.
 
 ### Multislice Objects
 
@@ -597,6 +603,6 @@ Pty-Chi still accepts this data through the corresponding `*_options` fields —
 ## Practical Notes
 
 - The generated probe pixel size is derived from detector geometry, detector distance, and probe energy through the product geometry. For physically meaningful generated probes, create or load the diffraction metadata before generating the product.
-- `average_pattern` and `stxm` depend on assembled diffraction data. Analytic generators such as `disk`, `super_gaussian`, `fresnel_zone_plate`, `random`, `grf`, `fractal_noise`, and `dead_leaves` do not require measured patterns.
+- `average_pattern`, `stxm_dpc` and `paganin` depend on assembled diffraction data. Analytic generators such as `disk`, `super_gaussian`, `fresnel_zone_plate`, `random`, `grf`, `fractal_noise`, and `dead_leaves` do not require measured patterns.
 - `super_gaussian` is the closest built-in Gaussian-like probe. Ptychodus does not currently register a separate builder literally named `gaussian`.
 - In workflow parameter mappings, use the builder parameter names, not the settings-file names. For example use `diameter_m` rather than `DiskDiameterInMeters`.

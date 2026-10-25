@@ -40,8 +40,8 @@ import numpy
 import numpy.testing
 import pytest
 
-from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.object import ObjectGeometry
+from ptychodus.api.geometry import ImageExtent, PixelGeometry
+from ptychodus.api.object import Object, ObjectGeometry
 from ptychodus.api.simulate.object import (
     _calculate_vertex_noise_contribution,
     _generate_simplex_noise,
@@ -51,8 +51,9 @@ from ptychodus.api.simulate.object import (
     generate_paganin_object,
     generate_random_object,
     generate_siemens_star_object,
-    generate_stxm_object,
+    generate_stxm_dpc_object,
     generate_uniform_object,
+    STXMDPCSignals,
 )
 from ptychodus.api.simulate.object import _interpolate_stxm_intensity
 from ptychodus.api.probe_positions import ProbePosition
@@ -627,16 +628,37 @@ def test_autocorrelation_length_increases_with_grid_scale() -> None:
 
 
 # ===========================================================================
-# generate_stxm_object
+# generate_stxm_dpc_object (amplitude)
 # ===========================================================================
 
 
-class TestStxmObject:
+def _make_stxm_signals(counts: list[int]) -> STXMDPCSignals:
+    """Signals carrying `counts` as totals, one per scan index, with no phase contrast."""
+    return STXMDPCSignals(
+        indexes=numpy.arange(len(counts)),
+        total_counts=numpy.asarray(counts, dtype=float),
+        center_of_mass_x_px=numpy.zeros(len(counts)),
+        center_of_mass_y_px=numpy.zeros(len(counts)),
+    )
+
+
+def _generate_stxm_dpc(
+    geometry: ObjectGeometry, counts: list[int], positions: list[ProbePosition]
+) -> Object:
+    """STXM-DPC on constant centroids, so only the amplitude carries information."""
+    return generate_stxm_dpc_object(
+        geometry,
+        _make_stxm_signals(counts),
+        positions,
+        detector_extent=ImageExtent(width_px=4, height_px=4),
+    )
+
+
+class TestStxmDpcObject:
     def test_shape_and_dtype(self) -> None:
         geometry = _make_geometry(32, 32)
         positions = _make_probe_positions_grid(geometry, (4, 4))
-        data = _make_assembled_data([100] * len(positions))
-        obj = generate_stxm_object(geometry, data, positions)
+        obj = _generate_stxm_dpc(geometry, [100] * len(positions), positions)
         assert obj.get_array().shape == (1, 32, 32)
         assert numpy.issubdtype(obj.get_array().dtype, numpy.complexfloating)
 
@@ -650,8 +672,7 @@ class TestStxmObject:
             center_y_m=-2.0e-6,
         )
         positions = _make_probe_positions_grid(geometry, (3, 3))
-        data = _make_assembled_data([50] * len(positions))
-        obj = generate_stxm_object(geometry, data, positions)
+        obj = _generate_stxm_dpc(geometry, [50] * len(positions), positions)
         assert obj.get_pixel_geometry().width_m == pytest.approx(2.5e-9)
         assert obj.get_pixel_geometry().height_m == pytest.approx(3.5e-9)
         assert obj.get_center().x_m == pytest.approx(1.0e-6)
@@ -662,8 +683,7 @@ class TestStxmObject:
         whatever the count level happens to be."""
         geometry = _make_geometry(64, 64)
         positions = _make_probe_positions_grid(geometry, (5, 5))
-        data = _make_assembled_data([200] * len(positions))
-        obj = generate_stxm_object(geometry, data, positions)
+        obj = _generate_stxm_dpc(geometry, [200] * len(positions), positions)
         intensity = numpy.square(numpy.abs(obj.get_array()[0]))
         interior = intensity[20:44, 20:44]
         numpy.testing.assert_allclose(interior, 1.0, rtol=1e-6)
@@ -676,10 +696,8 @@ class TestStxmObject:
         positions = _make_probe_positions_grid(geometry, (5, 5))
         shape = [100 + 10 * i for i in range(len(positions))]
 
-        dim = generate_stxm_object(geometry, _make_assembled_data(shape), positions)
-        bright = generate_stxm_object(
-            geometry, _make_assembled_data([c * 10_000 for c in shape]), positions
-        )
+        dim = _generate_stxm_dpc(geometry, shape, positions)
+        bright = _generate_stxm_dpc(geometry, [c * 10_000 for c in shape], positions)
 
         numpy.testing.assert_allclose(bright.get_array(), dim.get_array(), rtol=1e-6)
         assert numpy.abs(dim.get_array()).max() < 10.0
@@ -692,7 +710,7 @@ class TestStxmObject:
         counts = [100 + 17 * i for i in range(len(positions))]
         _, scanned = _interpolate_stxm_intensity(geometry, _make_assembled_data(counts), positions)
 
-        obj = generate_stxm_object(geometry, _make_assembled_data(counts), positions)
+        obj = _generate_stxm_dpc(geometry, counts, positions)
         intensity = numpy.square(numpy.abs(obj.get_array()[0]))
 
         assert scanned.any() and not scanned.all(), 'Test precondition: there is a border'
@@ -751,8 +769,7 @@ class TestStxmObject:
         counts = [
             int(1000 + 5000 * (p.x_m - geometry.minimum_x_m) / geometry.width_m) for p in positions
         ]
-        data = _make_assembled_data(counts)
-        obj = generate_stxm_object(geometry, data, positions)
+        obj = _generate_stxm_dpc(geometry, counts, positions)
         intensity = numpy.square(numpy.abs(obj.get_array()[0]))
         row = intensity[32, 20:44]
         assert numpy.all(numpy.diff(row) >= -1e-6)
@@ -761,7 +778,7 @@ class TestStxmObject:
     def test_an_unobstructed_position_ends_at_unit_modulus(self) -> None:
         """Ties this normalization to the one the builders apply on top of it.
 
-        `generate_stxm_object` divides out the scanned mean and
+        `generate_stxm_dpc_object` divides out the scanned mean and
         `estimate_mean_amplitude_transmission` supplies the absolute level, so a
         position recording the unobstructed beam has to come out transparent once both
         have been applied -- neither function knows about the other, and only together
@@ -779,19 +796,25 @@ class TestStxmObject:
         counts = [column_counts[i % 5] for i in range(len(positions))]
         data = _make_assembled_data(counts)
 
-        obj = generate_stxm_object(geometry, data, positions)
+        obj = _generate_stxm_dpc(geometry, counts, positions)
         scaled = obj.get_array() * estimate_mean_amplitude_transmission(data)
 
         _, scanned = _interpolate_stxm_intensity(geometry, data, positions)
         assert numpy.abs(scaled[0][scanned]).max() == pytest.approx(1.0, rel=5e-3)
 
+    def test_zero_mean_intensity_raises(self) -> None:
+        geometry = _make_geometry(32, 32)
+        positions = _make_probe_positions_grid(geometry, (4, 4))
+
+        with pytest.raises(ValueError, match='Mean STXM intensity'):
+            _generate_stxm_dpc(geometry, [0] * len(positions), positions)
+
     def test_skips_missing_indexes(self) -> None:
         geometry = _make_geometry(32, 32)
         positions = _make_probe_positions_grid(geometry, (4, 4))
-        # Provide patterns for only the first 9 of 16 positions; the rest are
-        # silently skipped because their LUT key is missing.
-        partial_data = _make_assembled_data([100] * 9)
-        obj = generate_stxm_object(geometry, partial_data, positions)
+        # Provide signals for only the first 9 of 16 positions; the positions with no
+        # signal pair with nothing and are ignored.
+        obj = _generate_stxm_dpc(geometry, [100] * 9, positions)
         assert obj.get_array().shape == (1, 32, 32)
 
 
@@ -890,7 +913,7 @@ class TestPaganinObject:
     def test_low_pass_behavior(self) -> None:
         """Paganin filter should suppress high frequencies relative to raw STXM."""
         geometry, data, positions = _paganin_common_inputs()
-        stxm_obj = generate_stxm_object(geometry, data, positions)
+        stxm_intensity, scanned = _interpolate_stxm_intensity(geometry, data, positions)
         paganin_obj = generate_paganin_object(
             geometry,
             data,
@@ -899,7 +922,7 @@ class TestPaganinObject:
             propagation_distance_m=10.0,
             delta_over_beta=500.0,
         )
-        stxm_intensity = numpy.square(numpy.abs(stxm_obj.get_array()[0]))
+        stxm_intensity = stxm_intensity / stxm_intensity[scanned].mean()
         paganin_intensity = numpy.square(numpy.abs(paganin_obj.get_array()[0]))
         # remove DC so the comparison is over fluctuations only
         stxm_intensity = stxm_intensity - stxm_intensity.mean()

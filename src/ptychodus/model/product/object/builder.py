@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import abstractmethod
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 import logging
 
 
@@ -12,6 +12,7 @@ from ptychodus.api.object import (
 )
 from ptychodus.api.simulate.object import generate_layers, pad_object
 from ptychodus.api.parameters import ParameterGroup
+from ptychodus.api.probe import ProbeEnsemble
 
 from .settings import ObjectSettings
 
@@ -39,6 +40,15 @@ class ObjectBuilder(ParameterGroup):
 
     @abstractmethod
     def copy(self) -> ObjectBuilder:
+        pass
+
+    def bind_probe_supplier(self, supplier: Callable[[], ProbeEnsemble] | None) -> None:
+        """Accept the source of the probe that shares this builder's product.
+
+        The item holding a builder binds it, so a builder copied into another product
+        reads that product's probe rather than the one it was copied from. Builders that
+        do not use the probe ignore it.
+        """
         pass
 
     @abstractmethod

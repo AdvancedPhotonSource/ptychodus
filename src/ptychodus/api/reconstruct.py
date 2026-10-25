@@ -33,6 +33,7 @@ from .diffraction import (
     FlatField,
 )
 from .geometry import ImageExtent
+from .interpolate import interpolate_at_indexes
 from .object import Object
 from .probe import ProbeEnsemble
 from .probe_positions import ProbePositionSequence, ProbePosition
@@ -829,31 +830,14 @@ def prepare_reconstruct_input(
     if filtered_pattern_indexes.size == 0 or pos_indexes.size == 0:
         raise ValueError('Index filter eliminated all pattern indexes and/or all position indexes.')
 
-    # Average duplicate position indexes. numpy.unique sorts ascending, so
-    # the resulting (unique_pos_indexes, mean_x, mean_y) triple is the
-    # canonical interpolation anchor set.
-    unique_pos_indexes, inverse = numpy.unique(pos_indexes, return_inverse=True)
-    counts = numpy.bincount(inverse)
-    mean_x = numpy.bincount(inverse, weights=pos_x) / counts
-    mean_y = numpy.bincount(inverse, weights=pos_y) / counts
-
-    # Averaging duplicate-index photon counts uses the arithmetic mean because the
-    # position readers store per-trigger integrated *counts* over equal-length trigger
-    # windows -- each duplicate is an independent sample of the same per-trigger count.
-    # A harmonic or geometric mean would only apply if a future reader supplied true
-    # rates (Hz) over unequal integration windows. NaN placeholders (positions whose
-    # reader did not supply a count) propagate through bincount -> mean, marking the
-    # anchor invalid so the subsequent interp yields NaN for any pattern index derived
-    # from it.
-    mean_photon_counts: RealArrayType | None = None
-    if pos_photon_counts is not None:
-        mean_photon_counts = numpy.bincount(inverse, weights=pos_photon_counts) / counts
-
-    lo = unique_pos_indexes[0]
-    hi = unique_pos_indexes[-1]
-    in_range_mask = (filtered_pattern_indexes >= lo) & (filtered_pattern_indexes <= hi)
+    # Duplicate position indexes average into one anchor; pattern indexes between
+    # anchors are interpolated and those beyond them dropped.
+    in_range_mask, coordinates = interpolate_at_indexes(
+        pos_indexes, numpy.column_stack((pos_x, pos_y)), filtered_pattern_indexes
+    )
     in_range_pattern_indexes = filtered_pattern_indexes[in_range_mask]
     in_range_pattern_offsets = filtered_pattern_offsets[in_range_mask]
+    unique_pos_indexes = numpy.unique(pos_indexes)
 
     if in_range_pattern_indexes.size == 0:
         pat_lo = filtered_pattern_indexes[0]
@@ -861,39 +845,34 @@ def prepare_reconstruct_input(
         raise ValueError(
             'No probe positions overlap the diffraction pattern indexes; '
             f'pattern indexes span [{pat_lo}, {pat_hi}] and position indexes '
-            f'span [{lo}, {hi}].'
+            f'span [{unique_pos_indexes[0]}, {unique_pos_indexes[-1]}].'
         )
 
-    # When unique_pos_indexes.size == 1, lo == hi, so only pattern indexes
-    # equal to that single anchor survive the in_range trim -- and those
-    # match exactly, never requiring interpolation. So the "need >= 2
-    # anchors to interpolate" rule is enforced by the in_range trim itself;
-    # no separate guard is needed.
+    # With a single anchor the range is one index wide, so every surviving pattern
+    # index matches it exactly; the range trim enforces the "two anchors to
+    # interpolate" rule with no separate guard.
     exact_match = numpy.isin(in_range_pattern_indexes, unique_pos_indexes)
+    x_coords = coordinates[:, 0]
+    y_coords = coordinates[:, 1]
 
-    # numpy.interp returns the exact value at coincident xp entries and
-    # linearly interpolates between them. Out-of-range is impossible here
-    # because in_range_mask already trimmed to [lo, hi].
-    x_coords = numpy.interp(in_range_pattern_indexes, unique_pos_indexes, mean_x)
-    y_coords = numpy.interp(in_range_pattern_indexes, unique_pos_indexes, mean_y)
+    # Averaging duplicate-index photon counts uses the arithmetic mean because the
+    # position readers store per-trigger integrated *counts* over equal-length trigger
+    # windows -- each duplicate is an independent sample of the same per-trigger count.
+    # A harmonic or geometric mean would only apply if a future reader supplied true
+    # rates (Hz) over unequal integration windows. NaN placeholders (positions whose
+    # reader did not supply a count) propagate through the mean, marking the anchor
+    # invalid so any pattern index interpolated from it comes out NaN.
     photon_counts: DiffractionPatternPhotonFluxes | None = None
-    if mean_photon_counts is not None:
-        photon_counts = numpy.interp(
-            in_range_pattern_indexes, unique_pos_indexes, mean_photon_counts
+    if pos_photon_counts is not None:
+        _, photon_counts = interpolate_at_indexes(
+            pos_indexes, pos_photon_counts, filtered_pattern_indexes
         )
 
     probes = product.probes
     if opr_weights_all is not None:
         opr_weights = opr_weights_all[pos_keep]
-        opr_weights_out = numpy.empty(
-            (in_range_pattern_indexes.size, opr_weights.shape[1]), dtype=opr_weights.dtype
-        )
-
-        for column in range(opr_weights.shape[1]):
-            mean_weight = numpy.bincount(inverse, weights=opr_weights[:, column]) / counts
-            opr_weights_out[:, column] = numpy.interp(
-                in_range_pattern_indexes, unique_pos_indexes, mean_weight
-            )
+        _, mean_weights = interpolate_at_indexes(pos_indexes, opr_weights, filtered_pattern_indexes)
+        opr_weights_out = mean_weights.astype(opr_weights.dtype)
 
         probes = ProbeEnsemble(
             array=probes.get_array(),

@@ -3,6 +3,7 @@ import pytest
 
 from ptychodus.api.interpolate import (
     BarycentricArrayInterpolator,
+    interpolate_at_indexes,
     lerp,
 )
 
@@ -199,3 +200,67 @@ def test_get_patch_preserves_a_leading_axis() -> None:
     for layer in range(stack.shape[0]):
         expected = BarycentricArrayInterpolator(stack[layer]).get_patch(9.3, 7.8, 6, 5)
         numpy.testing.assert_allclose(patch[layer], expected, atol=1e-12)
+
+
+def test_interpolate_at_indexes_averages_duplicates_and_interpolates_interior() -> None:
+    source = numpy.array([4, 0, 4, 2])
+    values = numpy.array([5.0, 0.0, 7.0, 2.0])
+    target = numpy.array([0, 1, 2, 3, 4])
+
+    mask, resampled = interpolate_at_indexes(source, values, target)
+
+    assert mask.all()
+    # index 4 averages 5 and 7 to 6; index 3 lies halfway between 2 and 6.
+    numpy.testing.assert_array_equal(resampled, [0.0, 1.0, 2.0, 4.0, 6.0])
+
+
+def test_interpolate_at_indexes_drops_targets_outside_the_anchor_range() -> None:
+    source = numpy.array([2, 4])
+    values = numpy.array([1.0, 3.0])
+    target = numpy.array([5, 3, 1, 2])
+
+    mask, resampled = interpolate_at_indexes(source, values, target)
+
+    numpy.testing.assert_array_equal(mask, [False, True, False, True])
+    numpy.testing.assert_array_equal(resampled, [2.0, 1.0])
+
+
+def test_interpolate_at_indexes_propagates_nan_from_an_anchor() -> None:
+    source = numpy.array([0, 2, 4])
+    values = numpy.array([0.0, numpy.nan, 4.0])
+    target = numpy.array([0, 1, 3, 4])
+
+    _, resampled = interpolate_at_indexes(source, values, target)
+
+    assert resampled[0] == 0.0
+    assert numpy.isnan(resampled[1])
+    assert numpy.isnan(resampled[2])
+    assert resampled[3] == 4.0
+
+
+def test_interpolate_at_indexes_resamples_columns_independently() -> None:
+    source = numpy.array([0, 2])
+    values = numpy.array([[0.0, 10.0, -1.0], [2.0, 30.0, 1.0]])
+    target = numpy.array([1, 2])
+
+    mask, resampled = interpolate_at_indexes(source, values, target)
+
+    assert mask.all()
+    assert resampled.shape == (2, 3)
+    numpy.testing.assert_array_equal(resampled, [[1.0, 20.0, 0.0], [2.0, 30.0, 1.0]])
+
+
+def test_interpolate_at_indexes_with_empty_source_leaves_every_target_out() -> None:
+    target = numpy.array([0, 1, 2])
+
+    mask, resampled = interpolate_at_indexes(
+        numpy.array([], dtype=int), numpy.empty((0, 2)), target
+    )
+
+    assert not mask.any()
+    assert resampled.shape == (0, 2)
+
+
+def test_interpolate_at_indexes_rejects_mismatched_rows() -> None:
+    with pytest.raises(ValueError, match='one row of values per source index'):
+        interpolate_at_indexes(numpy.array([0, 1]), numpy.array([1.0]), numpy.array([0]))

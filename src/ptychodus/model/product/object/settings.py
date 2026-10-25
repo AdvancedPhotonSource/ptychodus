@@ -95,6 +95,13 @@ class ObjectSettings(Observable, Observer):
             'PaganinDeltaOverBeta', 100.0, minimum=1e-3
         )
 
+        self.dpc_regularization_fov_fraction = self._group.create_real_parameter(
+            'DPCRegularizationFOVFraction', 0.0, minimum=0.0, maximum=2.0
+        )
+        self.dpc_shadow_correction = self._group.create_boolean_parameter(
+            'DPCShadowCorrection', False
+        )
+
     def _update(self, observable: Observable) -> None:
         if observable is self._group:
             self.notify_observers()

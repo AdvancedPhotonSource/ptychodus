@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Callable
 import logging
 import math
 
@@ -8,6 +9,7 @@ from ptychodus.api.geometry import GeometryNotDefinedError
 from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.observer import Observable
 from ptychodus.api.parameters import ParameterGroup
+from ptychodus.api.probe import ProbeEnsemble
 
 from .builder import FromMemoryObjectBuilder, ObjectBuilder
 from .settings import ObjectSettings
@@ -21,11 +23,15 @@ class ObjectRepositoryItem(ParameterGroup):
         geometry_provider: ObjectGeometryProvider,
         settings: ObjectSettings,
         builder: ObjectBuilder,
+        *,
+        probe_supplier: Callable[[], ProbeEnsemble] | None = None,
     ) -> None:
         super().__init__()
         self._geometry_provider = geometry_provider
         self._settings = settings
+        self._probe_supplier = probe_supplier
         self._builder = builder
+        self._builder.bind_probe_supplier(probe_supplier)
         self._object = Object(array=None, pixel_geometry=None, center=None)
 
         self.layer_spacing_m = settings.object_layer_spacing_m.copy()
@@ -82,6 +88,7 @@ class ObjectRepositoryItem(ParameterGroup):
         self._remove_group('builder')
         self._builder.remove_observer(self)
         self._builder = builder
+        self._builder.bind_probe_supplier(self._probe_supplier)
         self._builder.add_observer(self)
         self._add_group('builder', self._builder, observe=True)
         self.rebuild()

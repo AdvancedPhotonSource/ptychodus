@@ -1,22 +1,73 @@
-"""Object (transmission function) generation functions: STXM, random fields, simplex/fractal noise, dead-leaves models, and Siemens star resolution targets."""
+"""Object (transmission function) generation functions: STXM differential phase contrast, Paganin phase retrieval, random fields, simplex/fractal noise, dead-leaves models, and Siemens star resolution targets."""
 
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from typing import Final
 import logging
+import math
 
 from scipy.fft import fft2, fftfreq, ifft2
 from scipy.interpolate import griddata
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter, map_coordinates
 import numpy
 
+from ..assemble import AssembledDiffractionData, DetectorCorrections
 from ..constants import TWO_PI_J
-from ..interpolate import lerp
-from ..assemble import AssembledDiffractionData
+from ..geometry import ImageExtent, PixelGeometry
+from ..interpolate import interpolate_at_indexes, lerp
 from ..object import Object, ObjectGeometry, resample_object_layers
+from ..preprocess.diffraction import inpaint_bad_pixels
+from ..preprocess.noise import estimate_noise_floor
+from ..probe import Probe
 from ..probe_positions import ProbePosition
 from ..typing import BooleanArrayType, IntegerArrayType, RealArrayType
 
+__all__ = [
+    'STXMDPCSignals',
+    'compute_stxm_dpc_signals',
+    'generate_dead_leaves_object',
+    'generate_fractal_noise_object',
+    'generate_gaussian_random_field_object',
+    'generate_layers',
+    'generate_paganin_object',
+    'generate_random_object',
+    'generate_siemens_star_object',
+    'generate_simplex_noise_object',
+    'generate_stxm_dpc_object',
+    'generate_uniform_object',
+    'pad_object',
+]
+
 logger = logging.getLogger(__name__)
+
+
+def _interpolate_scan_channels(
+    geometry: ObjectGeometry, points_px: RealArrayType, channels: RealArrayType
+) -> tuple[RealArrayType, BooleanArrayType]:
+    """Interpolate per-position channels onto the object grid.
+
+    *points_px* holds one ``(y, x)`` object-pixel row per position and *channels* one
+    row of ``k`` finite values per position; the result is ``(k, height, width)``.
+
+    Linear interpolation holds inside the convex hull of the positions; beyond it every
+    pixel takes its nearest position's value, so the border continues the measured edge
+    rather than stepping to a level nothing observed. The returned mask marks the
+    linearly interpolated pixels, which are the only ones the scan measured.
+    """
+    YY, XX = numpy.mgrid[: geometry.height_px, : geometry.width_px]  # noqa: N806
+    query_points = numpy.transpose((YY.flat, XX.flat))
+
+    # griddata fills with NaN outside the hull unless told otherwise, which is what
+    # distinguishes the two regions here.
+    interpolated = griddata(points_px, channels, query_points, method='linear')
+    scanned = numpy.logical_not(numpy.isnan(interpolated[:, 0]))
+
+    if not scanned.all():
+        nearest = griddata(points_px, channels, query_points, method='nearest')
+        interpolated = numpy.where(scanned[:, numpy.newaxis], interpolated, nearest)
+
+    grids = numpy.moveaxis(interpolated.reshape(*XX.shape, channels.shape[1]), -1, 0)
+    return grids, scanned.reshape(XX.shape)
 
 
 def _interpolate_stxm_intensity(
@@ -54,53 +105,453 @@ def _interpolate_stxm_intensity(
             values.append(value)
 
     points = numpy.reshape(coordinates_px, (-1, 2))
-    YY, XX = numpy.mgrid[: geometry.height_px, : geometry.width_px]  # noqa: N806
-    query_points = numpy.transpose((YY.flat, XX.flat))
-
-    # griddata fills with NaN outside the hull unless told otherwise, which is what
-    # distinguishes the two regions here.
-    intensity = griddata(points, values, query_points, method='linear').reshape(XX.shape)
-    scanned = numpy.logical_not(numpy.isnan(intensity))
-
-    if not scanned.all():
-        nearest = griddata(points, values, query_points, method='nearest').reshape(XX.shape)
-        intensity = numpy.where(scanned, intensity, nearest)
-
-    return intensity, scanned
+    grids, scanned = _interpolate_scan_channels(geometry, points, numpy.reshape(values, (-1, 1)))
+    return grids[0], scanned
 
 
-def generate_stxm_object(
-    geometry: ObjectGeometry,
-    assembled_data: AssembledDiffractionData,
-    probe_positions: Iterable[ProbePosition],
-) -> Object:
-    """Generate an STXM-like object by interpolating per-position diffraction counts onto
-    the object grid.
+@dataclass(frozen=True)
+class STXMDPCSignals:
+    """Per-pattern scanning signals: the transmitted total and the intensity centroid.
 
-    The counts are divided by their mean over the scanned region, so the result is a
-    dimensionless contrast map of unit root-mean-square modulus rather than an amplitude
-    in units of the square root of a photon count. A caller that knows the sample's mean
-    opacity supplies the absolute level by scaling this; a position recording the
-    unobstructed beam then comes out at unit modulus.
-
-    The mean excludes pixels beyond the scan, which are extrapolated rather than
-    measured and would otherwise drag it toward whatever the edge of the scan happened
-    to be.
+    Rows pair with probe positions by `indexes`, never by order. Centroids are in
+    detector pixels, x along columns and y along rows, about the detector midpoint. A
+    pattern whose aperture held no signal keeps its total and has a NaN centroid.
     """
-    intensity, scanned = _interpolate_stxm_intensity(geometry, assembled_data, probe_positions)
+
+    indexes: IntegerArrayType
+    total_counts: RealArrayType
+    center_of_mass_x_px: RealArrayType
+    center_of_mass_y_px: RealArrayType
+
+
+def _find_dpc_aperture(
+    mean_pattern: RealArrayType,
+    good_pixels: BooleanArrayType,
+    *,
+    energy_fraction: float,
+    margin_px: float,
+) -> BooleanArrayType:
+    """The circular aperture holding `energy_fraction` of the mean pattern's signal.
+
+    The pedestal, estimated as the noise-floor median of the good pixels, is removed
+    first so that a uniform floor does not inflate the circle. The circle is centred on
+    the signal's centroid and widened by `margin_px`.
+    """
+    pedestal = estimate_noise_floor(mean_pattern[good_pixels]).median if good_pixels.any() else 0.0
+    signal = numpy.clip(mean_pattern - pedestal, 0.0, None)
+    total = float(numpy.sum(signal))
+
+    if not total > 0.0:
+        logger.warning('Mean pattern holds no signal; using the whole detector as the aperture.')
+        return numpy.ones(mean_pattern.shape, dtype=numpy.bool)
+
+    yy, xx = numpy.indices(mean_pattern.shape, dtype=numpy.float64)
+    center_x = numpy.sum(signal * xx) / total
+    center_y = numpy.sum(signal * yy) / total
+    radius = numpy.hypot(xx - center_x, yy - center_y)
+
+    order = numpy.argsort(radius, axis=None, kind='stable')
+    enclosed = numpy.cumsum(signal.ravel()[order])
+    position = min(int(numpy.searchsorted(enclosed, energy_fraction * total)), order.size - 1)
+    enclosing_radius = radius.ravel()[order[position]]
+
+    return radius <= enclosing_radius + margin_px
+
+
+def compute_stxm_dpc_signals(
+    assembled_data: AssembledDiffractionData,
+    *,
+    aperture_energy_fraction: float = 0.99,
+    aperture_margin_px: float = 4.0,
+    max_patterns_per_chunk: int = 256,
+) -> STXMDPCSignals:
+    """Measure each pattern's transmitted total and its intensity centroid.
+
+    A detector background or flat field the patterns still carry is applied first, as
+    ``(pattern - background) / flat_field`` clipped at zero, and the pixels those maps
+    make unusable join the bad pixels.
+
+    The total sums the whole corrected frame, with its bad pixels inpainted as for the
+    centroid below; it is the absorption signal. Summing only the good pixels instead
+    would let a beam that walks across a dead region with the sample's phase gradient
+    read as absorption. When measured incident photon counts are attached, each total is
+    scaled by ``mean(M) / M_j`` so beam decay does not read as absorption. A count at or
+    below zero cannot normalize anything and leaves its total unscaled.
+
+    The centroid is taken inside a circular aperture rather than over the whole
+    detector, because its noise variance grows as ``sum(I_p * r_p**2)`` and the shot
+    noise of sparse high-q pixels would dominate it. The circle holds
+    `aperture_energy_fraction` of the corrected mean pattern's signal above its
+    pedestal, widened by `aperture_margin_px`. The centre-of-mass theorem is exact only
+    when the aperture holds all of the scattered intensity, so the fraction states the
+    truncation directly: deflections that carry signal past the margin are
+    underestimated. Hard X-ray phase gradients usually shift a pattern by less than a
+    pixel, so the default margin is generous.
+
+    Bad pixels are inpainted in each frame from that frame's own neighbours, so a
+    shifted disk edge next to a hole carries into the fill. A bad region touching the
+    detector border is zeroed instead and so acts as dropped, and a wide gap across the
+    edge of the bright field is poorly constrained either way.
+
+    `max_patterns_per_chunk` bounds the working memory. It changes the result by
+    rounding alone, since every reduction runs within one pattern.
+
+    Raises:
+        ValueError: if a tunable is out of range.
+    """
+    if not 0.0 < aperture_energy_fraction <= 1.0:
+        raise ValueError('Aperture energy fraction must lie in (0, 1]!')
+
+    if aperture_margin_px < 0.0:
+        raise ValueError('Aperture margin must not be negative!')
+
+    if max_patterns_per_chunk < 1:
+        raise ValueError('Chunks must hold at least one pattern!')
+
+    corrections = DetectorCorrections(
+        background=assembled_data.get_background(),
+        flat_field=assembled_data.get_flat_field(),
+        subtract_background=True,
+        divide_flat_field=True,
+    )
+    bad_pixels = corrections.apply_to_bad_pixels(assembled_data.get_bad_pixels())
+    good_pixels = numpy.logical_not(bad_pixels)
+
+    mean_pattern = corrections.apply(assembled_data.get_mean_pattern()[numpy.newaxis])[0]
+    mean_pattern = inpaint_bad_pixels(mean_pattern.astype(numpy.float64), bad_pixels)
+    aperture = _find_dpc_aperture(
+        mean_pattern,
+        good_pixels,
+        energy_fraction=aperture_energy_fraction,
+        margin_px=aperture_margin_px,
+    )
+
+    height_px, width_px = mean_pattern.shape
+    yy, xx = numpy.indices((height_px, width_px), dtype=numpy.float64)
+    aperture_x_px = (xx - (width_px - 1) / 2)[aperture]
+    aperture_y_px = (yy - (height_px - 1) / 2)[aperture]
+
+    patterns = assembled_data.get_patterns()
+    num_patterns = patterns.shape[0]
+    total_counts = numpy.zeros(num_patterns, dtype=numpy.float64)
+    center_of_mass_x_px = numpy.full(num_patterns, numpy.nan)
+    center_of_mass_y_px = numpy.full(num_patterns, numpy.nan)
+
+    for start in range(0, num_patterns, max_patterns_per_chunk):
+        stop = min(start + max_patterns_per_chunk, num_patterns)
+        corrected = corrections.apply(patterns[start:stop]).astype(numpy.float64)
+        repaired = inpaint_bad_pixels(corrected, bad_pixels)
+        total_counts[start:stop] = numpy.sum(repaired, axis=(-2, -1))
+
+        inside = repaired[:, aperture]
+        weight = numpy.sum(inside, axis=-1)
+        moment_x = numpy.sum(inside * aperture_x_px, axis=-1)
+        moment_y = numpy.sum(inside * aperture_y_px, axis=-1)
+        has_weight = weight > 0.0
+        safe_weight = numpy.where(has_weight, weight, 1.0)
+        center_of_mass_x_px[start:stop] = numpy.where(has_weight, moment_x / safe_weight, numpy.nan)
+        center_of_mass_y_px[start:stop] = numpy.where(has_weight, moment_y / safe_weight, numpy.nan)
+
+    if assembled_data.has_measured_probe_photon_counts():
+        monitor = assembled_data.get_probe_photon_counts().astype(numpy.float64)
+        usable = numpy.isfinite(monitor) & (monitor > 0.0)
+
+        if usable.any():
+            total_counts[usable] *= numpy.mean(monitor[usable]) / monitor[usable]
+            logger.info('Normalizing STXM totals by the measured incident photon counts.')
+
+        if not usable.all():
+            logger.warning(
+                f'{int(numpy.count_nonzero(~usable))} incident photon counts are not positive;'
+                ' leaving those totals unnormalized.'
+            )
+
+    return STXMDPCSignals(
+        indexes=numpy.asarray(assembled_data.get_indexes()).copy(),
+        total_counts=total_counts,
+        center_of_mass_x_px=center_of_mass_x_px,
+        center_of_mass_y_px=center_of_mass_y_px,
+    )
+
+
+def _compute_probe_shadow_gradient(
+    transmission: RealArrayType,
+    probe: Probe,
+    points_px: RealArrayType,
+    pixel_geometry: PixelGeometry,
+) -> RealArrayType:
+    """The probe-phase gradient each position's centroid sees, in rad/m, as ``(n, 2)`` (x, y).
+
+    A centroid measures the ``|psi|**2``-weighted mean of the exit-wave phase gradient,
+    which includes the probe's own. Under transmission ``T`` that share is
+    ``(T * J)(r) / (T * I)(r)`` correlated over the probe window at position ``r``,
+    where ``I = sum_m |P_m|**2`` and ``J = sum_m Im(conj(P_m) grad P_m)`` --
+    ``|P|**2 grad(phase P)`` without unwrapping -- summed over the incoherent modes as
+    the centre-of-mass theorem requires of a mixed state.
+
+    *points_px* holds ``(x, y)`` object-pixel rows. Derivatives are spectral, which a
+    far-field probe supports because it is periodic on its FFT grid by construction.
+    """
+    modes = probe.get_array()
+    probe_height_px, probe_width_px = modes.shape[-2:]
+    kx = 2 * numpy.pi * fftfreq(probe_width_px, d=pixel_geometry.width_m)
+    ky = 2 * numpy.pi * fftfreq(probe_height_px, d=pixel_geometry.height_m)
+    spectrum = fft2(modes)
+    d_dx = numpy.asarray(ifft2(1j * kx[numpy.newaxis, numpy.newaxis, :] * spectrum))
+    d_dy = numpy.asarray(ifft2(1j * ky[numpy.newaxis, :, numpy.newaxis] * spectrum))
+    conjugate = numpy.conj(modes)
+    kernels = (
+        numpy.sum(numpy.imag(conjugate * d_dx), axis=0),
+        numpy.sum(numpy.imag(conjugate * d_dy), axis=0),
+        numpy.sum(numpy.square(numpy.abs(modes)), axis=0),
+    )
+
+    # Zero-pad by the probe extent on every side so the circular correlation never
+    # wraps over the positions sampled below.
+    padded = numpy.pad(transmission, ((probe_height_px,), (probe_width_px,)))
+    transmission_spectrum = fft2(padded)
+    # A window centred at (x, y) under the (N - 1) / 2 convention starts at this corner,
+    # expressed in the padded frame.
+    corner_y = points_px[:, 1] - (probe_height_px - 1) / 2 + probe_height_px
+    corner_x = points_px[:, 0] - (probe_width_px - 1) / 2 + probe_width_px
+
+    sampled = list()
+
+    for kernel in kernels:
+        embedded = numpy.zeros(padded.shape)
+        embedded[:probe_height_px, :probe_width_px] = kernel
+        correlation = numpy.real(
+            numpy.asarray(ifft2(transmission_spectrum * numpy.conj(fft2(embedded))))
+        )
+        sampled.append(map_coordinates(correlation, [corner_y, corner_x], order=1))
+
+    flux_x, flux_y, weight = sampled
+    positive = weight > 0.0
+    safe_weight = numpy.where(positive, weight, 1.0)
+    shadow_x = numpy.where(positive, flux_x / safe_weight, 0.0)
+    shadow_y = numpy.where(positive, flux_y / safe_weight, 0.0)
+    return numpy.column_stack((shadow_x, shadow_y))
+
+
+def _integrate_gradient(
+    gradient_x: RealArrayType,
+    gradient_y: RealArrayType,
+    pixel_geometry: PixelGeometry,
+    *,
+    regularization_per_m2: float,
+) -> RealArrayType:
+    """Least-squares phase from its gradient by an FFT Poisson solve.
+
+    The canvas is mirrored to twice its size, negating each component in the halves
+    mirrored along it, which makes the phase even and periodic so the FFT introduces no
+    seam. A positive regularization adds a Tikhonov term to ``|k|**2`` that damps
+    angular frequencies below ``sqrt(regularization_per_m2)``.
+    """
+    height_px, width_px = gradient_x.shape
+    extended_x = numpy.block(
+        [
+            [gradient_x, -gradient_x[:, ::-1]],
+            [gradient_x[::-1, :], -gradient_x[::-1, ::-1]],
+        ]
+    )
+    extended_y = numpy.block(
+        [
+            [gradient_y, gradient_y[:, ::-1]],
+            [-gradient_y[::-1, :], -gradient_y[::-1, ::-1]],
+        ]
+    )
+    kx = 2 * numpy.pi * fftfreq(2 * width_px, d=pixel_geometry.width_m)
+    ky = 2 * numpy.pi * fftfreq(2 * height_px, d=pixel_geometry.height_m)
+    KY, KX = numpy.meshgrid(ky, kx, indexing='ij')  # noqa: N806
+    denominator = numpy.square(KX) + numpy.square(KY) + regularization_per_m2
+    denominator[0, 0] = 1.0
+    phase_spectrum = -1j * (KX * fft2(extended_x) + KY * fft2(extended_y)) / denominator
+    phase_spectrum[0, 0] = 0.0
+    phase = numpy.real(numpy.asarray(ifft2(phase_spectrum)))
+    return phase[:height_px, :width_px]
+
+
+def generate_stxm_dpc_object(
+    geometry: ObjectGeometry,
+    signals: STXMDPCSignals,
+    probe_positions: Iterable[ProbePosition],
+    *,
+    detector_extent: ImageExtent,
+    probe: Probe | None = None,
+    regularization_fov_fraction: float = 0.0,
+    reference_quantile: float = 0.95,
+) -> Object:
+    """Generate a coarse complex object from far-field data by STXM differential phase contrast.
+
+    The amplitude is the STXM one: per-position totals interpolated onto the object
+    grid and divided by their mean over the scanned region, so the result is a
+    dimensionless contrast map, and a position recording the unobstructed beam comes out
+    at unit modulus once a caller scales it to the sample's mean opacity.
+
+    The phase comes from the far-field centre-of-mass theorem: a pattern's intensity
+    centroid is the ``|psi|**2``-weighted mean of the exit wave's phase gradient under
+    the probe. The data must be far field, and its centroids must already be in the
+    frame :func:`ptychodus.api.simulate.diffraction.generate_diffraction_data`
+    simulates, with x along columns and y along rows; a detector rotated or flipped
+    relative to the scan has to be oriented beforehand. Each centroid has the mean
+    centroid subtracted, which removes the beam centre's offset and, with it, any net
+    phase wedge across the sample.
+
+    A shift of ``u`` detector pixels is the gradient ``2 * pi * u / (N * dx)`` in rad/m,
+    where ``N`` is the `detector_extent` along that axis and ``dx`` the object pitch:
+    one detector pixel is one frequency step of the ``N``-pixel window the patterns
+    were recorded on. That holds when the object grid has the far-field pitch paired
+    with the patterns, ``wavelength * z_d / (N * dx_detector)``, which is the grid the
+    forward model reconstructs on. The conversion then needs neither the distance nor
+    the wavelength, and a miscalibration of either cannot rescale the phase apart from
+    the grid it lands on.
+
+    Signals pair with positions by index: duplicate positions average, a signal between
+    positions takes an interpolated one, and a signal outside the range of position
+    indexes is skipped. The gradient is interpolated onto the grid, zeroed beyond the
+    scan, and integrated by a least-squares FFT Poisson solve. The phase is referenced
+    to zero mean over the scanned pixels whose transmission reaches the
+    `reference_quantile`: the empty beam when the scan includes one, and otherwise the
+    most transparent region.
+
+    Integrating gradient noise piles its error up at low spatial frequency, as drift
+    across the field of view. A positive `regularization_fov_fraction` adds a Tikhonov
+    term that damps phase variations with wavelengths longer than that fraction of the
+    canvas's larger dimension, halving them at exactly that wavelength. It has little
+    effect beyond about 2, the extent of the mirrored canvas the solve runs on.
+
+    Resolution is the probe's and the scan step's, because each centroid averages the
+    gradient under ``|P|**2``. The theorem needs all of the scattered intensity, so
+    gradients that deflect signal beyond the measuring aperture are underestimated.
+
+    A centroid also carries the probe's own phase gradient, weighted by the sample's
+    transmission. Without a `probe`, that shadow term is ignored, which assumes a probe
+    of flat phase or a sample whose absorption contrast is weak where the probe's phase
+    varies. For a single material of decrement ratio ``beta / delta`` under a probe of
+    RMS intensity width ``sigma`` defocused by ``dz``, ignoring it rescales the phase by
+    ``1 +/- 4 * pi * (beta / delta) * sigma**2 / (wavelength * |dz|)``: of order one for
+    micron-scale defocused hard X-ray probes at moderate ``beta / delta``, and nothing
+    for a pure phase object. Given a `probe`, whose incoherent modes are summed, that
+    term is estimated against the STXM transmission and subtracted. The estimate is
+    first order, because that transmission is itself blurred by the probe.
+
+    Raises:
+        ValueError: for a detector extent that is not positive, a negative
+            regularization, a reference quantile outside [0, 1], a probe whose pixels
+            differ from the object's, when no probe position pairs with any signal, or
+            when the mean STXM intensity over the scanned region is not positive.
+    """
+    if detector_extent.width_px <= 0 or detector_extent.height_px <= 0:
+        raise ValueError(f'Detector extent must be positive, not {detector_extent}!')
+
+    if regularization_fov_fraction < 0.0:
+        raise ValueError('Regularization must not be negative!')
+
+    if not 0.0 <= reference_quantile <= 1.0:
+        raise ValueError('Reference quantile must lie in [0, 1]!')
+
+    pixel_geometry = geometry.get_pixel_geometry()
+
+    if probe is not None:
+        probe_pixel_geometry = probe.get_pixel_geometry()
+
+        if not (
+            math.isclose(probe_pixel_geometry.width_m, pixel_geometry.width_m, rel_tol=1e-6)
+            and math.isclose(probe_pixel_geometry.height_m, pixel_geometry.height_m, rel_tol=1e-6)
+        ):
+            raise ValueError(
+                f'Probe pixels ({probe_pixel_geometry}) differ from object pixels'
+                f' ({pixel_geometry})!'
+            )
+
+    positions = list(probe_positions)
+    position_indexes = numpy.array([position.index for position in positions], dtype=int)
+    position_xy_m = numpy.array(
+        [(position.x_m, position.y_m) for position in positions], dtype=float
+    ).reshape(-1, 2)
+    paired, xy_m = interpolate_at_indexes(position_indexes, position_xy_m, signals.indexes)
+    num_skipped = int(numpy.count_nonzero(~paired))
+
+    if num_skipped > 0:
+        logger.debug(f'Skipping {num_skipped} STXM-DPC signals outside the position indexes.')
+
+    if not paired.any():
+        raise ValueError('No probe position pairs with any STXM-DPC signal index!')
+
+    # Object pixels under the (N - 1) / 2 centred convention of ObjectGeometry.
+    points_x_px = (xy_m[:, 0] - geometry.center_x_m) / geometry.pixel_width_m + (
+        geometry.width_px - 1
+    ) / 2
+    points_y_px = (xy_m[:, 1] - geometry.center_y_m) / geometry.pixel_height_m + (
+        geometry.height_px - 1
+    ) / 2
+    points_yx_px = numpy.column_stack((points_y_px, points_x_px))
+
+    total_counts = signals.total_counts[paired]
+    centroid_x_px = signals.center_of_mass_x_px[paired]
+    centroid_y_px = signals.center_of_mass_y_px[paired]
+    finite = numpy.isfinite(centroid_x_px) & numpy.isfinite(centroid_y_px)
+    deviation_x_px = numpy.zeros_like(centroid_x_px)
+    deviation_y_px = numpy.zeros_like(centroid_y_px)
+
+    if finite.any():
+        deviation_x_px[finite] = centroid_x_px[finite] - numpy.mean(centroid_x_px[finite])
+        deviation_y_px[finite] = centroid_y_px[finite] - numpy.mean(centroid_y_px[finite])
+
+    radians_per_px_x = 2 * numpy.pi / (detector_extent.width_px * geometry.pixel_width_m)
+    radians_per_px_y = 2 * numpy.pi / (detector_extent.height_px * geometry.pixel_height_m)
+    grids, scanned = _interpolate_scan_channels(
+        geometry,
+        points_yx_px,
+        numpy.column_stack(
+            (
+                total_counts,
+                radians_per_px_x * deviation_x_px,
+                radians_per_px_y * deviation_y_px,
+            )
+        ),
+    )
+    intensity, gradient_x, gradient_y = grids
+
     mean_intensity = float(numpy.mean(intensity[scanned])) if scanned.any() else 0.0
 
-    if mean_intensity > 0.0:
-        intensity = intensity / mean_intensity
-    else:
-        logger.warning(
-            'Mean STXM intensity over the scanned region is %r; leaving the object unnormalized.',
-            mean_intensity,
+    if mean_intensity <= 0.0:
+        raise ValueError('Mean STXM intensity must be positive!')
+
+    transmission = intensity / mean_intensity
+
+    if probe is not None:
+        shadow = _compute_probe_shadow_gradient(
+            transmission, probe, numpy.column_stack((points_x_px, points_y_px)), pixel_geometry
         )
+        shadow -= numpy.mean(shadow, axis=0)
+        shadow_grids, _ = _interpolate_scan_channels(geometry, points_yx_px, shadow)
+        gradient_x = gradient_x - shadow_grids[0]
+        gradient_y = gradient_y - shadow_grids[1]
+
+    if regularization_fov_fraction > 0.0:
+        cutoff_wavelength_m = regularization_fov_fraction * max(geometry.width_m, geometry.height_m)
+        regularization_per_m2 = (2 * numpy.pi / cutoff_wavelength_m) ** 2
+    else:
+        regularization_per_m2 = 0.0
+
+    phase = _integrate_gradient(
+        numpy.where(scanned, gradient_x, 0.0),
+        numpy.where(scanned, gradient_y, 0.0),
+        pixel_geometry,
+        regularization_per_m2=regularization_per_m2,
+    )
+
+    if scanned.any():
+        threshold = numpy.quantile(transmission[scanned], reference_quantile)
+        reference = scanned & (transmission >= threshold)
+        phase -= numpy.mean(phase[reference if reference.any() else scanned])
+
+    array = numpy.sqrt(transmission) * numpy.exp(1j * phase)
 
     return Object(
-        array=numpy.sqrt(intensity[numpy.newaxis, :, :]).astype('complex'),
-        pixel_geometry=geometry.get_pixel_geometry(),
+        array=array[numpy.newaxis, :, :].astype('complex'),
+        pixel_geometry=pixel_geometry,
         center=geometry.get_center(),
     )
 

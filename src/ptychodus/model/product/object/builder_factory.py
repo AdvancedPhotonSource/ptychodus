@@ -17,7 +17,7 @@ from .paganin import PaganinObjectBuilder
 from .random import RandomObjectBuilder
 from .settings import ObjectSettings
 from .siemens_star import SiemensStarObjectBuilder
-from .stxm import STXMObjectBuilder
+from .stxm_dpc import STXMDPCObjectBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class ObjectBuilderFactory(Iterable[str]):
         self._diffraction_builders: Mapping[
             str, Callable[[AssembledDiffractionDataset], ObjectBuilder]
         ] = {
-            'stxm': lambda dataset: STXMObjectBuilder(settings, dataset),
+            'stxm_dpc': lambda dataset: STXMDPCObjectBuilder(settings, dataset),
             'paganin': lambda dataset: PaganinObjectBuilder(settings, dataset),
         }
 

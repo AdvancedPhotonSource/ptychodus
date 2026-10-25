@@ -81,6 +81,10 @@ class _StubObjectGeometryProvider(ObjectGeometryProvider):
     def object_plane_propagation_distance_m(self) -> float:
         return 1.0
 
+    @property
+    def far_field(self) -> bool:
+        return True
+
     def get_probe_positions(self) -> Sequence[ProbePosition]:
         return ()
 

@@ -89,7 +89,9 @@ class ProductRepositoryItemFactory:
         geometry = ProductGeometryProvider(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create(geometry)
-        object_item = self._object_item_factory.create(geometry)
+        object_item = self._object_item_factory.create(
+            geometry, probe_supplier=probe_item.get_probes
+        )
 
         return ProductRepositoryItem(
             parent=self._repository,
@@ -130,7 +132,9 @@ class ProductRepositoryItemFactory:
         geometry = ProductGeometryProvider(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create(geometry, product.probes)
-        object_item = self._object_item_factory.create(geometry, product.object_)
+        object_item = self._object_item_factory.create(
+            geometry, product.object_, probe_supplier=probe_item.get_probes
+        )
 
         return ProductRepositoryItem(
             parent=self._repository,
@@ -152,7 +156,9 @@ class ProductRepositoryItemFactory:
         scan_item = self._scan_item_factory.create()
         geometry = ProductGeometryProvider(metadata_item, scan_item)
         probe_item = self._probe_item_factory.create(geometry)
-        object_item = self._object_item_factory.create(geometry)
+        object_item = self._object_item_factory.create(
+            geometry, probe_supplier=probe_item.get_probes
+        )
         return ProductRepositoryItem(
             parent=self._repository,
             metadata_item=metadata_item,
@@ -187,7 +193,9 @@ class ProductRepositoryItemFactory:
         geometry = ProductGeometryProvider(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create_from_settings(geometry, dataset=dataset)
-        object_item = self._object_item_factory.create_from_settings(geometry, dataset=dataset)
+        object_item = self._object_item_factory.create_from_settings(
+            geometry, dataset=dataset, probe_supplier=probe_item.get_probes
+        )
 
         item = ProductRepositoryItem(
             parent=self._repository,

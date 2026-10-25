@@ -191,6 +191,11 @@ class ObjectGeometryProvider(ABC):
         nothing keeps in step.
         """
 
+    @property
+    @abstractmethod
+    def far_field(self) -> bool:
+        """Whether the detector records the Fraunhofer diffraction pattern."""
+
     @abstractmethod
     def get_probe_positions(self) -> Sequence[ProbePosition]:
         pass
