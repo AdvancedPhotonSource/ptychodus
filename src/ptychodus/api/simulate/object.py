@@ -16,7 +16,7 @@ from ..accumulate import DiffractionMoments, compute_diffraction_moments
 from ..assemble import AssembledDiffractionData
 from ..constants import TWO_PI_J
 from ..geometry import ImageExtent, PixelGeometry
-from ..interpolate import interpolate_at_indexes, lerp
+from ..interpolate import lerp
 from ..object import Object, ObjectGeometry, resample_object_layers
 from ..patch import accumulate_probe_intensity_on, iter_probe_patches_on
 from ..probe import Probe, ProbeEnsemble
@@ -225,12 +225,9 @@ def _pair_signals_with_positions(
     Raises:
         ValueError: when no position pairs with any signal.
     """
-    positions = list(probe_positions)
-    position_indexes = numpy.array([position.index for position in positions], dtype=int)
-    position_xy_m = numpy.array(
-        [(position.x_m, position.y_m) for position in positions], dtype=float
-    ).reshape(-1, 2)
-    paired, xy_m = interpolate_at_indexes(position_indexes, position_xy_m, signals.indexes)
+    paired, paired_positions = ProbePositionSequence(list(probe_positions)).interpolate_at_indexes(
+        signals.indexes
+    )
     num_skipped = int(numpy.count_nonzero(~paired))
 
     if num_skipped > 0:
@@ -239,12 +236,6 @@ def _pair_signals_with_positions(
     if not paired.any():
         raise ValueError('No probe position pairs with any STXM-DPC signal index!')
 
-    paired_positions = ProbePositionSequence(
-        [
-            ProbePosition(index=int(index), x_m=float(x_m), y_m=float(y_m))
-            for index, (x_m, y_m) in zip(signals.indexes[paired], xy_m)
-        ]
-    )
     return paired, paired_positions
 
 

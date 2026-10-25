@@ -9,7 +9,8 @@ from typing import cast, overload, TypeVar
 import numpy
 
 from .files import FileReader, FileWriter
-from .typing import IntegerArrayType, RealArrayType
+from .interpolate import interpolate_at_indexes
+from .typing import BooleanArrayType, IntegerArrayType, RealArrayType
 
 
 _ArrayT = TypeVar('_ArrayT', bound=numpy.ndarray)
@@ -166,6 +167,23 @@ class ProbePositionSequence(Sequence[ProbePosition]):
         when non-None, is fully populated and 1:1 aligned with the index / coordinate arrays.
         """
         return self._probe_photon_counts
+
+    def interpolate_at_indexes(
+        self, indexes: IntegerArrayType
+    ) -> tuple[BooleanArrayType, ProbePositionSequence]:
+        """The positions at other scan indexes, and which of those indexes have one.
+
+        Positions sharing an index average into one anchor, an index between anchors
+        takes the linearly interpolated position, and an index outside the range of the
+        anchors is left out rather than extrapolated. Returns the mask over *indexes*
+        marking those in range, and their positions in the order of *indexes*; photon
+        counts are not carried.
+        """
+        in_range, yx_m = interpolate_at_indexes(self._indexes, self._coordinates_m, indexes)
+        seq = ProbePositionSequence()
+        seq._indexes = numpy.asarray(indexes, dtype=numpy.intp)[in_range]
+        seq._coordinates_m = numpy.reshape(yx_m, (-1, 2))
+        return in_range, seq
 
     @property
     def nbytes(self) -> int:

@@ -124,3 +124,22 @@ class TestProbePositionSequencePhotonCounts:
             [ProbePosition(i, float(i), 0.0, probe_photon_count=float(i)) for i in range(3)]
         )
         assert with_counts.nbytes > without.nbytes
+
+
+class TestProbePositionSequenceInterpolateAtIndexes:
+    def test_duplicates_average_gaps_interpolate_and_the_outside_is_left_out(self) -> None:
+        seq = ProbePositionSequence(
+            [
+                ProbePosition(0, 0.0, 10.0, probe_photon_count=1.0),
+                ProbePosition(2, 2.0, 30.0, probe_photon_count=1.0),
+                ProbePosition(2, 4.0, 50.0, probe_photon_count=1.0),
+            ]
+        )
+
+        in_range, paired = seq.interpolate_at_indexes(numpy.array([5, 2, 1, -1]))
+
+        numpy.testing.assert_array_equal(in_range, [False, True, True, False])
+        numpy.testing.assert_array_equal(paired.get_indexes(), [2, 1])
+        numpy.testing.assert_allclose(paired.get_coordinates_x_m(), [3.0, 1.5])
+        numpy.testing.assert_allclose(paired.get_coordinates_y_m(), [40.0, 25.0])
+        assert paired.get_probe_photon_counts() is None
