@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 """
-Prepare experiment data for use in a beamline data pipeline
+Prepare experiment data for use in a beamline data pipeline.
+
+Deprecated: a standard driver run with ``--prepare-only`` writes the same prepared
+directory through the instrument's own conditioning, and ``ptychodus-reconstruct``
+reconstructs it.
 """
 
 from pathlib import Path
@@ -24,7 +28,11 @@ def main() -> int:
     crop_region: CropRegion | None = None
 
     parser = argparse.ArgumentParser(
-        description='ptychodus-bdp prepares experiment data for use in beamline data pipelines.',
+        description=(
+            'Deprecated: use ptychodus-reconstruct-<beamline> --prepare-only, then '
+            'ptychodus-reconstruct. ptychodus-bdp prepares experiment data for use in '
+            'beamline data pipelines.'
+        ),
     )
     parser.add_argument(
         '--crop-center-x-px',
@@ -146,6 +154,11 @@ def main() -> int:
     )
 
     args = parser.parse_args()
+    logger.warning(
+        'ptychodus-bdp is deprecated and will be removed. Prepare data with '
+        'ptychodus-reconstruct-<beamline> --prepare-only and reconstruct it with '
+        'ptychodus-reconstruct.'
+    )
 
     if args.crop_center_x_px is not None and args.crop_center_y_px is not None:
         crop_center = BeamCenter(

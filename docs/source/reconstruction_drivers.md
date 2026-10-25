@@ -9,7 +9,7 @@ Every driver is installed as a console command by `pip install ptychodus`.
 
 ## Choosing a driver
 
-Nine commands differ only in which instrument they read. The last three differ in shape: they
+Nine commands differ only in which instrument they read. The last four differ in shape: they
 take their configuration from a file, or operate on a directory another driver prepared.
 
 | Command | Instrument | Diffraction input | Position input |
@@ -25,7 +25,8 @@ take their configuration from a file, or operate on a directory another driver p
 | `ptychodus-reconstruct-foldslice` | Any, via fold_slice | Preprocessed `..._dp.hdf5` | Matching `..._para.hdf5` |
 | `ptychodus-reconstruct-pear` | Any, via a PEAR parameter file | Named in the parameter file | Named in the parameter file |
 | `ptychodus-reconstruct-batch-lamni` | APS 31-ID-E LamNI, a whole tomogram | Named in the settings file | Named in the settings file |
-| `ptychodus-reconstruct-subprocess` | Any, over a prepared directory | `diffraction.h5` | `product.h5` |
+| `ptychodus-reconstruct` | Any, over a prepared directory | `diffraction.h5` | `product.h5` |
+| `ptychodus-reconstruct-subprocess` | Any, over a prepared directory, for a launcher | `diffraction.h5` | `product.h5` |
 
 A scan that has already been preprocessed by fold_slice goes through
 `ptychodus-reconstruct-foldslice` whatever instrument recorded it, because the pattern file
@@ -72,8 +73,10 @@ The remaining arguments fall into four groups.
 : Shape the initial guesses. The zone-plate preset and defocus describe the optic that formed
   the probe.
 
-Three more control the run itself: `--ptychi-options` chooses the reconstruction algorithm and
-its settings, `--dry-run` reports the resolved configuration without reconstructing, and
+Four more control the run itself: `--ptychi-options` chooses the reconstruction algorithm and
+its settings, `--dry-run` reports the resolved configuration without reconstructing,
+`--prepare-only` writes a prepared directory and stops (see
+[Preparing and reconstructing separately](#preparing-and-reconstructing-separately)), and
 `--log-level` takes a Python logging level as an integer (`10` for DEBUG, `20` for INFO).
 
 ```{note}
@@ -110,6 +113,16 @@ gigabytes; `--no-save-diffraction` skips it.
 
 `ptychodus-reconstruct-batch-lamni` writes one such directory per scan, and adds
 `batch_settings.yaml` and `affine_fit.yaml` to each.
+
+A driver run with `--prepare-only` writes a smaller directory, which holds what a
+reconstruction starts from rather than what it produced:
+
+```text
+fly054-prepared/
+  diffraction.h5         # the assembled patterns
+  product.h5             # the initial object, probe and positions
+  ptychi_options.yaml    # the options the reconstruction will run with
+```
 
 ## Choosing the algorithm
 
@@ -273,25 +286,47 @@ example with `logging.basicConfig(level=logging.INFO)` — and neither installs 
 To make a run interruptible, pass a `CancellationToken`; it stops the batch at the first scan
 boundary after the request and leaves the scans already written in place.
 
-## Reconstructing a prepared directory
+## Preparing and reconstructing separately
 
-`ptychodus-reconstruct-subprocess` runs one reconstruction over a directory that already holds
-`diffraction.h5` and `product.h5` — a directory another driver wrote, or one staged for the
-purpose. It reads no raw beamline files and knows nothing about any instrument.
+Reading and assembling the raw files and running pty-chi need not happen in one command. Give
+any of the nine instrument commands `--prepare-only` and it stops after building the initial
+product: it writes the prepared directory shown above and exits successfully without
+reconstructing. `ptychodus-reconstruct` then runs the reconstruction from that directory:
 
 ```sh
-$ ptychodus-reconstruct-subprocess -i ./fly054 -o ./fly054-rerun --num-sync-epochs 10
+$ ptychodus-reconstruct-2ide \
+    --diffraction-file /data/2ide/ptycho/fly054_data_001.h5 \
+    --position-file /data/2ide/mda/2xfm_0054.mda \
+    --output-directory ./fly054-prepared \
+    --prepare-only
+$ ptychodus-reconstruct -i ./fly054-prepared -o ./fly054
 ```
 
-It is the way to re-run a reconstruction with different options without re-reading and
-re-assembling the raw data, which for a large scan is most of the wall-clock time. It also
-takes its options from the input directory's own `ptychi_options.yaml` when `--ptychi-options`
-is not given, so the command above repeats the original run.
+The split lets the preparation run where the raw data are, on a beamline workstation, and the
+reconstruction run where the GPUs are. It also lets one scan be reconstructed several times
+with different options without assembling the raw data again, which for a large scan is most
+of the wall-clock time. Every argument that shapes the data or the initial guesses — cropping,
+filtering, geometry, `--seed`, the probe options and `--ptychi-options` — takes effect at
+preparation. `--num-sync-epochs` belongs to the reconstruction.
 
-Unlike the other drivers it reports progress as newline-delimited JSON — one object per line,
-`started`, `epoch`, `checkpoint`, `finished` — which makes it usable as a child process of a
-launcher that wants to follow a reconstruction. Use `--event-file` to send that stream to a
-file and leave standard output alone.
+`ptychodus-reconstruct` reads no raw beamline files and knows nothing about any instrument. It
+takes its options from the prepared directory's `ptychi_options.yaml` unless `--ptychi-options`
+names another file, and falls back to stock LSQML, or BH for a near-field product, when there
+is neither. The input directory is never modified, and the output must be a different directory,
+since the final `product.h5` would otherwise overwrite the initial one. `--dry-run` loads and
+pairs the inputs and reports what would run.
+
+`ptychodus-reconstruct-subprocess` reconstructs the same input for a launching process. It
+reports progress as newline-delimited JSON — one object per line, `started`, `epoch`,
+`checkpoint`, `finished` — which makes it usable as a child process of a launcher that wants to
+follow a reconstruction. Use `--event-file` to send that stream to a file and leave standard
+output alone.
+
+```{note}
+`ptychodus-bdp` is deprecated and will be removed. Its prepared directory can still be
+reconstructed with `ptychodus-reconstruct`; new pipelines should prepare data with
+`--prepare-only` instead, which applies the instrument's own conditioning.
+```
 
 ## Reconstructing from a PEAR parameter file
 

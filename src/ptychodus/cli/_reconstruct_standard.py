@@ -8,6 +8,11 @@ what the fallback geometry is when a file records none, and how the files are de
 :func:`run_standard_reconstruction` runs the pipeline, so a driver is a profile and a
 ``main()`` rather than a copy of the pipeline.
 
+A driver can also stop after the preparation: ``--prepare-only`` writes the assembled
+patterns, the initial product and the aligned pty-chi options as a prepared directory and
+exits, and ``ptychodus-reconstruct`` runs the reconstruction from that directory later,
+on another node or with other options, without reading the raw files again.
+
 Two instruments vary more than a constant. A reader whose patterns arrive already cropped and
 centered sets ``conditions_patterns=False``, which drops the conditioning stage and the
 options that drive it. An instrument that wants the MAD and end-trim pattern filters sets
@@ -24,6 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy
+from ptychi.api.options.task import PtychographyTaskOptions
 
 from ptychodus.api.assemble import (
     AssembledDiffractionData,
@@ -42,7 +48,7 @@ from ptychodus.api.diffraction import (
 from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.typing import BooleanArrayType, RealArrayType
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.io import StandardFileLayout
+from ptychodus.api.io import StandardFileLayout, save_product
 from ptychodus.api.object import compute_object_geometry
 from ptychodus.api.propagate import compute_magnification
 from ptychodus.api.plugins import PluginRegistry
@@ -54,7 +60,6 @@ from ptychodus.api.preprocess.noise import compute_robust_statistics
 from ptychodus.api.probe import Probe, ProbeGeometry, ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata, reconcile_defocus_distance_m
-from ptychodus.api.reconstruct import prepare_reconstruct_input
 from ptychodus.api.simulate.object import generate_uniform_object
 from ptychodus.api.simulate.probe import (
     generate_average_pattern_probe,
@@ -78,13 +83,16 @@ from ptychodus.cli._reconstruct_common import (
     add_ptychi_options_argument,
     install_signal_handlers,
     invalid_count_threshold,
+    is_main_process,
     load_ptychi_options,
+    pair_patterns_with_positions,
     resolve_crop_region,
     resolve_flag,
     resolve_focus_object_distance_m,
     resolve_quantity,
     run_reconstruction,
     save_assembled_diffraction,
+    save_ptychi_options,
 )
 
 __all__ = ['InstrumentProfile', 'build_standard_parser', 'run_standard_reconstruction']
@@ -155,7 +163,8 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
         help=(
             'Destination directory, written in the ptychodus standard layout: '
             'diffraction.h5, ptychi_options.yaml, per-epoch product.NNNNNN.h5 '
-            'checkpoints, and the final product.h5.'
+            'checkpoints, and the final product.h5. With --prepare-only, the prepared '
+            'directory: diffraction.h5, the initial product.h5 and ptychi_options.yaml.'
         ),
     )
     parser.add_argument(
@@ -340,10 +349,21 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
     )
     add_ptychi_options_argument(parser)
     add_print_ptychi_options_argument(parser)
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         '--dry-run',
         action='store_true',
         help='Build everything and report the resolved configuration without reconstructing.',
+    )
+    mode.add_argument(
+        '--prepare-only',
+        action='store_true',
+        help=(
+            'Stop before reconstructing: write diffraction.h5, the initial product.h5 and the '
+            'aligned ptychi_options.yaml to the output directory and exit. Reconstruct it '
+            'later with "ptychodus-reconstruct -i OUTPUT_DIR -o RESULT_DIR". '
+            '--num-sync-epochs does not apply.'
+        ),
     )
     add_log_level_argument(parser)
     return parser
@@ -709,24 +729,74 @@ def _build_initial_probe(
     return rescale_probe_intensity(probe, probe_photon_count)
 
 
+def _write_prepared_directory(
+    logger: logging.Logger,
+    output_directory: Path,
+    assembled_data: AssembledDiffractionData,
+    product: Product,
+    options: PtychographyTaskOptions,
+) -> None:
+    """Write what a reconstruction starts from, so it can run later without the raw files.
+
+    The product is written unpaired -- every position the file recorded, with its I0 --
+    because pairing is deterministic and the reconstruction redoes it. It is still done
+    once here so that patterns and positions that do not overlap fail now rather than in a
+    queued job. The options are aligned against the paired product, which is the one that
+    will run, so a file the reconstruction would reject is rejected here as well.
+    """
+    product_file = StandardFileLayout.PRODUCT.path(output_directory)
+    previous_products = sorted(output_directory.glob(f'{product_file.stem}*{product_file.suffix}'))
+
+    if previous_products:
+        logger.warning(
+            'Overwriting %s with an initial product; %d product file(s) were already in %s, '
+            'which looks like an earlier reconstruction.',
+            product_file.name,
+            len(previous_products),
+            output_directory,
+        )
+
+    save_assembled_diffraction(logger, output_directory, assembled_data, skip=False)
+    reconstruct_input = pair_patterns_with_positions(logger, assembled_data, product)
+
+    if is_main_process():
+        logger.info('Writing %s', product_file)
+        save_product(product_file, product)
+
+    save_ptychi_options(logger, options, reconstruct_input.product, output_directory)
+    logger.info(
+        'Prepared %s; reconstruct it with: ptychodus-reconstruct -i %s -o RESULT_DIR',
+        output_directory,
+        output_directory,
+    )
+
+
 def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
     """Reconstruct one scan of `profile`'s instrument, end to end.
 
     Parses the command line, assembles the dataset, builds an initial product and runs
     pty-chi to convergence, writing the standard layout into ``--output-directory``.
+    With ``--prepare-only`` it stops ahead of pty-chi instead, and writes a prepared
+    directory that ``ptychodus-reconstruct`` takes as its input.
 
     To reconstruct with something other than stock LSQML, pass a pty-chi options file with
     ``--ptychi-options``; any ptychodus run writes one to ``ptychi_options.yaml``, and
     its algorithm stamp selects the reconstructor.
     """
     logger = logging.getLogger(profile.logger_name)
-    args = build_standard_parser(profile).parse_args()
+    parser = build_standard_parser(profile)
+    args = parser.parse_args()
+
+    if args.prepare_only and args.no_save_diffraction:
+        parser.error('--prepare-only needs diffraction.h5; drop --no-save-diffraction.')
 
     configure_logging(args)
 
     # Installed before the first long operation, so a cancel during the file reads is
-    # already honored. Nothing earlier than this is interruptible.
-    cancellation = install_signal_handlers()
+    # already honored. Nothing earlier than this is interruptible. A run that only prepares
+    # has no partial result worth stopping politely for, so there Ctrl-C keeps its default
+    # and ends the process at once.
+    cancellation = None if args.prepare_only else install_signal_handlers()
 
     registry = PluginRegistry.load_plugins()
     diffraction_reader = registry.diffraction_file_readers.get_strategy_by_name(
@@ -979,6 +1049,10 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
     options_file = StandardFileLayout.PTYCHI_OPTIONS.path(output_directory)
     product_file = StandardFileLayout.PRODUCT.path(output_directory)
 
+    if args.prepare_only:
+        _write_prepared_directory(logger, output_directory, assembled_data, product, options)
+        return ExitCode.SUCCESS
+
     if args.dry_run:
         # Stops ahead of align_task_options_with_product, so a dry run exercises the
         # ptychodus side -- readers, geometry, probe, object -- without requiring a
@@ -1005,25 +1079,13 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         logger.info('Nothing written: stopping before the pty-chi option alignment.')
         return ExitCode.SUCCESS
 
+    # Narrowed for the checker: only --prepare-only skips the handlers, and it returned above.
+    assert cancellation is not None
+
     save_assembled_diffraction(
         logger, output_directory, assembled_data, skip=args.no_save_diffraction
     )
-
-    reconstruct_input = prepare_reconstruct_input(assembled_data, product)
-    num_paired = reconstruct_input.diffraction_patterns.shape[0]
-
-    if num_paired < num_patterns:
-        # Ordinary on a scan that was stopped mid-raster: the detector keeps the line it
-        # was on, the position record truncates at its last completed line, and the
-        # patterns past that end have no position to pair with.
-        logger.warning(
-            'Paired %d of %d assembled patterns; %d had no probe position, which is'
-            ' expected when the detector recorded more scan lines than the position file.',
-            num_paired,
-            num_patterns,
-            num_patterns - num_paired,
-        )
-
+    reconstruct_input = pair_patterns_with_positions(logger, assembled_data, product)
     run_reconstruction(
         logger,
         reconstruct_input,

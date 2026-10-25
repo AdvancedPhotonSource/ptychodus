@@ -152,6 +152,55 @@ def test_logger_names_stay_per_driver() -> None:
         assert profile.logger_name == f'reconstruct_{name}'
 
 
+def test_every_profile_offers_prepare_only() -> None:
+    for name, profile in _profiles().items():
+        assert _defaults(profile).prepare_only is False, name
+
+
+def test_prepare_only_and_dry_run_are_exclusive() -> None:
+    parser = rs.build_standard_parser(_profiles()['2ide'])
+
+    with pytest.raises(SystemExit) as caught:
+        parser.parse_args(
+            [
+                '--diffraction-file',
+                'd',
+                '--position-file',
+                'p',
+                '--output-directory',
+                'o',
+                '--prepare-only',
+                '--dry-run',
+            ]
+        )
+
+    assert caught.value.code == 2
+
+
+def test_prepare_only_refuses_to_skip_the_patterns(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A prepared directory without diffraction.h5 cannot be reconstructed, so the
+    # combination is rejected before any file is read.
+    monkeypatch.setattr(
+        'sys.argv',
+        [
+            'ptychodus-reconstruct-2ide',
+            '--diffraction-file',
+            'd',
+            '--position-file',
+            'p',
+            '--output-directory',
+            'o',
+            '--prepare-only',
+            '--no-save-diffraction',
+        ],
+    )
+
+    with pytest.raises(SystemExit) as caught:
+        rs.run_standard_reconstruction(_profiles()['2ide'])
+
+    assert caught.value.code == 2
+
+
 # --- pattern filters ------------------------------------------------------------------
 
 

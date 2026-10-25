@@ -35,7 +35,7 @@ from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
+from ptychodus.api.reconstruct import PositionIndexFilter, ReconstructInput, ReconstructOutput
 from ptychi.api import LSQMLOptions
 
 # Deliberately imported at module scope: this file already does
@@ -47,10 +47,13 @@ from ptychodus.cli._reconstruct_common import (  # noqa: E402
     install_signal_handlers,
     is_main_process,
     load_ptychi_options,
+    pair_patterns_with_positions,
     resolve_flag,
     resolve_focus_object_distance_m,
+    resolve_ptychi_options_file,
     run_reconstruction,
     save_assembled_diffraction,
+    save_ptychi_options,
 )
 from ptychodus.plugins.ptychi.task import (  # noqa: E402
     dump_task_options,
@@ -650,6 +653,131 @@ def test_load_ptychi_options_reads_stdin_for_a_dash(
     loaded = load_ptychi_options(_reconstruct_common._STDIN_ARGUMENT)
 
     assert loaded.reconstructor_options.num_epochs == 5
+
+
+# --- prepared directories ----------------------------------------------------------------
+#
+# A prepared directory is read by both ptychodus-reconstruct and the subprocess driver, so
+# how its options file is chosen, how its options are written, and what pairing reports are
+# pinned here once.
+
+
+def test_an_explicit_options_file_wins(tmp_path: Path) -> None:
+    (tmp_path / 'ptychi_options.yaml').write_text('{}')
+    chosen = tmp_path / 'elsewhere.json'
+
+    assert resolve_ptychi_options_file(logging.getLogger('test'), chosen, tmp_path) == chosen
+
+
+def test_the_stdin_sentinel_is_passed_through(tmp_path: Path) -> None:
+    # ``-`` is not a path to probe for; resolving it against the input directory would
+    # turn an in-memory handoff into a missing file.
+    (tmp_path / 'ptychi_options.yaml').write_text('{}')
+    stdin = _reconstruct_common._STDIN_ARGUMENT
+
+    assert resolve_ptychi_options_file(logging.getLogger('test'), stdin, tmp_path) == stdin
+
+
+def test_the_staged_options_are_used_when_present(tmp_path: Path) -> None:
+    staged = tmp_path / 'ptychi_options.yaml'
+    staged.write_text('{}')
+
+    assert resolve_ptychi_options_file(logging.getLogger('test'), None, tmp_path) == staged
+
+
+def test_a_missing_staged_options_file_falls_back_rather_than_failing(
+    caplog: pytest.LogCaptureFixture, tmp_path: Path
+) -> None:
+    # A directory staged by hand carries no options, and an error would make that ordinary
+    # invocation the failing one.
+    with caplog.at_level('WARNING', logger='test'):
+        assert resolve_ptychi_options_file(logging.getLogger('test'), None, tmp_path) is None
+
+    assert any('stock options' in record.getMessage() for record in caplog.records)
+
+
+def test_the_stock_fallback_follows_the_propagation_regime() -> None:
+    assert type(load_ptychi_options(None, far_field=True)).__name__ == 'LSQMLOptions'
+    assert type(load_ptychi_options(None, far_field=False)).__name__ == 'BHOptions'
+
+
+def test_saved_options_are_aligned_and_read_back(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _set_rank(monkeypatch, 0, rank_variable=None)
+    options = LSQMLOptions()
+    options.reconstructor_options.num_epochs = 9
+
+    aligned = save_ptychi_options(
+        logging.getLogger('test'), options, _make_reconstruct_input().product, tmp_path
+    )
+    loaded = load_ptychi_options(tmp_path / 'ptychi_options.yaml')
+
+    # The pixel size comes from the product, not from the options handed in.
+    assert aligned.object_options.pixel_size_m == pytest.approx(PIXEL_M)
+    assert loaded.object_options.pixel_size_m == pytest.approx(PIXEL_M)
+    assert loaded.reconstructor_options.num_epochs == 9
+
+
+def test_saved_options_are_aligned_but_not_written_on_a_secondary_rank(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _set_rank(monkeypatch, 1, rank_variable=None)
+
+    aligned = save_ptychi_options(
+        logging.getLogger('test'), LSQMLOptions(), _make_reconstruct_input().product, tmp_path
+    )
+
+    assert aligned.object_options.pixel_size_m == pytest.approx(PIXEL_M)
+    assert not (tmp_path / 'ptychi_options.yaml').exists()
+
+
+def _product_with_positions(num_positions: int) -> Product:
+    product = _make_reconstruct_input().product
+    return Product(
+        metadata=product.metadata,
+        probe_positions=ProbePositionSequence(list(product.probe_positions)[:num_positions]),
+        probes=product.probes,
+        object_=product.object_,
+        losses=[],
+    )
+
+
+def test_pairing_every_pattern_is_quiet(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level('WARNING', logger='test'):
+        reconstruct_input = pair_patterns_with_positions(
+            logging.getLogger('test'), _assembled_data(), _product_with_positions(NUM_PATTERNS)
+        )
+
+    assert reconstruct_input.diffraction_patterns.shape[0] == NUM_PATTERNS
+    assert not caplog.records
+
+
+def test_patterns_past_the_last_position_are_reported(caplog: pytest.LogCaptureFixture) -> None:
+    # The last pattern index lies outside the position range, so it is dropped rather
+    # than extrapolated -- a stopped scan, which is worth a warning but not an error.
+    with caplog.at_level('WARNING', logger='test'):
+        reconstruct_input = pair_patterns_with_positions(
+            logging.getLogger('test'), _assembled_data(), _product_with_positions(NUM_PATTERNS - 1)
+        )
+
+    assert reconstruct_input.diffraction_patterns.shape[0] == NUM_PATTERNS - 1
+    assert any('Paired 2 of 3' in record.getMessage() for record in caplog.records)
+
+
+def test_patterns_an_index_filter_excludes_are_not_reported(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level('WARNING', logger='test'):
+        reconstruct_input = pair_patterns_with_positions(
+            logging.getLogger('test'),
+            _assembled_data(),
+            _product_with_positions(NUM_PATTERNS),
+            index_filter=PositionIndexFilter.EVEN,
+        )
+
+    assert reconstruct_input.diffraction_patterns.shape[0] < NUM_PATTERNS
+    assert not caplog.records
 
 
 # --- resolve_crop_region ---------------------------------------------------------------

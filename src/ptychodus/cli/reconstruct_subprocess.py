@@ -68,11 +68,7 @@ from typing import IO, Any
 import ptychodus
 from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.io import StandardFileLayout, load_diffraction_data, load_product
-from ptychodus.api.reconstruct import (
-    PositionIndexFilter,
-    ReconstructOutput,
-    prepare_reconstruct_input,
-)
+from ptychodus.api.reconstruct import PositionIndexFilter, ReconstructOutput
 from ptychodus.cli import DirectoryType, positive_int
 from ptychodus.cli._reconstruct_common import (
     CancellationToken,
@@ -80,7 +76,9 @@ from ptychodus.cli._reconstruct_common import (
     add_ptychi_options_argument,
     install_signal_handlers,
     load_ptychi_options,
+    pair_patterns_with_positions,
     process_rank,
+    resolve_ptychi_options_file,
     run_reconstruction,
 )
 
@@ -144,30 +142,6 @@ def log_file(output_directory: Path, rank: int) -> Path:
     return output_directory / f'{_LOG_STEM}.rank{rank:02d}.log'
 
 
-def resolve_ptychi_options_file(options_file: Path | None, input_directory: Path) -> Path | None:
-    """Pick the options file to read, or `None` to fall back to stock options.
-
-    An explicit argument always wins, including the ``-`` that means stdin. Otherwise the
-    staged options in the input directory are used when they are there; no current staging
-    path writes them, so their absence is the ordinary case and not an error.
-    """
-    if options_file is not None:
-        return options_file
-
-    staged_file = StandardFileLayout.PTYCHI_OPTIONS.path(input_directory)
-
-    if staged_file.is_file():
-        return staged_file
-
-    logger.warning(
-        'No %s in %s; reconstructing with stock LSQML options. '
-        'Pass --ptychi-options to choose another algorithm.',
-        StandardFileLayout.PTYCHI_OPTIONS.value,
-        input_directory,
-    )
-    return None
-
-
 def _finite_loss(output: ReconstructOutput) -> float | None:
     """The last loss as strict JSON can carry it: a number, or null."""
     losses = output.product.losses
@@ -188,10 +162,11 @@ def _reconstruct(
     input_directory: Path = args.input_directory
     output_directory: Path = args.output_directory
 
+    # A named or staged file is decoded before anything else is read, so that options which
+    # do not parse are a usage error however much data sits beside them.
     try:
-        task_options = load_ptychi_options(
-            resolve_ptychi_options_file(args.ptychi_options, input_directory)
-        )
+        options_file = resolve_ptychi_options_file(logger, args.ptychi_options, input_directory)
+        task_options = None if options_file is None else load_ptychi_options(options_file)
     except (OSError, TypeError, ValueError) as exc:
         stream.emit_exception(exc)
         logger.exception('Failed to read the pty-chi options.')
@@ -201,7 +176,13 @@ def _reconstruct(
         StandardFileLayout.DIFFRACTION.path(input_directory), mmap_file=args.mmap_file
     )
     product = load_product(StandardFileLayout.PRODUCT.path(input_directory))
-    reconstruct_input = prepare_reconstruct_input(
+
+    if task_options is None:
+        # The stock algorithm follows the propagation regime, which only the product states.
+        task_options = load_ptychi_options(None, far_field=product.metadata.far_field)
+
+    reconstruct_input = pair_patterns_with_positions(
+        logger,
         assembled_data,
         product,
         index_filter=PositionIndexFilter[args.index_filter.upper()],
@@ -292,7 +273,10 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     add_ptychi_options_argument(
-        parser, default_note='Defaults to the one in INPUT_DIR, else to stock LSQML.'
+        parser,
+        default_note=(
+            'Defaults to the one in INPUT_DIR, else to stock LSQML, or BH for a near-field product.'
+        ),
     )
     add_print_ptychi_options_argument(parser)
     parser.add_argument(

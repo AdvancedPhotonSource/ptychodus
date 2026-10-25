@@ -58,7 +58,12 @@ from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.io import StandardFileLayout, save_diffraction_data, save_product
 from ptychodus.api.preprocess.diffraction import FilterValuesStep, estimate_beam_center
 from ptychodus.api.product import Product
-from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
+from ptychodus.api.reconstruct import (
+    PositionIndexFilter,
+    ReconstructInput,
+    ReconstructOutput,
+    prepare_reconstruct_input,
+)
 from ptychodus.plugins.ptychi.algorithms import task_options_classes
 from ptychodus.plugins.ptychi.task import (
     align_task_options_with_product,
@@ -77,11 +82,14 @@ __all__ = [
     'invalid_count_threshold',
     'is_main_process',
     'load_ptychi_options',
+    'pair_patterns_with_positions',
     'process_rank',
     'resolve_crop_region',
+    'resolve_ptychi_options_file',
     'resolve_quantity',
     'run_reconstruction',
     'save_assembled_diffraction',
+    'save_ptychi_options',
 ]
 
 logger = logging.getLogger(__name__)
@@ -716,6 +724,34 @@ def load_ptychi_options(
     return _decode_ptychi_options(options_file.read_text(), options_file)
 
 
+def resolve_ptychi_options_file(
+    logger: logging.Logger, options_file: Path | None, input_directory: Path
+) -> Path | None:
+    """Pick the options file for a prepared directory, or `None` to fall back to stock options.
+
+    An explicit argument always wins, including the ``-`` that means stdin. Otherwise the
+    options staged in `input_directory` are used when they are there. A directory staged
+    by hand, or by a tool that chooses no algorithm, carries none, so their absence is
+    warned about rather than treated as an error.
+    """
+    if options_file is not None:
+        return options_file
+
+    staged_file = StandardFileLayout.PTYCHI_OPTIONS.path(input_directory)
+
+    if staged_file.is_file():
+        logger.info('Using the pty-chi options staged in %s', staged_file)
+        return staged_file
+
+    logger.warning(
+        'No %s in %s; reconstructing with stock options. '
+        'Pass --ptychi-options to choose another algorithm.',
+        StandardFileLayout.PTYCHI_OPTIONS.value,
+        input_directory,
+    )
+    return None
+
+
 def save_assembled_diffraction(
     logger: logging.Logger,
     output_directory: Path,
@@ -741,6 +777,61 @@ def save_assembled_diffraction(
     elif is_main_process():
         logger.info('Writing %s', diffraction_file)
         save_diffraction_data(diffraction_file, assembled_data)
+
+
+def pair_patterns_with_positions(
+    logger: logging.Logger,
+    assembled_data: AssembledDiffractionData,
+    product: Product,
+    *,
+    index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
+) -> ReconstructInput:
+    """Pair the assembled patterns with the product's positions, and say if any went unpaired.
+
+    A shortfall is ordinary on a scan that was stopped mid-raster: the detector keeps the
+    line it was on, the position record truncates at its last completed line, and the
+    patterns past that end have no position to pair with. It is reported as a warning
+    rather than raised, because the patterns that did pair are still a valid scan. Patterns
+    an `index_filter` excludes on purpose are not counted as unpaired.
+    """
+    reconstruct_input = prepare_reconstruct_input(assembled_data, product, index_filter)
+    num_paired = reconstruct_input.diffraction_patterns.shape[0]
+    num_patterns = assembled_data.get_num_patterns()
+
+    if index_filter is PositionIndexFilter.ALL and num_paired < num_patterns:
+        logger.warning(
+            'Paired %d of %d assembled patterns; %d had no probe position, which is'
+            ' expected when the detector recorded more scan lines than the position file.',
+            num_paired,
+            num_patterns,
+            num_patterns - num_paired,
+        )
+
+    return reconstruct_input
+
+
+def save_ptychi_options(
+    logger: logging.Logger,
+    options: PtychographyTaskOptions,
+    product: Product,
+    output_directory: Path,
+) -> PtychographyTaskOptions:
+    """Align `options` against `product`, check them, and write them to ``ptychi_options.yaml``.
+
+    Returns the aligned options. Those are the ones a reconstruction runs: they carry the
+    object pixel size, the wavelength and the slice spacings the product supplied, which
+    the unaligned object does not. The write is confined to the main process; every rank
+    aligns, since every rank runs with the result.
+    """
+    task_options = align_task_options_with_product(options, product)
+    task_options.check()
+
+    if is_main_process():
+        options_file = StandardFileLayout.PTYCHI_OPTIONS.path(output_directory)
+        logger.info('Writing %s', options_file)
+        options_file.write_text(dump_task_options_yaml(task_options))
+
+    return task_options
 
 
 def run_reconstruction(
@@ -778,19 +869,8 @@ def run_reconstruction(
     reports progress without reimplementing this loop.
     """
     main_process = is_main_process()
-
-    options_file = StandardFileLayout.PTYCHI_OPTIONS.path(output_directory)
     product_file = StandardFileLayout.PRODUCT.path(output_directory)
-
-    task_options = align_task_options_with_product(options, reconstruct_input.product)
-    task_options.check()
-
-    if main_process:
-        # The aligned options are the ones that ran: they carry the object pixel size, the
-        # wavelength and the slice spacings the product supplied, which the unaligned object
-        # does not.
-        logger.info('Writing %s', options_file)
-        options_file.write_text(dump_task_options_yaml(task_options))
+    task_options = save_ptychi_options(logger, options, reconstruct_input.product, output_directory)
 
     num_epochs = int(task_options.reconstructor_options.num_epochs)
     logger.info(

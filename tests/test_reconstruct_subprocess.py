@@ -3,8 +3,9 @@
 Its contract with a launcher is the event stream and the exit code, and both are produced
 by small helpers around the shared reconstruction tail rather than by the tail itself. These
 tests pin down the stream's framing (strict JSON, one object per line, silent on a rank that
-has no launcher listening), where the per-rank log lands, how the options file is resolved
-when none was named, and which exit code each ending produces. ``main()`` is never called:
+has no launcher listening), where the per-rank log lands, and which exit code each ending
+produces. How the options file is resolved is shared with ptychodus-reconstruct and pinned
+in test_reconstruct_common.py. ``main()`` is never called:
 it redirects file descriptors and installs signal handlers, neither of which a test process
 can give back.
 """
@@ -30,7 +31,6 @@ from ptychodus.cli.reconstruct_subprocess import (  # noqa: E402
     ExitCode,
     _finite_loss,
     log_file,
-    resolve_ptychi_options_file,
 )
 
 
@@ -115,40 +115,6 @@ def test_a_secondary_rank_logs_to_its_own_file(tmp_path: Path) -> None:
     assert log_file(tmp_path, 12).name == 'ptychodus.rank12.log'
 
 
-def test_an_explicit_options_file_wins(tmp_path: Path) -> None:
-    staged = tmp_path / 'ptychi_options.yaml'
-    staged.write_text('{}')
-    chosen = tmp_path / 'elsewhere.json'
-
-    assert resolve_ptychi_options_file(chosen, tmp_path) == chosen
-
-
-def test_the_stdin_sentinel_is_passed_through(tmp_path: Path) -> None:
-    # ``-`` is not a path to probe for; resolving it against the input directory would
-    # turn an in-memory handoff into a missing file.
-    (tmp_path / 'ptychi_options.yaml').write_text('{}')
-
-    assert resolve_ptychi_options_file(Path('-'), tmp_path) == Path('-')
-
-
-def test_the_staged_options_are_used_when_present(tmp_path: Path) -> None:
-    staged = tmp_path / 'ptychi_options.yaml'
-    staged.write_text('{}')
-
-    assert resolve_ptychi_options_file(None, tmp_path) == staged
-
-
-def test_a_missing_staged_options_file_falls_back_rather_than_failing(
-    caplog: pytest.LogCaptureFixture, tmp_path: Path
-) -> None:
-    # No staging path writes that file today, so its absence is the ordinary case. An
-    # error here would make the common invocation the failing one.
-    with caplog.at_level('WARNING', logger='reconstruct_subprocess'):
-        assert resolve_ptychi_options_file(None, tmp_path) is None
-
-    assert any('stock LSQML' in record.getMessage() for record in caplog.records)
-
-
 def _args(tmp_path: Path) -> argparse.Namespace:
     return argparse.Namespace(
         input_directory=tmp_path,
@@ -184,19 +150,25 @@ def _stub_reconstruction(
     options = reconstruct_subprocess.load_ptychi_options(None)
     options.reconstructor_options.num_epochs = 2
 
-    monkeypatch.setattr(reconstruct_subprocess, 'load_ptychi_options', lambda path: options)
+    monkeypatch.setattr(
+        reconstruct_subprocess, 'load_ptychi_options', lambda path, far_field=True: options
+    )
     monkeypatch.setattr(
         reconstruct_subprocess, 'load_diffraction_data', lambda path, mmap_file=None: object()
     )
-    monkeypatch.setattr(reconstruct_subprocess, 'load_product', lambda path: object())
+    monkeypatch.setattr(
+        reconstruct_subprocess,
+        'load_product',
+        lambda path: argparse.Namespace(metadata=argparse.Namespace(far_field=True)),
+    )
 
     class _Input:
         diffraction_patterns = numpy.zeros((3, 2, 2), dtype=numpy.float32)
 
     monkeypatch.setattr(
         reconstruct_subprocess,
-        'prepare_reconstruct_input',
-        lambda data, prod, index_filter=None: _Input(),
+        'pair_patterns_with_positions',
+        lambda logger, data, prod, index_filter=None: _Input(),
     )
     monkeypatch.setattr(
         reconstruct_subprocess,
