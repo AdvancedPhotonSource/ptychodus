@@ -3,10 +3,10 @@ from __future__ import annotations
 import numpy
 
 from ptychodus.api.probe import ProbeEnsemble, ProbeGeometryProvider
-from ptychodus.api.simulate.probe import generate_average_pattern_probe, propagate_probe
+from ptychodus.api.simulate.probe import generate_average_pattern_probe
 
 from ...diffraction import AssembledDiffractionDataset
-from .builder import ProbeEnsembleBuilder
+from .builder import ProbeEnsembleBuilder, resolve_defocus_distance_m
 from .settings import ProbeSettings
 
 
@@ -20,8 +20,16 @@ class AveragePatternProbeBuilder(ProbeEnsembleBuilder):
         super().__init__(rng, settings, 'average_pattern')
         self._settings = settings
         self._dataset = dataset
+
+        # from the focus to the sample: the back-propagated waist is carried this far
+        self.defocus_distance_m = settings.defocus_distance_m.copy()
+        self._add_parameter('defocus_distance_m', self.defocus_distance_m)
+
         self.propagation_distance_m = settings.propagation_distance_m.copy()
         self._add_parameter('propagation_distance_m', self.propagation_distance_m)
+
+        self.bright_field_threshold = settings.average_pattern_bright_field_threshold.copy()
+        self._add_parameter('bright_field_threshold', self.bright_field_threshold)
 
     def copy(self) -> AveragePatternProbeBuilder:
         builder = AveragePatternProbeBuilder(self._rng, self._settings, self._dataset)
@@ -33,6 +41,15 @@ class AveragePatternProbeBuilder(ProbeEnsembleBuilder):
 
     def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
         assembled_data = self._dataset.get_assembled_data()
+        # A flat-phase square root back-propagates to the beam at its waist. The defocus
+        # carries it to the object, deferring to the product's focus as the focusing
+        # builders do; the propagation distance then refines the plane without moving
+        # the object pixel size, which editing the geometry would. Both act on the same
+        # field, so they add.
+        distance_m = (
+            resolve_defocus_distance_m(geometry_provider, self.defocus_distance_m.get_value())
+            + self.propagation_distance_m.get_value()
+        )
         probe = generate_average_pattern_probe(
             geometry_provider.get_probe_geometry(),
             assembled_data.get_mean_pattern(),
@@ -43,19 +60,7 @@ class AveragePatternProbeBuilder(ProbeEnsembleBuilder):
             photon_wavelength_m=geometry_provider.photon_wavelength_m,
             detector_distance_m=geometry_provider.detector_distance_m,
             far_field=geometry_provider.far_field,
+            defocus_distance_m=distance_m,
+            bright_field_mad_threshold=4.5 if self.bright_field_threshold.get_value() else None,
         )
-        distance_m = self.propagation_distance_m.get_value()
-
-        # Back-propagation lands the probe at the object plane the declared geometry
-        # describes, so the plane is only as good as that geometry. Propagating from
-        # here refines where the probe sits without moving the object pixel size,
-        # which editing the geometry would. Skipped at zero: the angular spectrum is
-        # the identity there, but only after a full transform pair.
-        if distance_m != 0.0:
-            probe = propagate_probe(
-                probe,
-                photon_wavelength_m=geometry_provider.photon_wavelength_m,
-                propagation_distance_m=distance_m,
-            )
-
         return self._rescale_to_photon_count(probe, geometry_provider)

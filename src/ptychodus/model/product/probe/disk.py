@@ -5,14 +5,21 @@ import numpy
 from ptychodus.api.probe import ProbeEnsemble, ProbeGeometryProvider
 from ptychodus.api.simulate.probe import generate_disk_probe
 
+from ...diffraction import AssembledDiffractionDataset
 from .builder import ProbeEnsembleBuilder
 from .settings import ProbeSettings
 
 
 class DiskProbeBuilder(ProbeEnsembleBuilder):
-    def __init__(self, rng: numpy.random.Generator, settings: ProbeSettings) -> None:
+    def __init__(
+        self,
+        rng: numpy.random.Generator,
+        settings: ProbeSettings,
+        dataset: AssembledDiffractionDataset | None = None,
+    ) -> None:
         super().__init__(rng, settings, 'disk')
         self._settings = settings
+        self._dataset = dataset
 
         self.diameter_m = settings.disk_diameter_m.copy()
         self._add_parameter('diameter_m', self.diameter_m)
@@ -26,12 +33,26 @@ class DiskProbeBuilder(ProbeEnsembleBuilder):
         self._add_parameter('propagation_distance_m', self.propagation_distance_m)
 
     def copy(self) -> DiskProbeBuilder:
-        builder = DiskProbeBuilder(self._rng, self._settings)
+        builder = DiskProbeBuilder(self._rng, self._settings, self._dataset)
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
 
         return builder
+
+    def can_estimate_size_from_diffraction(self) -> bool:
+        return self._dataset is not None
+
+    def estimate_size_from_diffraction(self, geometry_provider: ProbeGeometryProvider) -> bool:
+        extent = self._estimate_extent(
+            self._dataset, geometry_provider, self.defocus_distance_m.get_value()
+        )
+
+        if extent is None:
+            return False
+
+        self.diameter_m.set_value(extent.disk_diameter_m)
+        return True
 
     def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
         probe = generate_disk_probe(

@@ -5,14 +5,21 @@ import numpy
 from ptychodus.api.probe import ProbeEnsemble, ProbeGeometryProvider
 from ptychodus.api.simulate.probe import generate_rectangular_probe
 
+from ...diffraction import AssembledDiffractionDataset
 from .builder import ProbeEnsembleBuilder
 from .settings import ProbeSettings
 
 
 class RectangularProbeBuilder(ProbeEnsembleBuilder):
-    def __init__(self, rng: numpy.random.Generator, settings: ProbeSettings) -> None:
+    def __init__(
+        self,
+        rng: numpy.random.Generator,
+        settings: ProbeSettings,
+        dataset: AssembledDiffractionDataset | None = None,
+    ) -> None:
         super().__init__(rng, settings, 'rectangular')
         self._settings = settings
+        self._dataset = dataset
 
         self.width_m = settings.rectangle_width_m.copy()
         self._add_parameter('width_m', self.width_m)
@@ -29,12 +36,27 @@ class RectangularProbeBuilder(ProbeEnsembleBuilder):
         self._add_parameter('propagation_distance_m', self.propagation_distance_m)
 
     def copy(self) -> RectangularProbeBuilder:
-        builder = RectangularProbeBuilder(self._rng, self._settings)
+        builder = RectangularProbeBuilder(self._rng, self._settings, self._dataset)
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
 
         return builder
+
+    def can_estimate_size_from_diffraction(self) -> bool:
+        return self._dataset is not None
+
+    def estimate_size_from_diffraction(self, geometry_provider: ProbeGeometryProvider) -> bool:
+        extent = self._estimate_extent(
+            self._dataset, geometry_provider, self.defocus_distance_m.get_value()
+        )
+
+        if extent is None:
+            return False
+
+        self.width_m.set_value(extent.rectangle_width_m)
+        self.height_m.set_value(extent.rectangle_height_m)
+        return True
 
     def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
         probe = generate_rectangular_probe(

@@ -46,14 +46,18 @@ class ProbeBuilderFactory(Iterable[str]):
         self._kb_mirror_chooser = kb_mirror_chooser
         self.file_readers = FileTypeChooser(file_reader_chooser)
         self.file_writers = FileTypeChooser(file_writer_chooser)
-        self._non_diffraction_builders: Mapping[str, Callable[[], ProbeEnsembleBuilder]] = {
-            'disk': lambda: DiskProbeBuilder(rng, settings),
-            'fresnel_zone_plate': self._create_fresnel_zone_plate_builder,
-            'hermite': lambda: HermiteProbeBuilder(rng, settings),
-            'kb_mirror': self._create_kb_mirror_builder,
-            'rectangular': lambda: RectangularProbeBuilder(rng, settings),
-            'super_gaussian': lambda: SuperGaussianProbeBuilder(rng, settings),
-            'zernike': lambda: ZernikeProbeBuilder(rng, settings),
+        # Builders that need no dataset, each handed one when there is one: the parametric
+        # apertures use it to estimate their size from the measured patterns.
+        self._non_diffraction_builders: Mapping[
+            str, Callable[[AssembledDiffractionDataset | None], ProbeEnsembleBuilder]
+        ] = {
+            'disk': lambda dataset: DiskProbeBuilder(rng, settings, dataset),
+            'fresnel_zone_plate': lambda _: self._create_fresnel_zone_plate_builder(),
+            'hermite': lambda _: HermiteProbeBuilder(rng, settings),
+            'kb_mirror': lambda _: self._create_kb_mirror_builder(),
+            'rectangular': lambda dataset: RectangularProbeBuilder(rng, settings, dataset),
+            'super_gaussian': lambda dataset: SuperGaussianProbeBuilder(rng, settings, dataset),
+            'zernike': lambda _: ZernikeProbeBuilder(rng, settings),
         }
         self._diffraction_builders: Mapping[
             str, Callable[[AssembledDiffractionDataset], ProbeEnsembleBuilder]
@@ -80,10 +84,10 @@ class ProbeBuilderFactory(Iterable[str]):
             factory = self._non_diffraction_builders[name]
         except KeyError as exc:
             raise KeyError(f'Unknown probe builder "{name}"!') from exc
-        return factory()
+        return factory(dataset)
 
     def create_default(self) -> ProbeEnsembleBuilder:
-        return next(iter(self._non_diffraction_builders.values()))()
+        return next(iter(self._non_diffraction_builders.values()))(None)
 
     def create_from_settings(
         self, *, dataset: AssembledDiffractionDataset | None = None

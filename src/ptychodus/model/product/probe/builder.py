@@ -5,6 +5,7 @@ import logging
 
 import numpy
 
+from ptychodus.api.assemble import DetectorCorrections
 from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.product import reconcile_defocus_distance_m
 from ptychodus.api.simulate.probe import (
@@ -25,11 +26,14 @@ from ptychodus.api.probe import (
     Probe,
     ProbeEnsemble,
     ProbeFileReader,
+    ProbeExtent,
     ProbeGeometryProvider,
     conform_opr_weights,
+    estimate_probe_extent,
     resample_probe_ensemble,
 )
 
+from ...diffraction import AssembledDiffractionDataset
 from .settings import ProbeSettings
 
 logger = logging.getLogger(__name__)
@@ -169,6 +173,63 @@ class ProbeEnsembleBuilder(ParameterGroup):
             )
 
         return probe
+
+    def can_estimate_size_from_diffraction(self) -> bool:
+        """Whether `estimate_size_from_diffraction` has a size to set and data to set it from."""
+        return False
+
+    def estimate_size_from_diffraction(self, geometry_provider: ProbeGeometryProvider) -> bool:
+        """Set this builder's size parameters from the moments of the measured patterns.
+
+        A one-off: the parameters take the estimate and keep it, so the settings stay
+        explicit and a later rebuild does not move them. Returns whether anything was
+        set; builders without a size, or without data, leave everything alone.
+        """
+        return False
+
+    def _estimate_extent(
+        self,
+        dataset: AssembledDiffractionDataset | None,
+        geometry_provider: ProbeGeometryProvider,
+        defocus_distance_m: float,
+    ) -> ProbeExtent | None:
+        """The probe extent the dataset's mean pattern implies, or None where it cannot say.
+
+        The defocus is resolved against the product's focus, as the build resolves it.
+        """
+        if dataset is None:
+            logger.warning('No diffraction dataset to estimate the probe size from.')
+            return None
+
+        if not geometry_provider.far_field:
+            logger.warning(
+                'The probe size is estimated from the far-field bright field; a near-field '
+                'pattern is a hologram and does not hold it.'
+            )
+            return None
+
+        assembled_data = dataset.get_assembled_data()
+        corrections = DetectorCorrections(
+            background=assembled_data.get_background(),
+            flat_field=assembled_data.get_flat_field(),
+            subtract_background=True,
+            divide_flat_field=True,
+        )
+        mean_pattern = corrections.apply(assembled_data.get_mean_pattern()[numpy.newaxis])[0]
+
+        try:
+            return estimate_probe_extent(
+                mean_pattern.astype(numpy.float64),
+                geometry_provider.get_probe_geometry(),
+                photon_wavelength_m=geometry_provider.photon_wavelength_m,
+                defocus_distance_m=resolve_defocus_distance_m(
+                    geometry_provider, defocus_distance_m
+                ),
+                bad_pixels=corrections.apply_to_bad_pixels(assembled_data.get_bad_pixels()),
+            )
+        except ValueError as exc:
+            logger.warning(f'Could not estimate the probe size: {exc}')
+            return None
 
     def _rescale_to_photon_count(
         self, probe: Probe, geometry_provider: ProbeGeometryProvider

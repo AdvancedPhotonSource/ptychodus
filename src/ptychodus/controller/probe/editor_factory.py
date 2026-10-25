@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QPushButton,
     QRadioButton,
     QSpinBox,
     QStackedWidget,
@@ -482,19 +483,56 @@ class ProbeMetricsViewController(ParameterViewController, Observer):
             self._refresh_metrics()
 
 
+class EstimateSizeViewController(ParameterViewController):
+    """A button that sets a parametric probe's size from the measured patterns."""
+
+    def __init__(self, item: ProbeRepositoryItem) -> None:
+        super().__init__()
+        self._item = item
+        self._widget = QPushButton('Estimate from Diffraction')
+        self._widget.setToolTip(
+            'Set the size from the second moments of the mean diffraction pattern, at the '
+            'defocus distance above. Needs far-field data.'
+        )
+        self._widget.setEnabled(item.get_builder().can_estimate_size_from_diffraction())
+        self._widget.clicked.connect(self._estimate)
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+    def _estimate(self) -> None:
+        self._item.estimate_size_from_diffraction()
+
+
 class ProbeEditorViewControllerFactory:
     def _append_primary_mode(
         self,
-        probe_builder: ProbeEnsembleBuilder,
+        item: ProbeRepositoryItem,
         dialog_builder: ParameterViewBuilder,
     ) -> bool:
+        probe_builder = item.get_builder()
         primary_mode_group = 'Primary Mode'
 
         if isinstance(probe_builder, AveragePatternProbeBuilder):
             dialog_builder.add_length_widget(
+                probe_builder.defocus_distance_m,
+                'Defocus Distance:',
+                default_unit=LengthUnit.MICROMETER,
+                group=primary_mode_group,
+            )
+            dialog_builder.add_length_widget(
                 probe_builder.propagation_distance_m,
                 'Propagation Distance:',
                 default_unit=LengthUnit.MICROMETER,
+                group=primary_mode_group,
+            )
+            dialog_builder.add_check_box(
+                probe_builder.bright_field_threshold,
+                'Bright Field Only:',
+                tool_tip=(
+                    'Remove the background pedestal and the noise around the bright field'
+                    ' before back-propagating. Far field only.'
+                ),
                 group=primary_mode_group,
             )
             return True
@@ -515,6 +553,9 @@ class ProbeEditorViewControllerFactory:
                 'Propagation Distance:',
                 default_unit=LengthUnit.MICROMETER,
                 group=primary_mode_group,
+            )
+            dialog_builder.add_view_controller(
+                EstimateSizeViewController(item), '', group=primary_mode_group
             )
             return True
         elif isinstance(probe_builder, FresnelZonePlateProbeBuilder):
@@ -555,6 +596,9 @@ class ProbeEditorViewControllerFactory:
                 default_unit=LengthUnit.MICROMETER,
                 group=primary_mode_group,
             )
+            dialog_builder.add_view_controller(
+                EstimateSizeViewController(item), '', group=primary_mode_group
+            )
             return True
         elif isinstance(probe_builder, SuperGaussianProbeBuilder):
             dialog_builder.add_length_widget(
@@ -584,6 +628,9 @@ class ProbeEditorViewControllerFactory:
                 'Propagation Distance:',
                 default_unit=LengthUnit.MICROMETER,
                 group=primary_mode_group,
+            )
+            dialog_builder.add_view_controller(
+                EstimateSizeViewController(item), '', group=primary_mode_group
             )
             return True
         elif isinstance(probe_builder, ZernikeProbeBuilder):
@@ -661,7 +708,7 @@ class ProbeEditorViewControllerFactory:
         # already-conditioned probe -- reconstruction output, or a product loaded
         # from file -- whose mode parameters are deliberately inert, so offering
         # controls that would silently do nothing is worse than offering none.
-        has_primary_mode = self._append_primary_mode(probe_builder, dialog_builder)
+        has_primary_mode = self._append_primary_mode(item, dialog_builder)
 
         if has_primary_mode or isinstance(probe_builder, FromFileProbeBuilder):
             self._append_additional_modes(probe_builder, dialog_builder)

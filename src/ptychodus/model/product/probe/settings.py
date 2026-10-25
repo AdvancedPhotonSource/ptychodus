@@ -92,6 +92,11 @@ class ProbeSettings(Observable, Observer):
         self.propagation_distance_m = self._group.create_real_parameter(
             'PropagationDistanceInMeters', 0.0
         )
+        # Keeps only the bright field of the mean pattern the average-pattern builder
+        # back-propagates, removing the background pedestal and the noise around it.
+        self.average_pattern_bright_field_threshold = self._group.create_boolean_parameter(
+            'AveragePatternBrightFieldThreshold', False
+        )
 
         self.kb_horizontal_acceptance_length_m = self._group.create_real_parameter(
             'KBHorizontalAcceptanceLengthInMeters', 0.1, minimum=0.0

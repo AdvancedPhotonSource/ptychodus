@@ -63,7 +63,6 @@ from ptychodus.api.product import Product, ProductMetadata, reconcile_defocus_di
 from ptychodus.api.simulate.object import generate_uniform_object
 from ptychodus.api.simulate.probe import (
     generate_average_pattern_probe,
-    propagate_probe,
     generate_coherent_probe_modes,
     generate_fresnel_zone_plate_probe,
     generate_incoherent_probe_modes,
@@ -712,17 +711,8 @@ def _build_initial_probe(
         photon_wavelength_m=photon_wavelength_m,
         detector_distance_m=detector_distance_m,
         far_field=far_field,
+        defocus_distance_m=args.probe_propagation_distance_m,
     )
-    distance_m = args.probe_propagation_distance_m
-
-    # Skipped at zero: the angular spectrum is the identity there, but only after a
-    # full transform pair, which a detector-sized near-field grid pays for.
-    if distance_m != 0.0:
-        probe = propagate_probe(
-            probe,
-            photon_wavelength_m=photon_wavelength_m,
-            propagation_distance_m=distance_m,
-        )
 
     # The mean pattern carries the mean transmitted photons, which is less than the
     # incident count wherever the sample absorbs; the probe states the illumination.

@@ -100,6 +100,10 @@ class ProbeRepositoryItem(ParameterGroup):
             logger.exception('Failed to estimate probe entropy!')
             return None
 
+    def estimate_size_from_diffraction(self) -> bool:
+        """Set the builder's size parameters from the measured patterns; see the builder."""
+        return self._builder.estimate_size_from_diffraction(self._geometry_provider)
+
     def get_builder(self) -> ProbeEnsembleBuilder:
         return self._builder
 
