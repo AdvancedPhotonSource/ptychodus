@@ -6,7 +6,6 @@ import numpy
 from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.probe import ProbeEnsemble
 
-from ...diffraction import AssembledDiffractionDataset
 from .builder import FromMemoryObjectBuilder
 from .builder_factory import ObjectBuilderFactory
 from .item import ObjectRepositoryItem
@@ -71,11 +70,13 @@ class ObjectRepositoryItemFactory:
         self,
         geometry_provider: ObjectGeometryProvider,
         *,
-        dataset: AssembledDiffractionDataset | None = None,
+        has_diffraction_data: bool = False,
         probe_supplier: Callable[[], ProbeEnsemble] | None = None,
     ) -> ObjectRepositoryItem:
         try:
-            builder = self._builder_factory.create_from_settings(dataset=dataset)
+            builder = self._builder_factory.create_from_settings(
+                has_diffraction_data=has_diffraction_data
+            )
         except Exception as exc:
             logger.error(''.join(exc.args))
             builder = self._builder_factory.create_default()

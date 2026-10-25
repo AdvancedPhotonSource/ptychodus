@@ -93,6 +93,11 @@ class ObjectRepositoryItem(ParameterGroup):
         self._add_group('builder', self._builder, observe=True)
         self.rebuild()
 
+    def handle_diffraction_data_changed(self) -> None:
+        """Rebuild if the builder reads the diffraction data, which has just changed."""
+        if self._builder.reads_diffraction_data:
+            self.rebuild()
+
     def rebuild(self, *, recenter: bool = False) -> None:
         try:
             object_ = self._builder.build(self._geometry_provider, self.layer_spacing_m.get_value())

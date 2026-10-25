@@ -39,8 +39,8 @@ class ProductRepositoryItemFactory:
     def _bind_dataset_geometry(
         geometry: ProductGeometryProvider, dataset: AssembledDiffractionDataset | None
     ) -> None:
-        """Push the dataset's processed detector extent and pixel geometry into
-        ``geometry`` so probe & object items built next see a valid geometry inside
+        """Push the dataset, and its processed detector extent and pixel geometry, into
+        ``geometry`` so probe & object items built next see valid data inside
         their own __init__ rebuild. This keeps the observer-triggered rebuild that
         fires later (from ProductRepositoryItem._bind_dataset) a no-op — the setters
         short-circuit on unchanged values, avoiding a spurious rebuild during
@@ -48,6 +48,7 @@ class ProductRepositoryItemFactory:
         the repository)."""
         if dataset is None:
             return
+        geometry.set_diffraction_dataset(dataset)
         geometry.set_detector_extent(dataset.get_processed_image_extent())
         geometry.set_detector_pixel_geometry(dataset.get_processed_pixel_geometry())
 
@@ -192,9 +193,14 @@ class ProductRepositoryItemFactory:
         scan_item = self._scan_item_factory.create_from_settings()
         geometry = ProductGeometryProvider(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
-        probe_item = self._probe_item_factory.create_from_settings(geometry, dataset=dataset)
+        has_diffraction_data = dataset is not None
+        probe_item = self._probe_item_factory.create_from_settings(
+            geometry, has_diffraction_data=has_diffraction_data
+        )
         object_item = self._object_item_factory.create_from_settings(
-            geometry, dataset=dataset, probe_supplier=probe_item.get_probes
+            geometry,
+            has_diffraction_data=has_diffraction_data,
+            probe_supplier=probe_item.get_probes,
         )
 
         item = ProductRepositoryItem(

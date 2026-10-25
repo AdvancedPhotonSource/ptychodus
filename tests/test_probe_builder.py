@@ -24,8 +24,7 @@ was reconstructed at.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, cast
-from unittest.mock import MagicMock
+from typing import Any
 import logging
 import math
 
@@ -33,7 +32,7 @@ import numpy
 import pytest
 
 from ptychodus.api.assemble import AssembledDiffractionData
-from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry
 from ptychodus.api.probe import (
     OPRWeightPolicy,
     Probe,
@@ -59,9 +58,6 @@ from ptychodus.api.simulate.probe import (
     propagate_probe,
     rescale_probe_intensity,
 )
-from ptychodus.model.diffraction.dataset import AssembledDiffractionDataset
-from ptychodus.model.diffraction.monitor import DiffractionTaskMonitor
-from ptychodus.model.diffraction.settings import DetectorSettings, DiffractionSettings
 from ptychodus.model.product.probe.average_pattern import AveragePatternProbeBuilder
 from ptychodus.model.product.probe.builder_factory import ProbeBuilderFactory
 from ptychodus.model.product.probe.disk import DiskProbeBuilder
@@ -70,7 +66,6 @@ from ptychodus.model.product.probe.rect import RectangularProbeBuilder
 from ptychodus.model.product.probe.settings import ProbeSettings
 from ptychodus.model.product.probe.super_gaussian import SuperGaussianProbeBuilder
 
-from test_diffraction_loader import InlineTaskManager
 
 NUM_SCAN_POINTS = 7
 PROBE_PHOTON_COUNT = 1.0e6
@@ -100,10 +95,15 @@ class _StubProbeGeometryProvider(ProbeGeometryProvider):
         probe_photon_count: float = PROBE_PHOTON_COUNT,
         pixel_size_m: float = PIXEL_SIZE_M,
         focus_object_distance_m: float = 0.0,
+        assembled_data: AssembledDiffractionData | None = None,
     ) -> None:
         self._probe_photon_count = probe_photon_count
         self._pixel_size_m = pixel_size_m
         self._focus_object_distance_m = focus_object_distance_m
+        self._assembled_data = assembled_data
+
+    def get_assembled_data(self) -> AssembledDiffractionData | None:
+        return self._assembled_data
 
     @property
     def detector_distance_m(self) -> float:
@@ -810,18 +810,10 @@ class TestFocusDistanceResolution:
 
 def _every_builder(settings: ProbeSettings) -> list[ProbeEnsembleBuilder]:
     """One of each builder the factory offers, all reading the same settings."""
-    registry = SettingsRegistry()
-    task_manager = InlineTaskManager()
-    dataset = AssembledDiffractionDataset(
-        DiffractionSettings(registry),
-        DetectorSettings(registry),
-        task_manager,
-        DiffractionTaskMonitor(task_manager),
-    )
     factory = ProbeBuilderFactory(
         _make_rng(), settings, PluginChooser(), PluginChooser(), PluginChooser(), PluginChooser()
     )
-    return [factory.create(name, dataset=dataset) for name in factory]
+    return [factory.create(name, has_diffraction_data=True) for name in factory]
 
 
 class TestPropagationDistanceIsSeparateFromDefocus:
@@ -1022,9 +1014,9 @@ _DQ = 1.0 / (PROBE_EXTENT_PX * PIXEL_SIZE_M)
 _ESTIMATE_DEFOCUS_M = 2.0e-3
 
 
-def _stub_dataset(mean_pattern: numpy.ndarray) -> AssembledDiffractionDataset:
-    """A dataset whose assembled data has exactly *mean_pattern* as its mean."""
-    data = AssembledDiffractionData(
+def _stub_data(mean_pattern: numpy.ndarray) -> AssembledDiffractionData:
+    """Assembled data whose mean is exactly *mean_pattern*."""
+    return AssembledDiffractionData(
         indexes=numpy.arange(2),
         patterns=numpy.stack([mean_pattern, mean_pattern]),
         # The detector pitch the stub geometry implies: dx = lambda z / (N p).
@@ -1034,9 +1026,10 @@ def _stub_dataset(mean_pattern: numpy.ndarray) -> AssembledDiffractionDataset:
         ),
         bad_pixels=numpy.zeros(mean_pattern.shape, dtype=bool),
     )
-    dataset = MagicMock(spec=AssembledDiffractionDataset)
-    dataset.get_assembled_data.return_value = data
-    return cast(AssembledDiffractionDataset, dataset)
+
+
+def _provider_with(mean_pattern: numpy.ndarray, **kwargs: Any) -> _StubProbeGeometryProvider:
+    return _StubProbeGeometryProvider(assembled_data=_stub_data(mean_pattern), **kwargs)
 
 
 def _frequency_grid() -> tuple[numpy.ndarray, numpy.ndarray]:
@@ -1044,18 +1037,16 @@ def _frequency_grid() -> tuple[numpy.ndarray, numpy.ndarray]:
     return q.reshape(1, -1), q.reshape(-1, 1)
 
 
-def _make_estimating_builder(
-    name: str, dataset: AssembledDiffractionDataset | None
-) -> _ParametricProbeBuilder:
+def _make_estimating_builder(name: str) -> _ParametricProbeBuilder:
     builder: _ParametricProbeBuilder
 
     match name:
         case 'disk':
-            builder = DiskProbeBuilder(_make_rng(), _make_settings(), dataset)
+            builder = DiskProbeBuilder(_make_rng(), _make_settings())
         case 'rectangular':
-            builder = RectangularProbeBuilder(_make_rng(), _make_settings(), dataset)
+            builder = RectangularProbeBuilder(_make_rng(), _make_settings())
         case 'super_gaussian':
-            builder = SuperGaussianProbeBuilder(_make_rng(), _make_settings(), dataset)
+            builder = SuperGaussianProbeBuilder(_make_rng(), _make_settings())
         case _:
             raise ValueError(name)
 
@@ -1069,9 +1060,9 @@ class TestSizeEstimateFromDiffraction:
     def test_a_disk_takes_the_diameter_of_its_shadow(self) -> None:
         qx, qy = _frequency_grid()
         mean_pattern = 100.0 * (numpy.hypot(qx, qy) <= 8.0 * _DQ)
-        builder = _make_estimating_builder('disk', _stub_dataset(mean_pattern))
+        builder = _make_estimating_builder('disk')
 
-        assert builder.estimate_size_from_diffraction(_StubProbeGeometryProvider())
+        assert builder.estimate_size_from_diffraction(_provider_with(mean_pattern))
 
         expected_m = 2.0 * 1.0e-10 * _ESTIMATE_DEFOCUS_M * 8.0 * _DQ
         assert isinstance(builder, DiskProbeBuilder)
@@ -1080,9 +1071,9 @@ class TestSizeEstimateFromDiffraction:
     def test_a_rectangle_takes_both_sides_of_its_shadow(self) -> None:
         qx, qy = _frequency_grid()
         mean_pattern = 100.0 * ((numpy.abs(qx) <= 8.0 * _DQ) & (numpy.abs(qy) <= 4.0 * _DQ))
-        builder = _make_estimating_builder('rectangular', _stub_dataset(mean_pattern))
+        builder = _make_estimating_builder('rectangular')
 
-        assert builder.estimate_size_from_diffraction(_StubProbeGeometryProvider())
+        assert builder.estimate_size_from_diffraction(_provider_with(mean_pattern))
 
         # The aperture spans 2 * half + 1 pixels of the frequency grid.
         scale_m = 1.0e-10 * _ESTIMATE_DEFOCUS_M * _DQ
@@ -1094,9 +1085,9 @@ class TestSizeEstimateFromDiffraction:
         qx, qy = _frequency_grid()
         sigma_q = 3.0 * _DQ
         mean_pattern = 100.0 * numpy.exp(-(qx**2 + qy**2) / (2.0 * sigma_q**2))
-        builder = _make_estimating_builder('super_gaussian', _stub_dataset(mean_pattern))
+        builder = _make_estimating_builder('super_gaussian')
 
-        assert builder.estimate_size_from_diffraction(_StubProbeGeometryProvider())
+        assert builder.estimate_size_from_diffraction(_provider_with(mean_pattern))
 
         sigma_m = math.hypot(
             1.0 / (4.0 * math.pi * sigma_q), 1.0e-10 * _ESTIMATE_DEFOCUS_M * sigma_q
@@ -1107,23 +1098,32 @@ class TestSizeEstimateFromDiffraction:
         )
 
     @pytest.mark.parametrize('name', _PARAMETRIC_BUILDER_NAMES)
-    def test_without_a_dataset_nothing_is_estimated(self, name: str) -> None:
-        builder = _make_estimating_builder(name, None)
+    def test_without_data_nothing_is_estimated(self, name: str) -> None:
+        builder = _make_estimating_builder(name)
+        provider = _StubProbeGeometryProvider()
         before = {key: value.get_value() for key, value in builder.parameters().items()}
 
-        assert not builder.can_estimate_size_from_diffraction()
-        assert not builder.estimate_size_from_diffraction(_StubProbeGeometryProvider())
+        assert not builder.can_estimate_size_from_diffraction(provider)
+        assert not builder.estimate_size_from_diffraction(provider)
         assert {key: value.get_value() for key, value in builder.parameters().items()} == before
 
     @pytest.mark.parametrize('name', _PARAMETRIC_BUILDER_NAMES)
-    def test_a_copy_keeps_the_dataset(self, name: str) -> None:
-        dataset = _stub_dataset(numpy.ones((PROBE_EXTENT_PX, PROBE_EXTENT_PX)))
-        builder = _make_estimating_builder(name, dataset)
+    def test_a_copy_reads_the_data_of_the_product_it_is_in(self, name: str) -> None:
+        """Nothing is cached: a copy estimates from whatever provider it is handed."""
+        qx, qy = _frequency_grid()
+        narrow = 100.0 * numpy.exp(-(qx**2 + qy**2) / (2.0 * (2.0 * _DQ) ** 2))
+        wide = 100.0 * numpy.exp(-(qx**2 + qy**2) / (2.0 * (4.0 * _DQ) ** 2))
+        original = _make_estimating_builder(name)
+        original.estimate_size_from_diffraction(_provider_with(narrow))
+        copy = original.copy()
 
-        assert builder.copy().can_estimate_size_from_diffraction()
+        assert copy.estimate_size_from_diffraction(_provider_with(wide))
+        assert any(
+            copy.parameters()[key].get_value() != value.get_value()
+            for key, value in original.parameters().items()
+        )
 
-    def test_the_factory_hands_the_dataset_to_the_parametric_builders(self) -> None:
-        dataset = _stub_dataset(numpy.ones((PROBE_EXTENT_PX, PROBE_EXTENT_PX)))
+    def test_the_factory_guards_only_the_builders_that_need_data(self) -> None:
         factory = ProbeBuilderFactory(
             _make_rng(),
             _make_settings(),
@@ -1134,9 +1134,12 @@ class TestSizeEstimateFromDiffraction:
         )
 
         for name in _PARAMETRIC_BUILDER_NAMES:
-            assert factory.create(name, dataset=dataset).can_estimate_size_from_diffraction()
-            assert not factory.create(name).can_estimate_size_from_diffraction()
+            assert factory.create(name).get_name() == name
 
+        with pytest.raises(RuntimeError, match='requires an associated diffraction dataset'):
+            factory.create('average_pattern')
+
+        assert factory.create('average_pattern', has_diffraction_data=True).reads_diffraction_data
         assert factory.create_default().get_name() == 'disk'
 
 
@@ -1149,7 +1152,7 @@ class TestAveragePatternOptions:
 
     def _expected(self, **kwargs: Any) -> numpy.ndarray:
         provider = _StubProbeGeometryProvider()
-        data = _stub_dataset(self._mean_pattern()).get_assembled_data()
+        data = _stub_data(self._mean_pattern())
         probe = generate_average_pattern_probe(
             provider.get_probe_geometry(),
             data.get_mean_pattern(),
@@ -1162,22 +1165,20 @@ class TestAveragePatternOptions:
         return rescale_probe_intensity(probe, PROBE_PHOTON_COUNT).get_array()
 
     def _builder(self) -> AveragePatternProbeBuilder:
-        return AveragePatternProbeBuilder(
-            _make_rng(), _make_settings(), _stub_dataset(self._mean_pattern())
-        )
+        return AveragePatternProbeBuilder(_make_rng(), _make_settings())
 
     def test_defocus_and_propagation_add(self) -> None:
         builder = self._builder()
         builder.defocus_distance_m.set_value(2.0e-6)
         builder.propagation_distance_m.set_value(1.0e-6)
 
-        built = builder.build(_StubProbeGeometryProvider()).get_probe_no_opr().get_array()
+        built = builder.build(_provider_with(self._mean_pattern())).get_probe_no_opr().get_array()
 
         numpy.testing.assert_allclose(built, self._expected(defocus_distance_m=3.0e-6), atol=1e-9)
 
     def test_a_declared_focus_stands_in_for_the_builder_defocus(self) -> None:
         builder = self._builder()
-        provider = _StubProbeGeometryProvider(focus_object_distance_m=-2.0e-6)
+        provider = _provider_with(self._mean_pattern(), focus_object_distance_m=-2.0e-6)
 
         built = builder.build(provider).get_probe_no_opr().get_array()
 
@@ -1185,7 +1186,7 @@ class TestAveragePatternOptions:
 
     def test_the_bright_field_threshold_is_off_by_default_and_passes_through(self) -> None:
         builder = self._builder()
-        provider = _StubProbeGeometryProvider()
+        provider = _provider_with(self._mean_pattern())
 
         numpy.testing.assert_allclose(
             builder.build(provider).get_probe_no_opr().get_array(), self._expected(), atol=1e-9
@@ -1198,3 +1199,17 @@ class TestAveragePatternOptions:
             self._expected(bright_field_mad_threshold=4.5),
             atol=1e-9,
         )
+
+    def test_without_data_the_build_waits_rather_than_fails(self) -> None:
+        with pytest.raises(GeometryNotDefinedError):
+            self._builder().build(_StubProbeGeometryProvider())
+
+    def test_a_copy_builds_from_the_data_of_the_product_it_is_in(self) -> None:
+        original = self._builder()
+        copy = original.copy()
+        other_pattern = 2.0 * self._mean_pattern()
+
+        built = copy.build(_provider_with(other_pattern)).get_probe_no_opr().get_array()
+        expected = original.build(_provider_with(other_pattern)).get_probe_no_opr().get_array()
+
+        numpy.testing.assert_allclose(built, expected, atol=1e-9)

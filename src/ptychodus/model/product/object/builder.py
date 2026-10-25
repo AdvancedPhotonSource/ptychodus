@@ -42,6 +42,16 @@ class ObjectBuilder(ParameterGroup):
     def copy(self) -> ObjectBuilder:
         pass
 
+    @property
+    def reads_diffraction_data(self) -> bool:
+        """Whether the object this builds depends on the diffraction data.
+
+        Such an object is rebuilt when the data changes under an unchanged detector
+        geometry -- another dataset, or a reload -- which the geometry alone does not
+        announce.
+        """
+        return False
+
     def bind_probe_supplier(self, supplier: Callable[[], ProbeEnsemble] | None) -> None:
         """Accept the source of the probe that shares this builder's product.
 

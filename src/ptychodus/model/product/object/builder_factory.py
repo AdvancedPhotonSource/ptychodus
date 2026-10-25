@@ -7,7 +7,6 @@ import numpy
 from ptychodus.api.object import Object, ObjectFileReader, ObjectFileWriter
 from ptychodus.api.plugins import PluginChooser
 
-from ...diffraction import AssembledDiffractionDataset
 from ...file_types import FileTypeChooser
 from .builder import FromFileObjectBuilder, ObjectBuilder
 from .dead_leaves import DeadLeavesObjectBuilder
@@ -41,40 +40,40 @@ class ObjectBuilderFactory(Iterable[str]):
             'grf': lambda: GaussianRandomFieldObjectBuilder(rng, settings),
             'siemens_star': lambda: SiemensStarObjectBuilder(settings),
         }
-        self._diffraction_builders: Mapping[
-            str, Callable[[AssembledDiffractionDataset], ObjectBuilder]
-        ] = {
-            'stxm_dpc': lambda dataset: STXMDPCObjectBuilder(settings, dataset),
-            'paganin': lambda dataset: PaganinObjectBuilder(settings, dataset),
+        # Builders that cannot build without diffraction data, which they read from the
+        # geometry provider when they build.
+        self._diffraction_builders: Mapping[str, Callable[[], ObjectBuilder]] = {
+            'stxm_dpc': lambda: STXMDPCObjectBuilder(settings),
+            'paganin': lambda: PaganinObjectBuilder(settings),
         }
 
     def __iter__(self) -> Iterator[str]:
         yield from self._non_diffraction_builders
         yield from self._diffraction_builders
 
-    def create(
-        self, name: str, *, dataset: AssembledDiffractionDataset | None = None
-    ) -> ObjectBuilder:
+    def create(self, name: str, *, has_diffraction_data: bool = False) -> ObjectBuilder:
+        """Create the builder *name*, refusing one that needs data on a product without any."""
         diffraction_factory = self._diffraction_builders.get(name)
+
         if diffraction_factory is not None:
-            if dataset is None:
+            if not has_diffraction_data:
                 raise RuntimeError(
                     f'Object builder "{name}" requires an associated diffraction dataset.'
                 )
-            return diffraction_factory(dataset)
+
+            return diffraction_factory()
 
         try:
             factory = self._non_diffraction_builders[name]
         except KeyError as exc:
             raise KeyError(f'Unknown object builder "{name}"!') from exc
+
         return factory()
 
     def create_default(self) -> ObjectBuilder:
         return next(iter(self._non_diffraction_builders.values()))()
 
-    def create_from_settings(
-        self, *, dataset: AssembledDiffractionDataset | None = None
-    ) -> ObjectBuilder:
+    def create_from_settings(self, *, has_diffraction_data: bool = False) -> ObjectBuilder:
         name = self._settings.builder.get_value()
         name_repaired = name.casefold()
 
@@ -84,7 +83,7 @@ class ObjectBuilderFactory(Iterable[str]):
                 self._settings.file_type.get_value(),
             )
 
-        return self.create(name_repaired, dataset=dataset)
+        return self.create(name_repaired, has_diffraction_data=has_diffraction_data)
 
     def create_object_from_file(self, file_path: Path, file_type: str) -> ObjectBuilder:
         plugin = self.file_readers.select(file_type)

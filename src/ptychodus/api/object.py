@@ -15,6 +15,7 @@ from skimage.registration import phase_cross_correlation
 from skimage.restoration import unwrap_phase
 
 from .typing import ComplexArrayType, InexactArrayType, RealArrayType
+from .assemble import AssembledDiffractionData
 from .constants import format_length
 from .files import FileReader, FileWriter
 from .fourier import fourier_shift_2d
@@ -203,6 +204,14 @@ class ObjectGeometryProvider(ABC):
     @abstractmethod
     def get_object_geometry(self) -> ObjectGeometry:
         pass
+
+    @abstractmethod
+    def get_assembled_data(self) -> AssembledDiffractionData | None:
+        """The diffraction data the product is bound to, or None while it is bound to none.
+
+        Read at the point of use rather than kept, so a builder copied into another
+        product, or a product rebound to other data, sees the data it has now.
+        """
 
 
 class Object:

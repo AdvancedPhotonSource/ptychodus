@@ -189,7 +189,9 @@ class ProbeAPI:
         dataset = self._repository.get_dataset(index)
 
         try:
-            builder = self._builder_factory.create(builder_name, dataset=dataset)
+            builder = self._builder_factory.create(
+                builder_name, has_diffraction_data=dataset is not None
+            )
         except (KeyError, RuntimeError) as exc:
             logger.warning(f'Failed to create builder {builder_name}: {exc}')
             return
@@ -218,7 +220,9 @@ class ProbeAPI:
         dataset = self._repository.get_dataset(index)
 
         try:
-            builder = self._builder_factory.create_from_settings(dataset=dataset)
+            builder = self._builder_factory.create_from_settings(
+                has_diffraction_data=dataset is not None
+            )
         except (KeyError, RuntimeError) as exc:
             logger.warning(f'Failed to create builder from settings: {exc}')
             return
@@ -326,7 +330,9 @@ class ObjectAPI:
         dataset = self._repository.get_dataset(index)
 
         try:
-            builder = self._builder_factory.create(builder_name, dataset=dataset)
+            builder = self._builder_factory.create(
+                builder_name, has_diffraction_data=dataset is not None
+            )
         except (KeyError, RuntimeError) as exc:
             logger.warning(f'Failed to create builder {builder_name}: {exc}')
             return
@@ -355,7 +361,9 @@ class ObjectAPI:
         dataset = self._repository.get_dataset(index)
 
         try:
-            builder = self._builder_factory.create_from_settings(dataset=dataset)
+            builder = self._builder_factory.create_from_settings(
+                has_diffraction_data=dataset is not None
+            )
         except (KeyError, RuntimeError) as exc:
             logger.warning(f'Failed to create builder from settings: {exc}')
             return

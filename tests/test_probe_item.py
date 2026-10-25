@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 import numpy
 import pytest
 
+from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry
 from ptychodus.api.observer import Observable
 from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider, ProbeEnsemble
@@ -210,6 +211,9 @@ class _ObservableProbeProvider(ProbeGeometryProvider, Observable):
     def get_detector_pixel_geometry(self) -> PixelGeometry:
         return PixelGeometry(width_m=1e-6, height_m=1e-6)
 
+    def get_assembled_data(self) -> AssembledDiffractionData | None:
+        return None
+
     def get_probe_geometry(self) -> ProbeGeometry:
         if self._geometry.pixel_width_m <= 0.0 or self._geometry.pixel_height_m <= 0.0:
             raise GeometryNotDefinedError('not bound')
@@ -239,3 +243,28 @@ def test_rebuild_fires_on_geometry_observer_notification() -> None:
 
     assert len(builder.build_calls) == 1
     assert item.get_probes().get_array() is canned.get_array()
+
+
+class _DataRecordingBuilder(_RecordingBuilder):
+    """A recording builder that, like the average-pattern builder, reads the patterns."""
+
+    @property
+    def reads_diffraction_data(self) -> bool:
+        return True
+
+
+def test_a_data_change_rebuilds_only_a_builder_that_reads_the_data() -> None:
+    settings = ProbeSettings(SettingsRegistry())
+    canned = _make_probe_seq(pixel_size_m=1e-6)
+    provider = _make_provider(pixel_width_m=1e-6, pixel_height_m=1e-6)
+
+    parametric = _RecordingBuilder(settings, canned)
+    parametric_item = ProbeRepositoryItem(_make_rng(), provider, settings, parametric)
+    reading = _DataRecordingBuilder(settings, canned)
+    reading_item = ProbeRepositoryItem(_make_rng(), provider, settings, reading)
+
+    parametric_item.handle_diffraction_data_changed()
+    reading_item.handle_diffraction_data_changed()
+
+    assert len(parametric.build_calls) == 1
+    assert len(reading.build_calls) == 2

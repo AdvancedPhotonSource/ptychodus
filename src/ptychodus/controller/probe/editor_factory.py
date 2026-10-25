@@ -494,7 +494,7 @@ class EstimateSizeViewController(ParameterViewController):
             'Set the size from the second moments of the mean diffraction pattern, at the '
             'defocus distance above. Needs far-field data.'
         )
-        self._widget.setEnabled(item.get_builder().can_estimate_size_from_diffraction())
+        self._widget.setEnabled(item.can_estimate_size_from_diffraction())
         self._widget.clicked.connect(self._estimate)
 
     def get_widget(self) -> QWidget:

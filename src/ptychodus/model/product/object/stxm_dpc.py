@@ -3,11 +3,11 @@ from collections.abc import Callable
 import logging
 import math
 
+from ptychodus.api.geometry import GeometryNotDefinedError
 from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.probe import Probe, ProbeEnsemble
 from ptychodus.api.simulate.object import compute_stxm_dpc_signals, generate_stxm_dpc_object
 
-from ...diffraction import AssembledDiffractionDataset
 from .builder import ObjectBuilder
 from .settings import ObjectSettings
 
@@ -15,14 +15,9 @@ logger = logging.getLogger(__name__)
 
 
 class STXMDPCObjectBuilder(ObjectBuilder):
-    def __init__(
-        self,
-        settings: ObjectSettings,
-        dataset: AssembledDiffractionDataset,
-    ) -> None:
+    def __init__(self, settings: ObjectSettings) -> None:
         super().__init__(settings, 'stxm_dpc')
         self._settings = settings
-        self._dataset = dataset
         self._probe_supplier: Callable[[], ProbeEnsemble] | None = None
 
         # The wavelength, detector distance and regime are the experiment's, read from
@@ -36,7 +31,7 @@ class STXMDPCObjectBuilder(ObjectBuilder):
         self._probe_supplier = supplier
 
     def copy(self) -> STXMDPCObjectBuilder:
-        builder = STXMDPCObjectBuilder(self._settings, self._dataset)
+        builder = STXMDPCObjectBuilder(self._settings)
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
@@ -74,6 +69,10 @@ class STXMDPCObjectBuilder(ObjectBuilder):
 
         return probe
 
+    @property
+    def reads_diffraction_data(self) -> bool:
+        return True
+
     def _build_raw(self, geometry_provider: ObjectGeometryProvider) -> Object:
         if not geometry_provider.far_field:
             raise ValueError(
@@ -81,7 +80,11 @@ class STXMDPCObjectBuilder(ObjectBuilder):
                 ' far-field centroid to the exit-wave phase gradient.'
             )
 
-        assembled_data = self._dataset.get_assembled_data()
+        assembled_data = geometry_provider.get_assembled_data()
+
+        if assembled_data is None:
+            # Not yet bound; the build is retried once the product has data.
+            raise GeometryNotDefinedError('No diffraction data to estimate the object from.')
         object_ = generate_stxm_dpc_object(
             geometry_provider.get_object_geometry(),
             compute_stxm_dpc_signals(assembled_data),

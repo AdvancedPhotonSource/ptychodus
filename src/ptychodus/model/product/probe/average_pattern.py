@@ -2,24 +2,18 @@ from __future__ import annotations
 
 import numpy
 
+from ptychodus.api.geometry import GeometryNotDefinedError
 from ptychodus.api.probe import ProbeEnsemble, ProbeGeometryProvider
 from ptychodus.api.simulate.probe import generate_average_pattern_probe
 
-from ...diffraction import AssembledDiffractionDataset
 from .builder import ProbeEnsembleBuilder, resolve_defocus_distance_m
 from .settings import ProbeSettings
 
 
 class AveragePatternProbeBuilder(ProbeEnsembleBuilder):
-    def __init__(
-        self,
-        rng: numpy.random.Generator,
-        settings: ProbeSettings,
-        dataset: AssembledDiffractionDataset,
-    ) -> None:
+    def __init__(self, rng: numpy.random.Generator, settings: ProbeSettings) -> None:
         super().__init__(rng, settings, 'average_pattern')
         self._settings = settings
-        self._dataset = dataset
 
         # from the focus to the sample: the back-propagated waist is carried this far
         self.defocus_distance_m = settings.defocus_distance_m.copy()
@@ -32,15 +26,24 @@ class AveragePatternProbeBuilder(ProbeEnsembleBuilder):
         self._add_parameter('bright_field_threshold', self.bright_field_threshold)
 
     def copy(self) -> AveragePatternProbeBuilder:
-        builder = AveragePatternProbeBuilder(self._rng, self._settings, self._dataset)
+        builder = AveragePatternProbeBuilder(self._rng, self._settings)
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
 
         return builder
 
+    @property
+    def reads_diffraction_data(self) -> bool:
+        return True
+
     def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
-        assembled_data = self._dataset.get_assembled_data()
+        assembled_data = geometry_provider.get_assembled_data()
+
+        if assembled_data is None:
+            # Not yet bound; the build is retried once the product has data.
+            raise GeometryNotDefinedError('No diffraction data to estimate the probe from.')
+
         # A flat-phase square root back-propagates to the beam at its waist. The defocus
         # carries it to the object, deferring to the product's focus as the focusing
         # builders do; the propagation distance then refines the plane without moving

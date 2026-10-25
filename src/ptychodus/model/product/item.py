@@ -182,11 +182,13 @@ class ProductRepositoryItem(ParameterGroup):
             self._dataset_observer = None
 
         self._dataset = dataset
+        data_changed = self._geometry.set_diffraction_dataset(dataset)
 
         if dataset is None:
             self._geometry.set_detector_extent(None)
             self._geometry.set_detector_pixel_geometry(None)
             self._geometry.set_mean_amplitude_transmission(1.0)
+            self._handle_diffraction_data_changed(data_changed)
             return
 
         self._geometry.set_detector_extent(dataset.get_processed_image_extent())
@@ -199,6 +201,18 @@ class ProductRepositoryItem(ParameterGroup):
 
         self._auto_estimate_probe_photon_count()
         self._estimate_mean_amplitude_transmission()
+        self._handle_diffraction_data_changed(data_changed)
+
+    def _handle_diffraction_data_changed(self, data_changed: bool = True) -> None:
+        """Rebuild the probe and object where their builders read the patterns.
+
+        The geometry setters already rebuild everything when the detector extent or
+        pixel geometry moves, but other data on the same detector -- another dataset,
+        or a reload after a value-filter edit -- moves neither.
+        """
+        if data_changed:
+            self._probe_item.handle_diffraction_data_changed()
+            self._object_item.handle_diffraction_data_changed()
 
     def _estimate_mean_amplitude_transmission(self) -> None:
         # Unguarded, unlike the photon count: this is a property of the patterns alone,
@@ -330,3 +344,4 @@ class _BoundDatasetObserver(DiffractionDatasetObserver):
         self._item._sync_geometry_from_dataset()
         self._item._auto_estimate_probe_photon_count()
         self._item._estimate_mean_amplitude_transmission()
+        self._item._handle_diffraction_data_changed()

@@ -13,6 +13,7 @@ import logging
 import numpy
 import pytest
 
+from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter, ObjectGeometry, ObjectGeometryProvider
 from ptychodus.api.observer import Observable
@@ -54,6 +55,9 @@ class _ObservableObjectProvider(ObjectGeometryProvider, Observable):
 
     def get_probe_positions(self) -> Sequence[ProbePosition]:
         return ()
+
+    def get_assembled_data(self) -> AssembledDiffractionData | None:
+        return None
 
     def get_object_geometry(self) -> ObjectGeometry:
         if self._geometry.pixel_width_m <= 0.0 or self._geometry.pixel_height_m <= 0.0:
@@ -162,3 +166,32 @@ def test_rebuild_is_silent_when_the_samplings_agree(caplog: pytest.LogCaptureFix
         _make_item_with_canned_pixel_size(1.0e-6, 1.0e-6)
 
     assert caplog.text == ''
+
+
+class _DataRecordingObjectBuilder(_RecordingObjectBuilder):
+    """A recording builder that, like the STXM-DPC builder, reads the patterns."""
+
+    @property
+    def reads_diffraction_data(self) -> bool:
+        return True
+
+
+def test_a_data_change_rebuilds_only_a_builder_that_reads_the_data() -> None:
+    settings = ObjectSettings(SettingsRegistry())
+    provider = _ObservableObjectProvider(_make_object_geometry(1e-6, 1e-6))
+    canned = Object(
+        array=numpy.zeros((1, 4, 4), dtype=complex),
+        pixel_geometry=PixelGeometry(width_m=1e-6, height_m=1e-6),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
+    )
+
+    parametric = _RecordingObjectBuilder(settings, canned)
+    parametric_item = ObjectRepositoryItem(provider, settings, parametric)
+    reading = _DataRecordingObjectBuilder(settings, canned)
+    reading_item = ObjectRepositoryItem(provider, settings, reading)
+
+    parametric_item.handle_diffraction_data_changed()
+    reading_item.handle_diffraction_data_changed()
+
+    assert len(parametric.build_calls) == 1
+    assert len(reading.build_calls) == 2

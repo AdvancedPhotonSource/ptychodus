@@ -100,9 +100,18 @@ class ProbeRepositoryItem(ParameterGroup):
             logger.exception('Failed to estimate probe entropy!')
             return None
 
+    def can_estimate_size_from_diffraction(self) -> bool:
+        """Whether the builder has a size to estimate and the product has data to estimate it from."""
+        return self._builder.can_estimate_size_from_diffraction(self._geometry_provider)
+
     def estimate_size_from_diffraction(self) -> bool:
         """Set the builder's size parameters from the measured patterns; see the builder."""
         return self._builder.estimate_size_from_diffraction(self._geometry_provider)
+
+    def handle_diffraction_data_changed(self) -> None:
+        """Rebuild if the builder reads the diffraction data, which has just changed."""
+        if self._builder.reads_diffraction_data:
+            self._rebuild()
 
     def get_builder(self) -> ProbeEnsembleBuilder:
         return self._builder

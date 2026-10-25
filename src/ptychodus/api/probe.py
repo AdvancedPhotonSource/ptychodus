@@ -13,6 +13,7 @@ from typing import cast
 import numpy
 from scipy.fft import fft2
 
+from .assemble import AssembledDiffractionData
 from .constants import format_length
 from .files import FileReader, FileWriter
 from .fourier import fourier_shift_2d
@@ -1018,6 +1019,14 @@ class ProbeGeometryProvider(ABC):
     @abstractmethod
     def get_probe_geometry(self) -> ProbeGeometry:
         pass
+
+    @abstractmethod
+    def get_assembled_data(self) -> AssembledDiffractionData | None:
+        """The diffraction data the product is bound to, or None while it is bound to none.
+
+        Read at the point of use rather than kept, so a builder copied into another
+        product, or a product rebound to other data, sees the data it has now.
+        """
 
 
 class Probe:

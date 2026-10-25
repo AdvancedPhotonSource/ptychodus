@@ -5,21 +5,14 @@ import numpy
 from ptychodus.api.probe import ProbeEnsemble, ProbeGeometryProvider
 from ptychodus.api.simulate.probe import generate_super_gaussian_probe
 
-from ...diffraction import AssembledDiffractionDataset
 from .builder import ProbeEnsembleBuilder
 from .settings import ProbeSettings
 
 
 class SuperGaussianProbeBuilder(ProbeEnsembleBuilder):
-    def __init__(
-        self,
-        rng: numpy.random.Generator,
-        settings: ProbeSettings,
-        dataset: AssembledDiffractionDataset | None = None,
-    ) -> None:
+    def __init__(self, rng: numpy.random.Generator, settings: ProbeSettings) -> None:
         super().__init__(rng, settings, 'super_gaussian')
         self._settings = settings
-        self._dataset = dataset
 
         self.annular_radius_m = settings.super_gaussian_annular_radius_m.copy()
         self._add_parameter('annular_radius_m', self.annular_radius_m)
@@ -39,20 +32,18 @@ class SuperGaussianProbeBuilder(ProbeEnsembleBuilder):
         self._add_parameter('propagation_distance_m', self.propagation_distance_m)
 
     def copy(self) -> SuperGaussianProbeBuilder:
-        builder = SuperGaussianProbeBuilder(self._rng, self._settings, self._dataset)
+        builder = SuperGaussianProbeBuilder(self._rng, self._settings)
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
 
         return builder
 
-    def can_estimate_size_from_diffraction(self) -> bool:
-        return self._dataset is not None
+    def can_estimate_size_from_diffraction(self, geometry_provider: ProbeGeometryProvider) -> bool:
+        return geometry_provider.get_assembled_data() is not None
 
     def estimate_size_from_diffraction(self, geometry_provider: ProbeGeometryProvider) -> bool:
-        extent = self._estimate_extent(
-            self._dataset, geometry_provider, self.defocus_distance_m.get_value()
-        )
+        extent = self._estimate_extent(geometry_provider, self.defocus_distance_m.get_value())
 
         if extent is None:
             return False

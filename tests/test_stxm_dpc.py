@@ -17,7 +17,7 @@ from scipy.ndimage import gaussian_filter
 
 from ptychodus.api.accumulate import DiffractionMomentAccumulator
 from ptychodus.api.assemble import AssembledDiffractionData
-from ptychodus.api.geometry import ImageExtent, PixelGeometry
+from ptychodus.api.geometry import GeometryNotDefinedError, ImageExtent, PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter, ObjectGeometry, ObjectGeometryProvider
 from ptychodus.api.probe import Probe, ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
@@ -526,9 +526,19 @@ def test_regularization(phase_scan: _Scan) -> None:
 
 
 class _StubProvider(ObjectGeometryProvider):
-    def __init__(self, positions: Sequence[ProbePosition], *, far_field: bool = True) -> None:
+    def __init__(
+        self,
+        positions: Sequence[ProbePosition],
+        *,
+        far_field: bool = True,
+        assembled_data: AssembledDiffractionData | None = None,
+    ) -> None:
         self._positions = positions
         self._far_field = far_field
+        self._assembled_data = assembled_data
+
+    def get_assembled_data(self) -> AssembledDiffractionData | None:
+        return self._assembled_data
 
     @property
     def photon_wavelength_m(self) -> float:
@@ -557,12 +567,6 @@ def _settings() -> ObjectSettings:
     return ObjectSettings(SettingsRegistry())
 
 
-def _dataset(data: AssembledDiffractionData) -> MagicMock:
-    dataset = MagicMock()
-    dataset.get_assembled_data.return_value = data
-    return dataset
-
-
 def _ensemble(probe: Probe) -> ProbeEnsemble:
     return ProbeEnsemble(
         array=probe.get_array()[numpy.newaxis],
@@ -581,17 +585,17 @@ def test_factory_offers_stxm_dpc_in_place_of_stxm() -> None:
 
 
 def test_builder_builds_a_single_layer_object(phase_scan: _Scan) -> None:
-    builder = STXMDPCObjectBuilder(_settings(), _dataset(phase_scan.data))
+    builder = STXMDPCObjectBuilder(_settings())
 
-    object_ = builder.build(_StubProvider(phase_scan.positions), [])
+    object_ = builder.build(_StubProvider(phase_scan.positions, assembled_data=phase_scan.data), [])
 
     assert object_.num_layers == 1
     assert numpy.isfinite(object_.get_array()).all()
 
 
 def test_builder_passes_its_regularization_through(phase_scan: _Scan) -> None:
-    provider = _StubProvider(phase_scan.positions)
-    builder = STXMDPCObjectBuilder(_settings(), _dataset(phase_scan.data))
+    provider = _StubProvider(phase_scan.positions, assembled_data=phase_scan.data)
+    builder = STXMDPCObjectBuilder(_settings())
     default = builder.build(provider, []).get_array()
 
     builder.regularization_fov_fraction.set_value(20 / 128)
@@ -600,20 +604,36 @@ def test_builder_passes_its_regularization_through(phase_scan: _Scan) -> None:
 
 
 def test_builder_rejects_near_field_before_the_signal_pass(phase_scan: _Scan) -> None:
-    dataset = _dataset(phase_scan.data)
-    builder = STXMDPCObjectBuilder(_settings(), dataset)
+    provider = _StubProvider(phase_scan.positions, far_field=False, assembled_data=phase_scan.data)
+    provider.get_assembled_data = MagicMock(return_value=phase_scan.data)  # type: ignore[method-assign]
+    builder = STXMDPCObjectBuilder(_settings())
 
     with pytest.raises(ValueError, match='far-field'):
-        builder.build(_StubProvider(phase_scan.positions, far_field=False), [])
+        builder.build(provider, [])
 
-    dataset.get_assembled_data.assert_not_called()
+    provider.get_assembled_data.assert_not_called()
+
+
+def test_builder_waits_for_data_rather_than_failing(phase_scan: _Scan) -> None:
+    with pytest.raises(GeometryNotDefinedError):
+        STXMDPCObjectBuilder(_settings()).build(_StubProvider(phase_scan.positions), [])
+
+
+def test_a_copied_builder_reads_the_data_of_the_product_it_is_in(phase_scan: _Scan) -> None:
+    builder = STXMDPCObjectBuilder(_settings())
+    provider = _StubProvider(phase_scan.positions, assembled_data=phase_scan.data)
+
+    numpy.testing.assert_array_equal(
+        builder.copy().build(provider, []).get_array(), builder.build(provider, []).get_array()
+    )
+    assert builder.reads_diffraction_data
 
 
 def test_builder_shadow_correction_uses_the_bound_probe(
     shadow_scan: _Scan, caplog: pytest.LogCaptureFixture
 ) -> None:
-    provider = _StubProvider(shadow_scan.positions)
-    builder = STXMDPCObjectBuilder(_settings(), _dataset(shadow_scan.data))
+    provider = _StubProvider(shadow_scan.positions, assembled_data=shadow_scan.data)
+    builder = STXMDPCObjectBuilder(_settings())
     uncorrected = builder.build(provider, []).get_array()
     builder.shadow_correction.set_value(True)
 
@@ -648,9 +668,12 @@ def test_item_binds_its_probe_supplier_to_every_builder(phase_scan: _Scan) -> No
     def supplier() -> ProbeEnsemble:
         return _ensemble(phase_scan.probe)
 
-    first = STXMDPCObjectBuilder(settings, _dataset(phase_scan.data))
+    first = STXMDPCObjectBuilder(settings)
     item = ObjectRepositoryItem(
-        _StubProvider(phase_scan.positions), settings, first, probe_supplier=supplier
+        _StubProvider(phase_scan.positions, assembled_data=phase_scan.data),
+        settings,
+        first,
+        probe_supplier=supplier,
     )
     assert first._probe_supplier is supplier
 

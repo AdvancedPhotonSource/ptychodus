@@ -33,7 +33,6 @@ from ptychodus.api.probe import (
     resample_probe_ensemble,
 )
 
-from ...diffraction import AssembledDiffractionDataset
 from .settings import ProbeSettings
 
 logger = logging.getLogger(__name__)
@@ -174,7 +173,17 @@ class ProbeEnsembleBuilder(ParameterGroup):
 
         return probe
 
-    def can_estimate_size_from_diffraction(self) -> bool:
+    @property
+    def reads_diffraction_data(self) -> bool:
+        """Whether the probe this builds depends on the diffraction data.
+
+        Such a probe is rebuilt when the data changes under an unchanged detector
+        geometry -- another dataset, or a reload -- which the geometry alone does not
+        announce.
+        """
+        return False
+
+    def can_estimate_size_from_diffraction(self, geometry_provider: ProbeGeometryProvider) -> bool:
         """Whether `estimate_size_from_diffraction` has a size to set and data to set it from."""
         return False
 
@@ -183,22 +192,21 @@ class ProbeEnsembleBuilder(ParameterGroup):
 
         A one-off: the parameters take the estimate and keep it, so the settings stay
         explicit and a later rebuild does not move them. Returns whether anything was
-        set; builders without a size, or without data, leave everything alone.
+        set; builders without a size, or a product without data, leave everything alone.
         """
         return False
 
     def _estimate_extent(
-        self,
-        dataset: AssembledDiffractionDataset | None,
-        geometry_provider: ProbeGeometryProvider,
-        defocus_distance_m: float,
+        self, geometry_provider: ProbeGeometryProvider, defocus_distance_m: float
     ) -> ProbeExtent | None:
-        """The probe extent the dataset's mean pattern implies, or None where it cannot say.
+        """The probe extent the product's mean pattern implies, or None where it cannot say.
 
         The defocus is resolved against the product's focus, as the build resolves it.
         """
-        if dataset is None:
-            logger.warning('No diffraction dataset to estimate the probe size from.')
+        assembled_data = geometry_provider.get_assembled_data()
+
+        if assembled_data is None:
+            logger.warning('No diffraction data to estimate the probe size from.')
             return None
 
         if not geometry_provider.far_field:
@@ -208,7 +216,6 @@ class ProbeEnsembleBuilder(ParameterGroup):
             )
             return None
 
-        assembled_data = dataset.get_assembled_data()
         corrections = DetectorCorrections(
             background=assembled_data.get_background(),
             flat_field=assembled_data.get_flat_field(),

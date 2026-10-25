@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 import math
 
+from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.geometry import GeometryNotDefinedError, ImageExtent, PixelGeometry
 from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider, compute_object_geometry
@@ -9,6 +10,7 @@ from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider
 from ptychodus.api.propagate import ProductGeometry, compute_product_geometry
 from ptychodus.api.probe_positions import ProbePosition
 
+from ..diffraction import AssembledDiffractionDataset
 from .metadata import MetadataRepositoryItem
 from .probe_positions import ProbePositionsRepositoryItem
 
@@ -44,6 +46,9 @@ class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Obs
         # describes the patterns rather than the experiment: it is re-estimated whenever
         # they are, and nothing should persist it across a reload. One while unbound.
         self._mean_amplitude_transmission = 1.0
+        # The bound dataset itself, so builders read the patterns at the point of use
+        # rather than keeping a reference that a copy or a rebind would leave stale.
+        self._dataset: AssembledDiffractionDataset | None = None
 
         self._metadata_item.add_observer(self)
         self._scan_item.add_observer(self)
@@ -59,6 +64,22 @@ class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Obs
             return
         self._detector_pixel_geometry = geometry
         self.notify_observers()
+
+    def set_diffraction_dataset(self, dataset: AssembledDiffractionDataset | None) -> bool:
+        """Bind the dataset `get_assembled_data` answers from; return whether it changed.
+
+        Observers are not notified: only the builders that read the patterns need
+        rebuilding, and the product item rebuilds those itself, so a probe or object
+        that does not depend on the data -- a random object above all -- is left as it is.
+        """
+        if dataset is self._dataset:
+            return False
+
+        self._dataset = dataset
+        return True
+
+    def get_assembled_data(self) -> AssembledDiffractionData | None:
+        return None if self._dataset is None else self._dataset.get_assembled_data()
 
     def set_mean_amplitude_transmission(self, transmission: float) -> None:
         if transmission == self._mean_amplitude_transmission:

@@ -28,6 +28,7 @@ import numpy
 import numpy.testing
 import pytest
 
+from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import (
     Object,
@@ -65,9 +66,14 @@ class _StubObjectGeometryProvider(ObjectGeometryProvider):
         self,
         photon_wavelength_m: float = 1.0e-10,
         mean_amplitude_transmission: float = 1.0,
+        assembled_data: AssembledDiffractionData | None = None,
     ) -> None:
         self._photon_wavelength_m = photon_wavelength_m
         self._mean_amplitude_transmission = mean_amplitude_transmission
+        self._assembled_data = assembled_data
+
+    def get_assembled_data(self) -> AssembledDiffractionData | None:
+        return self._assembled_data
 
     @property
     def photon_wavelength_m(self) -> float:
@@ -349,9 +355,6 @@ class TestPaganinReadsTheExperiment:
     """
 
     def _build(self, photon_wavelength_m: float) -> numpy.ndarray:
-        from unittest.mock import MagicMock
-
-        from ptychodus.api.assemble import AssembledDiffractionData
         from ptychodus.model.product.object.paganin import PaganinObjectBuilder
 
         num_positions = 25
@@ -363,11 +366,10 @@ class TestPaganinReadsTheExperiment:
             PixelGeometry(width_m=1e-6, height_m=1e-6),
             numpy.zeros((4, 4), dtype=numpy.bool_),
         )
-        dataset = MagicMock()
-        dataset.get_assembled_data.return_value = assembled
-
-        builder = PaganinObjectBuilder(_make_settings(), dataset)
-        provider = _StubObjectGeometryProvider(photon_wavelength_m=photon_wavelength_m)
+        builder = PaganinObjectBuilder(_make_settings())
+        provider = _StubObjectGeometryProvider(
+            photon_wavelength_m=photon_wavelength_m, assembled_data=assembled
+        )
         # A real 5x5 grid: the STXM step triangulates the positions, so coincident
         # points degenerate the hull.
         span_m = EXTENT_PX * PIXEL_SIZE_M / 3.0
