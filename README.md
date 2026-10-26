@@ -30,6 +30,12 @@ $ uv sync --extra globus --extra gui --extra ptychi-cuda128   # or -cuda130, -cu
 
 A build newer than the driver leaves `torch.cuda.is_available()` false and reconstruction silently falls back to the CPU; `uv run ptychodus-system-check` reports the driver ceiling, the PyTorch build and whether the two agree. These extras pin PyTorch to the matching index through `[tool.uv.sources]`, which only `uv` reads — a `pip install` of the same extra takes whatever PyTorch PyPI offers.
 
+The `cdtools` extra adds [cdtools](https://github.com/cdtools-developers/cdtools)' FancyPtycho model as a further reconstructor. On its own it takes PyPI's default PyTorch; alongside a `ptychi` extra it takes that extra's build:
+
+```sh
+$ uv sync --extra globus --extra gui --extra ptychi --extra cdtools
+```
+
 Launch `ptychodus`:
 
 ```sh

@@ -64,6 +64,7 @@ CONTEXT_CAPABLE_MODULES = (
 # scope in a ``reconstructor.py`` is what this list is here to catch.
 CHILD_ONLY_MODULES = (
     'cupy',  # links and initialises the CUDA runtime at import; no non-invasive probe
+    'cdtools',  # cdtools backend; child-side entry point only
     'ptycho',  # ptychopinn TensorFlow package; raw_data/probe/tf_helper pull TensorFlow
     'ptycho_torch',  # ptychopinn backend; child-side entry point only
     'ptycho_fm',  # ptycho_fm backend; child-side entry point only

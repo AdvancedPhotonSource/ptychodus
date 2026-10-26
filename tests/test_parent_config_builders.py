@@ -100,21 +100,46 @@ def _build_ptycho_fm_configs() -> list[Any]:
     return configs
 
 
+def _build_cdtools_payloads() -> list[Any]:
+    from cdtools_fixtures import make_input
+    from ptychodus.plugins.cdtools.options import CDToolsOptimizer, default_options
+    from ptychodus.plugins.cdtools.reconstructor import build_reconstructor
+
+    # Every optimizer, since each selects a different set of fields the child reads.
+    payloads: list[Any] = []
+    reconstructor = build_reconstructor()
+
+    for optimizer in CDToolsOptimizer:
+        options = default_options()
+        options.optimizer.optimizer = optimizer
+        payloads.append(reconstructor._dump_reconstruct_options(make_input(), options))
+
+    return payloads
+
+
 _BUILDERS = {
+    'cdtools': _build_cdtools_payloads,
     'ptychopinn': _build_ptychopinn_settings,
     'ptycho_fm': _build_ptycho_fm_configs,
 }
 
-# Both builders are pure-Python dict factories that import no backend, so these
-# probes run everywhere. An entry here would mean a builder that cannot.
+# Every builder is a pure-Python factory that imports no backend, so these probes
+# run everywhere. An entry here would mean a builder that cannot.
 _REQUIRED_MODULES: dict[str, tuple[str, ...]] = {
+    'cdtools': (),
     'ptychopinn': (),
     'ptycho_fm': (),
 }
 
 # Modules a builder must not pull in. Checked in the spawned probe, where no
 # earlier test can have imported them first.
-_FORBIDDEN_MODULES: tuple[str, ...] = ('ptycho', 'ptycho_torch', 'torch', 'tensorflow')
+_FORBIDDEN_MODULES: tuple[str, ...] = (
+    'cdtools',
+    'ptycho',
+    'ptycho_torch',
+    'torch',
+    'tensorflow',
+)
 
 
 def _probe(backend: str, result_queue: multiprocessing.Queue[dict[str, Any] | str]) -> None:

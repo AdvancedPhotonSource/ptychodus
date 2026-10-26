@@ -446,6 +446,16 @@ A parallax defocus is **resolved** when it reaches `ParallaxMinSignificance` sta
 
 **Warm-starting.** Kickstart's output is an ordinary product in ptychodus's conventions -- the probe in photons per pixel, the positions in meters -- so another backend can start from it: run Kickstart, then select the other backend and reconstruct from the product it produced.
 
+## Starting cdtools
+
+The **cdtools** reconstructor library (the `cdtools` extra) offers **FancyPtycho**, cdtools' far-field model. Unlike cdtools' own `from_dataset`, it builds no starting guess of its own: the probe, object and positions all come from the product, so any generator above applies. The `average_pattern` probe is the same estimate cdtools calls a SHARP-style probe, and Kickstart's product is a good start for both probe and object.
+
+- **Probe.** Every incoherent mode is used. cdtools models no orthogonal probe relaxation, so a probe with OPR coherent modes is reconstructed from its primary coherent mode alone, with a warning, and the result has none.
+- **Object.** A single layer, on the probe's pixel grid. A multislice object is refused.
+- **Canvas.** Every probe window must lie inside the object array. With `RefinePositions` on, a position can move only within the canvas, so leave room with `ExtraPaddingX` / `ExtraPaddingY` when generating the object.
+- **Detector maps.** A background the data carries starts cdtools' additive background term (`UseBackground`), refined unless `RefineBackground` is off. A flat field multiplies the model (`UseFlatField`) and is never refined.
+- **Scale.** The probe is measured against cdtools' forward model before the run and carried back after it, so the product it returns is in ptychodus's conventions and can warm-start another backend.
+
 ## Low-Level Generator API
 
 The workflow API is usually simpler, but the low-level functions can be used directly when the caller already has geometry objects and wants arrays without registering a product.

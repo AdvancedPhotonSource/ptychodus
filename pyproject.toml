@@ -58,6 +58,10 @@ ptychodus-store = "ptychodus_store.cli:main"
 #     uv pip install --no-deps -e ../PtychoPINN
 #     uv pip install --no-deps -e ../ptycho-fm
 [project.optional-dependencies]
+# cdtools-py requires torch itself. Listing it here as well would give torch a second
+# source whenever a ptychi extra is also selected; left to cdtools, it resolves from
+# that extra's pinned index, or from PyPI when cdtools is installed alone.
+cdtools = ["cdtools-py>=0.3.2"]
 docs = ["myst-parser", "sphinx", "sphinx-copybutton", "sphinx-rtd-theme"]
 globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]
 gui = ["PyQt5"]
@@ -173,6 +177,7 @@ warn_unused_ignores = false
 
 [[tool.mypy.overrides]]
 module = [
+    "cdtools.*",
     "colorcet",
     "fastmcp.*",
     "globus_compute_sdk.*",
