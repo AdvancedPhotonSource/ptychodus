@@ -17,7 +17,8 @@ Behaviors verified:
     a half turn is negation
   - the matrix fit names the orientation of patterns flipped or transposed after
     simulation -- the positive-defocus reading's steps restore them exactly -- tells a
-    reflection apart, and reads a rotated scan as a residual rotation
+    reflection apart, and reads a rotated scan as a position correction that, applied,
+    leaves no rotation on a refit
 """
 
 from collections.abc import Callable
@@ -209,14 +210,9 @@ def _transform(raw_frames: str, rotation_deg: float = 0.0) -> ParallaxTransform:
         binning=BinningStep(bin_size_x=2, bin_size_y=2),
     )
     assert moments is not None
-    cos, sin = math.cos(math.radians(rotation_deg)), math.sin(math.radians(rotation_deg))
-    positions = [
-        ProbePosition(p.index, cos * p.x_m - sin * p.y_m, sin * p.x_m + cos * p.y_m)
-        for p in make_positions()
-    ]
     transform = estimate_parallax_transform(
         moments,
-        ProbePositionSequence(positions),
+        ProbePositionSequence(_rotated_positions(rotation_deg)),
         OBJECT_GEOMETRY,
         PROBE_GEOMETRY,
         photon_wavelength_m=WAVELENGTH_M,
@@ -246,18 +242,49 @@ def test_the_positive_defocus_reading_restores_reoriented_patterns(raw_frames: s
 def test_an_aligned_scan_leaves_no_rotation_asymmetry_or_shear() -> None:
     components = _transform('identity').components()
 
-    # Measured: 0.26 deg, 0.030 and 0.41 deg.
+    # Measured on the correction: -0.15 deg, 0.030 and -0.41 deg.
     assert abs(math.degrees(components.rotation_rad)) < 1.0
     assert abs(components.asymmetry) < 0.06
     assert abs(math.degrees(components.shear_rad)) < 1.5
 
 
-def test_a_rotated_scan_reads_as_a_residual_rotation() -> None:
+def _rotated_positions(rotation_deg: float) -> list[ProbePosition]:
+    """The scan's recorded positions turned from x towards y about the scan centre."""
+    cos, sin = math.cos(math.radians(rotation_deg)), math.sin(math.radians(rotation_deg))
+    return [
+        ProbePosition(p.index, cos * p.x_m - sin * p.y_m, sin * p.x_m + cos * p.y_m)
+        for p in make_positions()
+    ]
+
+
+def test_a_rotated_scan_needs_the_opposite_rotation_to_correct() -> None:
     transform = _transform('identity', rotation_deg=10.0)
 
     assert transform.orientation_candidates()[0].orientation == DetectorOrientation()
-    # Measured -10.19 deg: AffineTransformComponents' rotation is the standard one negated.
+    # Positions turned +10 deg, x towards y, are turned back: measured -10.19 deg.
     assert math.degrees(transform.components().rotation_rad) == pytest.approx(-10.0, abs=1.0)
+    assert transform.components().scale == pytest.approx(1.0, abs=1e-12)
+
+
+def test_the_position_correction_removes_the_rotation_on_a_refit() -> None:
+    def fit(positions: list[ProbePosition]) -> ParallaxTransform:
+        transform = estimate_parallax_transform(
+            accumulate_scan(2.0e-3),
+            ProbePositionSequence(positions),
+            OBJECT_GEOMETRY,
+            PROBE_GEOMETRY,
+            photon_wavelength_m=WAVELENGTH_M,
+        )
+        assert transform is not None
+        return transform
+
+    rotated = _rotated_positions(10.0)
+    correction = fit(rotated).position_correction()
+
+    refit = fit([correction(position) for position in rotated])
+
+    # Measured 0.31 deg after correcting; the aligned scan itself reads -0.15 deg.
+    assert abs(math.degrees(refit.components().rotation_rad)) < 1.0
 
 
 def test_a_matrix_fit_needs_four_bins() -> None:

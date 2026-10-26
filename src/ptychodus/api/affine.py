@@ -43,16 +43,18 @@ _MAD_TO_SIGMA = 0.6744897501960817
 class AffineTransformComponents:
     """Physical decomposition of the 2x2 linear part of an :class:`AffineTransform`.
 
-    The linear part factors as ``M = scale * D * R * S`` with
+    In the (x, y) frame :class:`AffineTransform` acts in, the linear part factors as
+    ``M = scale * D * R * S`` with
 
-    * ``D = diag(1 + asymmetry / 2, 1 - asymmetry / 2)`` -- unequal magnification of the two axes,
-    * ``R = [[cos, sin], [-sin, cos]]`` evaluated at ``rotation_rad``,
-    * ``S = [[1, 0], [tan(shear_rad), 1]]`` -- a shear of the second axis along the first.
+    * ``D = diag(1 - asymmetry / 2, 1 + asymmetry / 2)`` -- a positive asymmetry magnifies y
+      relative to x,
+    * ``R = [[cos, -sin], [sin, cos]]`` evaluated at ``rotation_rad`` -- a positive rotation
+      turns x towards y,
+    * ``S = [[1, tan(shear_rad)], [0, 1]]`` -- a positive shear moves x in proportion to y.
 
-    The factorization is expressed in the (x, y) frame that :class:`AffineTransform` acts in:
-    column 0 / the first axis is x. ``scale`` is invariant under swapping the two axes, but
-    ``asymmetry``, ``rotation_rad`` and ``shear_rad`` are not, so values quoted in a (y, x) frame
-    do not transfer unchanged.
+    This is pty-chi's and PtychoShelves' factorization, which they state for positions held as
+    (y, x), written out for (x, y): the same physical transform has the same four numbers in
+    ptychodus as in pty-chi's ``affine_transform_components``.
     """
 
     scale: float
@@ -91,19 +93,18 @@ class AffineTransform:
 
         Inverse of :meth:`decompose` up to the translation, which the decomposition does not see.
         """
+        # The factorization as pty-chi writes it, for (y, x): b00 maps y to y.
         k1 = components.scale * (1.0 + components.asymmetry / 2.0)
         k2 = components.scale * (1.0 - components.asymmetry / 2.0)
         cos_rotation = math.cos(components.rotation_rad)
         sin_rotation = math.sin(components.rotation_rad)
         tan_shear = math.tan(components.shear_rad)
-        return cls(
-            k1 * (cos_rotation + tan_shear * sin_rotation),
-            k1 * sin_rotation,
-            translation_x_m,
-            k2 * (tan_shear * cos_rotation - sin_rotation),
-            k2 * cos_rotation,
-            translation_y_m,
-        )
+        b00 = k1 * (cos_rotation + tan_shear * sin_rotation)
+        b01 = k1 * sin_rotation
+        b10 = k2 * (tan_shear * cos_rotation - sin_rotation)
+        b11 = k2 * cos_rotation
+        # Swapping both axes takes it to (x, y).
+        return cls(b11, b10, translation_x_m, b01, b00, translation_y_m)
 
     def decompose(self, *, quadratic_eps: float = 1.0e-12) -> AffineTransformComponents:
         """Factor the linear part into scale, asymmetry, rotation and shear.
@@ -131,6 +132,14 @@ class AffineTransform:
                 f'got determinant {determinant}.'
             )
 
+        # The factorization is pty-chi's, stated for (y, x), so it is solved on the linear part
+        # with both axes swapped; swapping leaves the determinant unchanged.
+        return AffineTransform(
+            self.a11, self.a10, 0.0, self.a01, self.a00, 0.0
+        )._decompose_as_stated(quadratic_eps)
+
+    def _decompose_as_stated(self, quadratic_eps: float) -> AffineTransformComponents:
+        """Solve the factorization for this linear part as the (y, x) matrix pty-chi writes."""
         # tan(shear) satisfies quadratic * t**2 + linear * t + constant == 0, obtained by equating
         # the two expressions the factorization gives for tan(rotation).
         quadratic = self.a01 * self.a11

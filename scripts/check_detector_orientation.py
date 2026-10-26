@@ -223,23 +223,26 @@ def _report(transform: ParallaxTransform) -> None:
     print(f'Mirrored relative to the scan: {"yes" if transform.is_reflection else "no"}')
 
     try:
-        components = transform.components()
+        correction = transform.position_correction()
     except ValueError as exc:
         print(f'  Could not decompose what is left once the orientation is removed: {exc}')
     else:
-        # Positions turned from x towards y read as a negative rotation_rad.
-        rotation_deg = -math.degrees(components.rotation_rad)
+        components = correction.decompose()
+        rotation_deg = math.degrees(components.rotation_rad)
         print(
-            f'Left once the orientation is removed: scan rotated {rotation_deg:+.2f} deg'
-            f' (x towards y), asymmetry {components.asymmetry:+.3f},'
+            "Position correction, in pty-chi's convention (positive rotation turns x towards y):"
+            f' rotation {rotation_deg:+.2f} deg, asymmetry {components.asymmetry:+.3f},'
             f' shear {math.degrees(components.shear_rad):+.2f} deg'
         )
+        # Laid out as the probe-position editor's Transformation box lays out its entries.
+        print(f"  x' = {correction.a00:+.6f} x {correction.a01:+.6f} y + 0")
+        print(f"  y' = {correction.a10:+.6f} x {correction.a11:+.6f} y + 0")
 
-        if abs(rotation_deg) > 2.0:
-            print('  A rotation this large calls for the probe-position affine transform.')
-
-        if abs(components.asymmetry) > 0.05:
-            print('  An asymmetry this large suggests a miscalibrated position axis.')
+        if abs(rotation_deg) > 2.0 or abs(components.asymmetry) > 0.05:
+            print(
+                '  A rotation beyond 2 deg or an asymmetry beyond 0.05 calls for entering this as'
+                ' the probe-position affine transform.'
+            )
 
     print('Readings, equally good -- the sign of the defocus picks one:')
 

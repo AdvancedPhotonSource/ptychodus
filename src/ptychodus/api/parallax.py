@@ -23,7 +23,7 @@ apart; a reflection is unambiguous.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import logging
 import math
 
@@ -296,30 +296,43 @@ class ParallaxTransform:
             OrientationCandidate(orientation.rotated_by_half_turn(), -defocus_m),
         )
 
-    def components(self) -> AffineTransformComponents:
-        """What is left once the orientation is removed: scale, asymmetry, rotation, shear.
+    def position_correction(self) -> AffineTransform:
+        """The transform to apply to the recorded positions to align the scan with the detector.
 
-        The same for both candidates. What is left is the :class:`AffineTransform` taking
-        scan coordinates aligned with the detector onto the recorded positions, so the
-        affine transform that corrects the positions is its inverse. A rotation means the
-        scan is rotated relative to the detector by an angle no quarter turn expresses --
-        positions turned from x towards y read as a negative ``rotation_rad`` in that
-        class's convention -- and an asymmetry or a shear means a position axis is
-        miscalibrated. The scale is near one for a fit without asymmetry.
+        The same for both candidates: it is what is left of ``M`` once the orientation and
+        ``-lambda * |z|`` are divided out, inverted, since what is left takes scan
+        coordinates aligned with the detector onto the recorded positions. Its scale is one
+        and its translation zero: the parallax cannot tell a scale error in the positions
+        from the defocus magnitude, and measures no offset. Its matrix entries go into the
+        probe-position affine transform as they stand.
 
         Raises:
             ValueError: if what is left reverses orientation, which a poor fit can leave.
         """
         normalized = self._normalized()
         residual = normalized @ _nearest_orientation(normalized).matrix.T
-        return AffineTransform(
-            float(residual[0, 0]),
-            float(residual[0, 1]),
+        inverse = numpy.linalg.inv(residual)
+        components = AffineTransform(
+            float(inverse[0, 0]),
+            float(inverse[0, 1]),
             0.0,
-            float(residual[1, 0]),
-            float(residual[1, 1]),
+            float(inverse[1, 0]),
+            float(inverse[1, 1]),
             0.0,
         ).decompose()
+        return AffineTransform.from_components(replace(components, scale=1.0))
+
+    def components(self) -> AffineTransformComponents:
+        """The :meth:`position_correction` as rotation, asymmetry and shear, scale one.
+
+        In :class:`AffineTransformComponents`' convention, pty-chi's: a scan rotated from x
+        towards y relative to the detector needs a negative rotation to correct, and an
+        asymmetry or a shear means a position axis is miscalibrated.
+
+        Raises:
+            ValueError: if what is left reverses orientation, which a poor fit can leave.
+        """
+        return self.position_correction().decompose()
 
     def _normalized(self) -> RealArrayType:
         """``M / (-lambda * |z|)``: the orientation's map for a positive defocus."""

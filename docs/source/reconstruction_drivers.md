@@ -112,7 +112,11 @@ leaves the one artifact that cannot be rebuilt without the raw files. It can run
 gigabytes; `--no-save-diffraction` skips it.
 
 `ptychodus-reconstruct-batch-lamni` writes one such directory per scan, and adds
-`batch_settings.yaml` and `affine_fit.yaml` to each.
+`batch_settings.yaml` and `affine_fit.yaml` to each. The fit's `scale`, `asymmetry`,
+`rotation_deg` and `shear_deg` follow pty-chi's convention for the same transform, in
+`(x, y)`: a positive rotation turns x towards y, a positive asymmetry magnifies y relative to
+x, and a positive shear moves x in proportion to y. `linear_transform` holds the matrix
+itself.
 
 A driver run with `--prepare-only` writes a smaller directory, which holds what a
 reconstruction starts from rather than what it produced:
