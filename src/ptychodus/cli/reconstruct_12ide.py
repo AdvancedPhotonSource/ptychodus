@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 """Reconstruct one APS 12-ID-E Ptycho-SAXS ptychography dataset through the ptychodus api.
 
-Ptycho-SAXS writes one file per scan point, named <scan>_<line>_<point>, so the series is
-indexed by two fields rather than one. The long 10 m flight path and the Pilatus 172 um pitch
-make this the coarsest-sampled instrument here.
+Reads the layout written from 2026_2 on: a scan directory holding a NeXus
+``<sample>_<scan>_master.h5`` beside its ``<sample>_<scan>_<NNNNN>.h5`` frame files. The master
+supplies the energy, exposure, detector distance and pitch, and the nominal scan positions. The
+long flight path (up to 10 m) and the Pilatus 172 um pitch make this the coarsest-sampled
+instrument here. The beam center is not recorded, so pass it on the command line.
 
 Scope and limitations
 ---------------------
@@ -35,8 +37,13 @@ PROFILE = InstrumentProfile(
     product_name='12ide-reconstruct',
     diffraction_reader='APS_PtychoSAXS',
     position_reader='APS_PtychoSAXS',
-    diffraction_file_help='Any member of the <scan>_<line>_<point>.h5 series; the rest are globbed.',
-    position_file_help='Position .dat file for any point of the scan.',
+    diffraction_file_help=(
+        'The scan master <sample>_<scan>_master.h5, or any of its frame files; '
+        'the rest are globbed.'
+    ),
+    position_file_help=(
+        'The scan master, or any frame file of the scan; positions are read from the master.'
+    ),
     fzp_preset_help=(
         'FresnelZonePlate plugin preset for the model probe. No zone-plate preset is '
         'verified for this instrument, so this is empty by default and the probe is '

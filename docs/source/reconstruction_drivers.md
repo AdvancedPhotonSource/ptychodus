@@ -15,7 +15,7 @@ take their configuration from a file, or operate on a directory another driver p
 | Command | Instrument | Diffraction input | Position input |
 | --- | --- | --- | --- |
 | `ptychodus-reconstruct-2ide` | APS 2-ID-E XFM | `fly###_data_NNN.h5` series | EPICS MDA, `mda/2xfm_NNNN.mda` |
-| `ptychodus-reconstruct-12ide` | APS 12-ID-E Ptycho-SAXS | `<scan>_<line>_<point>.h5` series | Position `.dat` file |
+| `ptychodus-reconstruct-12ide` | APS 12-ID-E Ptycho-SAXS | `<sample>_<scan>_master.h5` or any frame file (2026_2 layout onward) | The same master; positions are read from it |
 | `ptychodus-reconstruct-34ide` | APS 34-ID-E Microdiffraction | One scan's TIFF series | EPICS MDA, `mda_files/34ide_NNNNNN.mda` |
 | `ptychodus-reconstruct-bnp` | APS 2-ID-D Bionanoprobe | `bnp_flyNNNN_NNNNNN.h5` series | EPICS MDA, `mda/bnp_flyNNNN.mda` |
 | `ptychodus-reconstruct-isn` | APS 19-ID-E In-situ Nanoprobe | `PTYCHO/scan_NNNN_FFFFF.h5` series | `Processed/SOCKETSERVER/Scan_NNNN_position.h5` |

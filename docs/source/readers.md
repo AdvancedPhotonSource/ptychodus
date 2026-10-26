@@ -48,7 +48,7 @@ Several file formats can be used to indicate detector pixels that are usable ("g
 | --- | --- |
 | NumPy Bad Pixel Files (`*.npy`) | A 2-D boolean array with the same dimensions as an unprocessed detector frame, where True indicates an unusable pixel. |
 | NumPy Good Pixel Files (`*.npy`) | The same array with the opposite sense, where True indicates a usable pixel. |
-| APS 12-ID-E Valid Pixel Mask Files (`*.h5` `*.hdf5`) | A `valid_pixel_mask` dataset, where a nonzero value indicates a usable pixel. |
+| APS 12-ID-E Valid Pixel Mask Files (`*.h5` `*.hdf5`) | A `valid_pixel_mask` dataset, stored as a boolean or `uint8`, where a nonzero value indicates a usable pixel. |
 | APS 34-ID-E Microdiffraction Bad Pixel Files (`*.json`) | A `Bad pixels` array of `{"Pixel": [column, row], "Set": int}` objects, one per unusable pixel. The file carries no detector dimensions, so the reader supplies the extent of the EIGER2 CdTe 1M that writes it and rejects a coordinate outside it. |
 | ESRF ID16A Dark Field Files (`*.h5` `*.hdf5`) | A dark frame stack. A pixel is bad when its mean dark level exceeds five times the stack median, or when it saturates in any dark frame. |
 | Coherent X-ray Imaging Files (`*.cxi` `*.h5` `*.hdf5`) | The `detector_1/mask` of a CXI file, which may hold nothing else. A pixel is bad when any bit other than "signal above background" (`0x1000`) is set. |

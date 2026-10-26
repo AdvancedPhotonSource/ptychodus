@@ -3,14 +3,11 @@
 A processed scan is a master file plus one file per scan line, the lines named
 ``<sample>_<scan>_<line>.h5`` beside it. Each line file carries its own patterns at
 ``/dp`` and its own positions at ``/positions``; the master carries the beam center as
-a ``beam_center_YX`` attribute. This differs from the raw layout handled by
-:mod:`ptychodus.plugins.aps12id_diffraction_file`, which is one file per scan point.
+a ``beam_center_YX`` attribute.
 
 Positions come from column 1 (y) and column 2 (x) of ``/positions``, in nanometers,
-with x negated -- the same convention as the raw ``.dat`` reader in
-:mod:`ptychodus.plugins.aps12id_position_file`. Unlike the raw ``.dat`` files, which
-hold several oversampled rows per scan point, ``/positions`` holds one row per point,
-so rows and indexes correspond one to one.
+with x negated. ``/positions`` holds one row per scan point, so rows and indexes
+correspond one to one.
 """
 
 from __future__ import annotations

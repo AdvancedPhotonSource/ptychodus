@@ -18,7 +18,7 @@ import tifffile
 from ptychodus.api.diffraction import CropRegion
 from ptychodus.plugins.aps02id_diffraction_file import APS2IDDiffractionFileReader
 from ptychodus.plugins.mda.mda_position_file import RASTER_LINE_INDEX_STRIDE
-from ptychodus.plugins.aps12id_diffraction_file import APS12IDDiffractionFileReader
+from ptychodus.plugins.aps12id_file import APS12IDDiffractionFileReader
 from ptychodus.plugins.aps19id_isn_diffraction_file import ISNDiffractionFileReader
 from ptychodus.plugins.h5_diffraction_file import H5DiffractionFileReader
 from ptychodus.plugins.tiff_diffraction_file import TiffDiffractionFileReader
@@ -145,33 +145,6 @@ def test_isn_reader_supplies_a_detector_pitch(tmp_path: Path) -> None:
     assert metadata.detector_pixel_geometry.width_m == pytest.approx(75e-6)
 
 
-def test_12id_series_collects_every_line_and_point(tmp_path: Path) -> None:
-    """12-ID writes one file per point, so the series is keyed by (line, point).
-
-    Matching a single digit field picks the line and pins the point, collecting one point
-    from each line and discarding the rest.
-    """
-    shape = (_DETECTOR_H, _DETECTOR_W)
-
-    for line in (1, 2):
-        for point in (0, 1, 2):
-            path = tmp_path / f'007_{line:05d}_{point:d}.h5'
-            with h5py.File(path, 'w') as h5_file:
-                h5_file.create_dataset(_DATA_PATH, data=numpy.zeros(shape, dtype=numpy.uint32))
-
-    dataset = APS12IDDiffractionFileReader().read(tmp_path / '007_00001_0.h5')
-    labels = [array.get_label() for array in dataset]
-
-    assert labels == [
-        '007_00001_0',
-        '007_00001_1',
-        '007_00001_2',
-        '007_00002_0',
-        '007_00002_1',
-        '007_00002_2',
-    ]
-
-
 def test_12id_single_frame_files_assemble(tmp_path: Path) -> None:
     """A one-frame-per-file layout stores a 2-D dataset, but an array must yield a stack.
 
@@ -180,13 +153,14 @@ def test_12id_single_frame_files_assemble(tmp_path: Path) -> None:
     nothing. Cropping is worse: the region slice indexes an axis that is not there.
     """
     shape = (_DETECTOR_H, _DETECTOR_W)
+    h5py.File(tmp_path / 'sample_0007_master.h5', 'w').close()
 
-    for point in (0, 1):
-        path = tmp_path / f'007_00001_{point:d}.h5'
+    for point in (1, 2):
+        path = tmp_path / f'sample_0007_{point:05d}.h5'
         with h5py.File(path, 'w') as h5_file:
             h5_file.create_dataset(_DATA_PATH, data=numpy.ones(shape, dtype=numpy.uint32))
 
-    dataset = APS12IDDiffractionFileReader().read(tmp_path / '007_00001_0.h5')
+    dataset = APS12IDDiffractionFileReader().read(tmp_path / 'sample_0007_master.h5')
 
     for array in dataset:
         patterns = array.get_patterns()

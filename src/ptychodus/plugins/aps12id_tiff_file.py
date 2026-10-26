@@ -5,8 +5,7 @@ directory of ``<sample>_<scan>_<line>_<point>.dat`` position files. Both readers
 any one member of the series and glob the rest, ordering by (line, point) so the
 pattern and position sequences agree.
 
-Positions use the same convention as the other 12-ID readers: column 1 is y and column
-2 is x, in nanometers, with x negated. Every row of a point shares that point's index,
+Column 1 of a position file is y and column 2 is x, in nanometers, with x negated. Every row of a point shares that point's index,
 so oversampled rows collapse into one anchor downstream rather than being averaged here.
 
 The TIFF and position trees are siblings -- ``tifs/<scan>/`` and ``positions/<scan>/``

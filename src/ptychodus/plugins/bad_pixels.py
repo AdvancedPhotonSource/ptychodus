@@ -34,6 +34,12 @@ class NPYGoodPixelsFileReader(BadPixelsFileReader):
 
 
 class APS12IDValidPixelMaskFileReader(BadPixelsFileReader):
+    """Read a 12-ID Pilatus mask whose ``valid_pixel_mask`` is nonzero at usable pixels.
+
+    The beamline stores the mask both as a boolean enum and as ``uint8``; either reads the
+    same way.
+    """
+
     DATA_PATH: Final[str] = 'valid_pixel_mask'
 
     def get_file_description(self) -> str:
