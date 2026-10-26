@@ -14,6 +14,12 @@ a Fresnel number of the probe's shadow above one. Nearer focus, each bright-fiel
 is a differently weighted phase-contrast image rather than a shifted copy of one image,
 and registering them still gives shifts that grow with ``q`` -- a systematic slope that
 the scatter of the fit cannot reveal.
+
+Fitting a full matrix instead, ``s = a + M q``, checks the detector's orientation: in a
+detector whose frames reach the scan's frame through flips and a transpose with
+coordinate map ``U``, ``M = -lambda * z * U``. Negating ``z`` negates ``U``, which is the
+same as rotating the detector by half a turn, so the parallax alone leaves the two
+apart; a reflection is unambiguous.
 """
 
 from __future__ import annotations
@@ -26,16 +32,27 @@ from scipy.ndimage import binary_erosion
 from skimage.registration import phase_cross_correlation
 
 from .accumulate import DiffractionMoments
+from .affine import AffineTransform, AffineTransformComponents
 from .fourier import fourier_shift_2d
 from .object import ObjectGeometry
+from .preprocess.diffraction import (
+    DiffractionPrepStep,
+    HorizontalFlipStep,
+    TransposeStep,
+    VerticalFlipStep,
+)
 from .probe import ProbeGeometry, estimate_probe_extent
 from .probe_positions import ProbePositionSequence
 from .simulate.object import interpolate_scan_values
 from .typing import BooleanArrayType, RealArrayType
 
 __all__ = [
+    'DetectorOrientation',
+    'OrientationCandidate',
     'ParallaxEstimate',
+    'ParallaxTransform',
     'estimate_defocus_from_parallax',
+    'estimate_parallax_transform',
 ]
 
 logger = logging.getLogger(__name__)
@@ -131,6 +148,290 @@ def estimate_defocus_from_parallax(
         ValueError: if *moments* holds no binned patterns or its frames do not match
             *probe_geometry*.
     """
+    measured = _measure_bin_shifts(
+        moments,
+        probe_positions,
+        object_geometry,
+        probe_geometry,
+        bright_field_fraction=bright_field_fraction,
+        upsample_factor=upsample_factor,
+        minimum_bins=minimum_bins,
+    )
+
+    if measured is None:
+        return None
+
+    q_per_m, shifts_m = measured
+    num_bins = q_per_m.shape[0]
+    q_x_per_m, q_y_per_m = q_per_m[:, 0], q_per_m[:, 1]
+    shift_x_m, shift_y_m = shifts_m[:, 0], shifts_m[:, 1]
+
+    # Unknowns (a_x, a_y, c), one equation per bin and axis, with c = -lambda * z.
+    design = numpy.zeros((2 * num_bins, 3))
+    design[:num_bins, 0] = 1.0
+    design[:num_bins, 2] = q_x_per_m
+    design[num_bins:, 1] = 1.0
+    design[num_bins:, 2] = q_y_per_m
+    observed = numpy.concatenate((shift_x_m, shift_y_m))
+    solution, _, _, _ = numpy.linalg.lstsq(design, observed, rcond=None)
+    residual = observed - design @ solution
+    variance = float(residual @ residual) / (2 * num_bins - 3)
+    slope_variance = variance * float(numpy.linalg.inv(design.T @ design)[2, 2])
+    defocus_distance_m = float(-solution[2] / photon_wavelength_m)
+
+    return ParallaxEstimate(
+        defocus_distance_m=defocus_distance_m,
+        standard_error_m=math.sqrt(slope_variance) / photon_wavelength_m,
+        depth_of_focus_m=_depth_of_focus_m(
+            moments, probe_geometry, photon_wavelength_m, defocus_distance_m
+        ),
+        num_bins=num_bins,
+    )
+
+
+@dataclass(frozen=True)
+class DetectorOrientation:
+    """The flips and transpose that bring a detector's frames into the scan's frame.
+
+    They are applied as the prep pipeline applies its steps: the horizontal flip, then
+    the vertical flip, then the transpose. `matrix` is what they do to a detector
+    coordinate ``(x, y)`` measured from the frame midpoint, x along columns.
+    """
+
+    hflip: bool = False
+    vflip: bool = False
+    transpose: bool = False
+
+    @classmethod
+    def create_all(cls) -> tuple[DetectorOrientation, ...]:
+        """The eight orientations, the identity first."""
+        return tuple(
+            cls(hflip=hflip, vflip=vflip, transpose=transpose)
+            for transpose in (False, True)
+            for vflip in (False, True)
+            for hflip in (False, True)
+        )
+
+    @property
+    def matrix(self) -> RealArrayType:
+        """The coordinate map, a signed permutation of ``(x, y)``."""
+        flip = numpy.diag([-1.0 if self.hflip else 1.0, -1.0 if self.vflip else 1.0])
+        swap = numpy.array([[0.0, 1.0], [1.0, 0.0]]) if self.transpose else numpy.eye(2)
+        # The transpose is applied last, so its map is applied last.
+        return swap @ flip
+
+    def prep_steps(self) -> tuple[DiffractionPrepStep, ...]:
+        """The prep-pipeline steps that apply this orientation, in the pipeline's order."""
+        steps: list[DiffractionPrepStep] = []
+
+        if self.hflip:
+            steps.append(HorizontalFlipStep())
+
+        if self.vflip:
+            steps.append(VerticalFlipStep())
+
+        if self.transpose:
+            steps.append(TransposeStep())
+
+        return tuple(steps)
+
+    def rotated_by_half_turn(self) -> DetectorOrientation:
+        """The orientation whose map is this one's negated."""
+        return _nearest_orientation(-self.matrix)
+
+
+@dataclass(frozen=True)
+class OrientationCandidate:
+    """One reading of a parallax transform: an orientation and the defocus it implies."""
+
+    orientation: DetectorOrientation
+    defocus_distance_m: float
+
+
+@dataclass(frozen=True)
+class ParallaxTransform:
+    """A matrix fitted to the parallax of `num_bins` bright-field images: ``s = a + M q``.
+
+    `matrix_m2` is ``M`` and `offset_m` is ``a``, both in ``(x, y)``, with `q_per_m` the
+    bins' spatial frequencies in the detector's own frame and `shifts_m` their measured
+    shifts, one row per bin. `residual_rms_m` is the shifts' rms scatter about the fit.
+    `depth_of_focus_m` is :attr:`ProbeExtent.depth_of_focus_m` from the mean pattern.
+    """
+
+    matrix_m2: RealArrayType
+    offset_m: RealArrayType
+    q_per_m: RealArrayType
+    shifts_m: RealArrayType
+    residual_rms_m: float
+    num_bins: int
+    photon_wavelength_m: float
+    depth_of_focus_m: float
+
+    @property
+    def defocus_magnitude_m(self) -> float:
+        """``|z| = sqrt|det M| / lambda``, the defocus whatever its sign."""
+        return math.sqrt(abs(float(numpy.linalg.det(self.matrix_m2)))) / self.photon_wavelength_m
+
+    @property
+    def is_reflection(self) -> bool:
+        """Whether the detector is mirrored relative to the scan, which no sign of z undoes."""
+        return float(numpy.linalg.det(self.matrix_m2)) < 0.0
+
+    @property
+    def fresnel_number(self) -> float:
+        """The defocus in depths of focus, as :attr:`ProbeExtent.fresnel_number`."""
+        return self.defocus_magnitude_m / self.depth_of_focus_m
+
+    def orientation_candidates(self) -> tuple[OrientationCandidate, OrientationCandidate]:
+        """The two equally good readings, the one with a positive defocus first.
+
+        Each orientation is the nearest of the eight to ``M / (-lambda * z)``; the second
+        is the first rotated by half a turn, with the defocus negated. Knowing the sign
+        of the defocus picks one.
+        """
+        defocus_m = self.defocus_magnitude_m
+        orientation = _nearest_orientation(self._normalized())
+        return (
+            OrientationCandidate(orientation, defocus_m),
+            OrientationCandidate(orientation.rotated_by_half_turn(), -defocus_m),
+        )
+
+    def components(self) -> AffineTransformComponents:
+        """What is left once the orientation is removed: scale, asymmetry, rotation, shear.
+
+        The same for both candidates. What is left is the :class:`AffineTransform` taking
+        scan coordinates aligned with the detector onto the recorded positions, so the
+        affine transform that corrects the positions is its inverse. A rotation means the
+        scan is rotated relative to the detector by an angle no quarter turn expresses --
+        positions turned from x towards y read as a negative ``rotation_rad`` in that
+        class's convention -- and an asymmetry or a shear means a position axis is
+        miscalibrated. The scale is near one for a fit without asymmetry.
+
+        Raises:
+            ValueError: if what is left reverses orientation, which a poor fit can leave.
+        """
+        normalized = self._normalized()
+        residual = normalized @ _nearest_orientation(normalized).matrix.T
+        return AffineTransform(
+            float(residual[0, 0]),
+            float(residual[0, 1]),
+            0.0,
+            float(residual[1, 0]),
+            float(residual[1, 1]),
+            0.0,
+        ).decompose()
+
+    def _normalized(self) -> RealArrayType:
+        """``M / (-lambda * |z|)``: the orientation's map for a positive defocus."""
+        return self.matrix_m2 / (-self.photon_wavelength_m * self.defocus_magnitude_m)
+
+
+def estimate_parallax_transform(
+    moments: DiffractionMoments,
+    probe_positions: ProbePositionSequence,
+    object_geometry: ObjectGeometry,
+    probe_geometry: ProbeGeometry,
+    *,
+    photon_wavelength_m: float,
+    bright_field_fraction: float = 0.5,
+    upsample_factor: int = 20,
+    minimum_bins: int = 4,
+) -> ParallaxTransform | None:
+    """Fit a full matrix to the shifts between the bright-field images, ``s = a + M q``.
+
+    The shifts are measured as :func:`estimate_defocus_from_parallax` measures them, with
+    ``q`` in the frame the patterns were recorded in; only the fit differs. Each axis of
+    the shifts is fitted by least squares to an offset and both components of ``q``.
+    *minimum_bins* must be at least four, so each axis's three unknowns leave a residual.
+
+    The patterns need not be oriented: the orientation is what the result tells. Judge
+    it by :attr:`ParallaxTransform.fresnel_number`, as for the scalar fit.
+
+    Returns None when fewer than *minimum_bins* bright-field bins remain or fewer than
+    three positions pair with a pattern.
+
+    Raises:
+        ValueError: if *moments* holds no binned patterns, its frames do not match
+            *probe_geometry*, or *minimum_bins* is below four.
+    """
+    if minimum_bins < 4:
+        raise ValueError('A matrix fit needs at least four bins!')
+
+    measured = _measure_bin_shifts(
+        moments,
+        probe_positions,
+        object_geometry,
+        probe_geometry,
+        bright_field_fraction=bright_field_fraction,
+        upsample_factor=upsample_factor,
+        minimum_bins=minimum_bins,
+    )
+
+    if measured is None:
+        return None
+
+    q_per_m, shifts_m = measured
+    num_bins = q_per_m.shape[0]
+    design = numpy.column_stack((numpy.ones(num_bins), q_per_m))
+    # One column of coefficients per shift axis: (a, M_x0, M_x1) and (a, M_y0, M_y1).
+    solution, _, _, _ = numpy.linalg.lstsq(design, shifts_m, rcond=None)
+    residual = shifts_m - design @ solution
+    matrix_m2 = solution[1:].T
+    defocus_magnitude_m = math.sqrt(abs(float(numpy.linalg.det(matrix_m2)))) / photon_wavelength_m
+
+    return ParallaxTransform(
+        matrix_m2=matrix_m2,
+        offset_m=solution[0],
+        q_per_m=q_per_m,
+        shifts_m=shifts_m,
+        residual_rms_m=float(numpy.sqrt(numpy.mean(residual**2))),
+        num_bins=num_bins,
+        photon_wavelength_m=photon_wavelength_m,
+        depth_of_focus_m=_depth_of_focus_m(
+            moments, probe_geometry, photon_wavelength_m, defocus_magnitude_m
+        ),
+    )
+
+
+def _nearest_orientation(matrix: RealArrayType) -> DetectorOrientation:
+    """The orientation whose map is nearest *matrix* in the Frobenius norm."""
+    return min(
+        DetectorOrientation.create_all(),
+        key=lambda orientation: float(numpy.linalg.norm(matrix - orientation.matrix)),
+    )
+
+
+def _depth_of_focus_m(
+    moments: DiffractionMoments,
+    probe_geometry: ProbeGeometry,
+    photon_wavelength_m: float,
+    defocus_distance_m: float,
+) -> float:
+    """The probe's depth of focus, from the second moments of the mean pattern."""
+    return estimate_probe_extent(
+        moments.mean_frame,
+        probe_geometry,
+        photon_wavelength_m=photon_wavelength_m,
+        defocus_distance_m=defocus_distance_m,
+        bad_pixels=moments.bad_pixels,
+    ).depth_of_focus_m
+
+
+def _measure_bin_shifts(
+    moments: DiffractionMoments,
+    probe_positions: ProbePositionSequence,
+    object_geometry: ObjectGeometry,
+    probe_geometry: ProbeGeometry,
+    *,
+    bright_field_fraction: float,
+    upsample_factor: int,
+    minimum_bins: int,
+) -> tuple[RealArrayType, RealArrayType] | None:
+    """Each bright-field bin's spatial frequency and image shift, ``(x, y)`` per row.
+
+    Steps 1 to 3 of :func:`estimate_defocus_from_parallax`; ``q`` is measured from the
+    frame midpoint. None when too few bins or positions remain.
+    """
     binned_patterns = moments.binned_patterns
     binning = moments.binning
 
@@ -171,37 +472,14 @@ def estimate_defocus_from_parallax(
     bin_center_x_px = (columns + 0.5) * binning.bin_size_x - 0.5 - (probe_geometry.width_px - 1) / 2
     dq_y_per_m = 1.0 / (probe_geometry.height_px * probe_geometry.pixel_height_m)
     dq_x_per_m = 1.0 / (probe_geometry.width_px * probe_geometry.pixel_width_m)
-    q_y_per_m = bin_center_y_px * dq_y_per_m
-    q_x_per_m = bin_center_x_px * dq_x_per_m
-    shift_y_m = shifts_yx_px[:, 0] * object_geometry.pixel_height_m
-    shift_x_m = shifts_yx_px[:, 1] * object_geometry.pixel_width_m
-
-    # Unknowns (a_x, a_y, c), one equation per bin and axis, with c = -lambda * z.
-    design = numpy.zeros((2 * num_bins, 3))
-    design[:num_bins, 0] = 1.0
-    design[:num_bins, 2] = q_x_per_m
-    design[num_bins:, 1] = 1.0
-    design[num_bins:, 2] = q_y_per_m
-    observed = numpy.concatenate((shift_x_m, shift_y_m))
-    solution, _, _, _ = numpy.linalg.lstsq(design, observed, rcond=None)
-    residual = observed - design @ solution
-    variance = float(residual @ residual) / (2 * num_bins - 3)
-    slope_variance = variance * float(numpy.linalg.inv(design.T @ design)[2, 2])
-    defocus_distance_m = float(-solution[2] / photon_wavelength_m)
-    extent = estimate_probe_extent(
-        moments.mean_frame,
-        probe_geometry,
-        photon_wavelength_m=photon_wavelength_m,
-        defocus_distance_m=defocus_distance_m,
-        bad_pixels=moments.bad_pixels,
+    q_per_m = numpy.column_stack((bin_center_x_px * dq_x_per_m, bin_center_y_px * dq_y_per_m))
+    shifts_m = numpy.column_stack(
+        (
+            shifts_yx_px[:, 1] * object_geometry.pixel_width_m,
+            shifts_yx_px[:, 0] * object_geometry.pixel_height_m,
+        )
     )
-
-    return ParallaxEstimate(
-        defocus_distance_m=defocus_distance_m,
-        standard_error_m=math.sqrt(slope_variance) / photon_wavelength_m,
-        depth_of_focus_m=extent.depth_of_focus_m,
-        num_bins=num_bins,
-    )
+    return q_per_m, shifts_m
 
 
 def _find_bright_bins(
