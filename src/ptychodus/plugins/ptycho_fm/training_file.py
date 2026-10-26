@@ -1,8 +1,9 @@
 """The paired HDF5 files PtychoFM trains from, written and read.
 
-A scan is two files sharing a stem: ``<stem>_dp.hdf5`` holding the diffraction
-patterns and ``<stem>_para.hdf5`` holding the reconstruction they are supervised
-against. Neither refers to the other, so the suffix is the whole of the association.
+A scan is two files sharing a stem and an extension: ``<stem>_dp.hdf5`` holding the
+diffraction patterns and ``<stem>_para.hdf5`` holding the reconstruction they are
+supervised against (``.h5`` serves as well as ``.hdf5``). Neither refers to the other,
+so the suffix is the whole of the association.
 
 The parameter file is a subset of the ptychodus product layout -- every dataset and
 attribute in it is a `ProductFileKeys` member -- restricted to what the training
@@ -19,6 +20,7 @@ import logging
 import h5py
 import numpy
 
+from ptychodus.api.files import FileFormat
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import ProductFileKeys
 from ptychodus.api.object import Object, ObjectCenter
@@ -26,19 +28,19 @@ from ptychodus.api.preprocess.diffraction import zero_bad_pixels
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductFileReader, ProductMetadata
-from ptychodus.api.reconstruct import ReconstructInput
+from ptychodus.api.reconstruct import ReconstructInput, TrainingDataFileWriter
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
     'PtychoFMProductFileReader',
+    'PtychoFMTrainingDataFileWriter',
     'resolve_training_pair',
     'save_training_data',
 ]
 
 _DIFFRACTION_SUFFIX = '_dp'
 _PARAMETER_SUFFIX = '_para'
-_FILE_SUFFIX = '.hdf5'
 
 # The patterns, under the name the loader looks for. It is not a product key: the
 # product layout keeps patterns in a separate file of its own.
@@ -55,13 +57,22 @@ def resolve_training_pair(file_path: Path) -> tuple[Path, Path]:
     Either member identifies the pair, because the loader on the other side accepts
     either and a reader should too. A stem carrying neither suffix is taken as the
     shared stem, which is what lets a writer be handed one destination and produce
-    both files from it.
+    both files from it: the pair suffixes go before the extension, so ``scan.h5``
+    names ``scan_dp.h5`` and ``scan_para.h5``. An extension that is not an HDF5 one
+    is taken as part of the stem, and the pair is given ``.hdf5``.
 
     Returns:
         The pattern path and the parameter path, in that order. Neither is checked
         for existence.
     """
-    stem = file_path.stem
+    extensions = FileFormat.HDF5.extensions
+
+    if file_path.suffix.casefold() in extensions:
+        stem = file_path.stem
+        extension = file_path.suffix
+    else:
+        stem = file_path.name
+        extension = '.hdf5'
 
     for suffix in (_DIFFRACTION_SUFFIX, _PARAMETER_SUFFIX):
         if stem.endswith(suffix):
@@ -69,39 +80,53 @@ def resolve_training_pair(file_path: Path) -> tuple[Path, Path]:
             break
 
     return (
-        file_path.with_name(f'{stem}{_DIFFRACTION_SUFFIX}{_FILE_SUFFIX}'),
-        file_path.with_name(f'{stem}{_PARAMETER_SUFFIX}{_FILE_SUFFIX}'),
+        file_path.with_name(f'{stem}{_DIFFRACTION_SUFFIX}{extension}'),
+        file_path.with_name(f'{stem}{_PARAMETER_SUFFIX}{extension}'),
     )
 
 
-def _verify_spatial_size(shape: tuple[int, ...], img_size: int, what: str) -> None:
-    """Raise unless a trailing ``(height, width)`` is exactly ``img_size`` square."""
-    if tuple(shape) != (img_size, img_size):
-        height, width = shape
+def _verify_spatial_size(pattern_shape: tuple[int, ...], probe_shape: tuple[int, ...]) -> None:
+    """Raise unless the patterns are square and the probe is the same size.
+
+    The model's encoder takes square inputs and the probe is multiplied into an object
+    patch cut at the pattern size, so anything else would surface as a shape error
+    inside the model. Whether that size matches the encoder is a property of the
+    model, and is left to training.
+    """
+    height, width = pattern_shape
+
+    if height != width:
         raise ValueError(
-            f'{what} are {height}x{width}, but PtychoFM requires {img_size}x{img_size} '
-            'to match the encoder input. Adjust the pattern crop or the model image size.'
+            f'Diffraction patterns are {height}x{width}, but PtychoFM requires square '
+            'patterns. Adjust the pattern crop.'
+        )
+
+    if tuple(probe_shape) != tuple(pattern_shape):
+        probe_height, probe_width = probe_shape
+        raise ValueError(
+            f'Probe is {probe_height}x{probe_width}, but PtychoFM requires it to match '
+            f'the {height}x{width} diffraction patterns.'
         )
 
 
-def save_training_data(file_path: Path, parameters: ReconstructInput, *, img_size: int) -> None:
+def save_training_data(file_path: Path, parameters: ReconstructInput) -> None:
     """Write a ReconstructInput as the HDF5 pair PtychoFM trains from.
 
-    `file_path` names the shared stem rather than a file: the patterns go to
-    ``<stem>_dp.hdf5`` and everything else to ``<stem>_para.hdf5``, so the path handed
-    in is itself never created.
+    `file_path` names the pair rather than a file: the patterns go to
+    ``<stem>_dp<ext>`` and everything else to ``<stem>_para<ext>``, as
+    `resolve_training_pair` derives them, so the path handed in is itself never
+    created unless it already names a member.
 
     Patterns and probe are stored at their native spatial size and the object patch is
-    cut at the pattern size, so both must already be `img_size` square; nothing
-    downstream resizes them, and a mismatch would otherwise surface as a shape error
-    inside the model. The probe is the mode stack at OPR index zero, carrying the
-    leading axis the loader requires.
+    cut at the pattern size, so the patterns must be square and the probe the same
+    size; nothing downstream resizes them. The probe is the mode stack at OPR index
+    zero, carrying the leading axis the loader requires.
 
     Bad pixels are zeroed rather than inpainted, which is what the model is trained
     against.
 
     Raises:
-        ValueError: when the patterns or the probe are not `img_size` square.
+        ValueError: when the patterns are not square or the probe does not match them.
     """
     diffraction_path, parameter_path = resolve_training_pair(file_path)
 
@@ -111,8 +136,7 @@ def save_training_data(file_path: Path, parameters: ReconstructInput, *, img_siz
     probe_array = parameters.product.probes.get_probe_no_opr().get_array()
     positions = parameters.product.probe_positions
 
-    _verify_spatial_size(patterns.shape[-2:], img_size, 'Diffraction patterns')
-    _verify_spatial_size(probe_array.shape[-2:], img_size, 'Probe')
+    _verify_spatial_size(patterns.shape[-2:], probe_array.shape[-2:])
 
     with h5py.File(diffraction_path, 'w') as h5_file:
         h5_file.create_dataset(_DIFFRACTION_DATA_PATH, data=patterns)
@@ -204,7 +228,7 @@ class PtychoFMProductFileReader(ProductFileReader):
         return 'PtychoFM Training Pair'
 
     def get_file_extensions(self) -> set[str]:
-        return {'.hdf5'}
+        return FileFormat.HDF5.extensions
 
     def read(self, file_path: Path) -> Product:
         _, parameter_path = resolve_training_pair(file_path)
@@ -263,3 +287,16 @@ class PtychoFMProductFileReader(ProductFileReader):
             ),
             losses=[],
         )
+
+
+class PtychoFMTrainingDataFileWriter(TrainingDataFileWriter):
+    """Writes the HDF5 pair PtychoFM trains from; see `save_training_data`."""
+
+    def get_file_description(self) -> str:
+        return 'PtychoFM Training Pair'
+
+    def get_file_extensions(self) -> set[str]:
+        return FileFormat.HDF5.extensions
+
+    def write(self, file_path: Path, parameters: ReconstructInput) -> None:
+        save_training_data(file_path, parameters)

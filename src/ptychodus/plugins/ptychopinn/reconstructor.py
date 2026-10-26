@@ -15,7 +15,6 @@ import zipfile
 from pathlib import Path
 from typing import Any, Final
 
-from ptychodus.api.io import save_ptychopinn_training_data
 from pydantic import BaseModel
 
 from ptychodus.api.reconstruct import ReconstructInput, SubprocessReconstructor
@@ -266,11 +265,6 @@ def build_reconstructor(model_training_mode: str) -> SubprocessReconstructor:
             'num_workers': declared.training.num_dataloader_workers,
         }
 
-    def export_training_data(
-        file_path: Path, parameters: ReconstructInput, options: BaseModel
-    ) -> None:
-        save_ptychopinn_training_data(file_path, parameters)
-
     return SubprocessReconstructor(
         name=model_training_mode,
         default_options=default_options,
@@ -280,7 +274,5 @@ def build_reconstructor(model_training_mode: str) -> SubprocessReconstructor:
         dump_train_options=dump_train_options,
         model_file_filter='Zipped Archive (*.zip)',
         model_file_extension='.zip',
-        training_data_file_filter='NumPy Zipped Archive (*.npz)',
-        export_training_data=export_training_data,
         save_model=_save_model_bundle,
     )

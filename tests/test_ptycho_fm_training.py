@@ -4,13 +4,14 @@ The format is two HDF5 files sharing a stem, associated by that suffix and nothi
 else. Its parameter half is a subset of the ptychodus product layout, which is what
 makes a round trip meaningful: what the exporter writes is what the reader has to
 recover. The constraints pinned here are the trainer's -- a strictly four-dimensional
-probe, a square pattern matching the encoder, positions as long as the pattern stack,
-and a span-based rule deciding whether coordinates are meters or pixels.
+probe, a square pattern with a probe the same size, positions as long as the pattern
+stack, and a span-based rule deciding whether coordinates are meters or pixels.
 
 Nothing here imports ptycho_fm itself: it is published on no index, so a test that
 needed it would not run on a bare install.
 """
 
+from dataclasses import replace
 from pathlib import Path
 
 import h5py
@@ -22,6 +23,7 @@ from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.reconstruct import ReconstructInput
 from ptychodus.plugins.ptycho_fm.training_file import (
     PtychoFMProductFileReader,
+    PtychoFMTrainingDataFileWriter,
     resolve_training_pair,
     save_training_data,
 )
@@ -61,12 +63,28 @@ class TestResolveTrainingPair:
         assert diffraction == tmp_path / 'scan_dp.hdf5'
         assert parameter == tmp_path / 'scan_para.hdf5'
 
+    @pytest.mark.parametrize('name', ['scan_dp.h5', 'scan_para.h5', 'scan.h5'])
+    def test_the_pair_suffixes_go_before_the_given_extension(
+        self, tmp_path: Path, name: str
+    ) -> None:
+        diffraction, parameter = resolve_training_pair(tmp_path / name)
+
+        assert diffraction == tmp_path / 'scan_dp.h5'
+        assert parameter == tmp_path / 'scan_para.h5'
+
+    @pytest.mark.parametrize('name', ['scan', 'scan.v2'])
+    def test_a_name_without_an_hdf5_extension_is_given_one(self, tmp_path: Path, name: str) -> None:
+        diffraction, parameter = resolve_training_pair(tmp_path / name)
+
+        assert diffraction == tmp_path / f'{name}_dp.hdf5'
+        assert parameter == tmp_path / f'{name}_para.hdf5'
+
 
 class TestSaveTrainingData:
     def test_both_members_are_written_and_the_stem_is_not(self, tmp_path: Path) -> None:
         stem = tmp_path / 'scan.hdf5'
 
-        save_training_data(stem, _make_input(), img_size=IMG_SIZE)
+        save_training_data(stem, _make_input())
 
         assert (tmp_path / 'scan_dp.hdf5').is_file()
         assert (tmp_path / 'scan_para.hdf5').is_file()
@@ -75,7 +93,7 @@ class TestSaveTrainingData:
     def test_the_probe_is_four_dimensional(self, tmp_path: Path) -> None:
         # The loader rejects a three-dimensional probe outright, so the leading
         # OPR axis has to be present even when there is one of them.
-        save_training_data(tmp_path / 'scan.hdf5', _make_input(), img_size=IMG_SIZE)
+        save_training_data(tmp_path / 'scan.hdf5', _make_input())
 
         with h5py.File(tmp_path / 'scan_para.hdf5', 'r') as h5_file:
             assert h5_file[ProductFileKeys.PROBE_ARRAY].ndim == 4
@@ -83,7 +101,7 @@ class TestSaveTrainingData:
     def test_the_parameter_file_is_spelled_in_product_keys(self, tmp_path: Path) -> None:
         # The format is a subset of the product layout. Asserting the names keeps the
         # two descriptions of one thing from drifting apart.
-        save_training_data(tmp_path / 'scan.hdf5', _make_input(), img_size=IMG_SIZE)
+        save_training_data(tmp_path / 'scan.hdf5', _make_input())
 
         with h5py.File(tmp_path / 'scan_para.hdf5', 'r') as h5_file:
             assert ProductFileKeys.OBJECT_ARRAY in h5_file
@@ -97,7 +115,7 @@ class TestSaveTrainingData:
     def test_normalization_is_the_pattern_maximum(self, tmp_path: Path) -> None:
         parameters = _make_input()
 
-        save_training_data(tmp_path / 'scan.hdf5', parameters, img_size=IMG_SIZE)
+        save_training_data(tmp_path / 'scan.hdf5', parameters)
 
         with h5py.File(tmp_path / 'scan_para.hdf5', 'r') as h5_file:
             assert h5_file['normalization'][()] == parameters.diffraction_patterns.max()
@@ -106,30 +124,68 @@ class TestSaveTrainingData:
         parameters = _make_input()
         parameters.bad_pixels[0, 0] = True
 
-        save_training_data(tmp_path / 'scan.hdf5', parameters, img_size=IMG_SIZE)
+        save_training_data(tmp_path / 'scan.hdf5', parameters)
 
         with h5py.File(tmp_path / 'scan_dp.hdf5', 'r') as h5_file:
             assert not h5_file['dp'][:, 0, 0].any()
 
-    def test_patterns_that_cannot_reach_the_encoder_are_refused(self, tmp_path: Path) -> None:
+    def test_patterns_that_are_not_square_are_refused(self, tmp_path: Path) -> None:
         # Nothing downstream resizes, so a mismatch surfaces as an opaque shape error
         # deep inside the model unless it is refused here.
-        with pytest.raises(ValueError, match='Diffraction patterns'):
-            save_training_data(tmp_path / 'scan.hdf5', _make_input(), img_size=IMG_SIZE + 1)
+        parameters = _make_input()
+        parameters = replace(
+            parameters,
+            diffraction_patterns=parameters.diffraction_patterns[:, :, :-1],
+            bad_pixels=parameters.bad_pixels[:, :-1],
+        )
 
-    def test_a_probe_that_cannot_reach_the_encoder_is_refused(self, tmp_path: Path) -> None:
-        # The probe is checked on its own: it is stored at its native size beside
-        # patterns that may well be the right one.
+        with pytest.raises(ValueError, match='Diffraction patterns'):
+            save_training_data(tmp_path / 'scan.hdf5', parameters)
+
+    def test_a_probe_that_does_not_match_the_patterns_is_refused(self, tmp_path: Path) -> None:
+        # The probe is stored at its native size beside the patterns, and is multiplied
+        # into an object patch cut at the pattern size.
         parameters = _make_input(probe_height=IMG_SIZE + 2, probe_width=IMG_SIZE + 2)
 
         with pytest.raises(ValueError, match='Probe'):
-            save_training_data(tmp_path / 'scan.hdf5', parameters, img_size=IMG_SIZE)
+            save_training_data(tmp_path / 'scan.hdf5', parameters)
+
+    def test_nothing_is_written_when_refused(self, tmp_path: Path) -> None:
+        parameters = _make_input(probe_height=IMG_SIZE + 2, probe_width=IMG_SIZE + 2)
+
+        with pytest.raises(ValueError):
+            save_training_data(tmp_path / 'scan.hdf5', parameters)
+
+        assert not any(tmp_path.iterdir())
+
+
+class TestPtychoFMTrainingDataFileWriter:
+    def test_a_pair_written_as_h5_reads_back_through_both_readers(self, tmp_path: Path) -> None:
+        parameters = _make_input()
+        registry = PluginRegistry.load_plugins()
+
+        PtychoFMTrainingDataFileWriter().write(tmp_path / 'scan.h5', parameters)
+
+        assert sorted(path.name for path in tmp_path.iterdir()) == ['scan_dp.h5', 'scan_para.h5']
+        diffraction_reader = registry.diffraction_file_readers.get_strategy_by_name(
+            PtychoFMProductFileReader.SIMPLE_NAME
+        )
+        dataset = diffraction_reader.read(tmp_path / 'scan_dp.h5')
+        assert numpy.array_equal(dataset[0].get_patterns(), parameters.diffraction_patterns)
+        product = PtychoFMProductFileReader().read(tmp_path / 'scan_para.h5')
+        assert len(product.probe_positions) == NUM_POSITIONS
+
+    def test_the_readers_offer_the_extensions_the_writer_does(self) -> None:
+        assert (
+            PtychoFMProductFileReader().get_file_extensions()
+            == PtychoFMTrainingDataFileWriter().get_file_extensions()
+        )
 
 
 class TestPtychoFMProductFileReader:
     def test_the_exported_pair_reads_back(self, tmp_path: Path) -> None:
         parameters = _make_input()
-        save_training_data(tmp_path / 'scan.hdf5', parameters, img_size=IMG_SIZE)
+        save_training_data(tmp_path / 'scan.hdf5', parameters)
 
         product = PtychoFMProductFileReader().read(tmp_path / 'scan_para.hdf5')
 
@@ -147,7 +203,7 @@ class TestPtychoFMProductFileReader:
         assert product.object_.get_pixel_geometry() == expected.object_.get_pixel_geometry()
 
     def test_either_member_reads_the_same_product(self, tmp_path: Path) -> None:
-        save_training_data(tmp_path / 'scan.hdf5', _make_input(), img_size=IMG_SIZE)
+        save_training_data(tmp_path / 'scan.hdf5', _make_input())
         reader = PtychoFMProductFileReader()
 
         from_patterns = reader.read(tmp_path / 'scan_dp.hdf5')
@@ -216,7 +272,7 @@ class TestPtychoFMProductFileReader:
             PtychoFMProductFileReader().read(path)
 
     def test_the_product_can_be_written_back_out(self, tmp_path: Path) -> None:
-        save_training_data(tmp_path / 'scan.hdf5', _make_input(), img_size=IMG_SIZE)
+        save_training_data(tmp_path / 'scan.hdf5', _make_input())
         product = PtychoFMProductFileReader().read(tmp_path / 'scan_para.hdf5')
 
         save_product(tmp_path / 'product.h5', product)
@@ -235,6 +291,17 @@ class TestPtychoFMProductFileReader:
         assert registry.product_file_readers.get_strategy_by_name(
             PtychoFMProductFileReader.SIMPLE_NAME
         )
+
+    def test_the_writer_is_registered_under_the_library_name(self) -> None:
+        # The shared name is what makes this the format offered by default whenever
+        # PtychoFM is the selected backend.
+        registry = PluginRegistry.load_plugins()
+
+        assert registry.reconstructor_libraries.find_plugin(PtychoFMProductFileReader.SIMPLE_NAME)
+        writer = registry.training_data_file_writers.get_strategy_by_name(
+            PtychoFMProductFileReader.SIMPLE_NAME
+        )
+        assert isinstance(writer, PtychoFMTrainingDataFileWriter)
 
 
 def _write_para(

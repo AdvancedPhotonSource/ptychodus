@@ -25,6 +25,7 @@ import numpy
 from pydantic import BaseModel
 
 from .assemble import AssembledDiffractionData
+from .files import FileWriter
 from .diffraction import (
     BadPixels,
     DetectorBackground,
@@ -48,7 +49,6 @@ __all__ = [
     'DeviceEnvironment',
     'DumpReconstructOptions',
     'DumpTrainOptions',
-    'ExportTrainingData',
     'NoOptions',
     'NullReconstructor',
     'PositionIndexFilter',
@@ -65,6 +65,7 @@ __all__ = [
     'SubprocessReconstructor',
     'TrainOutput',
     'TrainableReconstructor',
+    'TrainingDataFileWriter',
     'prepare_reconstruct_input',
     'warn_if_propagation_regime_disagrees',
 ]
@@ -97,6 +98,10 @@ class ReconstructInput:
     product: Product
     background: DetectorBackground | None = None
     flat_field: FlatField | None = None
+
+
+class TrainingDataFileWriter(FileWriter[ReconstructInput]):
+    """Plugin interface for writing what a trainable reconstructor learns from."""
 
 
 @dataclass(frozen=True)
@@ -183,16 +188,6 @@ class TrainableReconstructor(Reconstructor):
     @abstractmethod
     def save_model(self, file_path: Path) -> None:
         """Write the currently-loaded model to file_path."""
-        pass
-
-    @abstractmethod
-    def get_training_data_file_filter(self) -> str:
-        pass
-
-    @abstractmethod
-    def export_training_data(
-        self, file_path: Path, input_: ReconstructInput, *, options: BaseModel
-    ) -> None:
         pass
 
     @abstractmethod
@@ -342,9 +337,6 @@ archive or picks a file out of a bundle directory does it once and complains
 here rather than in the child when there is nothing to load.
 """
 
-ExportTrainingData = Callable[[Path, ReconstructInput, BaseModel], None]
-"""(file_path, reconstruct_input, options) -> None. Runs parent-side; must not touch GPU."""
-
 SaveModel = Callable[[Path, Path], None]
 """(source_path_loaded_by_child, destination_path) -> None. Runs parent-side."""
 
@@ -369,7 +361,7 @@ class SubprocessReconstructor(TrainableReconstructor):
     The parent-side object holds no GPU state. It stores:
 
     - the module its child code lives in, stamped on by its library,
-    - backend-supplied callbacks that dump options and export training data,
+    - backend-supplied callbacks that dump options and save models,
     - the loaded-model path (as recorded by ``load_model`` /
       remembered from the last ``train`` call).
 
@@ -382,8 +374,6 @@ class SubprocessReconstructor(TrainableReconstructor):
     ``save_model`` copies or archives that path to the destination through a
     backend-supplied callback, so a backend persisting one file and a backend
     persisting a whole bundle directory share this adapter unchanged.
-    ``export_training_data`` runs in the parent, which is safe only because
-    every implementation of it is pure numpy.
     """
 
     def __init__(
@@ -400,8 +390,6 @@ class SubprocessReconstructor(TrainableReconstructor):
         dump_train_options: DumpTrainOptions | None = None,
         model_file_filter: str = '',
         model_file_extension: str = '',
-        training_data_file_filter: str = '',
-        export_training_data: ExportTrainingData | None = None,
         save_model: SaveModel | None = None,
         apply_settings_sync: ApplySettingsSync | None = None,
         terminate_grace_sec: float = 10.0,
@@ -422,8 +410,6 @@ class SubprocessReconstructor(TrainableReconstructor):
         self.child_module = child_module
         self._model_file_filter = model_file_filter
         self._model_file_extension = model_file_extension
-        self._training_data_file_filter = training_data_file_filter
-        self._export_training_data = export_training_data
         self._save_model_fn = save_model
         self._apply_settings_sync = apply_settings_sync
         self._terminate_grace_sec = terminate_grace_sec
@@ -508,16 +494,6 @@ class SubprocessReconstructor(TrainableReconstructor):
             self._save_model_fn(self._loaded_model_path, file_path)
         else:
             shutil.copyfile(self._loaded_model_path, file_path)
-
-    def get_training_data_file_filter(self) -> str:
-        return self._training_data_file_filter
-
-    def export_training_data(
-        self, file_path: Path, input_: ReconstructInput, *, options: BaseModel
-    ) -> None:
-        if self._export_training_data is None:
-            raise NotImplementedError(f'{self._name} does not support exporting training data.')
-        self._export_training_data(file_path, input_, options)
 
     def train(
         self, input_directory: Path, output_directory: Path, *, options: BaseModel

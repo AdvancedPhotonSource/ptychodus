@@ -5,16 +5,15 @@ import time
 
 from pydantic import BaseModel
 
-from ptychodus.api.files import FileFormat
-from ptychodus.api.io import save_cxi_reconstruct_input
+from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.reconstruct import (
     NullReconstructor,
     PositionIndexFilter,
     ReconstructInput,
     Reconstructor,
     ReconstructorLibrary,
-    SubprocessReconstructor,
     TrainableReconstructor,
+    TrainingDataFileWriter,
     prepare_reconstruct_input,
 )
 
@@ -33,16 +32,6 @@ from .monitor import (
 )
 
 logger = logging.getLogger(__name__)
-
-_CXI_FILE_TYPE = 'CXI'
-
-
-def _is_trainable(reconstructor: Reconstructor) -> bool:
-    """Whether a reconstructor can train; a subprocess reconstructor says so itself."""
-    if isinstance(reconstructor, SubprocessReconstructor):
-        return reconstructor.is_trainable
-
-    return isinstance(reconstructor, TrainableReconstructor)
 
 
 def _algorithm_tag(library: str, algorithm: str) -> str:
@@ -251,6 +240,7 @@ class ProcessingAPI:
         algorithms_by_library: Mapping[str, Sequence[str]],
         task_monitor: ProcessingTaskMonitor,
         parameter_store: ProcessingParameterStore,
+        training_data_file_writers: PluginChooser[TrainingDataFileWriter],
     ) -> None:
         self._task_manager = task_manager
         self._product_api = product_api
@@ -261,6 +251,7 @@ class ProcessingAPI:
         }
         self._task_monitor = task_monitor
         self._parameter_store = parameter_store
+        self._training_data_file_writers = training_data_file_writers
 
     def _options_for(self, reconstructor: Reconstructor) -> BaseModel:
         """Return the options to run *reconstructor* with, as currently edited.
@@ -429,27 +420,21 @@ class ProcessingAPI:
         file_path: Path,
         *,
         product_index: int,
-        library: str | None = None,
-        algorithm: str | None = None,
         index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
         file_type: str | None = None,
     ) -> None:
-        """Export what the current trainable reconstructor would train on.
+        """Export what a trainable reconstructor would train on, in any registered format.
 
-        `file_type` of None writes the reconstructor's own format; ``'CXI'`` writes a
-        standard CXI file holding the patterns, mask, detector maps and initial
-        product, with a ``.cxi`` suffix added when the path has none.
+        `file_type` names a training-data writer by its simple or display name; None
+        writes the format `get_default_training_data_file_type` answers. The selected
+        reconstructor plays no part beyond that default, so every format is on offer
+        whether or not its backend is installed.
+
+        Raises:
+            LookupError: when `file_type` names no registered writer.
         """
-        self.set_reconstructor_if_provided(library=library, algorithm=algorithm)
-        trainer = self._algorithm_parameter.get_current_reconstructor()
-
-        if not _is_trainable(trainer):
-            logger.warning('Algorithm is not trainable!')
-            return
-
-        if file_type is not None and file_type.casefold() != _CXI_FILE_TYPE.casefold():
-            raise ValueError(f'Unknown training data file type "{file_type}".')
-
+        name = self.get_default_training_data_file_type() if file_type is None else file_type
+        writer = self._training_data_file_writers.get_strategy_by_name(name)
         reconstruct_input = self.get_reconstruct_input(
             product_index=product_index,
             index_filter=index_filter,
@@ -457,15 +442,7 @@ class ProcessingAPI:
 
         logger.info('Exporting...')
         tic = time.perf_counter()
-
-        if file_type is None:
-            assert isinstance(trainer, TrainableReconstructor)
-            options = self._options_for(trainer)
-            trainer.export_training_data(file_path, reconstruct_input, options=options)
-        else:
-            cxi_path = file_path if file_path.suffix else file_path.with_suffix('.cxi')
-            save_cxi_reconstruct_input(cxi_path, reconstruct_input)
-
+        writer.write(file_path, reconstruct_input)
         toc = time.perf_counter()
         logger.info(f'Export time {toc - tic:.4f} seconds.')
 
@@ -507,30 +484,22 @@ class ProcessingAPI:
         else:
             logger.warning('Algorithm is not trainable!')
 
-    def get_training_data_file_filters(
-        self, *, library: str | None = None, algorithm: str | None = None
-    ) -> dict[str, str | None]:
-        """Map each file-dialog name filter to the `file_type` that exports it.
+    def get_training_data_file_filters(self) -> dict[str, str]:
+        """Map each training-data file-dialog name filter to the `file_type` that writes it."""
+        return {
+            plugin.display_name: plugin.simple_name for plugin in self._training_data_file_writers
+        }
 
-        The reconstructor's own format comes first, keyed to None, then CXI. A
-        reconstructor that is not trainable offers nothing.
+    def get_default_training_data_file_type(self) -> str:
+        """Name the format to export in when none is chosen: the selected backend's own.
+
+        A backend's format is the writer registered under the same simple name as the
+        backend's library; that shared name is the whole of the association. A backend
+        without one, or a selection that resolves to none, falls back to CXI.
         """
-        self.set_reconstructor_if_provided(library=library, algorithm=algorithm)
-        trainer = self._algorithm_parameter.get_current_reconstructor()
-
-        if not _is_trainable(trainer):
-            logger.warning('Algorithm is not trainable!')
-            return {}
-
-        assert isinstance(trainer, TrainableReconstructor)
-        filters: dict[str, str | None] = {}
-        native_filter = trainer.get_training_data_file_filter()
-
-        if native_filter:
-            filters[native_filter] = None
-
-        filters[FileFormat.CXI.file_filter] = _CXI_FILE_TYPE
-        return filters
+        library, _ = self.current_selection()
+        plugin = self._training_data_file_writers.find_plugin(library) if library else None
+        return 'CXI' if plugin is None else plugin.simple_name
 
     def get_model_file_filter(
         self, *, library: str | None = None, algorithm: str | None = None

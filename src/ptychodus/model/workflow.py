@@ -213,20 +213,9 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
             case _:
                 raise ValueError(f'Unsupported remote compute provider: {provider}')
 
-    def export_training_data(
-        self,
-        file_path: Path,
-        *,
-        library: str | None = None,
-        algorithm: str | None = None,
-        file_type: str | None = None,
-    ) -> None:
+    def export_training_data(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._processing_api.export_training_data(
-            file_path,
-            product_index=self._product_index,
-            library=library,
-            algorithm=algorithm,
-            file_type=file_type,
+            file_path, product_index=self._product_index, file_type=file_type
         )
 
     def save_product(self, file_path: Path, *, file_type: str | None = None) -> None:

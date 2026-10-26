@@ -43,10 +43,10 @@ from ptychodus.plugins.ptycho_fm._subprocess import (
 )
 from ptychodus.plugins.ptycho_fm.reconstructor import (
     build_reconstruct_config,
-    build_reconstructor,
     build_train_config,
 )
 from ptychodus.plugins.ptycho_fm.options import PtychoFMOptions, default_options
+from ptychodus.plugins.ptycho_fm.training_file import PtychoFMTrainingDataFileWriter
 
 # Small enough to train in seconds. The decoder upsamples the token grid by
 # 2**num_stages, so (img_size / patch_size) * 2**num_stages must come back to
@@ -150,34 +150,34 @@ def _drain(q: queue.Queue[Any]) -> list[Any]:
     return events
 
 
-def check_export_validation(options: PtychoFMOptions) -> None:
-    """The exporter must refuse a product whose patterns are not img_size square."""
-    reconstructor = build_reconstructor('Supervised')
+def check_export_validation() -> None:
+    """The writer must refuse a probe that does not match the patterns."""
+    writer = PtychoFMTrainingDataFileWriter()
+    mismatched = ReconstructInput(
+        diffraction_patterns=_reconstruct_input(IMG_SIZE).diffraction_patterns,
+        bad_pixels=numpy.zeros((IMG_SIZE, IMG_SIZE), dtype=numpy.bool),
+        product=_product(IMG_SIZE // 2),
+    )
 
     with tempfile.TemporaryDirectory() as tmp:
         stem = Path(tmp) / 'scan'
         try:
-            reconstructor.export_training_data(
-                stem, _reconstruct_input(IMG_SIZE // 2), options=options
-            )
+            writer.write(stem, mismatched)
         except ValueError as exc:
-            print(f'  [ok] export rejected undersized patterns: {exc}')
+            print(f'  [ok] export rejected a mismatched probe: {exc}')
         else:
-            raise AssertionError('export_training_data accepted a wrongly-sized product')
+            raise AssertionError('the writer accepted a probe that does not match the patterns')
 
-        reconstructor.export_training_data(stem, _reconstruct_input(IMG_SIZE), options=options)
+        writer.write(stem, _reconstruct_input(IMG_SIZE))
         produced = sorted(p.name for p in Path(tmp).iterdir())
         assert produced == ['scan_dp.hdf5', 'scan_para.hdf5'], produced
         print(f'  [ok] export wrote {produced}')
 
 
 def run_training(mode: str, options: PtychoFMOptions, out_dir: Path) -> tuple[Path, list[float]]:
-    reconstructor = build_reconstructor(mode)
     in_dir = out_dir / 'input'
     in_dir.mkdir(parents=True, exist_ok=True)
-    reconstructor.export_training_data(
-        in_dir / 'scan', _reconstruct_input(IMG_SIZE), options=options
-    )
+    PtychoFMTrainingDataFileWriter().write(in_dir / 'scan', _reconstruct_input(IMG_SIZE))
 
     model_dir = out_dir / 'output'
     payload = SubprocessPayload(
@@ -368,7 +368,7 @@ def main() -> int:
     options = _options()
 
     print('1. export validation')
-    check_export_validation(options)
+    check_export_validation()
 
     losses_by_mode = {}
     with tempfile.TemporaryDirectory() as tmp:

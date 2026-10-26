@@ -31,9 +31,11 @@ from ptychodus.api.io import (
     load_cxi_product,
     save_cxi_diffraction,
     save_cxi_product,
+    save_cxi_reconstruct_input,
 )
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter
+from ptychodus.api.reconstruct import ReconstructInput, TrainingDataFileWriter
 
 from .h5_diffraction_file import H5DiffractionFileTreeBuilder, H5DiffractionPatternArray
 
@@ -109,6 +111,27 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
         save_cxi_product(file_path, product, variant=self._variant)
 
 
+class CXITrainingDataFileWriter(TrainingDataFileWriter):
+    """Writes the patterns, mask, detector maps and initial product to one CXI file.
+
+    A path without a suffix is given ``.cxi``, so a name typed without one still lands
+    on a file this reader recognizes.
+    """
+
+    def __init__(self, variant: CXIVariant = CXIVariant.STANDARD) -> None:
+        self._variant = variant
+
+    def get_file_description(self) -> str:
+        return _VARIANT_DESCRIPTIONS[self._variant]
+
+    def get_file_extensions(self) -> set[str]:
+        return FileFormat.CXI.extensions
+
+    def write(self, file_path: Path, parameters: ReconstructInput) -> None:
+        cxi_path = file_path if file_path.suffix else file_path.with_suffix('.cxi')
+        save_cxi_reconstruct_input(cxi_path, parameters, variant=self._variant)
+
+
 class CXIBadPixelsFileReader(BadPixelsFileReader):
     def get_file_description(self) -> str:
         return FileFormat.CXI.description
@@ -161,6 +184,9 @@ def register_plugins(registry: PluginRegistry) -> None:
     # The product reader returns an empty probe and object for a file that has neither,
     # so the positions it yields serve as a positions reader for raw-data files too.
     registry.register_product_file_reader_with_adapters(CXIProductFileIO(), simple_name=simple_name)
+    registry.training_data_file_writers.register_plugin(
+        CXITrainingDataFileWriter(), simple_name=simple_name
+    )
 
     writers = (
         (CXIVariant.STANDARD, simple_name),

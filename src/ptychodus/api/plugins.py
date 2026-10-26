@@ -41,7 +41,7 @@ from .probe_positions import (
     ProbePositionSequence,
 )
 from .product import ProductFileReader, ProductFileWriter
-from .reconstruct import ReconstructorLibrary
+from .reconstruct import ReconstructorLibrary, TrainingDataFileWriter
 from .workflow import FileBasedWorkflow
 
 __all__ = [
@@ -270,6 +270,7 @@ class PluginRegistry:
         self.file_based_workflows = PluginChooser[FileBasedWorkflow]()
         self.fluorescence_file_readers = PluginChooser[FluorescenceFileReader]()
         self.fluorescence_file_writers = PluginChooser[FluorescenceFileWriter]()
+        self.training_data_file_writers = PluginChooser[TrainingDataFileWriter]()
         self.upscaling_strategies = PluginChooser[UpscalingStrategy]()
         self.deconvolution_strategies = PluginChooser[DeconvolutionStrategy]()
         # A reconstructor backend is discovered the same way a file format is:

@@ -145,7 +145,14 @@ def _make_processing_api(item: MagicMock) -> ProcessingAPI:
     product_api = MagicMock()
     product_api.get_item.return_value = item
     return ProcessingAPI(
-        MagicMock(), product_api, MagicMock(), MagicMock(), {}, MagicMock(), MagicMock()
+        MagicMock(),
+        product_api,
+        MagicMock(),
+        MagicMock(),
+        {},
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
     )
 
 

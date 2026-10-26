@@ -11,7 +11,6 @@ without pulling any ptycho_fm module in. The child feeds that dict to
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
@@ -19,7 +18,6 @@ from pydantic import BaseModel
 from ptychodus.api.reconstruct import ReconstructInput, SubprocessReconstructor
 
 from .options import PtychoFMOptions, default_options
-from .training_file import PtychoFMProductFileReader, save_training_data
 
 __all__ = [
     'build_reconstruct_config',
@@ -130,13 +128,6 @@ def build_reconstructor(name: str) -> SubprocessReconstructor:
     def dump_train_options(options: BaseModel) -> dict[str, Any]:
         return build_train_config(name, _declared(options))
 
-    def export_training_data(
-        file_path: Path, parameters: ReconstructInput, options: BaseModel
-    ) -> None:
-        save_training_data(
-            file_path, parameters, img_size=int(_declared(options).model.encoder.img_size)
-        )
-
     return SubprocessReconstructor(
         name=name,
         default_options=default_options,
@@ -145,8 +136,4 @@ def build_reconstructor(name: str) -> SubprocessReconstructor:
         dump_train_options=dump_train_options,
         model_file_filter='PyTorch Checkpoint (*.pth *.pt)',
         model_file_extension='.pth',
-        # The same filter the reader registers, so the export and import dialogs
-        # name one format once.
-        training_data_file_filter=PtychoFMProductFileReader().get_file_filter(),
-        export_training_data=export_training_data,
     )

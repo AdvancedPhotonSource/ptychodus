@@ -131,6 +131,7 @@ class ModelCore:
             self.settings_registry,
             self.product_core.product_api,
             self.plugin_registry.reconstructor_libraries,
+            self.plugin_registry.training_data_file_writers,
         )
         self.fluorescence_core = FluorescenceCore(
             self._task_manager,

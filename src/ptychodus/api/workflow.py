@@ -164,17 +164,11 @@ class ProductWorkflowAPI(ABC):
         pass
 
     @abstractmethod
-    def export_training_data(
-        self,
-        file_path: Path,
-        *,
-        library: str | None = None,
-        algorithm: str | None = None,
-        file_type: str | None = None,
-    ) -> None:
-        """Export training data for the current reconstructor to file.
+    def export_training_data(self, file_path: Path, *, file_type: str | None = None) -> None:
+        """Export training data to file in a registered training-data format.
 
-        None writes the reconstructor's own format; 'CXI' writes a combined CXI file.
+        `file_type` names the format by its simple name; None writes the selected
+        reconstructor's own format, or CXI when it has none.
         """
         pass
 

@@ -390,11 +390,16 @@ class ProcessingController(Observer):
         if not name_filters:
             return
 
+        default_file_type = self._processing_api.get_default_training_data_file_type()
+        selected_name_filter = next(
+            (name for name, file_type in name_filters.items() if file_type == default_file_type),
+            next(iter(name_filters)),
+        )
         file_path, selected_filter = self._file_dialog_factory.get_save_file_path(
             self._view,
             'Export Training Data',
             name_filters=list(name_filters),
-            selected_name_filter=next(iter(name_filters)),
+            selected_name_filter=selected_name_filter,
         )
 
         if not file_path:
@@ -443,7 +448,6 @@ class ProcessingController(Observer):
 
         self._actions_view.train_button.setVisible(is_trainable)
         self._load_model_action.setVisible(is_trainable)
-        self._export_training_data_action.setVisible(is_trainable)
 
     def _update(self, observable: Observable) -> None:
         if observable in (self._library_parameter, self._algorithm_parameter):

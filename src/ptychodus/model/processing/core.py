@@ -2,7 +2,11 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.reconstruct import ReconstructorLibrary, SubprocessReconstructor
+from ptychodus.api.reconstruct import (
+    ReconstructorLibrary,
+    SubprocessReconstructor,
+    TrainingDataFileWriter,
+)
 from ptychodus.api.settings import SettingsRegistry
 
 from ..parameters import PluginChooserParameter
@@ -72,6 +76,7 @@ class ProcessingCore:
         settings_registry: SettingsRegistry,
         product_api: ProductAPI,
         reconstructor_libraries: PluginChooser[ReconstructorLibrary],
+        training_data_file_writers: PluginChooser[TrainingDataFileWriter],
     ) -> None:
         self._settings = ProcessingSettings(settings_registry)
         self._task_monitor = ProcessingTaskMonitor(task_manager)
@@ -136,6 +141,7 @@ class ProcessingCore:
             algorithms_by_library,
             self._task_monitor,
             self.parameter_store,
+            training_data_file_writers,
         )
 
     def library_names(self) -> Sequence[str]:
