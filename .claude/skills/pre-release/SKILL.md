@@ -1,11 +1,11 @@
 ---
 name: pre-release
-description: Run a comprehensive pre-release verification of the ptychodus repository — API docs coverage, minimal docstring presence, reader-plugin docs, README/CLAUDE.md/pyproject.toml consistency, install-instruction freshness, Markdown hygiene, zero-warning Sphinx build, full CI gate, entry-point smoke tests, and distribution-artifact contents. Report every finding and offer per-issue fixes. Use when the user says "pre-release check", "release audit", "before we cut a release", or "verify the repo is release-ready".
+description: Run a comprehensive pre-release verification of the ptychodus repository — API docs coverage, minimal docstring presence, reader-plugin docs, README/CLAUDE.md/pyproject.toml consistency, install-instruction freshness, Markdown hygiene, zero-warning Sphinx build, full CI gate, entry-point smoke tests, distribution-artifact contents, and the test suite against a bare install of the built wheel. Report every finding and offer per-issue fixes. Use when the user says "pre-release check", "release audit", "before we cut a release", or "verify the repo is release-ready".
 ---
 
 # pre-release
 
-Comprehensive gate for cutting a release. Runs nine verification sections in order, reports pass/fail for each, and — for every failure — proposes a specific fix and asks the user before applying it. **Never fixes silently. Never commits.**
+Comprehensive gate for cutting a release. Runs ten verification sections in order, reports pass/fail for each, and — for every failure — proposes a specific fix and asks the user before applying it. **Never fixes silently. Never commits.**
 
 ## How to run the check
 
@@ -43,7 +43,7 @@ uv sync --extra docs --extra gui --extra globus --extra ptychi --extra store
 
 If the developer deliberately runs an editable sibling checkout (pty-chi is the usual one), skip the sync entirely and pass `--no-sync` to every `uv run` below, as the `pre-push` skill does — an exact sync silently swaps that checkout for the published release.
 
-Then run Sections 6, 7, and 9 in order. They must not overlap — with each other or with Phase A. See "Why the phases" below.
+Then run Sections 6, 7, 9 and 10 in order. They must not overlap — with each other or with Phase A. See "Why the phases" below.
 
 ---
 
@@ -351,6 +351,48 @@ uvx twine check "$out"/* || echo "FAIL: twine check"
 
 `FAIL` on a count mismatch means the `sdist`/`build_py` hooks in `setup.py` did not compile the UI — check that `tsc` is on `PATH`. Report the temp directory path so the user can inspect the artifacts, and do not copy them into `./dist/`.
 
+### Section 10 — Bare install
+
+CI's test job runs `pip install . pytest` and then `pytest tests/` with **no extras**, but every developer environment, this audit's included, carries the full extras, so Section 7 cannot see a regression that only a bare install hits. The typical one is an optional dependency imported at module scope anywhere reachable from `ptychodus.model`. Measured here: `model/processing/_ptychi_sections.py` built an overlay table at import that named `ptychi.api.ForwardModels`. On a bare install, `import ptychodus.model` then raised `ModuleNotFoundError`, ten test modules failed to collect, and `ptychodus --version` crashed, while `pre-push` stayed green in every full environment.
+
+Install the wheel Section 9 built, not the checkout: it is what PyPI users get, so this also catches a module or data file missing from the wheel, which `pip install .` from a source tree would hide. Cover CI's whole Python matrix. The three environments are independent, so run them concurrently:
+
+```sh
+wheel=$(ls "$out"/ptychodus-*.whl)
+# Beside uv's cache, not in /tmp: uv then hardlinks packages instead of copying them.
+bare=$(mktemp -d -p "$(dirname "$(uv cache dir)")" ptychodus-bare.XXXXXX)
+for py in 3.11 3.12 3.13; do
+    (
+        uv venv -q "$bare/$py" --python "$py" \
+        && uv pip install -q --python "$bare/$py/bin/python" "$wheel" pytest pytest-xdist \
+        && "$bare/$py/bin/ptychodus" --version \
+        && "$bare/$py/bin/python" -m pytest tests/ -q -p no:cacheprovider -n auto --dist loadfile
+    ) >"$bare/$py.log" 2>&1
+    echo $? >"$bare/$py.rc" &
+done
+wait
+for py in 3.11 3.12 3.13; do printf '%s %s\n' "$(cat "$bare/$py.rc")" "py$py"; done
+```
+
+The environments go on the filesystem holding uv's cache. There uv hardlinks the scientific stack instead of copying it, so three environments cost little disk and install in seconds. In `/tmp` each is a full copy, about half a gigabyte, and on a small tmpfs the three together fill it mid-run, losing the logs.
+
+Run it from the checkout root, as CI does. The `src/` layout keeps the checkout's package off `sys.path`, so `import ptychodus` resolves to the installed wheel while the tests come from the working tree. `pytest-xdist` is not in CI's install and changes only speed; `-p no:cacheprovider` keeps the run from writing `.pytest_cache`.
+
+The extras must actually be absent, or the check proves nothing. Confirm it against the 3.11 environment:
+
+```sh
+"$bare/3.11/bin/python" -c "
+import importlib.util
+present = [m for m in ('ptychi', 'torch', 'PyQt5', 'globus_compute_sdk', 'xraydb')
+           if importlib.util.find_spec(m)]
+print('FAIL: extras present: ' + ', '.join(present) if present else 'PASS: no extras')
+"
+```
+
+`PASS` if every Python exits 0 and no extra is present. `FAIL` lists each failing Python with the first error in its log. A `ModuleNotFoundError` naming an optional package is the regression this section exists for. Report the temp directory so the user can read the logs; delete it once the run is clean.
+
+**Suggested fix**: move the offending import inside the function that needs it, or behind the deferred-import pattern CLAUDE.md's Testing section describes for optional subsystems. Never install the extra into the bare environment to make the section pass.
+
 ---
 
 ## Final report
@@ -368,6 +410,7 @@ Print a summary in this exact format after all sections have run:
 7. Full CI gate                PASS|FAIL
 8. Entry-point smoke tests     PASS|FAIL   (<pass>/<total>)
 9. Distribution artifacts      PASS|FAIL   (ui .js sdist/wheel vs .ts count)
+10. Bare install               PASS|FAIL   (<passing Pythons>/3; first error if any)
 ```
 
 Then, and only then, walk through each `FAIL` with the user: state the finding, propose the fix, ask "apply it?" per item, and Edit/Write only after they confirm.
@@ -416,11 +459,12 @@ The `--oneline` view gives you the merge granularity (usually one bullet per mer
 
 ## Why the phases
 
-Three constraints force Phase B to be serial. Do not re-flatten the phases without addressing them:
+These constraints force Phase B to be serial. Do not re-flatten the phases without addressing them:
 
 - **`uv sync` is exact by default.** It uninstalls anything outside the extras named on that one invocation (`--inexact` opts out). A narrow `uv sync --extra docs` therefore strips `gui`, `globus`, `ptychi`, and `store` — which silently narrows Section 7's pytest collection and inflates Section 3's "modules skipped at load" count. That is why the sync is hoisted to the top of Phase B and names every extra at once.
 - **`uv build` and `uv sync` contend on the same project lock.** Section 9 must not overlap Section 6 or the hoisted sync.
 - **Section 9's stale-`build/` guard only means something if nothing else is building.** A concurrent build would create the very directory the guard is checking for.
+- **Section 10 installs the wheel Section 9 builds**, so it runs after it. Its environments live in a temp directory and never touch the project's lock or `.venv`, which is why its three Pythons may run concurrently with each other, though not with Phase A.
 - **The lock guard is not ceremony.** `uv.lock` is untracked, so it drifts per machine with nothing to refresh it, and `uv sync` is exact. A stale lock silently narrows or rewrites what Sections 6, 7 and 9 test, and every one of them still reports `PASS` — against an environment the developer does not have. Keep the `uv lock --check` and the `--dry-run` read ahead of the real sync.
 
 Phase A is safe to fan out because every section in it only reads: filesystem scans, an AST walk, a plugin-registry load, and `--version`/`--help` invocations of the entry points.
