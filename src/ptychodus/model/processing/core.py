@@ -15,7 +15,6 @@ from ..task_manager import TaskManager
 from .api import ProcessingAPI, ProcessingAlgorithmParameter
 from . import (
     _cdtools_sections,
-    _kickstart_sections,
     _ptychi_sections,
     _ptycho_fm_sections,
     _ptychopinn_sections,
@@ -51,7 +50,6 @@ def _regardless(
 _SECTIONS_BY_LIBRARY: Mapping[str, SectionTable] = {
     'PtychoFM': _regardless(_ptycho_fm_sections.sections),
     'PtychoPINN': _regardless(_ptychopinn_sections.sections),
-    'Ptychodus': _regardless(_kickstart_sections.sections),
     'cdtools': _regardless(_cdtools_sections.sections),
     'pty-chi': _ptychi_sections.sections_for,
 }

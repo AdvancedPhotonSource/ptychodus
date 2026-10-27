@@ -1,4 +1,4 @@
-"""Simulated far-field scans under a defocusable disk probe, shared by the kickstart tests.
+"""Simulated far-field scans under a defocusable disk probe, shared by the parallax tests.
 
 The probe's far field is a uniform disk of radius `DISK_RADIUS_PX` detector pixels,
 propagated from its focus by the defocus asked for; the sample is a smooth random phase

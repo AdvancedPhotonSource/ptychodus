@@ -78,6 +78,17 @@ class ProductWorkflowAPI(ABC):
         pass
 
     @abstractmethod
+    def estimate_defocus(self) -> None:
+        """Measure the defocus from the parallax and set the product's focus position.
+
+        Blocks until the measurement is applied, so a probe generated next is sampled at
+        the measured defocus. A focus the product already states is replaced, and a
+        disagreement reported; an estimate the thresholds do not resolve leaves it alone.
+        Far-field data only.
+        """
+        pass
+
+    @abstractmethod
     def load_probe(self, file_path: Path, *, file_type: str | None = None) -> None:
         """Load a probe sequence from file, uses format from settings when file_type is None."""
         pass

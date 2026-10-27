@@ -2,6 +2,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 import logging
+import math
 import threading
 
 from ptychodus.api.accumulate import compute_diffraction_moments, estimate_incident_beam
@@ -10,7 +11,12 @@ from ptychodus.api.parallax import ParallaxEstimate, estimate_defocus_from_paral
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.preprocess.diffraction import BinningStep
 from ptychodus.api.probe import OPRWeightPolicy
-from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter
+from ptychodus.api.product import (
+    Product,
+    ProductFileReader,
+    ProductFileWriter,
+    ProductMetadata,
+)
 
 from ..diffraction import AssembledDiffractionDataset
 from ..file_types import FileTypeChooser
@@ -471,7 +477,9 @@ class ProductAPI:
         dataset's load task finishes (via the shared FIFO background worker)."""
         if dataset is None or not dataset.is_load_in_progress():
             item = build()
-            return self._repository.insert_product(item)
+            index = self._repository.insert_product(item)
+            self._maybe_estimate_defocus(index, block=True)
+            return index
 
         finished_event = dataset.get_last_load_finished_event()
 
@@ -484,7 +492,9 @@ class ProductAPI:
             if error is not None:
                 raise RuntimeError('Diffraction dataset failed to load') from error
             item = build()
-            return self._repository.insert_product(item)
+            index = self._repository.insert_product(item)
+            self._maybe_estimate_defocus(index, block=True)
+            return index
 
         stub = self._item_factory.create_pending_stub(name=stub_name)
         index = self._repository.insert_product(stub)
@@ -522,6 +532,7 @@ class ProductAPI:
 
                     stub.copy_contents_from(real)
                     stub.set_state(ProductState.READY)
+                    self._maybe_estimate_defocus(index, block=False)
                 finally:
                     self._end_queued_product()
 
@@ -612,20 +623,37 @@ class ProductAPI:
         self,
         product_index: int,
         *,
-        bin_size_px: int = 4,
-        minimum_significance: float = 3.0,
-        minimum_defocus_dof: float = 1.0,
+        block: bool = False,
+        bin_size_px: int | None = None,
+        minimum_significance: float | None = None,
+        minimum_defocus_dof: float | None = None,
         on_finished: Callable[[ParallaxEstimate | None, bool], None] | None = None,
     ) -> None:
-        """Measure the defocus from the parallax between bright-field images, in the background.
+        """Measure the defocus from the parallax between bright-field images.
 
         One pass over the bound patterns, binned *bin_size_px* detector pixels a side and
         corrected for beam decay by I0, gives :func:`estimate_defocus_from_parallax`'s
         estimate. When :meth:`ParallaxEstimate.is_resolved` holds for the thresholds, the
-        product's focus position is set to the negated defocus, in the foreground.
-        *on_finished* then receives the estimate, None when none could be made, and
-        whether it was applied. Far field only.
+        product's focus position is set to the negated defocus; a focus the product
+        already stated is replaced, and a disagreement reported. Every threshold defaults
+        to the corresponding product setting. *on_finished* receives the estimate, None
+        when none could be made, and whether it was applied. Far field only.
+
+        The pass runs in the background unless *block*, which runs it inline so the focus
+        position is set by the time this returns.
         """
+        settings = self._settings
+        bins = settings.parallax_bin_size_px.get_value() if bin_size_px is None else bin_size_px
+        significance = (
+            settings.parallax_min_significance.get_value()
+            if minimum_significance is None
+            else minimum_significance
+        )
+        defocus_dof = (
+            settings.parallax_min_defocus_dof.get_value()
+            if minimum_defocus_dof is None
+            else minimum_defocus_dof
+        )
         item = self._repository[product_index]
         dataset = item.get_dataset()
         metadata = item.get_metadata_item().get_metadata()
@@ -660,7 +688,7 @@ class ProductAPI:
                     bad_pixels=data.get_bad_pixels(),
                     background=data.get_background(),
                     flat_field=data.get_flat_field(),
-                    binning=BinningStep(bin_size_x=bin_size_px, bin_size_y=bin_size_px),
+                    binning=BinningStep(bin_size_x=bins, bin_size_y=bins),
                 )
 
                 if moments is not None:
@@ -681,8 +709,8 @@ class ProductAPI:
 
             def apply_in_foreground() -> None:
                 applied = estimate is not None and estimate.is_resolved(
-                    minimum_significance=minimum_significance,
-                    minimum_defocus_dof=minimum_defocus_dof,
+                    minimum_significance=significance,
+                    minimum_defocus_dof=defocus_dof,
                 )
 
                 if estimate is None:
@@ -692,6 +720,7 @@ class ProductAPI:
                         f'Parallax defocus {estimate.defocus_distance_m * 1e3:.4g} '
                         f'+/- {estimate.standard_error_m * 1e3:.2g} mm; setting the focus position.'
                     )
+                    self._warn_if_defocus_disagrees(metadata, estimate.defocus_distance_m)
                     item.get_metadata_item().focus_object_distance_m.set_value(
                         -estimate.defocus_distance_m
                     )
@@ -706,7 +735,54 @@ class ProductAPI:
 
             return apply_in_foreground
 
-        self._task_manager.put_background_task(estimate_in_background)
+        if block:
+            estimate_in_background()()
+        else:
+            self._task_manager.put_background_task(estimate_in_background)
+
+    def _warn_if_defocus_disagrees(self, metadata: ProductMetadata, measured_m: float) -> None:
+        """Report a measured defocus that contradicts the one the product already stated.
+
+        A sign difference is a flipped or transposed detector, and a large one a mistyped
+        focus; both are worth saying out loud, because the measurement replaces the stated
+        value either way.
+        """
+        stated_m = metadata.defocus_distance_m
+
+        if stated_m == 0.0:
+            return
+
+        rtol = self._settings.parallax_rtol.get_value()
+
+        if math.copysign(1.0, measured_m) != math.copysign(1.0, stated_m) or abs(
+            measured_m - stated_m
+        ) > rtol * abs(stated_m):
+            logger.warning(
+                f'The parallax measures a defocus of {measured_m * 1e3:.4g} mm against the '
+                f'{stated_m * 1e3:.4g} mm the product stated; replacing it.'
+            )
+
+    def _maybe_estimate_defocus(self, product_index: int, *, block: bool) -> None:
+        """Measure the defocus of a freshly inserted product, where the settings ask.
+
+        Only while the product states no focus of its own: a stated one is a measurement
+        or a design value the user supplied, and nothing about creating a product is a
+        reason to overrule it.
+        """
+        if not self._settings.estimate_defocus_from_parallax.get_value():
+            return
+
+        item = self._repository[product_index]
+
+        if item.get_dataset() is None:
+            return
+
+        metadata = item.get_metadata_item().get_metadata()
+
+        if metadata.focus_object_distance_m != 0.0 or not metadata.far_field:
+            return
+
+        self.estimate_defocus_from_parallax(product_index, block=block)
 
     def open_product(
         self,

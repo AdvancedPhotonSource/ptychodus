@@ -99,6 +99,9 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
         builder = item.get_probe_positions_item().get_builder()
         builder.set_transform(transform)
 
+    def estimate_defocus(self) -> None:
+        self._product_api.estimate_defocus_from_parallax(self._product_index, block=True)
+
     def load_probe(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._probe_api.open_probe(self._product_index, file_path, file_type=file_type)
 

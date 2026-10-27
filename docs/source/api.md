@@ -126,15 +126,6 @@
    :show-inheritance:
 ```
 
-## Kickstart
-
-```{eval-rst}
-.. automodule:: ptychodus.api.kickstart
-   :members:
-   :undoc-members:
-   :show-inheritance:
-```
-
 ## Metrics
 
 ```{eval-rst}

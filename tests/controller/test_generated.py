@@ -264,10 +264,10 @@ class TestTitlingAGroup:
         assert _group_label('PtychoFMInference', 'pty-chi') == 'PtychoFMInference'
 
     def test_the_algorithm_name_is_stripped_where_the_backend_name_is_absent(self) -> None:
-        assert _group_label('KickstartProbe', 'Ptychodus', 'Kickstart') == 'Probe'
+        assert _group_label('LSQMLProbe', 'pty-chi', 'LSQML') == 'Probe'
 
     def test_a_group_that_is_only_the_algorithm_name_keeps_it(self) -> None:
-        assert _group_label('Kickstart', 'Ptychodus', 'Kickstart') == 'Kickstart'
+        assert _group_label('LSQML', 'pty-chi', 'LSQML') == 'LSQML'
 
 
 class TestWhichEditorAFieldGets:

@@ -142,7 +142,7 @@ Nothing below is configured by hand. A near-field product resolves it all on the
 
 ### Algorithm
 
-Pick **BH**, which reconstructs a hologram better than stock LSQML. The GUI default is the **Ptychodus** library's **Kickstart**, which estimates from far-field data only, so selecting PtyChi and BH is a manual step. The beamline drivers reconstruct with pty-chi and fall back to BH on their own for a near-field run given no `--ptychi-options` file.
+Pick **BH**, which reconstructs a hologram better than stock LSQML. The GUI default is **LSQML**, so selecting BH is a manual step. The beamline drivers reconstruct with pty-chi and fall back to BH on their own for a near-field run given no `--ptychi-options` file.
 
 Near-field scans are often few enough frames to run as a single batch, where **BH Method:** `CG` converges faster than the default `GD`.
 
