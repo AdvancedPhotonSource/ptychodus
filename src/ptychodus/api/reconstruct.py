@@ -29,7 +29,6 @@ from .files import FileWriter
 from .diffraction import (
     BadPixels,
     DetectorBackground,
-    DiffractionPatternPhotonFluxes,
     DiffractionPatterns,
     FlatField,
 )
@@ -838,7 +837,7 @@ def prepare_reconstruct_input(
     # rates (Hz) over unequal integration windows. NaN placeholders (positions whose
     # reader did not supply a count) propagate through the mean, marking the anchor
     # invalid so any pattern index interpolated from it comes out NaN.
-    photon_counts: DiffractionPatternPhotonFluxes | None = None
+    photon_counts: RealArrayType | None = None
     if pos_photon_counts is not None:
         _, photon_counts = interpolate_at_indexes(
             pos_indexes, pos_photon_counts, filtered_pattern_indexes
@@ -909,7 +908,9 @@ def warn_if_propagation_regime_disagrees(
     describes -- and the consequence is a reconstruction on the wrong sample-plane
     sampling, which fails as a bad image rather than as an error. The object-plane
     Fresnel number is the regime indicator: much less than one is far field, much
-    greater is near field.
+    greater is near field. A far-field declaration is judged at the detector distance,
+    because its sampling does not depend on the magnification and a focus only curves
+    the probe; a near-field one at the demagnified distance ``z_d / M``.
 
     Raising `far_field_fresnel_number` tolerates a more transitional geometry before
     objecting to a far-field declaration; lowering `near_field_fresnel_number` does the
@@ -923,7 +924,11 @@ def warn_if_propagation_regime_disagrees(
 
     try:
         probe_geometry = product.probes.get_geometry()
-        propagation_distance_m = metadata.detector_distance_m / metadata.magnification
+        propagation_distance_m = (
+            metadata.detector_distance_m
+            if metadata.far_field
+            else metadata.detector_distance_m / metadata.magnification
+        )
         fresnel_number = compute_full_aperture_fresnel_number(
             probe_geometry.get_pixel_geometry(),
             ImageExtent(width_px=probe_geometry.width_px, height_px=probe_geometry.height_px),

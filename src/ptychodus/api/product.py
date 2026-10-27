@@ -79,6 +79,13 @@ class ProductMetadata:
     sits, not which propagation regime the detector samples. Far field with an optic
     and near field without one are both expressible, and both occur.
     """
+    i0_photons_per_count: float = 0.0
+    """Incident photons per unit of the I0 reading the probe positions carry.
+
+    I0 -- an upstream ion chamber, diode or scaler -- is recorded in whatever units the
+    instrument uses; this converts it to incident photons. Zero means uncalibrated, so
+    I0 then only corrects the detector totals for beam decay.
+    """
 
     @property
     def magnification(self) -> float:
@@ -109,6 +116,7 @@ class ProductMetadata:
         sz += getsizeof(self.detector_distance_m)
         sz += getsizeof(self.photon_energy_eV)
         sz += getsizeof(self.probe_photon_count)
+        sz += getsizeof(self.i0_photons_per_count)
         sz += getsizeof(self.exposure_time_s)
         sz += getsizeof(self.mass_attenuation_m2_per_kg)
         sz += getsizeof(self.tomography_angle_deg)

@@ -124,12 +124,14 @@ def test_the_child_estimates_the_product_on_the_inputs_grids() -> None:
 
     run_reconstruct(payload, cast(Any, queue))
 
-    assert len(queue.items) == 1
-    tag, body = queue.items[0]
-    assert tag == ReconstructorMessage.OUTPUT
-    output: ReconstructOutput = pickle.loads(body)
-    product = output.product
-    assert (output.progress, output.progress_goal) == (1, 1)
+    assert [tag for tag, _ in queue.items] == [ReconstructorMessage.OUTPUT] * options.update_count
+    outputs: list[ReconstructOutput] = [pickle.loads(body) for _, body in queue.items]
+    num_patterns = input_.diffraction_patterns.shape[0]
+    progress = [output.progress for output in outputs]
+    assert progress == sorted(set(progress))
+    assert progress[-1] == num_patterns
+    assert all(output.progress_goal == num_patterns for output in outputs)
+    product = outputs[-1].product
     assert product.probes.get_array().shape == (
         1,
         1,
@@ -150,7 +152,9 @@ def test_the_library_spawns_a_child_that_returns_the_estimate() -> None:
     (reconstructor,) = list(library)
     assert isinstance(reconstructor, SubprocessReconstructor)
 
-    outputs = list(reconstructor.reconstruct(_input(layer_spacing_m=[]), options=_options()))
+    options = _options()
+    options.update_count = 1
+    outputs = list(reconstructor.reconstruct(_input(layer_spacing_m=[]), options=options))
 
     assert len(outputs) == 1
     probe = outputs[0].product.probes.get_array()[0, 0]

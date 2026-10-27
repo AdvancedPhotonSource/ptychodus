@@ -39,10 +39,12 @@ class AveragePatternProbeBuilder(ProbeEnsembleBuilder):
 
     def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
         assembled_data = geometry_provider.get_assembled_data()
+        moments = geometry_provider.get_diffraction_moments()
 
-        if assembled_data is None:
-            # Not yet bound; the build is retried once the product has data.
-            raise GeometryNotDefinedError('No diffraction data to estimate the probe from.')
+        if assembled_data is None or moments is None:
+            # Not yet bound, or the moments are still being computed; the build is
+            # retried once they are available.
+            raise GeometryNotDefinedError('No diffraction moments to estimate the probe from.')
 
         # A flat-phase square root back-propagates to the beam at its waist. The defocus
         # carries it to the object, deferring to the product's focus as the focusing
@@ -53,13 +55,13 @@ class AveragePatternProbeBuilder(ProbeEnsembleBuilder):
             resolve_defocus_distance_m(geometry_provider, self.defocus_distance_m.get_value())
             + self.propagation_distance_m.get_value()
         )
+        # The moments' mean frame is already corrected for the background and flat field,
+        # and their mask includes the pixels those maps leave unusable.
         probe = generate_average_pattern_probe(
             geometry_provider.get_probe_geometry(),
-            assembled_data.get_mean_pattern(),
+            moments.mean_frame,
             detector_pixel_geometry=assembled_data.get_pixel_geometry(),
-            bad_pixels=assembled_data.get_bad_pixels(),
-            background=assembled_data.get_background(),
-            flat_field=assembled_data.get_flat_field(),
+            bad_pixels=moments.bad_pixels,
             photon_wavelength_m=geometry_provider.photon_wavelength_m,
             detector_distance_m=geometry_provider.detector_distance_m,
             far_field=geometry_provider.far_field,

@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 import math
 
+from ptychodus.api.accumulate import DiffractionMoments
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.geometry import GeometryNotDefinedError, ImageExtent, PixelGeometry
@@ -80,6 +81,9 @@ class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Obs
 
     def get_assembled_data(self) -> AssembledDiffractionData | None:
         return None if self._dataset is None else self._dataset.get_assembled_data()
+
+    def get_diffraction_moments(self) -> DiffractionMoments | None:
+        return None if self._dataset is None else self._dataset.get_diffraction_moments()
 
     def set_mean_amplitude_transmission(self, transmission: float) -> None:
         if transmission == self._mean_amplitude_transmission:

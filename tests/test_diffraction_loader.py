@@ -15,6 +15,7 @@ from typing import cast
 import numpy
 
 from ptychodus.model.task_manager import BackgroundTask, ForegroundTask, TaskManager
+from ptychodus.api.accumulate import compute_diffraction_moments
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.diffraction import (
     DiffractionArray,
@@ -26,7 +27,10 @@ from ptychodus.api.diffraction import (
 )
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.settings import SettingsRegistry
-from ptychodus.model.diffraction.dataset import AssembledDiffractionDataset
+from ptychodus.model.diffraction.dataset import (
+    AssembledDiffractionDataset,
+    DiffractionDatasetObserver,
+)
 from ptychodus.model.diffraction.monitor import DiffractionTaskMonitor
 from ptychodus.model.diffraction.settings import DetectorSettings, DiffractionSettings
 
@@ -307,3 +311,79 @@ def test_appended_array_masks_its_non_finite_pixels_for_the_whole_buffer() -> No
     assert dataset.get_assembled_data().get_bad_pixels()[4, 8]
     assert dataset.get_bad_pixels()[18, 30]
     assert numpy.isfinite(dataset.get_assembled_data().get_patterns()).all()
+
+
+class _MomentsObserver(DiffractionDatasetObserver):
+    def __init__(self) -> None:
+        super().__init__()
+        self.num_moments_changed = 0
+
+    def handle_array_inserted(self, index: int) -> None:
+        pass
+
+    def handle_array_changed(self, index: int) -> None:
+        pass
+
+    def handle_dataset_reloaded(self) -> None:
+        pass
+
+    def handle_moments_changed(self) -> None:
+        self.num_moments_changed += 1
+
+
+def _assert_moments_of(dataset: AssembledDiffractionDataset) -> None:
+    data = dataset.get_assembled_data()
+    expected = compute_diffraction_moments(
+        data.get_indexes(), data.get_patterns(), bad_pixels=data.get_bad_pixels()
+    )
+    moments = dataset.get_diffraction_moments()
+
+    assert expected is not None and moments is not None
+    numpy.testing.assert_array_equal(moments.indexes, expected.indexes)
+    numpy.testing.assert_allclose(moments.total_counts, expected.total_counts)
+    numpy.testing.assert_allclose(moments.mean_frame, expected.mean_frame)
+
+
+def test_a_load_accumulates_the_moments_of_what_it_assembled() -> None:
+    dataset = make_dataset(arrays=[_saturated_array('a', 3), _saturated_array('b', 2, 3)])
+    observer = _MomentsObserver()
+    dataset.add_observer(observer)
+
+    dataset.load_all_arrays(process_patterns=True, block=True)
+
+    assert dataset._moments is not None
+    assert observer.num_moments_changed == 1
+    _assert_moments_of(dataset)
+
+
+def test_a_reload_discards_the_moments() -> None:
+    arrays = [_saturated_array('a', 3)]
+    dataset = make_dataset(arrays=arrays)
+    dataset.load_all_arrays(process_patterns=True, block=True)
+    assert dataset.get_diffraction_moments() is not None
+
+    dataset.reload(
+        SimpleDiffractionDataset(
+            dataset.get_metadata(), DiffractionDatasetLayoutNode.create_root(), arrays
+        )
+    )
+
+    assert dataset._moments is None
+    assert dataset.get_diffraction_moments() is None
+
+
+def test_patterns_set_directly_get_their_moments_on_first_request() -> None:
+    dataset = make_dataset()
+    patterns = numpy.arange(4 * 6 * 6, dtype=numpy.uint16).reshape(4, 6, 6)
+    dataset.set_assembled_patterns(
+        AssembledDiffractionData(
+            numpy.arange(4, dtype=numpy.intp),
+            patterns,
+            PixelGeometry(width_m=1e-6, height_m=1e-6),
+            numpy.zeros((6, 6), dtype=bool),
+        )
+    )
+
+    assert dataset._moments is None
+    _assert_moments_of(dataset)
+    assert dataset._moments is not None

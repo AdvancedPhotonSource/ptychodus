@@ -20,7 +20,7 @@ import numpy
 import yaml
 
 from ptychodus.api.affine import AffineFitResult, estimate_affine_transform
-from ptychodus.api.assemble import assemble_dataset, estimate_mean_amplitude_transmission
+from ptychodus.api.assemble import assemble_dataset
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import BadPixels, CropRegion
 from ptychodus.api.geometry import PixelGeometry
@@ -48,6 +48,7 @@ from ptychodus.api.simulate.probe import (
 )
 from ptychodus.cli._batch_lamni_settings import BatchSettings
 from ptychodus.cli._reconstruct_common import (
+    estimate_incident_beam_from_assembled_data,
     CancellationToken,
     invalid_count_threshold,
     resolve_flag,
@@ -429,17 +430,18 @@ def reconstruct_one_scan(
         far_field=far_field,
         focus_object_distance_m=focus_object_distance_m,
     )
+    incident_beam = estimate_incident_beam_from_assembled_data(assembled_data, positions)
     object_ = _build_initial_object(
         settings,
         registry,
         positions,
         probe_geometry,
-        estimate_mean_amplitude_transmission(assembled_data),
+        incident_beam.mean_amplitude_transmission,
     )
     logger.info('Object geometry: %d layer(s)', object_.num_layers)
 
     probe_photon_count = (
-        float(assembled_data.get_probe_photon_count())
+        incident_beam.incident_photon_count
         if overrides.probe_photon_count is None
         else overrides.probe_photon_count
     )

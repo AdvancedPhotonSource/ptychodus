@@ -13,11 +13,18 @@ from PyQt5.QtCore import (
     Qt,
 )
 from PyQt5.QtGui import QBrush
-from PyQt5.QtWidgets import QComboBox, QStyledItemDelegate, QStyleOptionViewItem, QWidget
+from PyQt5.QtWidgets import (
+    QComboBox,
+    QMessageBox,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+    QWidget,
+)
 
 from ptychodus.api.constants import LengthUnit
 from ptychodus.api.diffraction import Polarization
 from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.parallax import ParallaxEstimate
 
 from ...model.diffraction import (
     AssembledDiffractionDataset,
@@ -25,7 +32,7 @@ from ...model.diffraction import (
     DiffractionDatasetRepositoryObserver,
 )
 from ..diffraction.dataset import UNBOUND_DATASET, DiffractionDatasetComboModel
-from ...model.product import ProductRepositoryItem
+from ...model.product import ProductAPI, ProductRepositoryItem
 from ...view.product import ProductEditorDialog
 from ..helpers import create_brush_for_editable_cell
 
@@ -53,6 +60,7 @@ class _Row(Enum):
     OBJECT_PLANE_PIXEL_WIDTH_NM = ('Object Plane Pixel Width [nm]', False)
     OBJECT_PLANE_PIXEL_HEIGHT_NM = ('Object Plane Pixel Height [nm]', False)
     EXPOSURE_TIME_S = ('Exposure Time [s]', True)
+    I0_PHOTONS_PER_COUNT = ('I0 Calibration [photons/count]', True)
     MASS_ATTENUATION_M2_PER_KG = ('Mass Attenuation [m\u00b2/kg]', True)
     TOMOGRAPHY_ANGLE_DEG = ('Tomography Angle [deg]', True)
     TILT_ANGLE_DEG = ('Tilt Angle [deg]', True)
@@ -167,6 +175,8 @@ class ProductPropertyTableModel(QAbstractTableModel):
                                 return f'{LengthUnit.NANOMETER.convert(height_m):.4g}'
                             case _Row.EXPOSURE_TIME_S:
                                 return f'{metadata_item.exposure_time_s.get_value():.4g}'
+                            case _Row.I0_PHOTONS_PER_COUNT:
+                                return f'{metadata_item.i0_photons_per_count.get_value():.4g}'
                             case _Row.MASS_ATTENUATION_M2_PER_KG:
                                 return f'{metadata_item.mass_attenuation_m2_per_kg.get_value():.4g}'
                             case _Row.TOMOGRAPHY_ANGLE_DEG:
@@ -216,6 +226,14 @@ class ProductPropertyTableModel(QAbstractTableModel):
                         return False
 
                     metadata_item.exposure_time_s.set_value(exposure_time_s)
+                    return True
+                case _Row.I0_PHOTONS_PER_COUNT:
+                    try:
+                        i0_photons_per_count = float(value)
+                    except ValueError:
+                        return False
+
+                    metadata_item.i0_photons_per_count.set_value(i0_photons_per_count)
                     return True
                 case _Row.MASS_ATTENUATION_M2_PER_KG:
                     try:
@@ -373,12 +391,16 @@ class ProductEditorViewController(Observer, DiffractionDatasetRepositoryObserver
     def __init__(
         self,
         diffraction_repository: DiffractionDatasetRepository,
+        product_api: ProductAPI,
+        product_index: int,
         product: ProductRepositoryItem,
         table_model: ProductPropertyTableModel,
         dialog: ProductEditorDialog,
     ) -> None:
         super().__init__()
         self._diffraction_repository = diffraction_repository
+        self._product_api = product_api
+        self._product_index = product_index
         self._product = product
         self._table_model = table_model
         self._dialog = dialog
@@ -388,6 +410,8 @@ class ProductEditorViewController(Observer, DiffractionDatasetRepositoryObserver
         cls,
         diffraction_repository: DiffractionDatasetRepository,
         dataset_combo_model: DiffractionDatasetComboModel,
+        product_api: ProductAPI,
+        product_index: int,
         product: ProductRepositoryItem,
         parent: QWidget,
     ) -> None:
@@ -416,7 +440,9 @@ class ProductEditorViewController(Observer, DiffractionDatasetRepositoryObserver
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
         dialog.table_view.resizeRowsToContents()
 
-        view_controller = cls(diffraction_repository, product, table_model, dialog)
+        view_controller = cls(
+            diffraction_repository, product_api, product_index, product, table_model, dialog
+        )
         product.add_observer(view_controller)
         diffraction_repository.add_observer(view_controller)
         dialog.text_edit.textChanged.connect(view_controller._sync_view_to_model)
@@ -425,6 +451,9 @@ class ProductEditorViewController(Observer, DiffractionDatasetRepositoryObserver
 
         dialog.actions_view.estimate_probe_photon_count_button.clicked.connect(
             view_controller._estimate_probe_photon_count
+        )
+        dialog.actions_view.estimate_defocus_button.clicked.connect(
+            view_controller._estimate_defocus
         )
         dialog.finished.connect(view_controller._finish)
         dialog.open()
@@ -441,21 +470,45 @@ class ProductEditorViewController(Observer, DiffractionDatasetRepositoryObserver
         metadata = self._product.get_metadata_item()
         self._dialog.text_edit.setPlainText(metadata.comments.get_value())
 
-        self._dialog.actions_view.estimate_probe_photon_count_button.setEnabled(
-            self._product.get_dataset() is not None
+        has_dataset = self._product.get_dataset() is not None
+        self._dialog.actions_view.estimate_probe_photon_count_button.setEnabled(has_dataset)
+        self._dialog.actions_view.estimate_defocus_button.setEnabled(
+            has_dataset and metadata.far_field.get_value()
         )
 
     def _estimate_probe_photon_count(self) -> None:
-        metadata = self._product.get_metadata_item()
-        dataset = self._product.get_dataset()
-        if dataset is None:
+        if self._product.get_dataset() is None:
             logger.warning('Cannot estimate probe photon count: no diffraction dataset selected.')
             return
-        photon_count = dataset.get_assembled_data().get_probe_photon_count()
-        metadata.probe_photon_count.set_value(photon_count)
 
+        self._product.estimate_probe_photon_count()
         self._table_model.beginResetModel()
         self._table_model.endResetModel()
+
+    def _estimate_defocus(self) -> None:
+        self._dialog.actions_view.estimate_defocus_button.setEnabled(False)
+        self._product_api.estimate_defocus_from_parallax(
+            self._product_index, on_finished=self._report_defocus
+        )
+
+    def _report_defocus(self, estimate: ParallaxEstimate | None, applied: bool) -> None:
+        self._dialog.actions_view.estimate_defocus_button.setEnabled(True)
+
+        if estimate is None:
+            text = 'The parallax gives no defocus estimate; see the log.'
+        else:
+            text = (
+                f'Defocus {estimate.defocus_distance_m * 1e3:.4g} '
+                f'\u00b1 {estimate.standard_error_m * 1e3:.2g} mm\n'
+                f'Depth of focus {estimate.depth_of_focus_m * 1e3:.4g} mm\n'
+                + (
+                    'Resolved: the focus position is set.'
+                    if applied
+                    else 'Not resolved: the focus position is left as it was.'
+                )
+            )
+
+        QMessageBox.information(self._dialog, 'Estimate Defocus', text)
 
     def _finish(self, result: int) -> None:
         self._product.remove_observer(self)

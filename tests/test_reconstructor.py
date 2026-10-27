@@ -1314,6 +1314,27 @@ class TestWarnIfPropagationRegimeDisagrees:
 
         assert caplog.records == []
 
+    def test_a_focus_does_not_question_a_far_field_declaration(self, caplog) -> None:
+        """Far-field sampling ignores the magnification and the probe carries the focus's
+        curvature, so a far-field declaration is judged at the detector distance."""
+        product = _product_with_regime(far_field=True, focus_object_distance_m=-1.0e-7)
+
+        with caplog.at_level(logging.WARNING, logger=_WARN_LOGGER):
+            warn_if_propagation_regime_disagrees(product)
+
+        assert product.metadata.magnification > 1.0e6
+        assert caplog.records == []
+
+    def test_a_near_field_declaration_is_judged_at_the_demagnified_distance(self, caplog) -> None:
+        """The same focus brings a near-field product's Fresnel number up by the
+        magnification, which is what makes this geometry near field after all."""
+        product = _product_with_regime(far_field=False, focus_object_distance_m=-1.0e-7)
+
+        with caplog.at_level(logging.WARNING, logger=_WARN_LOGGER):
+            warn_if_propagation_regime_disagrees(product)
+
+        assert caplog.records == []
+
     def test_a_detector_at_the_focus_is_silent_rather_than_raising(self, caplog) -> None:
         """Degenerate geometry is reported by nothing, so it warns about nothing."""
         product = _product_with_regime(far_field=False, focus_object_distance_m=1.0)

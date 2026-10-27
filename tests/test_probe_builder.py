@@ -31,6 +31,7 @@ import math
 import numpy
 import pytest
 
+from ptychodus.api.accumulate import DiffractionMoments, compute_diffraction_moments
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry
 from ptychodus.api.probe import (
@@ -104,6 +105,20 @@ class _StubProbeGeometryProvider(ProbeGeometryProvider):
 
     def get_assembled_data(self) -> AssembledDiffractionData | None:
         return self._assembled_data
+
+    def get_diffraction_moments(self) -> DiffractionMoments | None:
+        data = self._assembled_data
+
+        if data is None:
+            return None
+
+        return compute_diffraction_moments(
+            data.get_indexes(),
+            data.get_patterns(),
+            bad_pixels=data.get_bad_pixels(),
+            background=data.get_background(),
+            flat_field=data.get_flat_field(),
+        )
 
     @property
     def detector_distance_m(self) -> float:
@@ -350,6 +365,56 @@ def test_from_memory_builder_ignores_conditioning() -> None:
 
     assert numpy.array_equal(probe_seq.get_array(), raw.get_array())
     assert numpy.array_equal(probe_seq.get_opr_weights(), raw.get_opr_weights())
+
+
+def test_making_a_from_memory_probe_editable_changes_nothing_until_a_count_is_raised() -> None:
+    settings = _make_settings()
+    settings.num_incoherent_modes.set_value(6)
+    raw = _make_probe_seq(1, 2)
+    builder = FromMemoryProbeBuilder(_make_rng(), settings, raw)
+
+    builder.make_editable()
+
+    assert builder.is_editable
+    assert builder.num_incoherent_modes.get_value() == 2
+    assert builder.num_coherent_modes.get_value() == 1
+    probe_seq = builder.build(_StubProbeGeometryProvider())
+    assert numpy.array_equal(probe_seq.get_array(), raw.get_array())
+
+
+def test_an_editable_from_memory_probe_takes_on_more_modes_and_keeps_its_own() -> None:
+    raw = _make_probe_seq(1, 2)
+    builder = FromMemoryProbeBuilder(_make_rng(), _make_settings(), raw)
+    builder.make_editable()
+    builder.num_incoherent_modes.set_value(4)
+    # The fixture's random modes are not mutually orthogonal, and orthogonalizing them
+    # would change the second; a solved probe's modes already are.
+    builder.orthogonalize_incoherent_modes.set_value(False)
+
+    probe_seq = builder.build(_StubProbeGeometryProvider())
+
+    # The modes it had are kept in shape and order, and the beam's total power is not
+    # changed by how many modes represent it.
+    assert probe_seq.num_incoherent_modes == 4
+    expected = raw.get_array()[0]
+    actual = probe_seq.get_array()[0]
+
+    for kept, original in zip(actual[:2], expected, strict=True):
+        overlap = abs(numpy.vdot(kept, original)) / (
+            numpy.linalg.norm(kept) * numpy.linalg.norm(original)
+        )
+        assert overlap == pytest.approx(1.0, abs=1e-9)
+
+    assert numpy.sum(numpy.abs(actual) ** 2) == pytest.approx(numpy.sum(numpy.abs(expected) ** 2))
+
+
+def test_a_copy_of_an_editable_builder_is_editable() -> None:
+    builder = FromMemoryProbeBuilder(_make_rng(), _make_settings(), _make_probe_seq(1, 1))
+    assert not builder.copy().is_editable
+
+    builder.make_editable()
+
+    assert builder.copy().is_editable
 
 
 def test_repeated_from_memory_builds_are_idempotent() -> None:

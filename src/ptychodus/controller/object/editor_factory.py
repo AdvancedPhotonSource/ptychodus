@@ -6,6 +6,7 @@ from ...model.product.object import (
     DeadLeavesObjectBuilder,
     FractalNoiseObjectBuilder,
     FromFileObjectBuilder,
+    FromMemoryObjectBuilder,
     GaussianRandomFieldObjectBuilder,
     ObjectRepositoryItem,
     PaganinObjectBuilder,
@@ -13,6 +14,7 @@ from ...model.product.object import (
     STXMDPCObjectBuilder,
     SiemensStarObjectBuilder,
 )
+from ..make_editable import MakeEditableViewController
 from ..parameters import ParameterViewBuilder, ParameterViewController
 
 
@@ -269,16 +271,29 @@ class ObjectEditorViewControllerFactory:
                 group=additional_layers_group,
             )
             return dialog_builder.build_dialog(title, parent)
-        elif isinstance(object_builder, FromFileObjectBuilder):
-            # A from-file object is conditioned on the way in, but only the layer
-            # spacing applies -- the extra padding is generation-only, so its spin
-            # boxes are deliberately absent here. A from-memory object falls
-            # through to the message box below, since nothing about it is editable.
+        elif isinstance(object_builder, FromFileObjectBuilder) or (
+            isinstance(object_builder, FromMemoryObjectBuilder) and object_builder.is_editable
+        ):
+            # A from-file object is conditioned on the way in, and an editable result on
+            # every build, but only the layer spacing applies -- the extra padding is
+            # generation-only, so its spin boxes are deliberately absent here.
             dialog_builder = ParameterViewBuilder()
             dialog_builder.add_view_controller(
                 MultisliceViewController(item),
                 'Number of Layers:',
                 group=additional_layers_group,
+            )
+            return dialog_builder.build_dialog(title, parent)
+        elif item.can_make_editable():
+            # A result ignores the layer spacing until it is made editable.
+            dialog_builder = ParameterViewBuilder()
+            dialog_builder.add_view_controller_to_bottom(
+                MakeEditableViewController(
+                    item.make_editable,
+                    lambda: self.create_editor_dialog(item_name, item, parent).open(),
+                    'Let this result be resliced into more layers. The spacing starts at '
+                    'the one it has, so nothing changes until the layers are changed.',
+                )
             )
             return dialog_builder.build_dialog(title, parent)
 

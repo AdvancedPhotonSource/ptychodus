@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from enum import Enum
 import logging
 
-from ptychodus.api.assemble import estimate_mean_amplitude_transmission
+from ptychodus.api.accumulate import estimate_incident_beam
 from ptychodus.api.observer import Observable
 from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.product import LossValue, Product
@@ -199,8 +199,7 @@ class ProductRepositoryItem(ParameterGroup):
         self._dataset_observer = _BoundDatasetObserver(self)
         dataset.add_observer(self._dataset_observer)
 
-        self._auto_estimate_probe_photon_count()
-        self._estimate_mean_amplitude_transmission()
+        self._estimate_incident_beam()
         self._handle_diffraction_data_changed(data_changed)
 
     def _handle_diffraction_data_changed(self, data_changed: bool = True) -> None:
@@ -214,25 +213,33 @@ class ProductRepositoryItem(ParameterGroup):
             self._probe_item.handle_diffraction_data_changed()
             self._object_item.handle_diffraction_data_changed()
 
-    def _estimate_mean_amplitude_transmission(self) -> None:
-        # Unguarded, unlike the photon count: this is a property of the patterns alone,
-        # carries no user- or file-supplied value to protect, and must follow them
-        # whenever they are reprocessed.
-        if self._dataset is None:
-            return
-        transmission = estimate_mean_amplitude_transmission(self._dataset.get_assembled_data())
-        self._geometry.set_mean_amplitude_transmission(transmission)
+    def estimate_probe_photon_count(self) -> None:
+        """Set the probe photon count from the diffraction moments, replacing any value."""
+        self._estimate_incident_beam(replace_photon_count=True)
 
-    def _auto_estimate_probe_photon_count(self) -> None:
-        # Guard on the default sentinel so a user- or file-supplied value is
-        # never overwritten. A real measurement never sums to exactly zero on
-        # the brightest pattern.
-        if self._dataset is None:
+    def _estimate_incident_beam(self, *, replace_photon_count: bool = False) -> None:
+        """Set the mean transmission and the photon count from the bound data's moments.
+
+        The transmission is a property of the patterns alone, carries no user- or
+        file-supplied value to protect, and follows them whenever they are reprocessed.
+        The photon count is only filled while it holds the default sentinel, so a value
+        from the user or a file survives, unless `replace_photon_count` asks otherwise.
+        Nothing changes while the moments are still being computed.
+        """
+        moments = None if self._dataset is None else self._dataset.get_diffraction_moments()
+
+        if moments is None:
             return
-        if self._metadata_item.probe_photon_count.get_value() != 0.0:
-            return
-        photon_count = self._dataset.get_assembled_data().get_probe_photon_count()
-        self._metadata_item.probe_photon_count.set_value(float(photon_count))
+
+        estimate = estimate_incident_beam(
+            moments,
+            self._probe_positions_item.get_probe_positions().get_probe_photon_counts_by_index(),
+            i0_photons_per_count=self._metadata_item.i0_photons_per_count.get_value(),
+        )
+        self._geometry.set_mean_amplitude_transmission(estimate.mean_amplitude_transmission)
+
+        if replace_photon_count or self._metadata_item.probe_photon_count.get_value() == 0.0:
+            self._metadata_item.probe_photon_count.set_value(estimate.incident_photon_count)
 
     def _sync_geometry_from_dataset(self) -> None:
         if self._dataset is None:
@@ -342,6 +349,9 @@ class _BoundDatasetObserver(DiffractionDatasetObserver):
 
     def handle_dataset_reloaded(self) -> None:
         self._item._sync_geometry_from_dataset()
-        self._item._auto_estimate_probe_photon_count()
-        self._item._estimate_mean_amplitude_transmission()
+        self._item._estimate_incident_beam()
+        self._item._handle_diffraction_data_changed()
+
+    def handle_moments_changed(self) -> None:
+        self._item._estimate_incident_beam()
         self._item._handle_diffraction_data_changed()

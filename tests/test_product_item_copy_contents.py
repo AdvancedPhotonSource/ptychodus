@@ -83,14 +83,15 @@ def _make_item(
 
 
 def _make_dataset() -> MagicMock:
-    """A dataset mock whose assembled data is real.
+    """A dataset mock whose assembled data is real and whose moments are pending.
 
-    Binding a dataset estimates the sample transmission from its patterns, which is
-    arithmetic rather than a call to record, so the buffer has to be a real one. The
-    null buffer carries no patterns and yields a transparent sample.
+    Binding a dataset estimates the sample transmission from its moments, which is
+    arithmetic rather than a call to record, so the mock reports none yet and the
+    estimate waits for them.
     """
     dataset = MagicMock()
     dataset.get_assembled_data.return_value = AssembledDiffractionData.create_null()
+    dataset.get_diffraction_moments.return_value = None
     return dataset
 
 

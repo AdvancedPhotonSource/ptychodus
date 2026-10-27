@@ -13,6 +13,7 @@ from typing import cast
 import numpy
 from scipy.fft import fft2
 
+from .accumulate import DiffractionMoments
 from .assemble import AssembledDiffractionData
 from .constants import format_length
 from .files import FileReader, FileWriter
@@ -1046,6 +1047,14 @@ class ProbeGeometryProvider(ABC):
 
         Read at the point of use rather than kept, so a builder copied into another
         product, or a product rebound to other data, sees the data it has now.
+        """
+
+    @abstractmethod
+    def get_diffraction_moments(self) -> DiffractionMoments | None:
+        """The bound data's diffraction moments, or None while unbound or not yet computed.
+
+        Accumulated once from the assembled patterns, so a builder needing only their
+        statistics does not pass over every pattern itself.
         """
 
 

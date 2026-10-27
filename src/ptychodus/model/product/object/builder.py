@@ -141,11 +141,17 @@ class ObjectBuilder(ParameterGroup):
         unrequestable for an object that has more -- the data model cannot tell "one
         layer" from "unspecified".
 
+        A spacing equal to the object's own leaves it untouched, so rebuilding an
+        already-sliced object does not resample it again.
+
         Note the padding is applied earlier, in `_build_raw`, so the order here is
         pad-then-layers rather than the layers-then-pad of the original
         `_create_object`. The two do not commute, because a zero-amplitude border
         changes the resampled result near the edges.
         """
+        if list(layer_spacing_m) == list(object_.layer_spacing_m):
+            return object_
+
         if not layer_spacing_m and object_.num_layers > 1:
             logger.info(
                 f'Object has {object_.num_layers} layer(s) and no layer spacing is set;'
@@ -221,15 +227,35 @@ class FromMemoryObjectBuilder(ObjectBuilder):
     The requested `layer_spacing_m` is likewise ignored in favor of the spacing
     the object actually has, which is why `ObjectRepositoryItem.set_num_layers`
     is inert for from-memory items.
+
+    An *editable* builder slices the object onto the requested spacing after all, so
+    layers can be added to a result; it still pads nothing. Only :meth:`make_editable`
+    makes one, and the item a reconstruction writes into is reassigned a non-editable
+    builder every iteration.
     """
 
-    def __init__(self, settings: ObjectSettings, object_: Object) -> None:
+    def __init__(
+        self, settings: ObjectSettings, object_: Object, *, editable: bool = False
+    ) -> None:
         super().__init__(settings, 'from_memory')
         self._settings = settings
         self._object = object_.copy()
+        self._editable = editable
+
+    @property
+    def is_editable(self) -> bool:
+        return self._editable
+
+    def make_editable(self) -> None:
+        """Slice the object onto the requested layer spacing on later builds."""
+        if self._editable:
+            return
+
+        self._editable = True
+        self.notify_observers()
 
     def copy(self) -> FromMemoryObjectBuilder:
-        builder = FromMemoryObjectBuilder(self._settings, self._object)
+        builder = FromMemoryObjectBuilder(self._settings, self._object, editable=self._editable)
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
@@ -261,6 +287,9 @@ class FromMemoryObjectBuilder(ObjectBuilder):
         geometry_provider: ObjectGeometryProvider,
         layer_spacing_m: Sequence[float],
     ) -> Object:
+        if self._editable:
+            return self._condition_object(self._build_raw(geometry_provider), layer_spacing_m)
+
         return self._build_raw(geometry_provider)
 
 

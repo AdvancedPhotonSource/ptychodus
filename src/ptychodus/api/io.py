@@ -154,7 +154,6 @@ class DiffractionFileKeys(StrEnum):
     DETECTOR_PIXEL_WIDTH = 'detector_pixel_width_m'
     INDEXES = 'indexes'
     BAD_PIXELS = 'bad_pixels'
-    PROBE_PHOTON_COUNTS = 'probe_photon_counts'
     BACKGROUND = 'background'
     FLAT_FIELD = 'flat_field'
 
@@ -215,11 +214,6 @@ def load_diffraction_data(
                 mmap_file, dtype=h5_patterns.dtype, mode='r', shape=h5_patterns.shape
             )
 
-        probe_photon_counts = None
-        h5_probe_photon_counts = h5_file.get(DiffractionFileKeys.PROBE_PHOTON_COUNTS)
-        if isinstance(h5_probe_photon_counts, h5py.Dataset):
-            probe_photon_counts = h5_probe_photon_counts[()]
-
         background = None
         h5_background = h5_file.get(DiffractionFileKeys.BACKGROUND)
         if isinstance(h5_background, h5py.Dataset):
@@ -235,7 +229,6 @@ def load_diffraction_data(
             patterns,
             detector_pixel_geometry,
             h5_bad_pixels[()],
-            probe_photon_counts=probe_photon_counts,
             background=background,
             flat_field=flat_field,
         )
@@ -262,14 +255,6 @@ def save_diffraction_data(
         h5_file.create_dataset(
             DiffractionFileKeys.BAD_PIXELS, data=data._bad_pixels, compression=compression
         )
-        if data.has_measured_probe_photon_counts():
-            assert data._probe_photon_counts is not None
-            h5_file.create_dataset(
-                DiffractionFileKeys.PROBE_PHOTON_COUNTS,
-                data=data._probe_photon_counts,
-                compression=compression,
-            )
-
         background = data.get_background()
         if background is not None:
             h5_file.create_dataset(
@@ -298,6 +283,7 @@ class ProductFileKeys(StrEnum):
     TILT_ANGLE = 'tilt_angle_deg'
     POLARIZATION = 'polarization'
     FAR_FIELD = 'far_field'
+    I0_PHOTONS_PER_COUNT = 'i0_photons_per_count'
     PROBE_ARRAY = 'probe'
     OPR_WEIGHTS = 'opr_weights'
     PROBE_PIXEL_HEIGHT = 'pixel_height_m'
@@ -347,6 +333,7 @@ def load_product(file: Path) -> Product:
         comments = str(h5_file.attrs.get(ProductFileKeys.COMMENTS, ''))
         probe_photon_count = float(h5_file.attrs.get(ProductFileKeys.PROBE_PHOTON_COUNT, 0.0))
         exposure_time_s = float(h5_file.attrs.get(ProductFileKeys.EXPOSURE_TIME, 0.0))
+        i0_photons_per_count = float(h5_file.attrs.get(ProductFileKeys.I0_PHOTONS_PER_COUNT, 0.0))
         mass_attenuation_m2_per_kg = float(h5_file.attrs.get(ProductFileKeys.MASS_ATTENUATION, 0.0))
         tomography_angle_deg = float(h5_file.attrs.get(ProductFileKeys.TOMOGRAPHY_ANGLE, 0.0))
         tilt_angle_deg = float(h5_file.attrs.get(ProductFileKeys.TILT_ANGLE, 0.0))
@@ -373,6 +360,7 @@ def load_product(file: Path) -> Product:
             tilt_angle_deg=tilt_angle_deg,
             polarization=polarization,
             far_field=far_field,
+            i0_photons_per_count=i0_photons_per_count,
         )
 
         h5_object = h5_file[ProductFileKeys.OBJECT_ARRAY]
@@ -522,6 +510,7 @@ def save_product(file: Path, product: Product) -> None:
         h5_file.attrs[ProductFileKeys.FOCUS_OBJECT_DISTANCE] = metadata.focus_object_distance_m
         h5_file.attrs[ProductFileKeys.TILT_ANGLE] = metadata.tilt_angle_deg
         h5_file.attrs[ProductFileKeys.FAR_FIELD] = metadata.far_field
+        h5_file.attrs[ProductFileKeys.I0_PHOTONS_PER_COUNT] = metadata.i0_photons_per_count
         if metadata.polarization is not None:
             h5_file.attrs[ProductFileKeys.POLARIZATION] = metadata.polarization.value
 
@@ -771,6 +760,7 @@ class CXIFileKeys(StrEnum):
     FOCUS_OBJECT_DISTANCE = 'ptychodus/focus_object_distance_m'
     POLARIZATION = 'ptychodus/polarization'
     FAR_FIELD = 'ptychodus/far_field'
+    I0_PHOTONS_PER_COUNT = 'ptychodus/i0_photons_per_count'
     BEAM_CENTER_X = 'ptychodus/beam_center_x_px'
     BEAM_CENTER_Y = 'ptychodus/beam_center_y_px'
 
@@ -1350,6 +1340,7 @@ def _read_cxi_product_metadata(entry: h5py.Group, file_path: Path) -> ProductMet
             None if raw_polarization is None else _parse_polarization(raw_polarization, file_path)
         ),
         far_field=True if far_field is None else bool(far_field),
+        i0_photons_per_count=scalar(CXIFileKeys.I0_PHOTONS_PER_COUNT),
     )
 
 
@@ -1921,6 +1912,7 @@ def _write_cxi_product(
         (CXIFileKeys.TILT_ANGLE, metadata.tilt_angle_deg),
         (CXIFileKeys.FOCUS_OBJECT_DISTANCE, metadata.focus_object_distance_m),
         (CXIFileKeys.FAR_FIELD, metadata.far_field),
+        (CXIFileKeys.I0_PHOTONS_PER_COUNT, metadata.i0_photons_per_count),
     ):
         _replace_cxi_dataset(entry, key, value)
 

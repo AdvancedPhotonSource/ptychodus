@@ -28,6 +28,7 @@ import numpy
 import numpy.testing
 import pytest
 
+from ptychodus.api.accumulate import DiffractionMoments, compute_diffraction_moments
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import (
@@ -74,6 +75,20 @@ class _StubObjectGeometryProvider(ObjectGeometryProvider):
 
     def get_assembled_data(self) -> AssembledDiffractionData | None:
         return self._assembled_data
+
+    def get_diffraction_moments(self) -> DiffractionMoments | None:
+        data = self._assembled_data
+
+        if data is None:
+            return None
+
+        return compute_diffraction_moments(
+            data.get_indexes(),
+            data.get_patterns(),
+            bad_pixels=data.get_bad_pixels(),
+            background=data.get_background(),
+            flat_field=data.get_flat_field(),
+        )
 
     @property
     def photon_wavelength_m(self) -> float:
@@ -253,6 +268,34 @@ def test_from_memory_builder_ignores_conditioning() -> None:
 
     assert numpy.array_equal(object_.get_array(), raw.get_array())
     assert list(object_.layer_spacing_m) == list(raw.layer_spacing_m)
+
+
+def test_an_editable_from_memory_object_is_resliced_but_not_padded() -> None:
+    settings = _make_settings()
+    raw = _make_object(1)
+    builder = FromMemoryObjectBuilder(settings, raw)
+    builder.extra_padding_x.set_value(5)
+    builder.make_editable()
+
+    unchanged = builder.build(_StubObjectGeometryProvider(), list(raw.layer_spacing_m))
+    resliced = builder.build(_StubObjectGeometryProvider(), [LAYER_SPACING_M, LAYER_SPACING_M])
+
+    assert builder.is_editable
+    assert numpy.array_equal(unchanged.get_array(), raw.get_array())
+    assert resliced.num_layers == 3
+    assert resliced.get_array().shape[-2:] == raw.get_array().shape[-2:]
+    numpy.testing.assert_allclose(
+        resliced.get_layers_flattened(), raw.get_layers_flattened(), rtol=1e-9, atol=1e-12
+    )
+
+
+def test_a_copy_of_an_editable_object_builder_is_editable() -> None:
+    builder = FromMemoryObjectBuilder(_make_settings(), _make_object(2))
+    assert not builder.copy().is_editable
+
+    builder.make_editable()
+
+    assert builder.copy().is_editable
 
 
 def test_repeated_from_memory_builds_are_idempotent() -> None:

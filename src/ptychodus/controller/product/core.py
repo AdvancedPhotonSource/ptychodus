@@ -611,7 +611,12 @@ class ProductController(ProductRepositoryObserver):
         if item_index >= 0:
             product = self._repository[item_index]
             ProductEditorViewController.edit_product(
-                self._diffraction_repository, self._dataset_combo_model, product, self._view
+                self._diffraction_repository,
+                self._dataset_combo_model,
+                self._api,
+                item_index,
+                product,
+                self._view,
             )
         else:
             logger.error('No current item!')

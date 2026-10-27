@@ -78,6 +78,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
     TILT_ANGLE: Final[str] = 'tilt_angle_deg'
     POLARIZATION: Final[str] = 'polarization'
     FAR_FIELD: Final[str] = 'far_field'
+    I0_PHOTONS_PER_COUNT: Final[str] = 'i0_photons_per_count'
 
     PROBE_ARRAY: Final[str] = 'probe'
     OPR_WEIGHTS: Final[str] = 'opr_weights'
@@ -135,6 +136,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
                 tilt_angle_deg=_read_real(npz_file, self.TILT_ANGLE, 0.0),
                 polarization=self._read_polarization(npz_file, file_path),
                 far_field=_read_boolean(npz_file, self.FAR_FIELD, True),
+                i0_photons_per_count=_read_real(npz_file, self.I0_PHOTONS_PER_COUNT, 0.0),
             )
 
             scan_indexes = npz_file[self.PROBE_POSITION_INDEXES]
@@ -231,6 +233,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
         contents[self.FOCUS_OBJECT_DISTANCE] = metadata.focus_object_distance_m
         contents[self.TILT_ANGLE] = metadata.tilt_angle_deg
         contents[self.FAR_FIELD] = metadata.far_field
+        contents[self.I0_PHOTONS_PER_COUNT] = metadata.i0_photons_per_count
 
         # savez cannot store None, so an absent key is how both formats spell "unpolarized".
         if metadata.polarization is not None:

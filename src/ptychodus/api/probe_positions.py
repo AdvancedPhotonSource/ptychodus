@@ -25,7 +25,12 @@ def _read_only(array: _ArrayT) -> _ArrayT:
 
 @dataclass(frozen=True)
 class ProbePosition:
-    """Probe position with its scan index and (x, y) physical coordinates in meters."""
+    """Probe position with its scan index and (x, y) physical coordinates in meters.
+
+    `probe_photon_count` is the I0 reading recorded for the exposure -- an upstream ion
+    chamber, diode or scaler -- in the units the instrument records it, photons only once
+    calibrated by :attr:`ptychodus.api.product.ProductMetadata.i0_photons_per_count`.
+    """
 
     index: int
     x_m: float
@@ -161,12 +166,31 @@ class ProbePositionSequence(Sequence[ProbePosition]):
         return _read_only(self._coordinates_m[:, -2])
 
     def get_probe_photon_counts(self) -> RealArrayType | None:
-        """Return the per-position photon-count array, or ``None`` when the reader did not measure it.
+        """Return the per-position I0 readings, or ``None`` when the reader recorded none.
 
         The all-or-nothing invariant guaranteed at construction means the returned array,
         when non-None, is fully populated and 1:1 aligned with the index / coordinate arrays.
+        See :class:`ProbePosition` for their units.
         """
         return self._probe_photon_counts
+
+    def get_probe_photon_counts_by_index(self) -> dict[int, float]:
+        """Return the I0 readings keyed by scan index, empty when the reader recorded none.
+
+        Positions sharing a scan index average into one reading, so the mapping pairs with
+        diffraction patterns by index as the positions themselves do.
+        """
+        counts = self._probe_photon_counts
+
+        if counts is None or counts.size == 0:
+            return {}
+
+        unique_indexes = numpy.unique(self._indexes)
+        _, unique_counts = interpolate_at_indexes(self._indexes, counts, unique_indexes)
+        return {
+            int(index): float(count)
+            for index, count in zip(unique_indexes, unique_counts, strict=True)
+        }
 
     def interpolate_at_indexes(
         self, indexes: IntegerArrayType

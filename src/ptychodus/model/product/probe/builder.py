@@ -5,7 +5,6 @@ import logging
 
 import numpy
 
-from ptychodus.api.assemble import DetectorCorrections
 from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.product import reconcile_defocus_distance_m
 from ptychodus.api.simulate.probe import (
@@ -203,10 +202,10 @@ class ProbeEnsembleBuilder(ParameterGroup):
 
         The defocus is resolved against the product's focus, as the build resolves it.
         """
-        assembled_data = geometry_provider.get_assembled_data()
+        moments = geometry_provider.get_diffraction_moments()
 
-        if assembled_data is None:
-            logger.warning('No diffraction data to estimate the probe size from.')
+        if moments is None:
+            logger.warning('No diffraction moments to estimate the probe size from.')
             return None
 
         if not geometry_provider.far_field:
@@ -216,23 +215,17 @@ class ProbeEnsembleBuilder(ParameterGroup):
             )
             return None
 
-        corrections = DetectorCorrections(
-            background=assembled_data.get_background(),
-            flat_field=assembled_data.get_flat_field(),
-            subtract_background=True,
-            divide_flat_field=True,
-        )
-        mean_pattern = corrections.apply(assembled_data.get_mean_pattern()[numpy.newaxis])[0]
-
         try:
+            # The moments' mean frame is already corrected for the background and flat
+            # field, and their mask includes the pixels those maps leave unusable.
             return estimate_probe_extent(
-                mean_pattern.astype(numpy.float64),
+                moments.mean_frame,
                 geometry_provider.get_probe_geometry(),
                 photon_wavelength_m=geometry_provider.photon_wavelength_m,
                 defocus_distance_m=resolve_defocus_distance_m(
                     geometry_provider, defocus_distance_m
                 ),
-                bad_pixels=corrections.apply_to_bad_pixels(assembled_data.get_bad_pixels()),
+                bad_pixels=moments.bad_pixels,
             )
         except ValueError as exc:
             logger.warning(f'Could not estimate the probe size: {exc}')
@@ -494,6 +487,11 @@ class FromMemoryProbeBuilder(ProbeEnsembleBuilder):
     copied onto a scan of a different size is unusable until its weight rows are
     resolved. It runs no generator and is a strict no-op whenever the row count
     already matches, which it always does for reconstruction output.
+
+    An *editable* builder runs the expand-only conditioning after all, so modes can be
+    added to a result. Only :meth:`make_editable` makes one, starting the mode counts at
+    the probe's own so that nothing changes until they are raised; the item a
+    reconstruction writes into is reassigned a non-editable builder every iteration.
     """
 
     def __init__(
@@ -501,13 +499,32 @@ class FromMemoryProbeBuilder(ProbeEnsembleBuilder):
         rng: numpy.random.Generator,
         settings: ProbeSettings,
         probe: ProbeEnsemble,
+        *,
+        editable: bool = False,
     ) -> None:
         super().__init__(rng, settings, 'from_memory')
         self._settings = settings
         self._probe = probe.copy()
+        self._editable = editable
+
+    @property
+    def is_editable(self) -> bool:
+        return self._editable
+
+    def make_editable(self) -> None:
+        """Condition the probe on later builds, starting from the modes it already has."""
+        if self._editable:
+            return
+
+        self.num_incoherent_modes.set_value(self._probe.num_incoherent_modes, notify=False)
+        self.num_coherent_modes.set_value(self._probe.num_coherent_modes, notify=False)
+        self._editable = True
+        self.notify_observers()
 
     def copy(self) -> FromMemoryProbeBuilder:
-        builder = FromMemoryProbeBuilder(self._rng, self._settings, self._probe)
+        builder = FromMemoryProbeBuilder(
+            self._rng, self._settings, self._probe, editable=self._editable
+        )
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
@@ -533,6 +550,9 @@ class FromMemoryProbeBuilder(ProbeEnsembleBuilder):
         )
 
     def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
+        if self._editable:
+            return super().build(geometry_provider)
+
         return self._build_raw(geometry_provider)
 
 

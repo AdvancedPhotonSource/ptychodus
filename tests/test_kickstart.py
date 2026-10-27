@@ -177,11 +177,11 @@ def test_the_object_is_resliced_into_the_inputs_layers() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Monitor normalization and the regime
+# I0, the writeback and the regime
 # ---------------------------------------------------------------------------
 
 
-def test_measured_incident_photon_counts_remove_a_beam_decay() -> None:
+def _decayed_scan() -> tuple[DiffractionMoments, numpy.ndarray]:
     data = simulate_scan(2.0e-3)
     indexes = numpy.array(data.get_indexes())
     decay = numpy.linspace(1.0, 0.5, indexes.size)
@@ -192,22 +192,85 @@ def test_measured_incident_photon_counts_remove_a_beam_decay() -> None:
         binning=BinningStep(bin_size_x=2, bin_size_y=2),
     )
     assert decayed is not None
-    monitored = [
+    return decayed, decay
+
+
+def test_the_positions_i0_removes_a_beam_decay() -> None:
+    decayed, decay = _decayed_scan()
+    with_i0 = [
         replace(position, probe_photon_count=1.0e6 * float(scale))
         for position, scale in zip(make_positions(), decay)
     ]
 
     reference = _kickstart(accumulate_scan(2.0e-3), defocus_distance_m=2.0e-3)
-    unmonitored = _kickstart(decayed, defocus_distance_m=2.0e-3)
-    normalized = _kickstart(decayed, positions=monitored, defocus_distance_m=2.0e-3)
+    uncorrected = _kickstart(decayed, defocus_distance_m=2.0e-3)
+    corrected = _kickstart(decayed, positions=with_i0, defocus_distance_m=2.0e-3)
 
-    assert not unmonitored.monitor_normalized
-    assert normalized.monitor_normalized
-    # Normalized to the mean monitor count, three quarters of the undecayed beam.
-    assert normalized.incident_photon_count == pytest.approx(
+    assert not uncorrected.decay_corrected
+    assert corrected.decay_corrected
+    # Corrected to the mean I0, three quarters of the undecayed beam.
+    assert corrected.incident_photon_count == pytest.approx(
         0.75 * reference.incident_photon_count, rel=0.02
     )
-    assert unmonitored.incident_photon_count > 1.2 * normalized.incident_photon_count
+    assert uncorrected.incident_photon_count > 1.2 * corrected.incident_photon_count
+
+
+def test_calibrated_i0_sets_the_incident_photon_count() -> None:
+    decayed, decay = _decayed_scan()
+    with_i0 = [
+        replace(position, probe_photon_count=float(scale))
+        for position, scale in zip(make_positions(), decay)
+    ]
+    reference = _kickstart(accumulate_scan(2.0e-3), defocus_distance_m=2.0e-3)
+    photons_per_count = reference.incident_photon_count
+
+    estimate = _kickstart(
+        decayed,
+        positions=with_i0,
+        metadata=replace(METADATA, i0_photons_per_count=photons_per_count),
+        defocus_distance_m=2.0e-3,
+    )
+
+    assert estimate.incident_photon_count == pytest.approx(
+        photons_per_count * numpy.mean(decay), rel=1e-9
+    )
+
+
+@pytest.mark.parametrize('defocus_m', [2.0e-3, -2.0e-3])
+def test_the_product_carries_the_defocus_and_the_incident_photon_count(defocus_m: float) -> None:
+    estimate = _kickstart(accumulate_scan(defocus_m))
+    metadata = estimate.product.metadata
+
+    assert estimate.defocus_source is DefocusSource.PARALLAX
+    assert metadata.focus_object_distance_m == pytest.approx(-estimate.defocus_distance_m)
+    assert metadata.probe_photon_count == pytest.approx(estimate.incident_photon_count)
+
+
+def test_a_stated_defocus_is_written_as_the_focus_position() -> None:
+    estimate = _kickstart(accumulate_scan(2.0e-3), defocus_distance_m=2.0e-3)
+
+    assert estimate.product.metadata.focus_object_distance_m == pytest.approx(-2.0e-3)
+
+
+def test_without_a_defocus_the_focus_position_is_left_alone() -> None:
+    estimate = _kickstart(accumulate_scan(0.0))
+
+    assert estimate.defocus_source is DefocusSource.NONE
+    assert estimate.product.metadata.focus_object_distance_m == 0.0
+
+
+def test_the_parallax_can_be_skipped() -> None:
+    estimate = estimate_product_from_moments(
+        accumulate_scan(2.0e-3),
+        ProbePositionSequence(make_positions()),
+        metadata=METADATA,
+        probe_geometry=PROBE_GEOMETRY,
+        object_geometry=OBJECT_GEOMETRY,
+        estimate_parallax=False,
+    )
+
+    assert estimate.parallax is None
+    assert estimate.defocus_source is DefocusSource.NONE
 
 
 def test_near_field_is_rejected() -> None:

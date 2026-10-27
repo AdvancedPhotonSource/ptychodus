@@ -377,6 +377,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
         far_field: bool | None = None,
+        i0_photons_per_count: float | None = None,
         diffraction: DiffractionWorkflowAPI | None = None,
     ) -> ProductWorkflowAPI:
         product_index = self._product_api.insert_new_product(
@@ -392,6 +393,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
             tilt_angle_deg=tilt_angle_deg,
             polarization=polarization,
             far_field=far_field,
+            i0_photons_per_count=i0_photons_per_count,
             dataset=self._fetch_dataset(diffraction),
         )
         return self.get_product(product_index)

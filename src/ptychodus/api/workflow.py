@@ -272,6 +272,7 @@ class WorkflowAPI(ABC):
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
         far_field: bool | None = None,
+        i0_photons_per_count: float | None = None,
         diffraction: DiffractionWorkflowAPI | None = None,
     ) -> ProductWorkflowAPI:
         """Create a new product with optional metadata overrides and return a handle to it.

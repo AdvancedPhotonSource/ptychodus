@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from bisect import bisect
 from collections.abc import Iterator, Sequence
 from enum import Enum
+from functools import partial
 from pathlib import Path
 from typing import IO, overload
 import logging
@@ -11,6 +12,7 @@ import threading
 
 import numpy
 
+from ptychodus.api.accumulate import DiffractionMoments, compute_diffraction_moments
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     BadPixels,
@@ -72,6 +74,10 @@ class DiffractionDatasetObserver(ABC):
 
     @abstractmethod
     def handle_dataset_reloaded(self) -> None:
+        pass
+
+    def handle_moments_changed(self) -> None:
+        """React to the diffraction moments of a finished load becoming available."""
         pass
 
 
@@ -183,6 +189,10 @@ class AssembledDiffractionDataset(DiffractionDataset):
         # Raw measured detector maps, absent unless the source or a file supplies them.
         self._background: DetectorBackground | None = None
         self._flat_field: FlatField | None = None
+        # Moments of self._data: set by the loader thread when a load finishes, or
+        # computed on first request otherwise; None whenever self._data changes.
+        self._moments_lock = threading.Lock()
+        self._moments: DiffractionMoments | None = None
 
     def _create_default_bad_pixels(self) -> BadPixels:
         extent = self._dataset.get_metadata().detector_extent
@@ -295,6 +305,53 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
     def get_assembled_data(self) -> AssembledDiffractionData:
         return self._data
+
+    def get_diffraction_moments(self) -> DiffractionMoments | None:
+        """The moments of the assembled patterns, or None while loading or with none loaded.
+
+        A load computes them as it finishes; patterns set or streamed in any other way
+        have them computed here, once, on first request.
+        """
+        with self._moments_lock:
+            moments = self._moments
+
+        if moments is not None or not self._array_list or self.is_load_in_progress():
+            return moments
+
+        data = self._data
+        moments = compute_diffraction_moments(
+            data.get_indexes(),
+            data.get_patterns(),
+            bad_pixels=data.get_bad_pixels(),
+            background=data.get_background(),
+            flat_field=data.get_flat_field(),
+        )
+
+        with self._moments_lock:
+            if data is self._data and self._moments is None:
+                self._moments = moments
+
+        return moments
+
+    def _invalidate_moments(self) -> None:
+        with self._moments_lock:
+            self._moments = None
+
+    def _on_moments_computed(
+        self, data: AssembledDiffractionData, moments: DiffractionMoments | None
+    ) -> None:
+        """Keep moments computed by the loader thread, unless the buffer was replaced since."""
+        with self._moments_lock:
+            if data is not self._data:
+                return
+
+            self._moments = moments
+
+        self._task_manager.put_foreground_task(self._notify_moments_changed)
+
+    def _notify_moments_changed(self) -> None:
+        for observer in self._observer_list:
+            observer.handle_moments_changed()
 
     def get_source(self) -> DiffractionDataset:
         """Return the raw source dataset queued for load, or the currently-loaded one.
@@ -501,6 +558,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
         offset = compute_array_offsets(metadata)[array_index]
         self._on_array_assembled(array_index, label, self._data.assemble(data, offset))
+        self._invalidate_moments()
 
     def _mask_nonfinite_pixels(self, nonfinite_pixels: BadPixels) -> None:
         """Mark detector pixels that held NaN or infinite values bad for later loads."""
@@ -546,6 +604,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
     def clear(self) -> None:
         self._dataset = SimpleDiffractionDataset.create_null()
         self._data = AssembledDiffractionData.create_null()
+        self._invalidate_moments()
         self._array_list.clear()
         self._array_counter = 0
         self._source = None
@@ -626,6 +685,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
             read_region=read_region,
             corrections=corrections,
         )
+        self._invalidate_moments()
         self._array_counter = len(source)
 
         for observer in self._observer_list:
@@ -644,6 +704,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
             corrections=corrections,
             on_array_assembled=self._on_array_assembled,
             on_nonfinite_pixels=self._mask_nonfinite_pixels,
+            on_moments_computed=partial(self._on_moments_computed, self._data),
             task_monitor=self._task_monitor,
         )
         finished_event = loader.get_finished_event()

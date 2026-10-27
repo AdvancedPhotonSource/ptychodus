@@ -7,7 +7,7 @@ from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.simulate.object import generate_paganin_object
 
 from .builder import ObjectBuilder
-from .stxm_dpc import compute_monitored_signals
+from .stxm_dpc import compute_decay_corrected_signals
 from .settings import ObjectSettings
 
 logger = logging.getLogger(__name__)
@@ -45,15 +45,13 @@ class PaganinObjectBuilder(ObjectBuilder):
         return True
 
     def _build_raw(self, geometry_provider: ObjectGeometryProvider) -> Object:
-        assembled_data = geometry_provider.get_assembled_data()
-
-        if assembled_data is None:
+        if geometry_provider.get_assembled_data() is None:
             # Not yet bound; the build is retried once the product has data.
             raise GeometryNotDefinedError('No diffraction data to estimate the object from.')
 
         object_ = generate_paganin_object(
             geometry_provider.get_object_geometry(),
-            compute_monitored_signals(assembled_data, geometry_provider),
+            compute_decay_corrected_signals(geometry_provider),
             geometry_provider.get_probe_positions(),
             probe=self._get_probe_on_object_pixels(
                 geometry_provider, consequence='using the hull of the positions'

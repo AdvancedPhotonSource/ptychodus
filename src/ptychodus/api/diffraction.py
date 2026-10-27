@@ -30,7 +30,6 @@ DiffractionPatternCounts: TypeAlias = numpy.ndarray[tuple[int], DiffractionPatte
 DiffractionPattern: TypeAlias = numpy.ndarray[tuple[int, int], DiffractionPatternDType]
 DiffractionPatterns: TypeAlias = numpy.ndarray[tuple[int, int, int], DiffractionPatternDType]
 DiffractionIndexes: TypeAlias = numpy.ndarray[tuple[int], numpy.dtype[numpy.integer]]
-DiffractionPatternPhotonFluxes: TypeAlias = numpy.ndarray[tuple[int], numpy.dtype[numpy.floating]]
 
 _ArrayT = TypeVar('_ArrayT', bound=numpy.ndarray)
 
@@ -186,16 +185,6 @@ class DiffractionArray(ABC):
     def get_num_patterns(self) -> int:
         return self.get_patterns().shape[0]
 
-    def get_probe_photon_flux_per_s(self) -> DiffractionPatternPhotonFluxes | None:
-        """Per-pattern incident probe photon flux (photons per second).
-
-        Beamline readers with hardware flux measurements (ion chamber, BPM,
-        ring-current-normalized upstream reading) override this. The default
-        returns None to signal no measurement is available, and downstream
-        assembly falls back to per-pattern detector totals.
-        """
-        return None
-
 
 class SimpleDiffractionArray(DiffractionArray):
     """Concrete DiffractionArray backed by in-memory numpy arrays."""
@@ -205,13 +194,11 @@ class SimpleDiffractionArray(DiffractionArray):
         label: str,
         indexes: DiffractionIndexes,
         patterns: DiffractionPatterns,
-        probe_photon_flux_per_s: DiffractionPatternPhotonFluxes | None = None,
     ) -> None:
         super().__init__()
         self._label = label
         self._indexes = indexes
         self._patterns = patterns
-        self._probe_photon_flux_per_s = probe_photon_flux_per_s
 
     def get_label(self) -> str:
         return self._label
@@ -224,15 +211,9 @@ class SimpleDiffractionArray(DiffractionArray):
             return self._patterns
         return read_region.apply_to(self._patterns)
 
-    def get_probe_photon_flux_per_s(self) -> DiffractionPatternPhotonFluxes | None:
-        return self._probe_photon_flux_per_s
-
     @property
     def nbytes(self) -> int:
-        sz = self._indexes.nbytes + self._patterns.nbytes
-        if self._probe_photon_flux_per_s is not None:
-            sz += self._probe_photon_flux_per_s.nbytes
-        return sz
+        return self._indexes.nbytes + self._patterns.nbytes
 
 
 class Polarization(StrEnum):

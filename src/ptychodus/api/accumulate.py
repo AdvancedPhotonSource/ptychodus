@@ -10,7 +10,7 @@ twice and partial results from separate workers merge exactly.
 """
 
 from __future__ import annotations
-from collections.abc import Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 import logging
 import threading
@@ -35,7 +35,10 @@ from .typing import IntegerArrayType, RealArrayType
 __all__ = [
     'DiffractionMomentAccumulator',
     'DiffractionMoments',
+    'IncidentBeamEstimate',
     'compute_diffraction_moments',
+    'estimate_incident_beam',
+    'iterate_diffraction_moments',
 ]
 
 logger = logging.getLogger(__name__)
@@ -94,41 +97,37 @@ class DiffractionMoments:
             binned_patterns=None if self.binned_patterns is None else self.binned_patterns[keep],
         )
 
-    def normalize_by_monitor(
-        self, monitor_indexes: IntegerArrayType, monitor_counts: RealArrayType
+    def normalize_by_i0(
+        self, i0_indexes: IntegerArrayType, i0_counts: RealArrayType
     ) -> DiffractionMoments:
-        """Scale each total by ``mean(M) / M_j`` so a change in the beam does not read as absorption.
+        """Scale each total by ``mean(I0) / I0_j`` so a change in the beam does not read as absorption.
 
         Binned patterns, when kept, are scaled by the same factor.
 
-        *monitor_counts* are measured incident photon counts, such as an upstream ion chamber
-        records, keyed by *monitor_indexes*; each must be unique. A count that is not a
-        positive finite number cannot normalize anything and leaves its total unscaled,
-        with a warning, as does a pattern whose index has no count.
+        *i0_counts* are the incident-beam readings an upstream ion chamber, diode or scaler
+        records, in any units, keyed by *i0_indexes*; each index must be unique. A reading
+        that is not a positive finite number cannot correct anything and leaves its total
+        unscaled, with a warning, as does a pattern whose index has no reading.
         """
-        unique_indexes, first = numpy.unique(monitor_indexes, return_index=True)
+        unique_indexes, first = numpy.unique(i0_indexes, return_index=True)
 
-        if unique_indexes.size != monitor_indexes.size:
-            raise ValueError('Monitor indexes must be unique!')
+        if unique_indexes.size != i0_indexes.size:
+            raise ValueError('I0 indexes must be unique!')
 
-        counts = numpy.asarray(monitor_counts, dtype=numpy.float64)[first]
-        position = numpy.clip(numpy.searchsorted(unique_indexes, self.indexes), 0, None)
-        found = (position < unique_indexes.size) & (
-            unique_indexes[numpy.minimum(position, unique_indexes.size - 1)] == self.indexes
+        i0 = _pair_by_index(
+            self.indexes, unique_indexes, numpy.asarray(i0_counts, dtype=numpy.float64)[first]
         )
-        monitor = numpy.full(self.indexes.shape, numpy.nan)
-        monitor[found] = counts[position[found]]
-        usable = numpy.isfinite(monitor) & (monitor > 0.0)
+        usable = numpy.isfinite(i0) & (i0 > 0.0)
         scale = numpy.ones(self.indexes.shape)
 
         if usable.any():
-            scale[usable] = numpy.mean(monitor[usable]) / monitor[usable]
-            logger.info('Normalizing totals by the measured incident photon counts.')
+            scale[usable] = numpy.mean(i0[usable]) / i0[usable]
+            logger.info('Correcting the totals for beam decay by I0.')
 
         if not usable.all():
             logger.warning(
-                f'{int(numpy.count_nonzero(~usable))} incident photon counts are missing or'
-                ' not positive; leaving those totals unnormalized.'
+                f'{int(numpy.count_nonzero(~usable))} I0 readings are missing or not positive;'
+                ' leaving those totals uncorrected.'
             )
 
         binned_patterns = self.binned_patterns
@@ -342,6 +341,69 @@ class DiffractionMomentAccumulator:
                 self._binned_patterns.append(numpy.asarray(binned_patterns, dtype=numpy.float32))
 
 
+def iterate_diffraction_moments(
+    indexes: DiffractionIndexes,
+    patterns: DiffractionPatterns,
+    *,
+    bad_pixels: BadPixels,
+    background: DetectorBackground | None = None,
+    flat_field: FlatField | None = None,
+    chunk_size: int = 256,
+    binning: BinningStep | None = None,
+    num_snapshots: int = 1,
+) -> Iterator[tuple[int, DiffractionMoments]]:
+    """Accumulate an in-memory pattern stack in one chunked pass, snapshotting as it goes.
+
+    Yields ``(num_seen, moments)`` after each of *num_snapshots* evenly spaced stops, the
+    last after every pattern, so a caller can act on a partial accumulation while the
+    rest is still to come; the final snapshot equals what
+    :func:`compute_diffraction_moments` returns. A *background* or *flat_field* the
+    patterns still carry is applied first, as ``(pattern - background) / flat_field``
+    clipped at zero, and the pixels those maps make unusable join *bad_pixels*. Rows come
+    out in the order of *patterns*. A *binning* step keeps the binned patterns as well;
+    see :class:`DiffractionMoments`. Yields nothing for an empty stack.
+
+    Raises:
+        ValueError: if *num_snapshots* is less than one.
+    """
+    if num_snapshots < 1:
+        raise ValueError('At least one snapshot must be taken!')
+
+    corrections = DetectorCorrections(
+        background=background,
+        flat_field=flat_field,
+        subtract_background=True,
+        divide_flat_field=True,
+    )
+    num_patterns = patterns.shape[0]
+    height, width = patterns.shape[-2:]
+    accumulator = DiffractionMomentAccumulator(
+        height,
+        width,
+        bad_pixels=corrections.apply_to_bad_pixels(bad_pixels),
+        chunk_size=chunk_size,
+        binning=binning,
+    )
+    stops = numpy.unique(
+        numpy.rint(numpy.linspace(0, num_patterns, num_snapshots + 1)[1:]).astype(int)
+    )
+    start = 0
+
+    for stop in stops[stops > 0]:
+        for chunk_start in range(start, stop, chunk_size):
+            chunk_stop = min(chunk_start + chunk_size, stop)
+            accumulator.add(
+                indexes[chunk_start:chunk_stop],
+                corrections.apply(patterns[chunk_start:chunk_stop]),
+            )
+
+        start = int(stop)
+        moments = accumulator.get_moments()
+
+        if moments is not None:
+            yield start, moments
+
+
 def compute_diffraction_moments(
     indexes: DiffractionIndexes,
     patterns: DiffractionPatterns,
@@ -354,29 +416,141 @@ def compute_diffraction_moments(
 ) -> DiffractionMoments | None:
     """Accumulate the statistics of an in-memory pattern stack, in one chunked pass.
 
-    A *background* or *flat_field* the patterns still carry is applied first, as
-    ``(pattern - background) / flat_field`` clipped at zero, and the pixels those maps
-    make unusable join *bad_pixels*. Rows come out in the order of *patterns*. A
-    *binning* step keeps the binned patterns as well; see :class:`DiffractionMoments`.
-    Returns None for an empty stack.
+    The single snapshot of :func:`iterate_diffraction_moments`, with the same
+    corrections, ordering and binning. Returns None for an empty stack.
     """
-    corrections = DetectorCorrections(
+    moments: DiffractionMoments | None = None
+
+    for _, moments in iterate_diffraction_moments(
+        indexes,
+        patterns,
+        bad_pixels=bad_pixels,
         background=background,
         flat_field=flat_field,
-        subtract_background=True,
-        divide_flat_field=True,
-    )
-    height, width = patterns.shape[-2:]
-    accumulator = DiffractionMomentAccumulator(
-        height,
-        width,
-        bad_pixels=corrections.apply_to_bad_pixels(bad_pixels),
         chunk_size=chunk_size,
         binning=binning,
+    ):
+        pass
+
+    return moments
+
+
+@dataclass(frozen=True)
+class IncidentBeamEstimate:
+    """The incident beam a diffraction scan implies, and the moments it was judged from.
+
+    `incident_photon_count` is the photons per exposure the probe is scaled to, and
+    `mean_amplitude_transmission` the modulus a uniform object of the sample's mean
+    opacity carries. `moments` are those given, with the totals corrected for beam decay
+    by I0 when `decay_corrected` says I0 was recorded.
+    """
+
+    moments: DiffractionMoments
+    incident_photon_count: float
+    mean_amplitude_transmission: float
+    decay_corrected: bool
+
+
+def estimate_incident_beam(
+    moments: DiffractionMoments,
+    i0_counts_by_index: Mapping[int, float] | None = None,
+    *,
+    i0_photons_per_count: float | None = None,
+    quantile: float = 0.99,
+    max_intensity_transmission: float = 1.05,
+    min_intensity_transmission: float = 1.0e-3,
+    roundoff_floor: float = 1.0e-12,
+) -> IncidentBeamEstimate:
+    """Estimate the incident photon count and the sample's mean transmission from the totals.
+
+    *i0_counts_by_index* holds the I0 readings keyed by scan index. Where they are given
+    the totals are first corrected for beam decay, scaled by ``mean(I0) / I0_j``. Then
+    one of three rules applies, decided by the inputs alone and named in the log:
+
+    - **I0 with a calibration.** A positive *i0_photons_per_count* converts I0 to
+      incident photons: the incident photon count is ``factor * mean(I0)`` and the
+      intensity transmission ``mean(total_j / (factor * I0_j))``. A transmission
+      outside [*min_intensity_transmission*, *max_intensity_transmission*] -- totals
+      above the incident beam, or a vanishing fraction of it -- is reported but kept,
+      because the calibration is a statement about the instrument.
+    - **I0 without a calibration.** The brightest corrected totals stand in for the
+      empty beam: the incident photon count is their *quantile*.
+    - **No I0.** The same, over the uncorrected totals; a calibration is unused.
+
+    Without a calibration the intensity transmission is the mean total over the
+    incident photon count. Its square root, clipped to [0, 1], is the mean amplitude
+    transmission. An incident photon count at or below *roundoff_floor* gives a
+    transparent sample rather than a division by it.
+
+    Raises:
+        ValueError: if *quantile* is outside ``[0, 1]`` or the transmission bounds are
+            out of order.
+    """
+    if min_intensity_transmission > max_intensity_transmission:
+        raise ValueError('The minimum intensity transmission exceeds the maximum!')
+
+    corrected = moments
+    i0 = numpy.full(moments.indexes.shape, numpy.nan)
+
+    if i0_counts_by_index:
+        i0_indexes = numpy.fromiter(i0_counts_by_index.keys(), dtype=numpy.intp)
+        i0_counts = numpy.fromiter(i0_counts_by_index.values(), dtype=numpy.float64)
+        corrected = moments.normalize_by_i0(i0_indexes, i0_counts)
+        order = numpy.argsort(i0_indexes)
+        i0 = _pair_by_index(moments.indexes, i0_indexes[order], i0_counts[order])
+
+    usable = numpy.isfinite(i0) & (i0 > roundoff_floor)
+    decay_corrected = bool(usable.any())
+    is_calibrated = i0_photons_per_count is not None and i0_photons_per_count > 0.0
+
+    if decay_corrected and is_calibrated and i0_photons_per_count is not None:
+        incident_photons = i0_photons_per_count * i0[usable]
+        incident_photon_count = float(numpy.mean(incident_photons))
+        intensity_transmission = numpy.mean(moments.total_counts[usable] / incident_photons)
+        logger.info(
+            f'Incident photon count {incident_photon_count:.4g} from I0 at '
+            f'{i0_photons_per_count:.4g} photons per count.'
+        )
+
+        if not min_intensity_transmission <= intensity_transmission <= max_intensity_transmission:
+            logger.warning(
+                f'The calibrated I0 implies an intensity transmission of '
+                f'{intensity_transmission:.4g}, outside [{min_intensity_transmission:.4g}, '
+                f'{max_intensity_transmission:.4g}]; check the I0 calibration.'
+            )
+    else:
+        totals = corrected.total_counts
+        incident_photon_count = estimate_incident_photon_count(totals, quantile=quantile)
+        finite = totals[numpy.isfinite(totals)]
+        intensity_transmission = (
+            numpy.mean(finite) / incident_photon_count
+            if finite.size > 0 and incident_photon_count > roundoff_floor
+            else 1.0
+        )
+        source = 'decay-corrected totals' if decay_corrected else 'totals; no I0 was recorded'
+        logger.info(
+            f'Incident photon count {incident_photon_count:.4g} from the {quantile:g} '
+            f'quantile of the {source}.'
+        )
+
+    return IncidentBeamEstimate(
+        moments=corrected,
+        incident_photon_count=incident_photon_count,
+        mean_amplitude_transmission=float(numpy.sqrt(numpy.clip(intensity_transmission, 0, 1))),
+        decay_corrected=decay_corrected,
     )
 
-    for start in range(0, patterns.shape[0], chunk_size):
-        stop = min(start + chunk_size, patterns.shape[0])
-        accumulator.add(indexes[start:stop], corrections.apply(patterns[start:stop]))
 
-    return accumulator.get_moments()
+def _pair_by_index(
+    indexes: IntegerArrayType, sorted_indexes: IntegerArrayType, values: RealArrayType
+) -> RealArrayType:
+    """The value for each of *indexes* from *values* keyed by unique *sorted_indexes*; NaN if none."""
+    paired = numpy.full(indexes.shape, numpy.nan)
+
+    if sorted_indexes.size == 0:
+        return paired
+
+    position = numpy.clip(numpy.searchsorted(sorted_indexes, indexes), 0, sorted_indexes.size - 1)
+    found = sorted_indexes[position] == indexes
+    paired[found] = values[position[found]]
+    return paired

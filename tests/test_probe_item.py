@@ -14,12 +14,13 @@ from unittest.mock import MagicMock
 import numpy
 import pytest
 
+from ptychodus.api.accumulate import DiffractionMoments
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry
 from ptychodus.api.observer import Observable
 from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider, ProbeEnsemble
 from ptychodus.api.settings import SettingsRegistry
-from ptychodus.model.product.probe.builder import ProbeEnsembleBuilder
+from ptychodus.model.product.probe.builder import FromMemoryProbeBuilder, ProbeEnsembleBuilder
 from ptychodus.model.product.probe.item import ProbeRepositoryItem
 from ptychodus.model.product.probe.settings import ProbeSettings
 
@@ -214,6 +215,9 @@ class _ObservableProbeProvider(ProbeGeometryProvider, Observable):
     def get_assembled_data(self) -> AssembledDiffractionData | None:
         return None
 
+    def get_diffraction_moments(self) -> DiffractionMoments | None:
+        return None
+
     def get_probe_geometry(self) -> ProbeGeometry:
         if self._geometry.pixel_width_m <= 0.0 or self._geometry.pixel_height_m <= 0.0:
             raise GeometryNotDefinedError('not bound')
@@ -268,3 +272,27 @@ def test_a_data_change_rebuilds_only_a_builder_that_reads_the_data() -> None:
 
     assert len(parametric.build_calls) == 1
     assert len(reading.build_calls) == 2
+
+
+def test_a_result_made_editable_reverts_when_reassigned() -> None:
+    """Reconstruction reassigns the output item every iteration, so an editable
+    builder can never be conditioned by a solve that is still running."""
+    settings = ProbeSettings(SettingsRegistry())
+    provider = _ObservableProbeProvider(
+        ProbeGeometry(width_px=64, height_px=64, pixel_width_m=1e-6, pixel_height_m=1e-6),
+    )
+    result = _make_probe_seq(pixel_size_m=1e-6)
+    item = ProbeRepositoryItem(
+        _make_rng(), provider, settings, FromMemoryProbeBuilder(_make_rng(), settings, result)
+    )
+    assert item.can_make_editable()
+
+    item.make_editable()
+    assert not item.can_make_editable()
+
+    item.assign(result)
+
+    builder = item.get_builder()
+    assert isinstance(builder, FromMemoryProbeBuilder)
+    assert not builder.is_editable
+    assert item.can_make_editable()

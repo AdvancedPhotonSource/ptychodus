@@ -67,6 +67,7 @@ class ProductRepositoryItemFactory:
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
         far_field: bool | None = None,
+        i0_photons_per_count: float | None = None,
         dataset: AssembledDiffractionDataset | None = None,
     ) -> ProductRepositoryItem:
         metadata_item = MetadataRepositoryItem(
@@ -84,6 +85,7 @@ class ProductRepositoryItemFactory:
             tilt_angle_deg=tilt_angle_deg,
             polarization=polarization,
             far_field=far_field,
+            i0_photons_per_count=i0_photons_per_count,
         )
 
         scan_item = self._scan_item_factory.create()
@@ -127,6 +129,7 @@ class ProductRepositoryItemFactory:
             tilt_angle_deg=product.metadata.tilt_angle_deg,
             polarization=product.metadata.polarization,
             far_field=product.metadata.far_field,
+            i0_photons_per_count=product.metadata.i0_photons_per_count,
         )
 
         scan_item = self._scan_item_factory.create(product.probe_positions)

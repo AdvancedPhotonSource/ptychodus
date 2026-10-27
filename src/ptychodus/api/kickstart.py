@@ -10,15 +10,14 @@ curvature removed. The data must be far field.
 
 from __future__ import annotations
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 import logging
 
 import numpy
 
-from .accumulate import DiffractionMoments
+from .accumulate import DiffractionMoments, estimate_incident_beam
 from .geometry import ImageExtent
-from .interpolate import interpolate_at_indexes
 from .object import ObjectGeometry, compute_object_geometry
 from .parallax import ParallaxEstimate, estimate_defocus_from_parallax
 from .probe import Probe, ProbeEnsemble, ProbeGeometry
@@ -80,10 +79,11 @@ class KickstartParameters:
 class KickstartEstimate:
     """A kickstarted product and how it was arrived at.
 
-    `incident_photon_count` is the unattenuated incident photon count the probe is scaled to and
-    the object's transmission is referenced to; `monitor_normalized` says whether the
-    totals were normalized by measured incident photon counts first. `parallax` is the
-    parallax estimate whether or not it was used.
+    `incident_photon_count` is the incident photon count the probe is scaled to and the
+    object's transmission is referenced to; `decay_corrected` says whether the totals were
+    first corrected for beam decay by the positions' I0. `parallax` is the parallax
+    estimate whether or not it was used, and None when none was made. The product's
+    metadata carries the defocus, as a focus position, and the incident photon count.
     """
 
     product: Product
@@ -91,7 +91,7 @@ class KickstartEstimate:
     defocus_source: DefocusSource
     parallax: ParallaxEstimate | None
     incident_photon_count: float
-    monitor_normalized: bool
+    decay_corrected: bool
 
 
 def estimate_probe_from_moments(
@@ -133,19 +133,22 @@ def estimate_product_from_moments(
     object_geometry: ObjectGeometry | None = None,
     layer_spacing_m: Sequence[float] = (),
     parameters: KickstartParameters | None = None,
+    estimate_parallax: bool = True,
 ) -> KickstartEstimate:
     """A starting product from far-field diffraction moments and the probe positions.
 
-    1. Totals are normalized by the positions' measured incident photon counts, when they carry
-       them, paired by index; the incident photon count is a quantile of the totals.
+    1. The incident photon count follows :func:`estimate_incident_beam`, from the
+       positions' I0 paired by index and the metadata's I0 calibration.
     2. The defocus is the stated one when nonzero, else a resolved parallax estimate,
        else zero with a warning. The parallax is estimated whenever *moments* were
-       binned, and logged whichever is used.
+       binned and *estimate_parallax* is set, and logged whichever is used.
     3. The probe follows :func:`estimate_probe_from_moments`.
     4. The object is :func:`generate_stxm_dpc_object` on *object_geometry* -- by default
        the scan's bounding box plus a probe width -- with that probe setting its
        support and correcting the shadow its phase curvature casts, its transmission
        referenced to the incident photon count. *layer_spacing_m* reslices it into layers.
+    5. The product's metadata takes the defocus, as the focus position it implies, and
+       the incident photon count.
 
     Raises:
         ValueError: if *metadata* is not far field, or the moments and positions share
@@ -159,13 +162,17 @@ def estimate_product_from_moments(
     if object_geometry is None:
         object_geometry = compute_object_geometry(probe_positions, probe_geometry)
 
-    moments, monitor_normalized = _normalize_by_monitor(moments, probe_positions)
-    incident_photon_count = moments.estimate_incident_photon_count(
-        quantile=parameters.incident_photon_count_quantile
+    incident_beam = estimate_incident_beam(
+        moments,
+        probe_positions.get_probe_photon_counts_by_index(),
+        i0_photons_per_count=metadata.i0_photons_per_count,
+        quantile=parameters.incident_photon_count_quantile,
     )
+    moments = incident_beam.moments
+    incident_photon_count = incident_beam.incident_photon_count
     parallax = (
         None
-        if moments.binning is None
+        if moments.binning is None or not estimate_parallax
         else estimate_defocus_from_parallax(
             moments,
             probe_positions,
@@ -200,7 +207,15 @@ def estimate_product_from_moments(
         object_ = generate_layers(object_, layer_spacing_m)
 
     product = Product(
-        metadata=metadata,
+        metadata=replace(
+            metadata,
+            focus_object_distance_m=(
+                -defocus_distance_m
+                if defocus_distance_m != 0.0
+                else metadata.focus_object_distance_m
+            ),
+            probe_photon_count=incident_photon_count,
+        ),
         probe_positions=probe_positions,
         probes=ProbeEnsemble.from_probe(probe),
         object_=object_,
@@ -212,23 +227,8 @@ def estimate_product_from_moments(
         defocus_source=defocus_source,
         parallax=parallax,
         incident_photon_count=incident_photon_count,
-        monitor_normalized=monitor_normalized,
+        decay_corrected=incident_beam.decay_corrected,
     )
-
-
-def _normalize_by_monitor(
-    moments: DiffractionMoments, probe_positions: ProbePositionSequence
-) -> tuple[DiffractionMoments, bool]:
-    """Normalize by the positions' incident photon counts, averaged over duplicate indexes."""
-    counts = probe_positions.get_probe_photon_counts()
-
-    if counts is None:
-        return moments, False
-
-    indexes = probe_positions.get_indexes()
-    unique_indexes = numpy.unique(indexes)
-    _, unique_counts = interpolate_at_indexes(indexes, counts, unique_indexes)
-    return moments.normalize_by_monitor(unique_indexes, unique_counts), True
 
 
 def _decide_defocus(

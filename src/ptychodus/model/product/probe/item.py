@@ -116,6 +116,15 @@ class ProbeRepositoryItem(ParameterGroup):
     def get_builder(self) -> ProbeEnsembleBuilder:
         return self._builder
 
+    def can_make_editable(self) -> bool:
+        """Whether the probe is a result whose mode structure cannot yet be extended."""
+        return isinstance(self._builder, FromMemoryProbeBuilder) and not self._builder.is_editable
+
+    def make_editable(self) -> None:
+        """Let a result take on more modes; see :meth:`FromMemoryProbeBuilder.make_editable`."""
+        if isinstance(self._builder, FromMemoryProbeBuilder):
+            self._builder.make_editable()
+
     def set_builder(self, builder: ProbeEnsembleBuilder) -> None:
         group = 'builder'
         self._remove_group(group)

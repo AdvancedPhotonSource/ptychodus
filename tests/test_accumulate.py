@@ -7,8 +7,11 @@ Behaviors verified:
     interleaving or merge, including a merge from a pickled snapshot
   - snapshots are unaffected by later additions, and an empty accumulator gives None
   - the inpainted mean equals the mean of the inpainted frames
-  - select, normalize_by_monitor and estimate_incident_photon_count on snapshots
-  - compute_diffraction_moments applies carried detector corrections first
+  - select, normalize_by_i0 and estimate_incident_photon_count on snapshots
+  - compute_diffraction_moments applies carried detector corrections first, and is the last
+    snapshot of iterate_diffraction_moments, whose earlier snapshots are of the prefixes
+  - estimate_incident_beam: calibrated I0, uncalibrated I0 and no I0, each judged as
+    documented, with an implausible calibration reported but kept
   - binned patterns are the prep pipeline's BinningStep, with a bin touching any bad pixel
     NaN, carried through every chunking, merge, selection and normalization
 """
@@ -25,6 +28,8 @@ from ptychodus.api.accumulate import (
     DiffractionMomentAccumulator,
     DiffractionMoments,
     compute_diffraction_moments,
+    estimate_incident_beam,
+    iterate_diffraction_moments,
 )
 from ptychodus.api.assemble import estimate_incident_photon_count
 from ptychodus.api.diffraction import BadPixels
@@ -299,7 +304,7 @@ def test_select_keeps_the_rows_and_the_frames() -> None:
     numpy.testing.assert_array_equal(selected.mean_frame, moments.mean_frame)
 
 
-def test_the_monitor_removes_a_beam_decay(caplog: pytest.LogCaptureFixture) -> None:
+def test_i0_removes_a_beam_decay(caplog: pytest.LogCaptureFixture) -> None:
     patterns = _patterns(10)
     decay = numpy.linspace(1.0, 0.5, 10)
     decayed = numpy.rint(patterns * decay[:, numpy.newaxis, numpy.newaxis]).astype(numpy.uint32)
@@ -307,7 +312,7 @@ def test_the_monitor_removes_a_beam_decay(caplog: pytest.LogCaptureFixture) -> N
     reference = _accumulate(indexes, patterns, chunk_size=4, step=10)
     moments = _accumulate(indexes, decayed, chunk_size=4, step=10)
 
-    normalized = moments.normalize_by_monitor(indexes[::-1], 1000.0 * decay[::-1])
+    normalized = moments.normalize_by_i0(indexes[::-1], 1000.0 * decay[::-1])
 
     ratio = normalized.total_counts / reference.total_counts
     numpy.testing.assert_allclose(ratio / ratio.mean(), 1.0, rtol=2e-3)
@@ -316,18 +321,18 @@ def test_the_monitor_removes_a_beam_decay(caplog: pytest.LogCaptureFixture) -> N
     counts[3] = 0.0
 
     with caplog.at_level(logging.WARNING, logger='ptychodus.api.accumulate'):
-        partial = moments.normalize_by_monitor(indexes[:-1], counts[:-1])
+        partial = moments.normalize_by_i0(indexes[:-1], counts[:-1])
 
     assert partial.total_counts[3] == moments.total_counts[3]
     assert partial.total_counts[9] == moments.total_counts[9]
-    assert any('2 incident photon counts' in record.message for record in caplog.records)
+    assert any('2 I0 readings' in record.message for record in caplog.records)
 
 
-def test_monitor_indexes_must_be_unique() -> None:
+def test_i0_indexes_must_be_unique() -> None:
     moments = _accumulate(numpy.arange(4), _patterns(4), chunk_size=4, step=4)
 
     with pytest.raises(ValueError, match='unique'):
-        moments.normalize_by_monitor(numpy.array([0, 0, 1, 2]), numpy.ones(4))
+        moments.normalize_by_i0(numpy.array([0, 0, 1, 2]), numpy.ones(4))
 
 
 def test_incident_photon_count_is_a_high_quantile_of_the_totals() -> None:
@@ -429,7 +434,7 @@ def test_a_binning_must_leave_a_whole_bin() -> None:
         DiffractionMomentAccumulator(*_SHAPE, binning=BinningStep(bin_size_x=33, bin_size_y=1))
 
 
-def test_select_and_the_monitor_carry_the_binned_patterns() -> None:
+def test_select_and_i0_carry_the_binned_patterns() -> None:
     patterns = _patterns(10)
     indexes = numpy.arange(10)
     moments = _accumulate(indexes, patterns, chunk_size=4, step=10)
@@ -439,11 +444,11 @@ def test_select_and_the_monitor_carry_the_binned_patterns() -> None:
     assert selected.binned_patterns is not None
     numpy.testing.assert_array_equal(selected.binned_patterns, moments.binned_patterns[[2, 7]])
 
-    monitor = numpy.linspace(1.0, 2.0, 10)
-    normalized = moments.normalize_by_monitor(indexes, monitor)
+    i0 = numpy.linspace(1.0, 2.0, 10)
+    normalized = moments.normalize_by_i0(indexes, i0)
     assert normalized.binned_patterns is not None
     scale = normalized.total_counts / moments.total_counts
-    numpy.testing.assert_allclose(scale, monitor.mean() / monitor, rtol=1e-12)
+    numpy.testing.assert_allclose(scale, i0.mean() / i0, rtol=1e-12)
     numpy.testing.assert_allclose(
         normalized.binned_patterns,
         moments.binned_patterns * scale[:, numpy.newaxis, numpy.newaxis],
@@ -462,3 +467,188 @@ def test_compute_diffraction_moments_bins_too() -> None:
 
     assert moments is not None
     _assert_same_moments(moments, expected)
+
+
+def test_the_last_snapshot_is_the_whole_accumulation() -> None:
+    patterns = _patterns(30)
+    indexes = numpy.arange(30)
+    expected = compute_diffraction_moments(
+        indexes, patterns, bad_pixels=_bad_pixels(), chunk_size=7, binning=_BINNING
+    )
+    snapshots = list(
+        iterate_diffraction_moments(
+            indexes,
+            patterns,
+            bad_pixels=_bad_pixels(),
+            chunk_size=7,
+            binning=_BINNING,
+            num_snapshots=4,
+        )
+    )
+
+    assert expected is not None
+    assert [num_seen for num_seen, _ in snapshots] == [8, 15, 22, 30]
+    _assert_same_moments(snapshots[-1][1], expected)
+
+
+def test_each_snapshot_is_the_accumulation_of_its_prefix() -> None:
+    patterns = _patterns(20)
+    indexes = numpy.arange(20)
+
+    for num_seen, moments in iterate_diffraction_moments(
+        indexes, patterns, bad_pixels=_bad_pixels(), chunk_size=3, num_snapshots=3
+    ):
+        expected = compute_diffraction_moments(
+            indexes[:num_seen], patterns[:num_seen], bad_pixels=_bad_pixels(), chunk_size=3
+        )
+        assert expected is not None
+        assert moments.num_patterns == num_seen
+        numpy.testing.assert_array_equal(moments.indexes, expected.indexes)
+        numpy.testing.assert_allclose(moments.total_counts, expected.total_counts)
+        numpy.testing.assert_allclose(moments.mean_frame, expected.mean_frame)
+
+
+def test_snapshots_never_repeat_and_need_at_least_one() -> None:
+    patterns = _patterns(3)
+    indexes = numpy.arange(3)
+    stops = [
+        num_seen
+        for num_seen, _ in iterate_diffraction_moments(
+            indexes, patterns, bad_pixels=_bad_pixels(), num_snapshots=10
+        )
+    ]
+
+    assert stops == [1, 2, 3]
+    assert not list(
+        iterate_diffraction_moments(indexes[:0], patterns[:0], bad_pixels=_bad_pixels())
+    )
+
+    with pytest.raises(ValueError, match='snapshot'):
+        next(
+            iterate_diffraction_moments(
+                indexes, patterns, bad_pixels=_bad_pixels(), num_snapshots=0
+            )
+        )
+
+
+def _with_totals(totals: list[float]) -> DiffractionMoments:
+    """Moments whose totals are exactly `totals`, at scan indexes 0, 1, ..."""
+    num_patterns = len(totals)
+    frame = numpy.zeros(_SHAPE)
+    rows = numpy.zeros(num_patterns)
+    return DiffractionMoments(
+        num_patterns=num_patterns,
+        minimum_frame=frame,
+        mean_frame=frame,
+        maximum_frame=frame,
+        bad_pixels=numpy.zeros(_SHAPE, dtype=bool),
+        indexes=numpy.arange(num_patterns),
+        total_counts=numpy.asarray(totals, dtype=numpy.float64),
+        center_of_mass_x_px=rows,
+        center_of_mass_y_px=rows.copy(),
+    )
+
+
+def test_an_unattenuated_scan_is_transparent() -> None:
+    estimate = estimate_incident_beam(_with_totals([64, 64, 64]))
+
+    assert estimate.incident_photon_count == pytest.approx(64.0)
+    assert estimate.mean_amplitude_transmission == pytest.approx(1.0)
+    assert not estimate.decay_corrected
+
+
+def test_without_i0_the_brightest_frames_stand_in_for_the_empty_beam() -> None:
+    totals = [64.0, 32.0, 32.0, 32.0]
+    estimate = estimate_incident_beam(_with_totals(totals))
+    incident = numpy.quantile(totals, 0.99)
+
+    assert estimate.incident_photon_count == pytest.approx(incident)
+    assert estimate.mean_amplitude_transmission == pytest.approx(numpy.sqrt(40.0 / incident))
+    assert estimate_incident_beam(
+        _with_totals(totals), quantile=1.0
+    ).mean_amplitude_transmission == pytest.approx(numpy.sqrt(40.0 / 64.0))
+
+
+def test_one_anomalous_frame_does_not_set_the_incident_beam() -> None:
+    totals = [32.0] * 150 + [64.0] * 49 + [640.0]
+    estimate = estimate_incident_beam(_with_totals(totals))
+
+    assert estimate.incident_photon_count == pytest.approx(64.0)
+    assert estimate.mean_amplitude_transmission == pytest.approx(
+        numpy.sqrt(numpy.mean(totals) / 64)
+    )
+
+
+def test_uncalibrated_i0_corrects_the_decay_before_the_quantile() -> None:
+    """The beam halves for the second frame, so its half-height total is no absorption."""
+    estimate = estimate_incident_beam(_with_totals([64.0, 32.0]), {0: 2.0, 1: 1.0})
+
+    assert estimate.decay_corrected
+    numpy.testing.assert_allclose(estimate.moments.total_counts, [48.0, 48.0])
+    assert estimate.incident_photon_count == pytest.approx(48.0)
+    assert estimate.mean_amplitude_transmission == pytest.approx(1.0)
+
+
+def test_calibrated_i0_gives_the_incident_photons_and_a_per_position_transmission() -> None:
+    estimate = estimate_incident_beam(
+        _with_totals([64.0, 32.0]), {0: 32.0, 1: 32.0}, i0_photons_per_count=2.0
+    )
+
+    assert estimate.decay_corrected
+    assert estimate.incident_photon_count == pytest.approx(64.0)
+    # Per-position intensity transmissions are 1.0 and 0.5; their mean is 0.75.
+    assert estimate.mean_amplitude_transmission == pytest.approx(numpy.sqrt(0.75))
+
+
+def test_a_calibration_without_i0_is_unused() -> None:
+    plain = estimate_incident_beam(_with_totals([64.0, 32.0]))
+    calibrated = estimate_incident_beam(_with_totals([64.0, 32.0]), i0_photons_per_count=5.0)
+
+    assert calibrated.incident_photon_count == pytest.approx(plain.incident_photon_count)
+    assert calibrated.mean_amplitude_transmission == pytest.approx(
+        plain.mean_amplitude_transmission
+    )
+    assert not calibrated.decay_corrected
+
+
+def test_a_non_positive_calibration_leaves_i0_uncalibrated() -> None:
+    uncalibrated = estimate_incident_beam(_with_totals([64.0, 32.0]), {0: 2.0, 1: 1.0})
+    zero = estimate_incident_beam(
+        _with_totals([64.0, 32.0]), {0: 2.0, 1: 1.0}, i0_photons_per_count=0.0
+    )
+
+    assert zero.incident_photon_count == pytest.approx(uncalibrated.incident_photon_count)
+
+
+def test_positions_without_usable_i0_drop_out_of_a_calibrated_estimate() -> None:
+    estimate = estimate_incident_beam(
+        _with_totals([64.0, 32.0]), {0: 0.0, 1: 64.0}, i0_photons_per_count=1.0
+    )
+
+    assert estimate.incident_photon_count == pytest.approx(64.0)
+    assert estimate.mean_amplitude_transmission == pytest.approx(numpy.sqrt(0.5))
+
+
+def test_an_implausible_calibration_is_reported_but_kept(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING, logger='ptychodus.api.accumulate'):
+        estimate = estimate_incident_beam(
+            _with_totals([64.0, 64.0]), {0: 32.0, 1: 32.0}, i0_photons_per_count=1.0
+        )
+
+    assert estimate.incident_photon_count == pytest.approx(32.0)
+    assert estimate.mean_amplitude_transmission == pytest.approx(1.0)
+    assert any('I0 calibration' in record.message for record in caplog.records)
+
+
+def test_a_scan_that_recorded_nothing_is_transparent() -> None:
+    estimate = estimate_incident_beam(_with_totals([0.0, 0.0]))
+
+    assert estimate.incident_photon_count == 0.0
+    assert estimate.mean_amplitude_transmission == 1.0
+
+
+def test_transmission_bounds_must_be_ordered() -> None:
+    with pytest.raises(ValueError, match='minimum'):
+        estimate_incident_beam(
+            _with_totals([1.0]), min_intensity_transmission=2.0, max_intensity_transmission=1.0
+        )

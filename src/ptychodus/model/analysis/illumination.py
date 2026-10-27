@@ -2,7 +2,6 @@ from __future__ import annotations
 import logging
 import time
 
-from ptychodus.api.assemble import compute_probe_photon_counts_by_index
 from ptychodus.api.illumination import IlluminationMap, compute_illumination_map
 
 from ..product import ProductRepository
@@ -27,18 +26,14 @@ class IlluminationMapper:
         item = self._repository[product_index]
         product = item.get_product()
 
-        probe_photon_counts_by_index: dict[int, float] | None = None
-        dataset = item.get_dataset()
-        if dataset is not None:
-            assembled = dataset.get_assembled_data()
-            probe_photon_counts_by_index = compute_probe_photon_counts_by_index(
-                assembled, product.probe_positions
-            )
-
+        # Dose follows the incident beam, so positions are weighted by their I0 when it
+        # was recorded and equally otherwise; the detector totals would fold the
+        # sample's own absorption into the dose.
         logger.info('Computing illumination map...')
         tic = time.perf_counter()
         result = compute_illumination_map(
-            product, probe_photon_counts_by_index=probe_photon_counts_by_index
+            product,
+            probe_photon_counts_by_index=product.probe_positions.get_probe_photon_counts_by_index(),
         )
         toc = time.perf_counter()
         logger.info(f'Computed illumination map in {toc - tic:.4f} seconds.')

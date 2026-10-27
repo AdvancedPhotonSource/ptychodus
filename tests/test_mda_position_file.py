@@ -831,7 +831,6 @@ def _pair(mda_path: Path, series_path: Path) -> list[tuple[float, float]]:
         patterns=numpy.zeros((indexes.size, 2, 2), dtype=numpy.uint16),
         pixel_geometry=pixel_geometry,
         bad_pixels=numpy.zeros((2, 2), dtype=numpy.bool_),
-        probe_photon_counts=None,
     )
     positions = _mda_reader(
         scale_to_meters=MICROMETER_M,

@@ -25,6 +25,7 @@ from ...model.product.probe import (
     DiskProbeBuilder,
     FresnelZonePlateProbeBuilder,
     FromFileProbeBuilder,
+    FromMemoryProbeBuilder,
     HermiteProbeBuilder,
     KBMirrorProbeBuilder,
     ProbeModeDecayType,
@@ -35,6 +36,7 @@ from ...model.product.probe import (
     ZernikeProbeBuilder,
 )
 from ...view.widgets import GroupBoxWithPresets
+from ..make_editable import MakeEditableViewController
 from ..parameters import (
     DecimalLineEditParameterViewController,
     DecimalSliderParameterViewController,
@@ -706,12 +708,30 @@ class ProbeEditorViewControllerFactory:
         # A from-file probe is conditioned on the way in, so the mode parameters
         # do something and belong in the dialog. A from-memory probe holds an
         # already-conditioned probe -- reconstruction output, or a product loaded
-        # from file -- whose mode parameters are deliberately inert, so offering
-        # controls that would silently do nothing is worse than offering none.
+        # from file -- whose mode parameters are deliberately inert until it is made
+        # editable, so offering controls that would silently do nothing is worse than
+        # offering the button that makes them apply.
         has_primary_mode = self._append_primary_mode(item, dialog_builder)
+        is_editable_result = (
+            isinstance(probe_builder, FromMemoryProbeBuilder) and probe_builder.is_editable
+        )
 
-        if has_primary_mode or isinstance(probe_builder, FromFileProbeBuilder):
+        if (
+            has_primary_mode
+            or is_editable_result
+            or isinstance(probe_builder, FromFileProbeBuilder)
+        ):
             self._append_additional_modes(probe_builder, dialog_builder)
+        elif item.can_make_editable():
+            dialog_builder.add_view_controller_to_bottom(
+                MakeEditableViewController(
+                    item.make_editable,
+                    lambda: self.create_editor_dialog(item_name, item, parent).open(),
+                    'Let this result take on more incoherent or coherent modes. The '
+                    'counts start at the modes it has, so nothing changes until they are '
+                    'raised.',
+                )
+            )
         else:
             dialog_builder.add_view_controller_to_bottom(
                 LabelViewController(f'"{builder_name}" has no editable parameters.')

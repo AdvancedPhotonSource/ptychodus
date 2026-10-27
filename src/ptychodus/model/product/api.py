@@ -4,8 +4,11 @@ from typing import Any
 import logging
 import threading
 
+from ptychodus.api.accumulate import compute_diffraction_moments, estimate_incident_beam
 from ptychodus.api.diffraction import Polarization
+from ptychodus.api.parallax import ParallaxEstimate, estimate_defocus_from_parallax
 from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.preprocess.diffraction import BinningStep
 from ptychodus.api.probe import OPRWeightPolicy
 from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter
 
@@ -542,6 +545,7 @@ class ProductAPI:
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
         far_field: bool | None = None,
+        i0_photons_per_count: float | None = None,
         dataset: AssembledDiffractionDataset | None = None,
         block: bool = True,
     ) -> int:
@@ -559,6 +563,7 @@ class ProductAPI:
                 tilt_angle_deg=tilt_angle_deg,
                 polarization=polarization,
                 far_field=far_field,
+                i0_photons_per_count=i0_photons_per_count,
                 dataset=dataset,
             )
 
@@ -602,6 +607,106 @@ class ProductAPI:
 
     def get_item(self, product_index: int) -> ProductRepositoryItem:
         return self._repository[product_index]
+
+    def estimate_defocus_from_parallax(
+        self,
+        product_index: int,
+        *,
+        bin_size_px: int = 4,
+        minimum_significance: float = 3.0,
+        minimum_defocus_dof: float = 1.0,
+        on_finished: Callable[[ParallaxEstimate | None, bool], None] | None = None,
+    ) -> None:
+        """Measure the defocus from the parallax between bright-field images, in the background.
+
+        One pass over the bound patterns, binned *bin_size_px* detector pixels a side and
+        corrected for beam decay by I0, gives :func:`estimate_defocus_from_parallax`'s
+        estimate. When :meth:`ParallaxEstimate.is_resolved` holds for the thresholds, the
+        product's focus position is set to the negated defocus, in the foreground.
+        *on_finished* then receives the estimate, None when none could be made, and
+        whether it was applied. Far field only.
+        """
+        item = self._repository[product_index]
+        dataset = item.get_dataset()
+        metadata = item.get_metadata_item().get_metadata()
+
+        def finish(estimate: ParallaxEstimate | None, applied: bool) -> None:
+            if on_finished is not None:
+                on_finished(estimate, applied)
+
+        if dataset is None:
+            logger.warning('No diffraction data to estimate the defocus from.')
+            finish(None, False)
+            return
+
+        if not metadata.far_field:
+            logger.warning('The defocus is estimated from far-field parallax only.')
+            finish(None, False)
+            return
+
+        data = dataset.get_assembled_data()
+        positions = item.get_probe_positions_item().get_probe_positions()
+        geometry = item.get_geometry()
+        object_geometry = geometry.get_object_geometry()
+        probe_geometry = geometry.get_probe_geometry()
+
+        def estimate_in_background() -> Callable[[], None]:
+            estimate: ParallaxEstimate | None = None
+
+            try:
+                moments = compute_diffraction_moments(
+                    data.get_indexes(),
+                    data.get_patterns(),
+                    bad_pixels=data.get_bad_pixels(),
+                    background=data.get_background(),
+                    flat_field=data.get_flat_field(),
+                    binning=BinningStep(bin_size_x=bin_size_px, bin_size_y=bin_size_px),
+                )
+
+                if moments is not None:
+                    moments = estimate_incident_beam(
+                        moments,
+                        positions.get_probe_photon_counts_by_index(),
+                        i0_photons_per_count=metadata.i0_photons_per_count,
+                    ).moments
+                    estimate = estimate_defocus_from_parallax(
+                        moments,
+                        positions,
+                        object_geometry,
+                        probe_geometry,
+                        photon_wavelength_m=metadata.photon_wavelength_m,
+                    )
+            except Exception:
+                logger.exception('Failed to estimate the defocus from the parallax!')
+
+            def apply_in_foreground() -> None:
+                applied = estimate is not None and estimate.is_resolved(
+                    minimum_significance=minimum_significance,
+                    minimum_defocus_dof=minimum_defocus_dof,
+                )
+
+                if estimate is None:
+                    logger.warning('The parallax gives no defocus estimate.')
+                elif applied:
+                    logger.info(
+                        f'Parallax defocus {estimate.defocus_distance_m * 1e3:.4g} '
+                        f'+/- {estimate.standard_error_m * 1e3:.2g} mm; setting the focus position.'
+                    )
+                    item.get_metadata_item().focus_object_distance_m.set_value(
+                        -estimate.defocus_distance_m
+                    )
+                else:
+                    logger.warning(
+                        f'Parallax defocus {estimate.defocus_distance_m * 1e3:.4g} '
+                        f'+/- {estimate.standard_error_m * 1e3:.2g} mm is not resolved; '
+                        'leaving the focus position.'
+                    )
+
+                finish(estimate, applied)
+
+            return apply_in_foreground
+
+        self._task_manager.put_background_task(estimate_in_background)
 
     def open_product(
         self,

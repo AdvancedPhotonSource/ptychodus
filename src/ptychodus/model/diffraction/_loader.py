@@ -3,6 +3,7 @@ from collections.abc import Callable
 import logging
 import threading
 
+from ptychodus.api.accumulate import DiffractionMoments, compute_diffraction_moments
 from ptychodus.api.assemble import AssembledDiffractionData, DetectorCorrections, assemble_dataset
 from ptychodus.api.diffraction import BadPixels, CropRegion, DiffractionDataset
 from ptychodus.api.geometry import PixelGeometry
@@ -21,6 +22,10 @@ class LoadDiffractionDataset:
     processed differently from others. The task itself only bridges the
     :class:`TaskProgressMonitor` protocol to the callback parameters and records
     the first per-array failure for :meth:`get_error`.
+
+    A load that completes is followed by one pass accumulating the diffraction moments
+    of what was assembled, handed to `on_moments_computed` before the finished event is
+    set, so a caller blocking on the load finds them in place.
     """
 
     def __init__(
@@ -37,6 +42,7 @@ class LoadDiffractionDataset:
         corrections: DetectorCorrections,
         on_array_assembled: Callable[[int, str, AssembledDiffractionData], None],
         on_nonfinite_pixels: Callable[[BadPixels], None],
+        on_moments_computed: Callable[[DiffractionMoments | None], None],
         task_monitor: TaskProgressMonitor,
     ) -> None:
         super().__init__()
@@ -51,6 +57,7 @@ class LoadDiffractionDataset:
         self._corrections = corrections
         self._on_array_assembled = on_array_assembled
         self._on_nonfinite_pixels = on_nonfinite_pixels
+        self._on_moments_computed = on_moments_computed
         self._task_monitor = task_monitor
         self._finished_event = threading.Event()
         self._error: BaseException | None = None
@@ -85,9 +92,31 @@ class LoadDiffractionDataset:
                     on_array_error=self._handle_array_error,
                     should_stop=lambda: monitor.is_stopping,
                 )
+                self._compute_moments()
         except BaseException as ex:
             if self._error is None:
                 self._error = ex
             raise
         finally:
             self._finished_event.set()
+
+    def _compute_moments(self) -> None:
+        # The assembled data's own mask already holds any pixel found non-finite here,
+        # and its maps are those the patterns still carry.
+        # A failure here leaves the dataset loaded; the moments are computed on demand.
+        logger.info('Accumulating diffraction moments...')
+        out = self._out
+
+        try:
+            moments = compute_diffraction_moments(
+                out.get_indexes(),
+                out.get_patterns(),
+                bad_pixels=out.get_bad_pixels(),
+                background=out.get_background(),
+                flat_field=out.get_flat_field(),
+            )
+        except Exception:
+            logger.exception('Failed to accumulate the diffraction moments!')
+            return
+
+        self._on_moments_computed(moments)

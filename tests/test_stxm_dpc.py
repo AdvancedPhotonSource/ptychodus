@@ -17,6 +17,7 @@ from scipy.ndimage import gaussian_filter
 
 from ptychodus.api.accumulate import DiffractionMomentAccumulator
 from ptychodus.api.assemble import AssembledDiffractionData
+from ptychodus.api.accumulate import DiffractionMoments, compute_diffraction_moments
 from ptychodus.api.geometry import GeometryNotDefinedError, ImageExtent, PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter, ObjectGeometry, ObjectGeometryProvider
 from ptychodus.api.probe import Probe, ProbeEnsemble
@@ -38,7 +39,7 @@ from ptychodus.model.product.object import (
     STXMDPCObjectBuilder,
 )
 from ptychodus.model.product.object.paganin import PaganinObjectBuilder
-from ptychodus.model.product.object.stxm_dpc import compute_monitored_signals
+from ptychodus.model.product.object.stxm_dpc import compute_decay_corrected_signals
 
 _LOGGER_NAME = 'ptychodus.api.simulate.object'
 _PIXEL_SIZE_M = 50e-9
@@ -278,17 +279,17 @@ def test_amplitude_is_the_normalized_stxm_map(phase_scan: _Scan) -> None:
     numpy.testing.assert_allclose(numpy.abs(recovered.get_array()[0]), expected, rtol=1e-9)
 
 
-def test_monitor_removes_a_beam_decay(absorbing_scan: _Scan) -> None:
+def test_i0_removes_a_beam_decay(absorbing_scan: _Scan) -> None:
     data = absorbing_scan.data
     decay = numpy.linspace(1.0, 0.6, data.get_patterns().shape[0])
-    decayed = _with(
-        data,
-        patterns=data.get_patterns() * decay[:, numpy.newaxis, numpy.newaxis],
-        probe_photon_counts=1.0e6 * decay,
-    )
+    decayed = _with(data, patterns=data.get_patterns() * decay[:, numpy.newaxis, numpy.newaxis])
+    i0_counts_by_index = {
+        int(index): 1.0e6 * float(scale) for index, scale in zip(data.get_indexes(), decay)
+    }
+    signals = compute_stxm_dpc_signals(decayed, i0_counts_by_index=i0_counts_by_index)
 
     expected = numpy.abs(_recover(data, absorbing_scan.positions).get_array())
-    actual = numpy.abs(_recover(decayed, absorbing_scan.positions).get_array())
+    actual = numpy.abs(_recover(decayed, absorbing_scan.positions, signals).get_array())
 
     numpy.testing.assert_allclose(actual, expected, rtol=1e-9)
 
@@ -547,6 +548,20 @@ class _StubProvider(ObjectGeometryProvider):
     def get_assembled_data(self) -> AssembledDiffractionData | None:
         return self._assembled_data
 
+    def get_diffraction_moments(self) -> DiffractionMoments | None:
+        data = self._assembled_data
+
+        if data is None:
+            return None
+
+        return compute_diffraction_moments(
+            data.get_indexes(),
+            data.get_patterns(),
+            bad_pixels=data.get_bad_pixels(),
+            background=data.get_background(),
+            flat_field=data.get_flat_field(),
+        )
+
     @property
     def photon_wavelength_m(self) -> float:
         return _metadata().photon_wavelength_m
@@ -692,7 +707,7 @@ def test_item_binds_its_probe_supplier_to_every_builder(phase_scan: _Scan) -> No
 
 
 # ---------------------------------------------------------------------------
-# Mapping, support, scale and monitor counts
+# Mapping, support, scale and I0
 # ---------------------------------------------------------------------------
 
 
@@ -733,7 +748,7 @@ def test_the_incident_photon_count_gives_an_absolute_transmission(absorbing_scan
         _recover(absorbing_scan.data, absorbing_scan.positions, incident_photon_count=0.0)
 
 
-def _with_position_monitor(scan: _Scan, decay: numpy.ndarray) -> list[ProbePosition]:
+def _with_position_i0(scan: _Scan, decay: numpy.ndarray) -> list[ProbePosition]:
     return [
         ProbePosition(
             index=position.index, x_m=position.x_m, y_m=position.y_m, probe_photon_count=float(m)
@@ -742,26 +757,33 @@ def _with_position_monitor(scan: _Scan, decay: numpy.ndarray) -> list[ProbePosit
     ]
 
 
-def test_position_side_counts_normalize_the_builders_signals(absorbing_scan: _Scan) -> None:
+def test_the_positions_i0_corrects_the_builders_signals(absorbing_scan: _Scan) -> None:
     data = absorbing_scan.data
     decay = numpy.linspace(1.0, 0.6, data.get_patterns().shape[0])
     decayed = _with(data, patterns=data.get_patterns() * decay[:, numpy.newaxis, numpy.newaxis])
     reference = compute_stxm_dpc_signals(data)
 
-    unmonitored = compute_monitored_signals(decayed, _StubProvider(absorbing_scan.positions))
-    monitored = compute_monitored_signals(
-        decayed, _StubProvider(_with_position_monitor(absorbing_scan, 1.0e6 * decay))
+    uncorrected = compute_decay_corrected_signals(
+        _StubProvider(absorbing_scan.positions, assembled_data=decayed)
+    )
+    corrected = compute_decay_corrected_signals(
+        _StubProvider(_with_position_i0(absorbing_scan, 1.0e6 * decay), assembled_data=decayed)
     )
 
     def spread(signals: STXMDPCSignals) -> float:
         ratio = signals.total_counts / reference.total_counts
         return float(numpy.std(ratio / numpy.mean(ratio)))
 
-    assert spread(unmonitored) > 0.05
-    assert spread(monitored) < 1e-3
+    assert spread(uncorrected) > 0.05
+    assert spread(corrected) < 1e-3
 
 
-def test_paganin_builds_on_the_monitored_totals(absorbing_scan: _Scan) -> None:
+def test_the_builders_wait_for_the_moments(absorbing_scan: _Scan) -> None:
+    with pytest.raises(GeometryNotDefinedError):
+        compute_decay_corrected_signals(_StubProvider(absorbing_scan.positions))
+
+
+def test_paganin_builds_on_the_decay_corrected_totals(absorbing_scan: _Scan) -> None:
     data = absorbing_scan.data
     decay = numpy.linspace(1.0, 0.6, data.get_patterns().shape[0])
     decayed = _with(data, patterns=data.get_patterns() * decay[:, numpy.newaxis, numpy.newaxis])
@@ -770,14 +792,12 @@ def test_paganin_builds_on_the_monitored_totals(absorbing_scan: _Scan) -> None:
     clean = builder.build(
         _StubProvider(absorbing_scan.positions, assembled_data=data), []
     ).get_array()
-    monitored = builder.build(
-        _StubProvider(
-            _with_position_monitor(absorbing_scan, 1.0e6 * decay), assembled_data=decayed
-        ),
+    corrected = builder.build(
+        _StubProvider(_with_position_i0(absorbing_scan, 1.0e6 * decay), assembled_data=decayed),
         [],
     ).get_array()
 
-    numpy.testing.assert_allclose(numpy.abs(monitored), numpy.abs(clean), rtol=1e-3)
+    numpy.testing.assert_allclose(numpy.abs(corrected), numpy.abs(clean), rtol=1e-3)
 
 
 def test_a_bound_probe_sets_the_builders_support(phase_scan: _Scan) -> None:

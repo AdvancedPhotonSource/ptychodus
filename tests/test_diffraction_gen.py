@@ -193,7 +193,7 @@ class TestOutputProperties:
         result = generate_diffraction_data(product)
 
         assert result.get_patterns()[0].sum() == pytest.approx(photon_count, rel=1e-9)
-        assert result.get_probe_photon_count() == pytest.approx(photon_count, rel=1e-6)
+        assert result.get_total_counts().max() == pytest.approx(photon_count, rel=1e-6)
 
 
 # ---------------------------------------------------------------------------

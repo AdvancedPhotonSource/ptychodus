@@ -3,7 +3,6 @@ import logging
 import math
 import time
 
-from ptychodus.api.assemble import compute_probe_photon_counts_by_index
 from ptychodus.api.probe import (
     OPRModeSeries,
     OPRModeStatistics,
@@ -41,27 +40,37 @@ class OPRModeAnalyzer:
         return self._repository[product_index].get_probe_positions_item().get_probe_positions()
 
     def get_measured_photon_counts(self, product_index: int) -> RealArrayType | None:
-        """Per-position measured photon counts, or ``None`` when no dataset is bound.
+        """Per-position I0, or the detector totals when no I0 was recorded.
 
-        The counts come back keyed by scan index, while OPR weights are addressed by
-        position row, so they are re-expressed in row order here. A position whose scan
-        index the dataset does not carry gets NaN rather than being dropped, which keeps
-        the result aligned with the weight rows and leaves a gap where a plot would
-        otherwise bridge over missing data.
+        The I0 the probe positions carry is what the incident beam did; without it the
+        totals from the bound data's moments are the nearest measure, folding in the
+        sample's absorption, and the log says which is returned. None when neither is
+        available.
+
+        The counts are keyed by scan index, while OPR weights are addressed by position
+        row, so they are re-expressed in row order here. A position whose scan index has
+        no count gets NaN rather than being dropped, which keeps the result aligned with
+        the weight rows and leaves a gap where a plot would otherwise bridge over
+        missing data.
         """
         item = self._repository[product_index]
-        dataset = item.get_dataset()
-
-        if dataset is None:
-            return None
-
         positions = item.get_probe_positions_item().get_probe_positions()
-        counts_by_index = compute_probe_photon_counts_by_index(
-            dataset.get_assembled_data(), positions
-        )
+        counts_by_index = positions.get_probe_photon_counts_by_index()
 
-        if not counts_by_index:
-            return None
+        if counts_by_index:
+            logger.info('Comparing the OPR weights with the recorded I0.')
+        else:
+            dataset = item.get_dataset()
+            moments = None if dataset is None else dataset.get_diffraction_moments()
+
+            if moments is None:
+                return None
+
+            logger.info('No I0 was recorded; comparing the OPR weights with the detector totals.')
+            counts_by_index = {
+                int(index): float(total)
+                for index, total in zip(moments.indexes, moments.total_counts, strict=True)
+            }
 
         return numpy.array(
             [counts_by_index.get(int(position.index), math.nan) for position in positions]

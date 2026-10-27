@@ -19,7 +19,6 @@ pytest.importorskip('ptychi')
 from ptychodus.api.assemble import AssembledDiffractionData  # noqa: E402
 from ptychodus.api.diffraction import (  # noqa: E402
     DiffractionIndexes,
-    DiffractionPatternCounts,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.geometry import PixelGeometry  # noqa: E402
@@ -217,9 +216,7 @@ def test_mad_bounds_brackets_the_median_of_a_spread() -> None:
     assert upper < 1000.0
 
 
-def _assembled(
-    indexes: DiffractionIndexes, counts: DiffractionPatternCounts | None = None
-) -> AssembledDiffractionData:
+def _assembled(indexes: DiffractionIndexes) -> AssembledDiffractionData:
     """A real AssembledDiffractionData over constant 2x2 frames.
 
     The filters under test slice one of these and rebuild it, so they are handed
@@ -231,7 +228,6 @@ def _assembled(
         patterns=numpy.ones((indexes.size, 2, 2), dtype=numpy.uint16),
         pixel_geometry=PixelGeometry(width_m=1.0, height_m=1.0),
         bad_pixels=numpy.zeros((2, 2), dtype=numpy.bool_),
-        probe_photon_counts=counts,
     )
 
 

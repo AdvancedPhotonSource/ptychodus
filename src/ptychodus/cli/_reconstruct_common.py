@@ -39,6 +39,11 @@ import yaml
 from ptychi.api import BHOptions, LSQMLOptions
 from ptychi.api.options.task import PtychographyTaskOptions
 
+from ptychodus.api.accumulate import (
+    IncidentBeamEstimate,
+    compute_diffraction_moments,
+    estimate_incident_beam,
+)
 from ptychodus.api.assemble import (
     AssembledDiffractionData,
     DetectorCorrections,
@@ -57,6 +62,7 @@ from ptychodus.api.diffraction import (
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.io import StandardFileLayout, save_diffraction_data, save_product
 from ptychodus.api.preprocess.diffraction import FilterValuesStep, estimate_beam_center
+from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import (
     PositionIndexFilter,
@@ -75,6 +81,7 @@ from ptychodus.plugins.ptychi.task import (
 
 __all__ = [
     'CancellationToken',
+    'estimate_incident_beam_from_assembled_data',
     'add_print_ptychi_options_argument',
     'add_ptychi_options_argument',
     'format_ptychi_options_defaults',
@@ -777,6 +784,38 @@ def save_assembled_diffraction(
     elif is_main_process():
         logger.info('Writing %s', diffraction_file)
         save_diffraction_data(diffraction_file, assembled_data)
+
+
+def estimate_incident_beam_from_assembled_data(
+    assembled_data: AssembledDiffractionData,
+    positions: ProbePositionSequence,
+    *,
+    i0_photons_per_count: float = 0.0,
+) -> IncidentBeamEstimate:
+    """The incident photon count and mean transmission the assembled patterns imply.
+
+    One pass accumulates their moments, and :func:`estimate_incident_beam` judges them
+    with the I0 the positions carry, calibrated by *i0_photons_per_count* when positive.
+
+    Raises:
+        ValueError: if no patterns were assembled.
+    """
+    moments = compute_diffraction_moments(
+        assembled_data.get_indexes(),
+        assembled_data.get_patterns(),
+        bad_pixels=assembled_data.get_bad_pixels(),
+        background=assembled_data.get_background(),
+        flat_field=assembled_data.get_flat_field(),
+    )
+
+    if moments is None:
+        raise ValueError('No diffraction patterns were assembled to estimate the beam from.')
+
+    return estimate_incident_beam(
+        moments,
+        positions.get_probe_photon_counts_by_index(),
+        i0_photons_per_count=i0_photons_per_count,
+    )
 
 
 def pair_patterns_with_positions(

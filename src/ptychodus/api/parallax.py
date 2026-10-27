@@ -119,8 +119,9 @@ def estimate_defocus_from_parallax(
 
     *moments* must have been accumulated with a binning step, from far-field patterns on
     *probe_geometry*'s reciprocal grid, one detector pixel being ``1 / (N * dx)``; no
-    detector pitch is needed. Binned patterns are used as they are stored, so normalize
-    them by a monitor first if the beam drifted.
+    detector pitch is needed. Binned patterns are used as they are stored, so correct
+    them for beam decay by I0 first (:meth:`DiffractionMoments.normalize_by_i0`) if the
+    beam drifted.
 
     1. The bright field is every bin whose mean reaches *bright_field_fraction* of the
        brightest, less the bins on its edge, whose images mix the disk with the dark

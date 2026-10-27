@@ -13,6 +13,7 @@ import logging
 import numpy
 import pytest
 
+from ptychodus.api.accumulate import DiffractionMoments
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter, ObjectGeometry, ObjectGeometryProvider
@@ -57,6 +58,9 @@ class _ObservableObjectProvider(ObjectGeometryProvider, Observable):
         return ()
 
     def get_assembled_data(self) -> AssembledDiffractionData | None:
+        return None
+
+    def get_diffraction_moments(self) -> DiffractionMoments | None:
         return None
 
     def get_object_geometry(self) -> ObjectGeometry:

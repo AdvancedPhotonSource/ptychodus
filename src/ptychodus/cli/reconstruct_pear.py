@@ -75,7 +75,7 @@ from ptychi.api import (
     PositionCorrectionTypes,
 )
 
-from ptychodus.api.assemble import assemble_dataset, estimate_mean_amplitude_transmission
+from ptychodus.api.assemble import assemble_dataset
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import CropRegion
 from ptychodus.api.exit_codes import ExitCode
@@ -117,6 +117,7 @@ from ptychodus.api.simulate.probe import (
     propagate_probe,
 )
 from ptychodus.cli._reconstruct_common import (
+    estimate_incident_beam_from_assembled_data,
     install_signal_handlers,
     run_reconstruction,
     save_assembled_diffraction,
@@ -930,6 +931,8 @@ def main() -> ExitCode:
         num_positions=len(positions),
     )
 
+    incident_beam = estimate_incident_beam_from_assembled_data(assembled_data, positions)
+
     # --- initial object ---
     number_of_slices = max(1, params.number_of_slices)
     layer_spacing_m = compute_uniform_layer_spacing_m(params.object_thickness_m, number_of_slices)
@@ -941,7 +944,7 @@ def main() -> ExitCode:
         # Uniform, but carrying the mean transmission the patterns imply, so the exit
         # wave predicts their totals rather than the unobstructed beam.
         object_ = generate_uniform_object(
-            object_geometry, amplitude=estimate_mean_amplitude_transmission(assembled_data)
+            object_geometry, amplitude=incident_beam.mean_amplitude_transmission
         )
 
         if number_of_slices > 1:
@@ -1024,7 +1027,7 @@ def main() -> ExitCode:
             comments=f'Reconstructed from {args.params.name}',
             detector_distance_m=detector_distance_m,
             photon_energy_eV=params.beam_energy_kev * 1.0e3,
-            probe_photon_count=float(assembled_data.get_probe_photon_count()),
+            probe_photon_count=incident_beam.incident_photon_count,
             exposure_time_s=float(raw_metadata.exposure_time_s or 0.0),
             mass_attenuation_m2_per_kg=0.0,
             tomography_angle_deg=0.0,

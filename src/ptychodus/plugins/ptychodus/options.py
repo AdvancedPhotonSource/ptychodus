@@ -77,6 +77,15 @@ class KickstartOptions(BaseModel):
         'from: pixels within this many median absolute deviations of the background are '
         'zeroed before back-propagating.',
     )
+    update_count: int = Field(
+        10,
+        ge=1,
+        le=1000,
+        title='Update Count:',
+        description='How many times the estimate is shown while the patterns are '
+        'accumulated, the last after all of them; intermediate updates skip the parallax. '
+        'One shows only the final estimate.',
+    )
     phase_regularization_fov_fraction: float = Field(
         0.0,
         ge=0.0,

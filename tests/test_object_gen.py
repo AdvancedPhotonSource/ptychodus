@@ -58,9 +58,9 @@ from ptychodus.api.simulate.object import (
     STXMDPCSignals,
 )
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
+from ptychodus.api.accumulate import compute_diffraction_moments, estimate_incident_beam
 from ptychodus.api.assemble import (
     AssembledDiffractionData,
-    estimate_mean_amplitude_transmission,
 )
 
 
@@ -790,7 +790,7 @@ class TestStxmDpcObject:
         """Ties this normalization to the one the builders apply on top of it.
 
         `generate_stxm_dpc_object` divides out the scanned mean and
-        `estimate_mean_amplitude_transmission` supplies the absolute level, so a
+        `estimate_incident_beam` supplies the absolute level, so a
         position recording the unobstructed beam has to come out transparent once both
         have been applied -- neither function knows about the other, and only together
         do they say what a modulus means.
@@ -808,7 +808,11 @@ class TestStxmDpcObject:
         data = _make_assembled_data(counts)
 
         obj = _generate_stxm_dpc(geometry, counts, positions)
-        scaled = obj.get_array() * estimate_mean_amplitude_transmission(data)
+        moments = compute_diffraction_moments(
+            data.get_indexes(), data.get_patterns(), bad_pixels=data.get_bad_pixels()
+        )
+        assert moments is not None
+        scaled = obj.get_array() * estimate_incident_beam(moments).mean_amplitude_transmission
 
         _, scanned = _stxm_map(geometry, data, positions)
         assert numpy.abs(scaled[0][scanned]).max() == pytest.approx(1.0, rel=5e-3)

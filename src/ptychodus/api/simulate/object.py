@@ -139,7 +139,7 @@ def compute_stxm_dpc_signals(
     assembled_data: AssembledDiffractionData,
     *,
     max_patterns_per_chunk: int = 256,
-    monitor_counts_by_index: Mapping[int, float] | None = None,
+    i0_counts_by_index: Mapping[int, float] | None = None,
 ) -> STXMDPCSignals:
     """Measure each pattern's transmitted total and its intensity centroid.
 
@@ -156,12 +156,12 @@ def compute_stxm_dpc_signals(
 
     The total sums the whole inpainted frame; it is the absorption signal. Summing only
     the good pixels instead would let a beam that walks across a dead region with the
-    sample's phase gradient read as absorption. When measured incident photon counts are
-    attached, each total is scaled by ``mean(M) / M_j`` so beam decay does not read as
-    absorption; a count at or below zero cannot normalize anything and leaves its total
-    unscaled. *monitor_counts_by_index* supplies those counts keyed by scan index -- as
-    :func:`ptychodus.api.assemble.compute_probe_photon_counts_by_index` merges them from
-    both sides with its fallback off -- in place of the assembled data's own.
+    sample's phase gradient read as absorption. *i0_counts_by_index* holds the I0
+    readings keyed by scan index, as
+    :meth:`ptychodus.api.probe_positions.ProbePositionSequence.get_probe_photon_counts_by_index`
+    gives them; each total is then scaled by ``mean(I0) / I0_j`` so beam decay does not
+    read as absorption, and a reading at or below zero cannot correct anything and leaves
+    its total unscaled.
 
     The centroid is also taken over the whole inpainted frame. The centre-of-mass
     theorem then holds up to whatever scatters off the detector, so the crop sets both
@@ -200,14 +200,10 @@ def compute_stxm_dpc_signals(
             center_of_mass_y_px=empty.copy(),
         )
 
-    if monitor_counts_by_index:
-        moments = moments.normalize_by_monitor(
-            numpy.fromiter(monitor_counts_by_index.keys(), dtype=numpy.intp),
-            numpy.fromiter(monitor_counts_by_index.values(), dtype=numpy.float64),
-        )
-    elif assembled_data.has_measured_probe_photon_counts():
-        moments = moments.normalize_by_monitor(
-            indexes, assembled_data.get_probe_photon_counts().astype(numpy.float64)
+    if i0_counts_by_index:
+        moments = moments.normalize_by_i0(
+            numpy.fromiter(i0_counts_by_index.keys(), dtype=numpy.intp),
+            numpy.fromiter(i0_counts_by_index.values(), dtype=numpy.float64),
         )
 
     return STXMDPCSignals.from_moments(moments)

@@ -36,7 +36,6 @@ from ptychodus.api.assemble import (
     DetectorCorrections,
     assemble_dataset,
     compute_dataset_total_counts,
-    estimate_mean_amplitude_transmission,
 )
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import (
@@ -79,6 +78,7 @@ from ptychodus.cli import (
 )
 from ptychodus.cli._reconstruct_common import (
     add_print_ptychi_options_argument,
+    estimate_incident_beam_from_assembled_data,
     add_ptychi_options_argument,
     install_signal_handlers,
     invalid_count_threshold,
@@ -132,6 +132,8 @@ class InstrumentProfile:
     offers_detector_pixel_size: bool = False
     # True adds --probe-photon-count, for a layout whose recorded flux is worth overriding.
     offers_probe_photon_count: bool = False
+    # Incident photons per unit of the I0 the positions carry; zero leaves I0 uncalibrated.
+    default_i0_photons_per_count: float = 0.0
     # True adds the MAD and end-trim pattern filters. They are instrument-agnostic; this
     # only decides which instruments offer them.
     offers_pattern_filters: bool = False
@@ -341,6 +343,14 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
             help='Override the per-snapshot probe photon count.',
         )
     parser.add_argument(
+        '--i0-photons-per-count',
+        type=_non_negative_float,
+        default=profile.default_i0_photons_per_count,
+        help='Incident photons per unit of the I0 the probe positions carry, which sets the '
+        'probe photon count and the object transmission from I0. Zero (the default unless '
+        'the instrument names one) leaves I0 to correct beam decay only.',
+    )
+    parser.add_argument(
         '--tomography-angle-deg',
         type=float,
         default=None,
@@ -401,6 +411,15 @@ def _add_pattern_filter_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _non_negative_float(text: str) -> float:
+    value = float(text)
+
+    if not value >= 0.0:
+        raise argparse.ArgumentTypeError(f'expected a non-negative number, got {text!r}')
+
+    return value
+
+
 def _mad_bounds(values: RealArrayType, k: float) -> tuple[float, float]:
     """Symmetric MAD interval about the median, excluding non-positive values.
 
@@ -442,18 +461,11 @@ def _select_patterns(
         int(keep.sum()),
     )
 
-    photon_counts = (
-        assembled_data.get_probe_photon_counts()[keep]
-        if assembled_data.has_measured_probe_photon_counts()
-        else None
-    )
-
     return AssembledDiffractionData(
         indexes=assembled_data.get_indexes()[keep],
         patterns=assembled_data.get_patterns()[keep],
         pixel_geometry=assembled_data.get_pixel_geometry(),
         bad_pixels=assembled_data.get_bad_pixels(),
-        probe_photon_counts=photon_counts,
         background=assembled_data.get_background(),
         flat_field=assembled_data.get_flat_field(),
     )
@@ -965,9 +977,12 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
     logger.info('Probe geometry: %s', probe_geometry)
 
     # Resolved before the probe is built, because a generated probe is normalized to it.
+    incident_beam = estimate_incident_beam_from_assembled_data(
+        assembled_data, positions, i0_photons_per_count=args.i0_photons_per_count
+    )
     probe_photon_count_override = getattr(args, 'probe_photon_count', None)
     probe_photon_count = (
-        float(assembled_data.get_probe_photon_count())
+        incident_beam.incident_photon_count
         if probe_photon_count_override is None
         else float(probe_photon_count_override)
     )
@@ -1007,7 +1022,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
     # unobstructed beam. Absorption belongs here rather than in the probe, which has to
     # go on meaning the incident illumination that probe_photon_count states.
     object_ = generate_uniform_object(
-        object_geometry, amplitude=estimate_mean_amplitude_transmission(assembled_data)
+        object_geometry, amplitude=incident_beam.mean_amplitude_transmission
     )
 
     product = Product(
@@ -1024,6 +1039,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             tomography_angle_deg=(
                 0.0 if args.tomography_angle_deg is None else float(args.tomography_angle_deg)
             ),
+            i0_photons_per_count=args.i0_photons_per_count,
         ),
         probe_positions=positions,
         probes=probe_ensemble,

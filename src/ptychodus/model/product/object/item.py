@@ -84,6 +84,15 @@ class ObjectRepositoryItem(ParameterGroup):
     def get_builder(self) -> ObjectBuilder:
         return self._builder
 
+    def can_make_editable(self) -> bool:
+        """Whether the object is a result whose layers cannot yet be changed."""
+        return isinstance(self._builder, FromMemoryObjectBuilder) and not self._builder.is_editable
+
+    def make_editable(self) -> None:
+        """Let a result be resliced; see :meth:`FromMemoryObjectBuilder.make_editable`."""
+        if isinstance(self._builder, FromMemoryObjectBuilder):
+            self._builder.make_editable()
+
     def set_builder(self, builder: ObjectBuilder) -> None:
         self._remove_group('builder')
         self._builder.remove_observer(self)

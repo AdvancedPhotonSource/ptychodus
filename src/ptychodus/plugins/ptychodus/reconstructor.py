@@ -53,6 +53,7 @@ def build_reconstructor() -> SubprocessReconstructor:
         return {
             'parameters': build_parameters(declared),
             'binning': BinningStep(bin_size_x=bin_size_px, bin_size_y=bin_size_px),
+            'update_count': declared.update_count,
         }
 
     return SubprocessReconstructor(

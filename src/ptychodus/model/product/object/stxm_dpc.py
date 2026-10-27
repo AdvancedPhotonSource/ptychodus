@@ -1,15 +1,12 @@
 from __future__ import annotations
 import logging
 
-from ptychodus.api.assemble import AssembledDiffractionData, compute_probe_photon_counts_by_index
+import numpy
+
 from ptychodus.api.geometry import GeometryNotDefinedError
 from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.probe_positions import ProbePositionSequence
-from ptychodus.api.simulate.object import (
-    STXMDPCSignals,
-    compute_stxm_dpc_signals,
-    generate_stxm_dpc_object,
-)
+from ptychodus.api.simulate.object import STXMDPCSignals, generate_stxm_dpc_object
 
 from .builder import ObjectBuilder
 from .settings import ObjectSettings
@@ -17,21 +14,35 @@ from .settings import ObjectSettings
 logger = logging.getLogger(__name__)
 
 
-def compute_monitored_signals(
-    assembled_data: AssembledDiffractionData, geometry_provider: ObjectGeometryProvider
-) -> STXMDPCSignals:
-    """STXM-DPC signals normalized by measured incident photon counts from either side.
+def compute_decay_corrected_signals(geometry_provider: ObjectGeometryProvider) -> STXMDPCSignals:
+    """STXM-DPC signals from the bound data's moments, corrected for beam decay by I0.
 
-    Counts recorded with the patterns take precedence, then counts recorded with the
-    probe positions; a pattern with neither is left unnormalized.
+    The I0 the probe positions carry scales each total by ``mean(I0) / I0_j``; without
+    any the totals are used as they are.
+
+    Raises:
+        GeometryNotDefinedError: while the moments are not yet available, so the build
+            is retried once they are.
     """
-    positions = ProbePositionSequence(geometry_provider.get_probe_positions())
-    return compute_stxm_dpc_signals(
-        assembled_data,
-        monitor_counts_by_index=compute_probe_photon_counts_by_index(
-            assembled_data, positions, fall_back_to_totals=False
-        ),
-    )
+    moments = geometry_provider.get_diffraction_moments()
+
+    if moments is None:
+        raise GeometryNotDefinedError('No diffraction moments to estimate the object from yet.')
+
+    positions = geometry_provider.get_probe_positions()
+    i0_counts_by_index = (
+        positions
+        if isinstance(positions, ProbePositionSequence)
+        else ProbePositionSequence(positions)
+    ).get_probe_photon_counts_by_index()
+
+    if i0_counts_by_index:
+        moments = moments.normalize_by_i0(
+            numpy.fromiter(i0_counts_by_index.keys(), dtype=numpy.intp),
+            numpy.fromiter(i0_counts_by_index.values(), dtype=numpy.float64),
+        )
+
+    return STXMDPCSignals.from_moments(moments)
 
 
 class STXMDPCObjectBuilder(ObjectBuilder):
@@ -90,7 +101,7 @@ class STXMDPCObjectBuilder(ObjectBuilder):
 
         object_ = generate_stxm_dpc_object(
             geometry_provider.get_object_geometry(),
-            compute_monitored_signals(assembled_data, geometry_provider),
+            compute_decay_corrected_signals(geometry_provider),
             geometry_provider.get_probe_positions(),
             detector_extent=assembled_data.get_image_extent(),
             probe=probe,

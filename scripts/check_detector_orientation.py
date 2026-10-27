@@ -37,7 +37,6 @@ from ptychodus.api.accumulate import DiffractionMomentAccumulator, DiffractionMo
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import DiffractionDataset
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.interpolate import interpolate_at_indexes
 from ptychodus.api.object import ObjectGeometry
 from ptychodus.api.parallax import (
     OrientationCandidate,
@@ -136,19 +135,19 @@ def _accumulate(dataset: DiffractionDataset, bin_size_px: int) -> DiffractionMom
     return moments
 
 
-def _normalize_by_monitor(
+def _correct_beam_decay(
     moments: DiffractionMoments, positions: ProbePositionSequence
 ) -> DiffractionMoments:
-    """Normalize by the positions' incident photon counts, averaged over duplicate indexes."""
-    counts = positions.get_probe_photon_counts()
+    """Correct the totals for beam decay by the I0 the positions carry, if any."""
+    i0_counts_by_index = positions.get_probe_photon_counts_by_index()
 
-    if counts is None:
+    if not i0_counts_by_index:
         return moments
 
-    indexes = positions.get_indexes()
-    unique_indexes = numpy.unique(indexes)
-    _, unique_counts = interpolate_at_indexes(indexes, counts, unique_indexes)
-    return moments.normalize_by_monitor(unique_indexes, unique_counts)
+    return moments.normalize_by_i0(
+        numpy.fromiter(i0_counts_by_index.keys(), dtype=numpy.intp),
+        numpy.fromiter(i0_counts_by_index.values(), dtype=numpy.float64),
+    )
 
 
 def _image_geometry(positions: ProbePositionSequence, pixel_m: float | None) -> ObjectGeometry:
@@ -360,7 +359,7 @@ def main() -> int:
         raise SystemExit(f'The file does not state them; pass {", ".join(missing)}.')
 
     wavelength_m = energy_eV_to_wavelength_m(energy_eV)
-    moments = _normalize_by_monitor(_accumulate(dataset, args.bin_size_px), positions)
+    moments = _correct_beam_decay(_accumulate(dataset, args.bin_size_px), positions)
     height_px, width_px = moments.mean_frame.shape
     probe_geometry = ProbeGeometry.from_far_field(
         pixel_geometry,
