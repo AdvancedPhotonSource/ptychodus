@@ -1,6 +1,10 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
     QHBoxLayout,
+    QLineEdit,
     QMenu,
     QPlainTextEdit,
     QProgressBar,
@@ -34,6 +38,47 @@ class ProcessingActionsView(QWidget):
         layout.addWidget(self.reconstruct_button)
         layout.addWidget(self.train_button)
         layout.addWidget(self.actions_button)
+        self.setLayout(layout)
+
+
+class TrainDialog(QDialog):
+    """Where a training run reads its data from and writes its model to.
+
+    The two are separate directories because training writes checkpoints, a
+    loss log and whatever else a backend emits, none of which belongs beside
+    the data it learned from.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle('Train')
+        self.data_line_edit = QLineEdit()
+        self.data_browse_button = QPushButton('Browse...')
+        self.output_line_edit = QLineEdit()
+        self.output_browse_button = QPushButton('Browse...')
+        self.button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+
+        data_layout = QHBoxLayout()
+        data_layout.setContentsMargins(0, 0, 0, 0)
+        data_layout.addWidget(self.data_line_edit)
+        data_layout.addWidget(self.data_browse_button)
+
+        output_layout = QHBoxLayout()
+        output_layout.setContentsMargins(0, 0, 0, 0)
+        output_layout.addWidget(self.output_line_edit)
+        output_layout.addWidget(self.output_browse_button)
+
+        form_layout = QFormLayout()
+        form_layout.addRow('Training Data:', data_layout)
+        form_layout.addRow('Model Output:', output_layout)
+
+        layout = QVBoxLayout()
+        layout.addLayout(form_layout)
+        layout.addWidget(self.button_box)
         self.setLayout(layout)
 
 

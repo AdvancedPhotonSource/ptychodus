@@ -8,8 +8,8 @@ run manually with PYTHONPATH pointing at the sibling checkout:
 
 Drives the child entry points directly (no GUI, no subprocess) so failures
 surface as ordinary tracebacks. Covers both training objectives, each
-``coupled_decoder_mode``, the diffraction-space losses and the probe-envelope
-call contract -- everything that needs a real ptycho_fm to prove.
+``coupled_decoder_mode`` and each offered loss -- everything that needs a real
+ptycho_fm to prove.
 """
 
 from __future__ import annotations
@@ -36,8 +36,6 @@ from ptychodus.api.reconstruct import (
     SubprocessPayload,
 )
 from ptychodus.plugins.ptycho_fm._subprocess import (
-    _build_criterion,
-    _compute_loss,
     run_reconstruct,
     run_train,
 )
@@ -283,7 +281,7 @@ def check_mode_mismatch_is_reported(options: PtychoFMOptions) -> None:
         try:
             run_reconstruct(payload, q)  # type: ignore[arg-type]
         except ValueError as exc:
-            assert 'coupled_decoder_mode' in str(exc), f'unhelpful message: {exc}'
+            assert 'state dict' in str(exc), f'unhelpful message: {exc}'
             print(f'  [ok] mismatch reported: {str(exc).splitlines()[0][:80]}...')
         else:
             raise AssertionError('loading an amp_phase checkpoint as uncoupled did not raise')
@@ -291,12 +289,12 @@ def check_mode_mismatch_is_reported(options: PtychoFMOptions) -> None:
     options.model.coupled_decoder_mode = original_mode
 
 
-def check_new_losses(options: PtychoFMOptions) -> None:
-    """Each diffraction-space loss trains to a finite value."""
+def check_offered_losses(options: PtychoFMOptions) -> None:
+    """Each loss ptychodus offers trains to a finite value."""
     original_mode = options.model.coupled_decoder_mode
     options.model.coupled_decoder_mode = None
 
-    for loss_function in ('total_flux', 'probe_aware', 'q_dependent'):
+    for loss_function in ('mse', 'l1', 'smooth_l1'):
         options.training.loss_function = loss_function
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -307,48 +305,6 @@ def check_new_losses(options: PtychoFMOptions) -> None:
 
     options.training.loss_function = 'mse'
     options.model.coupled_decoder_mode = original_mode
-
-
-def check_probe_envelope_dispatch(options: PtychoFMOptions) -> None:
-    """The probe-aware loss must actually receive the probe.
-
-    Called with prediction and target alone it still returns a number -- a
-    different one -- so only comparing the two call forms catches a regression.
-    """
-    import torch
-
-    options.training.loss_function = 'probe_aware'
-    config = build_train_config('Unsupervised', options)
-    criterion = _build_criterion(config['training'])
-
-    assert getattr(criterion, 'uses_probe_envelope', False), (
-        'ProbeAwareLoss no longer advertises uses_probe_envelope; the dispatch is dead'
-    )
-
-    generator = torch.Generator().manual_seed(0)
-    shape = (2, 1, IMG_SIZE, IMG_SIZE)
-    prediction = torch.rand(shape, generator=generator)
-    target = torch.rand(shape, generator=generator)
-    probe = torch.view_as_real(
-        torch.randn(2, 1, 2, IMG_SIZE, IMG_SIZE, generator=generator, dtype=torch.complex64)
-    )
-    normalization = torch.ones(2)
-    scale = torch.full((2,), 10000.0)
-
-    with_envelope = _compute_loss(
-        criterion, prediction, target, probe=probe, normalization=normalization, scale=scale
-    )
-    without_envelope = criterion(prediction, target)
-
-    assert not torch.isclose(with_envelope, without_envelope), (
-        'the probe envelope changed nothing; _compute_loss is dropping it'
-    )
-    print(
-        f'  [ok] envelope honoured: with={with_envelope.item():.6g}, '
-        f'without={without_envelope.item():.6g}'
-    )
-
-    options.training.loss_function = 'mse'
 
 
 def main() -> int:
@@ -393,11 +349,8 @@ def main() -> int:
     print('5. checkpoint/mode mismatch')
     check_mode_mismatch_is_reported(options)
 
-    print('6. diffraction-space losses')
-    check_new_losses(options)
-
-    print('7. probe-envelope dispatch')
-    check_probe_envelope_dispatch(options)
+    print('6. offered losses')
+    check_offered_losses(options)
 
     print('\nAll smoke checks passed.')
     return 0

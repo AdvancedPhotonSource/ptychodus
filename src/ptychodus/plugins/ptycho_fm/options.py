@@ -15,9 +15,16 @@ backend.
 **Absent means absent.** Upstream resolves pretrained encoder sizes, validation
 batch size and dataset normalization from a field having no value at all, so the
 config travels as ``model_dump(exclude_unset=True)`` and only the fields
-ptychodus surfaces may be set. Every default below is therefore passed
+ptychodus surfaces or freezes may be set. Every default below is therefore passed
 explicitly, including the ones that agree with upstream's: a field left to its
 declared default would be dropped from the dump and resolved at runtime instead.
+
+The architecture is **frozen here rather than surfaced**. A ``.pth`` holds a bare
+state dict naming no architecture, so a checkpoint loads only into the model it
+was trained with; offering the sizes as settings invited a mismatch that only
+shows up as a failed load. The ``model`` branch below is therefore the single
+statement of what every run builds, and nothing in the settings file can reach
+it. Changing a value here changes which checkpoints this build can load.
 """
 
 from __future__ import annotations
@@ -29,11 +36,8 @@ from ptycho_fm.config import (
     DecoderConfig,
     EncoderConfig,
     InitConfig,
-    LossConfig,
     ModelConfig,
-    ProbeAwareLossConfig,
     PtychoFMConfig,
-    QDependentLossConfig,
     TrainingConfig,
 )
 from pydantic import BaseModel, ConfigDict, Field
@@ -110,7 +114,8 @@ def default_options() -> PtychoFMOptions:
             encoder_type='custom',
             # Selects the model class, so a checkpoint loads only into the mode
             # that produced it. None builds separate amplitude and phase
-            # decoders; ptychodus persists that as 'none'.
+            # decoders instead, sharing no decoder and running no forward
+            # physics.
             coupled_decoder_mode='amp_phase',
             encoder=EncoderConfig(
                 img_size=256,
@@ -137,20 +142,7 @@ def default_options() -> PtychoFMOptions:
             batch_size=128,
             learning_rate=1.0e-5,
             epochs=2,
-            loss_function='weighted',
-            weighted_loss=LossConfig(loss_type='mse', threshold=1.0e-6, alpha=1.0),
-            probe_aware_loss=ProbeAwareLossConfig(
-                loss_type='mae', threshold=1.0e-6, alpha=0.5, envelope_floor=0.05
-            ),
-            q_dependent_loss=QDependentLossConfig(
-                loss_type='mse',
-                alpha=1.0,
-                q_beta=1.0,
-                q_floor=0.05,
-                threshold=1.0e-6,
-                log_error=True,
-                normalize_q=True,
-            ),
+            loss_function='mse',
             save_epoch_models=True,
         ),
         inference=_fully_set(InferenceOptions()),

@@ -193,12 +193,10 @@ def run_reconstruct(payload: SubprocessPayload, queue: Queue[Any]) -> None:
         load_checkpoint(model, model_path, device)
     except RuntimeError as exc:
         raise ValueError(
-            f'Could not load {model_path} into the model selected by '
-            f'coupled_decoder_mode={coupled_decoder_mode!r}. A .pth holds a bare state '
-            'dict with no mode metadata, so the most common cause is a mode differing '
-            'from the one the checkpoint was trained with. Set Coupled Decoder to that '
-            "mode -- 'none' for a checkpoint trained before the coupled decoders were "
-            'selectable.'
+            f'Could not load {model_path} into the model PtychoFM builds. A .pth holds a '
+            'bare state dict naming no architecture, so a checkpoint fits only the model '
+            'it was trained with, and ptychodus builds one fixed architecture. Use a '
+            'checkpoint this build produced.'
         ) from exc
 
     parameters = payload.require_input()
@@ -352,78 +350,22 @@ def run_reconstruct(payload: SubprocessPayload, queue: Queue[Any]) -> None:
 def _build_criterion(training_config: dict[str, Any]) -> Any:
     """Instantiate the loss module named in ``training_config['loss_function']``.
 
-    Each branch builds the loss ptycho_fm's own trainer selects for the same
-    name, configured from the sub-section that shares that name. Parameters the
-    settings do not expose are left at the constructor defaults.
+    The three ptychodus offers, each a plain ``torch.nn`` module defined on both
+    objectives and taking no parameters of its own. Upstream's remaining losses
+    are each configured by a sub-branch that ptychodus no longer persists, so a
+    name reaching here outside this set means the settings table and this
+    function have drifted apart.
     """
     import torch.nn as nn
 
-    from ptycho_fm.custom_loss import ProbeAwareLoss, QDependentLoss, TotalFluxLoss, WeightedLoss
-
     name = training_config['loss_function']
-    if name == 'smooth_l1':
-        return nn.SmoothL1Loss()
     if name == 'mse':
         return nn.MSELoss()
     if name == 'l1':
         return nn.L1Loss()
-    if name == 'poisson_nll':
-        return nn.PoissonNLLLoss(log_input=False, full=False)
-    if name == 'total_flux':
-        return TotalFluxLoss()
-    if name == 'weighted':
-        weighted_config = training_config['weighted_loss']
-        return WeightedLoss(
-            loss_type=weighted_config['loss_type'],
-            threshold=weighted_config['threshold'],
-            alpha=weighted_config['alpha'],
-        )
-    if name == 'probe_aware':
-        probe_aware_config = training_config['probe_aware_loss']
-        return ProbeAwareLoss(
-            loss_type=probe_aware_config['loss_type'],
-            threshold=probe_aware_config['threshold'],
-            alpha=probe_aware_config['alpha'],
-            envelope_floor=probe_aware_config['envelope_floor'],
-        )
-    if name == 'q_dependent':
-        q_dependent_config = training_config['q_dependent_loss']
-        return QDependentLoss(
-            loss_type=q_dependent_config['loss_type'],
-            alpha=q_dependent_config['alpha'],
-            q_beta=q_dependent_config['q_beta'],
-            q_floor=q_dependent_config['q_floor'],
-            threshold=q_dependent_config['threshold'],
-            log_error=q_dependent_config['log_error'],
-            normalize_q=q_dependent_config['normalize_q'],
-        )
-    if name == 'combined':
-        raise ValueError(
-            "The 'combined' loss takes a list of weighted loss terms, which has no "
-            'representation in ptychodus settings. Select a single loss function.'
-        )
+    if name == 'smooth_l1':
+        return nn.SmoothL1Loss()
     raise ValueError(f'Unknown loss function: {name!r}')
-
-
-def _compute_loss(
-    criterion: Any,
-    prediction: Any,
-    target: Any,
-    *,
-    probe: Any,
-    normalization: Any,
-    scale: Any,
-) -> Any:
-    """Apply ``criterion``, supplying the probe far-field envelope when it asks.
-
-    A loss module advertises the need by setting ``uses_probe_envelope``; called
-    with prediction and target alone it would silently compute an unweighted
-    error instead. Every other loss takes the two arguments.
-    """
-    if getattr(criterion, 'uses_probe_envelope', False):
-        return criterion(prediction, target, probe=probe, normalization=normalization, scale=scale)
-
-    return criterion(prediction, target)
 
 
 def _build_training_model(model_config: dict[str, Any]) -> Any:
@@ -623,14 +565,7 @@ def run_train(payload: SubprocessPayload, queue: Queue[Any]) -> None:
             ph_loss = criterion(pred_ph, ph_patch.to(device))
             return amp_loss + ph_loss
 
-        return _compute_loss(
-            criterion,
-            pred_diff,
-            input_diff,
-            probe=input_probe,
-            normalization=input_norm,
-            scale=input_scale,
-        )
+        return criterion(pred_diff, input_diff)
 
     training_losses: list[LossValue] = []
     validation_losses: list[LossValue] = []

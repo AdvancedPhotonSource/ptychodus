@@ -36,6 +36,7 @@ from .parameters import (
     ProductParameterViewController,
     ComputeParameterViewController,
 )
+from .train import TrainDialogController
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +124,7 @@ class ProcessingController(Observer):
         self._view = view
         self._status_view = status_view
         self._file_dialog_factory = file_dialog_factory
+        self._train_dialog_controller = TrainDialogController(view, file_dialog_factory)
 
         self._stacked_widget = QStackedWidget()
         self._page: dict[tuple[str, str], int] = {}
@@ -317,17 +319,17 @@ class ProcessingController(Observer):
                 logger.exception(exc)
                 ExceptionDialog.show_exception('Train Remote (Genesis)', exc)
         else:  # local
-            data_path = self._file_dialog_factory.get_existing_directory_path(
-                self._view, 'Choose Training Data Directory'
-            )
+            directories = self._train_dialog_controller.get_directories()
 
-            if not data_path:
+            if directories is None:
                 return
+
+            data_path, output_path = directories
 
             try:
                 self._processing_api.train(
                     data_path,
-                    data_path,
+                    output_path,
                     product_index=product_index,
                 )
             except Exception as exc:

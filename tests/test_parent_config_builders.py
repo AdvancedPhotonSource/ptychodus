@@ -79,18 +79,14 @@ def _build_ptycho_fm_configs() -> list[Any]:
     )
 
     # The name selects the training objective, coupled_decoder_mode the model
-    # class, and loss_function which sub-section the child reads back. Both
-    # section sets are built, since each operation narrows to its own and a
-    # builder that imported a backend would do it for either.
+    # class, and loss_function the criterion the child builds. Both section
+    # sets are built, since each operation narrows to its own and a builder
+    # that imported a backend would do it for either.
     configs: list[Any] = []
 
     for name in ('Unsupervised', 'Supervised'):
         for coupled_decoder_mode in (None, 'real_imag', 'amp_phase'):
-            for loss_function in ('weighted', 'total_flux', 'probe_aware', 'q_dependent'):
-                if name == 'Supervised' and loss_function != 'weighted':
-                    # Rejected on the train path; covered in-process below.
-                    continue
-
+            for loss_function in ('mse', 'l1', 'smooth_l1'):
                 options = default_options()
                 options.model.coupled_decoder_mode = coupled_decoder_mode
                 options.training.loss_function = loss_function
@@ -227,37 +223,13 @@ def test_parent_config_builders_acquire_no_gpu_context(backend: str) -> None:
     assert result['count'] > 0, f'{backend} built no configs.'
 
 
-@pytest.mark.parametrize('loss_function', ['total_flux', 'probe_aware', 'q_dependent'])
-def test_ptycho_fm_rejects_diffraction_losses_when_supervised(loss_function: str) -> None:
-    """Diffraction-space losses are meaningless against an object patch.
-
-    They do not raise on their own -- they compute a different quantity -- so
-    the parent has to turn the combination away before a child is spawned.
-    """
-    pytest.importorskip('ptycho_fm')
-    from ptychodus.plugins.ptycho_fm.reconstructor import _verify_loss_supports_mode
-
-    with pytest.raises(ValueError, match=loss_function):
-        _verify_loss_supports_mode('Supervised', loss_function)
-
-    _verify_loss_supports_mode('Unsupervised', loss_function)
-
-
-def test_ptycho_fm_accepts_object_space_loss_when_supervised() -> None:
-    pytest.importorskip('ptycho_fm')
-    from ptychodus.plugins.ptycho_fm.reconstructor import _verify_loss_supports_mode
-
-    for name in ('Supervised', 'Unsupervised'):
-        for loss_function in ('mse', 'l1', 'smooth_l1', 'poisson_nll', 'weighted'):
-            _verify_loss_supports_mode(name, loss_function)
-
-
 def test_ptycho_fm_maps_the_uncoupled_mode_to_null() -> None:
-    """'none' is how the settings file spells it; ptycho_fm reads the key as null.
+    """The uncoupled mode is an absent key, and must survive ``exclude_unset``.
 
-    The translation moved into the section table's Sentinel when the backend
-    started declaring, so what is checked here is that the declared value
-    reaches the child unchanged rather than that a builder converts it.
+    ptychodus freezes the architecture rather than persisting it, so the only
+    thing that can carry a decoder mode to the child is the declaration. A
+    value of None is exactly the shape ``exclude_unset`` exists to drop, so
+    that it arrives is worth pinning.
     """
     pytest.importorskip('ptycho_fm')
     from ptychodus.plugins.ptycho_fm.options import default_options

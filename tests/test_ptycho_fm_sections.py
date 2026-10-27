@@ -1,17 +1,20 @@
 """The PtychoFM overlay must reproduce the settings layout it replaces.
 
-Three contracts, each with its own oracle. The keys and defaults are checked
-against the golden settings fixture, because a missing key orphans a saved
-setting silently and a slipped default changes what a run computes while every
-key still matches. The choice lists are checked against ``PtychoFMEnumerators``,
-the hand-kept lists the policy table replaces. And the config the child receives
-is checked against the dict ``_build_config`` hands it today.
+The keys and defaults are checked against the golden settings fixture, because
+a missing key orphans a saved setting silently and a slipped default changes
+what a run computes while every key still matches. And the config the child
+receives is checked against the dict ``_build_config`` hands it today.
 
-That last one is the property specific to this backend: upstream resolves
+That second one is the property specific to this backend: upstream resolves
 pretrained encoder sizes, validation batch size and dataset normalization from a
-field having *no value*, so the declaration may set only what ptychodus
-surfaces. ``model_dump(exclude_unset=True)`` is what preserves that, and it is
+field having *no value*, so the declaration may set only what ptychodus surfaces
+or freezes. ``model_dump(exclude_unset=True)`` is what preserves that, and it is
 only correct if nothing else was set along the way.
+
+The frozen half needs its own guard here, because it is nowhere else. The
+architecture has no settings group, so the golden fixture does not see it; a
+slipped ``embed_dim`` would change every run with no test to notice.
+``_FROZEN`` is that guard.
 """
 
 from __future__ import annotations
@@ -36,7 +39,6 @@ from ptychodus.model.processing.generate import (  # noqa: E402
     restore_options,
 )
 from ptychodus.model.processing.parameter_store import OptionsSection  # noqa: E402
-from ptychodus.plugins.ptycho_fm.enums import PtychoFMEnumerators  # noqa: E402
 from ptychodus.plugins.ptycho_fm.options import default_options  # noqa: E402
 
 
@@ -88,30 +90,24 @@ def _flat_by_key() -> dict[str, Any]:
     }
 
 
-def _expected_choices() -> dict[str, tuple[str, ...]]:
-    enumerators = PtychoFMEnumerators()
-    loss_types = tuple(enumerators.get_loss_types())
-    return {
-        'encoder_type': tuple(enumerators.get_encoder_types()),
-        'coupled_decoder_mode': tuple(enumerators.get_coupled_decoder_modes()),
-        'init_method': tuple(enumerators.get_init_methods()),
-        'loss_function': tuple(enumerators.get_loss_functions()),
-        'weighted_loss_type': loss_types,
-        'probe_aware_loss_type': loss_types,
-        'q_dependent_loss_type': loss_types,
-    }
+# The three losses ptychodus offers, each defined on both objectives and taking
+# no parameters of its own. Upstream declares eight more; adding one back here
+# means persisting the sub-branch that configures it.
+_EXPECTED_CHOICES: dict[str, tuple[str, ...]] = {
+    'loss_function': ('mse', 'l1', 'smooth_l1'),
+}
 
 
 def test_every_choice_field_offers_what_the_panel_offered() -> None:
     """Upstream types every choice as a bare str, so the members come from the table."""
     flat = _flat_by_key()
-    assert {key: tuple(flat[key].choices) for key in _expected_choices()} == _expected_choices()
+    assert {key: tuple(flat[key].choices) for key in _EXPECTED_CHOICES} == _EXPECTED_CHOICES
 
 
 def test_no_other_key_claims_a_choice_list() -> None:
     """A stray entry would render a free value as a combo box of two."""
     with_choices = {key for key, flat in _flat_by_key().items() if flat.choices}
-    assert with_choices == set(_expected_choices())
+    assert with_choices == set(_EXPECTED_CHOICES)
 
 
 class TestRoundTrip:
@@ -147,16 +143,6 @@ class TestRoundTrip:
         parameters['max_files'].set_value(12)
         assert restore_options(options.data, parameters, section.policy).max_files == 12
 
-    def test_the_uncoupled_decoder_persists_as_none(self) -> None:
-        registry, options = self._build()
-        section = next(s for s in sections() if s.group_name == 'PtychoFMModel')
-        parameters = registry['PtychoFMModel'].parameters()
-        assert parameters['coupled_decoder_mode'].get_value() == 'amp_phase'
-
-        parameters['coupled_decoder_mode'].set_value('none')
-        restored = restore_options(options.model, parameters, section.policy)
-        assert restored.coupled_decoder_mode is None
-
 
 def _restored_config() -> Any:
     """The declaration carrying what the generated parameters hold at defaults."""
@@ -180,21 +166,81 @@ def _restored_config() -> Any:
     return restored
 
 
-def test_only_the_fields_ptychodus_surfaces_are_set() -> None:
-    """Anything else set here would be emitted, overriding a runtime-resolved default."""
-    restored = _restored_config()
-    surfaced = {
+# What ptychodus sets without offering, and the values it sets. Everything
+# under `model` is here because a .pth names no architecture, so the sizes a
+# checkpoint was trained with are not a user's to vary; the four under `data`
+# because they size the dataloader and the array cache to the machine.
+#
+# The values matter as much as the names. No settings group holds them, so the
+# golden fixture never sees them, and this is the only place a changed one is
+# noticed. Changing a value under `model` changes which checkpoints this build
+# can load, so a diff here should be deliberate.
+_FROZEN: dict[str, dict[str, Any]] = {
+    'data': {
+        'num_workers': 4,
+        'prefetch_factor': 2,
+        'cache_object': False,
+        'cache_memory_budget_mb': 512,
+    },
+    'model': {
+        'encoder_type': 'custom',
+        'coupled_decoder_mode': 'amp_phase',
+        'encoder': {
+            'img_size': 256,
+            'patch_size': 16,
+            'embed_dim': 512,
+            'depth': 12,
+            'num_heads': 8,
+            'mlp_ratio': 4.0,
+            'use_cls_token': False,
+            'dropout': 0.1,
+            'attn_dropout': 0.0,
+            'timm_model_name': 'vit_large_patch32_224',
+        },
+        'decoder': {
+            'base_channels': 64,
+            'latent_dim': 512,
+            'num_stages': 4,
+            'use_batchnorm': True,
+            'dropout': 0.1,
+        },
+        'init': {'enabled': False, 'method': 'trunc_normal'},
+    },
+}
+
+
+def _surfaced() -> dict[str, set[str]]:
+    """The first path segment of every key each section persists."""
+    options = _restored_config()
+    return {
         section.root_path: {
             flat.path.split('.')[0]
-            for flat in flatten_options(getattr(restored, section.root_path), section.policy)
+            for flat in flatten_options(getattr(options, section.root_path), section.policy)
         }
         for section in sections()
     }
 
-    assert set(restored.model_fields_set) == set(surfaced)
 
-    for root_path, names in surfaced.items():
-        assert getattr(restored, root_path).model_fields_set == names, root_path
+def test_only_the_fields_ptychodus_surfaces_or_freezes_are_set() -> None:
+    """Anything else set here would be emitted, overriding a runtime-resolved default."""
+    restored = _restored_config()
+    surfaced = _surfaced()
+
+    assert set(restored.model_fields_set) == set(surfaced) | set(_FROZEN)
+
+    for root_path in set(surfaced) | set(_FROZEN):
+        expected = surfaced.get(root_path, set()) | set(_FROZEN.get(root_path, {}))
+        assert getattr(restored, root_path).model_fields_set == expected, root_path
+
+
+def test_the_frozen_fields_hold_the_values_declared_for_them() -> None:
+    """The architecture's only guard: no settings group holds it to compare against."""
+    restored = _restored_config()
+
+    assert restored.model_dump(exclude_unset=True, include={'model'})['model'] == _FROZEN['model']
+
+    for name, value in _FROZEN['data'].items():
+        assert getattr(restored.data, name) == value, name
 
 
 def _dumps(name: str) -> tuple[Any, Any]:

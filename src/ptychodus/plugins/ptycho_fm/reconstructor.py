@@ -26,12 +26,6 @@ __all__ = [
 ]
 
 
-# Losses evaluated on the detector plane. The supervised objective applies the
-# criterion to object amplitude and phase patches instead, where a probe
-# envelope, a radial detector coordinate and a total photon flux are undefined.
-_DIFFRACTION_SPACE_LOSSES = frozenset({'total_flux', 'probe_aware', 'q_dependent'})
-
-
 def _build_config(
     name: str, options: PtychoFMOptions, *, sections: frozenset[str]
 ) -> dict[str, Any]:
@@ -40,7 +34,8 @@ def _build_config(
     ``exclude_unset`` is what preserves upstream's absent-means-resolve-later
     semantics: pretrained encoder sizes, validation batch size and dataset
     normalization are all decided by a field having no value, so only the
-    fields ptychodus surfaces may appear. The declaration sets exactly those.
+    fields ptychodus surfaces or freezes may appear. The declaration sets
+    exactly those.
     Narrowing composes with it rather than fighting it -- the two intersect --
     so a branch that survives is spelled exactly as it would be whole.
 
@@ -79,24 +74,7 @@ def build_train_config(name: str, options: PtychoFMOptions) -> dict[str, Any]:
     Training reads the whole data branch and the whole training branch, and
     never looks at the inference knobs.
     """
-    _verify_loss_supports_mode(name, str(options.training.loss_function))
     return _build_config(name, options, sections=frozenset({'data', 'model', 'training'}))
-
-
-def _verify_loss_supports_mode(name: str, loss_function: str) -> None:
-    """Raise unless ``loss_function`` is meaningful for the training objective.
-
-    The diffraction-space losses do not fail on object patches, they quietly
-    compute something else: a log of a signed phase clamps half the patch to the
-    stability floor, and a probe envelope the caller never supplies degrades to
-    a plain masked error.
-    """
-    if name == 'Supervised' and loss_function in _DIFFRACTION_SPACE_LOSSES:
-        raise ValueError(
-            f'The {loss_function!r} loss compares diffraction amplitudes, but supervised '
-            'training compares the decoded object against the ground truth patch. Select '
-            'an object-space loss, or train unsupervised.'
-        )
 
 
 def _declared(options: BaseModel) -> PtychoFMOptions:
