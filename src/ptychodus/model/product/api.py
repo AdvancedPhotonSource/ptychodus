@@ -22,7 +22,7 @@ from ..diffraction import AssembledDiffractionDataset
 from ..file_types import FileTypeChooser
 from ..task_manager import TaskManager
 from .item import ProductRepositoryItem, ProductState
-from .item_factory import ProductRepositoryItemFactory
+from .item_factory import ProductRepositoryItemFactory, resolve_product_name
 from .monitor import ProductTaskMonitor
 from .object.builder_factory import ObjectBuilderFactory
 from .object.settings import ObjectSettings
@@ -543,7 +543,7 @@ class ProductAPI:
 
     def insert_new_product(
         self,
-        name: str = 'Unnamed',
+        name: str = '',
         *,
         comments: str = '',
         detector_distance_m: float | None = None,
@@ -578,7 +578,9 @@ class ProductAPI:
                 dataset=dataset,
             )
 
-        return self._insert_via_queue(dataset, build, block=block, stub_name=name)
+        return self._insert_via_queue(
+            dataset, build, block=block, stub_name=resolve_product_name(name, dataset)
+        )
 
     def insert_product(
         self,
@@ -614,7 +616,9 @@ class ProductAPI:
         def build() -> ProductRepositoryItem:
             return self._item_factory.create_from_settings(dataset=dataset)
 
-        return self._insert_via_queue(dataset, build, block=block, stub_name='Unnamed')
+        return self._insert_via_queue(
+            dataset, build, block=block, stub_name=resolve_product_name('', dataset)
+        )
 
     def get_item(self, product_index: int) -> ProductRepositoryItem:
         return self._repository[product_index]

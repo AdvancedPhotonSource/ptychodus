@@ -17,6 +17,21 @@ from .settings import ProductSettings
 logger = logging.getLogger(__name__)
 
 
+def resolve_product_name(name: str, dataset: AssembledDiffractionDataset | None) -> str:
+    """The name a new product takes, given what its creator asked for.
+
+    An explicit name wins. Failing that, the sample the diffraction data was taken from,
+    where the file records one. An empty result leaves the choice to ProductSettings.name.
+    """
+    if name:
+        return name
+
+    if dataset is None:
+        return ''
+
+    return dataset.get_metadata().sample_name or ''
+
+
 class ProductRepositoryItemFactory:
     def __init__(
         self,
@@ -73,7 +88,7 @@ class ProductRepositoryItemFactory:
         metadata_item = MetadataRepositoryItem(
             self._settings,
             self._repository,
-            name=name,
+            name=resolve_product_name(name, dataset),
             comments=comments,
             detector_distance_m=detector_distance_m,
             focus_object_distance_m=focus_object_distance_m,
@@ -192,7 +207,9 @@ class ProductRepositoryItemFactory:
             else:
                 return self.create_from_product(product, dataset=dataset)
 
-        metadata_item = MetadataRepositoryItem(self._settings, self._repository)
+        metadata_item = MetadataRepositoryItem(
+            self._settings, self._repository, name=resolve_product_name('', dataset)
+        )
         scan_item = self._scan_item_factory.create_from_settings()
         geometry = ProductGeometryProvider(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)

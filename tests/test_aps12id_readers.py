@@ -43,7 +43,11 @@ _MM = 1e-3
 
 
 def _write_master(
-    scan_directory: Path, *, positions_mm: numpy.ndarray | None, exposure: bool = True
+    scan_directory: Path,
+    *,
+    positions_mm: numpy.ndarray | None,
+    exposure: bool = True,
+    sample_name: str | None = 'siemens_star',
 ) -> Path:
     """A 2026 master file holding the geometry and, when given, the nominal positions."""
     scan_directory.mkdir(parents=True, exist_ok=True)
@@ -58,6 +62,9 @@ def _write_master(
 
         if exposure:
             h5_file['/entry/instrument/detector/ExposureTime'] = 0.002
+
+        if sample_name is not None:
+            h5_file['/entry/sample/sample_name'] = sample_name
 
         if positions_mm is not None:
             h5_file['/entry/sample/positions'] = positions_mm
@@ -119,17 +126,22 @@ class TestAPS12IDReaders:
         assert metadata.detector_pixel_geometry.width_m == pytest.approx(172e-6)
         assert metadata.detector_pixel_geometry.height_m == pytest.approx(175e-6)
         assert metadata.tomography_angle_deg == pytest.approx(15.0)
+        assert metadata.sample_name == 'siemens_star'
         assert metadata.detector_extent.width_px == _DETECTOR_W
         assert metadata.detector_extent.height_px == _DETECTOR_H
 
     def test_an_unrecorded_field_is_left_unset(self, tmp_path: Path) -> None:
+        """A master predating a field must read as None, not fail."""
         scan_directory = tmp_path / 'S0042'
-        master = _write_master(scan_directory, positions_mm=None, exposure=False)
+        master = _write_master(scan_directory, positions_mm=None, exposure=False, sample_name=None)
 
         with h5py.File(scan_directory / 'sample_0042_00001.h5', 'w') as h5_file:
             h5_file['/entry/data/data'] = _frame(0)
 
-        assert APS12IDDiffractionFileReader().read(master).get_metadata().exposure_time_s is None
+        metadata = APS12IDDiffractionFileReader().read(master).get_metadata()
+
+        assert metadata.exposure_time_s is None
+        assert metadata.sample_name is None
 
     def test_negative_pixels_are_bad(self, tmp_path: Path) -> None:
         bad_pixels = (

@@ -14,18 +14,21 @@ probe-position builder factories behind it.
 from __future__ import annotations
 
 import inspect
-from dataclasses import fields
+from dataclasses import fields, replace
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ptychodus.api.diffraction import Polarization
+from ptychodus.api.diffraction import DiffractionMetadata, Polarization
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.workflow import WorkflowAPI
 from ptychodus.model.product import item_factory as item_factory_module
 from ptychodus.model.product.api import ProductAPI
-from ptychodus.model.product.item_factory import ProductRepositoryItemFactory
+from ptychodus.model.product.item_factory import (
+    ProductRepositoryItemFactory,
+    resolve_product_name,
+)
 
 
 # One value per field, each away from both the dataclass default and the
@@ -46,9 +49,9 @@ DISTINCTIVE_METADATA = ProductMetadata(
 )
 
 
-def _make_factory() -> ProductRepositoryItemFactory:
+def _make_factory(settings: Any = None) -> ProductRepositoryItemFactory:
     return ProductRepositoryItemFactory(
-        settings=MagicMock(),
+        settings=MagicMock() if settings is None else settings,
         scan_item_factory=MagicMock(),
         probe_item_factory=MagicMock(),
         object_item_factory=MagicMock(),
@@ -136,3 +139,49 @@ class TestConstructionChainSignatures:
 
         missing = _settable_field_names() - parameters
         assert not missing, f'{label} cannot express {sorted(missing)}'
+
+
+def _dataset_named(sample_name: str | None) -> MagicMock:
+    dataset = MagicMock()
+    dataset.get_metadata.return_value = replace(
+        DiffractionMetadata.create_null(), sample_name=sample_name
+    )
+    return dataset
+
+
+class TestResolveProductName:
+    """A product with no name of its own takes the sample the data was measured from."""
+
+    def test_an_explicit_name_wins(self) -> None:
+        assert resolve_product_name('typed', _dataset_named('from_the_file')) == 'typed'
+
+    def test_the_sample_name_is_the_fallback(self) -> None:
+        assert resolve_product_name('', _dataset_named('from_the_file')) == 'from_the_file'
+
+    @pytest.mark.parametrize('dataset', [None, _dataset_named(None), _dataset_named('')])
+    def test_nothing_to_go_on_defers_to_the_settings(self, dataset: MagicMock | None) -> None:
+        """An empty result is what lets ProductSettings.name keep deciding, as before."""
+        assert resolve_product_name('', dataset) == ''
+
+
+class TestSampleNameReachesTheMetadataItem:
+    """Resolving in the factory is what makes every creation path inherit the rule."""
+
+    def test_create_from_values_names_the_product_for_the_sample(self) -> None:
+        kwargs = _capture_metadata_kwargs(
+            lambda: _make_factory().create_from_values(dataset=_dataset_named('cRZP_star'))
+        )
+
+        assert kwargs['name'] == 'cRZP_star'
+
+    def test_create_from_settings_names_the_product_for_the_sample(self) -> None:
+        # Steer past the branch that reads a product file, which carries its own name.
+        settings = MagicMock()
+        settings.file_path.get_value.return_value.is_file.return_value = False
+        factory = _make_factory(settings)
+
+        kwargs = _capture_metadata_kwargs(
+            lambda: factory.create_from_settings(dataset=_dataset_named('cRZP_star'))
+        )
+
+        assert kwargs['name'] == 'cRZP_star'

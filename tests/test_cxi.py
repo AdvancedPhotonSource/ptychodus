@@ -119,6 +119,9 @@ def test_diffraction_round_trips_every_metadata_field(tmp_path: Path) -> None:
     assert metadata.tomography_angle_deg == pytest.approx(original.tomography_angle_deg)
     assert metadata.tilt_angle_deg == pytest.approx(original.tilt_angle_deg)
     assert metadata.polarization == original.polarization
+    # The sample name identifies a product, not a detector readout, so the diffraction
+    # writer does not record it; only the product writer does.
+    assert metadata.sample_name is None
     numpy.testing.assert_array_equal(loaded[0].get_indexes(), [5, 7, 9, 20, 21])
     numpy.testing.assert_array_equal(loaded[0].get_patterns(), _all_patterns(dataset))
     numpy.testing.assert_array_equal(loaded.get_bad_pixels(), dataset.get_bad_pixels())
@@ -526,8 +529,32 @@ def test_absent_quantities_read_as_unknown(tmp_path: Path) -> None:
     assert metadata.photon_energy_eV is None
     assert metadata.detector_distance_m is None
     assert metadata.detector_pixel_geometry is None
+    assert metadata.sample_name is None
     assert contents.bad_pixels is None
     numpy.testing.assert_array_equal(contents.indexes, [0, 1])
+
+
+@pytest.mark.parametrize(
+    'fields',
+    [
+        {CXIFileKeys.SAMPLE_NAME: 'Mimivirus'},
+        {CXIFileKeys.TITLE: 'Mimivirus'},
+        # The sample name is the field; the title is only the fallback spelling.
+        {CXIFileKeys.SAMPLE_NAME: 'Mimivirus', CXIFileKeys.TITLE: 'a title'},
+    ],
+)
+def test_the_sample_name_is_read_under_either_spelling(
+    tmp_path: Path, fields: dict[str, str]
+) -> None:
+    path = _write_minimal_patterns_file(tmp_path / 'm.cxi', **fields)
+
+    assert load_cxi_diffraction_contents(path).metadata.sample_name == 'Mimivirus'
+
+
+def test_an_empty_sample_name_reads_as_unknown(tmp_path: Path) -> None:
+    path = _write_minimal_patterns_file(tmp_path / 'm.cxi', **{CXIFileKeys.SAMPLE_NAME: ''})
+
+    assert load_cxi_diffraction_contents(path).metadata.sample_name is None
 
 
 def test_one_pixel_size_serves_both_axes(tmp_path: Path) -> None:

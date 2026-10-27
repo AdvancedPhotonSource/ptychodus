@@ -121,6 +121,26 @@ def _read_scalar(h5_file: h5py.File, path: str, *, scale: float = 1.0) -> float 
     return float(numpy.atleast_1d(item[()])[0]) * scale
 
 
+def _read_string(h5_file: h5py.File, path: str) -> str | None:
+    """The string at `path`, or None when the file does not record a usable one."""
+    try:
+        item = h5_file[path]
+    except KeyError:
+        logger.debug(f'"{path}" not found in "{h5_file.filename}".')
+        return None
+
+    if not isinstance(item, h5py.Dataset):
+        logger.debug(f'"{path}" in "{h5_file.filename}" is not a dataset.')
+        return None
+
+    value = numpy.atleast_1d(item[()])[0]
+
+    if isinstance(value, bytes):
+        value = value.decode('utf-8', errors='replace')
+
+    return str(value).strip() or None
+
+
 class APS12IDDiffractionFileReader(DiffractionFileReader):
     # The master records the pitch; this is the Pilatus 2M pitch, for a master that does not.
     DETECTOR_PIXEL_SIZE_M: Final[float] = 172e-6
@@ -189,6 +209,9 @@ class APS12IDDiffractionFileReader(DiffractionFileReader):
                 h5_file, '/entry/instrument/detector/y_pixel_size', scale=_METERS_PER_MILLIMETER
             )
             tomography_angle_deg = _read_scalar(h5_file, '/entry/sample/theta')
+            # The instrument writes the sample name here, not at the NeXus
+            # '/entry/sample/name'; a master that predates the field reads as None.
+            sample_name = _read_string(h5_file, '/entry/sample/sample_name')
 
         metadata = DiffractionMetadata(
             num_patterns_per_array=num_patterns_per_array,
@@ -202,6 +225,7 @@ class APS12IDDiffractionFileReader(DiffractionFileReader):
             photon_energy_eV=None if photon_energy_keV is None else 1000.0 * photon_energy_keV,
             exposure_time_s=exposure_time_s,
             tomography_angle_deg=tomography_angle_deg,
+            sample_name=sample_name,
             file_path=master,
         )
         return SimpleDiffractionDataset(metadata, contents_tree, array_list, bad_pixels)

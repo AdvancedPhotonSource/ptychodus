@@ -1107,6 +1107,11 @@ def _read_cxi_diffraction_contents(
     beam_center_x = _read_cxi_float(entry, CXIFileKeys.BEAM_CENTER_X)
     beam_center_y = _read_cxi_float(entry, CXIFileKeys.BEAM_CENTER_Y)
     raw_polarization = _read_cxi_string(entry, CXIFileKeys.POLARIZATION)
+    # SAMPLE_NAME leads because that is the field; TITLE is the alternative spelling
+    # the product reader already treats as interchangeable with it.
+    sample_name = _read_cxi_string(entry, CXIFileKeys.SAMPLE_NAME) or _read_cxi_string(
+        entry, CXIFileKeys.TITLE
+    )
 
     metadata = DiffractionMetadata(
         num_patterns_per_array=[num_patterns],
@@ -1127,6 +1132,7 @@ def _read_cxi_diffraction_contents(
         polarization=(
             None if raw_polarization is None else _parse_polarization(raw_polarization, file_path)
         ),
+        sample_name=sample_name or None,
         file_path=file_path,
     )
 

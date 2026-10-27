@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import threading
+from dataclasses import replace
 from unittest.mock import MagicMock
 
 import pytest
 
+from ptychodus.api.diffraction import DiffractionMetadata
 from ptychodus.model.task_manager import BackgroundTask, ForegroundTask, TaskManager
 from ptychodus.model.product.api import ProductAPI
 from ptychodus.model.product.monitor import ProductTaskMonitor
@@ -88,9 +90,15 @@ def _dataset(
     in_progress: bool,
     error: BaseException | None = None,
     event_set: bool | None = None,
+    sample_name: str | None = None,
 ) -> MagicMock:
     dataset = MagicMock()
     dataset.is_load_in_progress.return_value = in_progress
+    # Real metadata, not a mock: the stub name is read off it, so a mock here would
+    # stand in for a name and every assertion on that name would pass vacuously.
+    dataset.get_metadata.return_value = replace(
+        DiffractionMetadata.create_null(), sample_name=sample_name
+    )
     dataset.get_last_load_error.return_value = error
     event = threading.Event()
     # By default, event is set iff the load is not in progress. Individual tests
@@ -143,6 +151,36 @@ def test_enqueues_stub_when_mid_load_and_not_blocking() -> None:
     repo.insert_product.assert_called_once_with(stub)
     assert len(tm.background_tasks) == 1
     factory.create_from_values.assert_not_called()
+
+
+def test_the_stub_is_named_for_the_sample_while_the_dataset_loads() -> None:
+    """The stub's name is the row the user sees during the load, so it has to be final."""
+    tm = _StubTaskManager()
+    api, _, factory = _make_api(tm, MagicMock(), MagicMock())
+
+    dataset = _dataset(in_progress=True, sample_name='cRZP_siemens_star')
+    api.insert_new_product(dataset=dataset, block=False)
+
+    factory.create_pending_stub.assert_called_once_with(name='cRZP_siemens_star')
+
+
+def test_an_explicit_name_outranks_the_sample_name() -> None:
+    tm = _StubTaskManager()
+    api, _, factory = _make_api(tm, MagicMock(), MagicMock())
+
+    dataset = _dataset(in_progress=True, sample_name='cRZP_siemens_star')
+    api.insert_new_product(name='p', dataset=dataset, block=False)
+
+    factory.create_pending_stub.assert_called_once_with(name='p')
+
+
+def test_a_nameless_sample_leaves_the_stub_name_to_the_settings() -> None:
+    tm = _StubTaskManager()
+    api, _, factory = _make_api(tm, MagicMock(), MagicMock())
+
+    api.insert_new_product(dataset=_dataset(in_progress=True), block=False)
+
+    factory.create_pending_stub.assert_called_once_with(name='')
 
 
 def test_background_task_finalizes_stub_on_success() -> None:

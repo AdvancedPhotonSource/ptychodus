@@ -244,6 +244,7 @@ class DiffractionMetadata:
     tomography_angle_deg: float | None = None
     tilt_angle_deg: float | None = None
     polarization: Polarization | None = None
+    sample_name: str | None = None
     file_path: Path | None = None
 
     @property
@@ -262,6 +263,7 @@ class DiffractionMetadata:
         sz += getsizeof(self.tomography_angle_deg)
         sz += getsizeof(self.tilt_angle_deg)
         sz += getsizeof(self.polarization)
+        sz += getsizeof(self.sample_name)
         sz += getsizeof(self.file_path)
         return sz
 
