@@ -102,7 +102,7 @@ _OBJECT_OVERLAYS: Mapping[str, Overlay] = {
     'step_size': Overlay('Step Size:', 'Optimizer step size (learning rate).', minimum=0.0),
     'patch_interpolation_method': Overlay(
         'Patch Interpolator:',
-        'Interpolation method used for extracting and updating patches of the object',
+        'Interpolation method used for sampling the object and for subpixel shifts of the probe',
     ),
     'build_preconditioner_with_all_modes': Overlay(
         'Build Preconditioner with All Modes',
@@ -129,7 +129,7 @@ _OBJECT_OVERLAYS: Mapping[str, Overlay] = {
     ),
     'smoothness_constraint.enabled': Overlay(
         'Constrain Smoothness',
-        'Whether to constrain smoothness in the magnitude (but not phase) of the object',
+        'Whether to constrain smoothness in the real and imaginary components of the object',
     ),
     'smoothness_constraint.alpha': Overlay(
         'Alpha:',
@@ -597,6 +597,13 @@ _RECONSTRUCTOR_OVERLAYS: Mapping[str, Overlay] = {
         'When checked, forward propagation of ptychography will be done using less '
         'vectorized code. This reduces the speed, but also lowers memory usage',
     ),
+    'forward_model_options.shift_operator': Overlay(
+        'Shift Operator:',
+        'How the object is sampled under the probe. AUTO shifts the whole slice '
+        'periodically for a near-field product whose probe exceeds 80% of the object '
+        'in both dimensions, and samples patches otherwise. FULL_OBJECT always shifts '
+        'the whole slice and ignores Pad For Shift; PATCH always samples patches.',
+    ),
     # Typed optional upstream, but zero is its own default and its own
     # meaning -- no padding -- so ptychodus offers the count rather than a
     # switch, and never sends the absent value.
@@ -762,6 +769,7 @@ def _reconstructor_policy(extras: set[str], *, ignores_batching: bool = False) -
             'use_double_precision_for_fft': 'UseDoublePrecisionForFFT',
             'forward_model_options.low_memory_mode': 'UseLowMemoryMode',
             'forward_model_options.pad_for_shift': 'PadForShift',
+            'forward_model_options.shift_operator': 'ShiftOperator',
         },
         structural={
             'default_dtype': _precision(),

@@ -138,7 +138,15 @@ Nothing below is configured by hand. A near-field product resolves it all on the
 | --- | --- | --- |
 | `free_space_propagation_distance_m` | `z_d / M` | The equivalent parallel-beam distance, finite rather than infinite. |
 | `fft_shift` | cleared | The measurement is real-space intensity; there is no DC corner to roll. Far field sets it instead, for the plain FFT it compares against. |
-| `forward_model_options.pad_for_shift` | raised from `0` to `50` | A bright-field probe wants a margin to shift into. Only the default is replaced, never a value you chose. |
+| `forward_model_options.pad_for_shift` | raised from `0` to `50` | A bright-field probe wants a margin to shift into. Only the default is replaced, never a value you chose. Full-object sampling ignores it — see [Object Sampling](#object-sampling). |
+
+### Object Sampling
+
+**Shift Operator:** decides how the object is sampled under the probe, and its default `AUTO` resolves differently in this regime than in far field. At a finite propagation distance, when the probe exceeds 80% of the object in *both* dimensions on the probe pixel grid, it resolves to `FULL_OBJECT`: the whole slice is shifted periodically rather than a patch being cut from it. Far field never resolves that way, whatever the probe size.
+
+Two consequences worth knowing before reading a near-field result. Periodic shifting wraps — a feature crossing one edge of the object reappears at the opposite edge — and full-object sampling **ignores Pad For Shift:**, so the margin the table above raises to `50` stops applying. `DM` and `RAAR` keep normalized-adjoint object updates under it, which are approximate for fractional shifts, so their convergence can differ from patch sampling under cropped or non-uniform illumination.
+
+Set **Shift Operator:** to `PATCH` to sample patches whatever the geometry, which is what every near-field run did before pty-chi 2.3.0.
 
 ### Algorithm
 
