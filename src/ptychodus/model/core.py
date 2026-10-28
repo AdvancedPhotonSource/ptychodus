@@ -121,6 +121,7 @@ class ModelCore:
             self.plugin_registry.kb_mirrors,
             self.plugin_registry.probe_file_readers,
             self.plugin_registry.probe_file_writers,
+            self.plugin_registry.object_generators,
             self.plugin_registry.object_file_readers,
             self.plugin_registry.object_file_writers,
             self.plugin_registry.product_file_readers,

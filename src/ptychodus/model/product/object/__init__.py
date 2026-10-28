@@ -1,29 +1,17 @@
 from .builder import FromFileObjectBuilder, FromMemoryObjectBuilder, ObjectBuilder
 from .builder_factory import ObjectBuilderFactory
-from .dead_leaves import DeadLeavesObjectBuilder
-from .fractal_noise import FractalNoiseObjectBuilder
-from .grf import GaussianRandomFieldObjectBuilder
 from .item import ObjectRepositoryItem
 from .item_factory import ObjectRepositoryItemFactory
-from .paganin import PaganinObjectBuilder
-from .random import RandomObjectBuilder
+from .plugin import PluginObjectBuilder
 from .settings import ObjectSettings
-from .siemens_star import SiemensStarObjectBuilder
-from .stxm_dpc import STXMDPCObjectBuilder
 
 __all__ = [
-    'DeadLeavesObjectBuilder',
-    'FractalNoiseObjectBuilder',
     'FromFileObjectBuilder',
     'FromMemoryObjectBuilder',
-    'GaussianRandomFieldObjectBuilder',
     'ObjectBuilder',
     'ObjectBuilderFactory',
     'ObjectRepositoryItem',
     'ObjectRepositoryItemFactory',
     'ObjectSettings',
-    'PaganinObjectBuilder',
-    'RandomObjectBuilder',
-    'STXMDPCObjectBuilder',
-    'SiemensStarObjectBuilder',
+    'PluginObjectBuilder',
 ]

@@ -1,6 +1,13 @@
-"""Object (transmission function) generation functions: STXM differential phase contrast, Paganin phase retrieval, random fields, simplex/fractal noise, dead-leaves models, and Siemens star resolution targets."""
+"""Object (transmission function) generation functions: STXM differential phase contrast, Paganin phase retrieval, random fields, simplex/fractal noise, dead-leaves models, and Siemens star resolution targets.
+
+Also home to :class:`ObjectGenerator`, the interface an object model is offered
+through. It sits beside the functions because it is how they are reached: a generator
+states what it accepts and turns one set of those values into an object, and the
+functions below are what it turns them with.
+"""
 
 from __future__ import annotations
+from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final
@@ -11,19 +18,21 @@ from scipy.fft import fft2, fftfreq, ifft2
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 import numpy
+from pydantic import BaseModel
 
 from ..accumulate import DiffractionMoments, compute_diffraction_moments
 from ..assemble import AssembledDiffractionData
 from ..constants import TWO_PI_J
 from ..geometry import ImageExtent, PixelGeometry
 from ..interpolate import lerp
-from ..object import Object, ObjectGeometry, resample_object_layers
+from ..object import Object, ObjectGeometry, ObjectGeometryProvider, resample_object_layers
 from ..patch import accumulate_probe_intensity_on, iter_probe_patches_on
 from ..probe import Probe, ProbeEnsemble
 from ..probe_positions import ProbePosition, ProbePositionSequence
 from ..typing import BooleanArrayType, IntegerArrayType, RealArrayType
 
 __all__ = [
+    'ObjectGenerator',
     'STXMDPCSignals',
     'compute_stxm_dpc_signals',
     'generate_dead_leaves_object',
@@ -41,6 +50,75 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
+
+
+class ObjectGenerator(ABC):
+    """An object model, and the options it accepts.
+
+    Stateless and configured per call: a generator holds no settings of its own, so it
+    costs nothing to construct and two callers can drive the same one with different
+    values at the same time. It does not name itself either; the name a person selects
+    it by is the one it was registered under.
+
+    A generator is a complete description of one kind of object and knows nothing about
+    where its option values come from. Its options may state what a field *is* -- its
+    unit, its bounds -- but never where a value for it is found. The same holds for its
+    other inputs: the random draws and the probe are handed to it.
+
+    What it returns is raw: a single layer on the provider's object grid, unpadded, at
+    whatever modulus the model produces. Padding the canvas and scaling to the sample's
+    measured transmission are separate concerns from describing a specimen, and a
+    generator that applied either would be applying it twice.
+    """
+
+    @abstractmethod
+    def get_default_options(self) -> BaseModel:
+        """Return this generator's options, populated with their defaults.
+
+        A description, not live state: plain pydantic carrying values, types, ranges,
+        enums and the words to put beside each field. A caller edits a copy and passes
+        it back as ``options``, and its type is what an incoming ``options`` is
+        validated against.
+
+        An instance rather than the class, because a field declared with a
+        ``default_factory`` reports its class-level default as undefined. Only an
+        instance carries the value such a field actually starts at.
+        """
+
+    @abstractmethod
+    def generate(
+        self,
+        options: BaseModel,
+        geometry_provider: ObjectGeometryProvider,
+        *,
+        rng: numpy.random.Generator,
+        probe: Probe | None,
+    ) -> Object:
+        """Return the object *options* describe, sampled on the provider's object grid.
+
+        *rng* is the source of every random draw; a generator that draws none ignores
+        it. *probe* is the illumination on the object's pixels, or None where there is
+        none; it is supplied only to a generator that :attr:`reads_probe`.
+
+        Raises:
+            GeometryNotDefinedError: while something the object depends on is not yet
+                available, which a caller should treat as "not yet" rather than as a
+                failure.
+        """
+
+    @property
+    def reads_diffraction_data(self) -> bool:
+        """Whether :meth:`generate` reads the diffraction data, not only the geometry.
+
+        Such an object goes stale when the data changes under an unchanged detector
+        geometry, which the geometry alone does not announce.
+        """
+        return False
+
+    @property
+    def reads_probe(self) -> bool:
+        """Whether :meth:`generate` reads the probe it is handed."""
+        return False
 
 
 def interpolate_scan_values(

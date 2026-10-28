@@ -22,7 +22,9 @@ to whatever the item's layer spacing happens to say.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from functools import cache
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import numpy
 import numpy.testing
@@ -38,15 +40,17 @@ from ptychodus.api.object import (
     ObjectGeometry,
     ObjectGeometryProvider,
 )
+from ptychodus.api.plugins import PluginChooser, PluginRegistry
 from ptychodus.api.probe_positions import ProbePosition
 from ptychodus.api.settings import SettingsRegistry
+from ptychodus.api.simulate.object import ObjectGenerator
 from ptychodus.model.product.object.builder import (
     FromFileObjectBuilder,
     FromMemoryObjectBuilder,
     ObjectBuilder,
 )
+from ptychodus.model.product.object.builder_factory import ObjectBuilderFactory
 from ptychodus.model.product.object.item import ObjectRepositoryItem
-from ptychodus.model.product.object.random import RandomObjectBuilder
 from ptychodus.model.product.object.settings import ObjectSettings
 
 EXTENT_PX = 8
@@ -60,6 +64,21 @@ def _make_settings() -> ObjectSettings:
 
 def _make_rng() -> numpy.random.Generator:
     return numpy.random.default_rng(42)
+
+
+@cache
+def _object_generators() -> PluginChooser[ObjectGenerator]:
+    return PluginRegistry.load_plugins().object_generators
+
+
+def _make_builder(
+    name: str, settings: ObjectSettings, *, has_diffraction_data: bool = False
+) -> ObjectBuilder:
+    """The builder the factory makes for *name*, drawing from a freshly seeded rng."""
+    factory = ObjectBuilderFactory(
+        _make_rng(), settings, _object_generators(), MagicMock(), MagicMock()
+    )
+    return factory.create(name, has_diffraction_data=has_diffraction_data)
 
 
 class _StubObjectGeometryProvider(ObjectGeometryProvider):
@@ -157,7 +176,7 @@ def test_generator_pads_canvas() -> None:
     """The padding moved from the shared pipeline into _build_raw; the generative
     path must still honor it."""
     settings = _make_settings()
-    builder = RandomObjectBuilder(_make_rng(), settings)
+    builder = _make_builder('random', settings)
     builder.extra_padding_x.set_value(3)
     builder.extra_padding_y.set_value(2)
 
@@ -169,7 +188,7 @@ def test_generator_pads_canvas() -> None:
 
 def test_generator_generates_layers() -> None:
     settings = _make_settings()
-    builder = RandomObjectBuilder(_make_rng(), settings)
+    builder = _make_builder('random', settings)
 
     object_ = builder.build(_StubObjectGeometryProvider(), [LAYER_SPACING_M] * 2)
 
@@ -340,7 +359,7 @@ def test_copy_preserves_padding_parameters(builder_name: str) -> None:
     builder: ObjectBuilder
 
     if builder_name == 'random':
-        builder = RandomObjectBuilder(_make_rng(), settings)
+        builder = _make_builder('random', settings)
     else:
         builder = _make_from_file_builder(settings, _make_object(1))
 
@@ -398,8 +417,6 @@ class TestPaganinReadsTheExperiment:
     """
 
     def _build(self, photon_wavelength_m: float) -> numpy.ndarray:
-        from ptychodus.model.product.object.paganin import PaganinObjectBuilder
-
         num_positions = 25
         patterns = numpy.full((num_positions, 4, 4), 100.0, dtype=numpy.float64)
         patterns[:, 2, 2] += numpy.arange(num_positions, dtype=numpy.float64)
@@ -409,7 +426,7 @@ class TestPaganinReadsTheExperiment:
             PixelGeometry(width_m=1e-6, height_m=1e-6),
             numpy.zeros((4, 4), dtype=numpy.bool_),
         )
-        builder = PaganinObjectBuilder(_make_settings())
+        builder = _make_builder('paganin', _make_settings(), has_diffraction_data=True)
         provider = _StubObjectGeometryProvider(
             photon_wavelength_m=photon_wavelength_m, assembled_data=assembled
         )
@@ -451,12 +468,10 @@ def test_generated_object_carries_the_measured_mean_transmission() -> None:
     settings = _make_settings()
     transmission = 0.6
 
-    opaque = RandomObjectBuilder(_make_rng(), settings).build(
+    opaque = _make_builder('random', settings).build(
         _StubObjectGeometryProvider(mean_amplitude_transmission=transmission), []
     )
-    transparent = RandomObjectBuilder(_make_rng(), settings).build(
-        _StubObjectGeometryProvider(), []
-    )
+    transparent = _make_builder('random', settings).build(_StubObjectGeometryProvider(), [])
 
     numpy.testing.assert_allclose(
         opaque.get_array(), transparent.get_array() * transmission, atol=1e-12
@@ -493,9 +508,9 @@ def test_an_unusable_transmission_leaves_a_generated_object_alone(transmission: 
     """An initial guess degrades rather than stopping a reconstruction."""
     settings = _make_settings()
 
-    scaled = RandomObjectBuilder(_make_rng(), settings).build(
+    scaled = _make_builder('random', settings).build(
         _StubObjectGeometryProvider(mean_amplitude_transmission=transmission), []
     )
-    unscaled = RandomObjectBuilder(_make_rng(), settings).build(_StubObjectGeometryProvider(), [])
+    unscaled = _make_builder('random', settings).build(_StubObjectGeometryProvider(), [])
 
     numpy.testing.assert_allclose(scaled.get_array(), unscaled.get_array(), atol=1e-12)

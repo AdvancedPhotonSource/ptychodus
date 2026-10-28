@@ -6,6 +6,7 @@ and orientation conventions are pinned against that model rather than derived.
 
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
+from functools import cache
 from typing import Any
 from unittest.mock import MagicMock
 import logging
@@ -22,10 +23,12 @@ from ptychodus.api.geometry import GeometryNotDefinedError, ImageExtent, PixelGe
 from ptychodus.api.object import Object, ObjectCenter, ObjectGeometry, ObjectGeometryProvider
 from ptychodus.api.probe import Probe, ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
+from ptychodus.api.plugins import PluginChooser, PluginRegistry
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.simulate.diffraction import generate_diffraction_data
 from ptychodus.api.simulate.object import (
+    ObjectGenerator,
     STXMDPCSignals,
     compute_stxm_dpc_signals,
     generate_stxm_dpc_object,
@@ -33,13 +36,12 @@ from ptychodus.api.simulate.object import (
 )
 from ptychodus.api.simulate.probe import propagate_probe
 from ptychodus.model.product.object import (
+    ObjectBuilder,
     ObjectBuilderFactory,
     ObjectRepositoryItem,
     ObjectSettings,
-    STXMDPCObjectBuilder,
 )
-from ptychodus.model.product.object.paganin import PaganinObjectBuilder
-from ptychodus.model.product.object.stxm_dpc import compute_decay_corrected_signals
+from ptychodus.plugins.object.phase_retrieval import compute_decay_corrected_signals
 
 _LOGGER_NAME = 'ptychodus.api.simulate.object'
 _PIXEL_SIZE_M = 50e-9
@@ -589,6 +591,21 @@ def _settings() -> ObjectSettings:
     return ObjectSettings(SettingsRegistry())
 
 
+@cache
+def _object_generators() -> PluginChooser[ObjectGenerator]:
+    return PluginRegistry.load_plugins().object_generators
+
+
+def _factory(settings: ObjectSettings) -> ObjectBuilderFactory:
+    return ObjectBuilderFactory(
+        numpy.random.default_rng(0), settings, _object_generators(), MagicMock(), MagicMock()
+    )
+
+
+def _builder(name: str, settings: ObjectSettings) -> ObjectBuilder:
+    return _factory(settings).create(name, has_diffraction_data=True)
+
+
 def _ensemble(probe: Probe) -> ProbeEnsemble:
     return ProbeEnsemble(
         array=probe.get_array()[numpy.newaxis],
@@ -598,16 +615,14 @@ def _ensemble(probe: Probe) -> ProbeEnsemble:
 
 
 def test_factory_offers_stxm_dpc_in_place_of_stxm() -> None:
-    names = list(
-        ObjectBuilderFactory(numpy.random.default_rng(0), _settings(), MagicMock(), MagicMock())
-    )
+    names = list(_factory(_settings()))
 
     assert 'stxm_dpc' in names
     assert 'stxm' not in names
 
 
 def test_builder_builds_a_single_layer_object(phase_scan: _Scan) -> None:
-    builder = STXMDPCObjectBuilder(_settings())
+    builder = _builder('stxm_dpc', _settings())
 
     object_ = builder.build(_StubProvider(phase_scan.positions, assembled_data=phase_scan.data), [])
 
@@ -617,10 +632,10 @@ def test_builder_builds_a_single_layer_object(phase_scan: _Scan) -> None:
 
 def test_builder_passes_its_regularization_through(phase_scan: _Scan) -> None:
     provider = _StubProvider(phase_scan.positions, assembled_data=phase_scan.data)
-    builder = STXMDPCObjectBuilder(_settings())
+    builder = _builder('stxm_dpc', _settings())
     default = builder.build(provider, []).get_array()
 
-    builder.regularization_fov_fraction.set_value(20 / 128)
+    builder.parameters()['regularization_fov_fraction'].set_value(20 / 128)
 
     assert not numpy.allclose(builder.build(provider, []).get_array(), default)
 
@@ -628,7 +643,7 @@ def test_builder_passes_its_regularization_through(phase_scan: _Scan) -> None:
 def test_builder_rejects_near_field_before_the_signal_pass(phase_scan: _Scan) -> None:
     provider = _StubProvider(phase_scan.positions, far_field=False, assembled_data=phase_scan.data)
     provider.get_assembled_data = MagicMock(return_value=phase_scan.data)  # type: ignore[method-assign]
-    builder = STXMDPCObjectBuilder(_settings())
+    builder = _builder('stxm_dpc', _settings())
 
     with pytest.raises(ValueError, match='far-field'):
         builder.build(provider, [])
@@ -638,11 +653,11 @@ def test_builder_rejects_near_field_before_the_signal_pass(phase_scan: _Scan) ->
 
 def test_builder_waits_for_data_rather_than_failing(phase_scan: _Scan) -> None:
     with pytest.raises(GeometryNotDefinedError):
-        STXMDPCObjectBuilder(_settings()).build(_StubProvider(phase_scan.positions), [])
+        _builder('stxm_dpc', _settings()).build(_StubProvider(phase_scan.positions), [])
 
 
 def test_a_copied_builder_reads_the_data_of_the_product_it_is_in(phase_scan: _Scan) -> None:
-    builder = STXMDPCObjectBuilder(_settings())
+    builder = _builder('stxm_dpc', _settings())
     provider = _StubProvider(phase_scan.positions, assembled_data=phase_scan.data)
 
     numpy.testing.assert_array_equal(
@@ -655,9 +670,9 @@ def test_builder_shadow_correction_uses_the_bound_probe(
     shadow_scan: _Scan, caplog: pytest.LogCaptureFixture
 ) -> None:
     provider = _StubProvider(shadow_scan.positions, assembled_data=shadow_scan.data)
-    builder = STXMDPCObjectBuilder(_settings())
+    builder = _builder('stxm_dpc', _settings())
     uncorrected = builder.build(provider, []).get_array()
-    builder.shadow_correction.set_value(True)
+    builder.parameters()['shadow_correction'].set_value(True)
 
     with caplog.at_level(logging.WARNING):
         unbound = builder.build(provider, []).get_array()
@@ -690,7 +705,7 @@ def test_item_binds_its_probe_supplier_to_every_builder(phase_scan: _Scan) -> No
     def supplier() -> ProbeEnsemble:
         return _ensemble(phase_scan.probe)
 
-    first = STXMDPCObjectBuilder(settings)
+    first = _builder('stxm_dpc', settings)
     item = ObjectRepositoryItem(
         _StubProvider(phase_scan.positions, assembled_data=phase_scan.data),
         settings,
@@ -787,7 +802,7 @@ def test_paganin_builds_on_the_decay_corrected_totals(absorbing_scan: _Scan) -> 
     data = absorbing_scan.data
     decay = numpy.linspace(1.0, 0.6, data.get_patterns().shape[0])
     decayed = _with(data, patterns=data.get_patterns() * decay[:, numpy.newaxis, numpy.newaxis])
-    builder = PaganinObjectBuilder(_settings())
+    builder = _builder('paganin', _settings())
 
     clean = builder.build(
         _StubProvider(absorbing_scan.positions, assembled_data=data), []
@@ -802,7 +817,7 @@ def test_paganin_builds_on_the_decay_corrected_totals(absorbing_scan: _Scan) -> 
 
 def test_a_bound_probe_sets_the_builders_support(phase_scan: _Scan) -> None:
     provider = _StubProvider(phase_scan.positions, assembled_data=phase_scan.data)
-    builder = STXMDPCObjectBuilder(_settings())
+    builder = _builder('stxm_dpc', _settings())
     unbound = builder.build(provider, []).get_array()
 
     builder.bind_probe_supplier(lambda: _ensemble(phase_scan.probe))

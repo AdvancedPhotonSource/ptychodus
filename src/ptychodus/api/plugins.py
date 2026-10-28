@@ -34,6 +34,7 @@ from .fluorescence import (
 from .object import ObjectFileReader, ObjectFileWriter, Object
 from .observer import Observable
 from .probe import ProbeFileReader, ProbeFileWriter, ProbeEnsemble
+from .simulate.object import ObjectGenerator
 from .simulate.probe import FresnelZonePlate, KirkpatrickBaezMirrorPreset, ProbeGenerator
 from .simulate.probe_positions import ProbePositionsGenerator
 from .probe_positions import (
@@ -271,6 +272,8 @@ class PluginRegistry:
         self.kb_mirrors = PluginChooser[KirkpatrickBaezMirrorPreset]()
         self.probe_file_readers = PluginChooser[ProbeFileReader]()
         self.probe_file_writers = PluginChooser[ProbeFileWriter]()
+        # An object model is offered the way a probe model is.
+        self.object_generators = PluginChooser[ObjectGenerator]()
         self.object_file_readers = PluginChooser[ObjectFileReader]()
         self.object_file_writers = PluginChooser[ObjectFileWriter]()
         self.product_file_readers = PluginChooser[ProductFileReader]()

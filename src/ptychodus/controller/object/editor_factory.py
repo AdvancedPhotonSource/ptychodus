@@ -1,21 +1,21 @@
-from PyQt5.QtWidgets import QDialog, QMessageBox, QSpinBox, QWidget
+from PyQt5.QtWidgets import QDialog, QFormLayout, QGroupBox, QMessageBox, QSpinBox, QWidget
 
 from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.parameters import BooleanParameter
 
 from ...model.product.object import (
-    DeadLeavesObjectBuilder,
-    FractalNoiseObjectBuilder,
     FromFileObjectBuilder,
     FromMemoryObjectBuilder,
-    GaussianRandomFieldObjectBuilder,
     ObjectRepositoryItem,
-    PaganinObjectBuilder,
-    RandomObjectBuilder,
-    STXMDPCObjectBuilder,
-    SiemensStarObjectBuilder,
+    PluginObjectBuilder,
 )
 from ..make_editable import MakeEditableViewController
-from ..parameters import ParameterViewBuilder, ParameterViewController
+from ..parameters import (
+    ParameterViewBuilder,
+    ParameterViewController,
+    SpinBoxParameterViewController,
+    create_parameter_view_controller,
+)
 
 
 class MultisliceViewController(ParameterViewController, Observer):
@@ -52,218 +52,59 @@ class MultisliceViewController(ParameterViewController, Observer):
             self._sync_model_to_view()
 
 
+class DeclaredParametersViewController(ParameterViewController):
+    """The extra padding, then the rows a generator declares, in one group."""
+
+    def __init__(self, title: str, builder: PluginObjectBuilder) -> None:
+        super().__init__()
+        self._view_controllers: list[ParameterViewController] = [
+            SpinBoxParameterViewController(builder.extra_padding_x),
+            SpinBoxParameterViewController(builder.extra_padding_y),
+        ]
+        layout = QFormLayout()
+        layout.addRow('Extra Padding X:', self._view_controllers[0].get_widget())
+        layout.addRow('Extra Padding Y:', self._view_controllers[1].get_widget())
+
+        for description in builder.describe_parameters():
+            parameter = builder.parameters()[description.name]
+            view_controller = create_parameter_view_controller(
+                parameter,
+                name=description.name,
+                label=description.label,
+                tool_tip=description.tool_tip,
+                choices=description.choices,
+                unit=description.unit,
+                display_unit=description.display_unit,
+            )
+
+            if view_controller is not None:
+                self._view_controllers.append(view_controller)
+                # A check box carries its own text, so its row needs no label beside it.
+                row_label = '' if isinstance(parameter, BooleanParameter) else description.label
+                layout.addRow(row_label, view_controller.get_widget())
+
+        self._widget = QGroupBox(title)
+        self._widget.setLayout(layout)
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+
 class ObjectEditorViewControllerFactory:
     def create_editor_dialog(
         self, item_name: str, item: ObjectRepositoryItem, parent: QWidget
     ) -> QDialog:
         object_builder = item.get_builder()
         builder_name = object_builder.get_name()
-        first_layer_group = 'First Layer'
         additional_layers_group = 'Additional Layers'
         title = f'{item_name} [{builder_name}]'
 
-        if isinstance(object_builder, DeadLeavesObjectBuilder):
+        if isinstance(object_builder, PluginObjectBuilder):
+            # One branch for every object model, because a generator describes its own
+            # parameters: a model added later needs no branch of its own.
             dialog_builder = ParameterViewBuilder()
-            dialog_builder.add_spin_box(
-                object_builder.extra_padding_x, 'Extra Padding X:', group=first_layer_group
-            )
-            dialog_builder.add_spin_box(
-                object_builder.extra_padding_y, 'Extra Padding Y:', group=first_layer_group
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.leaf_radius_lower_px,
-                'Leaf Radius Lower [px]:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.leaf_radius_upper_px,
-                'Leaf Radius Upper [px]:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.leaf_radius_power_law_exponent,
-                'Leaf Radius Power Law Exponent:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.leaf_amplitude_lower,
-                'Leaf Amplitude Lower:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.leaf_amplitude_upper,
-                'Leaf Amplitude Upper:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.leaf_phase_lower_tr,
-                'Leaf Phase Lower [turns]:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.leaf_phase_upper_tr,
-                'Leaf Phase Upper [turns]:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_view_controller(
-                MultisliceViewController(item),
-                'Number of Layers:',
-                group=additional_layers_group,
-            )
-            return dialog_builder.build_dialog(title, parent)
-        elif isinstance(object_builder, FractalNoiseObjectBuilder):
-            dialog_builder = ParameterViewBuilder()
-            dialog_builder.add_spin_box(
-                object_builder.extra_padding_x, 'Extra Padding X:', group=first_layer_group
-            )
-            dialog_builder.add_spin_box(
-                object_builder.extra_padding_y, 'Extra Padding Y:', group=first_layer_group
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.grid_scale_px, 'Grid Scale:', group=first_layer_group
-            )
-            dialog_builder.add_spin_box(
-                object_builder.num_octaves, 'Number of Octaves:', group=first_layer_group
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.gain, 'Gain:', group=first_layer_group
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.lacunarity, 'Lacunarity:', group=first_layer_group
-            )
-            dialog_builder.add_view_controller(
-                MultisliceViewController(item),
-                'Number of Layers:',
-                group=additional_layers_group,
-            )
-            return dialog_builder.build_dialog(title, parent)
-        elif isinstance(object_builder, GaussianRandomFieldObjectBuilder):
-            dialog_builder = ParameterViewBuilder()
-            dialog_builder.add_spin_box(
-                object_builder.extra_padding_x, 'Extra Padding X:', group=first_layer_group
-            )
-            dialog_builder.add_spin_box(
-                object_builder.extra_padding_y, 'Extra Padding Y:', group=first_layer_group
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.correlation_length_px,
-                'Correlation Length [px]:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_view_controller(
-                MultisliceViewController(item),
-                'Number of Layers:',
-                group=additional_layers_group,
-            )
-            return dialog_builder.build_dialog(title, parent)
-        elif isinstance(object_builder, RandomObjectBuilder):
-            dialog_builder = ParameterViewBuilder()
-            dialog_builder.add_spin_box(
-                object_builder.extra_padding_x, 'Extra Padding X:', group=first_layer_group
-            )
-            dialog_builder.add_spin_box(
-                object_builder.extra_padding_y, 'Extra Padding Y:', group=first_layer_group
-            )
-            dialog_builder.add_decimal_slider(
-                object_builder.amplitude_mean, 'Amplitude Mean:', group=first_layer_group
-            )
-            dialog_builder.add_decimal_slider(
-                object_builder.amplitude_deviation,
-                'Amplitude Deviation:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_decimal_slider(
-                object_builder.phase_deviation_tr,
-                'Phase Deviation [turns]:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.blur_deviation_px, 'Blur Deviation [px]:', group=first_layer_group
-            )
-            dialog_builder.add_view_controller(
-                MultisliceViewController(item),
-                'Number of Layers:',
-                group=additional_layers_group,
-            )
-            return dialog_builder.build_dialog(title, parent)
-        elif isinstance(object_builder, SiemensStarObjectBuilder):
-            dialog_builder = ParameterViewBuilder()
-            dialog_builder.add_spin_box(
-                object_builder.extra_padding_x, 'Extra Padding X:', group=first_layer_group
-            )
-            dialog_builder.add_spin_box(
-                object_builder.extra_padding_y, 'Extra Padding Y:', group=first_layer_group
-            )
-            dialog_builder.add_spin_box(
-                object_builder.num_spokes, 'Number of Spokes:', group=first_layer_group
-            )
-            dialog_builder.add_decimal_slider(
-                object_builder.outer_radius_fraction,
-                'Outer Radius Fraction:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_decimal_slider(
-                object_builder.spoke_amplitude,
-                'Spoke Amplitude:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_decimal_slider(
-                object_builder.background_amplitude,
-                'Background Amplitude:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.spoke_phase_tr,
-                'Spoke Phase [turns]:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.background_phase_tr,
-                'Background Phase [turns]:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_view_controller(
-                MultisliceViewController(item),
-                'Number of Layers:',
-                group=additional_layers_group,
-            )
-            return dialog_builder.build_dialog(title, parent)
-        elif isinstance(object_builder, STXMDPCObjectBuilder):
-            dialog_builder = ParameterViewBuilder()
-            dialog_builder.add_spin_box(
-                object_builder.extra_padding_x, 'Extra Padding X:', group=first_layer_group
-            )
-            dialog_builder.add_spin_box(
-                object_builder.extra_padding_y, 'Extra Padding Y:', group=first_layer_group
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.regularization_fov_fraction,
-                'Regularization [FOV fraction]:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_check_box(
-                object_builder.shadow_correction,
-                'Probe Shadow Correction:',
-                group=first_layer_group,
-            )
-            dialog_builder.add_view_controller(
-                MultisliceViewController(item),
-                'Number of Layers:',
-                group=additional_layers_group,
-            )
-            return dialog_builder.build_dialog(title, parent)
-        elif isinstance(object_builder, PaganinObjectBuilder):
-            dialog_builder = ParameterViewBuilder()
-            dialog_builder.add_spin_box(
-                object_builder.extra_padding_x, 'Extra Padding X:', group=first_layer_group
-            )
-            dialog_builder.add_spin_box(
-                object_builder.extra_padding_y, 'Extra Padding Y:', group=first_layer_group
-            )
-            dialog_builder.add_decimal_line_edit(
-                object_builder.delta_over_beta,
-                'Delta / Beta:',
-                group=first_layer_group,
+            dialog_builder.add_view_controller_to_top(
+                DeclaredParametersViewController('First Layer', object_builder)
             )
             dialog_builder.add_view_controller(
                 MultisliceViewController(item),

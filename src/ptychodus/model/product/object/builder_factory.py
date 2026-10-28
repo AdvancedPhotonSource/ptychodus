@@ -1,22 +1,20 @@
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from pathlib import Path
+from typing import Any, Final
 import logging
 
 import numpy
 
 from ptychodus.api.object import Object, ObjectFileReader, ObjectFileWriter
+from ptychodus.api.parameters import Parameter
 from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.simulate.object import ObjectGenerator
 
+from ...declared import describe
 from ...file_types import FileTypeChooser
 from .builder import FromFileObjectBuilder, ObjectBuilder
-from .dead_leaves import DeadLeavesObjectBuilder
-from .fractal_noise import FractalNoiseObjectBuilder
-from .grf import GaussianRandomFieldObjectBuilder
-from .paganin import PaganinObjectBuilder
-from .random import RandomObjectBuilder
+from .plugin import PluginObjectBuilder
 from .settings import ObjectSettings
-from .siemens_star import SiemensStarObjectBuilder
-from .stxm_dpc import STXMDPCObjectBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -26,52 +24,56 @@ class ObjectBuilderFactory(Iterable[str]):
         self,
         rng: numpy.random.Generator,
         settings: ObjectSettings,
+        generator_chooser: PluginChooser[ObjectGenerator],
         file_reader_chooser: PluginChooser[ObjectFileReader],
         file_writer_chooser: PluginChooser[ObjectFileWriter],
     ) -> None:
         self._rng = rng
         self._settings = settings
+        self._generators = generator_chooser
         self.file_readers = FileTypeChooser(file_reader_chooser)
         self.file_writers = FileTypeChooser(file_writer_chooser)
-        self._non_diffraction_builders: Mapping[str, Callable[[], ObjectBuilder]] = {
-            'random': lambda: RandomObjectBuilder(rng, settings),
-            'dead_leaves': lambda: DeadLeavesObjectBuilder(rng, settings),
-            'fractal_noise': lambda: FractalNoiseObjectBuilder(rng, settings),
-            'grf': lambda: GaussianRandomFieldObjectBuilder(rng, settings),
-            'siemens_star': lambda: SiemensStarObjectBuilder(settings),
-        }
-        # Builders that cannot build without diffraction data, which they read from the
-        # geometry provider when they build.
-        self._diffraction_builders: Mapping[str, Callable[[], ObjectBuilder]] = {
-            'stxm_dpc': lambda: STXMDPCObjectBuilder(settings),
-            'paganin': lambda: PaganinObjectBuilder(settings),
+
+        # Every registered generator, not only the one selected: the settings file holds
+        # one section for the object and it must hold the same keys however the
+        # application was driven, so a model never chosen still contributes the keys it
+        # would be configured by.
+        self._parameters: dict[str, Mapping[str, Parameter[Any]]] = {
+            plugin.simple_name: settings.declare(
+                describe(plugin.strategy.get_default_options(), expand_num=True)
+            )
+            for plugin in generator_chooser
         }
 
     def __iter__(self) -> Iterator[str]:
-        yield from self._non_diffraction_builders
-        yield from self._diffraction_builders
+        for plugin in self._generators:
+            yield plugin.simple_name
 
     def create(self, name: str, *, has_diffraction_data: bool = False) -> ObjectBuilder:
         """Create the builder *name*, refusing one that needs data on a product without any."""
-        diffraction_factory = self._diffraction_builders.get(name)
+        plugin = self._generators.find_plugin(name)
 
-        if diffraction_factory is not None:
-            if not has_diffraction_data:
-                raise RuntimeError(
-                    f'Object builder "{name}" requires an associated diffraction dataset.'
-                )
+        if plugin is None:
+            raise KeyError(f'Unknown object builder "{name}"!')
 
-            return diffraction_factory()
+        if plugin.strategy.reads_diffraction_data and not has_diffraction_data:
+            raise RuntimeError(
+                f'Object builder "{name}" requires an associated diffraction dataset.'
+            )
 
-        try:
-            factory = self._non_diffraction_builders[name]
-        except KeyError as exc:
-            raise KeyError(f'Unknown object builder "{name}"!') from exc
-
-        return factory()
+        return PluginObjectBuilder(
+            self._rng,
+            self._settings,
+            plugin.simple_name,
+            plugin.strategy,
+            self._parameters[plugin.simple_name],
+        )
 
     def create_default(self) -> ObjectBuilder:
-        return next(iter(self._non_diffraction_builders.values()))()
+        # Named rather than taken as the first the chooser holds: the chooser sorts by
+        # name, so that would silently make it whichever model sorts first.
+        default_generator: Final = 'random'
+        return self.create(default_generator)
 
     def create_from_settings(self, *, has_diffraction_data: bool = False) -> ObjectBuilder:
         name = self._settings.builder.get_value()

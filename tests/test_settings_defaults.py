@@ -71,6 +71,7 @@ def _build_registry() -> SettingsRegistry:
 _GENERATORS_BY_GROUP: Mapping[str, Callable[[PluginRegistry], PluginChooser[Any]]] = {
     'ProbePositions': lambda plugins: plugins.probe_position_generators,
     'Probe': lambda plugins: plugins.probe_generators,
+    'Object': lambda plugins: plugins.object_generators,
 }
 
 

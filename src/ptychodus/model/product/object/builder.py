@@ -103,9 +103,10 @@ class ObjectBuilder(ParameterGroup):
         """Return the raw, unconditioned object.
 
         Implementations must NOT generate layers; `build` owns the conditioning
-        pipeline. Generative implementations should return
-        `self._pad_object(object_)` so the extra padding is applied to the canvas
-        they just sized against the scan geometry.
+        pipeline. `PluginObjectBuilder`, the one builder that generates, pads what its
+        generator returns with `_pad_object` and scales it with
+        `_rescale_to_mean_transmission`, so the padding lands on the canvas the
+        generator just sized against the scan geometry.
         """
         pass
 
@@ -164,7 +165,7 @@ class ObjectBuilder(ParameterGroup):
     def _pad_object(self, object_: Object) -> Object:
         """Widen a freshly generated canvas by the extra padding.
 
-        Only generative builders call this. `pad_object` is strictly additive --
+        Only `PluginObjectBuilder` calls this. `pad_object` is strictly additive --
         N applications add 2*N*pad pixels per dimension -- and it leaves no trace
         in the array, so there is no way to detect an already-padded object and
         skip it. The size of a file-supplied object is already fixed by the file,
@@ -189,7 +190,7 @@ class ObjectBuilder(ParameterGroup):
         the probe stop meaning the incident illumination that `probe_photon_count`,
         and the dose derived from it, are stated in.
 
-        Only generative builders call this. A file- or memory-supplied object already
+        Only `PluginObjectBuilder` calls this. A file- or memory-supplied object already
         carries the transmission it was reconstructed at, and scaling it would decouple
         it from a matching probe, because the data constrains the product of the two and
         not either alone.

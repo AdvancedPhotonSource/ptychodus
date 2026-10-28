@@ -4,6 +4,7 @@ from ptychodus.api.object import ObjectFileReader, ObjectFileWriter
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import ProbeFileReader, ProbeFileWriter
+from ptychodus.api.simulate.object import ObjectGenerator
 from ptychodus.api.simulate.probe import (
     FresnelZonePlate,
     KirkpatrickBaezMirrorPreset,
@@ -73,6 +74,7 @@ class ProductCore(Observer):
         kb_mirror_chooser: PluginChooser[KirkpatrickBaezMirrorPreset],
         probe_file_reader_chooser: PluginChooser[ProbeFileReader],
         probe_file_writer_chooser: PluginChooser[ProbeFileWriter],
+        object_generator_chooser: PluginChooser[ObjectGenerator],
         object_file_reader_chooser: PluginChooser[ObjectFileReader],
         object_file_writer_chooser: PluginChooser[ObjectFileWriter],
         product_file_reader_chooser: PluginChooser[ProductFileReader],
@@ -113,6 +115,7 @@ class ProductCore(Observer):
         self._object_builder_factory = ObjectBuilderFactory(
             rng,
             self._object_settings,
+            object_generator_chooser,
             object_file_reader_chooser,
             object_file_writer_chooser,
         )

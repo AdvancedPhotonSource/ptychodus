@@ -40,7 +40,7 @@ with ModelCore(Path('settings.ini')) as model:
         {
             'amplitude_mean': 1.0,
             'amplitude_deviation': 0.0,
-            'phase_deviation_turns': 0.1,
+            'phase_deviation_tr': 0.1,
             'blur_deviation_px': 0.0,
         },
     )
@@ -424,19 +424,26 @@ This replaces the probe with a new `ProbeEnsemble` whose shape is `(2, 3, height
 
 ## Object Generators
 
-Use `WorkflowProductAPI.generate_object(name, parameters)`. Object geometry is derived from the current probe geometry and scan bounding box, then optional extra padding is applied by `extra_padding_x` and `extra_padding_y`.
+Use `WorkflowProductAPI.generate_object(name, parameters)`. Each object model is a plugin, registered under the name passed here, and its parameters are the fields it declares; the settings file holds each under the same name in PascalCase with its unit in words (`phase_deviation_tr` is `PhaseDeviationInTurns` in `[Object]`). Phases are in turns throughout, as the `_tr` suffix says, so an object is `amplitude * exp(2j * pi * phase_tr)`.
+
+Object geometry is derived from the current probe geometry and scan bounding box. The generated object is then widened by `extra_padding_x` and `extra_padding_y` and scaled to the sample's measured mean transmission (see below); both apply to every generated object and to no file-supplied one.
 
 `random`
-: Generates a complex object from Gaussian amplitude and phase fields. Parameters are `amplitude_mean`, `amplitude_deviation`, `phase_deviation_turns`, and `blur_deviation_px`. The generated field is `amplitude * exp(2j * pi * phase_turns)`.
+: Generates a complex object from independent Gaussian amplitude and phase fields. Parameters are `amplitude_mean`, `amplitude_deviation`, `phase_deviation_tr`, and `blur_deviation_px`, the width of a Gaussian blur applied to both fields.
 
-`grf`
+`gaussian_random_field`
 : Generates a complex Gaussian random field by spectral synthesis. Parameter: `correlation_length_px`.
 
 `fractal_noise`
-: Generates a complex fractal-noise object by summing multiple octaves of simplex noise. Parameters are `grid_scale_px`, `num_octaves`, `gain`, and `lacunarity`.
+: Generates a complex fractal-noise object by summing multiple octaves of simplex noise. Parameters are `grid_scale_px`, the grid scale of the first octave, `num_octaves`, `gain`, the amplitude ratio of each octave to the one before, and `lacunarity`, the factor each octave divides the grid scale by.
 
 `dead_leaves`
-: Generates a layered random disk texture. Parameters include `leaf_radius_lower_px`, `leaf_radius_upper_px`, `leaf_radius_power_law_exponent`, `leaf_amplitude_lower`, `leaf_amplitude_upper`, `leaf_phase_lower_tr`, and `leaf_phase_upper_tr`.
+: Generates a layered random disk texture. Parameters are `leaf_radius_lower_px`, `leaf_radius_upper_px`, `leaf_radius_power_law_exponent`, `leaf_amplitude_lower`, `leaf_amplitude_upper`, `leaf_phase_lower_tr`, and `leaf_phase_upper_tr`.
+
+`siemens_star`
+: Generates a Siemens star resolution target: `2 * num_spokes` wedges alternate between the spoke and background values inside a disk whose radius is `outer_radius_fraction` of the canvas's smaller half-extent, and pixels outside it take the background values. Parameters are `num_spokes`, `outer_radius_fraction`, `spoke_amplitude`, `background_amplitude`, `spoke_phase_tr`, and `background_phase_tr`.
+
+The four random textures draw from the application's random number generator, so each rebuild draws a fresh texture.
 
 `stxm_dpc`
 : Generates a coarse complex object from far-field diffraction data by STXM differential phase contrast. It requires assembled diffraction data, probe positions and far-field metadata; near-field data is rejected, because the center-of-mass theorem it rests on relates a *far-field* centroid to the phase gradient of the exit wave. Parameters are `shadow_correction` and `regularization_fov_fraction`, described below.
@@ -447,6 +454,9 @@ Use `WorkflowProductAPI.generate_object(name, parameters)`. Object geometry is d
 - **Orientation.** The centroids are taken to lie in the frame the forward model simulates, with the detector's x and y along the scan's. A detector rotated or flipped relative to the scan should be oriented with the probe-position affine transform or the diffraction `hflip`, `vflip` and `transpose` steps, which the reconstruction needs in any case. With a defocused probe and a textured sample, `python scripts/check_detector_orientation.py`, a checkout tool that is not installed with the package, names those steps from the raw files (see [Measuring the Defocus](#measuring-the-defocus) above).
 - **Probe shadow.** A centroid also measures the probe's own phase gradient, weighted by the sample's transmission. For a single material under a probe of RMS width σ defocused by Δz, ignoring that term rescales the phase by roughly `1 ± 4π(β/δ)σ²/(λ|Δz|)`, which is of order one for micron-scale defocused hard X-ray probes at moderate β/δ and nothing for a pure phase object. `shadow_correction` subtracts a first-order estimate using the product's current probe. The probe sets the support and the shadow correction when the object is built, and the object does not rebuild when the probe changes, so rebuild it after changing the probe.
 - **Regularization.** Integrating noisy gradients leaves its error as drift across the field of view. `regularization_fov_fraction` adds a Tikhonov term that damps phase variations longer than that fraction of the object canvas's larger dimension, halving them at exactly that length. 0 disables it, and values beyond about 2 have little effect.
+
+`paganin`
+: Generates a complex object by Paganin single-material phase retrieval on the STXM intensity of the diffraction data, corrected for beam decay by I0 as `stxm_dpc`'s amplitude is. It requires assembled diffraction data. The wavelength and propagation distance are the product's; the one parameter is the specimen's `delta_over_beta`. With the product's probe on the object's pixels, the mean intensity is taken over the probe's illumination rather than the convex hull of the positions. The object does not rebuild when the probe changes, so rebuild it after changing the probe.
 
 ### Incident Photon Count and Transmission
 
@@ -665,6 +675,6 @@ Pty-Chi still accepts this data through the corresponding `*_options` fields —
 ## Practical Notes
 
 - The generated probe pixel size is derived from detector geometry, detector distance, and probe energy through the product geometry. For physically meaningful generated probes, create or load the diffraction metadata before generating the product.
-- `average_pattern`, `stxm_dpc` and `paganin` depend on assembled diffraction data. Analytic generators such as `disk`, `super_gaussian`, `fresnel_zone_plate`, `random`, `grf`, `fractal_noise`, and `dead_leaves` do not require measured patterns.
+- `average_pattern`, `stxm_dpc` and `paganin` depend on assembled diffraction data. Analytic generators such as `disk`, `super_gaussian`, `fresnel_zone_plate`, `random`, `gaussian_random_field`, `fractal_noise`, `dead_leaves`, and `siemens_star` do not require measured patterns.
 - `super_gaussian` is the closest built-in Gaussian-like probe. Ptychodus does not currently register a separate builder literally named `gaussian`.
 - In workflow parameter mappings, use the builder parameter names, not the settings-file names. For example use `full_width_at_half_maximum_m` rather than `FullWidthAtHalfMaximumInMeters`.
