@@ -47,7 +47,8 @@ from ptychodus.controller.processing.generated import (
     _group_label,
     _split,
 )
-from ptychodus.model.processing.flatten import EnumSpelling, FlatParameter, Unit
+from ptychodus.api.constants import Unit
+from ptychodus.model.processing.flatten import EnumSpelling, FlatParameter
 from ptychodus.model.processing.parameter_store import DescribedField
 
 

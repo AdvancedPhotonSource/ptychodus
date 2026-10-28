@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 import logging
 
 from PyQt5.QtCore import QRegularExpression, Qt
@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ptychodus.api.constants import AngleUnit, LengthUnit
+from ptychodus.api.constants import AngleUnit, LengthUnit, Unit
 from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parameters import (
@@ -744,6 +744,98 @@ class AngleParameterViewController(ParameterViewController, Observer):
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
             self.__sync_model_to_view()
+
+
+def create_whole_number_view_controller(
+    parameter: IntegerParameter, *, tool_tip: str = ''
+) -> ParameterViewController:
+    """A spin box where there is a floor to count from, a line edit otherwise.
+
+    Public because a caller laying out several whole numbers itself needs the
+    same choice made the same way, and needs it without the None that the
+    general dispatcher returns for a type no editor covers.
+    """
+    if parameter.get_minimum() is None:
+        return IntegerLineEditParameterViewController(parameter, tool_tip=tool_tip)
+
+    return SpinBoxParameterViewController(parameter, tool_tip=tool_tip)
+
+
+def _real_number_editor(
+    parameter: RealParameter,
+    unit: Unit | None,
+    *,
+    display_unit: LengthUnit | None = None,
+    tool_tip: str = '',
+) -> ParameterViewController:
+    """A unit ladder where the field names a unit, else a slider or a line edit.
+
+    A bounded real slides between its ends; an unbounded one has nothing to
+    slide between and gets a line edit. A real naming a unit gets neither: a
+    length is read and written in whichever SI prefix suits its magnitude --
+    *display_unit* where the value is zero and suggests none -- and a slider
+    over the whole range would make the small end unreachable.
+    """
+    # Only the base unit of each quantity, because each of these controllers
+    # holds one: a field declaring degrees handed to the one that reads turns
+    # would be rescaled by a factor nobody asked for.
+    if unit is Unit.METER:
+        return LengthParameterViewController(
+            parameter, default_unit=display_unit or LengthUnit.METER, tool_tip=tool_tip
+        )
+
+    if unit is Unit.TURN:
+        return AngleParameterViewController(parameter, tool_tip=tool_tip)
+
+    if parameter.get_minimum() is not None and parameter.get_maximum() is not None:
+        return DecimalSliderParameterViewController(parameter, tool_tip=tool_tip)
+
+    return DecimalLineEditParameterViewController(parameter, tool_tip=tool_tip)
+
+
+def create_parameter_view_controller(
+    parameter: Parameter[Any],
+    *,
+    name: str = '',
+    label: str = '',
+    tool_tip: str = '',
+    choices: Sequence[str] = (),
+    unit: Unit | None = None,
+    display_unit: LengthUnit | None = None,
+) -> ParameterViewController | None:
+    """The editor a parameter gets, chosen from what its declaration says about it.
+
+    One place decides, so that two panels built from two kinds of declaration
+    put the same widget on the same kind of value. A field with a fixed set of
+    values is a combo box and a boolean is a check box. A number is editable
+    within its bounds where they are given: a whole number with a floor is a
+    spin box, and a real number with both ends is a slider. Without those a
+    spin box has nothing to count from and a slider nothing to slide between,
+    so both fall back to a line edit that accepts any value of the right type.
+
+    *name* is used only to say which field was skipped when no editor covers
+    it, which is a gap here rather than a bad declaration. Returns None in
+    that case, so a caller can leave the row out rather than show a blank.
+    """
+    if isinstance(parameter, BooleanParameter):
+        # The text rides on the check box rather than the row's label, so the
+        # box reads as the sentence it is instead of as a value beside a name.
+        return CheckBoxParameterViewController(parameter, label, tool_tip=tool_tip)
+
+    if isinstance(parameter, IntegerParameter):
+        return create_whole_number_view_controller(parameter, tool_tip=tool_tip)
+
+    if isinstance(parameter, RealParameter):
+        return _real_number_editor(parameter, unit, display_unit=display_unit, tool_tip=tool_tip)
+
+    if isinstance(parameter, StringParameter):
+        if choices:
+            return ComboBoxParameterViewController(parameter, choices, tool_tip=tool_tip)
+
+        return LineEditParameterViewController(parameter, tool_tip=tool_tip)
+
+    logger.warning(f'No editor for "{name}" ({type(parameter).__name__}); omitted.')
+    return None
 
 
 class ParameterWidget(QWidget):

@@ -49,34 +49,20 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ptychodus.api.constants import LengthUnit
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parameters import (
-    BooleanParameter,
-    IntegerParameter,
-    RealParameter,
-    StringParameter,
-)
+from ptychodus.api.parameters import BooleanParameter, IntegerParameter
 from ptychodus.model.processing import (
     DescribedField,
     DescribedGroup,
     ProcessingParameterStore,
-    Unit,
 )
 
 from ..parameters import (
-    AngleParameterViewController,
     CheckableGroupBoxParameterViewController,
-    CheckBoxParameterViewController,
-    ComboBoxParameterViewController,
-    DecimalLineEditParameterViewController,
-    DecimalSliderParameterViewController,
-    IntegerLineEditParameterViewController,
-    LengthParameterViewController,
-    LineEditParameterViewController,
     ParameterViewController,
     ParameterWidget,
-    SpinBoxParameterViewController,
+    create_parameter_view_controller,
+    create_whole_number_view_controller,
 )
 from .core import ReconstructorViewControllerFactory
 
@@ -219,55 +205,13 @@ class _BitFieldViewController(ParameterViewController, Observer):
             self._model.layoutChanged.emit()
 
 
-def _whole_number_editor(
-    parameter: IntegerParameter, *, tool_tip: str = ''
-) -> ParameterViewController:
-    """A spin box where there is a floor to count from, a line edit otherwise."""
-    if parameter.get_minimum() is None:
-        return IntegerLineEditParameterViewController(parameter, tool_tip=tool_tip)
-
-    return SpinBoxParameterViewController(parameter, tool_tip=tool_tip)
-
-
-def _real_number_editor(
-    parameter: RealParameter,
-    unit: Unit | None,
-    *,
-    display_unit: LengthUnit | None = None,
-    tool_tip: str = '',
-) -> ParameterViewController:
-    """A unit ladder where the field names a unit, else a slider or a line edit.
-
-    A bounded real slides between its ends; an unbounded one has nothing to
-    slide between and gets a line edit. A real naming a unit gets neither: a
-    length is read and written in whichever SI prefix suits its magnitude --
-    *display_unit* where the value is zero and suggests none -- and a slider
-    over the whole range would make the small end unreachable.
-    """
-    # Only the base unit of each quantity, because each of these controllers
-    # holds one: a field declaring degrees handed to the one that reads turns
-    # would be rescaled by a factor nobody asked for.
-    if unit is Unit.METER:
-        return LengthParameterViewController(
-            parameter, default_unit=display_unit or LengthUnit.METER, tool_tip=tool_tip
-        )
-
-    if unit is Unit.TURN:
-        return AngleParameterViewController(parameter, tool_tip=tool_tip)
-
-    if parameter.get_minimum() is not None and parameter.get_maximum() is not None:
-        return DecimalSliderParameterViewController(parameter, tool_tip=tool_tip)
-
-    return DecimalLineEditParameterViewController(parameter, tool_tip=tool_tip)
-
-
 class _PlanViewController(ParameterViewController):
     """A branch's start, stop and stride on one row, each captioned by what it is."""
 
     def __init__(self, parameters: Sequence[IntegerParameter]) -> None:
         super().__init__()
         self._controllers = [
-            _whole_number_editor(parameter, tool_tip=tool_tip)
+            create_whole_number_view_controller(parameter, tool_tip=tool_tip)
             for parameter, tool_tip in zip(parameters, _PLAN_TOOL_TIPS)
         ]
         self._widget = QWidget()
@@ -286,38 +230,29 @@ class _PlanViewController(ParameterViewController):
 
 
 def _editor(field: DescribedField) -> ParameterViewController | None:
-    """The editor one field gets, or None for a declared type none covers."""
+    """The editor one field gets, or None for a declared type none covers.
+
+    Widget choice is shared with every other panel built from a declaration;
+    only the one case this declaration shape has of its own is answered here.
+    """
     described = field.described
     parameter = field.parameter
-    tool_tip = described.tool_tip
-    choices = _choices(field)
 
-    if isinstance(parameter, BooleanParameter):
-        # The text rides on the check box rather than the row's label, so the
-        # box reads as the sentence it is instead of as a value beside a name.
-        return CheckBoxParameterViewController(parameter, _label(field), tool_tip=tool_tip)
+    # A whole number carrying a list of choices is a chosen subset rather than
+    # a single pick, one bit per name. Nothing but a nested upstream
+    # declaration spells a field that way, so it stays with the flattener.
+    if isinstance(parameter, IntegerParameter) and described.choices:
+        return _BitFieldViewController(parameter, described.choices, tool_tip=described.tool_tip)
 
-    if isinstance(parameter, IntegerParameter):
-        if described.choices:
-            return _BitFieldViewController(parameter, described.choices, tool_tip=tool_tip)
-
-        return _whole_number_editor(parameter, tool_tip=tool_tip)
-
-    if isinstance(parameter, RealParameter):
-        return _real_number_editor(
-            parameter, described.unit, display_unit=described.display_unit, tool_tip=tool_tip
-        )
-
-    if isinstance(parameter, StringParameter):
-        if choices:
-            return ComboBoxParameterViewController(parameter, choices, tool_tip=tool_tip)
-
-        return LineEditParameterViewController(parameter, tool_tip=tool_tip)
-
-    # Reached only by a declared type no editor covers, which is a gap in
-    # this function rather than a bad declaration -- so say which field.
-    logger.warning(f'No editor for "{described.ini_key}" ({type(parameter).__name__}); omitted.')
-    return None
+    return create_parameter_view_controller(
+        parameter,
+        name=described.ini_key,
+        label=_label(field),
+        tool_tip=described.tool_tip,
+        choices=_choices(field),
+        unit=described.unit,
+        display_unit=described.display_unit,
+    )
 
 
 @dataclass(frozen=True)

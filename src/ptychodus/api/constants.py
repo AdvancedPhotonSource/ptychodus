@@ -30,6 +30,43 @@ PLANCK_CONSTANT_J_PER_HZ: Final[float] = 6.62607015e-34
 # unit it was written in and leaves in whatever unit it is to be read in.
 
 
+class Unit(Enum):
+    """A unit a field names itself after, and how a settings key spells it out.
+
+    The suffix convention above, read back: a name ending in ``_m`` is held in
+    meters, and a key derived from that name says so in words.
+
+    Declared in descending suffix length, which is the order :meth:`of` matches
+    in: ``m`` is a suffix of ``m2_per_kg`` as a string, so a shorter member
+    reached first would claim a field belonging to a longer one.
+    """
+
+    SQUARE_METERS_PER_KILOGRAM = ('m2_per_kg', 'SquareMetersPerKilogram')
+    DEGREE = ('deg', 'InDegrees')
+    RADIAN = ('rad', 'InRadians')
+    ELECTRON_VOLT = ('eV', 'InElectronVolts')
+    PIXEL = ('px', 'InPixels')
+    TURN = ('tr', 'InTurns')
+    METER = ('m', 'InMeters')
+    SECOND = ('s', 'InSeconds')
+
+    def __init__(self, suffix: str, words: str) -> None:
+        self.suffix = suffix
+        self.words = words
+
+    @classmethod
+    def of(cls, field_name: str) -> Unit | None:
+        """The unit *field_name* ends in, or None where it names none."""
+        return next(
+            (unit for unit in cls if field_name.endswith(f'_{unit.suffix}')),
+            None,
+        )
+
+    def strip_from(self, field_name: str) -> str:
+        """*field_name* without the trailing suffix that named this unit."""
+        return field_name[: -len(self.suffix) - 1]
+
+
 class LengthUnit(Enum):
     """Length units, ordered smallest to largest.
 

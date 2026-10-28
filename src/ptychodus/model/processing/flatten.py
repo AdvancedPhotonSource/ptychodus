@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Final
 
-from ptychodus.api.constants import LengthUnit
+from ptychodus.api.constants import LengthUnit, Unit
 
 __all__ = [
     'BitField',
@@ -45,7 +45,6 @@ __all__ = [
     'Overlay',
     'Sentinel',
     'StructuralAdapter',
-    'Unit',
     'flatten_options',
 ]
 
@@ -251,44 +250,6 @@ class EnumSpelling(Enum):
     def members(self, annotation: type[Enum]) -> list[str]:
         """Every member of *annotation*, each spelled as a persisted value."""
         return [self.render(member) for member in annotation]
-
-
-class Unit(Enum):
-    """A unit a declared field names itself after, and how a key spells it out.
-
-    Declared in descending suffix length, which is the order :meth:`of` matches
-    in: ``m`` is a suffix of ``m2_per_kg`` as a string, so a shorter member
-    reached first would claim a field belonging to a longer one.
-
-    Kept on the flattened key rather than consumed and discarded, because the
-    unit a value is held in is part of what the field says about itself and
-    nothing downstream can recover it once the suffix is words.
-    """
-
-    SQUARE_METERS_PER_KILOGRAM = ('m2_per_kg', 'SquareMetersPerKilogram')
-    DEGREE = ('deg', 'InDegrees')
-    RADIAN = ('rad', 'InRadians')
-    ELECTRON_VOLT = ('eV', 'InElectronVolts')
-    PIXEL = ('px', 'InPixels')
-    TURN = ('tr', 'InTurns')
-    METER = ('m', 'InMeters')
-    SECOND = ('s', 'InSeconds')
-
-    def __init__(self, suffix: str, words: str) -> None:
-        self.suffix = suffix
-        self.words = words
-
-    @classmethod
-    def of(cls, field_name: str) -> Unit | None:
-        """The unit *field_name* ends in, or None where it names none."""
-        return next(
-            (unit for unit in cls if field_name.endswith(f'_{unit.suffix}')),
-            None,
-        )
-
-    def strip_from(self, field_name: str) -> str:
-        """*field_name* without the trailing suffix that named this unit."""
-        return field_name[: -len(self.suffix) - 1]
 
 
 class NamingConvention(Enum):

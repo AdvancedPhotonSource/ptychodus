@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 import pytest
 
-from ptychodus.api.constants import LengthUnit
+from ptychodus.api.constants import LengthUnit, Unit
 from ptychodus.model.processing.flatten import (
     BitField,
     BoolEnum,
@@ -23,7 +23,6 @@ from ptychodus.model.processing.flatten import (
     OptionalGate,
     OptionalRange,
     Sentinel,
-    Unit,
     flatten_options,
 )
 
