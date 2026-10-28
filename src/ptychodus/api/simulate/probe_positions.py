@@ -1,10 +1,52 @@
-"""Probe position (scan pattern) generators: cartesian, concentric, Lissajous, and spiral grids."""
+"""Probe position (scan pattern) generators: cartesian, concentric, Lissajous, and spiral grids.
 
-from collections.abc import Iterator
+Also home to :class:`ProbePositionsGenerator`, the interface a scan pattern is
+offered through. It sits beside the functions because it is how they are
+reached: a generator states what it accepts and turns one set of those values
+into points, and the functions below are what it turns them with.
+"""
+
+from abc import ABC, abstractmethod
+from collections.abc import Iterator, Sequence
 
 import numpy
+from pydantic import BaseModel
 
 from ..probe_positions import ProbePosition
+
+
+class ProbePositionsGenerator(ABC):
+    """A scan pattern, and the options it accepts.
+
+    Stateless and configured per call: a generator holds no settings of its
+    own, so it costs nothing to construct and two callers can drive the same
+    one with different values at the same time. It does not name itself
+    either; the name a person selects it by is the one it was registered
+    under.
+
+    What it returns is raw: the points the pattern describes, in acquisition
+    order, in meters, with no transform or jitter applied and nothing
+    discarded. Conditioning a scan is a separate concern from describing one,
+    and a generator that applied any of it would be applying it twice.
+    """
+
+    @abstractmethod
+    def get_default_options(self) -> BaseModel:
+        """Return this generator's options, populated with their defaults.
+
+        A description, not live state: plain pydantic carrying values, types,
+        ranges, enums and the words to put beside each field. A caller edits a
+        copy and passes it back as ``options``, and its type is what an
+        incoming ``options`` is validated against.
+
+        An instance rather than the class, because a field declared with a
+        ``default_factory`` reports its class-level default as undefined. Only
+        an instance carries the value such a field actually starts at.
+        """
+
+    @abstractmethod
+    def generate(self, options: BaseModel) -> Sequence[ProbePosition]:
+        """Return the points *options* describes, in acquisition order."""
 
 
 def generate_cartesian_probe_positions(

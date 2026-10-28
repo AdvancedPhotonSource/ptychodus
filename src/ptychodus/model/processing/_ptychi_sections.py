@@ -20,11 +20,11 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Final
 import math
 
+from ..declared import fields_of
 from .flatten import (
     BitField,
     BoolEnum,
     Overlay,
-    fields_of,
     FlatteningPolicy,
     OptionalGate,
     OptionalRange,

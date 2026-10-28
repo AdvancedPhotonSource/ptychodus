@@ -25,13 +25,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
+from ..declared import fields_of
 from .flatten import (
     EnumSpelling,
     FlatteningPolicy,
     NamingConvention,
     Overlay,
     Sentinel,
-    fields_of,
 )
 from .parameter_store import OptionsSection
 

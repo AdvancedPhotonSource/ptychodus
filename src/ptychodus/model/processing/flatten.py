@@ -27,9 +27,11 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Final
+from typing import Any
 
 from ptychodus.api.constants import LengthUnit, Unit
+
+from ..declared import fields_of, read_bounds, read_display_unit, render_key
 
 __all__ = [
     'BitField',
@@ -37,7 +39,6 @@ __all__ = [
     'EnumSpelling',
     'NamingConvention',
     'compose_key',
-    'fields_of',
     'FlatParameter',
     'FlatteningPolicy',
     'OptionalGate',
@@ -270,16 +271,9 @@ class NamingConvention(Enum):
         if self is NamingConvention.VERBATIM:
             return field_name
 
-        unit = Unit.of(field_name)
-
-        if unit is None:
-            return _join_words(field_name)
-
-        return _join_words(unit.strip_from(field_name)) + unit.words
-
-
-def _join_words(name: str) -> str:
-    return ''.join(word[:1].upper() + word[1:] for word in name.split('_'))
+        # Without the `num` expansion: these are foreign declarations, and two
+        # of them already persist NumEpochs from num_epochs.
+        return render_key(field_name)
 
 
 # A name beginning with this escapes its group's prefix. A handful of pty-chi
@@ -300,17 +294,6 @@ def _is_nested(value: Any) -> bool:
     unset is treated as a leaf instead of being walked into.
     """
     return hasattr(value, '__pydantic_fields__')
-
-
-def fields_of(model: type) -> Mapping[str, Any]:
-    """Return a model's pydantic field map.
-
-    Read reflectively because the two shapes a declaration may take -- a
-    ``BaseModel`` subclass and a ``pydantic.dataclasses.dataclass`` -- share this
-    attribute but no common base class.
-    """
-    fields: Mapping[str, Any] = getattr(model, '__pydantic_fields__')
-    return fields
 
 
 @dataclass(frozen=True)
@@ -512,65 +495,6 @@ def _walk(options: Any, policy: FlatteningPolicy, *, path: str, prefix: str) -> 
     return flat
 
 
-def _bounds(info: Any) -> tuple[Any, Any]:
-    """Read an inclusive bound pair off a pydantic field.
-
-    An exclusive constraint is moved inward, since the range a parameter clamps
-    to includes its endpoints: a field declared strictly greater than zero
-    would otherwise admit exactly zero and fail validation wherever it is used.
-    The offset is small enough to be indistinguishable from the excluded value
-    in use, and far below any default declared against such a bound. A field
-    carrying both forms of a bound takes the exclusive one, the narrower.
-    """
-    exclusive_offset: Final = 1.0e-12
-    minimum: Any = None
-    maximum: Any = None
-
-    for constraint in info.metadata:
-        # Compared against None rather than tested for truth: ge=0.0 is the most
-        # common bound in this codebase and is falsy.
-        lower = getattr(constraint, 'ge', None)
-        upper = getattr(constraint, 'le', None)
-        above = getattr(constraint, 'gt', None)
-        below = getattr(constraint, 'lt', None)
-
-        if above is not None:
-            lower = above + exclusive_offset
-
-        if below is not None:
-            upper = below - exclusive_offset
-
-        if lower is not None:
-            minimum = lower
-
-        if upper is not None:
-            maximum = upper
-
-    return minimum, maximum
-
-
-def _display_unit(info: Any, unit: Unit | None, path: str) -> LengthUnit | None:
-    """The length unit a field declares to be shown in, or None where it declares none.
-
-    Raises:
-        ValueError: if the declared name is no LengthUnit member, or the field is not
-            held in meters, where a length unit would mislabel the value.
-    """
-    extra = info.json_schema_extra
-    name = extra.get('display_unit') if isinstance(extra, Mapping) else None
-
-    if name is None:
-        return None
-
-    if unit is not Unit.METER:
-        raise ValueError(f'{path} declares a display unit but is not held in meters!')
-
-    try:
-        return LengthUnit[name]
-    except KeyError:
-        raise ValueError(f'{path} declares an unknown display unit {name!r}!') from None
-
-
 def _stated_or_declared(stated: Any, declared: Any) -> Any:
     """Return the bound an overlay states, else the one the field declares.
 
@@ -611,7 +535,7 @@ def _leaf(
     # clamps the key silently -- a parameter reports a bounded value but
     # persists the raw one, so the settings file looks right and the value
     # handed to the backend is not.
-    declared_minimum, declared_maximum = (None, None) if role else _bounds(info)
+    declared_minimum, declared_maximum = (None, None) if role else read_bounds(info)
     # Read off the declared field, so an adapter's key reports none: an adapter may
     # persist a pair of radians as a pair of degrees, and inheriting the field's unit
     # would label the key with the one it is not in.
@@ -635,6 +559,6 @@ def _leaf(
         # is the adapter's own business.
         gates_group=not role and path.rsplit('.', 1)[-1] in policy.collapse_onto_prefix,
         unit=unit,
-        display_unit=None if role else _display_unit(info, unit, path),
+        display_unit=None if role else read_display_unit(info, unit, path),
         panel_hidden=policy.is_panel_hidden(path),
     )
