@@ -10,13 +10,14 @@ application code.
 from __future__ import annotations
 
 import logging
-import pickle
 import sys
 import time
 from collections.abc import Mapping
-from multiprocessing.queues import Queue
+from multiprocessing.queues import SimpleQueue
 from types import ModuleType, SimpleNamespace
 from typing import Any
+
+import numpy
 
 from ptychodus.api.reconstruct import (
     ReconstructOutput,
@@ -149,7 +150,7 @@ def yield_n_outputs(payload: Any, queue: Any) -> None:
     n = int(payload.options['n'])
     for i in range(n):
         output = ReconstructOutput(product=payload.options['product'], progress=i + 1)
-        queue.put((ReconstructorMessage.OUTPUT, pickle.dumps(output)))
+        queue.put((ReconstructorMessage.OUTPUT, output))
 
 
 def raise_immediately(payload: Any, queue: Any) -> None:
@@ -172,7 +173,7 @@ def emit_output_then_hang(payload: Any, queue: Any) -> None:
     queue.put(
         (
             ReconstructorMessage.OUTPUT,
-            pickle.dumps(ReconstructOutput(product=payload.options['product'], progress=1)),
+            ReconstructOutput(product=payload.options['product'], progress=1),
         )
     )
     time.sleep(3600.0)
@@ -182,23 +183,23 @@ def emit_log_then_output(payload: Any, queue: Any) -> None:
     """Log a message, then emit one output; parent must see log before output."""
     logger.warning(payload.options['log_message'])
     output = ReconstructOutput(product=payload.options['product'], progress=1)
-    queue.put((ReconstructorMessage.OUTPUT, pickle.dumps(output)))
+    queue.put((ReconstructorMessage.OUTPUT, output))
 
 
 def emit_settings_sync_then_output(payload: Any, queue: Any) -> None:
     """Emit a settings-sync message, then an output."""
     queue.put((ReconstructorMessage.SETTINGS_SYNC, payload.options['settings']))
     output = ReconstructOutput(product=payload.options['product'], progress=1)
-    queue.put((ReconstructorMessage.OUTPUT, pickle.dumps(output)))
+    queue.put((ReconstructorMessage.OUTPUT, output))
 
 
 def train_and_save(payload: Any, queue: Any) -> None:
     """Emit one :class:`TrainOutput` and a model-saved path."""
-    queue.put((ReconstructorMessage.TRAIN_OUTPUT, pickle.dumps(TrainOutput(progress=1))))
+    queue.put((ReconstructorMessage.TRAIN_OUTPUT, TrainOutput(progress=1)))
     queue.put((ReconstructorMessage.MODEL_SAVED, payload.options['saved_path']))
 
 
-def probe_cuda_uuids(_payload: Any, queue: Queue[Any]) -> None:
+def probe_cuda_uuids(_payload: Any, queue: SimpleQueue[Any]) -> None:
     """Report the UUID of every CUDA device visible to this child.
 
     A name does not identify a device when a host holds two of the same model,
@@ -210,4 +211,16 @@ def probe_cuda_uuids(_payload: Any, queue: Queue[Any]) -> None:
         str(torch.cuda.get_device_properties(index).uuid)
         for index in range(torch.cuda.device_count())
     ]
-    queue.put((ReconstructorMessage.OUTPUT, pickle.dumps(uuids)))
+    queue.put((ReconstructorMessage.OUTPUT, uuids))
+
+
+def emit_unpicklable(payload: Any, queue: Any) -> None:
+    """Put a message that cannot be pickled; the put itself must raise."""
+    queue.put((ReconstructorMessage.OUTPUT, lambda: None))
+
+
+def emit_then_modify_in_place(payload: Any, queue: Any) -> None:
+    """Put an array, then overwrite it; the parent must see what was put."""
+    array = numpy.zeros(1 << 20)
+    queue.put(('array', array))
+    array += 1.0

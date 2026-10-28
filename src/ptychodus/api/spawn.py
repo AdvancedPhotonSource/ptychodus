@@ -21,9 +21,16 @@ on the first call rather than at startup.
 Wire protocol
 -------------
 
-Messages travel over a ``multiprocessing.Queue`` as tagged tuples. Because a
+Messages travel over a ``multiprocessing.SimpleQueue`` as tagged tuples. Because a
 single child thread produces every message, ordering is preserved (a log line
 arrives before the result it precedes).
+
+A message is pickled by ``put`` itself, in the calling thread, before ``put``
+returns -- unlike ``multiprocessing.Queue``, which pickles later in a feeder
+thread. So a child puts the object it means to send, never pre-pickled bytes:
+an array it goes on to modify in place has already been captured, and a message
+that cannot be pickled raises at its own ``put`` and reaches the parent as a
+:class:`ChildError` rather than vanishing from a background thread.
 
 - ``(ChildMessage.LOG, levelno, logger_name, formatted_message)``
 - ``(ChildMessage.ERROR, traceback_str, exception_type_name, pickled_exc_or_none)``
@@ -52,7 +59,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
 from multiprocessing.context import SpawnProcess
-from multiprocessing.queues import Queue
+from multiprocessing.queues import SimpleQueue
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -111,7 +118,7 @@ class SubprocessLogHandler(logging.Handler):
     logging tree unchanged.
     """
 
-    def __init__(self, result_queue: Queue[Any]) -> None:
+    def __init__(self, result_queue: SimpleQueue[Any]) -> None:
         super().__init__()
         self._result_queue = result_queue
 
@@ -126,7 +133,7 @@ class SubprocessLogHandler(logging.Handler):
 
 
 def install_child_log_forwarder(
-    result_queue: Queue[Any], level: int = logging.INFO
+    result_queue: SimpleQueue[Any], level: int = logging.INFO
 ) -> SubprocessLogHandler:
     """Install a queue-forwarding handler on the child's root logger.
 
@@ -142,12 +149,19 @@ def install_child_log_forwarder(
     return handler
 
 
-def send_error(result_queue: Queue[Any], exc: BaseException) -> None:
+def send_error(result_queue: SimpleQueue[Any], exc: BaseException) -> None:
     """Marshal an unhandled child-side exception onto the queue.
 
     Pickles the exception when possible so the parent can re-raise the
     original class; otherwise the parent falls back to :class:`ChildError`
     carrying the traceback text.
+
+    The one message the transport pickles explicitly rather than leaving to
+    the queue. An exception can pickle here and still fail to rebuild in the
+    parent -- an ``__init__`` whose signature differs from ``args`` is the
+    usual cause -- and a failure inside ``SimpleQueue.get`` would take the
+    traceback down with it. Nested bytes let the parent drop only the
+    exception.
     """
     tb = traceback.format_exc()
     try:
@@ -164,7 +178,7 @@ def send_error(result_queue: Queue[Any], exc: BaseException) -> None:
 def _child_main(
     entry_point: str,
     payload: Any,
-    result_queue: Queue[Any],
+    result_queue: SimpleQueue[Any],
     log_level: int,
     environment: Mapping[str, str],
 ) -> None:
@@ -204,7 +218,7 @@ def _child_main(
 @dataclass
 class _RunState:
     process: SpawnProcess
-    queue: Queue[Any]
+    queue: SimpleQueue[Any]
 
 
 @contextmanager
@@ -242,7 +256,7 @@ def run_subprocess(
         log_level = logging.getLogger().getEffectiveLevel()
 
     ctx = multiprocessing.get_context('spawn')
-    result_queue: Queue[Any] = ctx.Queue()
+    result_queue: SimpleQueue[Any] = ctx.SimpleQueue()
     process = ctx.Process(
         target=_child_main,
         args=(entry_point, payload, result_queue, log_level, dict(environment or {})),
@@ -297,6 +311,5 @@ def _shutdown(state: _RunState, grace_sec: float) -> None:
         process.join()
     try:
         state.queue.close()
-        state.queue.join_thread()
     except Exception:
         pass

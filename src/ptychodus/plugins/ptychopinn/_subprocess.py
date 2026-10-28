@@ -22,11 +22,10 @@ from __future__ import annotations
 
 import csv
 import logging
-import pickle
 import tempfile
 from collections.abc import Sequence
 from dataclasses import replace
-from multiprocessing.queues import Queue
+from multiprocessing.queues import SimpleQueue
 from pathlib import Path
 from typing import Any
 
@@ -103,7 +102,7 @@ def _build_arrays(parameters: Any) -> dict[str, Any]:
     }
 
 
-def run_reconstruct(payload: SubprocessPayload, queue: Queue[Any]) -> None:
+def run_reconstruct(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None:
     """Child entry point for one inference pass. Streams a single ReconstructOutput."""
     bundle_dir = payload.require_model_path()
     options = payload.options
@@ -173,7 +172,7 @@ def run_reconstruct(payload: SubprocessPayload, queue: Queue[Any]) -> None:
     queue.put(
         (
             ReconstructorMessage.OUTPUT,
-            pickle.dumps(ReconstructOutput(product=product, progress=1, progress_goal=1)),
+            ReconstructOutput(product=product, progress=1, progress_goal=1),
         )
     )
 
@@ -260,7 +259,7 @@ def _read_epoch_losses(output_path: Path) -> tuple[list[LossValue], list[LossVal
     return collect(train_column), collect(val_column)
 
 
-def run_train(payload: SubprocessPayload, queue: Queue[Any]) -> None:
+def run_train(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None:
     """Child entry point for one training session.
 
     Masks the visible GPUs, then hands the already-translated settings mapping
@@ -303,13 +302,11 @@ def run_train(payload: SubprocessPayload, queue: Queue[Any]) -> None:
     queue.put(
         (
             ReconstructorMessage.TRAIN_OUTPUT,
-            pickle.dumps(
-                TrainOutput(
-                    training_loss=training_loss,
-                    validation_loss=validation_loss,
-                    progress=progress,
-                    progress_goal=progress,
-                )
+            TrainOutput(
+                training_loss=training_loss,
+                validation_loss=validation_loss,
+                progress=progress,
+                progress_goal=progress,
             ),
         )
     )

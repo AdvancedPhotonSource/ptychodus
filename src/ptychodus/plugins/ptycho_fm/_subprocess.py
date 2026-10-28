@@ -30,9 +30,8 @@ from __future__ import annotations
 
 import logging
 import os
-import pickle
 from collections.abc import Sequence
-from multiprocessing.queues import Queue
+from multiprocessing.queues import SimpleQueue
 from pathlib import Path
 from typing import Any
 
@@ -160,7 +159,7 @@ def _make_inference_dataset(
     return _InMemoryPatternDataset()
 
 
-def run_reconstruct(payload: SubprocessPayload, queue: Queue[Any]) -> None:
+def run_reconstruct(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None:
     """Child entry point for one inference pass. Streams a single ReconstructOutput.
 
     ``resolve_inference_model`` picks the model class from the config and
@@ -342,7 +341,7 @@ def run_reconstruct(payload: SubprocessPayload, queue: Queue[Any]) -> None:
     queue.put(
         (
             ReconstructorMessage.OUTPUT,
-            pickle.dumps(ReconstructOutput(product=product, progress=1, progress_goal=1)),
+            ReconstructOutput(product=product, progress=1, progress_goal=1),
         )
     )
 
@@ -435,7 +434,7 @@ def _build_param_groups(
     ]
 
 
-def run_train(payload: SubprocessPayload, queue: Queue[Any]) -> None:
+def run_train(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None:
     """Child entry point for one training session.
 
     Single-device, no DDP, no mlflow, no wandb. Builds a CombinedDataset over
@@ -609,13 +608,11 @@ def run_train(payload: SubprocessPayload, queue: Queue[Any]) -> None:
         queue.put(
             (
                 ReconstructorMessage.TRAIN_OUTPUT,
-                pickle.dumps(
-                    TrainOutput(
-                        training_loss=list(training_losses),
-                        validation_loss=list(validation_losses),
-                        progress=epoch + 1,
-                        progress_goal=epochs,
-                    )
+                TrainOutput(
+                    training_loss=list(training_losses),
+                    validation_loss=list(validation_losses),
+                    progress=epoch + 1,
+                    progress_goal=epochs,
                 ),
             )
         )

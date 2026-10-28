@@ -30,11 +30,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from multiprocessing.queues import Queue
+from multiprocessing.queues import SimpleQueue
 from typing import Any, Final
 import logging
 import os
-import pickle
 
 from .spawn import ChildError, run_subprocess
 
@@ -108,9 +107,9 @@ def enumerate_devices() -> list[Device]:
     return devices
 
 
-def _probe_devices_child(_payload: Any, queue: Queue[Any]) -> None:
+def _probe_devices_child(_payload: Any, queue: SimpleQueue[Any]) -> None:
     """Child entry point: enumerate devices, put them on the queue, exit."""
-    queue.put((_PROBE_TAG, pickle.dumps(enumerate_devices())))
+    queue.put((_PROBE_TAG, enumerate_devices()))
 
 
 def probe_devices(*, terminate_grace_sec: float = 5.0) -> Sequence[Device]:
@@ -130,7 +129,7 @@ def probe_devices(*, terminate_grace_sec: float = 5.0) -> Sequence[Device]:
         with run_subprocess(_PROBE_ENTRY, None, terminate_grace_sec=terminate_grace_sec) as events:
             for event in events:
                 if event[0] == _PROBE_TAG:
-                    devices = pickle.loads(event[1])
+                    devices = event[1]
 
                     if isinstance(devices, list):
                         return devices

@@ -19,8 +19,7 @@ the CPU leaves nothing for ``Devices.GPU`` to mean.
 from __future__ import annotations
 
 import logging
-import pickle
-from multiprocessing.queues import Queue
+from multiprocessing.queues import SimpleQueue
 from typing import Any
 
 from ...api.reconstruct import ReconstructorMessage, SubprocessPayload
@@ -45,7 +44,7 @@ def _resolve_default_device(options: Any) -> None:
     logger.info(f'Reconstructing on the {device.name}.')
 
 
-def run_reconstruct(payload: SubprocessPayload, queue: Queue[Any]) -> None:
+def run_reconstruct(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None:
     """Child entry point. Acquire a GPU context via PtychographyTask, stream outputs."""
     task_options = payload.options['task']
     _resolve_default_device(task_options)
@@ -53,4 +52,4 @@ def run_reconstruct(payload: SubprocessPayload, queue: Queue[Any]) -> None:
     for output in reconstruct_with_ptychi(
         payload.require_input(), task_options, payload.options['num_sync_epochs']
     ):
-        queue.put((ReconstructorMessage.OUTPUT, pickle.dumps(output)))
+        queue.put((ReconstructorMessage.OUTPUT, output))

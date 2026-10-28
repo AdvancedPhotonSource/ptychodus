@@ -127,6 +127,33 @@ def test_child_exception_propagates_as_child_error() -> None:
     assert 'boom' in str(excinfo.value.child_exception)
 
 
+def test_unpicklable_output_raises_child_error_rather_than_vanishing() -> None:
+    """A child puts the object itself, so the put is where pickling fails.
+
+    The failure must reach the parent: pickled on a feeder thread instead, the
+    message would be dropped and the parent would see a stream with no output.
+    """
+    adapter = SubprocessReconstructor(
+        name='FAKE',
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='emit_unpicklable',
+        dump_reconstruct_options=lambda parameters, options: {},
+    )
+
+    with pytest.raises(ChildError):
+        list(
+            adapter.reconstruct(_minimal_reconstruct_input(), options=adapter.get_default_options())
+        )
+
+
+def test_put_captures_the_object_before_the_child_modifies_it() -> None:
+    with spawn.run_subprocess(f'{FIXTURES_MODULE}:emit_then_modify_in_place', None) as events:
+        arrays = [event[1] for event in events if event[0] == 'array']
+
+    assert len(arrays) == 1
+    assert not numpy.any(arrays[0])
+
+
 class _ProcessRecordingContext:
     """A spawn context that hands back the processes it was asked to build.
 

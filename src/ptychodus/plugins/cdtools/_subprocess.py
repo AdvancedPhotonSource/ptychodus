@@ -10,9 +10,8 @@ by the measured gauge, the positions mapped onto the pixel frame of
 
 from __future__ import annotations
 
-from multiprocessing.queues import Queue
+from multiprocessing.queues import SimpleQueue
 import logging
-import pickle
 from typing import Any
 
 import numpy
@@ -289,7 +288,7 @@ def _read_product(
     )
 
 
-def run_reconstruct(payload: SubprocessPayload, queue: Queue[Any]) -> None:
+def run_reconstruct(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None:
     """Child entry point. Runs every stage and streams a ReconstructOutput as it goes."""
     input_ = payload.require_input()
     options: CDToolsOptions = payload.options['options']
@@ -319,4 +318,4 @@ def run_reconstruct(payload: SubprocessPayload, queue: Queue[Any]) -> None:
                     progress=epoch,
                     progress_goal=num_epochs,
                 )
-                queue.put((ReconstructorMessage.OUTPUT, pickle.dumps(output)))
+                queue.put((ReconstructorMessage.OUTPUT, output))

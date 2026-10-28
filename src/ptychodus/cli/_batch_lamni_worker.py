@@ -19,7 +19,7 @@ import os
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from multiprocessing import Queue
+    from multiprocessing.queues import SimpleQueue
 
 __all__ = ['reconstruct_scan']
 
@@ -52,7 +52,7 @@ def _redirect_console(output_directory: Any) -> None:
     sys.stderr = os.fdopen(os.dup(2), 'w', buffering=1)
 
 
-def reconstruct_scan(payload: dict[str, Any], queue: Queue[Any]) -> None:
+def reconstruct_scan(payload: dict[str, Any], queue: SimpleQueue[Any]) -> None:
     """Reconstruct the one scan this child was spawned for.
 
     Raising is how a failure is reported: the subprocess protocol marshals the exception

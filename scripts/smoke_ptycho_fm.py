@@ -15,7 +15,6 @@ ptycho_fm to prove.
 from __future__ import annotations
 
 import argparse
-import pickle
 import queue
 import sys
 import tempfile
@@ -189,9 +188,7 @@ def run_training(mode: str, options: PtychoFMOptions, out_dir: Path) -> tuple[Pa
     run_train(payload, q)  # type: ignore[arg-type]
 
     events = _drain(q)
-    train_outputs = [
-        pickle.loads(e[1]) for e in events if e[0] == ReconstructorMessage.TRAIN_OUTPUT
-    ]
+    train_outputs = [e[1] for e in events if e[0] == ReconstructorMessage.TRAIN_OUTPUT]
     saved = [e[1] for e in events if e[0] == ReconstructorMessage.MODEL_SAVED]
 
     assert len(train_outputs) == 2, f'expected 2 TrainOutput, got {len(train_outputs)}'
@@ -216,7 +213,7 @@ def run_inference(checkpoint: Path, options: PtychoFMOptions) -> None:
     run_reconstruct(payload, q)  # type: ignore[arg-type]
 
     events = _drain(q)
-    outputs = [pickle.loads(e[1]) for e in events if e[0] == ReconstructorMessage.OUTPUT]
+    outputs = [e[1] for e in events if e[0] == ReconstructorMessage.OUTPUT]
     assert len(outputs) == 1, f'expected 1 ReconstructOutput, got {len(outputs)}'
 
     array = outputs[0].product.object_.get_array()

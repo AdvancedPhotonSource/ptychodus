@@ -14,7 +14,7 @@ handled by the shared subprocess protocol in
 
 from __future__ import annotations
 
-from multiprocessing.queues import Queue
+from multiprocessing.queues import SimpleQueue
 from typing import Any
 
 import numpy
@@ -26,7 +26,7 @@ __all__ = [
 ]
 
 
-def run_vspi_enhancement(payload: PtychozoonPayload, result_queue: Queue[Any]) -> None:
+def run_vspi_enhancement(payload: PtychozoonPayload, result_queue: SimpleQueue[Any]) -> None:
     """Run ptychozoon VSPI enhancement and stream checkpoint results over a queue.
 
     Intended as the ``entry_point`` for

@@ -10,7 +10,6 @@ directly and once spawned through its library.
 from __future__ import annotations
 
 from dataclasses import replace
-import pickle
 from typing import Any
 
 import numpy
@@ -95,7 +94,7 @@ def _run(parameters: ReconstructInput, options: CDToolsOptions) -> list[Reconstr
     )
     run_reconstruct(payload, queue)  # type: ignore[arg-type]
     assert all(tag is ReconstructorMessage.OUTPUT for tag, _ in queue.items)
-    return [pickle.loads(blob) for _, blob in queue.items]
+    return [output for _, output in queue.items]
 
 
 def _probe_power(output: ReconstructOutput) -> float:

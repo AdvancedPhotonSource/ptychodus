@@ -14,11 +14,10 @@ from enum import auto, Enum, StrEnum
 from importlib.metadata import PackageNotFoundError, version
 from importlib import import_module
 from importlib.util import find_spec
-from multiprocessing.queues import Queue
+from multiprocessing.queues import SimpleQueue
 from pathlib import Path
 from typing import Any
 import logging
-import pickle
 import shutil
 
 import numpy
@@ -228,8 +227,8 @@ class ReconstructorMessage(StrEnum):
 
     What rides with each is fixed by the tag:
 
-    - ``OUTPUT`` -- a pickled :class:`ReconstructOutput`
-    - ``TRAIN_OUTPUT`` -- a pickled :class:`TrainOutput`
+    - ``OUTPUT`` -- a :class:`ReconstructOutput`
+    - ``TRAIN_OUTPUT`` -- a :class:`TrainOutput`
     - ``MODEL_SAVED`` -- the path, as a string, the child wrote a checkpoint to
     - ``SETTINGS_SYNC`` -- ``{group_name: {parameter_name: value_as_string}}``
     """
@@ -458,7 +457,7 @@ class SubprocessReconstructor(TrainableReconstructor):
             for event in events:
                 tag = event[0]
                 if tag == ReconstructorMessage.OUTPUT:
-                    yield pickle.loads(event[1])
+                    yield event[1]
                 elif tag == ReconstructorMessage.SETTINGS_SYNC:
                     if self._apply_settings_sync is not None:
                         try:
@@ -521,7 +520,7 @@ class SubprocessReconstructor(TrainableReconstructor):
             for event in events:
                 tag = event[0]
                 if tag == ReconstructorMessage.TRAIN_OUTPUT:
-                    yield pickle.loads(event[1])
+                    yield event[1]
                 elif tag == ReconstructorMessage.MODEL_SAVED:
                     self._loaded_model_path = Path(event[1])
                 elif tag == ReconstructorMessage.SETTINGS_SYNC:
@@ -555,7 +554,7 @@ def _child_module_for(library_class: type) -> str:
 _DISPATCH_ENTRY_POINT = 'ptychodus.api.reconstruct:_run_in_child'
 
 
-def _run_in_child(payload: SubprocessPayload, queue: Queue[Any]) -> None:
+def _run_in_child(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None:
     """Import the backend the payload names and hand it the payload.
 
     Runs in the child. One entry point for every backend and both
