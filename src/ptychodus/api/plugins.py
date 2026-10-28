@@ -35,6 +35,7 @@ from .object import ObjectFileReader, ObjectFileWriter, Object
 from .observer import Observable
 from .probe import ProbeFileReader, ProbeFileWriter, ProbeEnsemble
 from .simulate.probe import FresnelZonePlate, KirkpatrickBaezMirrorPair
+from .simulate.probe_positions import ProbePositionsGenerator
 from .probe_positions import (
     ProbePositionFileReader,
     ProbePositionFileWriter,
@@ -259,6 +260,11 @@ class PluginRegistry:
         self.diffraction_file_writers = PluginChooser[DiffractionFileWriter]()
         self.probe_position_file_readers = PluginChooser[ProbePositionFileReader]()
         self.probe_position_file_writers = PluginChooser[ProbePositionFileWriter]()
+        # A scan pattern is discovered the same way a file format is, and states
+        # what it accepts the same way a reconstructor does. An instance like
+        # every other chooser holds, which a generator can supply because it is
+        # configured per call and holds nothing of its own.
+        self.probe_position_generators = PluginChooser[ProbePositionsGenerator]()
         self.fresnel_zone_plates = PluginChooser[FresnelZonePlate]()
         self.kb_mirrors = PluginChooser[KirkpatrickBaezMirrorPair]()
         self.probe_file_readers = PluginChooser[ProbeFileReader]()
