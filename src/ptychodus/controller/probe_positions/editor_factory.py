@@ -6,21 +6,16 @@ from PyQt5.QtWidgets import (
     QFormLayout,
     QGridLayout,
     QLabel,
-    QMessageBox,
     QWidget,
 )
 
 from ptychodus.api.constants import LengthUnit
 
 from ...model.product.probe_positions import (
-    CartesianProbePositionsBuilder,
-    ConcentricProbePositionsBuilder,
-    FromFileProbePositionsBuilder,
     FromMemoryProbePositionsBuilder,
-    LissajousProbePositionsBuilder,
+    PluginProbePositionsBuilder,
     ProbePositionsBuilder,
     ProbePositionsRepositoryItem,
-    SpiralProbePositionsBuilder,
 )
 from ..parameters import (
     CheckableGroupBoxParameterViewController,
@@ -28,6 +23,7 @@ from ..parameters import (
     LengthParameterViewController,
     ParameterViewBuilder,
     ParameterViewController,
+    create_parameter_view_controller,
 )
 from ...view.widgets import GroupBoxWithPresets
 
@@ -151,118 +147,38 @@ class ProbePositionsEditorViewControllerFactory:
     def create_editor_dialog(
         self, item_name: str, item: ProbePositionsRepositoryItem, parent: QWidget
     ) -> QDialog:
-        probe_positions_builder = item.get_builder()
-        builder_name = probe_positions_builder.get_name()
-        base_probe_positions_group = 'Base Probe Positions'
-        title = f'{item_name} [{builder_name}]'
+        """Build the dialog for whichever builder the item holds.
 
-        if isinstance(probe_positions_builder, CartesianProbePositionsBuilder):
-            dialog_builder = ParameterViewBuilder()
-            dialog_builder.add_spin_box(
-                probe_positions_builder.num_points_x,
-                'Number of Points X:',
-                group=base_probe_positions_group,
-            )
-            dialog_builder.add_spin_box(
-                probe_positions_builder.num_points_y,
-                'Number of Points Y:',
-                group=base_probe_positions_group,
-            )
-            dialog_builder.add_length_widget(
-                probe_positions_builder.step_size_x_m,
-                'Step Size X:',
-                group=base_probe_positions_group,
-            )
+        Two branches, because there are two kinds of builder. A plugin
+        generator describes its own parameters, so its rows are derived rather
+        than written here and a pattern added later needs no branch of its
+        own. The from-file and from-memory builders describe nothing: one
+        carries a path already chosen in a file dialog and the other holds
+        positions that arrived conditioned, so both offer only the controls
+        every builder shares.
+        """
+        builder = item.get_builder()
+        title = f'{item_name} [{builder.get_name()}]'
+        dialog_builder = ParameterViewBuilder()
 
-            if not probe_positions_builder.is_equilateral:
-                dialog_builder.add_length_widget(
-                    probe_positions_builder.step_size_y_m,
-                    'Step Size Y:',
-                    group=base_probe_positions_group,
+        if isinstance(builder, PluginProbePositionsBuilder):
+            group = 'Base Probe Positions'
+
+            for description in builder.describe_parameters():
+                view_controller = create_parameter_view_controller(
+                    builder.parameters()[description.name],
+                    name=description.name,
+                    label=description.label,
+                    tool_tip=description.tool_tip,
+                    choices=description.choices,
+                    unit=description.unit,
+                    display_unit=description.display_unit,
                 )
 
-            self._append_common_controls(dialog_builder, item)
-            return dialog_builder.build_dialog(title, parent)
-        elif isinstance(probe_positions_builder, ConcentricProbePositionsBuilder):
-            dialog_builder = ParameterViewBuilder()
-            dialog_builder.add_spin_box(
-                probe_positions_builder.num_shells,
-                'Number of Shells:',
-                group=base_probe_positions_group,
-            )
-            dialog_builder.add_spin_box(
-                probe_positions_builder.num_points_1st_shell,
-                'Number of Points in First Shell:',
-                group=base_probe_positions_group,
-            )
-            dialog_builder.add_length_widget(
-                probe_positions_builder.radial_step_size_m,
-                'Radial Step Size:',
-                group=base_probe_positions_group,
-            )
-            self._append_common_controls(dialog_builder, item)
-            return dialog_builder.build_dialog(title, parent)
-        elif isinstance(probe_positions_builder, FromFileProbePositionsBuilder):
-            dialog_builder = ParameterViewBuilder()
-            self._append_common_controls(dialog_builder, item)
-            return dialog_builder.build_dialog(title, parent)
-        elif isinstance(probe_positions_builder, FromMemoryProbePositionsBuilder):
-            dialog_builder = ParameterViewBuilder()
-            self._append_common_controls(dialog_builder, item)
-            return dialog_builder.build_dialog(title, parent)
-        elif isinstance(probe_positions_builder, SpiralProbePositionsBuilder):
-            dialog_builder = ParameterViewBuilder()
-            dialog_builder.add_spin_box(
-                probe_positions_builder.num_points,
-                'Number of Points:',
-                group=base_probe_positions_group,
-            )
-            dialog_builder.add_length_widget(
-                probe_positions_builder.radius_scalar_m,
-                'Radius Scalar:',
-                group=base_probe_positions_group,
-            )
-            self._append_common_controls(dialog_builder, item)
-            return dialog_builder.build_dialog(title, parent)
-        elif isinstance(probe_positions_builder, LissajousProbePositionsBuilder):
-            dialog_builder = ParameterViewBuilder()
-            dialog_builder.add_spin_box(
-                probe_positions_builder.num_points,
-                'Number of Points:',
-                group=base_probe_positions_group,
-            )
-            dialog_builder.add_length_widget(
-                probe_positions_builder.amplitude_x_m,
-                'Amplitude X:',
-                group=base_probe_positions_group,
-            )
-            dialog_builder.add_length_widget(
-                probe_positions_builder.amplitude_y_m,
-                'Amplitude Y:',
-                group=base_probe_positions_group,
-            )
-            dialog_builder.add_angle_widget(
-                probe_positions_builder.angular_step_x_turns,
-                'Angular Step X:',
-                group=base_probe_positions_group,
-            )
-            dialog_builder.add_angle_widget(
-                probe_positions_builder.angular_step_y_turns,
-                'Angular Step Y:',
-                group=base_probe_positions_group,
-            )
-            dialog_builder.add_angle_widget(
-                probe_positions_builder.angular_shift_turns,
-                'Angular Shift:',
-                group=base_probe_positions_group,
-            )
-            self._append_common_controls(dialog_builder, item)
-            return dialog_builder.build_dialog(title, parent)
+                if view_controller is not None:
+                    dialog_builder.add_view_controller(
+                        view_controller, description.label, group=group
+                    )
 
-        return QMessageBox(
-            QMessageBox.Icon.Information,
-            title,
-            f'"{builder_name}" has no editable parameters!',
-            QMessageBox.StandardButton.Ok,
-            parent,
-        )
+        self._append_common_controls(dialog_builder, item)
+        return dialog_builder.build_dialog(title, parent)

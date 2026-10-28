@@ -27,17 +27,23 @@ from ptychodus.api.probe_positions import (
     ProbePositionFileReader,
     ProbePositionSequence,
 )
+from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
+from ptychodus.api.simulate.probe_positions import ProbePositionsGenerator
 from ptychodus.model.product.probe_positions.builder import (
     FromFileProbePositionsBuilder,
     FromMemoryProbePositionsBuilder,
+    ProbePositionsBuilder,
 )
-from ptychodus.model.product.probe_positions.cartesian import (
-    CartesianProbePositionsBuilder,
-    CartesianProbePositionsVariant,
+from ptychodus.model.product.probe_positions.builder_factory import (
+    ProbePositionsBuilderFactory,
 )
 from ptychodus.model.product.probe_positions.settings import ProbePositionsSettings
 from ptychodus.model.product.probe_positions.streaming import StreamingScanBuilder
+from ptychodus.plugins.probe_positions.cartesian import (
+    CartesianProbePositionsGenerator,
+    CartesianVariant,
+)
 
 
 def _make_settings() -> ProbePositionsSettings:
@@ -71,13 +77,24 @@ class _StubPositionFileReader(ProbePositionFileReader):
 
 def _make_cartesian_line_builder(
     settings: ProbePositionsSettings, num_points: int
-) -> CartesianProbePositionsBuilder:
-    """A single-row raster, so acquisition order is unambiguous."""
-    builder = CartesianProbePositionsBuilder(
-        CartesianProbePositionsVariant.RECTANGULAR_RASTER, _make_rng(), settings
+) -> ProbePositionsBuilder:
+    """A single-row raster, so acquisition order is unambiguous.
+
+    Built through the factory rather than directly, because that is what
+    creates the settings parameters a plugin builder copies from.
+    """
+    generators = PluginChooser[ProbePositionsGenerator]()
+    generators.register_plugin(
+        CartesianProbePositionsGenerator(CartesianVariant.RECTANGULAR_RASTER),
+        simple_name='rectangular_raster',
+        display_name='rectangular_raster',
     )
-    builder.num_points_x.set_value(num_points)
-    builder.num_points_y.set_value(1)
+    factory = ProbePositionsBuilderFactory(
+        _make_rng(), settings, generators, PluginChooser(), PluginChooser()
+    )
+    builder = factory.create('rectangular_raster')
+    builder.parameters()['num_points_x'].set_value(num_points)
+    builder.parameters()['num_points_y'].set_value(1)
     return builder
 
 

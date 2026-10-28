@@ -4,24 +4,18 @@ from .builder import (
     ProbePositionsBuilder,
 )
 from .builder_factory import ProbePositionsBuilderFactory
-from .cartesian import CartesianProbePositionsBuilder
-from .concentric import ConcentricProbePositionsBuilder
 from .item import ProbePositionsRepositoryItem
 from .item_factory import ProbePositionsRepositoryItemFactory
-from .lissajous import LissajousProbePositionsBuilder
+from .plugin import PluginProbePositionsBuilder
 from .settings import ProbePositionsSettings
-from .spiral import SpiralProbePositionsBuilder
 
 __all__ = [
-    'CartesianProbePositionsBuilder',
-    'ConcentricProbePositionsBuilder',
     'FromFileProbePositionsBuilder',
     'FromMemoryProbePositionsBuilder',
-    'LissajousProbePositionsBuilder',
+    'PluginProbePositionsBuilder',
     'ProbePositionsBuilder',
     'ProbePositionsBuilderFactory',
     'ProbePositionsRepositoryItem',
     'ProbePositionsRepositoryItemFactory',
     'ProbePositionsSettings',
-    'SpiralProbePositionsBuilder',
 ]

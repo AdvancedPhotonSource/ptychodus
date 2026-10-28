@@ -22,18 +22,27 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Any, Final
 
 from ptychodus.api.constants import LengthUnit, Unit
+from ptychodus.api.parameters import Parameter, ParameterGroup
 
 __all__ = [
     'ParameterDescription',
+    'UnsupportedParameterError',
+    'declare_in',
     'describe',
     'fields_of',
     'read_bounds',
     'read_display_unit',
     'render_key',
+    'restore',
 ]
+
+
+class UnsupportedParameterError(TypeError):
+    """Raised for a declared field the settings layer cannot represent."""
 
 
 def fields_of(model: type) -> Mapping[str, Any]:
@@ -197,3 +206,92 @@ def describe(options: Any, *, expand_num: bool = False) -> Sequence[ParameterDes
         )
 
     return described
+
+
+def _create(group: ParameterGroup, described: ParameterDescription) -> Parameter[Any]:
+    annotation = described.annotation
+    key = described.key
+    default = described.default
+
+    # Enums persist as their value, which is how a model ptychodus owns spells
+    # them, so the live parameter is a string and the declared type is what
+    # restores meaning on the way back out.
+    if isinstance(annotation, type) and issubclass(annotation, Enum):
+        return group.create_string_parameter(key, str(default.value))
+
+    # bool is a subclass of int, so it has to be tested first.
+    if annotation is bool:
+        return group.create_boolean_parameter(key, bool(default))
+
+    if annotation is int:
+        return group.create_integer_parameter(
+            key, int(default), minimum=described.minimum, maximum=described.maximum
+        )
+
+    if annotation is float:
+        return group.create_real_parameter(
+            key, float(default), minimum=described.minimum, maximum=described.maximum
+        )
+
+    if annotation is str:
+        return group.create_string_parameter(key, str(default))
+
+    if isinstance(annotation, type) and issubclass(annotation, Path):
+        return group.create_path_parameter(key, Path(default))
+
+    raise UnsupportedParameterError(
+        f'Cannot represent "{described.name}" ({annotation}) as a settings parameter.'
+    )
+
+
+def declare_in(
+    group: ParameterGroup, described: Sequence[ParameterDescription]
+) -> Mapping[str, Parameter[Any]]:
+    """Add the parameters *described* names to *group*, returning them by key.
+
+    Idempotent, and deliberately so: a key the group already holds is reused
+    rather than recreated, which is what lets two declarations naming the same
+    field share one live value. They must then agree on its default, since the
+    first to arrive is the one that sets it.
+    """
+    existing = group.parameters()
+    parameters: dict[str, Parameter[Any]] = {}
+
+    for description in described:
+        parameter = existing.get(description.key)
+        parameters[description.key] = (
+            _create(group, description) if parameter is None else parameter
+        )
+
+    return parameters
+
+
+def restore(
+    defaults: Any,
+    described: Sequence[ParameterDescription],
+    parameters: Mapping[str, Parameter[Any]],
+) -> Any:
+    """Return a copy of *defaults* carrying the values *parameters* now hold.
+
+    The inverse of :func:`declare_in`. A declared object is what a generator is
+    handed, so edits made against the live parameters have to be written back
+    into one before the call. A copy, because the defaults are the record of
+    where each field started and must survive being read repeatedly.
+    """
+    restored = defaults.model_copy(deep=True)
+
+    for description in described:
+        parameter = parameters.get(description.key)
+
+        if parameter is None:
+            continue
+
+        value = parameter.get_value()
+        annotation = description.annotation
+
+        if isinstance(annotation, type) and issubclass(annotation, Enum):
+            value = annotation(value)
+
+        setattr(restored, description.name, value)
+
+    return restored

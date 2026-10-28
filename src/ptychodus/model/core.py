@@ -113,6 +113,7 @@ class ModelCore:
             self.rng,
             self.settings_registry,
             self.diffraction_core.diffraction_api,
+            self.plugin_registry.probe_position_generators,
             self.plugin_registry.probe_position_file_readers,
             self.plugin_registry.probe_position_file_writers,
             self.plugin_registry.fresnel_zone_plates,

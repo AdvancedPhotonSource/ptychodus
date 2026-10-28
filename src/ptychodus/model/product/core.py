@@ -6,6 +6,7 @@ from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import ProbeFileReader, ProbeFileWriter
 from ptychodus.api.simulate.probe import FresnelZonePlate, KirkpatrickBaezMirrorPair
 from ptychodus.api.probe_positions import ProbePositionFileReader, ProbePositionFileWriter
+from ptychodus.api.simulate.probe_positions import ProbePositionsGenerator
 from ptychodus.api.product import ProductFileReader, ProductFileWriter
 from ptychodus.api.settings import SettingsRegistry
 
@@ -60,6 +61,7 @@ class ProductCore(Observer):
         rng: numpy.random.Generator,
         settings_registry: SettingsRegistry,
         diffraction_api: DiffractionAPI,
+        scan_generator_chooser: PluginChooser[ProbePositionsGenerator],
         scan_file_reader_chooser: PluginChooser[ProbePositionFileReader],
         scan_file_writer_chooser: PluginChooser[ProbePositionFileWriter],
         fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
@@ -78,7 +80,11 @@ class ProductCore(Observer):
 
         self._scan_settings = ProbePositionsSettings(settings_registry)
         self._scan_builder_factory = ProbePositionsBuilderFactory(
-            rng, self._scan_settings, scan_file_reader_chooser, scan_file_writer_chooser
+            rng,
+            self._scan_settings,
+            scan_generator_chooser,
+            scan_file_reader_chooser,
+            scan_file_writer_chooser,
         )
         self._scan_repository_item_factory = ProbePositionsRepositoryItemFactory(
             rng, self._scan_settings, self._scan_builder_factory

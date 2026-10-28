@@ -19,16 +19,17 @@ Regenerate after an intentional change, then read the diff::
 
 from __future__ import annotations
 
-from collections.abc import Callable, Container, Iterable
+from collections.abc import Callable, Container, Iterable, Mapping
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 import importlib
 import inspect
 import pkgutil
 import warnings
 
-from ptychodus.api.plugins import PluginRegistry
+from ptychodus.api.plugins import PluginChooser, PluginRegistry
 from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.declared import declare_in, describe
 from ptychodus.model.processing import ProcessingParameterStore
 from ptychodus.model.processing.core import _SECTIONS_BY_LIBRARY
 
@@ -58,7 +59,29 @@ def _build_registry() -> SettingsRegistry:
         _construct_settings_under(root, prefix, registry, constructed)
 
     _register_declared_sections(registry)
+    _register_generator_parameters(registry)
     return registry
+
+
+# Which group each kind of generator declares into. A generator is a plugin and
+# its parameters are created by the factory that offers it, so unlike a
+# *Settings class there is nothing here for the walk above to discover. Naming
+# the group is what keeps those keys in the fixture; without this they would
+# read as deleted the day the generators stopped being hand-written.
+_GENERATORS_BY_GROUP: Mapping[str, Callable[[PluginRegistry], PluginChooser[Any]]] = {
+    'ProbePositions': lambda plugins: plugins.probe_position_generators,
+}
+
+
+def _register_generator_parameters(registry: SettingsRegistry) -> None:
+    """Add the parameters every registered generator declares."""
+    plugins = PluginRegistry.load_plugins()
+
+    for group_name, choose in _GENERATORS_BY_GROUP.items():
+        group = registry[group_name]
+
+        for plugin in choose(plugins):
+            declare_in(group, describe(plugin.strategy.get_default_options(), expand_num=True))
 
 
 def absent_backends() -> list[str]:

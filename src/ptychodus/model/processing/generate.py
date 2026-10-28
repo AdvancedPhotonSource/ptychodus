@@ -22,6 +22,7 @@ import logging
 
 from ptychodus.api.parameters import Parameter, ParameterGroup
 
+from ..declared import UnsupportedParameterError
 from .flatten import FlatParameter, FlatteningPolicy, flatten_options
 
 __all__ = [
@@ -32,10 +33,6 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
-
-
-class UnsupportedParameterError(TypeError):
-    """Raised for a declared field the settings layer cannot represent."""
 
 
 def _unwrap_optional(annotation: Any) -> Any:

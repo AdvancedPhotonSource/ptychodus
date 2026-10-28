@@ -93,6 +93,8 @@ A product opened from HDF5 or NPZ does carry its pixel size, and that path behav
 
 Use `WorkflowProductAPI.generate_probe_positions(name, parameters)`.
 
+Each pattern is a plugin that states the parameters it accepts, so the names below are what it registered under and the parameter names are the ones it declares. A pattern added to `ptychodus.plugins` appears here, in the settings file and in the editor dialog without any of them being told about it.
+
 Supported generator names are:
 
 `rectangular_raster`
@@ -133,7 +135,21 @@ The Cartesian builders use:
 : Number of grid points along each axis.
 
 `step_size_x_m`, `step_size_y_m`
-: Physical step size in meters. Equilateral variants derive the effective `y` step from `step_size_x_m`.
+: Physical step size in meters. The equilateral variants derive their `y` step from `step_size_x_m` and do not accept a `step_size_y_m` at all.
+
+The other patterns use:
+
+`num_points`
+: Total number of points, for `spiral` and `lissajous`. Persisted as `NumberOfPoints`, which the two share; it was previously read from the Cartesian `NumberOfPointsX`, so a settings file written before that split starts both at the default rather than at whatever the Cartesian count happened to be.
+
+`radial_step_size_m`, `num_shells`, `num_points_in_first_shell`
+: Shell spacing and population, for `concentric`. Each shell holds a multiple of the first shell's count.
+
+`radius_scalar_m`
+: Spiral radius at unit index, for `spiral`.
+
+`amplitude_x_m`, `amplitude_y_m`, `angular_step_x_tr`, `angular_step_y_tr`, `angular_shift_tr`
+: Figure extent, the two angular rates whose ratio sets the figure, and the phase offset between them, for `lissajous`. The angular values are in turns and may be negative.
 
 ## Probe Generators
 
