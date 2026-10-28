@@ -31,6 +31,7 @@ from ptychodus.api.parameters import Parameter, ParameterGroup
 __all__ = [
     'ParameterDescription',
     'UnsupportedParameterError',
+    'apply',
     'declare_in',
     'describe',
     'fields_of',
@@ -175,14 +176,21 @@ def _choices_of(annotation: Any) -> Sequence[str]:
     return []
 
 
-def describe(options: Any, *, expand_num: bool = False) -> Sequence[ParameterDescription]:
+def describe(
+    options: Any, *, expand_num: bool = False, prefix: str = ''
+) -> Sequence[ParameterDescription]:
     """Describe every field of *options*, in declaration order.
 
     Takes a populated instance rather than its class: a field declared with a
     ``default_factory`` reports its class-level default as undefined, so only an
     instance carries the value the field actually starts at.
 
-    *expand_num* is passed through to :func:`render_key`.
+    *expand_num* is passed through to :func:`render_key`. *prefix* is prepended
+    to every key, which is how one of several like branches says which it is:
+    three identically shaped stages persist as ``Stage1Epochs``,
+    ``Stage2Epochs`` and so on. The caller names the branch and describes it,
+    rather than this recursing -- a declaration deep enough to need recursing
+    into is not the kind this serves.
     """
     described: list[ParameterDescription] = []
 
@@ -194,7 +202,7 @@ def describe(options: Any, *, expand_num: bool = False) -> Sequence[ParameterDes
                 name=name,
                 annotation=info.annotation,
                 default=getattr(options, name),
-                key=render_key(name, expand_num=expand_num),
+                key=prefix + render_key(name, expand_num=expand_num),
                 label=info.title or '',
                 tool_tip=info.description or '',
                 minimum=minimum,
@@ -266,6 +274,32 @@ def declare_in(
     return parameters
 
 
+def apply(
+    target: Any,
+    described: Sequence[ParameterDescription],
+    parameters: Mapping[str, Parameter[Any]],
+) -> None:
+    """Write the values *parameters* hold into *target*, in place.
+
+    Separate from :func:`restore` because one declared object may be filled
+    from several branches, each described on its own, and the object they fill
+    has to be copied once rather than once per branch.
+    """
+    for description in described:
+        parameter = parameters.get(description.key)
+
+        if parameter is None:
+            continue
+
+        value = parameter.get_value()
+        annotation = description.annotation
+
+        if isinstance(annotation, type) and issubclass(annotation, Enum):
+            value = annotation(value)
+
+        setattr(target, description.name, value)
+
+
 def restore(
     defaults: Any,
     described: Sequence[ParameterDescription],
@@ -279,19 +313,5 @@ def restore(
     where each field started and must survive being read repeatedly.
     """
     restored = defaults.model_copy(deep=True)
-
-    for description in described:
-        parameter = parameters.get(description.key)
-
-        if parameter is None:
-            continue
-
-        value = parameter.get_value()
-        annotation = description.annotation
-
-        if isinstance(annotation, type) and issubclass(annotation, Enum):
-            value = annotation(value)
-
-        setattr(restored, description.name, value)
-
+    apply(restored, described, parameters)
     return restored

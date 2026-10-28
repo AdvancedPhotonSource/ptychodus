@@ -31,7 +31,7 @@ from ptychodus.api.plugins import PluginChooser, PluginRegistry
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.declared import declare_in, describe
 from ptychodus.model.processing import ProcessingParameterStore
-from ptychodus.model.processing.core import _SECTIONS_BY_LIBRARY
+from ptychodus.model.processing.core import _BRANCHES_BY_LIBRARY, _SECTIONS_BY_LIBRARY
 
 GOLDEN_PATH = Path(__file__).parent / 'data' / 'settings_defaults.ini'
 
@@ -94,29 +94,36 @@ def absent_backends() -> list[str]:
     """
     absent: list[str] = []
 
+    crossed_over = set(_SECTIONS_BY_LIBRARY) | set(_BRANCHES_BY_LIBRARY)
+
     for plugin in PluginRegistry.load_plugins().reconstructor_libraries:
-        if plugin.display_name in _SECTIONS_BY_LIBRARY and not list(plugin.strategy):
+        if plugin.display_name in crossed_over and not list(plugin.strategy):
             absent.append(plugin.display_name)
 
     return absent
 
 
 def _register_declared_sections(registry: SettingsRegistry) -> None:
-    """Add the groups generated from each backend's declaration."""
+    """Add the groups generated from each backend's declaration.
+
+    Both ways a backend reaches the store, since the groups a backend
+    contributes are the same contract whichever way it got there.
+    """
     store = ProcessingParameterStore(registry)
 
     for plugin in PluginRegistry.load_plugins().reconstructor_libraries:
         sections = _SECTIONS_BY_LIBRARY.get(plugin.display_name)
-
-        if sections is None:
-            continue
+        branches = _BRANCHES_BY_LIBRARY.get(plugin.display_name)
 
         for reconstructor in plugin.strategy:
-            store.register(
-                plugin.display_name,
-                reconstructor,
-                sections(reconstructor.name, reconstructor.get_default_options()),
-            )
+            if branches is not None:
+                store.register_declared(plugin.display_name, reconstructor, branches)
+            elif sections is not None:
+                store.register(
+                    plugin.display_name,
+                    reconstructor,
+                    sections(reconstructor.name, reconstructor.get_default_options()),
+                )
 
 
 def _construct_settings_under(
@@ -197,9 +204,13 @@ def generated_groups(backend: str) -> set[str]:
 
     Asked per reconstructor because a section table may answer differently for
     each: pty-chi files every algorithm's additions under a group of that
-    algorithm's own. Empty for a backend whose package is absent.
+    algorithm's own. A backend reading its own declaration answers the same
+    way for all of them. Empty for a backend whose package is absent.
     """
     groups: set[str] = set()
+
+    for branch in _BRANCHES_BY_LIBRARY.get(backend, ()):
+        groups.add(branch.group_name)
 
     for plugin in PluginRegistry.load_plugins().reconstructor_libraries:
         sections = _SECTIONS_BY_LIBRARY.get(plugin.display_name)
@@ -297,8 +308,12 @@ def test_each_backends_group_prefix_covers_what_it_declares() -> None:
 
 def test_the_prefix_table_names_every_crossed_over_backend() -> None:
     """A backend missing from the table would be compared against a golden
-    that cannot contain it, so a bare install would fail rather than elide."""
-    assert set(_GROUP_PREFIX_BY_BACKEND) == set(_SECTIONS_BY_LIBRARY)
+    that cannot contain it, so a bare install would fail rather than elide.
+
+    Both ways a backend reaches the store: which of the two it uses says how
+    its declaration is read, not whether its groups need eliding.
+    """
+    assert set(_GROUP_PREFIX_BY_BACKEND) == set(_SECTIONS_BY_LIBRARY) | set(_BRANCHES_BY_LIBRARY)
 
 
 def test_golden_covers_the_whole_surface() -> None:

@@ -23,12 +23,15 @@ from ptychodus.api.parameters import Parameter, ParameterGroup
 from ptychodus.api.reconstruct import Reconstructor
 from ptychodus.api.settings import SettingsRegistry
 
-from .flatten import FlatParameter, FlatteningPolicy, flatten_options
+from ..declared import ParameterDescription, declare_in, describe
+from ..declared import apply as apply_declared
+from .flatten import EnumSpelling, FlatParameter, FlatteningPolicy, flatten_options
 from .generate import apply_options, populate_parameter_group
 
 __all__ = [
     'DescribedField',
     'DescribedGroup',
+    'OptionsBranch',
     'OptionsSection',
     'ProcessingParameterStore',
 ]
@@ -49,6 +52,24 @@ class OptionsSection:
     group_name: str
     root_path: str = ''
     policy: FlatteningPolicy = field(default_factory=FlatteningPolicy)
+
+
+@dataclass(frozen=True)
+class OptionsBranch:
+    """One settings group read straight off a declaration ptychodus owns.
+
+    The alternative to :class:`OptionsSection`, and the simpler one. A model
+    ptychodus wrote states its own bounds, choices and display text, and names
+    its units in its field names, so there is nothing to overlay and no policy
+    to state -- only which branch of the declaration a group covers.
+
+    ``prefix`` distinguishes several branches of the same shape: three stages
+    of one schedule persist as ``Stage1Epochs``, ``Stage2Epochs`` and so on.
+    """
+
+    group_name: str
+    root_path: str = ''
+    prefix: str = ''
 
 
 @dataclass(frozen=True)
@@ -79,9 +100,45 @@ class _BoundSection:
 
 
 @dataclass(frozen=True)
+class _BoundBranch:
+    branch: OptionsBranch
+    described: Sequence[ParameterDescription]
+    parameters: Mapping[str, Parameter[Any]]
+
+
+@dataclass(frozen=True)
 class _Entry:
     defaults: Any
-    sections: Sequence[_BoundSection]
+    sections: Sequence[_BoundSection] = ()
+    branches: Sequence[_BoundBranch] = ()
+
+
+def _as_flat(described: ParameterDescription) -> FlatParameter:
+    """Describe one owned field the way the flattened path describes a foreign one.
+
+    The panel reads a `FlatParameter`, which is this plus what only a foreign
+    declaration needs -- a key an adapter owns, a bool that gates its group, a
+    key some algorithm sharing the group does not read. None of those arise
+    here, so they take their defaults.
+
+    Choices are left for the panel to read off the annotation, spelled by
+    value, rather than listed here: that is what a declaration ptychodus owns
+    means by an enum, and listing them instead would make a whole number
+    carrying choices look like the bit field that only pty-chi declares.
+    """
+    return FlatParameter(
+        ini_key=described.key,
+        path=described.name,
+        annotation=described.annotation,
+        default=described.default,
+        label=described.label,
+        tool_tip=described.tool_tip,
+        minimum=described.minimum,
+        maximum=described.maximum,
+        spelling=EnumSpelling.BY_VALUE,
+        unit=described.unit,
+        display_unit=described.display_unit,
+    )
 
 
 def _compose_key(library: str, algorithm: str) -> str:
@@ -156,7 +213,42 @@ class ProcessingParameterStore:
             parameters = populate_parameter_group(group, root, section.policy)
             bound.append(_BoundSection(section, parameters))
 
-        self._entries[key] = _Entry(defaults, bound)
+        self._entries[key] = _Entry(defaults, sections=bound)
+
+    def register_declared(
+        self,
+        library: str,
+        reconstructor: Reconstructor,
+        branches: Sequence[OptionsBranch] = (),
+    ) -> None:
+        """Generate the live parameters for a backend that declares its own options.
+
+        The same job as :meth:`register`, for a declaration ptychodus owns: the
+        field names are the keys, the bounds and display text are already on the
+        fields, and nothing is overlaid or adapted. A backend reaches this
+        instead of the other when it has nothing for a policy to say.
+        """
+        key = _compose_key(library, reconstructor.name)
+        defaults = reconstructor.get_default_options()
+        bound: list[_BoundBranch] = []
+
+        for branch in branches:
+            root = _resolve(defaults, branch.root_path)
+            described = describe(root, prefix=branch.prefix)
+
+            if not described:
+                logger.debug(f'{key}: branch "{branch.group_name}" declares nothing; skipped.')
+                continue
+
+            group = self._groups.get(branch.group_name)
+
+            if group is None:
+                group = self._settings_registry.create_group(branch.group_name)
+                self._groups[branch.group_name] = group
+
+            bound.append(_BoundBranch(branch, described, declare_in(group, described)))
+
+        self._entries[key] = _Entry(defaults, branches=bound)
 
     def get_options(self, library: str, algorithm: str) -> Any:
         """Return the declared object carrying the values currently held.
@@ -179,6 +271,11 @@ class ProcessingParameterStore:
                 _resolve(options, bound.section.root_path),
                 bound.parameters,
                 bound.section.policy,
+            )
+
+        for branch in entry.branches:
+            apply_declared(
+                _resolve(options, branch.branch.root_path), branch.described, branch.parameters
             )
 
         return options
@@ -216,6 +313,15 @@ class ProcessingParameterStore:
 
                 if parameter is not None:
                     fields.append(DescribedField(described, parameter))
+
+        for branch in entry.branches:
+            fields = merged.setdefault(branch.branch.group_name, [])
+
+            for description in branch.described:
+                parameter = branch.parameters.get(description.key)
+
+                if parameter is not None:
+                    fields.append(DescribedField(_as_flat(description), parameter))
 
         return [DescribedGroup(name, fields) for name, fields in merged.items()]
 

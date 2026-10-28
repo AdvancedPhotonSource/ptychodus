@@ -94,7 +94,7 @@ def _flat_by_key() -> dict[str, Any]:
 # no parameters of its own. Upstream declares eight more; adding one back here
 # means persisting the sub-branch that configures it.
 _EXPECTED_CHOICES: dict[str, tuple[str, ...]] = {
-    'loss_function': ('mse', 'l1', 'smooth_l1'),
+    'LossFunction': ('mse', 'l1', 'smooth_l1'),
 }
 
 
@@ -127,7 +127,7 @@ class TestRoundTrip:
     def test_an_edit_reaches_the_restored_branch(self) -> None:
         registry, options = self._build()
         section = next(s for s in sections() if s.group_name == 'PtychoFMTraining')
-        registry['PtychoFMTraining'].parameters()['epochs'].set_value(77)
+        registry['PtychoFMTraining'].parameters()['Epochs'].set_value(77)
         restored = restore_options(
             options.training, registry['PtychoFMTraining'].parameters(), section.policy
         )
@@ -137,10 +137,10 @@ class TestRoundTrip:
         registry, options = self._build()
         section = next(s for s in sections() if s.group_name == 'PtychoFMData')
         parameters = registry['PtychoFMData'].parameters()
-        assert parameters['max_files'].get_value() == 0
+        assert parameters['MaxFiles'].get_value() == 0
         assert restore_options(options.data, parameters, section.policy).max_files is None
 
-        parameters['max_files'].set_value(12)
+        parameters['MaxFiles'].set_value(12)
         assert restore_options(options.data, parameters, section.policy).max_files == 12
 
 

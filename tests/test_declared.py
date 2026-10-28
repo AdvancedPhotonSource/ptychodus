@@ -85,8 +85,10 @@ class Options(BaseModel):
     defocus_m: float = Field(0.0, json_schema_extra={'display_unit': 'MICROMETER'})
 
 
-def _by_name(options: BaseModel, **kwargs: bool) -> dict[str, ParameterDescription]:
-    return {d.name: d for d in describe(options, **kwargs)}
+def _by_name(
+    options: BaseModel, *, expand_num: bool = False, prefix: str = ''
+) -> dict[str, ParameterDescription]:
+    return {d.name: d for d in describe(options, expand_num=expand_num, prefix=prefix)}
 
 
 class TestDescribe:
@@ -154,3 +156,28 @@ class TestDisplayUnitIsRefusedWhereItWouldMislead:
 
         with pytest.raises(ValueError, match='unknown display unit'):
             describe(Bad())
+
+
+class TestPrefix:
+    def test_a_prefix_distinguishes_branches_of_the_same_shape(self) -> None:
+        """Three stages of one schedule persist side by side in one group."""
+
+        class Stage(BaseModel):
+            epochs: int = 1
+
+        assert _by_name(Stage(), prefix='Stage2')['epochs'].key == 'Stage2Epochs'
+
+    def test_a_prefix_does_not_touch_the_declared_name(self) -> None:
+        """The name is what a caller supplies values under; only the key moves."""
+
+        class Stage(BaseModel):
+            epochs: int = 1
+
+        described = describe(Stage(), prefix='Stage3')
+        assert [d.name for d in described] == ['epochs']
+
+    def test_no_prefix_is_the_default(self) -> None:
+        class Stage(BaseModel):
+            epochs: int = 1
+
+        assert _by_name(Stage())['epochs'].key == 'Epochs'

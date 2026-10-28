@@ -13,15 +13,10 @@ from ..parameters import PluginChooserParameter
 from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .api import ProcessingAPI, ProcessingAlgorithmParameter
-from . import (
-    _cdtools_sections,
-    _ptychi_sections,
-    _ptycho_fm_sections,
-    _ptychopinn_sections,
-)
+from . import _ptychi_sections, _ptycho_fm_sections
 from .devices import DeviceSelection
 from .monitor import ProcessingTaskMonitor
-from .parameter_store import OptionsSection, ProcessingParameterStore
+from .parameter_store import OptionsBranch, OptionsSection, ProcessingParameterStore
 from .settings import ProcessingSettings
 
 # A backend's section table, given one reconstructor's name and the options it
@@ -49,9 +44,28 @@ def _regardless(
 # absent here registers no groups and runs on its declared defaults.
 _SECTIONS_BY_LIBRARY: Mapping[str, SectionTable] = {
     'PtychoFM': _regardless(_ptycho_fm_sections.sections),
-    'PtychoPINN': _regardless(_ptychopinn_sections.sections),
-    'cdtools': _regardless(_cdtools_sections.sections),
     'pty-chi': _ptychi_sections.sections_for,
+}
+
+# Which groups back the backends whose declaration ptychodus owns. No policy and
+# no overlay: the fields carry their own bounds and display text, the field name
+# is the key, and this says only which branch each group covers. A backend that
+# can be described this way belongs here rather than above.
+_BRANCHES_BY_LIBRARY: Mapping[str, Sequence[OptionsBranch]] = {
+    'PtychoPINN': (
+        OptionsBranch('PtychoPINNData', root_path='data'),
+        OptionsBranch('PtychoPINNModel', root_path='model'),
+        OptionsBranch('PtychoPINNTraining', root_path='training'),
+        OptionsBranch('PtychoPINNInference', root_path='inference'),
+    ),
+    'cdtools': (
+        OptionsBranch('CDToolsOptimizer', root_path='optimizer'),
+        OptionsBranch('CDToolsSchedule', root_path='schedule.stage1', prefix='Stage1'),
+        OptionsBranch('CDToolsSchedule', root_path='schedule.stage2', prefix='Stage2'),
+        OptionsBranch('CDToolsSchedule', root_path='schedule.stage3', prefix='Stage3'),
+        OptionsBranch('CDToolsRefinement', root_path='refinement'),
+        OptionsBranch('CDToolsFancyPtycho', root_path='model'),
+    ),
 }
 
 
@@ -118,13 +132,19 @@ class ProcessingCore:
             sections = _SECTIONS_BY_LIBRARY.get(name, _no_sections)
             offered = algorithms_by_library.setdefault(name, [])
 
+            branches = _BRANCHES_BY_LIBRARY.get(name)
+
             for reconstructor in library:
                 offered.append(reconstructor.name)
-                self.parameter_store.register(
-                    name,
-                    reconstructor,
-                    sections(reconstructor.name, reconstructor.get_default_options()),
-                )
+
+                if branches is None:
+                    self.parameter_store.register(
+                        name,
+                        reconstructor,
+                        sections(reconstructor.name, reconstructor.get_default_options()),
+                    )
+                else:
+                    self.parameter_store.register_declared(name, reconstructor, branches)
 
                 # Placement is ptychodus's to decide, so it is attached here
                 # rather than passed through every backend's factory.

@@ -2,7 +2,8 @@
 
 The keys are the external contract -- a missing one orphans a saved setting silently --
 and the golden values pin the defaults a run starts from. Needs no backend installed:
-the declaration is ptychodus's own.
+the declaration is ptychodus's own, which is also why it is read through
+`model/declared.py` rather than through the flattener.
 """
 
 from __future__ import annotations
@@ -12,16 +13,17 @@ from pathlib import Path
 import pytest
 
 from ptychodus.api.settings import SettingsRegistry
-from ptychodus.model.processing._cdtools_sections import sections
-from ptychodus.model.processing.flatten import flatten_options
-from ptychodus.model.processing.generate import populate_parameter_group, restore_options
-from ptychodus.model.processing.parameter_store import OptionsSection
+from ptychodus.model.declared import declare_in, describe, restore
+from ptychodus.model.processing.core import _BRANCHES_BY_LIBRARY
+from ptychodus.model.processing.parameter_store import OptionsBranch
 from ptychodus.plugins.cdtools.options import (
     CDToolsOptimizer,
     CDToolsOptions,
     ScheduleOptions,
     StageOptions,
 )
+
+_BRANCHES = _BRANCHES_BY_LIBRARY['cdtools']
 
 
 def _golden() -> dict[str, dict[str, str]]:
@@ -39,36 +41,65 @@ def _golden() -> dict[str, dict[str, str]]:
     return groups
 
 
-@pytest.mark.parametrize('section', sections(), ids=lambda s: s.group_name)
-def test_every_group_reproduces_its_persisted_keys(section: OptionsSection) -> None:
-    root = getattr(CDToolsOptions(), section.root_path)
-    produced = {flat.ini_key for flat in flatten_options(root, section.policy)}
-    assert produced == set(_golden()[section.group_name])
+def _described(branch: OptionsBranch) -> list:
+    root = CDToolsOptions()
+
+    for name in branch.root_path.split('.'):
+        root = getattr(root, name)
+
+    return list(describe(root, prefix=branch.prefix))
 
 
-@pytest.mark.parametrize('section', sections(), ids=lambda s: s.group_name)
-def test_every_declared_default_matches_the_persisted_one(section: OptionsSection) -> None:
-    root = getattr(CDToolsOptions(), section.root_path)
-    expected = _golden()[section.group_name]
-
-    for flat in flatten_options(root, section.policy):
-        assert flat.spelling.render(flat.default) == expected[flat.ini_key], flat.ini_key
+def _ids(branch: OptionsBranch) -> str:
+    return f'{branch.group_name}:{branch.root_path}'
 
 
-@pytest.mark.parametrize('section', sections(), ids=lambda s: s.group_name)
-def test_every_key_carries_display_text(section: OptionsSection) -> None:
-    root = getattr(CDToolsOptions(), section.root_path)
-    unlabelled = [f.ini_key for f in flatten_options(root, section.policy) if not f.label]
+@pytest.mark.parametrize('branch', _BRANCHES, ids=_ids)
+def test_every_branch_lands_in_the_group_that_persists_it(branch: OptionsBranch) -> None:
+    produced = {description.key for description in _described(branch)}
+    assert produced <= set(_golden()[branch.group_name])
+
+
+def test_the_branches_together_reproduce_every_persisted_key() -> None:
+    """Separately each branch is a subset; together they must be the whole group."""
+    produced: dict[str, set[str]] = {}
+
+    for branch in _BRANCHES:
+        keys = produced.setdefault(branch.group_name, set())
+        keys.update(description.key for description in _described(branch))
+
+    golden = _golden()
+    assert produced == {name: set(golden[name]) for name in produced}
+
+
+@pytest.mark.parametrize('branch', _BRANCHES, ids=_ids)
+def test_every_declared_default_matches_the_persisted_one(branch: OptionsBranch) -> None:
+    registry = SettingsRegistry()
+    group = registry.create_group(branch.group_name)
+    expected = _golden()[branch.group_name]
+
+    for key, parameter in declare_in(group, _described(branch)).items():
+        assert parameter.get_value_as_string() == expected[key], key
+
+
+@pytest.mark.parametrize('branch', _BRANCHES, ids=_ids)
+def test_every_key_carries_display_text(branch: OptionsBranch) -> None:
+    unlabelled = [d.key for d in _described(branch) if not d.label]
     assert not unlabelled
 
 
-def test_the_sections_cover_every_declared_branch() -> None:
-    assert {section.root_path for section in sections()} == set(CDToolsOptions.model_fields)
+def test_the_branches_cover_every_declared_branch() -> None:
+    roots = {branch.root_path.split('.')[0] for branch in _BRANCHES}
+    assert roots == set(CDToolsOptions.model_fields)
 
 
 def test_each_stage_persists_under_its_own_prefix() -> None:
-    section = next(s for s in sections() if s.group_name == 'CDToolsSchedule')
-    keys = {f.ini_key for f in flatten_options(CDToolsOptions().schedule, section.policy)}
+    keys = {
+        description.key
+        for branch in _BRANCHES
+        if branch.group_name == 'CDToolsSchedule'
+        for description in _described(branch)
+    }
     assert keys == {
         f'Stage{number}{field}'
         for number in (1, 2, 3)
@@ -87,44 +118,50 @@ def test_a_stage_with_no_epochs_is_skipped() -> None:
 
 
 class TestRoundTrip:
-    def _build(self) -> tuple[SettingsRegistry, CDToolsOptions]:
+    def _build(self) -> SettingsRegistry:
         registry = SettingsRegistry()
-        options = CDToolsOptions()
+        groups: dict[str, object] = {}
 
-        for section in sections():
-            populate_parameter_group(
-                registry.create_group(section.group_name),
-                getattr(options, section.root_path),
-                section.policy,
-            )
+        for branch in _BRANCHES:
+            group = groups.get(branch.group_name)
 
-        return registry, options
+            if group is None:
+                group = registry.create_group(branch.group_name)
+                groups[branch.group_name] = group
+
+            declare_in(group, _described(branch))  # type: ignore[arg-type]
+
+        return registry
 
     def test_an_edit_reaches_the_restored_stage(self) -> None:
-        registry, options = self._build()
-        section = next(s for s in sections() if s.group_name == 'CDToolsSchedule')
+        registry = self._build()
+        branch = next(b for b in _BRANCHES if b.root_path == 'schedule.stage2')
         parameters = registry['CDToolsSchedule'].parameters()
         parameters['Stage2Epochs'].set_value(7)
-        restored = restore_options(options.schedule, parameters, section.policy)
-        assert restored.stage2.epochs == 7
-        assert restored.stage1.epochs == options.schedule.stage1.epochs
+
+        restored = restore(CDToolsOptions().schedule.stage2, _described(branch), parameters)
+
+        assert restored.epochs == 7
+        assert restored.learning_rate == CDToolsOptions().schedule.stage2.learning_rate
 
     def test_enums_persist_by_value(self) -> None:
-        registry, _ = self._build()
+        registry = self._build()
         optimizer = registry['CDToolsOptimizer'].parameters()['Optimizer']
         assert optimizer.get_value() == 'Adam'
         assert registry['CDToolsFancyPtycho'].parameters()['Loss'].get_value() == 'amplitude_mse'
 
     def test_an_optimizer_choice_restores_as_its_member(self) -> None:
-        registry, options = self._build()
-        section = next(s for s in sections() if s.group_name == 'CDToolsOptimizer')
+        registry = self._build()
+        branch = next(b for b in _BRANCHES if b.root_path == 'optimizer')
         parameters = registry['CDToolsOptimizer'].parameters()
         parameters['Optimizer'].set_value('LBFGS')
-        restored = restore_options(options.optimizer, parameters, section.policy)
+
+        restored = restore(CDToolsOptions().optimizer, _described(branch), parameters)
+
         assert restored.optimizer is CDToolsOptimizer.LBFGS
 
     def test_a_bound_clamps_a_value_loaded_from_file(self) -> None:
-        registry, _ = self._build()
+        registry = self._build()
         parameter = registry['CDToolsOptimizer'].parameters()['AdamBeta1']
         parameter.set_value_from_string('2.0')
         assert parameter.get_value() == 0.999999

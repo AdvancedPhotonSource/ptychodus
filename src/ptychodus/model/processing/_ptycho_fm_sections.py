@@ -11,8 +11,8 @@ trained with are not a user's to vary, and they are frozen in the declaration
 instead. ``options.py`` states them, and the dump carries them to the child
 whether or not a settings group exists.
 
-ptychodus persists PtychoFM keys as the literal field names, so the policy is
-verbatim.
+Keys are spelled the way the rest of the application spells them, PascalCase
+with units in words, rather than as upstream's literal field names.
 
 Upstream carries nothing a reader would need: no title, no description, no
 bound, and every choice typed as a bare ``str`` rather than an enum. All of it
@@ -67,7 +67,7 @@ _DATA_OVERLAYS: Mapping[str, Overlay] = {
         maximum=1.0,
     ),
     'random_seed': Overlay('Random Seed:'),
-    'max_files': Overlay('Max Files (0 = no cap):', minimum=0),
+    'MaxFiles': Overlay('Max Files (0 = no cap):', minimum=0),
 }
 
 
@@ -83,7 +83,7 @@ def _data_policy() -> FlatteningPolicy:
     from ptycho_fm.config import DataConfig
 
     return FlatteningPolicy(
-        naming=NamingConvention.VERBATIM,
+        naming=NamingConvention.PASCAL_CASE,
         spelling=EnumSpelling.BY_VALUE,
         collapse_onto_prefix=frozenset(),
         hidden=frozenset(
@@ -99,7 +99,7 @@ def _data_policy() -> FlatteningPolicy:
                 'max_files',
             )
         ),
-        structural={'max_files': Sentinel('max_files', value_type=int, sentinel=0)},
+        structural={'max_files': Sentinel('MaxFiles', value_type=int, sentinel=0)},
         overlays=_DATA_OVERLAYS,
     )
 
@@ -129,7 +129,7 @@ def _training_policy() -> FlatteningPolicy:
     from ptycho_fm.config import TrainingConfig
 
     return FlatteningPolicy(
-        naming=NamingConvention.VERBATIM,
+        naming=NamingConvention.PASCAL_CASE,
         spelling=EnumSpelling.BY_VALUE,
         collapse_onto_prefix=frozenset(),
         hidden=frozenset(
@@ -150,7 +150,7 @@ def _training_policy() -> FlatteningPolicy:
 def _inference_policy() -> FlatteningPolicy:
     """The stitching branch, which is ptychodus's own and states its own text."""
     return FlatteningPolicy(
-        naming=NamingConvention.VERBATIM,
+        naming=NamingConvention.PASCAL_CASE,
         spelling=EnumSpelling.BY_VALUE,
         collapse_onto_prefix=frozenset(),
     )
