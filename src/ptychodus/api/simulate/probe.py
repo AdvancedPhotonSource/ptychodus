@@ -1,4 +1,10 @@
-"""Probe generation functions: geometric apertures, zone plates, KB mirrors, Zernike modes, Hermite modes, and OPR ensembles."""
+"""Probe generation functions: geometric apertures, zone plates, KB mirrors, Zernike modes, Hermite-Gauss modes, and OPR ensembles.
+
+Also home to :class:`ProbeGenerator`, the interface a probe model is offered through. It
+sits beside the functions because it is how they are reached: a generator states what it
+accepts and turns one set of those values into a probe, and the functions below are what
+it turns them with.
+"""
 
 from __future__ import annotations
 
@@ -16,7 +22,14 @@ from ..constants import TWO_PI, TWO_PI_J
 from ..typing import ComplexArrayType, RealArrayType
 from ..geometry import HermiteMode, ImageExtent, LegendreMode, PixelGeometry, ZernikeMode
 from ..moments import compute_intensity_moments
-from ..probe import Probe, ProbeGeometry, ProbeEnsemble, ProbeTransverseCoordinates
+from ..probe import (
+    Probe,
+    ProbeEnsemble,
+    ProbeGeometry,
+    ProbeGeometryProvider,
+    ProbeTransverseCoordinates,
+)
+from ..product import reconcile_defocus_distance_m
 from ..propagate import (
     AngularSpectrumPropagator,
     FresnelTransformPropagator,
@@ -31,6 +44,75 @@ from ..preprocess.noise import subtract_noise_floor
 
 
 logger = logging.getLogger(__name__)
+
+
+class ProbeGenerator(ABC):
+    """A probe model, and the options it accepts.
+
+    Stateless and configured per call: a generator holds no settings of its own, so it
+    costs nothing to construct and two callers can drive the same one with different
+    values at the same time. It does not name itself either; the name a person selects
+    it by is the one it was registered under.
+
+    A generator is a complete description of one kind of probe and knows nothing about
+    where its option values come from. Its options may state what a field *is* -- its
+    unit, its bounds, the measured quantity it corresponds to -- but never where a value
+    for it is found.
+
+    What it returns is raw: a single incoherent mode, at whatever intensity the model
+    produces. Expanding modes and normalizing the photon count are separate concerns
+    from describing an illumination, and a generator that applied either would be
+    applying it twice.
+    """
+
+    @abstractmethod
+    def get_default_options(self) -> BaseModel:
+        """Return this generator's options, populated with their defaults.
+
+        A description, not live state: plain pydantic carrying values, types, ranges,
+        enums and the words to put beside each field. A caller edits a copy and passes
+        it back as ``options``, and its type is what an incoming ``options`` is
+        validated against.
+
+        An instance rather than the class, because a field declared with a
+        ``default_factory`` reports its class-level default as undefined. Only an
+        instance carries the value such a field actually starts at.
+        """
+
+    @abstractmethod
+    def generate(self, options: BaseModel, geometry_provider: ProbeGeometryProvider) -> Probe:
+        """Return the probe *options* describe, sampled on the provider's probe grid.
+
+        Raises:
+            GeometryNotDefinedError: while something the probe depends on is not yet
+                available, which a caller should treat as "not yet" rather than as a
+                failure.
+        """
+
+    @property
+    def reads_diffraction_data(self) -> bool:
+        """Whether :meth:`generate` reads the diffraction data, not only the geometry.
+
+        Such a probe goes stale when the data changes under an unchanged detector
+        geometry, which the geometry alone does not announce.
+        """
+        return False
+
+
+def resolve_defocus_distance_m(
+    geometry_provider: ProbeGeometryProvider,
+    defocus_distance_m: float,
+    *,
+    rel_tol: float = 1.0e-6,
+) -> float:
+    """How far past its focus a probe is sampled, deferring to the product.
+
+    See :func:`ptychodus.api.product.reconcile_defocus_distance_m`, which this applies
+    to the provider's focus-object distance and the probe's own *defocus_distance_m*.
+    """
+    return reconcile_defocus_distance_m(
+        geometry_provider.focus_object_distance_m, defocus_distance_m, rel_tol=rel_tol
+    )
 
 
 def rescale_probe_intensity(probe: Probe, new_intensity: float) -> Probe:
@@ -592,6 +674,29 @@ class KirkpatrickBaezMirrorPair(BaseModel):
         return 0.5 * (self.horizontal.focus_distance_m + self.vertical.focus_distance_m)
 
 
+class KirkpatrickBaezMirrorPreset(BaseModel):
+    """A Kirkpatrick-Baez pair as measured on an instrument, flattened axis by axis.
+
+    The nested :class:`KirkpatrickBaezMirrorPair` is what the simulation reads; this is
+    the same optic spelled as one flat record, one field per mirror quantity, which is
+    the shape a set of named values takes. Each field carries the bounds of the
+    :class:`KirkpatrickBaezMirror` field it mirrors.
+
+    The source distance is left out because the simulation never reads it, and the
+    astigmatism and defocus because they describe how the pair is aligned rather than
+    the pair itself.
+    """
+
+    model_config = ConfigDict(frozen=True, extra='forbid', allow_inf_nan=False)
+
+    horizontal_acceptance_length_m: float = Field(gt=0.0)
+    horizontal_grazing_angle_rad: float = Field(gt=0.0, lt=0.5 * numpy.pi)
+    horizontal_focus_distance_m: float = Field(gt=0.0)
+    vertical_acceptance_length_m: float = Field(gt=0.0)
+    vertical_grazing_angle_rad: float = Field(gt=0.0, lt=0.5 * numpy.pi)
+    vertical_focus_distance_m: float = Field(gt=0.0)
+
+
 def generate_mirror_figure_error(
     rng: numpy.random.Generator,
     *,
@@ -926,21 +1031,58 @@ def generate_zernike_probe(
     )
 
 
-def generate_hermite_probe(
+def _hermite_gauss_norm(order: int, beam_waist_m: float) -> float:
+    """The factor normalizing the one-dimensional Hermite-Gauss mode *order* to unit power.
+
+    ``(2 / pi)**(1/4) / sqrt(2**order * order! * w)``, evaluated through ``lgamma`` so a
+    high order does not overflow the factorial before the square root brings it back.
+    """
+    log_norm = 0.25 * math.log(2.0 / math.pi) - 0.5 * (
+        order * math.log(2.0) + math.lgamma(order + 1) + math.log(beam_waist_m)
+    )
+    return math.exp(log_norm)
+
+
+def generate_hermite_gauss_probe(
     geometry: ProbeGeometry,
     polynomial: Iterable[HermiteMode],
     *,
-    width_m: float,
-    height_m: float,
+    beam_waist_x_m: float,
+    beam_waist_y_m: float,
 ) -> Probe:
-    """Generate a probe as a superposition of 2D Hermite polynomial modes with characteristic widths *width_m* (x) and *height_m* (y)."""
+    """Generate a probe as a superposition of Hermite-Gauss modes.
+
+    Mode ``(m, n)`` is ``N_m N_n H_m(sqrt(2) x / w_x) H_n(sqrt(2) y / w_y)
+    exp(-x**2 / w_x**2 - y**2 / w_y**2)``. The waist ``w`` along each axis is the radius
+    at which the intensity of mode ``(0, 0)`` falls to ``1 / e**2`` of its peak.
+
+    Each one-dimensional factor is normalized to unit power, ``N_m = (2 / pi)**(1/4) /
+    sqrt(2**m m! w)``, so a mode's coefficient is its amplitude relative to the other
+    modes rather than being inflated by the growth of ``H_m``. The Gaussian envelope
+    gives every mode a finite extent, about ``sqrt(2 m + 1) w`` along its axis: the
+    scale of the polynomial and the size of the probe are one width, not two.
+
+    Raises:
+        ValueError: if either waist is not positive.
+    """
+    if beam_waist_x_m <= 0.0 or beam_waist_y_m <= 0.0:
+        raise ValueError(
+            f'Hermite-Gauss waists must be positive (got {beam_waist_x_m}, {beam_waist_y_m}).'
+        )
+
     coords = geometry.get_transverse_coordinates()
-    x = coords.x_m / width_m
-    y = coords.y_m / height_m
-    array = numpy.zeros_like(x, dtype=complex)
+    u = math.sqrt(2.0) * coords.x_m / beam_waist_x_m
+    v = math.sqrt(2.0) * coords.y_m / beam_waist_y_m
+    array = numpy.zeros_like(u, dtype=complex)
 
     for mode in polynomial:
-        array += mode(x, y)
+        norm = _hermite_gauss_norm(mode.order_x, beam_waist_x_m) * _hermite_gauss_norm(
+            mode.order_y, beam_waist_y_m
+        )
+        array += norm * mode(u, v)
+
+    # exp(-x**2 / w**2) is exp(-u**2 / 2) in the scaled coordinate.
+    array *= numpy.exp(-0.5 * (u * u + v * v))
 
     return Probe(
         array=array,

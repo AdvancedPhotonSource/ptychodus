@@ -4,7 +4,11 @@ from ptychodus.api.object import ObjectFileReader, ObjectFileWriter
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import ProbeFileReader, ProbeFileWriter
-from ptychodus.api.simulate.probe import FresnelZonePlate, KirkpatrickBaezMirrorPair
+from ptychodus.api.simulate.probe import (
+    FresnelZonePlate,
+    KirkpatrickBaezMirrorPreset,
+    ProbeGenerator,
+)
 from ptychodus.api.probe_positions import ProbePositionFileReader, ProbePositionFileWriter
 from ptychodus.api.simulate.probe_positions import ProbePositionsGenerator
 from ptychodus.api.product import ProductFileReader, ProductFileWriter
@@ -64,8 +68,9 @@ class ProductCore(Observer):
         scan_generator_chooser: PluginChooser[ProbePositionsGenerator],
         scan_file_reader_chooser: PluginChooser[ProbePositionFileReader],
         scan_file_writer_chooser: PluginChooser[ProbePositionFileWriter],
+        probe_generator_chooser: PluginChooser[ProbeGenerator],
         fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
-        kb_mirror_chooser: PluginChooser[KirkpatrickBaezMirrorPair],
+        kb_mirror_chooser: PluginChooser[KirkpatrickBaezMirrorPreset],
         probe_file_reader_chooser: PluginChooser[ProbeFileReader],
         probe_file_writer_chooser: PluginChooser[ProbeFileWriter],
         object_file_reader_chooser: PluginChooser[ObjectFileReader],
@@ -94,6 +99,7 @@ class ProductCore(Observer):
         self._probe_builder_factory = ProbeBuilderFactory(
             rng,
             self._probe_settings,
+            probe_generator_chooser,
             fresnel_zone_plate_chooser,
             kb_mirror_chooser,
             probe_file_reader_chooser,

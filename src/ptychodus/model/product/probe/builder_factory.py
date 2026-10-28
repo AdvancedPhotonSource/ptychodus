@@ -1,9 +1,11 @@
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from pathlib import Path
+from typing import Any, Final
 import logging
 
 import numpy
 
+from ptychodus.api.parameters import Parameter
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import (
     OPRWeightPolicy,
@@ -11,19 +13,17 @@ from ptychodus.api.probe import (
     ProbeFileWriter,
     ProbeEnsemble,
 )
-from ptychodus.api.simulate.probe import FresnelZonePlate, KirkpatrickBaezMirrorPair
+from ptychodus.api.simulate.probe import (
+    FresnelZonePlate,
+    KirkpatrickBaezMirrorPreset,
+    ProbeGenerator,
+)
 
+from ...declared import describe
 from ...file_types import FileTypeChooser
-from .average_pattern import AveragePatternProbeBuilder
 from .builder import FromFileProbeBuilder, ProbeEnsembleBuilder
-from .disk import DiskProbeBuilder
-from .fzp import FresnelZonePlateProbeBuilder
-from .hermite import HermiteProbeBuilder
-from .kb_mirror import KBMirrorProbeBuilder
-from .rect import RectangularProbeBuilder
+from .plugin import PluginProbeBuilder
 from .settings import ProbeSettings
-from .super_gaussian import SuperGaussianProbeBuilder
-from .zernike import ZernikeProbeBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -33,58 +33,63 @@ class ProbeBuilderFactory(Iterable[str]):
         self,
         rng: numpy.random.Generator,
         settings: ProbeSettings,
+        generator_chooser: PluginChooser[ProbeGenerator],
         fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
-        kb_mirror_chooser: PluginChooser[KirkpatrickBaezMirrorPair],
+        kb_mirror_chooser: PluginChooser[KirkpatrickBaezMirrorPreset],
         file_reader_chooser: PluginChooser[ProbeFileReader],
         file_writer_chooser: PluginChooser[ProbeFileWriter],
     ) -> None:
         super().__init__()
         self._rng = rng
         self._settings = settings
+        self._generators = generator_chooser
         self._fresnel_zone_plate_chooser = fresnel_zone_plate_chooser
         self._kb_mirror_chooser = kb_mirror_chooser
         self.file_readers = FileTypeChooser(file_reader_chooser)
         self.file_writers = FileTypeChooser(file_writer_chooser)
-        self._non_diffraction_builders: Mapping[str, Callable[[], ProbeEnsembleBuilder]] = {
-            'disk': lambda: DiskProbeBuilder(rng, settings),
-            'fresnel_zone_plate': self._create_fresnel_zone_plate_builder,
-            'hermite': lambda: HermiteProbeBuilder(rng, settings),
-            'kb_mirror': self._create_kb_mirror_builder,
-            'rectangular': lambda: RectangularProbeBuilder(rng, settings),
-            'super_gaussian': lambda: SuperGaussianProbeBuilder(rng, settings),
-            'zernike': lambda: ZernikeProbeBuilder(rng, settings),
-        }
-        # Builders that cannot build without diffraction data, which they read from the
-        # geometry provider when they build.
-        self._diffraction_builders: Mapping[str, Callable[[], ProbeEnsembleBuilder]] = {
-            'average_pattern': lambda: AveragePatternProbeBuilder(rng, settings),
+
+        # Every registered generator, not only the one selected: the settings file holds
+        # one section for the probe and it must hold the same keys however the
+        # application was driven, so a model never chosen still contributes the keys it
+        # would be configured by.
+        self._parameters: dict[str, Mapping[str, Parameter[Any]]] = {
+            plugin.simple_name: settings.declare(
+                describe(plugin.strategy.get_default_options(), expand_num=True)
+            )
+            for plugin in generator_chooser
         }
 
     def __iter__(self) -> Iterator[str]:
-        yield from self._non_diffraction_builders
-        yield from self._diffraction_builders
+        for plugin in self._generators:
+            yield plugin.simple_name
 
     def create(self, name: str, *, has_diffraction_data: bool = False) -> ProbeEnsembleBuilder:
         """Create the builder *name*, refusing one that needs data on a product without any."""
-        diffraction_factory = self._diffraction_builders.get(name)
+        plugin = self._generators.find_plugin(name)
 
-        if diffraction_factory is not None:
-            if not has_diffraction_data:
-                raise RuntimeError(
-                    f'Probe builder "{name}" requires an associated diffraction dataset.'
-                )
+        if plugin is None:
+            raise KeyError(f'Unknown probe builder "{name}"!')
 
-            return diffraction_factory()
+        if plugin.strategy.reads_diffraction_data and not has_diffraction_data:
+            raise RuntimeError(
+                f'Probe builder "{name}" requires an associated diffraction dataset.'
+            )
 
-        try:
-            factory = self._non_diffraction_builders[name]
-        except KeyError as exc:
-            raise KeyError(f'Unknown probe builder "{name}"!') from exc
-
-        return factory()
+        return PluginProbeBuilder(
+            self._rng,
+            self._settings,
+            plugin.simple_name,
+            plugin.strategy,
+            self._parameters[plugin.simple_name],
+            self._fresnel_zone_plate_chooser,
+            self._kb_mirror_chooser,
+        )
 
     def create_default(self) -> ProbeEnsembleBuilder:
-        return next(iter(self._non_diffraction_builders.values()))()
+        # Named rather than taken as the first the chooser holds: the chooser sorts by
+        # name, so that would silently make it whichever model sorts first.
+        default_generator: Final = 'disk'
+        return self.create(default_generator)
 
     def create_from_settings(self, *, has_diffraction_data: bool = False) -> ProbeEnsembleBuilder:
         name = self._settings.builder.get_value()
@@ -97,14 +102,6 @@ class ProbeBuilderFactory(Iterable[str]):
             )
 
         return self.create(name_repaired, has_diffraction_data=has_diffraction_data)
-
-    def _create_fresnel_zone_plate_builder(self) -> ProbeEnsembleBuilder:
-        return FresnelZonePlateProbeBuilder(
-            self._rng, self._settings, self._fresnel_zone_plate_chooser
-        )
-
-    def _create_kb_mirror_builder(self) -> ProbeEnsembleBuilder:
-        return KBMirrorProbeBuilder(self._rng, self._settings, self._kb_mirror_chooser)
 
     def read_probe_from_file(self, file_path: Path, file_type: str) -> ProbeEnsemble:
         """Read a probe without binding it to a repository item.

@@ -6,7 +6,6 @@ import logging
 import numpy
 
 from ptychodus.api.parameters import ParameterGroup
-from ptychodus.api.product import reconcile_defocus_distance_m
 from ptychodus.api.simulate.probe import (
     GaussianSchellStrategy,
     IncoherentModeStrategy,
@@ -14,11 +13,10 @@ from ptychodus.api.simulate.probe import (
     ProbeMomentPolynomialStrategy,
     ProbeModeDecayType,
     RandomPhaseRampStrategy,
-    apply_defocus_phase,
     generate_coherent_probe_modes,
     generate_incoherent_probe_modes,
-    propagate_probe,
     rescale_probe_intensity,
+    resolve_defocus_distance_m,
 )
 from ptychodus.api.probe import (
     OPRWeightPolicy,
@@ -35,22 +33,6 @@ from ptychodus.api.probe import (
 from .settings import ProbeSettings
 
 logger = logging.getLogger(__name__)
-
-
-def resolve_defocus_distance_m(
-    geometry_provider: ProbeGeometryProvider,
-    builder_defocus_distance_m: float,
-    *,
-    rel_tol: float = 1.0e-6,
-) -> float:
-    """How far past its focus a builder's probe is sampled, deferring to the product.
-
-    See :func:`ptychodus.api.product.reconcile_defocus_distance_m`, which this applies
-    to the product's focus-object distance and the builder's own defocus.
-    """
-    return reconcile_defocus_distance_m(
-        geometry_provider.focus_object_distance_m, builder_defocus_distance_m, rel_tol=rel_tol
-    )
 
 
 class ProbeEnsembleBuilder(ParameterGroup):
@@ -139,38 +121,6 @@ class ProbeEnsembleBuilder(ParameterGroup):
         instead.
         """
         return self._condition_probe(self._build_raw(geometry_provider), geometry_provider)
-
-    def _shape_parametric_field(
-        self,
-        probe: Probe,
-        geometry_provider: ProbeGeometryProvider,
-        *,
-        defocus_distance_m: float,
-        propagation_distance_m: float,
-    ) -> Probe:
-        """Curve a flat-phased amplitude to its defocus, then carry it to another plane.
-
-        The defocus is the curvature of the beam the amplitude models, reconciled
-        with the product's focus by `resolve_defocus_distance_m`; the propagation
-        moves the plane afterwards. A zero propagation distance skips the
-        propagator, whose FFT round trip would otherwise perturb the field at
-        round-off level.
-        """
-        photon_wavelength_m = geometry_provider.photon_wavelength_m
-        probe = apply_defocus_phase(
-            probe,
-            photon_wavelength_m=photon_wavelength_m,
-            defocus_distance_m=resolve_defocus_distance_m(geometry_provider, defocus_distance_m),
-        )
-
-        if propagation_distance_m != 0.0:
-            probe = propagate_probe(
-                probe,
-                photon_wavelength_m=photon_wavelength_m,
-                propagation_distance_m=propagation_distance_m,
-            )
-
-        return probe
 
     @property
     def reads_diffraction_data(self) -> bool:

@@ -85,7 +85,7 @@ class ProbeFromFile(_Section):
 
 
 class SimulatedProbe(_Section):
-    fzp_preset: str = 'APS_LamNI'
+    fzp_preset: str = 'APS 31-ID-E LamNI'
     fzp_defocus_m: float = 800.0e-6
 
 

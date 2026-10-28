@@ -4,9 +4,11 @@ from collections.abc import Callable, Iterable, Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Final
+import cmath
 import logging
+import math
 
-from PyQt5.QtCore import QRegularExpression, Qt
+from PyQt5.QtCore import QAbstractTableModel, QModelIndex, QObject, QRegularExpression, Qt
 from PyQt5.QtGui import QIntValidator, QRegularExpressionValidator, QValidator
 from PyQt5.QtWidgets import (
     QCheckBox,
@@ -19,6 +21,7 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QPushButton,
     QSpinBox,
+    QTableView,
     QVBoxLayout,
     QWidget,
 )
@@ -28,6 +31,7 @@ from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parameters import (
     BooleanParameter,
+    ComplexSequenceParameter,
     IntegerParameter,
     Parameter,
     PathParameter,
@@ -746,6 +750,149 @@ class AngleParameterViewController(ParameterViewController, Observer):
             self.__sync_model_to_view()
 
 
+class ComplexSequenceTableModel(QAbstractTableModel):
+    """A sequence of complex values as rows of amplitude and phase, in turns.
+
+    Rows are headed by their index from zero, which is the position a value holds in
+    the sequence. An edit changes one of the two polar parts and keeps the other.
+    """
+
+    _HEADERS: Final = ('Amplitude', 'Phase [tr]')
+
+    def __init__(self, parameter: ComplexSequenceParameter, parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self._parameter = parameter
+
+    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+        value = super().flags(index)
+
+        if index.isValid():
+            value |= Qt.ItemFlag.ItemIsEditable
+
+        return value
+
+    def headerData(  # noqa: N802
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int = Qt.ItemDataRole.DisplayRole,
+    ) -> Any:
+        if role != Qt.ItemDataRole.DisplayRole:
+            return None
+
+        if orientation == Qt.Orientation.Horizontal:
+            return self._HEADERS[section]
+
+        return str(section)
+
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+        if not index.isValid() or role not in (
+            Qt.ItemDataRole.DisplayRole,
+            Qt.ItemDataRole.EditRole,
+        ):
+            return None
+
+        value = self._parameter[index.row()]
+
+        if index.column() == 0:
+            return f'{abs(value):.6g}'
+
+        return f'{cmath.phase(value) / (2.0 * math.pi):.6g}'
+
+    def setData(  # noqa: N802
+        self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole
+    ) -> bool:
+        if not index.isValid() or role != Qt.ItemDataRole.EditRole:
+            return False
+
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return False
+
+        if not math.isfinite(number):
+            return False
+
+        current = self._parameter[index.row()]
+
+        if index.column() == 0:
+            # A zero value has no phase to keep, so it takes phase zero.
+            updated = cmath.rect(number, cmath.phase(current))
+        else:
+            updated = cmath.rect(abs(current), 2.0 * math.pi * number)
+
+        self._parameter[index.row()] = updated
+        self.dataChanged.emit(index, index)
+        return True
+
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
+        return len(self._parameter)
+
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
+        return len(self._HEADERS)
+
+    def append_row(self) -> None:
+        """Add a zero, so the sequence means the same thing until the new value is edited."""
+        self._parameter.insert(len(self._parameter), 0j)
+
+    def remove_last_row(self) -> None:
+        """Drop the last value, keeping at least one."""
+        if len(self._parameter) > 1:
+            del self._parameter[len(self._parameter) - 1]
+
+    def refresh(self) -> None:
+        self.beginResetModel()
+        self.endResetModel()
+
+
+class ComplexSequenceParameterViewController(ParameterViewController, Observer):
+    """A table of amplitude and phase per value, with buttons to add and remove values."""
+
+    def __init__(self, parameter: ComplexSequenceParameter, *, tool_tip: str = '') -> None:
+        super().__init__()
+        self._parameter = parameter
+        self._model = ComplexSequenceTableModel(parameter)
+        self._table_view = QTableView()
+        self._table_view.setModel(self._model)
+        header = self._table_view.horizontalHeader()
+        header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
+
+        self._add_button = QPushButton('Add')
+        self._add_button.clicked.connect(self._model.append_row)
+        self._remove_button = QPushButton('Remove Last')
+        self._remove_button.clicked.connect(self._model.remove_last_row)
+
+        button_layout = QHBoxLayout()
+        button_layout.setContentsMargins(0, 0, 0, 0)
+        button_layout.addWidget(self._add_button)
+        button_layout.addWidget(self._remove_button)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._table_view)
+        layout.addLayout(button_layout)
+
+        self._widget = QWidget()
+        self._widget.setLayout(layout)
+
+        if tool_tip:
+            self._widget.setToolTip(tool_tip)
+
+        self.__sync_model_to_view()
+        parameter.add_observer(self)
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+    def __sync_model_to_view(self) -> None:
+        self._model.refresh()
+        self._remove_button.setEnabled(len(self._parameter) > 1)
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self.__sync_model_to_view()
+
+
 def create_whole_number_view_controller(
     parameter: IntegerParameter, *, tool_tip: str = ''
 ) -> ParameterViewController:
@@ -812,6 +959,7 @@ def create_parameter_view_controller(
     spin box, and a real number with both ends is a slider. Without those a
     spin box has nothing to count from and a slider nothing to slide between,
     so both fall back to a line edit that accepts any value of the right type.
+    A sequence of complex values is a table of amplitude and phase.
 
     *name* is used only to say which field was skipped when no editor covers
     it, which is a gap here rather than a bad declaration. Returns None in
@@ -833,6 +981,9 @@ def create_parameter_view_controller(
             return ComboBoxParameterViewController(parameter, choices, tool_tip=tool_tip)
 
         return LineEditParameterViewController(parameter, tool_tip=tool_tip)
+
+    if isinstance(parameter, ComplexSequenceParameter):
+        return ComplexSequenceParameterViewController(parameter, tool_tip=tool_tip)
 
     logger.warning(f'No editor for "{name}" ({type(parameter).__name__}); omitted.')
     return None

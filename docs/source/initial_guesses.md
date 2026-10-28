@@ -155,6 +155,8 @@ The other patterns use:
 
 Use `WorkflowProductAPI.generate_probe(name, parameters)`. All generated probe builders first create a base complex probe, rescale its total intensity to the product metadata field `probe_photon_count`, then expand it into incoherent and OPR/coherent modes according to the mode settings described below.
 
+Each probe model is a plugin that states the parameters it accepts, so the names below are what it registered under and the parameter names are the ones it declares. A model added to `ptychodus.plugins` appears here, in the settings file and in the editor dialog without any of them being told about it. A plugin knows nothing about where its values come from: the settings file, a workflow call, a preset and a size measured from the data are all just sources of the same declared parameters. Parameters with the same name share one settings key and one value across models — `defocus_distance_m`, `propagation_distance_m`, and the `diameter_m` that `disk` and `zernike` both take as the diameter of a circular pupil — so switching models keeps them.
+
 `disk`
 : Generates a binary circular aperture with parameter `diameter_m`. `defocus_distance_m` first gives it the quadratic phase of a beam sampled that far past its focus (positive downstream, diverging; negative upstream, converging), deferring to the product's `focus_object_distance_m` the same way the zone plate does. The aperture is then optionally propagated by `propagation_distance_m` with the angular-spectrum propagator. This is the default probe builder. With far-field diffraction data loaded, **Estimate from Diffraction** sets `diameter_m` from the second moments of the mean pattern: the bright field's angular spread times the defocus is the geometric shadow the aperture casts, so set the defocus first. It sets the parameter once and leaves it there. A zone plate's annular bright field reads about 5% larger than its outer diameter at a central stop of a third, and at zero defocus the estimate falls back to the transform-limited waist with a warning.
 
@@ -162,7 +164,7 @@ Use `WorkflowProductAPI.generate_probe(name, parameters)`. All generated probe b
 : Generates a binary rectangular aperture with `width_m` and `height_m`. It takes `defocus_distance_m` and `propagation_distance_m` exactly as `disk` does, and its **Estimate from Diffraction** sets both sides from the spread of the bright field along x and y.
 
 `super_gaussian`
-: Generates a super-Gaussian amplitude profile. Parameters are `annular_radius_m`, `full_width_at_half_maximum_m` (or the builder parameter name `fwhm_m` in the low-level function), and `order_parameter`. `annular_radius_m = 0` gives a Gaussian-like spot; a positive `annular_radius_m` gives a ring or donut-like profile. This is not a zone-plate simulation: the profile is analytic and flat-phased, and takes `defocus_distance_m` and `propagation_distance_m` exactly as `disk` does. Its **Estimate from Diffraction** sets `full_width_at_half_maximum_m` to that of a Gaussian beam with the measured angular spread, at its waist plus the spread of the cone over the defocus; the annular radius and order are left as chosen.
+: Generates a super-Gaussian amplitude profile. Parameters are `annular_radius_m`, `full_width_at_half_maximum_m` (`fwhm_m` in the low-level function), and `order_parameter`. `annular_radius_m = 0` gives a Gaussian-like spot; a positive `annular_radius_m` gives a ring or donut-like profile. This is not a zone-plate simulation: the profile is analytic and flat-phased, and takes `defocus_distance_m` and `propagation_distance_m` exactly as `disk` does. Its **Estimate from Diffraction** sets `full_width_at_half_maximum_m` to that of a Gaussian beam with the measured angular spread, at its waist plus the spread of the cone over the defocus; the annular radius and order are left as chosen.
 
 `fresnel_zone_plate`
 : Simulates a Fresnel zone plate optic and propagates it to the sample plane with the Fresnel-transform propagator. Parameters are `zone_plate_diameter_m`, `outermost_zone_width_m`, `central_beamstop_diameter_m`, and `defocus_distance_m`. The central beamstop creates the donut-like zone-plate aperture. The focal length is computed as `zone_plate_diameter_m * outermost_zone_width_m / photon_wavelength_m` and the propagation distance is `focal_length_m + defocus_distance_m`. `defocus_distance_m` is the object plane's position relative to the focus, which is the negated product metadata field `focus_object_distance_m`; when the product declares a nonzero focus the product's value is used and a disagreeing builder value is reported.
@@ -173,16 +175,23 @@ Use `WorkflowProductAPI.generate_probe(name, parameters)`. All generated probe b
 `average_pattern`
 : Estimates a probe from diffraction data by taking the square root of the mean assembled diffraction pattern and back-propagating it to the object plane. Far field takes the square root as the probe's flat-phase angular spectrum and inverse-transforms it onto the probe grid, giving the beam at its waist; the phase the Fresnel transform adds across the detector is not the probe's and is not undone, and no detector pitch is needed. Near field uses the angular spectrum over the demagnified distance, which preserves pitch. Because the far-field estimate is the waist, so `defocus_distance_m` carries it to an object sampled that far past the focus, deferring to the product's `focus_object_distance_m` as the zone plate does. `propagation_distance_m` refines where the probe plane sits without altering the geometry the object pixel size comes from; the two act on the same field and add. Bad pixels are inpainted rather than zeroed, since a hole in the bright field rings through the probe. `bright_field_threshold` (off by default) keeps only the bright field of a far-field mean pattern: the background pedestal is subtracted and the noise around the bright field zeroed, while the bright field keeps its measured values. This requires assembled diffraction data to already be available in the model.
 
+`hermite_gauss`
+: Generates a probe as a superposition of Hermite–Gauss modes. `beam_waist_x_m` and `beam_waist_y_m` are the radii at which the intensity of mode `(0, 0)` falls to `1/e²` of its peak; the Gaussian envelope gives every mode a finite extent, about `sqrt(2m + 1)` waists along its axis, so the scale of the polynomials and the size of the probe are one width. `hermite_gauss_coefficients` is a list of complex amplitudes in total-degree order, `(0, 0), (1, 0), (0, 1), (2, 0), (1, 1), (0, 2), ...`, whose length is the number of modes. Each mode is normalized to unit power, so a coefficient is that mode's amplitude relative to the others.
+
 `zernike`
-: Generates a probe as a superposition of Zernike polynomial modes inside a disk with parameter `diameter_m`. Through the builder object, callers can set the Zernike order and individual coefficients before rebuilding. The workflow parameter mapping covers the common builder parameters, but coefficient-level editing is done on the `ZernikeProbeBuilder` object.
+: Generates a probe as a superposition of Zernike polynomial modes inside a disk with parameter `diameter_m`. `zernike_coefficients` is a list of complex amplitudes in OSA/ANSI order, `(0, 0), (1, -1), (1, 1), (2, -2), (2, 0), (2, 2), ...`, whose length is the number of modes. A coefficient list is a parameter like any other, so a workflow call sets it directly, as complex values or as strings such as `"0.5-0.25j"`; the settings file stores it the same way, as a JSON array of those strings.
+
+**Estimate from Diffraction** fills the parameters a model declares as sizes, measured at its `defocus_distance_m`; today that is `disk`, `rectangular` and `super_gaussian`. A size written into a shared parameter is the value every model sharing it starts from, so estimating a disk's diameter also sets the diameter `zernike` uses.
 
 ### Mirror Presets
 
-Kirkpatrick-Baez mirror pairs register the same way zone plates do, through `registry.kb_mirrors`. None ship yet: a preset states an instrument's measured optics, and those numbers reach a reconstruction, so the presets menu stays empty until real measurements are available and the builder works from its own settings in the meantime.
+Kirkpatrick-Baez mirror pairs register the same way zone plates do, as a {py:class}`ptychodus.api.simulate.probe.KirkpatrickBaezMirrorPreset` through `registry.kb_mirrors`. Its six fields carry the `kb_mirror` parameter names, which is what lets a registered pair fill them. None ship yet: a preset states an instrument's measured optics, and those numbers reach a reconstruction, so the presets menu stays empty until real measurements are available and the builder works from its own settings in the meantime.
+
+A preset is offered to whichever model declares every field the preset names, and applying one writes those fields and leaves the rest — a defocus, an astigmatism — as they were.
 
 ### Zone Plate Presets
 
-Ptychodus registers Fresnel zone plate presets as plugins. The current presets are:
+Ptychodus registers Fresnel zone plate presets as plugins, each under the one name below, which is also what the reconstruction drivers' `--fzp-preset` takes. The current presets are:
 
 - `APS 2-ID-D`: `160e-6` m diameter, `70e-9` m outermost zone width, `60e-6` m central beamstop.
 - `CNM/APS 26-ID-C Hard X-ray Nanoprobe`: `160e-6` m diameter, `30e-9` m outermost zone width, `80e-6` m central beamstop.
@@ -206,9 +215,9 @@ Fitting a full matrix to the same shifts instead of one slope also measures the 
 
 ## Probe Mode Generation
 
-Every generated probe type uses the shared `ProbeEnsembleBuilder._build_probe_modes` path:
+Every generated probe type goes through the same `ProbeEnsembleBuilder.build` path:
 
-1. Generate one base {py:class}`ptychodus.api.probe.Probe`.
+1. Generate one base {py:class}`ptychodus.api.probe.Probe` and rescale its total intensity to `probe_photon_count`.
 2. Expand to `num_incoherent_modes` with {py:func}`ptychodus.api.simulate.probe.generate_incoherent_probe_modes`.
 3. Expand to `num_coherent_modes` OPR modes with {py:func}`ptychodus.api.simulate.probe.generate_coherent_probe_modes`.
 4. Store the final result as a `ProbeEnsemble` with array shape `(num_coherent_modes, num_incoherent_modes, height, width)`.
@@ -658,4 +667,4 @@ Pty-Chi still accepts this data through the corresponding `*_options` fields —
 - The generated probe pixel size is derived from detector geometry, detector distance, and probe energy through the product geometry. For physically meaningful generated probes, create or load the diffraction metadata before generating the product.
 - `average_pattern`, `stxm_dpc` and `paganin` depend on assembled diffraction data. Analytic generators such as `disk`, `super_gaussian`, `fresnel_zone_plate`, `random`, `grf`, `fractal_noise`, and `dead_leaves` do not require measured patterns.
 - `super_gaussian` is the closest built-in Gaussian-like probe. Ptychodus does not currently register a separate builder literally named `gaussian`.
-- In workflow parameter mappings, use the builder parameter names, not the settings-file names. For example use `diameter_m` rather than `DiskDiameterInMeters`.
+- In workflow parameter mappings, use the builder parameter names, not the settings-file names. For example use `full_width_at_half_maximum_m` rather than `FullWidthAtHalfMaximumInMeters`.

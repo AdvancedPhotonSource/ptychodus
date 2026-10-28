@@ -4,9 +4,11 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping, MutableSequence, Sequence
 from pathlib import Path
-from typing import Any, Final, Generic, TypeVar
+from typing import Any, ClassVar, Final, Generic, TypeVar
 from uuid import UUID
 import logging
+
+from pydantic import TypeAdapter, ValidationError
 
 from .observer import Observable, Observer
 
@@ -337,10 +339,18 @@ class RealSequenceParameter(ParameterBase[MutableSequence[float]]):
 
 
 class ComplexSequenceParameter(ParameterBase[MutableSequence[complex]]):
-    """Parameter holding a mutable sequence of complex values, serialized as a comma-separated string."""
+    """Parameter holding a mutable sequence of complex values.
+
+    Serialized the way pydantic writes a ``list[complex]`` as JSON, an array of complex
+    literals such as ``["1+0j", "0.5-0.25j"]``, so the settings file, the declared
+    options type and any JSON payload all spell a value the same way. Incoming values,
+    from a string or from code, accept plain numbers and complex literals alike.
+    """
+
+    _ADAPTER: ClassVar[TypeAdapter[list[complex]]] = TypeAdapter(list[complex])
 
     def __init__(self, value: Sequence[complex], parent: ComplexSequenceParameter | None) -> None:
-        super().__init__(list(value), parent)
+        super().__init__(self._ADAPTER.validate_python(list(value)), parent)
 
     def __iter__(self) -> Iterator[complex]:
         return iter(self._value)
@@ -365,28 +375,29 @@ class ComplexSequenceParameter(ParameterBase[MutableSequence[complex]]):
         return len(self._value)
 
     def set_value(self, value: Sequence[complex], *, notify: bool = True) -> None:
-        if self._value != value:
-            self._value = list(value)
+        """Store *value*, converting each element to complex.
+
+        Raises:
+            ValidationError: if an element is neither a number nor a complex literal.
+        """
+        coerced = self._ADAPTER.validate_python(list(value))
+
+        if self._value != coerced:
+            self._value = coerced
 
             if notify:
                 self.notify_observers()
 
     def get_value_as_string(self) -> str:
-        return ','.join(repr(value) for value in self)
+        return self._ADAPTER.dump_json(list(self._value)).decode()
 
     def set_value_from_string(self, value: str) -> None:
-        tmp: list[complex] = list()
-
-        for xstr in value.split(','):
-            if xstr:
-                try:
-                    x = complex(xstr)
-                except ValueError:
-                    x = float('nan') * 1j
-
-                tmp.append(x)
-
-        self.set_value(tmp)
+        try:
+            coerced = self._ADAPTER.validate_json(value)
+        except ValidationError:
+            logger.warning(f'Ignoring a malformed complex sequence: {value!r}')
+        else:
+            self.set_value(coerced)
 
     def copy(self) -> ComplexSequenceParameter:
         return ComplexSequenceParameter(self.get_value(), self)

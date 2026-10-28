@@ -6,10 +6,13 @@ values a choice accepts, and the field's own name carries the unit it is held in
 This reads that back out, one record per field, and names the settings key each
 field persists as.
 
-Flat by design. A declaration this serves is a plain object of scalars, so there is
-no nesting to project, no prefix to compose, no adapter to bridge one field onto
-several keys, and no table of exceptions. A declaration that needs any of those is
-not one ptychodus owns.
+Flat by design. A declaration this serves is a plain object of fields, so there is no
+nesting to project, no adapter to bridge one field onto several keys, and no table of
+exceptions; one of several like branches is told apart by a key prefix its caller
+names. A declaration that needs more than that is not one ptychodus owns.
+
+Anything else a field states about itself in ``json_schema_extra`` is carried through
+untouched, for whatever reads the description to interpret. This module does not.
 
 The primitives below -- reading a model's fields, its bounds, its display unit, and
 spelling a key from a field name -- are shared with the flattener, which projects
@@ -20,10 +23,10 @@ the module that outlives it.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, get_args, get_origin
 
 from ptychodus.api.constants import LengthUnit, Unit
 from ptychodus.api.parameters import Parameter, ParameterGroup
@@ -162,6 +165,7 @@ class ParameterDescription:
     choices: Sequence[str] = ()
     unit: Unit | None = None
     display_unit: LengthUnit | None = None
+    extra: Mapping[str, Any] = field(default_factory=dict)
 
 
 def _choices_of(annotation: Any) -> Sequence[str]:
@@ -197,6 +201,7 @@ def describe(
     for name, info in fields_of(type(options)).items():
         unit = Unit.of(name)
         minimum, maximum = read_bounds(info)
+        extra = info.json_schema_extra
         described.append(
             ParameterDescription(
                 name=name,
@@ -210,10 +215,16 @@ def describe(
                 choices=_choices_of(info.annotation),
                 unit=unit,
                 display_unit=read_display_unit(info, unit, name),
+                extra=dict(extra) if isinstance(extra, Mapping) else {},
             )
         )
 
     return described
+
+
+def _is_complex_list(annotation: Any) -> bool:
+    """Whether *annotation* is ``list[complex]``, the one sequence a declaration may hold."""
+    return get_origin(annotation) is list and get_args(annotation) == (complex,)
 
 
 def _create(group: ParameterGroup, described: ParameterDescription) -> Parameter[Any]:
@@ -246,6 +257,9 @@ def _create(group: ParameterGroup, described: ParameterDescription) -> Parameter
 
     if isinstance(annotation, type) and issubclass(annotation, Path):
         return group.create_path_parameter(key, Path(default))
+
+    if _is_complex_list(annotation):
+        return group.create_complex_sequence_parameter(key, default)
 
     raise UnsupportedParameterError(
         f'Cannot represent "{described.name}" ({annotation}) as a settings parameter.'
@@ -296,6 +310,10 @@ def apply(
 
         if isinstance(annotation, type) and issubclass(annotation, Enum):
             value = annotation(value)
+        elif _is_complex_list(annotation):
+            # A copy, or the target would share the live parameter's list and see later
+            # edits made to it.
+            value = list(value)
 
         setattr(target, description.name, value)
 

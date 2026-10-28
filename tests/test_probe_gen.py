@@ -32,7 +32,7 @@ from ptychodus.api.simulate.probe import (
     generate_coherent_probe_modes,
     generate_disk_probe,
     generate_fresnel_zone_plate_probe,
-    generate_hermite_probe,
+    generate_hermite_gauss_probe,
     RandomPhaseRampStrategy,
     generate_incoherent_probe_modes,
     generate_rectangular_probe,
@@ -186,18 +186,36 @@ def _probe_geometry(height_px: int = 16, width_px: int = 16) -> ProbeGeometry:
     )
 
 
-class TestGenerateHermiteProbe:
+# A grid fine and wide enough that sampling error stays well below the tolerances below:
+# both waists span many pixels, and three waists fit inside the half-width. Odd, so a
+# pixel sits exactly on each axis and exactly one waist out.
+_HG_GEOMETRY = ProbeGeometry(width_px=257, height_px=257, pixel_width_m=20e-9, pixel_height_m=20e-9)
+_HG_WAIST_X_M = 25 * 20e-9
+_HG_WAIST_Y_M = 15 * 20e-9
+
+
+def _hermite_gauss(modes: list[HermiteMode]) -> numpy.ndarray:
+    return generate_hermite_gauss_probe(
+        _HG_GEOMETRY, modes, beam_waist_x_m=_HG_WAIST_X_M, beam_waist_y_m=_HG_WAIST_Y_M
+    ).get_array()[0]
+
+
+def _power(array: numpy.ndarray) -> float:
+    return float(numpy.sum(numpy.abs(array) ** 2)) * 20e-9 * 20e-9
+
+
+class TestGenerateHermiteGaussProbe:
     def test_returns_probe_with_input_pixel_geometry(self) -> None:
         geometry = _probe_geometry()
-        result = generate_hermite_probe(
-            geometry, [HermiteMode(1.0, 0, 0)], width_m=1e-7, height_m=1e-7
+        result = generate_hermite_gauss_probe(
+            geometry, [HermiteMode(1.0, 0, 0)], beam_waist_x_m=1e-7, beam_waist_y_m=1e-7
         )
         assert result.get_pixel_geometry() == geometry.get_pixel_geometry()
 
     def test_returns_probe_with_geometry_shape(self) -> None:
         geometry = _probe_geometry(height_px=12, width_px=20)
-        result = generate_hermite_probe(
-            geometry, [HermiteMode(1.0, 1, 2)], width_m=1e-7, height_m=1e-7
+        result = generate_hermite_gauss_probe(
+            geometry, [HermiteMode(1.0, 1, 2)], beam_waist_x_m=1e-7, beam_waist_y_m=1e-7
         )
         array = result.get_array()
         # Probe packs incoherent modes in a leading dim: (num_modes, height, width).
@@ -206,56 +224,69 @@ class TestGenerateHermiteProbe:
 
     def test_empty_modes_returns_zero_probe(self) -> None:
         geometry = _probe_geometry()
-        result = generate_hermite_probe(geometry, [], width_m=1e-7, height_m=1e-7)
+        result = generate_hermite_gauss_probe(
+            geometry, [], beam_waist_x_m=1e-7, beam_waist_y_m=1e-7
+        )
         array = result.get_array()
         assert array.shape[-2:] == (geometry.height_px, geometry.width_px)
         numpy.testing.assert_array_equal(array, numpy.zeros_like(array))
 
-    def test_piston_mode_is_constant(self) -> None:
-        """A single HermiteMode(c, 0, 0) yields an array of constant value c."""
-        geometry = _probe_geometry()
-        coefficient = 1.7 - 0.3j
-        for scale_m in (1e-8, 1.0, 1e3):
-            result = generate_hermite_probe(
-                geometry, [HermiteMode(coefficient, 0, 0)], width_m=scale_m, height_m=scale_m
-            )
-            numpy.testing.assert_allclose(result.get_array(), coefficient)
-
     def test_linearity_over_modes(self) -> None:
         """Sum of probes from individual modes equals the probe from the combined list."""
-        geometry = _probe_geometry()
-        scale_m = 2e-7
         modes = [HermiteMode(2.0 + 1j, 1, 0), HermiteMode(-0.5j, 0, 2), HermiteMode(0.7, 2, 1)]
 
-        combined = generate_hermite_probe(
-            geometry, modes, width_m=scale_m, height_m=scale_m
-        ).get_array()
-        separate = sum(
-            generate_hermite_probe(geometry, [m], width_m=scale_m, height_m=scale_m).get_array()
-            for m in modes
-        )
+        combined = _hermite_gauss(modes)
+        separate = sum(_hermite_gauss([mode]) for mode in modes)
+
         numpy.testing.assert_allclose(combined, separate, atol=1e-12)
 
-    def test_width_inversely_scales_x_argument(self) -> None:
-        """For H_1(x) = 2x/width_m, doubling width_m halves the returned array."""
-        geometry = _probe_geometry()
-        mode = HermiteMode(1.0, 1, 0)
-        scale_m = 1e-7
-        small = generate_hermite_probe(
-            geometry, [mode], width_m=scale_m, height_m=scale_m
-        ).get_array()
-        large = generate_hermite_probe(
-            geometry, [mode], width_m=2.0 * scale_m, height_m=scale_m
-        ).get_array()
-        numpy.testing.assert_allclose(large, 0.5 * small, atol=1e-12)
+    def test_the_fundamental_mode_falls_to_one_over_e_squared_at_each_waist(self) -> None:
+        intensity = numpy.abs(_hermite_gauss([HermiteMode(1.0, 0, 0)])) ** 2
+        center = 128
 
-    def test_independent_axis_scaling(self) -> None:
-        """Doubling height_m halves the y-argument; x-argument is unaffected."""
-        geometry = _probe_geometry()
-        mode_y = HermiteMode(1.0, 0, 1)  # H_1(y) = 2y
-        small = generate_hermite_probe(geometry, [mode_y], width_m=1e-7, height_m=1e-7).get_array()
-        large = generate_hermite_probe(geometry, [mode_y], width_m=1e-7, height_m=2e-7).get_array()
-        numpy.testing.assert_allclose(large, 0.5 * small, atol=1e-12)
+        assert intensity[center, center + 25] / intensity[center, center] == pytest.approx(
+            numpy.exp(-2.0)
+        )
+        assert intensity[center + 15, center] / intensity[center, center] == pytest.approx(
+            numpy.exp(-2.0)
+        )
+
+    @pytest.mark.parametrize(
+        ('order_x', 'order_y'), [(m, n) for m in range(4) for n in range(4 - m)]
+    )
+    def test_each_mode_is_confined_to_a_few_waists(self, order_x: int, order_y: int) -> None:
+        """The envelope gives the probe a finite extent; bare polynomials filled the grid."""
+        intensity = numpy.abs(_hermite_gauss([HermiteMode(1.0, order_x, order_y)])) ** 2
+        coords = _HG_GEOMETRY.get_transverse_coordinates()
+        inside = (numpy.abs(coords.x_m) <= 3.0 * _HG_WAIST_X_M) & (
+            numpy.abs(coords.y_m) <= 3.0 * _HG_WAIST_Y_M
+        )
+
+        assert intensity[inside].sum() / intensity.sum() > 0.999
+
+    def test_the_first_modes_are_orthonormal(self) -> None:
+        orders = [(0, 0), (1, 0), (0, 1), (2, 0), (1, 1), (0, 2)]
+        arrays = [_hermite_gauss([HermiteMode(1.0, m, n)]) for m, n in orders]
+        gram = numpy.array([[numpy.vdot(a, b) * 20e-9 * 20e-9 for b in arrays] for a in arrays])
+
+        numpy.testing.assert_allclose(gram, numpy.eye(len(orders)), atol=1e-3)
+
+    def test_a_coefficient_scales_its_mode_power_by_its_squared_magnitude(self) -> None:
+        coefficient = 1.7 - 0.3j
+
+        power = _power(_hermite_gauss([HermiteMode(coefficient, 2, 1)]))
+
+        assert power == pytest.approx(abs(coefficient) ** 2, rel=1e-3)
+
+    @pytest.mark.parametrize(('waist_x_m', 'waist_y_m'), [(0.0, 1e-7), (1e-7, -1e-7)])
+    def test_a_non_positive_waist_is_refused(self, waist_x_m: float, waist_y_m: float) -> None:
+        with pytest.raises(ValueError, match='waists must be positive'):
+            generate_hermite_gauss_probe(
+                _probe_geometry(),
+                [HermiteMode(1.0, 0, 0)],
+                beam_waist_x_m=waist_x_m,
+                beam_waist_y_m=waist_y_m,
+            )
 
 
 # ---------------------------------------------------------------------------

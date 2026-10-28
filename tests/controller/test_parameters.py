@@ -11,15 +11,19 @@ from uuid import UUID
 
 import pytest
 
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QValidator
 from PyQt5.QtWidgets import QApplication
 
 from ptychodus.api.constants import TWO_PI, AngleUnit, LengthUnit
-from ptychodus.api.parameters import RealParameter, UUIDParameter
+from ptychodus.api.parameters import ComplexSequenceParameter, RealParameter, UUIDParameter
 from ptychodus.controller.parameters import (
     AngleParameterViewController,
+    ComplexSequenceParameterViewController,
+    ComplexSequenceTableModel,
     LengthParameterViewController,
     UUIDLineEditParameterViewController,
+    create_parameter_view_controller,
 )
 
 
@@ -261,3 +265,74 @@ class TestUUID:
         view_controller._widget.setText('123e4567-e89b-12d3-a456-426614174000')
         view_controller._widget.editingFinished.emit()
         assert parameter.get_value() == UUID('123e4567-e89b-12d3-a456-426614174000')
+
+
+class TestComplexSequenceTable:
+    """A coefficient list edited as amplitude and phase in turns, one row per value."""
+
+    def _model(
+        self, values: list[complex]
+    ) -> tuple[ComplexSequenceParameter, ComplexSequenceTableModel]:
+        parameter = ComplexSequenceParameter(values, None)
+        return parameter, ComplexSequenceTableModel(parameter)
+
+    def test_rows_show_amplitude_and_phase_in_turns(self, qapp: QApplication) -> None:
+        _, model = self._model([2j])
+
+        assert model.data(model.index(0, 0)) == '2'
+        assert model.data(model.index(0, 1)) == '0.25'
+        assert model.headerData(0, Qt.Orientation.Vertical) == '0'
+
+    def test_an_amplitude_edit_keeps_the_phase(self, qapp: QApplication) -> None:
+        parameter, model = self._model([2j])
+
+        assert model.setData(model.index(0, 0), '3')
+
+        assert parameter[0] == pytest.approx(3j)
+
+    def test_a_phase_edit_in_turns_keeps_the_amplitude(self, qapp: QApplication) -> None:
+        parameter, model = self._model([2 + 0j])
+
+        assert model.setData(model.index(0, 1), '0.5')
+
+        assert parameter[0] == pytest.approx(-2 + 0j)
+
+    def test_a_zero_takes_an_amplitude_without_becoming_nan(self, qapp: QApplication) -> None:
+        parameter, model = self._model([0j])
+
+        assert model.setData(model.index(0, 0), '1.5')
+
+        assert parameter[0] == pytest.approx(1.5 + 0j)
+
+    def test_a_value_that_is_not_a_finite_number_is_refused(self, qapp: QApplication) -> None:
+        parameter, model = self._model([1 + 0j])
+
+        assert not model.setData(model.index(0, 0), 'abc')
+        assert not model.setData(model.index(0, 1), 'nan')
+        assert parameter.get_value() == [1 + 0j]
+
+    def test_a_new_row_is_zero_and_the_last_row_stays(self, qapp: QApplication) -> None:
+        parameter, model = self._model([1 + 0j])
+
+        model.append_row()
+        assert parameter.get_value() == [1 + 0j, 0j]
+
+        model.remove_last_row()
+        model.remove_last_row()
+        assert parameter.get_value() == [1 + 0j]
+
+    def test_the_remove_button_is_disabled_at_one_row(self, qapp: QApplication) -> None:
+        parameter = ComplexSequenceParameter([1 + 0j], None)
+        view_controller = ComplexSequenceParameterViewController(parameter)
+
+        assert not view_controller._remove_button.isEnabled()
+
+        parameter.set_value([1 + 0j, 0.5j])
+        assert view_controller._remove_button.isEnabled()
+
+    def test_the_dispatcher_picks_the_table(self, qapp: QApplication) -> None:
+        parameter = ComplexSequenceParameter([1 + 0j], None)
+
+        assert isinstance(
+            create_parameter_view_controller(parameter), ComplexSequenceParameterViewController
+        )

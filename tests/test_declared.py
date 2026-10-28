@@ -10,12 +10,20 @@ back to defaults, which looks identical to loading correctly.
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Any
 
 import pytest
 from pydantic import BaseModel, Field
 
 from ptychodus.api.constants import LengthUnit, Unit
-from ptychodus.model.declared import ParameterDescription, describe, render_key
+from ptychodus.api.parameters import ComplexSequenceParameter, Parameter, ParameterGroup
+from ptychodus.model.declared import (
+    ParameterDescription,
+    declare_in,
+    describe,
+    render_key,
+    restore,
+)
 
 
 class TestRenderKey:
@@ -181,3 +189,44 @@ class TestPrefix:
             epochs: int = 1
 
         assert _by_name(Stage())['epochs'].key == 'Epochs'
+
+
+class _CoefficientOptions(BaseModel):
+    scale_m: float = Field(1e-6, gt=0.0, json_schema_extra={'probe_extent': 'disk_diameter_m'})
+    coefficients: list[complex] = Field(default_factory=lambda: [1 + 0j, 0.5j])
+
+
+class TestComplexListsAndExtras:
+    """A coefficient list persists as one parameter, and field extras pass through."""
+
+    def _declared(
+        self,
+    ) -> tuple[_CoefficientOptions, list[ParameterDescription], dict[str, Parameter[Any]]]:
+        options = _CoefficientOptions()
+        described = list(describe(options))
+        group = ParameterGroup()
+        return options, described, dict(declare_in(group, described))
+
+    def test_a_complex_list_becomes_a_complex_sequence_parameter(self) -> None:
+        _, _, parameters = self._declared()
+        parameter = parameters['Coefficients']
+
+        assert isinstance(parameter, ComplexSequenceParameter)
+        assert parameter.get_value() == [1 + 0j, 0.5j]
+
+    def test_restore_carries_the_live_list_without_sharing_it(self) -> None:
+        options, described, parameters = self._declared()
+        parameters['Coefficients'].set_value([2j])
+
+        restored = restore(options, described, parameters)
+        parameters['Coefficients'].set_value([3j])
+
+        assert restored.coefficients == [2j]
+        assert options.coefficients == [1 + 0j, 0.5j]
+
+    def test_field_extras_are_carried_through_untouched(self) -> None:
+        _, described, _ = self._declared()
+        by_name = {description.name: description for description in described}
+
+        assert by_name['scale_m'].extra == {'probe_extent': 'disk_diameter_m'}
+        assert by_name['coefficients'].extra == {}

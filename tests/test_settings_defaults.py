@@ -70,6 +70,7 @@ def _build_registry() -> SettingsRegistry:
 # read as deleted the day the generators stopped being hand-written.
 _GENERATORS_BY_GROUP: Mapping[str, Callable[[PluginRegistry], PluginChooser[Any]]] = {
     'ProbePositions': lambda plugins: plugins.probe_position_generators,
+    'Probe': lambda plugins: plugins.probe_generators,
 }
 
 
