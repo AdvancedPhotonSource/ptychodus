@@ -288,6 +288,31 @@ def _read_product(
     )
 
 
+def _give_the_model_unit_weights(model: Any, num_positions: int, device: str) -> None:
+    """Work around a device-less tensor in cdtools' forward model.
+
+    With no weights set, ``FancyPtycho.forward`` builds its per-shot weights as
+    ``torch.ones(len(index))``, which lands on the CPU whatever device the model
+    is on, and then multiplies it by the probes. Every reconstruction ptychodus
+    starts leaves weights unset, so on a CUDA host every run raises before it
+    produces anything. Present in cdtools through 0.3.3.dev0, and flagged in a
+    comment in the function itself.
+
+    Supplying the weights takes the other branch of that same ``if``, where the
+    weights are read from the model and so carry its device. A vector of ones
+    through a stable coherent illumination is the arithmetic the buggy branch
+    was doing, so nothing about the reconstruction changes.
+
+    A plain tensor rather than a ``Parameter``, so it joins no optimizer group
+    and nothing is refined that was not before. Delete this once cdtools builds
+    those ones on the model's device.
+    """
+    import torch
+
+    if getattr(model, 'weights', None) is None:
+        model.weights = torch.ones(num_positions, device=device)
+
+
 def run_reconstruct(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None:
     """Child entry point. Runs every stage and streams a ReconstructOutput as it goes."""
     input_ = payload.require_input()
@@ -302,6 +327,7 @@ def run_reconstruct(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None
     dataset = _build_dataset(input_, frame)
     model.to(device=device)
     dataset.get_as(device=device)
+    _give_the_model_unit_weights(model, len(input_.product.probe_positions), device)
 
     stages = options.schedule.stages()
     num_epochs = sum(stage.epochs for stage in stages)

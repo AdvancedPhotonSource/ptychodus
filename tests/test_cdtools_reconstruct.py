@@ -43,7 +43,11 @@ from ptychodus.plugins.cdtools._subprocess import (  # noqa: E402
 )
 from ptychodus.plugins.cdtools.gauge import ProbeGauge  # noqa: E402
 from ptychodus.plugins.cdtools.geometry import build_frame  # noqa: E402
-from ptychodus.plugins.cdtools.options import CDToolsOptimizer, CDToolsOptions  # noqa: E402
+from ptychodus.plugins.cdtools.options import (  # noqa: E402
+    CDToolsDevice,
+    CDToolsOptimizer,
+    CDToolsOptions,
+)
 from ptychodus.plugins.cdtools.reconstructor import build_reconstructor  # noqa: E402
 
 _UNIT_GAUGE = ProbeGauge(to_cdtools=1.0, expected_factor=1.0, sampled_positions=0)
@@ -77,6 +81,11 @@ def _short_options(**refinement: bool) -> CDToolsOptions:
     options.schedule.stage2.epochs = 2
     options.schedule.stage3.epochs = 0
     options.optimizer.num_sync_epochs = 2
+    # These tests run the child's work in this process, so the device is pinned
+    # rather than resolved: a run that took a CUDA device would leave a context
+    # behind in a parent that is supposed never to hold one, and would make the
+    # result depend on whether the machine running the tests has a GPU.
+    options.optimizer.device = CDToolsDevice.CPU
 
     for name, value in refinement.items():
         setattr(options.refinement, name, value)
