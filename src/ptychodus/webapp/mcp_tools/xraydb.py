@@ -1,10 +1,4 @@
-"""Optional MCP sub-server exposing xraydb reference data.
-
-Mounted with namespace 'xraydb' by :func:`ptychodus.webapp.mcp_server.create_mcp_server`
-when the ``xraydb`` optional extra is installed. Import-guarded: ``import xraydb`` at
-module top means this module fails to import when the extra is absent, and the parent
-skips mounting.
-"""
+"""MCP sub-server exposing xraydb reference data, mounted with namespace 'xraydb'."""
 
 from __future__ import annotations
 

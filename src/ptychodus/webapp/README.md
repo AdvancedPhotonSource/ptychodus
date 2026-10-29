@@ -27,8 +27,7 @@ Panels with no web counterpart are the ones that write or dispatch: Settings, Pr
 ## Install
 
 ```sh
-uv sync --extra webapp              # required
-uv sync --extra webapp --extra xraydb   # optional X-ray reference-data MCP sub-server
+uv sync --extra webapp
 ```
 
 The shipped wheel already contains the compiled frontend. Rebuilding the UI in place is only needed when editing `ui/src/*.ts` — see [Rebuild the frontend](#rebuild-the-frontend).

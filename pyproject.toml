@@ -82,8 +82,8 @@ webapp = [
     "pillow>=10.3",
     "pydantic-settings>=2.5",
     "python-multipart>=0.0.18",
+    "xraydb>=4.5",
 ]
-xraydb = ["xraydb>=4.5"]
 
 [tool.setuptools.package-data]
 "ptychodus" = ["py.typed"]

@@ -25,6 +25,7 @@ from ptychodus.webapp.db import repositories as repo
 from ptychodus.webapp.db.base import IngestState
 from ptychodus.webapp.db.models import Campaign, DerivationEdge, Diffraction, Fluorescence, Product
 from ptychodus.webapp.db.session import SessionProvider
+from ptychodus.webapp.mcp_tools.xraydb import create_xraydb_mcp
 from ptychodus.webapp.rendering import (
     OptionsRead,
     RenderParamsError,
@@ -662,12 +663,6 @@ def create_mcp_server() -> FastMCP:
             raise ToolError(str(exc)) from exc
         return MCPImage(data=product_to_png_bytes(vp), format='png')
 
-    try:
-        from ptychodus.webapp.mcp_tools.xraydb import create_xraydb_mcp
-
-        mcp.mount(create_xraydb_mcp(), namespace='xraydb')
-        logger.info('mounted xraydb MCP sub-server (tools namespaced as xraydb_*)')
-    except ImportError:
-        logger.debug('xraydb not installed; xraydb MCP tools disabled')
+    mcp.mount(create_xraydb_mcp(), namespace='xraydb')
 
     return mcp
