@@ -1,138 +1,508 @@
-"""Settings-backed parameter adapters over the plugin choosers."""
+"""Observable typed parameters and hierarchical parameter groups for settings management."""
 
 from __future__ import annotations
-from collections.abc import Iterator
-from typing import Generic, TypeVar
+from abc import ABC, abstractmethod
+from collections.abc import Iterator, Mapping, MutableSequence, Sequence
+from pathlib import Path
+from typing import Any, ClassVar, Final, Generic, TypeVar
+from uuid import UUID
+import logging
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parameters import Parameter, StringParameter
-from ptychodus.api.plugins import Plugin, PluginChooser
+from pydantic import TypeAdapter, ValidationError
+
+from .observer import Observable, Observer
 
 __all__ = [
-    'PluginChooserParameter',
+    'Parameter',
+    'ParameterGroup',
 ]
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar('T')
 
 
-class PluginChooserParameter(Parameter[str], Observer, Generic[T]):
-    """Parameter[str] view of a PluginChooser whose value space is plugin display names.
+class Parameter(ABC, Generic[T], Observable):
+    """Abstract typed parameter that notifies observers when its value changes."""
 
-    A chooser has two name spaces: the human-readable ``display_name`` a person
-    chooses by and the ``simple_name`` persisted to settings. This adapter is the
-    single place that translates between them. Its own value space is display
-    names, so an editor bound to it round trips without knowing there are two.
-
-    Passing *settings* additionally binds the chooser to that settings parameter: the
-    persisted name selects a plugin at construction and is rewritten to its canonical
-    simple name, and every later selection change writes the simple name back. A
-    persisted name that matches no registered plugin is left alone rather than
-    reconciled, because a plugin can be missing merely because its optional
-    dependency failed to import this run.
-
-    Note that :meth:`get_value` raises ``LookupError`` when no plugins are registered,
-    so this must not be read before ``PluginRegistry.load_plugins()`` has run.
-    """
-
-    def __init__(self, chooser: PluginChooser[T], settings: StringParameter | None = None) -> None:
+    def __init__(self, parent: Parameter[T] | None = None) -> None:
         super().__init__()
-        self._chooser = chooser
-        self._settings = settings
-        self._selected: Plugin[T] | None = None
-        self._suppress_notify = False
+        self._parent = parent
 
-        if settings is not None:
-            self._apply_settings()
-            settings.add_observer(self)
+    @abstractmethod
+    def get_value(self) -> T:
+        pass
 
-        self._selected = chooser.get_current_plugin() if chooser else None
-        chooser.add_observer(self)
+    @abstractmethod
+    def set_value(self, value: T, *, notify: bool = True) -> None:
+        pass
 
-    def choices(self) -> Iterator[str]:
-        """Yield every value this parameter accepts, by display name."""
-        for plugin in self._chooser:
-            yield plugin.display_name
+    @abstractmethod
+    def get_value_as_string(self) -> str:
+        pass
 
-    def get_strategy(self) -> T:
-        return self._chooser.get_current_plugin().strategy
+    @abstractmethod
+    def set_value_from_string(self, value: str) -> None:
+        pass
 
-    def get_value(self) -> str:
-        return self._chooser.get_current_plugin().display_name
+    @abstractmethod
+    def copy(self) -> Parameter[T]:
+        pass
 
-    def set_value(self, value: str, *, notify: bool = True) -> None:
-        # The chooser notifies us back through _update; suppress that relay rather
-        # than notifying here, so a no-op selection stays silent either way. Only the
-        # relay is suppressed: persistence must not depend on a view flag.
-        self._suppress_notify = not notify
+    def sync_value_to_parent(self) -> None:
+        if self._parent is None:
+            logger.warning('sync_value_to_parent: parent is None!')
+        else:
+            self._parent.set_value(self.get_value())
 
-        try:
-            self._chooser.set_current_plugin(value)
-        finally:
-            self._suppress_notify = False
+    def sync_value_from_parent(self) -> None:
+        if self._parent is None:
+            logger.warning('sync_value_from_parent: parent is None!')
+        else:
+            self.set_value(self._parent.get_value())
+
+
+class ParameterBase(Parameter[T]):
+    """Concrete Parameter base that stores a value and notifies on change."""
+
+    def __init__(self, value: T, parent: Parameter[T] | None) -> None:
+        super().__init__(parent)
+        self._value = value
+
+    def get_value(self) -> T:
+        return self._value
+
+    def set_value(self, value: T, *, notify: bool = True) -> None:
+        if self._value != value:
+            self._value = value
+
+            if notify:
+                self.notify_observers()
 
     def get_value_as_string(self) -> str:
-        return self.get_value()
+        return repr(self._value)
+
+
+class StringParameter(ParameterBase[str]):
+    """Parameter holding a str value."""
+
+    def __init__(self, value: str, parent: StringParameter | None) -> None:
+        super().__init__(value, parent)
 
     def set_value_from_string(self, value: str) -> None:
-        self.set_value(value)
+        self.set_value(str(value))
 
-    def copy(self) -> Parameter[str]:
-        """Return an unbound view of the same chooser; the copy does not persist."""
-        return PluginChooserParameter(self._chooser)
+    def get_value_as_string(self) -> str:
+        return str(self._value)
 
-    def _apply_settings(self) -> None:
-        settings = self._settings
+    def copy(self) -> StringParameter:
+        return StringParameter(self.get_value(), self)
 
-        if settings is None:
-            return
 
-        name = settings.get_value()
-        plugin = self._chooser.find_plugin(name)
-        self._chooser.set_current_plugin(name)
+class PathParameter(ParameterBase[Path]):
+    """Parameter holding a Path value, with optional prefix-remapping on save."""
 
-        if plugin is not None:
-            # Unconditional, so that a display name normalizes to its simple name even
-            # when it already resolves to the current selection. ParameterBase guards
-            # against no-op writes, so this does not notify unless the value changed.
-            settings.set_value(plugin.simple_name)
+    def __init__(self, value: Path, parent: PathParameter | None) -> None:
+        super().__init__(value, parent)
 
-    def _reconcile(self) -> None:
-        """Settle the chooser and the settings parameter against each other.
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(Path(value))
 
-        Observable notifications carry no payload, so the cached selection is what
-        distinguishes "the selection moved" from "a plugin was registered". Only the
-        former may write back; the latter must leave an unresolved setting intact.
+    def get_value_as_string(self) -> str:
+        return str(self._value)
+
+    def copy(self) -> PathParameter:
+        return PathParameter(self.get_value(), self)
+
+
+class UUIDParameter(ParameterBase[UUID]):
+    """Parameter holding a UUID value."""
+
+    def __init__(self, value: UUID, parent: UUIDParameter | None) -> None:
+        super().__init__(value, parent)
+
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(UUID(value))
+
+    def get_value_as_string(self) -> str:
+        return str(self._value)
+
+    def copy(self) -> UUIDParameter:
+        return UUIDParameter(self.get_value(), self)
+
+
+class BooleanParameter(ParameterBase[bool]):
+    """Parameter holding a bool value, parseable from common truth strings."""
+
+    TRUE_VALUES: Final = ('1', 'true', 't', 'yes', 'y')
+
+    def __init__(self, value: bool, parent: BooleanParameter | None) -> None:
+        super().__init__(value, parent)
+
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(value.lower() in BooleanParameter.TRUE_VALUES)
+
+    def copy(self) -> BooleanParameter:
+        return BooleanParameter(self.get_value(), self)
+
+
+class IntegerParameter(ParameterBase[int]):
+    """Parameter holding an int value with optional inclusive minimum and maximum bounds."""
+
+    def __init__(
+        self,
+        value: int,
+        parent: IntegerParameter | None,
+        *,
+        minimum: int | None = None,
+        maximum: int | None = None,
+    ) -> None:
+        super().__init__(value, parent)
+        self._minimum = minimum
+        self._maximum = maximum
+
+    def get_minimum(self) -> int | None:
+        return self._minimum
+
+    def get_maximum(self) -> int | None:
+        return self._maximum
+
+    def get_value(self) -> int:
+        value = super().get_value()
+
+        if self._minimum is not None:
+            value = max(self._minimum, value)
+
+        if self._maximum is not None:
+            value = min(value, self._maximum)
+
+        return value
+
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(int(value))
+
+    def copy(self) -> IntegerParameter:
+        return IntegerParameter(
+            self.get_value(), self, minimum=self.get_minimum(), maximum=self.get_maximum()
+        )
+
+
+class RealParameter(ParameterBase[float]):
+    """Parameter holding a float value with optional inclusive minimum and maximum bounds."""
+
+    def __init__(
+        self,
+        value: float,
+        parent: RealParameter | None,
+        *,
+        minimum: float | None = None,
+        maximum: float | None = None,
+    ) -> None:
+        super().__init__(value, parent)
+        self._minimum = minimum
+        self._maximum = maximum
+
+    def get_minimum(self) -> float | None:
+        return self._minimum
+
+    def get_maximum(self) -> float | None:
+        return self._maximum
+
+    def get_value(self) -> float:
+        value = super().get_value()
+
+        if self._minimum is not None:
+            value = max(self._minimum, value)
+
+        if self._maximum is not None:
+            value = min(value, self._maximum)
+
+        return value
+
+    def set_value(self, value: float, *, notify: bool = True) -> None:
+        super().set_value(float(value), notify=notify)
+
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(float(value))
+
+    def copy(self) -> RealParameter:
+        return RealParameter(
+            self.get_value(), self, minimum=self.get_minimum(), maximum=self.get_maximum()
+        )
+
+
+class IntegerSequenceParameter(ParameterBase[MutableSequence[int]]):
+    """Parameter holding a mutable sequence of int values, serialized as a comma-separated string."""
+
+    def __init__(self, value: Sequence[int], parent: IntegerSequenceParameter | None) -> None:
+        super().__init__(list(value), parent)
+
+    def __iter__(self) -> Iterator[int]:
+        return iter(self._value)
+
+    def __getitem__(self, index: int) -> int:
+        return self._value[index]
+
+    def __setitem__(self, index: int, value: int) -> None:
+        if self._value[index] != value:
+            self._value[index] = value
+            self.notify_observers()
+
+    def __delitem__(self, index: int) -> None:
+        del self._value[index]
+        self.notify_observers()
+
+    def insert(self, index: int, value: int) -> None:
+        self._value.insert(index, value)
+        self.notify_observers()
+
+    def __len__(self) -> int:
+        return len(self._value)
+
+    def set_value(self, value: Sequence[int], *, notify: bool = True) -> None:
+        if self._value != value:
+            self._value = list(value)
+
+            if notify:
+                self.notify_observers()
+
+    def get_value_as_string(self) -> str:
+        return ','.join(repr(value) for value in self)
+
+    def set_value_from_string(self, value: str) -> None:
+        new_value: list[int] = list()
+
+        for xstr in value.split(','):
+            if xstr:
+                new_value.append(int(xstr))
+
+        self.set_value(new_value)
+
+    def copy(self) -> IntegerSequenceParameter:
+        return IntegerSequenceParameter(self.get_value(), self)
+
+
+class RealSequenceParameter(ParameterBase[MutableSequence[float]]):
+    """Parameter holding a mutable sequence of float values, serialized as a comma-separated string."""
+
+    def __init__(self, value: Sequence[float], parent: RealSequenceParameter | None) -> None:
+        super().__init__(list(value), parent)
+
+    def __iter__(self) -> Iterator[float]:
+        return iter(self._value)
+
+    def __getitem__(self, index: int) -> float:
+        return self._value[index]
+
+    def __setitem__(self, index: int, value: float) -> None:
+        if self._value[index] != value:
+            self._value[index] = value
+            self.notify_observers()
+
+    def __delitem__(self, index: int) -> None:
+        del self._value[index]
+        self.notify_observers()
+
+    def insert(self, index: int, value: float) -> None:
+        self._value.insert(index, value)
+        self.notify_observers()
+
+    def __len__(self) -> int:
+        return len(self._value)
+
+    def set_value(self, value: Sequence[float], *, notify: bool = True) -> None:
+        if self._value != value:
+            self._value = list(value)
+
+            if notify:
+                self.notify_observers()
+
+    def get_value_as_string(self) -> str:
+        return ','.join(repr(value) for value in self)
+
+    def set_value_from_string(self, value: str) -> None:
+        tmp: list[float] = list()
+
+        for xstr in value.split(','):
+            if xstr:
+                try:
+                    x = float(xstr)
+                except ValueError:
+                    x = float('nan')
+
+                tmp.append(x)
+
+        self.set_value(tmp)
+
+    def copy(self) -> RealSequenceParameter:
+        return RealSequenceParameter(self.get_value(), self)
+
+
+class ComplexSequenceParameter(ParameterBase[MutableSequence[complex]]):
+    """Parameter holding a mutable sequence of complex values.
+
+    Serialized the way pydantic writes a ``list[complex]`` as JSON, an array of complex
+    literals such as ``["1+0j", "0.5-0.25j"]``, so the settings file, the declared
+    options type and any JSON payload all spell a value the same way. Incoming values,
+    from a string or from code, accept plain numbers and complex literals alike.
+    """
+
+    _ADAPTER: ClassVar[TypeAdapter[list[complex]]] = TypeAdapter(list[complex])
+
+    def __init__(self, value: Sequence[complex], parent: ComplexSequenceParameter | None) -> None:
+        super().__init__(self._ADAPTER.validate_python(list(value)), parent)
+
+    def __iter__(self) -> Iterator[complex]:
+        return iter(self._value)
+
+    def __getitem__(self, index: int) -> complex:
+        return self._value[index]
+
+    def __setitem__(self, index: int, value: complex) -> None:
+        if self._value[index] != value:
+            self._value[index] = value
+            self.notify_observers()
+
+    def __delitem__(self, index: int) -> None:
+        del self._value[index]
+        self.notify_observers()
+
+    def insert(self, index: int, value: complex) -> None:
+        self._value.insert(index, value)
+        self.notify_observers()
+
+    def __len__(self) -> int:
+        return len(self._value)
+
+    def set_value(self, value: Sequence[complex], *, notify: bool = True) -> None:
+        """Store *value*, converting each element to complex.
+
+        Raises:
+            ValidationError: if an element is neither a number nor a complex literal.
         """
-        settings = self._settings
-        plugin = self._chooser.get_current_plugin() if self._chooser else None
+        coerced = self._ADAPTER.validate_python(list(value))
 
-        if plugin is None or settings is None:
-            self._selected = plugin
-            return
+        if self._value != coerced:
+            self._value = coerced
 
-        if self._selected is None:
-            # The chooser just gained its first plugin: the selection came into
-            # existence rather than moving, so the fallback must not be persisted.
-            self._selected = plugin
+            if notify:
+                self.notify_observers()
 
-        if plugin is not self._selected:
-            self._selected = plugin
-            settings.set_value(plugin.simple_name)
-            return
+    def get_value_as_string(self) -> str:
+        return self._ADAPTER.dump_json(list(self._value)).decode()
 
-        # The selection held, so this was a registration. If it has just made the
-        # persisted name resolvable, honor it now — set_current_plugin re-enters
-        # here through the chooser's notification to finish the write-back.
-        desired = self._chooser.find_plugin(settings.get_value())
+    def set_value_from_string(self, value: str) -> None:
+        try:
+            coerced = self._ADAPTER.validate_json(value)
+        except ValidationError:
+            logger.warning(f'Ignoring a malformed complex sequence: {value!r}')
+        else:
+            self.set_value(coerced)
 
-        if desired is not None and desired is not plugin:
-            self._apply_settings()
+    def copy(self) -> ComplexSequenceParameter:
+        return ComplexSequenceParameter(self.get_value(), self)
+
+
+class ParameterGroup(Observable, Observer):
+    """Hierarchical container of named Parameters and nested ParameterGroups."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._parameters: dict[str, Parameter[Any]] = dict()
+        self._groups: dict[str, ParameterGroup] = dict()
+
+    def parameters(self) -> Mapping[str, Parameter[Any]]:
+        return self._parameters
+
+    def _add_parameter(self, name: str, parameter: Parameter[Any]) -> None:
+        if self._parameters.setdefault(name, parameter) is parameter:
+            parameter.add_observer(self)
+        else:
+            raise ValueError(f'Parameter "{name}" already exists!')
+
+    def create_string_parameter(self, name: str, value: str) -> StringParameter:
+        parameter = StringParameter(value, parent=None)
+        self._add_parameter(name, parameter)
+        return parameter
+
+    def create_path_parameter(self, name: str, value: Path) -> PathParameter:
+        parameter = PathParameter(value, parent=None)
+        self._add_parameter(name, parameter)
+        return parameter
+
+    def create_uuid_parameter(self, name: str, value: UUID) -> UUIDParameter:
+        parameter = UUIDParameter(value, parent=None)
+        self._add_parameter(name, parameter)
+        return parameter
+
+    def create_boolean_parameter(self, name: str, value: bool) -> BooleanParameter:
+        parameter = BooleanParameter(value, parent=None)
+        self._add_parameter(name, parameter)
+        return parameter
+
+    def create_integer_parameter(
+        self, name: str, value: int, *, minimum: int | None = None, maximum: int | None = None
+    ) -> IntegerParameter:
+        parameter = IntegerParameter(value, parent=None, minimum=minimum, maximum=maximum)
+        self._add_parameter(name, parameter)
+        return parameter
+
+    def create_integer_sequence_parameter(
+        self, name: str, value: Sequence[int]
+    ) -> IntegerSequenceParameter:
+        parameter = IntegerSequenceParameter(value, parent=None)
+        self._add_parameter(name, parameter)
+        return parameter
+
+    def create_real_parameter(
+        self, name: str, value: float, *, minimum: float | None = None, maximum: float | None = None
+    ) -> RealParameter:
+        parameter = RealParameter(value, parent=None, minimum=minimum, maximum=maximum)
+        self._add_parameter(name, parameter)
+        return parameter
+
+    def create_real_sequence_parameter(
+        self, name: str, value: Sequence[float]
+    ) -> RealSequenceParameter:
+        parameter = RealSequenceParameter(value, parent=None)
+        self._add_parameter(name, parameter)
+        return parameter
+
+    def create_complex_sequence_parameter(
+        self, name: str, value: Sequence[complex]
+    ) -> ComplexSequenceParameter:
+        parameter = ComplexSequenceParameter(value, parent=None)
+        self._add_parameter(name, parameter)
+        return parameter
+
+    def groups(self) -> Mapping[str, ParameterGroup]:
+        return self._groups
+
+    def _add_group(self, name: str, group: ParameterGroup, *, observe: bool = False) -> None:
+        if self._groups.setdefault(name, group) is group:
+            if observe:
+                group.add_observer(self)
+        else:
+            raise ValueError(f'Group "{name}" already exists!')
+
+    def _remove_group(self, name: str) -> None:
+        try:
+            group = self._groups.pop(name)
+        except KeyError:
+            pass
+        else:
+            group.remove_observer(self)
+
+    def create_group(self, name: str) -> ParameterGroup:
+        group = ParameterGroup()
+        self._add_group(name, group)
+        return group
+
+    def get_group(self, name: str) -> ParameterGroup:
+        return self._groups[name]
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._settings:
-            self._apply_settings()
-        elif observable is self._chooser:
-            self._reconcile()
-
-            if not self._suppress_notify:
-                self.notify_observers()
+        if observable in self._parameters.values():
+            self.notify_observers()
+        elif observable in self._groups.values():
+            self.notify_observers()

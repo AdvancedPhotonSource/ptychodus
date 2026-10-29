@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QDialog, QFormLayout, QGroupBox, QMessageBox, QSpinBox, QWidget
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parameters import BooleanParameter
+from ptychodus.model.observer import Observable, Observer
+from ptychodus.model.parameters import BooleanParameter
 
 from ...model.product.object import (
     FromFileObjectBuilder,

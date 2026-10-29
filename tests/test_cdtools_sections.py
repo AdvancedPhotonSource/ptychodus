@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.declared import declare_in, describe, restore
 from ptychodus.model.processing.core import _BRANCHES_BY_LIBRARY
 from ptychodus.model.processing.parameter_store import OptionsBranch

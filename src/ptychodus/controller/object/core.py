@@ -4,7 +4,7 @@ import logging
 from PyQt5.QtCore import QModelIndex, QStringListModel
 from PyQt5.QtWidgets import QAbstractItemView, QDialog, QStatusBar
 
-from ptychodus.api.observer import SequenceObserver
+from ptychodus.model.observer import SequenceObserver
 
 from ...model.analysis import FourierAnalyzer, FourierRingCorrelator, XMCDAnalyzer
 from ...model.product import ObjectAPI, ObjectRepository

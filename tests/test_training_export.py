@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.plugins import PluginCatalog, PluginList
 from ptychodus.api.reconstruct import (
     NullReconstructor,
     ReconstructInput,
@@ -33,21 +33,21 @@ class _StubWriter(TrainingDataFileWriter):
         self.written.append((file_path, parameters))
 
 
-def _writers() -> tuple[PluginChooser[TrainingDataFileWriter], dict[str, _StubWriter]]:
+def _writers() -> tuple[PluginCatalog[TrainingDataFileWriter], dict[str, _StubWriter]]:
     stubs = {
         'CXI': _StubWriter('CXI Files', '.cxi'),
         'Native': _StubWriter('Native Files', '.npz'),
     }
-    chooser = PluginChooser[TrainingDataFileWriter]()
+    writers = PluginList[TrainingDataFileWriter]()
 
     for simple_name, stub in stubs.items():
-        chooser.register_plugin(stub, simple_name=simple_name)
+        writers.register_plugin(stub, simple_name=simple_name)
 
-    return chooser, stubs
+    return writers, stubs
 
 
 def _processing_api(
-    writers: PluginChooser[TrainingDataFileWriter], *, library: str = 'Native'
+    writers: PluginCatalog[TrainingDataFileWriter], *, library: str = 'Native'
 ) -> ProcessingAPI:
     algorithm_parameter = MagicMock()
     # Not trainable: export must not depend on what is selected being able to train.

@@ -36,7 +36,7 @@ from ptychodus.api.fluorescence import (
     FluorescenceEnhancerInput,
 )
 from ptychodus.api.io import load_product
-from ptychodus.api.plugins import Plugin, PluginChooser, PluginRegistry
+from ptychodus.api.plugins import Plugin, PluginCatalog, PluginRegistry
 from ptychodus.cli import add_log_level_argument, configure_logging
 
 logger = logging.getLogger('enhance')
@@ -157,7 +157,7 @@ class _PrintOptionsAction(argparse.Action):
         option_strings: Sequence[str],
         dest: str,
         *,
-        enhancers: PluginChooser[FluorescenceEnhancer],
+        enhancers: PluginCatalog[FluorescenceEnhancer],
         **kwargs: Any,
     ) -> None:
         self._enhancers = enhancers

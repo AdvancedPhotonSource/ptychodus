@@ -3,14 +3,14 @@ import logging
 
 import numpy
 
-from ptychodus.api.observer import Observable
-from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
     ScanGeometry,
     calculate_scan_geometry,
 )
 
+from ...observer import Observable
+from ...parameters import ParameterGroup
 from .builder import FromMemoryProbePositionsBuilder, ProbePositionsBuilder
 from .settings import ProbePositionsSettings
 

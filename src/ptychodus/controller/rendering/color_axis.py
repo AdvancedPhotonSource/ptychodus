@@ -1,6 +1,6 @@
 import logging
 
-from ptychodus.api.parameters import ParameterGroup
+from ptychodus.model.parameters import ParameterGroup
 
 logger = logging.getLogger(__name__)
 

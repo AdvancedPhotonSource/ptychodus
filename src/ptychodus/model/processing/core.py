@@ -1,16 +1,16 @@
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
-from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.plugins import PluginCatalog
 from ptychodus.api.reconstruct import (
     ReconstructorLibrary,
     SubprocessReconstructor,
     TrainingDataFileWriter,
 )
-from ptychodus.api.settings import SettingsRegistry
 
-from ..parameters import PluginChooserParameter
+from ..plugins import PluginChooser, PluginChooserParameter
 from ..product import ProductAPI
+from ..settings import SettingsRegistry
 from ..task_manager import TaskManager
 from .api import ProcessingAPI, ProcessingAlgorithmParameter
 from . import _ptychi_sections, _ptycho_fm_sections
@@ -88,7 +88,7 @@ class ProcessingCore:
         settings_registry: SettingsRegistry,
         product_api: ProductAPI,
         reconstructor_libraries: PluginChooser[ReconstructorLibrary],
-        training_data_file_writers: PluginChooser[TrainingDataFileWriter],
+        training_data_file_writers: PluginCatalog[TrainingDataFileWriter],
     ) -> None:
         self._settings = ProcessingSettings(settings_registry)
         self._task_monitor = ProcessingTaskMonitor(task_manager)

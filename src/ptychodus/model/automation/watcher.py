@@ -6,8 +6,7 @@ import watchdog.events
 from watchdog.observers.polling import PollingObserver
 import watchdog.observers
 
-from ptychodus.api.observer import Observable, Observer
-
+from ..observer import Observable, Observer
 from .buffer import PendingFileBuffer
 from .settings import AutomationSettings
 

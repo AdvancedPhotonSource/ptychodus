@@ -19,11 +19,11 @@ from PyQt5.QtWidgets import (
     QWizardPage,
 )
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parameters import PathParameter
+from ptychodus.model.observer import Observable, Observer
+from ptychodus.model.parameters import PathParameter
 
 from ....model.diffraction import DiffractionAPI, DiffractionSettings
-from ....model.parameters import PluginChooserParameter
+from ....model.plugins import PluginChooserParameter
 from ....view.diffraction import OpenDatasetWizardPage
 from ....view.widgets import ExceptionDialog
 from ...data import FileDialogFactory

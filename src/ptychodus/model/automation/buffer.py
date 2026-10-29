@@ -7,10 +7,10 @@ from typing import Final
 import logging
 import threading
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.workflow import FileBasedWorkflow, WorkflowAPI
 
+from ..observer import Observable, Observer
+from ..plugins import PluginChooser
 from ..task_manager import TaskManager
 from .repository import (
     AutomationDatasetRepository,

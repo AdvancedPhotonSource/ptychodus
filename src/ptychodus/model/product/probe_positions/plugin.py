@@ -7,11 +7,11 @@ from typing import Any
 
 import numpy
 
-from ptychodus.api.parameters import Parameter
 from ptychodus.api.probe_positions import ProbePosition
 from ptychodus.api.simulate.probe_positions import ProbePositionsGenerator
 
 from ...declared import ParameterDescription, describe, restore
+from ...parameters import Parameter
 from .builder import ProbePositionsBuilder
 from .settings import ProbePositionsSettings
 

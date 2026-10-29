@@ -47,7 +47,7 @@ Expected: no output. If found, the code should move to `view/` or `controller/`.
 
 ### 4. plugins/ must not import model/, view/, or controller/
 
-A plugin is loaded by `api/plugins.py`, which `model/` builds on, so an import back into `model/` inverts the layering and risks a cycle at discovery time.
+A plugin is loaded by `api/plugins.py`, which `model/` builds on, so an import back into `model/` inverts the layering and risks a cycle at discovery time. [tests/test_layering.py](../../tests/test_layering.py) enforces this rule, the api rule and the store rule in CI, including deferred imports inside function bodies; the greps here are the quick local check.
 
 ```sh
 grep -rn --include='*.py' -E "^(from|import)[[:space:]]+ptychodus\.(model|view|controller)" src/ptychodus/plugins/

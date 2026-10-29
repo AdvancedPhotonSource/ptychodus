@@ -37,7 +37,7 @@ from ptychodus.api.preprocess.diffraction import (
     PaddingStep,
 )
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.cli import add_detector_map_arguments, read_detector_corrections
 from ptychodus.model.diffraction.dataset import AssembledDiffractionDataset
 from ptychodus.model.diffraction.monitor import DiffractionTaskMonitor

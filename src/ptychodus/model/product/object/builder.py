@@ -11,9 +11,9 @@ from ptychodus.api.object import (
     resample_object_to_pixel_size,
 )
 from ptychodus.api.simulate.object import generate_layers, pad_object
-from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.probe import Probe, ProbeEnsemble
 
+from ...parameters import ParameterGroup
 from .settings import ObjectSettings
 
 logger = logging.getLogger(__name__)

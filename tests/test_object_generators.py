@@ -21,10 +21,11 @@ from ptychodus.api.accumulate import DiffractionMoments
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import GeometryNotDefinedError
 from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider
-from ptychodus.api.plugins import PluginChooser, PluginRegistry
+from ptychodus.api.plugins import PluginList, PluginRegistry
 from ptychodus.api.probe_positions import ProbePosition
-from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.simulate.object import ObjectGenerator, pad_object
+from ptychodus.model.plugins import PluginChooser
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.declared import ParameterDescription, describe
 from ptychodus.model.product.object.builder import FromFileObjectBuilder
 from ptychodus.model.product.object.builder_factory import ObjectBuilderFactory
@@ -93,8 +94,8 @@ def _make_factory(
         numpy.random.default_rng(42),
         ObjectSettings(SettingsRegistry()) if settings is None else settings,
         registry.object_generators,
-        PluginChooser(),
-        PluginChooser(),
+        PluginChooser(PluginList()),
+        PluginChooser(PluginList()),
     )
 
 

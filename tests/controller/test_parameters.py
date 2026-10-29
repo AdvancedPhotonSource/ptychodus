@@ -16,7 +16,7 @@ from PyQt5.QtGui import QValidator
 from PyQt5.QtWidgets import QApplication
 
 from ptychodus.api.constants import TWO_PI, AngleUnit, LengthUnit
-from ptychodus.api.parameters import ComplexSequenceParameter, RealParameter, UUIDParameter
+from ptychodus.model.parameters import ComplexSequenceParameter, RealParameter, UUIDParameter
 from ptychodus.controller.parameters import (
     AngleParameterViewController,
     ComplexSequenceParameterViewController,

@@ -20,9 +20,8 @@ from types import UnionType
 from typing import Any, Union, get_args, get_origin
 import logging
 
-from ptychodus.api.parameters import Parameter, ParameterGroup
-
 from ..declared import UnsupportedParameterError
+from ..parameters import Parameter, ParameterGroup
 from .flatten import FlatParameter, FlatteningPolicy, flatten_options
 
 __all__ = [

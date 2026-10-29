@@ -29,7 +29,8 @@ from pathlib import Path
 from typing import Any, Final, get_args, get_origin
 
 from ptychodus.api.constants import LengthUnit, Unit
-from ptychodus.api.parameters import Parameter, ParameterGroup
+
+from .parameters import Parameter, ParameterGroup
 
 __all__ = [
     'ParameterDescription',

@@ -6,12 +6,13 @@ import logging
 import numpy
 
 from ptychodus.api.object import Object, ObjectFileReader, ObjectFileWriter
-from ptychodus.api.parameters import Parameter
-from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.plugins import PluginCatalog
 from ptychodus.api.simulate.object import ObjectGenerator
 
 from ...declared import describe
 from ...file_types import FileTypeChooser
+from ...parameters import Parameter
+from ...plugins import PluginChooser
 from .builder import FromFileObjectBuilder, ObjectBuilder
 from .plugin import PluginObjectBuilder
 from .settings import ObjectSettings
@@ -24,7 +25,7 @@ class ObjectBuilderFactory(Iterable[str]):
         self,
         rng: numpy.random.Generator,
         settings: ObjectSettings,
-        generator_chooser: PluginChooser[ObjectGenerator],
+        generator_chooser: PluginCatalog[ObjectGenerator],
         file_reader_chooser: PluginChooser[ObjectFileReader],
         file_writer_chooser: PluginChooser[ObjectFileWriter],
     ) -> None:

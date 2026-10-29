@@ -5,7 +5,6 @@ import logging
 
 import numpy
 
-from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.simulate.probe import (
     GaussianSchellStrategy,
     IncoherentModeStrategy,
@@ -30,6 +29,7 @@ from ptychodus.api.probe import (
     resample_probe_ensemble,
 )
 
+from ...parameters import ParameterGroup
 from .settings import ProbeSettings
 
 logger = logging.getLogger(__name__)

@@ -13,7 +13,7 @@ from ptychodus.api.reconstruct import (
     ReconstructOutput,
     Reconstructor,
 )
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.processing.flatten import FlatteningPolicy
 from ptychodus.model.processing.parameter_store import (
     OptionsSection,

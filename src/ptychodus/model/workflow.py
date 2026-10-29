@@ -9,7 +9,6 @@ from ptychodus.api.diffraction import CropRegion, Polarization
 from ptychodus.api.affine import AffineTransform
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import ReconstructInput
-from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.workflow import (
     DiffractionWorkflowAPI,
     ProductWorkflowAPI,
@@ -23,6 +22,7 @@ from .genesis import GenesisExecutor
 from .globus import GlobusExecutor
 from .processing import ProcessingAPI
 from .product import ObjectAPI, ProbeAPI, ProductAPI, ProbePositionsAPI
+from .settings import SettingsRegistry
 
 logger = logging.getLogger(__name__)
 

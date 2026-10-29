@@ -44,13 +44,13 @@ If `grep` finds nothing, the plugin needs a `register_plugins(registry: PluginRe
 
 ### 4. Confirm it's registered
 
-If discovery succeeded (a `DEBUG` line said `Registered ptychodus.plugins.<name>`), verify the plugin actually ended up in the right chooser:
+If discovery succeeded (a `DEBUG` line said `Registered ptychodus.plugins.<name>`), verify the plugin actually ended up in the right catalog:
 
 ```sh
 uv run python -c "
 from ptychodus.api.plugins import PluginRegistry
 r = PluginRegistry.load_plugins()
-# Pick the chooser matching the plugin category:
+# Pick the catalog matching the plugin category:
 for p in r.probe_file_readers:
     print(p.simple_name, '—', p.display_name)
 "

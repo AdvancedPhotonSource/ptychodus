@@ -18,10 +18,8 @@ from pydantic import BaseModel, Field
 from ptychodus.api.accumulate import DiffractionMoments
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry, ZernikeMode
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.plugins import PluginChooser, PluginRegistry
+from ptychodus.api.plugins import PluginCatalog, PluginList, PluginRegistry
 from ptychodus.api.probe import Probe, ProbeGeometry, ProbeGeometryProvider
-from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.simulate.probe import (
     FresnelZonePlate,
     KirkpatrickBaezMirrorPreset,
@@ -29,6 +27,9 @@ from ptychodus.api.simulate.probe import (
     generate_disk_probe,
     generate_zernike_probe,
 )
+from ptychodus.model.observer import Observable, Observer
+from ptychodus.model.plugins import PluginChooser
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.declared import ParameterDescription, describe, fields_of
 from ptychodus.model.product.probe.builder_factory import ProbeBuilderFactory
 from ptychodus.model.product.probe.plugin import PluginProbeBuilder
@@ -107,20 +108,30 @@ def _described(generator: ProbeGenerator) -> list[ParameterDescription]:
     return list(describe(generator.get_default_options(), expand_num=True))
 
 
-def _make_factory(registry: PluginRegistry) -> ProbeBuilderFactory:
+def _make_factory(
+    registry: PluginRegistry,
+    *,
+    kb_mirrors: PluginCatalog[KirkpatrickBaezMirrorPreset] | None = None,
+) -> ProbeBuilderFactory:
     return ProbeBuilderFactory(
         numpy.random.default_rng(42),
         ProbeSettings(SettingsRegistry()),
         registry.probe_generators,
         registry.fresnel_zone_plates,
-        registry.kb_mirrors,
-        PluginChooser(),
-        PluginChooser(),
+        registry.kb_mirrors if kb_mirrors is None else kb_mirrors,
+        PluginChooser(PluginList()),
+        PluginChooser(PluginList()),
     )
 
 
-def _make_builder(registry: PluginRegistry, name: str) -> PluginProbeBuilder:
-    builder = _make_factory(registry).create(name, has_diffraction_data=True)
+def _make_builder(
+    registry: PluginRegistry,
+    name: str,
+    *,
+    kb_mirrors: PluginCatalog[KirkpatrickBaezMirrorPreset] | None = None,
+) -> PluginProbeBuilder:
+    factory = _make_factory(registry, kb_mirrors=kb_mirrors)
+    builder = factory.create(name, has_diffraction_data=True)
     assert isinstance(builder, PluginProbeBuilder)
     return builder
 
@@ -244,16 +255,16 @@ class _StubGenerator(ProbeGenerator):
     ],
 )
 def test_a_faulty_size_declaration_is_refused(options: BaseModel, message: str) -> None:
-    generators = PluginChooser[ProbeGenerator]()
+    generators = PluginList[ProbeGenerator]()
     generators.register_plugin(_StubGenerator(options), simple_name='stub', display_name='stub')
     factory = ProbeBuilderFactory(
         numpy.random.default_rng(42),
         ProbeSettings(SettingsRegistry()),
         generators,
-        PluginChooser(),
-        PluginChooser(),
-        PluginChooser(),
-        PluginChooser(),
+        PluginList(),
+        PluginList(),
+        PluginChooser(PluginList()),
+        PluginChooser(PluginList()),
     )
 
     with pytest.raises(ValueError, match=message):
@@ -333,7 +344,6 @@ def test_every_zone_plate_goes_by_one_name(registry: PluginRegistry) -> None:
 def test_a_zone_plate_preset_fills_its_fields_and_nothing_else(registry: PluginRegistry) -> None:
     builder = _make_builder(registry, 'fresnel_zone_plate')
     builder.parameters()['defocus_distance_m'].set_value(1.0e-4)
-    selected_before = registry.fresnel_zone_plates.get_current_plugin()
     counter = _NotificationCounter(builder)
     label = 'APS 31-ID-E LamNI'
 
@@ -351,7 +361,6 @@ def test_a_zone_plate_preset_fills_its_fields_and_nothing_else(registry: PluginR
     )
     assert parameters['defocus_distance_m'].get_value() == 1.0e-4
     assert counter.count == 1
-    assert registry.fresnel_zone_plates.get_current_plugin() is selected_before
 
 
 def test_a_mirror_preset_fills_its_six_fields() -> None:
@@ -364,8 +373,10 @@ def test_a_mirror_preset_fills_its_six_fields() -> None:
         vertical_grazing_angle_rad=4e-3,
         vertical_focus_distance_m=0.2,
     )
-    registry.kb_mirrors.register_plugin(preset, simple_name='Test Pair', display_name='Test Pair')
-    builder = _make_builder(registry, 'kb_mirror')
+    # The loaded registry is frozen, so the preset goes into a catalog of its own.
+    mirrors = PluginList[KirkpatrickBaezMirrorPreset]()
+    mirrors.register_plugin(preset, simple_name='Test Pair', display_name='Test Pair')
+    builder = _make_builder(registry, 'kb_mirror', kb_mirrors=mirrors)
 
     builder.apply_presets('Test Pair')
 
@@ -393,11 +404,14 @@ def test_a_generator_no_preset_fits_offers_none(registry: PluginRegistry) -> Non
 
 def test_a_preset_registered_after_the_builder_is_offered() -> None:
     registry = PluginRegistry.load_plugins()
-    builder = _make_builder(registry, 'kb_mirror')
+    # The loaded registry is frozen; a catalog still open to registration shows that
+    # the builder reads its presets live rather than from a snapshot.
+    mirrors = PluginList[KirkpatrickBaezMirrorPreset]()
+    builder = _make_builder(registry, 'kb_mirror', kb_mirrors=mirrors)
 
     assert list(builder.labels_for_presets()) == []
 
-    registry.kb_mirrors.register_plugin(
+    mirrors.register_plugin(
         KirkpatrickBaezMirrorPreset(
             horizontal_acceptance_length_m=0.2,
             horizontal_grazing_angle_rad=2e-3,

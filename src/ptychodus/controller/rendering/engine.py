@@ -4,9 +4,10 @@ import logging
 
 from ptychodus.api.typing import NumberArrayType, RealArrayType
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.plugins import PluginList
 from ptychodus.api.visualize import ComplexComponent, VisualizationProduct
+from ptychodus.model.observer import Observable, Observer
+from ptychodus.model.plugins import PluginChooser
 
 from .color_axis import ColorAxis
 from .color_model_renderer import CylindricalColorModelRenderer
@@ -21,12 +22,12 @@ logger = logging.getLogger(__name__)
 class VisualizationEngine(Observable, Observer):
     def __init__(self, *, is_complex: bool) -> None:
         super().__init__()
-        self._renderer_chooser = PluginChooser[Renderer]()
+        renderers = PluginList[Renderer]()
         self._transformation = ScalarTransformationParameter()
         self._color_axis = ColorAxis()
         acyclic_colormap = ColormapParameter(is_cyclic=False)
 
-        self._renderer_chooser.register_plugin(
+        renderers.register_plugin(
             ColormapRenderer(
                 ComplexComponent.REAL,
                 self._transformation,
@@ -39,7 +40,7 @@ class VisualizationEngine(Observable, Observer):
         if is_complex:
             cyclic_colormap = ColormapParameter(is_cyclic=True)
 
-            self._renderer_chooser.register_plugin(
+            renderers.register_plugin(
                 ColormapRenderer(
                     ComplexComponent.IMAGINARY,
                     self._transformation,
@@ -48,7 +49,7 @@ class VisualizationEngine(Observable, Observer):
                 ),
                 display_name='Imaginary',
             )
-            self._renderer_chooser.register_plugin(
+            renderers.register_plugin(
                 ColormapRenderer(
                     ComplexComponent.AMPLITUDE,
                     self._transformation,
@@ -57,7 +58,7 @@ class VisualizationEngine(Observable, Observer):
                 ),
                 display_name='Amplitude',
             )
-            self._renderer_chooser.register_plugin(
+            renderers.register_plugin(
                 ColormapRenderer(
                     ComplexComponent.PHASE_RAD,
                     self._transformation,
@@ -66,7 +67,7 @@ class VisualizationEngine(Observable, Observer):
                 ),
                 display_name='Phase',
             )
-            self._renderer_chooser.register_plugin(
+            renderers.register_plugin(
                 ColormapRenderer(
                     ComplexComponent.UNWRAPPED_PHASE_RAD,
                     self._transformation,
@@ -75,13 +76,17 @@ class VisualizationEngine(Observable, Observer):
                 ),
                 display_name='Phase (Unwrapped)',
             )
-            self._renderer_chooser.register_plugin(
+            renderers.register_plugin(
                 CylindricalColorModelRenderer(
                     self._transformation,
                     self._color_axis,
                 ),
                 display_name='Complex',
             )
+
+        self._renderer_chooser = PluginChooser(renderers)
+
+        if is_complex:
             self._renderer_chooser.set_current_plugin('Complex')
 
         self._renderer_chooser.add_observer(self)

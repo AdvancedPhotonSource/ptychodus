@@ -23,8 +23,8 @@ Run the `check-layers` skill after wiring to confirm you haven't accidentally in
 Create `src/ptychodus/model/<feature>/settings.py`. Follow the pattern in [src/ptychodus/model/analysis/settings.py](../../src/ptychodus/model/analysis/settings.py):
 
 ```python
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.settings import SettingsRegistry
+from ..observer import Observable, Observer
+from ..settings import SettingsRegistry
 
 
 class <Feature>Settings(Observable, Observer):
@@ -38,7 +38,7 @@ class <Feature>Settings(Observable, Observer):
             'NumberOfIterations', 1000, minimum=1
         )
         # create_real_parameter, create_boolean_parameter, create_string_parameter,
-        # create_path_parameter — see api/parameters.py for the full menu.
+        # create_path_parameter — see model/parameters.py for the full menu.
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:
@@ -86,13 +86,15 @@ Create `src/ptychodus/controller/<feature>/` with the `*ViewController` that bri
 
 ## PluginChooser binding for settings-driven selection
 
-If your feature has a "current selected implementation" (e.g. current file reader), wrap the `PluginChooser` in a `PluginChooserParameter` over the backing `StringParameter`:
+If your feature has a "current selected implementation" (e.g. current file reader), take a `PluginChooser` (from `model/plugins.py`) and wrap it in a `PluginChooserParameter` over the backing `StringParameter`. For a registry category, `ModelCore` builds the chooser once, as `PluginChooser(self.plugin_registry.<category>)`, and passes it in; never wrap the same catalog a second time, because that second chooser would hold its own selection:
 
 ```python
 self.file_reader_parameter = PluginChooserParameter(file_reader_chooser, self.settings.file_type)
 ```
 
-`PluginChooserParameter` in [src/ptychodus/model/parameters.py](../../src/ptychodus/model/parameters.py) owns the two-way binding and the translation between the two name spaces: its own value space is display names, while the settings parameter stores the canonical simple name. The chooser itself holds no settings.
+A category the feature only looks plugins up in, with no selection, takes the read-only `PluginCatalog` from `api/plugins.py` instead of a chooser.
+
+`PluginChooserParameter` in [src/ptychodus/model/plugins.py](../../src/ptychodus/model/plugins.py) owns the two-way binding and the translation between the two name spaces: its own value space is display names, while the settings parameter stores the canonical simple name. The chooser itself holds no settings.
 
 ## Verify
 

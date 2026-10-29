@@ -1,5 +1,4 @@
-from ptychodus.api.settings import SettingsRegistry
-
+from ..settings import SettingsRegistry
 from .model_catalog import ModelCatalog
 from .repository import ConversationRepository
 from .settings import AgentSettings

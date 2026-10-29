@@ -20,7 +20,6 @@ from ptychodus.api.diffraction import DiffractionMetadata, DiffractionArray
 from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.workflow import WorkflowAPI
 
 from .agent import AgentCore
@@ -31,8 +30,10 @@ from .fluorescence import FluorescenceCore
 from .genesis import GenesisCore
 from .globus import GlobusCore
 from .memory import MemoryPresenter
+from .plugins import PluginChooser
 from .processing import ProcessingCore
 from .product import PositionsStreamingContext, ProductCore
+from .settings import SettingsRegistry
 from .task_manager import TaskManager
 from .workflow import ConcreteWorkflowAPI
 
@@ -102,30 +103,30 @@ class ModelCore:
         self.diffraction_core = DiffractionCore(
             self._task_manager,
             self.settings_registry,
-            self.plugin_registry.bad_pixels_file_readers,
-            self.plugin_registry.diffraction_file_readers,
-            self.plugin_registry.diffraction_file_writers,
+            PluginChooser(self.plugin_registry.bad_pixels_file_readers),
+            PluginChooser(self.plugin_registry.diffraction_file_readers),
+            PluginChooser(self.plugin_registry.diffraction_file_writers),
             self.settings_registry,
-            self.plugin_registry.background_file_readers,
-            self.plugin_registry.flat_field_file_readers,
+            PluginChooser(self.plugin_registry.background_file_readers),
+            PluginChooser(self.plugin_registry.flat_field_file_readers),
         )
         self.product_core = ProductCore(
             self.rng,
             self.settings_registry,
             self.diffraction_core.diffraction_api,
             self.plugin_registry.probe_position_generators,
-            self.plugin_registry.probe_position_file_readers,
-            self.plugin_registry.probe_position_file_writers,
+            PluginChooser(self.plugin_registry.probe_position_file_readers),
+            PluginChooser(self.plugin_registry.probe_position_file_writers),
             self.plugin_registry.probe_generators,
             self.plugin_registry.fresnel_zone_plates,
             self.plugin_registry.kb_mirrors,
-            self.plugin_registry.probe_file_readers,
-            self.plugin_registry.probe_file_writers,
+            PluginChooser(self.plugin_registry.probe_file_readers),
+            PluginChooser(self.plugin_registry.probe_file_writers),
             self.plugin_registry.object_generators,
-            self.plugin_registry.object_file_readers,
-            self.plugin_registry.object_file_writers,
-            self.plugin_registry.product_file_readers,
-            self.plugin_registry.product_file_writers,
+            PluginChooser(self.plugin_registry.object_file_readers),
+            PluginChooser(self.plugin_registry.object_file_writers),
+            PluginChooser(self.plugin_registry.product_file_readers),
+            PluginChooser(self.plugin_registry.product_file_writers),
             self.settings_registry,
             self._task_manager,
         )
@@ -133,7 +134,7 @@ class ModelCore:
             self._task_manager,
             self.settings_registry,
             self.product_core.product_api,
-            self.plugin_registry.reconstructor_libraries,
+            PluginChooser(self.plugin_registry.reconstructor_libraries),
             self.plugin_registry.training_data_file_writers,
         )
         self.fluorescence_core = FluorescenceCore(
@@ -141,10 +142,10 @@ class ModelCore:
             self.settings_registry,
             self.product_core.product_api,
             self.product_core.product_repository,
-            self.plugin_registry.fluorescence_enhancers,
+            PluginChooser(self.plugin_registry.fluorescence_enhancers),
             self.processing_core.device_selection,
-            self.plugin_registry.fluorescence_file_readers,
-            self.plugin_registry.fluorescence_file_writers,
+            PluginChooser(self.plugin_registry.fluorescence_file_readers),
+            PluginChooser(self.plugin_registry.fluorescence_file_writers),
             self.settings_registry,
         )
         self.analysis_core = AnalysisCore(
@@ -181,7 +182,7 @@ class ModelCore:
             self._task_manager,
             self.settings_registry,
             self.workflow_api,
-            self.plugin_registry.file_based_workflows,
+            PluginChooser(self.plugin_registry.file_based_workflows),
         )
         self.agent_core = AgentCore(self.settings_registry)
 

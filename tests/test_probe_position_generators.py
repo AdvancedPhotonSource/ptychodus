@@ -16,8 +16,8 @@ from pathlib import Path
 import pytest
 
 from ptychodus.api.plugins import Plugin, PluginRegistry
-from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.simulate.probe_positions import ProbePositionsGenerator
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.declared import declare_in, describe, restore
 
 _GOLDEN_PATH = Path(__file__).parent / 'data' / 'settings_defaults.ini'

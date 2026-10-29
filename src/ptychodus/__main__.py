@@ -5,8 +5,8 @@ import argparse
 import logging
 import sys
 
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.exit_codes import ExitCode
+from ptychodus.model.observer import Observable, Observer
 from ptychodus.cli import DirectoryType, verify_all_arguments_parsed
 from ptychodus.model import ModelCore
 from ptychodus.model.diffraction import DiffractionTaskMonitor

@@ -27,9 +27,10 @@ from ptychodus.api.probe_positions import (
     ProbePositionFileReader,
     ProbePositionSequence,
 )
-from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.api.plugins import PluginList
 from ptychodus.api.simulate.probe_positions import ProbePositionsGenerator
+from ptychodus.model.plugins import PluginChooser
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.product.probe_positions.builder import (
     FromFileProbePositionsBuilder,
     FromMemoryProbePositionsBuilder,
@@ -83,14 +84,14 @@ def _make_cartesian_line_builder(
     Built through the factory rather than directly, because that is what
     creates the settings parameters a plugin builder copies from.
     """
-    generators = PluginChooser[ProbePositionsGenerator]()
+    generators = PluginList[ProbePositionsGenerator]()
     generators.register_plugin(
         CartesianProbePositionsGenerator(CartesianVariant.RECTANGULAR_RASTER),
         simple_name='rectangular_raster',
         display_name='rectangular_raster',
     )
     factory = ProbePositionsBuilderFactory(
-        _make_rng(), settings, generators, PluginChooser(), PluginChooser()
+        _make_rng(), settings, generators, PluginChooser(PluginList()), PluginChooser(PluginList())
     )
     builder = factory.create('rectangular_raster')
     builder.parameters()['num_points_x'].set_value(num_points)

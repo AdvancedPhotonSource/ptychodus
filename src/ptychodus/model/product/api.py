@@ -8,7 +8,6 @@ import threading
 from ptychodus.api.accumulate import compute_diffraction_moments, estimate_incident_beam
 from ptychodus.api.diffraction import Polarization
 from ptychodus.api.parallax import ParallaxEstimate, estimate_defocus_from_parallax
-from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.preprocess.diffraction import BinningStep
 from ptychodus.api.probe import OPRWeightPolicy
 from ptychodus.api.product import (
@@ -20,6 +19,7 @@ from ptychodus.api.product import (
 
 from ..diffraction import AssembledDiffractionDataset
 from ..file_types import FileTypeChooser
+from ..plugins import PluginChooser
 from ..task_manager import TaskManager
 from .item import ProductRepositoryItem, ProductState
 from .item_factory import ProductRepositoryItemFactory, resolve_product_name

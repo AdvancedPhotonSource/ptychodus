@@ -6,11 +6,11 @@ import queue
 import threading
 
 from ptychodus.api.io import StandardFileLayout, sanitize_path_component
-from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.settings import SettingsRegistry
 
+from ..plugins import PluginChooser
 from ..processing import ProcessingAPI
 from ..product import ProductAPI
+from ..settings import SettingsRegistry
 from ..task_manager import BackgroundTaskManager
 from .facility_adapters import IRIFacilityAdapter
 from .settings import GenesisSettings

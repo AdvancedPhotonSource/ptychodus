@@ -5,7 +5,9 @@ from collections.abc import Sequence
 from typing import Generic, TypeVar
 
 from ptychodus.api.files import FileHandler
-from ptychodus.api.plugins import Plugin, PluginChooser
+from ptychodus.api.plugins import Plugin
+
+from .plugins import PluginChooser
 
 __all__ = [
     'FileTypeChooser',

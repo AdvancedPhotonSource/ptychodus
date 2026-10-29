@@ -3,9 +3,9 @@ from abc import abstractmethod, ABC
 import logging
 
 from ptychodus.api.diffraction import Polarization
-from ptychodus.api.parameters import Parameter, ParameterGroup
 from ptychodus.api.product import ProductMetadata
 
+from ..parameters import Parameter, ParameterGroup
 from .settings import ProductSettings
 
 logger = logging.getLogger(__name__)

@@ -1,10 +1,10 @@
 import logging
 
 from ptychodus.api.diffraction import Polarization
-from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import Product, ProductFileReader
 
 from ..diffraction import AssembledDiffractionDataset
+from ..plugins import PluginChooser
 from .geometry import ProductGeometryProvider
 from .item import ProductRepositoryItem, ProductState
 from .metadata import MetadataRepositoryItem

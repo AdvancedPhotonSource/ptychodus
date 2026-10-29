@@ -22,7 +22,7 @@ import pytest
 from ptychodus.api.parallax import ParallaxEstimate
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import ProductMetadata
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.product import ProductAPI
 from ptychodus.model.product.settings import ProductSettings
 from ptychodus.model.workflow import ConcreteProductWorkflowAPI

@@ -6,8 +6,7 @@ import logging
 import queue
 import threading
 
-from ptychodus.api.observer import Observable
-
+from .observer import Observable
 from .task_manager import ForegroundTaskManager
 
 __all__ = [

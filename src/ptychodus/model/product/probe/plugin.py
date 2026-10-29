@@ -8,9 +8,7 @@ from typing import Any, TypeVar
 import numpy
 from pydantic import BaseModel
 
-from ptychodus.api.observer import Observable
-from ptychodus.api.parameters import Parameter
-from ptychodus.api.plugins import Plugin, PluginChooser
+from ptychodus.api.plugins import Plugin, PluginCatalog
 from ptychodus.api.probe import ProbeEnsemble, ProbeExtent, ProbeGeometryProvider
 from ptychodus.api.simulate.probe import (
     FresnelZonePlate,
@@ -19,6 +17,8 @@ from ptychodus.api.simulate.probe import (
 )
 
 from ...declared import ParameterDescription, describe, fields_of, restore
+from ...observer import Observable
+from ...parameters import Parameter
 from .builder import ProbeEnsembleBuilder
 from .settings import ProbeSettings
 
@@ -76,8 +76,8 @@ class PluginProbeBuilder(ProbeEnsembleBuilder):
         name: str,
         generator: ProbeGenerator,
         parameters: Mapping[str, Parameter[Any]],
-        fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
-        kb_mirror_chooser: PluginChooser[KirkpatrickBaezMirrorPreset],
+        fresnel_zone_plate_chooser: PluginCatalog[FresnelZonePlate],
+        kb_mirror_chooser: PluginCatalog[KirkpatrickBaezMirrorPreset],
     ) -> None:
         # Before the base class adds parameters, since a change to any of them reaches
         # _update, which reads it.
@@ -147,7 +147,7 @@ class PluginProbeBuilder(ProbeEnsembleBuilder):
         )
         return True
 
-    def _fitting(self, chooser: PluginChooser[PresetT]) -> Iterator[Plugin[PresetT]]:
+    def _fitting(self, chooser: PluginCatalog[PresetT]) -> Iterator[Plugin[PresetT]]:
         """The presets in *chooser* whose every field this generator declares.
 
         Read off each preset itself, so a preset registered after this builder was made

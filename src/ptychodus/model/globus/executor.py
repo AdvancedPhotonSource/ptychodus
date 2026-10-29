@@ -2,10 +2,10 @@ from pathlib import Path
 import logging
 
 from ptychodus.api.io import StandardFileLayout, sanitize_path_component
-from ptychodus.api.settings import SettingsRegistry
 
 from ..product import ProductAPI
 from ..processing import ProcessingAPI
+from ..settings import SettingsRegistry
 from .client import GlobusClient, GlobusJob
 from .settings import GlobusSettings
 

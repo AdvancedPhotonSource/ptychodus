@@ -23,7 +23,7 @@ from ptychodus.api.preprocess.diffraction import (
     VerticalFlipStep,
 )
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.settings import SettingsRegistry
 
 from ptychodus.model.diffraction.prep_pipeline import PrepPipelineBuilder
 from ptychodus.model.diffraction.settings import DetectorSettings, DiffractionSettings

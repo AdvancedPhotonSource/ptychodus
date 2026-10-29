@@ -1,16 +1,15 @@
 import logging
 
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.diffraction import (
     BadPixelsFileReader,
     DiffractionFileReader,
     DiffractionFileWriter,
     PixelMapFileReader,
 )
-from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.settings import SettingsRegistry
 
-from ..parameters import PluginChooserParameter
+from ..observer import Observable, Observer
+from ..plugins import PluginChooser, PluginChooserParameter
+from ..settings import SettingsRegistry
 from ..task_manager import TaskManager
 from .api import DiffractionAPI
 from .monitor import DiffractionTaskMonitor

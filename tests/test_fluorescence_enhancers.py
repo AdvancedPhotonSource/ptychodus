@@ -23,8 +23,9 @@ from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.spawn import ChildError
+from ptychodus.model.plugins import PluginChooser
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.fluorescence import ENHANCER_LIBRARY, FluorescenceCore
 from ptychodus.model.fluorescence.core import _BRANCHES_BY_ENHANCER
 from ptychodus.model.processing import ProcessingParameterStore
@@ -109,10 +110,10 @@ def _make_core(registry: SettingsRegistry, plugins: PluginRegistry) -> Fluoresce
         registry,
         MagicMock(),
         MagicMock(),
-        plugins.fluorescence_enhancers,
+        PluginChooser(plugins.fluorescence_enhancers),
         DeviceSelection(devices),
-        plugins.fluorescence_file_readers,
-        plugins.fluorescence_file_writers,
+        PluginChooser(plugins.fluorescence_file_readers),
+        PluginChooser(plugins.fluorescence_file_writers),
         MagicMock(),
     )
 

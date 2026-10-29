@@ -23,8 +23,7 @@ from globus_sdk.token_storage import JSONTokenStorage
 import globus_compute_sdk
 import globus_sdk
 
-from ptychodus.api.settings import get_ptychodus_dir
-
+from ..settings import get_ptychodus_dir
 from .actions import process_with_ptychodus
 from .authorizer import GlobusAuthorizer
 from .client import GlobusClient, GlobusJob, GlobusStatus

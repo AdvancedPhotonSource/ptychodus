@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.settings import SettingsRegistry
 
-_LOGGER_NAME = 'ptychodus.api.settings'
+_LOGGER_NAME = 'ptychodus.model.settings'
 
 
 def _write_settings(tmp_path: Path, text: str) -> Path:

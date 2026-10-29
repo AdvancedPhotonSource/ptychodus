@@ -28,8 +28,8 @@ from PyQt5.QtWidgets import (
 
 from ptychodus.api.constants import AngleUnit, LengthUnit, Unit
 from ptychodus.api.geometry import Interval
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parameters import (
+from ptychodus.model.observer import Observable, Observer
+from ptychodus.model.parameters import (
     BooleanParameter,
     ComplexSequenceParameter,
     IntegerParameter,

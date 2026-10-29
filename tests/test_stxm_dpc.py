@@ -23,9 +23,8 @@ from ptychodus.api.geometry import GeometryNotDefinedError, ImageExtent, PixelGe
 from ptychodus.api.object import Object, ObjectCenter, ObjectGeometry, ObjectGeometryProvider
 from ptychodus.api.probe import Probe, ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
-from ptychodus.api.plugins import PluginChooser, PluginRegistry
+from ptychodus.api.plugins import PluginCatalog, PluginRegistry
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.simulate.diffraction import generate_diffraction_data
 from ptychodus.api.simulate.object import (
     ObjectGenerator,
@@ -35,6 +34,7 @@ from ptychodus.api.simulate.object import (
     interpolate_scan_values,
 )
 from ptychodus.api.simulate.probe import propagate_probe
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.product.object import (
     ObjectBuilder,
     ObjectBuilderFactory,
@@ -592,7 +592,7 @@ def _settings() -> ObjectSettings:
 
 
 @cache
-def _object_generators() -> PluginChooser[ObjectGenerator]:
+def _object_generators() -> PluginCatalog[ObjectGenerator]:
     return PluginRegistry.load_plugins().object_generators
 
 

@@ -6,12 +6,12 @@ from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.geometry import GeometryNotDefinedError, ImageExtent, PixelGeometry
 from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider, compute_object_geometry
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider
 from ptychodus.api.propagate import ProductGeometry, compute_product_geometry
 from ptychodus.api.probe_positions import ProbePosition
 
 from ..diffraction import AssembledDiffractionDataset
+from ..observer import Observable, Observer
 from .metadata import MetadataRepositoryItem
 from .probe_positions import ProbePositionsRepositoryItem
 

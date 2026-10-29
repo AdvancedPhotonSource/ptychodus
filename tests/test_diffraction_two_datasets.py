@@ -19,7 +19,7 @@ from ptychodus.api.diffraction import (
 )
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.assemble import AssembledDiffractionData
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.diffraction.dataset import (
     DiffractionDatasetState,
     AssembledDiffractionArray,

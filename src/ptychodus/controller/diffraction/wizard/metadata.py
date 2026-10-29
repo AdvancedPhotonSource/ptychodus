@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import QHeaderView, QWizardPage
 from ptychodus.api.constants import LengthUnit
 from ptychodus.api.diffraction import BeamCenter, CropRegion, DiffractionMetadata
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.parameters import RealParameter
+from ptychodus.model.parameters import RealParameter
 
 from ....model.diffraction import DetectorSettings, DiffractionSettings
 from ....model.product import ProductSettings

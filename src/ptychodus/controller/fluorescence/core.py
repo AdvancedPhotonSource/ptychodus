@@ -5,7 +5,7 @@ from PyQt5.QtCore import QModelIndex
 from PyQt5.QtWidgets import QInputDialog, QStatusBar
 
 from ptychodus.api.geometry import GeometryNotDefinedError
-from ptychodus.api.observer import Observable, Observer
+from ptychodus.model.observer import Observable, Observer
 
 from ...model.fluorescence import (
     FluorescenceAPI,

@@ -31,12 +31,12 @@ pytest.importorskip('ptychi')
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.parameters import IntegerParameter, RealParameter
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructInput
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.parameters import IntegerParameter, RealParameter
+from ptychodus.model.settings import SettingsRegistry
 from ptychi.api import (
     RECONSTRUCTOR_OPTIONS_MAP,
     LSQMLOptions,

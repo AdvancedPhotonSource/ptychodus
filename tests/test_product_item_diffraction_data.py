@@ -18,9 +18,9 @@ import numpy
 import pytest
 
 from ptychodus.api.accumulate import DiffractionMoments
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.observer import Observable, Observer
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.product.geometry import ProductGeometryProvider
 from ptychodus.model.product.item import ProductRepositoryItem, ProductState, _BoundDatasetObserver
 from ptychodus.model.product.metadata import MetadataRepositoryItem

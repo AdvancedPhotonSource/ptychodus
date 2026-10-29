@@ -1,7 +1,8 @@
 from typing import Final
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.settings import SettingsRegistry
+from ..observer import Observable, Observer
+from ..settings import SettingsRegistry
+
 
 # The backend a fresh install starts on, and its algorithm. The algorithm is
 # named so that it can also be the fallback for a persisted name the selected

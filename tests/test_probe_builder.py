@@ -42,9 +42,10 @@ from ptychodus.api.probe import (
     ProbeGeometryProvider,
     ProbeEnsemble,
 )
-from ptychodus.api.parameters import Parameter
-from ptychodus.api.plugins import PluginChooser, PluginRegistry
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.parameters import Parameter
+from ptychodus.api.plugins import PluginList, PluginRegistry
+from ptychodus.model.plugins import PluginChooser
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.declared import describe
 from ptychodus.model.product.probe.builder import (
     FromFileProbeBuilder,
@@ -100,8 +101,8 @@ def _make_factory(settings: ProbeSettings) -> ProbeBuilderFactory:
         registry.probe_generators,
         registry.fresnel_zone_plates,
         registry.kb_mirrors,
-        PluginChooser(),
-        PluginChooser(),
+        PluginChooser(PluginList()),
+        PluginChooser(PluginList()),
     )
 
 

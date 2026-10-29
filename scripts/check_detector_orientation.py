@@ -43,7 +43,7 @@ from ptychodus.api.parallax import (
     ParallaxTransform,
     estimate_parallax_transform,
 )
-from ptychodus.api.plugins import PluginChooser, PluginRegistry
+from ptychodus.api.plugins import PluginCatalog, PluginRegistry
 from ptychodus.api.preprocess.diffraction import BinningStep
 from ptychodus.api.probe import ProbeGeometry
 from ptychodus.api.probe_positions import ProbePositionSequence, calculate_scan_geometry
@@ -105,7 +105,7 @@ def _list_types(registry: PluginRegistry) -> None:
             print(f'  {plugin.simple_name:32s} {plugin.display_name}')
 
 
-def _reader(chooser: PluginChooser[_ReaderT], name: str, kind: str) -> _ReaderT:
+def _reader(chooser: PluginCatalog[_ReaderT], name: str, kind: str) -> _ReaderT:
     plugin = chooser.find_plugin(name)
 
     if plugin is None:

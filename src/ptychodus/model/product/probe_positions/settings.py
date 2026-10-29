@@ -2,11 +2,10 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parameters import Parameter
-from ptychodus.api.settings import SettingsRegistry
-
 from ...declared import ParameterDescription, declare_in
+from ...observer import Observable, Observer
+from ...parameters import Parameter
+from ...settings import SettingsRegistry
 
 
 class ProbePositionsSettings(Observable, Observer):

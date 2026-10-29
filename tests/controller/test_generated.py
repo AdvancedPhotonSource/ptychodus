@@ -20,7 +20,7 @@ from PyQt5.QtCore import QModelIndex, Qt
 from PyQt5.QtWidgets import QApplication, QComboBox
 
 from ptychodus.api.constants import LengthUnit
-from ptychodus.api.parameters import (
+from ptychodus.model.parameters import (
     BooleanParameter,
     IntegerParameter,
     Parameter,

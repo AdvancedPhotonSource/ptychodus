@@ -26,8 +26,8 @@ from PyQt5.QtWidgets import (
 
 from ptychodus.api.diffraction import BeamCenter
 from ptychodus.api.geometry import Interval
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.preprocess.noise import RobustStatistics, compute_robust_statistics
+from ptychodus.model.observer import Observable, Observer
 
 from ....model.diffraction import (
     DetectorSettings,

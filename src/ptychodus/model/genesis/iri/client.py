@@ -3,8 +3,7 @@ import json
 
 import httpx
 
-from ptychodus.api.settings import get_ptychodus_dir
-
+from ...settings import get_ptychodus_dir
 from .account import IRIAccountClient
 from .compute import IRIComputeClient
 from .facility import IRIFacilityClient

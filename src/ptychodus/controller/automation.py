@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ptychodus.api.observer import Observable, Observer, SequenceObserver
+from ptychodus.model.observer import Observable, Observer, SequenceObserver
 
 from ..model.automation import (
     AutomationDataset,

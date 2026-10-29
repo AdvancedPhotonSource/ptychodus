@@ -27,8 +27,8 @@ import inspect
 import pkgutil
 import warnings
 
-from ptychodus.api.plugins import PluginChooser, PluginRegistry
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.api.plugins import PluginCatalog, PluginRegistry
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.declared import declare_in, describe
 from ptychodus.model.fluorescence import ENHANCER_LIBRARY
 from ptychodus.model.fluorescence.core import _BRANCHES_BY_ENHANCER
@@ -70,7 +70,7 @@ def _build_registry() -> SettingsRegistry:
 # *Settings class there is nothing here for the walk above to discover. Naming
 # the group is what keeps those keys in the fixture; without this they would
 # read as deleted the day the generators stopped being hand-written.
-_GENERATORS_BY_GROUP: Mapping[str, Callable[[PluginRegistry], PluginChooser[Any]]] = {
+_GENERATORS_BY_GROUP: Mapping[str, Callable[[PluginRegistry], PluginCatalog[Any]]] = {
     'ProbePositions': lambda plugins: plugins.probe_position_generators,
     'Probe': lambda plugins: plugins.probe_generators,
     'Object': lambda plugins: plugins.object_generators,

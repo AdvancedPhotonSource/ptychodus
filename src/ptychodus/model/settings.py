@@ -6,7 +6,7 @@ from pathlib import Path
 import configparser
 import logging
 
-from .files import FileFormat, FileHandler
+from ptychodus.api.files import FileFormat, FileHandler
 from .observer import Observable
 from .parameters import ParameterGroup
 

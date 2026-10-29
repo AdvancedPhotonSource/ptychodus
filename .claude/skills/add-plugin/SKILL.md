@@ -11,14 +11,14 @@ Plugins are auto-discovered by `PluginRegistry.load_plugins()` in [src/ptychodus
 
 1. **Identify the abstract interface.** Pick the right one from `ptychodus.api`:
 
-   | You want to read/write... | Interface | Registry chooser |
+   | You want to read/write... | Interface | Registry catalog |
    | --- | --- | --- |
    | Raw diffraction patterns | `DiffractionFileReader/Writer` (`api/diffraction.py`) | `diffraction_file_readers` / `_writers` |
    | Probe positions | `ProbePositionFileReader/Writer` (`api/probe_positions.py`) | `probe_position_file_readers` / `_writers` |
    | Probes | `ProbeFileReader/Writer` (`api/probe.py`) | `probe_file_readers` / `_writers` |
    | Objects | `ObjectFileReader/Writer` (`api/object.py`) | `object_file_readers` / `_writers` |
    | A full Product (probe + positions + object bundled) | `ProductFileReader/Writer` (`api/product.py`) | see step 4 |
-   | Fluorescence / bad pixels | `Fluorescence*` / `BadPixelsFileReader` | corresponding choosers |
+   | Fluorescence / bad pixels | `Fluorescence*` / `BadPixelsFileReader` | corresponding catalogs |
 
 2. **Create the module** at `src/ptychodus/plugins/<beamline_or_format>_<kind>_file.py`. Follow the naming convention already in use — e.g. `csv_probe_file.py`, `aps33id_velociprobe/`, `aps19id_isn_diffraction_file.py`. Beamline plugins may be a subpackage if they need more than one file.
 
@@ -51,7 +51,7 @@ Plugins are auto-discovered by `PluginRegistry.load_plugins()` in [src/ptychodus
          )
      ```
 
-   - **For everything else**, register on the appropriate chooser:
+   - **For everything else**, register on the appropriate catalog:
 
      ```python
      def register_plugins(registry: PluginRegistry) -> None:

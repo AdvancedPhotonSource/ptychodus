@@ -1,7 +1,8 @@
 import logging
 import queue
 
-from ptychodus.api.observer import Observable
+from ..observer import Observable
+
 
 logger = logging.getLogger(__name__)
 

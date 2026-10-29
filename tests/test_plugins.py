@@ -1,10 +1,10 @@
-"""Unit tests for ptychodus.api.plugins.PluginChooser and PluginRegistry.
+"""Unit tests for ptychodus.api.plugins: the plugin catalogs and PluginRegistry.
 
-The chooser is a pure registry plus a tracked selection, and knows nothing about
-settings persistence. These tests pin that half: name resolution across both name
-spaces, selection and truthiness on an empty chooser, strategy lookup, and the
-duplicate-simple-name warning that registration emits. The settings binding layered
-over a chooser is covered in test_plugin_chooser_parameter.py.
+A catalog is a sorted, read-only collection once registration is over, and holds no
+selection. These tests pin name resolution across both name spaces, strategy lookup,
+the warnings registration emits, and the freeze that ends registration. Selection over
+a catalog is covered in test_plugin_chooser.py, and the settings binding layered over
+that in test_plugin_chooser_parameter.py.
 """
 
 from __future__ import annotations
@@ -17,45 +17,32 @@ import pytest
 
 from ptychodus.api.files import FileHandler
 from ptychodus.api.object import Object, ObjectFileReader
-from ptychodus.api.plugins import PluginChooser, PluginRegistry
+from ptychodus.api.plugins import PluginList, PluginRegistry
 
 
-def test_get_current_plugin_empty_raises_lookup_error() -> None:
-    chooser: PluginChooser[str] = PluginChooser()
+def test_empty_catalog_is_falsy() -> None:
+    catalog: PluginList[str] = PluginList()
 
-    with pytest.raises(LookupError):
-        chooser.get_current_plugin()
-
-
-def test_get_current_plugin_returns_registered() -> None:
-    chooser: PluginChooser[str] = PluginChooser()
-    chooser.register_plugin('strategy-a', display_name='Strategy A')
-
-    plugin = chooser.get_current_plugin()
-
-    assert plugin.strategy == 'strategy-a'
-    assert plugin.display_name == 'Strategy A'
+    assert not catalog
+    assert len(catalog) == 0
 
 
-def test_empty_chooser_is_falsy() -> None:
-    chooser: PluginChooser[str] = PluginChooser()
+def test_catalog_is_sorted_by_display_name() -> None:
+    catalog: PluginList[str] = PluginList()
+    catalog.register_plugin('z', display_name='Zeta')
+    catalog.register_plugin('a', display_name='Alpha')
+    catalog.register_plugin('m', display_name='Middle')
 
-    assert not chooser
-
-
-def test_populated_chooser_is_truthy() -> None:
-    chooser: PluginChooser[str] = PluginChooser()
-    chooser.register_plugin('s', display_name='S')
-
-    assert chooser
+    assert [plugin.display_name for plugin in catalog] == ['Alpha', 'Middle', 'Zeta']
+    assert catalog[0].strategy == 'a'
 
 
 def test_find_plugin_matches_either_name_space_case_insensitively() -> None:
-    chooser: PluginChooser[str] = PluginChooser()
-    chooser.register_plugin('s', display_name='Richardson-Lucy')
+    catalog: PluginList[str] = PluginList()
+    catalog.register_plugin('s', display_name='Richardson-Lucy')
 
-    by_display = chooser.find_plugin('richardson-lucy')
-    by_simple = chooser.find_plugin('RICHARDSONLUCY')
+    by_display = catalog.find_plugin('richardson-lucy')
+    by_simple = catalog.find_plugin('RICHARDSONLUCY')
 
     assert by_display is not None
     assert by_simple is by_display
@@ -63,27 +50,27 @@ def test_find_plugin_matches_either_name_space_case_insensitively() -> None:
 
 
 def test_find_plugin_returns_none_for_unknown_name() -> None:
-    chooser: PluginChooser[str] = PluginChooser()
-    chooser.register_plugin('s', display_name='Richardson-Lucy')
+    catalog: PluginList[str] = PluginList()
+    catalog.register_plugin('s', display_name='Richardson-Lucy')
 
-    assert chooser.find_plugin('Nonexistent') is None
+    assert catalog.find_plugin('Nonexistent') is None
 
 
 def test_get_strategy_by_name_resolves_either_name_space_case_insensitively() -> None:
-    chooser: PluginChooser[str] = PluginChooser()
-    chooser.register_plugin('rl-strategy', display_name='Richardson-Lucy')
+    catalog: PluginList[str] = PluginList()
+    catalog.register_plugin('rl-strategy', display_name='Richardson-Lucy')
 
-    assert chooser.get_strategy_by_name('richardson-lucy') == 'rl-strategy'
-    assert chooser.get_strategy_by_name('RICHARDSONLUCY') == 'rl-strategy'
+    assert catalog.get_strategy_by_name('richardson-lucy') == 'rl-strategy'
+    assert catalog.get_strategy_by_name('RICHARDSONLUCY') == 'rl-strategy'
 
 
 def test_get_strategy_by_name_raises_lookup_error_with_registered_names_in_message() -> None:
-    chooser: PluginChooser[str] = PluginChooser()
-    chooser.register_plugin('a', display_name='Alpha')
-    chooser.register_plugin('b', display_name='Beta')
+    catalog: PluginList[str] = PluginList()
+    catalog.register_plugin('a', display_name='Alpha')
+    catalog.register_plugin('b', display_name='Beta')
 
     with pytest.raises(LookupError) as info:
-        chooser.get_strategy_by_name('missing')
+        catalog.get_strategy_by_name('missing')
 
     message = str(info.value)
     assert 'missing' in message
@@ -91,11 +78,11 @@ def test_get_strategy_by_name_raises_lookup_error_with_registered_names_in_messa
     assert 'Beta' in message
 
 
-def test_get_strategy_by_name_empty_chooser_raises_lookup_error() -> None:
-    chooser: PluginChooser[str] = PluginChooser()
+def test_get_strategy_by_name_empty_catalog_raises_lookup_error() -> None:
+    catalog: PluginList[str] = PluginList()
 
     with pytest.raises(LookupError):
-        chooser.get_strategy_by_name('anything')
+        catalog.get_strategy_by_name('anything')
 
 
 def test_register_duplicate_simple_name_warns(caplog: pytest.LogCaptureFixture) -> None:
@@ -105,32 +92,68 @@ def test_register_duplicate_simple_name_warns(caplog: pytest.LogCaptureFixture) 
     second registration under a taken name can never be selected from settings.
     Registration still succeeds: plugin loading must never be fatal.
     """
-    chooser: PluginChooser[str] = PluginChooser()
-    chooser.register_plugin('h5', display_name='Example Files (*.h5)', simple_name='example')
+    catalog: PluginList[str] = PluginList()
+    catalog.register_plugin('h5', display_name='Example Files (*.h5)', simple_name='example')
 
     with caplog.at_level(logging.WARNING, logger='ptychodus.api.plugins'):
-        chooser.register_plugin('mat', display_name='Example Files (*.mat)', simple_name='example')
+        catalog.register_plugin('mat', display_name='Example Files (*.mat)', simple_name='example')
 
     assert 'Example Files (*.h5)' in caplog.text
     assert 'Example Files (*.mat)' in caplog.text
 
-    assert chooser.get_strategy_by_name('example') == 'h5'
+    assert catalog.get_strategy_by_name('example') == 'h5'
 
 
 def test_register_distinct_simple_names_is_quiet(caplog: pytest.LogCaptureFixture) -> None:
-    chooser: PluginChooser[str] = PluginChooser()
-    chooser.register_plugin('h5', display_name='Example Files (*.h5)', simple_name='example')
+    catalog: PluginList[str] = PluginList()
+    catalog.register_plugin('h5', display_name='Example Files (*.h5)', simple_name='example')
 
     with caplog.at_level(logging.WARNING, logger='ptychodus.api.plugins'):
-        chooser.register_plugin(
+        catalog.register_plugin(
             'mat', display_name='Example Files (*.mat)', simple_name='example_mat'
         )
 
     assert 'Duplicate plugin simple name' not in caplog.text
 
 
+def test_a_frozen_catalog_refuses_registration(caplog: pytest.LogCaptureFixture) -> None:
+    """Read-only after registration, but a late registration warns rather than raises."""
+    catalog: PluginList[str] = PluginList()
+    catalog.register_plugin('a', display_name='Alpha')
+    catalog.freeze()
+
+    with caplog.at_level(logging.WARNING, logger='ptychodus.api.plugins'):
+        catalog.register_plugin('b', display_name='Beta')
+
+    assert 'frozen' in caplog.text
+    assert [plugin.display_name for plugin in catalog] == ['Alpha']
+
+
+def test_load_plugins_freezes_every_catalog() -> None:
+    registry = PluginRegistry.load_plugins()
+    open_catalogs: list[str] = []
+
+    for attribute, catalog in vars(registry).items():
+        if isinstance(catalog, PluginList):
+            before = len(catalog)
+            catalog.register_plugin(object(), display_name='Late Registration')
+
+            if len(catalog) != before:
+                open_catalogs.append(attribute)
+
+    assert not open_catalogs
+
+
+def test_a_directly_built_registry_accepts_registration() -> None:
+    """Only load_plugins freezes, so a test can still assemble a registry by hand."""
+    registry = PluginRegistry()
+    registry.kb_mirrors.register_plugin(object(), display_name='Mirrors')  # type: ignore[arg-type]
+
+    assert len(registry.kb_mirrors) == 1
+
+
 def test_load_plugins_has_no_duplicate_simple_names() -> None:
-    """Every chooser resolves each simple name to exactly one plugin.
+    """Every catalog resolves each simple name to exactly one plugin.
 
     A duplicate makes the later registration unreachable from settings, which is
     how the two fold_slice probe-position readers once shadowed each other.
@@ -142,12 +165,12 @@ def test_load_plugins_has_no_duplicate_simple_names() -> None:
         if attribute.startswith('_'):
             continue
 
-        chooser = getattr(registry, attribute)
+        catalog = getattr(registry, attribute)
 
-        if not isinstance(chooser, PluginChooser):
+        if not isinstance(catalog, PluginList):
             continue
 
-        counter = Counter(plugin.simple_name.casefold() for plugin in chooser)
+        counter = Counter(plugin.simple_name.casefold() for plugin in catalog)
         duplicates.extend(f'{attribute}: {name}' for name, count in counter.items() if count > 1)
 
     assert not duplicates
@@ -166,42 +189,42 @@ class _ExampleObjectFileReader(ObjectFileReader):
 
 def test_register_plugin_derives_display_name_from_a_file_handler() -> None:
     """A file handler names itself, so the registration need not repeat the filter."""
-    chooser: PluginChooser[ObjectFileReader] = PluginChooser()
-    chooser.register_plugin(_ExampleObjectFileReader(), simple_name='example')
+    catalog: PluginList[ObjectFileReader] = PluginList()
+    catalog.register_plugin(_ExampleObjectFileReader(), simple_name='example')
 
-    assert chooser.get_current_plugin().display_name == 'Example Files (*.h5 *.hdf5)'
+    assert catalog[0].display_name == 'Example Files (*.h5 *.hdf5)'
 
 
 def test_register_plugin_skips_a_non_file_handler_with_no_display_name(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Nothing to register under, but plugin loading must never be fatal."""
-    chooser: PluginChooser[str] = PluginChooser()
+    catalog: PluginList[str] = PluginList()
 
     with caplog.at_level(logging.WARNING, logger='ptychodus.api.plugins'):
-        chooser.register_plugin('strategy', simple_name='strategy')
+        catalog.register_plugin('strategy', simple_name='strategy')
 
     assert 'not a FileHandler' in caplog.text
-    assert not chooser
+    assert not catalog
 
 
 def test_register_plugin_ignores_a_display_name_override_for_a_file_handler(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """A file handler is named by its own filter; an override would reopen the drift."""
-    chooser: PluginChooser[ObjectFileReader] = PluginChooser()
+    catalog: PluginList[ObjectFileReader] = PluginList()
 
     with caplog.at_level(logging.WARNING, logger='ptychodus.api.plugins'):
-        chooser.register_plugin(
+        catalog.register_plugin(
             _ExampleObjectFileReader(), display_name='Something Else', simple_name='example'
         )
 
     assert 'Ignoring display name' in caplog.text
-    assert chooser.get_current_plugin().display_name == 'Example Files (*.h5 *.hdf5)'
+    assert catalog[0].display_name == 'Example Files (*.h5 *.hdf5)'
 
 
 def test_every_registered_file_handler_describes_itself() -> None:
-    """A file chooser holds only FileHandlers, and each one owns the name it shows.
+    """A file catalog holds only FileHandlers, and each one owns the name it shows.
 
     The registered display name is the Qt filter and the key a settings file resolves
     against, so a handler whose description and extensions drift from it would move a
@@ -214,12 +237,12 @@ def test_every_registered_file_handler_describes_itself() -> None:
         if attribute.startswith('_') or not attribute.endswith(('_readers', '_writers')):
             continue
 
-        chooser = getattr(registry, attribute)
+        catalog = getattr(registry, attribute)
 
-        if not isinstance(chooser, PluginChooser):
+        if not isinstance(catalog, PluginList):
             continue
 
-        for plugin in chooser:
+        for plugin in catalog:
             strategy = plugin.strategy
             where = f'{attribute}: {plugin.simple_name}'
 

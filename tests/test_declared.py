@@ -16,7 +16,7 @@ import pytest
 from pydantic import BaseModel, Field
 
 from ptychodus.api.constants import LengthUnit, Unit
-from ptychodus.api.parameters import ComplexSequenceParameter, Parameter, ParameterGroup
+from ptychodus.model.parameters import ComplexSequenceParameter, Parameter, ParameterGroup
 from ptychodus.model.declared import (
     ParameterDescription,
     declare_in,

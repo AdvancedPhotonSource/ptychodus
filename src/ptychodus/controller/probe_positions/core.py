@@ -4,7 +4,7 @@ import logging
 from PyQt5.QtCore import QModelIndex, QStringListModel
 from PyQt5.QtWidgets import QAbstractItemView, QDialog, QMessageBox
 
-from ptychodus.api.observer import SequenceObserver
+from ptychodus.model.observer import SequenceObserver
 
 from ...model.product import ProbePositionsAPI, ProbePositionsRepository
 from ...model.product.probe_positions import ProbePositionsRepositoryItem

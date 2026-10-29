@@ -4,12 +4,12 @@ from collections.abc import Iterator
 from matplotlib.colors import Normalize
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.visualize import (
     NumberArrayType,
     RealArrayType,
     VisualizationProduct,
 )
+from ptychodus.model.parameters import ParameterGroup
 
 from .color_axis import ColorAxis
 from .transformation import ScalarTransformationParameter

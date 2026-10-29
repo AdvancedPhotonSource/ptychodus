@@ -22,10 +22,10 @@ from ptychodus.api.reconstruct import (
     ReconstructorLibrary,
     TrainableReconstructor,
 )
-from ptychodus.api.parameters import StringParameter
-from ptychodus.api.plugins import PluginChooser
-from ptychodus.model.parameters import PluginChooserParameter
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.api.plugins import PluginList
+from ptychodus.model.parameters import StringParameter
+from ptychodus.model.plugins import PluginChooser, PluginChooserParameter
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.processing.api import ProcessingAlgorithmParameter
 
 
@@ -59,15 +59,15 @@ def _selection(
     default: str = '',
 ) -> tuple[ProcessingAlgorithmParameter, StringParameter, StringParameter]:
     """Build the two live selections over *libraries*, as ProcessingCore does."""
-    chooser = PluginChooser[ReconstructorLibrary]()
+    catalog = PluginList[ReconstructorLibrary]()
 
     for name, offered in libraries:
-        chooser.register_plugin(offered, simple_name=name, display_name=name)
+        catalog.register_plugin(offered, simple_name=name, display_name=name)
 
     group = SettingsRegistry().create_group('Processing')
     library_setting = group.create_string_parameter('Library', library)
     algorithm_setting = group.create_string_parameter('Algorithm', algorithm)
-    library_parameter = PluginChooserParameter(chooser, library_setting)
+    library_parameter = PluginChooserParameter(PluginChooser(catalog), library_setting)
 
     return (
         ProcessingAlgorithmParameter(algorithm_setting, library_parameter, default=default),

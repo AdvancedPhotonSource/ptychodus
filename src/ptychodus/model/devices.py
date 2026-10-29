@@ -17,7 +17,8 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from ptychodus.api.devices import Device, probe_devices, visibility_environment
-from ptychodus.api.parameters import Parameter
+
+from .parameters import Parameter
 
 __all__ = ['DeviceSelection']
 

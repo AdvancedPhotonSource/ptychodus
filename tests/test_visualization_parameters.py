@@ -14,8 +14,8 @@ and therefore testable -- on an install without PyQt5.
 
 from __future__ import annotations
 
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.visualize import CylindricalColorModel, ScalarTransformation
+from ptychodus.model.observer import Observable, Observer
 from ptychodus.controller.rendering.color_model import CylindricalColorModelParameter
 from ptychodus.controller.rendering.colormap import ColormapParameter
 from ptychodus.controller.rendering.transformation import ScalarTransformationParameter

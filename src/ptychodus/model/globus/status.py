@@ -4,10 +4,9 @@ from datetime import datetime, timezone
 from typing import overload
 import queue
 
-from ptychodus.api.observer import ObservableSequence
-
-from .settings import GlobusSettings
+from ..observer import ObservableSequence
 from .client import GlobusClient, GlobusStatus
+from .settings import GlobusSettings
 
 
 class GlobusStatusRepository(ObservableSequence[GlobusStatus]):

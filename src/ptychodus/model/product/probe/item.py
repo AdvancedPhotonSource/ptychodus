@@ -4,8 +4,6 @@ import logging
 import numpy
 
 from ptychodus.api.geometry import GeometryNotDefinedError
-from ptychodus.api.observer import Observable
-from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.probe import (
     ProbeEntropyMetrics,
     ProbeGeometryProvider,
@@ -15,6 +13,8 @@ from ptychodus.api.probe import (
     estimate_probe_size,
 )
 
+from ...observer import Observable
+from ...parameters import ParameterGroup
 from .builder import FromMemoryProbeBuilder, ProbeEnsembleBuilder
 from .settings import ProbeSettings
 

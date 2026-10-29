@@ -1,7 +1,6 @@
 from pathlib import Path
 import logging
 
-
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.diffraction import (
     BadPixels,
@@ -18,10 +17,9 @@ from ptychodus.api.diffraction import (
     PixelMapFileReader,
     SimpleDiffractionDataset,
 )
-from ptychodus.api.plugins import PluginChooser
 
 from ..file_types import FileTypeChooser
-from ..parameters import PluginChooserParameter
+from ..plugins import PluginChooser, PluginChooserParameter
 from .dataset import AssembledDiffractionDataset
 from .repository import DiffractionDatasetRepository
 from .settings import DiffractionSettings

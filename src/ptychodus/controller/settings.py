@@ -7,8 +7,8 @@ import logging
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QStringListModel
 from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QTableView
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.observer import Observable, Observer
+from ptychodus.model.settings import SettingsRegistry
 
 from ..model.product import ProductRepository
 from ..view.settings import SettingsView, SyncProductToSettingsDialog

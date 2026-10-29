@@ -17,9 +17,9 @@ import pytest
 from ptychodus.api.accumulate import DiffractionMoments
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry
-from ptychodus.api.observer import Observable
 from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider, ProbeEnsemble
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.observer import Observable
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.product.probe.builder import FromMemoryProbeBuilder, ProbeEnsembleBuilder
 from ptychodus.model.product.probe.item import ProbeRepositoryItem
 from ptychodus.model.product.probe.settings import ProbeSettings

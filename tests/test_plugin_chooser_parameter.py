@@ -13,10 +13,10 @@ No Qt is required — this is pure model-layer behavior.
 
 from __future__ import annotations
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parameters import ParameterGroup, StringParameter
-from ptychodus.api.plugins import PluginChooser
-from ptychodus.model.parameters import PluginChooserParameter
+from ptychodus.api.plugins import PluginList
+from ptychodus.model.observer import Observable, Observer
+from ptychodus.model.parameters import ParameterGroup, StringParameter
+from ptychodus.model.plugins import PluginChooser, PluginChooserParameter
 
 # Display names deliberately chosen so that simple_name != display_name for
 # most of them: re.sub(r'\W+', '', ...) strips the space and the hyphen.
@@ -40,12 +40,12 @@ def _build(
     default: str = 'Richardson-Lucy',
 ) -> tuple[PluginChooserParameter[str], StringParameter]:
     settings = _make_settings(default)
-    chooser = PluginChooser[str]()
+    catalog = PluginList[str]()
 
     for display_name in DISPLAY_NAMES:
-        chooser.register_plugin(display_name, display_name=display_name)
+        catalog.register_plugin(display_name, display_name=display_name)
 
-    return PluginChooserParameter(chooser, settings), settings
+    return PluginChooserParameter(PluginChooser(catalog), settings), settings
 
 
 def test_value_is_display_name_while_settings_hold_simple_name() -> None:
@@ -76,7 +76,7 @@ def test_set_value_by_display_name_moves_chooser_and_settles() -> None:
 
     assert chooser_parameter.get_value() == 'Unsupervised Wiener'
     assert settings.get_value() == 'UnsupervisedWiener'
-    # One notification, not a cascade: the chooser's index guard breaks the loop.
+    # One notification, not a cascade: the chooser's identity guard breaks the loop.
     assert counter.count == 1
 
 
@@ -179,9 +179,10 @@ def test_copy_is_an_unbound_view() -> None:
 
 def test_binding_normalizes_a_persisted_display_name() -> None:
     settings = _make_settings('Richardson-Lucy')
-    chooser: PluginChooser[str] = PluginChooser()
-    chooser.register_plugin('i', display_name='Identity')
-    chooser.register_plugin('r', display_name='Richardson-Lucy')
+    catalog: PluginList[str] = PluginList()
+    catalog.register_plugin('i', display_name='Identity')
+    catalog.register_plugin('r', display_name='Richardson-Lucy')
+    chooser = PluginChooser(catalog)
 
     PluginChooserParameter(chooser, settings)
 
@@ -191,9 +192,10 @@ def test_binding_normalizes_a_persisted_display_name() -> None:
 
 def test_binding_leaves_a_persisted_simple_name_alone() -> None:
     settings = _make_settings('RichardsonLucy')
-    chooser: PluginChooser[str] = PluginChooser()
-    chooser.register_plugin('i', display_name='Identity')
-    chooser.register_plugin('r', display_name='Richardson-Lucy')
+    catalog: PluginList[str] = PluginList()
+    catalog.register_plugin('i', display_name='Identity')
+    catalog.register_plugin('r', display_name='Richardson-Lucy')
+    chooser = PluginChooser(catalog)
 
     PluginChooserParameter(chooser, settings)
 
@@ -203,14 +205,15 @@ def test_binding_leaves_a_persisted_simple_name_alone() -> None:
 def test_binding_normalizes_even_at_index_zero() -> None:
     """The selection does not move, but the persisted value must still be canonical.
 
-    'Alpha-Plugin' sorts first, so binding to it leaves _current_index at 0. An
-    earlier implementation gated the write-back on the index changing, which left
-    a display name sitting in the INI forever.
+    'Alpha-Plugin' sorts first, so binding to it leaves the selection where it
+    started. An earlier implementation gated the write-back on the selection
+    changing, which left a display name sitting in the INI forever.
     """
     settings = _make_settings('Alpha-Plugin')
-    chooser: PluginChooser[str] = PluginChooser()
-    chooser.register_plugin('a', display_name='Alpha-Plugin')
-    chooser.register_plugin('z', display_name='Zeta-Plugin')
+    catalog: PluginList[str] = PluginList()
+    catalog.register_plugin('a', display_name='Alpha-Plugin')
+    catalog.register_plugin('z', display_name='Zeta-Plugin')
+    chooser = PluginChooser(catalog)
 
     PluginChooserParameter(chooser, settings)
 
@@ -225,9 +228,10 @@ def test_unknown_name_holds_selection_and_setting_but_notifies() -> None:
     view is resynchronized.
     """
     settings = _make_settings('Identity')
-    chooser: PluginChooser[str] = PluginChooser()
-    chooser.register_plugin('i', display_name='Identity')
-    chooser.register_plugin('w', display_name='Wiener')
+    catalog: PluginList[str] = PluginList()
+    catalog.register_plugin('i', display_name='Identity')
+    catalog.register_plugin('w', display_name='Wiener')
+    chooser = PluginChooser(catalog)
     chooser_parameter = PluginChooserParameter(chooser, settings)
 
     settings.set_value('MissingPlugin')
@@ -240,44 +244,6 @@ def test_unknown_name_holds_selection_and_setting_but_notifies() -> None:
     assert counter.count == 1
 
 
-def test_registration_does_not_repoint_the_selection() -> None:
-    """register_plugin re-sorts by display name; the selected plugin must survive it."""
-    settings = _make_settings('Zeta')
-    chooser: PluginChooser[str] = PluginChooser()
-    chooser.register_plugin('m', display_name='Middle')
-    chooser.register_plugin('z', display_name='Zeta')
-    PluginChooserParameter(chooser, settings)
-
-    chooser.register_plugin('a', display_name='Alpha')
-
-    assert chooser.get_current_plugin().display_name == 'Zeta'
-    assert settings.get_value() == 'Zeta'
-
-
-def test_registration_does_not_clobber_an_unresolved_setting() -> None:
-    settings = _make_settings('MissingPlugin')
-    chooser: PluginChooser[str] = PluginChooser()
-    chooser.register_plugin('m', display_name='Middle')
-    PluginChooserParameter(chooser, settings)
-
-    chooser.register_plugin('a', display_name='Alpha')
-
-    assert settings.get_value() == 'MissingPlugin'
-
-
-def test_late_registration_settles_an_empty_chooser_onto_the_persisted_name() -> None:
-    """Binding before plugins are registered must still honor the persisted choice."""
-    settings = _make_settings('Zeta')
-    chooser: PluginChooser[str] = PluginChooser()
-    chooser_parameter = PluginChooserParameter(chooser, settings)
-
-    chooser.register_plugin('a', display_name='Alpha')
-    chooser.register_plugin('z', display_name='Zeta')
-
-    assert chooser_parameter.get_value() == 'Zeta'
-    assert settings.get_value() == 'Zeta'
-
-
 def test_two_adapters_over_one_chooser_both_track_it() -> None:
     """The single-binding slot that synchronize_with_parameter had is gone.
 
@@ -286,9 +252,10 @@ def test_two_adapters_over_one_chooser_both_track_it() -> None:
     """
     settings_a = _make_settings('Alpha')
     settings_b = _make_settings('Alpha')
-    chooser: PluginChooser[str] = PluginChooser()
-    chooser.register_plugin('a', display_name='Alpha')
-    chooser.register_plugin('z', display_name='Zeta')
+    catalog: PluginList[str] = PluginList()
+    catalog.register_plugin('a', display_name='Alpha')
+    catalog.register_plugin('z', display_name='Zeta')
+    chooser = PluginChooser(catalog)
 
     parameter_a = PluginChooserParameter(chooser, settings_a)
     parameter_b = PluginChooserParameter(chooser, settings_b)

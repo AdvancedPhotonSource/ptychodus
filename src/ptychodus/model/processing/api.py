@@ -5,7 +5,7 @@ import time
 
 from pydantic import BaseModel
 
-from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.plugins import PluginCatalog
 from ptychodus.api.reconstruct import (
     NullReconstructor,
     PositionIndexFilter,
@@ -17,11 +17,10 @@ from ptychodus.api.reconstruct import (
     prepare_reconstruct_input,
 )
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parameters import Parameter, StringParameter
-
 from ..naming import split_name_counter
-from ..parameters import PluginChooserParameter
+from ..observer import Observable, Observer
+from ..parameters import Parameter, StringParameter
+from ..plugins import PluginChooserParameter
 from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .parameter_store import ProcessingParameterStore
@@ -240,7 +239,7 @@ class ProcessingAPI:
         algorithms_by_library: Mapping[str, Sequence[str]],
         task_monitor: ProcessingTaskMonitor,
         parameter_store: ProcessingParameterStore,
-        training_data_file_writers: PluginChooser[TrainingDataFileWriter],
+        training_data_file_writers: PluginCatalog[TrainingDataFileWriter],
     ) -> None:
         self._task_manager = task_manager
         self._product_api = product_api

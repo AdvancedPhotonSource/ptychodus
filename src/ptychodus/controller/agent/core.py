@@ -14,8 +14,8 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parameters import StringParameter
+from ptychodus.model.observer import Observable, Observer
+from ptychodus.model.parameters import StringParameter
 
 from ...model.agent import (
     AgentSettings,

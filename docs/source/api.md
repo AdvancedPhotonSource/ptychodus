@@ -153,28 +153,10 @@
    :show-inheritance:
 ```
 
-## Observer
-
-```{eval-rst}
-.. automodule:: ptychodus.api.observer
-   :members:
-   :undoc-members:
-   :show-inheritance:
-```
-
 ## Parallax
 
 ```{eval-rst}
 .. automodule:: ptychodus.api.parallax
-   :members:
-   :undoc-members:
-   :show-inheritance:
-```
-
-## Parameters
-
-```{eval-rst}
-.. automodule:: ptychodus.api.parameters
    :members:
    :undoc-members:
    :show-inheritance:
@@ -258,15 +240,6 @@
 
 ```{eval-rst}
 .. automodule:: ptychodus.api.reconstruct
-   :members:
-   :undoc-members:
-   :show-inheritance:
-```
-
-## Settings
-
-```{eval-rst}
-.. automodule:: ptychodus.api.settings
    :members:
    :undoc-members:
    :show-inheritance:

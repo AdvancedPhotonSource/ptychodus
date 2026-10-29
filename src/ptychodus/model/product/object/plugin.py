@@ -8,10 +8,10 @@ from typing import Any
 import numpy
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
-from ptychodus.api.parameters import Parameter
 from ptychodus.api.simulate.object import ObjectGenerator
 
 from ...declared import ParameterDescription, describe, restore
+from ...parameters import Parameter
 from .builder import ObjectBuilder
 from .settings import ObjectSettings
 

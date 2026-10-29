@@ -5,8 +5,7 @@ from pathlib import Path
 from typing import overload
 import logging
 
-from ptychodus.api.observer import ObservableSequence
-
+from ..observer import ObservableSequence
 from .settings import AutomationSettings
 
 logger = logging.getLogger(__name__)

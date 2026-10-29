@@ -3,7 +3,7 @@
 import json
 import logging
 
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.genesis.core import create_facility_adapters
 from ptychodus.model.genesis.iri import (
     JobAttributes,

@@ -10,9 +10,9 @@ from ptychodus.api.fluorescence import (
     FluorescenceFileReader,
     FluorescenceFileWriter,
 )
-from ptychodus.api.plugins import PluginChooser
 
 from ..file_types import FileTypeChooser
+from ..plugins import PluginChooser
 from ..processing.parameter_store import ProcessingParameterStore
 from ..product import ProductAPI
 from ..task_manager import TaskManager

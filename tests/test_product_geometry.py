@@ -14,7 +14,7 @@ import pytest
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.geometry import GeometryNotDefinedError, ImageExtent, PixelGeometry
 from ptychodus.api.propagate import compute_magnification
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.product.geometry import ProductGeometryProvider
 from ptychodus.model.product.metadata import MetadataRepositoryItem, UniqueNameFactory
 from ptychodus.model.product.settings import ProductSettings

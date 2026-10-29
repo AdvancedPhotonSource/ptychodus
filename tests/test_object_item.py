@@ -17,9 +17,9 @@ from ptychodus.api.accumulate import DiffractionMoments
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter, ObjectGeometry, ObjectGeometryProvider
-from ptychodus.api.observer import Observable
 from ptychodus.api.probe_positions import ProbePosition
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.observer import Observable
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.product.object.builder import ObjectBuilder
 from ptychodus.model.product.object.item import ObjectRepositoryItem
 from ptychodus.model.product.object.settings import ObjectSettings

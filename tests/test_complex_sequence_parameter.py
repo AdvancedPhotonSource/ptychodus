@@ -13,7 +13,7 @@ import logging
 import pytest
 from pydantic import ValidationError
 
-from ptychodus.api.parameters import ComplexSequenceParameter
+from ptychodus.model.parameters import ComplexSequenceParameter
 
 
 def test_the_string_form_is_pydantic_json_and_round_trips_exactly() -> None:

@@ -30,7 +30,7 @@ import pytest
 
 pytest.importorskip('ptycho_fm')
 
-from ptychodus.api.settings import SettingsRegistry  # noqa: E402
+from ptychodus.model.settings import SettingsRegistry  # noqa: E402
 from ptychodus.model.processing._ptycho_fm_sections import sections  # noqa: E402
 from ptychodus.model.processing.flatten import flatten_options  # noqa: E402
 from ptychodus.model.processing.generate import (  # noqa: E402

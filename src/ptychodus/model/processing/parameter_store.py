@@ -21,12 +21,12 @@ import logging
 
 from pydantic import BaseModel
 
-from ptychodus.api.parameters import Parameter, ParameterGroup
 from ptychodus.api.reconstruct import Reconstructor
-from ptychodus.api.settings import SettingsRegistry
 
 from ..declared import ParameterDescription, declare_in, describe
 from ..declared import apply as apply_declared
+from ..parameters import Parameter, ParameterGroup
+from ..settings import SettingsRegistry
 from .flatten import EnumSpelling, FlatParameter, FlatteningPolicy, flatten_options
 from .generate import apply_options, populate_parameter_group
 

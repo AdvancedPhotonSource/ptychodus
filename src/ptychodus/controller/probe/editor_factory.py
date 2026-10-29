@@ -13,9 +13,9 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.probe import OPRWeightPolicy
-from ptychodus.api.parameters import BooleanParameter, StringParameter
+from ptychodus.model.observer import Observable, Observer
+from ptychodus.model.parameters import BooleanParameter, StringParameter
 
 from ...model.product.probe import (
     INCOHERENT_MODE_STRATEGY_NAMES,

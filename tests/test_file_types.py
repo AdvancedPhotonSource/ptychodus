@@ -14,8 +14,9 @@ import logging
 import pytest
 
 from ptychodus.api.object import Object, ObjectFileReader
-from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.plugins import PluginList
 from ptychodus.model.file_types import FileTypeChooser
+from ptychodus.model.plugins import PluginChooser
 
 
 class _Reader(ObjectFileReader):
@@ -35,10 +36,10 @@ class _Reader(ObjectFileReader):
 
 @pytest.fixture
 def file_types() -> FileTypeChooser[ObjectFileReader]:
-    chooser: PluginChooser[ObjectFileReader] = PluginChooser()
-    chooser.register_plugin(_Reader('Alpha Files', '.alpha'), simple_name='alpha')
-    chooser.register_plugin(_Reader('Beta Files', '.beta'), simple_name='beta')
-    return FileTypeChooser(chooser)
+    readers = PluginList[ObjectFileReader]()
+    readers.register_plugin(_Reader('Alpha Files', '.alpha'), simple_name='alpha')
+    readers.register_plugin(_Reader('Beta Files', '.beta'), simple_name='beta')
+    return FileTypeChooser(PluginChooser(readers))
 
 
 def test_filters_are_the_handlers_own(file_types: FileTypeChooser[ObjectFileReader]) -> None:
@@ -100,7 +101,7 @@ def test_select_an_unknown_name_warns_and_keeps_the_selection(
     """
     file_types.select('beta')
 
-    with caplog.at_level(logging.WARNING, logger='ptychodus.api.plugins'):
+    with caplog.at_level(logging.WARNING, logger='ptychodus.model.plugins'):
         plugin = file_types.select('nonesuch')
 
     assert 'Invalid plugin name' in caplog.text

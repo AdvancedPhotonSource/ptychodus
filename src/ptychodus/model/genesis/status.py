@@ -5,7 +5,8 @@ from typing import overload
 import logging
 import queue
 
-from ptychodus.api.observer import ObservableSequence
+from ..observer import ObservableSequence
+
 
 logger = logging.getLogger(__name__)
 

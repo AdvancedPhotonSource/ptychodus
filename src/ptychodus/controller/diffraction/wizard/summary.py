@@ -21,8 +21,8 @@ from matplotlib.figure import Figure
 
 from ptychodus.api.diffraction import CropRegion, DiffractionPattern
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.preprocess.diffraction import FilterValuesStep
+from ptychodus.model.observer import Observable, Observer
 
 from ....model.diffraction import (
     DiffractionSettings,

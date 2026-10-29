@@ -29,7 +29,7 @@ import time
 from pathlib import Path
 
 from ptychodus.api.io import StandardFileLayout, load_product
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.processing import ProcessingParameterStore
 from ptychodus.model.processing._ptychi_sections import sections_for
 from ptychodus.model.processing.settings import ProcessingSettings

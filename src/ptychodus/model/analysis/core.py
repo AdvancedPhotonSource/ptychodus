@@ -1,9 +1,8 @@
 import numpy
 
-from ptychodus.api.settings import SettingsRegistry
-
 from ..diffraction import DiffractionDatasetRepository
 from ..product import ProbePositionsRepository, ProductRepository
+from ..settings import SettingsRegistry
 from .affine import AffineTransformEstimator
 from .diffraction import DiffractionSimulator
 from .fourier import FourierAnalyzer

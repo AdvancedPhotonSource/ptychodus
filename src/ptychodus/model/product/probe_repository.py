@@ -3,10 +3,10 @@ from typing import overload
 import logging
 
 from ptychodus.api.constants import format_bytes
-from ptychodus.api.observer import ObservableSequence
 from ptychodus.api.product import LossValue
 
 from ..diffraction import AssembledDiffractionDataset
+from ..observer import ObservableSequence
 from .item import ProductRepositoryItem, ProductRepositoryObserver
 from .metadata import MetadataRepositoryItem
 from .object import ObjectRepositoryItem

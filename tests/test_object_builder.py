@@ -40,10 +40,10 @@ from ptychodus.api.object import (
     ObjectGeometry,
     ObjectGeometryProvider,
 )
-from ptychodus.api.plugins import PluginChooser, PluginRegistry
+from ptychodus.api.plugins import PluginCatalog, PluginRegistry
 from ptychodus.api.probe_positions import ProbePosition
-from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.simulate.object import ObjectGenerator
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.product.object.builder import (
     FromFileObjectBuilder,
     FromMemoryObjectBuilder,
@@ -67,7 +67,7 @@ def _make_rng() -> numpy.random.Generator:
 
 
 @cache
-def _object_generators() -> PluginChooser[ObjectGenerator]:
+def _object_generators() -> PluginCatalog[ObjectGenerator]:
     return PluginRegistry.load_plugins().object_generators
 
 

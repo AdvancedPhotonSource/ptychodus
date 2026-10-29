@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.settings import SettingsRegistry
+from ..observer import Observable, Observer
+from ..settings import SettingsRegistry
 
 
 class ProductSettings(Observable, Observer):

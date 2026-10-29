@@ -3,14 +3,13 @@ from collections.abc import Callable
 import logging
 import math
 
-
 from ptychodus.api.constants import format_length
 from ptychodus.api.geometry import GeometryNotDefinedError
 from ptychodus.api.object import Object, ObjectGeometryProvider
-from ptychodus.api.observer import Observable
-from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.probe import ProbeEnsemble
 
+from ...observer import Observable
+from ...parameters import ParameterGroup
 from .builder import FromMemoryObjectBuilder, ObjectBuilder
 from .settings import ObjectSettings
 

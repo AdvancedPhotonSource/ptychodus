@@ -5,8 +5,7 @@ import logging
 
 import numpy
 
-from ptychodus.api.parameters import Parameter
-from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.plugins import PluginCatalog
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
     ProbePositionFileReader,
@@ -16,6 +15,8 @@ from ptychodus.api.simulate.probe_positions import ProbePositionsGenerator
 
 from ...declared import describe
 from ...file_types import FileTypeChooser
+from ...parameters import Parameter
+from ...plugins import PluginChooser
 from .builder import (
     FromFileProbePositionsBuilder,
     FromMemoryProbePositionsBuilder,
@@ -38,7 +39,7 @@ class ProbePositionsBuilderFactory(Iterable[str]):
         self,
         rng: numpy.random.Generator,
         settings: ProbePositionsSettings,
-        generator_chooser: PluginChooser[ProbePositionsGenerator],
+        generator_chooser: PluginCatalog[ProbePositionsGenerator],
         file_reader_chooser: PluginChooser[ProbePositionFileReader],
         file_writer_chooser: PluginChooser[ProbePositionFileWriter],
     ) -> None:

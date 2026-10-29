@@ -5,8 +5,7 @@ import logging
 
 import numpy
 
-from ptychodus.api.parameters import Parameter
-from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.plugins import PluginCatalog
 from ptychodus.api.probe import (
     OPRWeightPolicy,
     ProbeFileReader,
@@ -21,6 +20,8 @@ from ptychodus.api.simulate.probe import (
 
 from ...declared import describe
 from ...file_types import FileTypeChooser
+from ...parameters import Parameter
+from ...plugins import PluginChooser
 from .builder import FromFileProbeBuilder, ProbeEnsembleBuilder
 from .plugin import PluginProbeBuilder
 from .settings import ProbeSettings
@@ -33,9 +34,9 @@ class ProbeBuilderFactory(Iterable[str]):
         self,
         rng: numpy.random.Generator,
         settings: ProbeSettings,
-        generator_chooser: PluginChooser[ProbeGenerator],
-        fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
-        kb_mirror_chooser: PluginChooser[KirkpatrickBaezMirrorPreset],
+        generator_chooser: PluginCatalog[ProbeGenerator],
+        fresnel_zone_plate_chooser: PluginCatalog[FresnelZonePlate],
+        kb_mirror_chooser: PluginCatalog[KirkpatrickBaezMirrorPreset],
         file_reader_chooser: PluginChooser[ProbeFileReader],
         file_writer_chooser: PluginChooser[ProbeFileWriter],
     ) -> None:

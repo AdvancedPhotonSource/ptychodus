@@ -13,16 +13,16 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.reconstruct import (
     ReconstructorLibrary,
     SubprocessReconstructor,
     TrainableReconstructor,
 )
+from ptychodus.model.observer import Observable, Observer
 
 from ...model.genesis import GenesisCore
 from ...model.globus import GlobusCore
-from ...model.parameters import PluginChooserParameter
+from ...model.plugins import PluginChooserParameter
 from ...model.processing import ProcessingAPI, ProcessingAlgorithmParameter
 from ...model.product import ProductRepository
 from ...view.processing import ProcessingActionsView, ProcessingStatusView

@@ -10,7 +10,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 import pytest
 
-from ptychodus.api.parameters import (
+from ptychodus.model.parameters import (
     BooleanParameter,
     Parameter,
     IntegerParameter,
@@ -18,7 +18,7 @@ from ptychodus.api.parameters import (
     RealParameter,
     StringParameter,
 )
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.processing.flatten import (
     EnumSpelling,
     FlatteningPolicy,

@@ -23,8 +23,8 @@ from PyQt5.QtWidgets import (
 
 from ptychodus.api.constants import LengthUnit
 from ptychodus.api.diffraction import Polarization
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parallax import ParallaxEstimate
+from ptychodus.model.observer import Observable, Observer
 
 from ...model.diffraction import (
     AssembledDiffractionDataset,
