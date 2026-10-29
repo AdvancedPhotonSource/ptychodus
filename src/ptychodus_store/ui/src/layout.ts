@@ -90,3 +90,11 @@ function wireSplitterDrag(divider: HTMLElement): void {
     divider.addEventListener('pointercancel', up);
   });
 }
+
+/** A repository's totals under its table, as the desktop's info label sits. */
+export function infoLabel(text: string): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'info-label';
+  el.textContent = text;
+  return el;
+}

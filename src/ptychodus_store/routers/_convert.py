@@ -8,6 +8,7 @@ import math
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ptychodus_store.db import repositories as repo
+from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.propagate import compute_product_geometry
 
@@ -21,9 +22,21 @@ from ptychodus_store.routers.schemas import (
 )
 
 
+def row_label(row: object) -> str:
+    """Display name of a row: a diffraction dataset's label, a product's name."""
+    return str(getattr(row, 'label', '') or getattr(row, 'name', '') or '')
+
+
 async def _edges_for(session: AsyncSession, uuid: UUID) -> list[DerivedFromEdge]:
     edges = await repo.outgoing_edges(session, uuid)
-    return [DerivedFromEdge(kind=e.target_kind, uuid=e.target_uuid) for e in edges]
+    out: list[DerivedFromEdge] = []
+
+    for edge in edges:
+        target = await repo.get_row_by_kind(session, edge.target_kind, edge.target_uuid)
+        label = row_label(target) if target is not None else ''
+        out.append(DerivedFromEdge(kind=edge.target_kind, uuid=edge.target_uuid, label=label))
+
+    return out
 
 
 async def diffraction_to_read(session: AsyncSession, row: Diffraction) -> DiffractionRead:
@@ -77,6 +90,13 @@ async def product_to_read(session: AsyncSession, row: Product) -> ProductRead:
     data = ProductRead.model_validate(row)
     data.derived_from = await _edges_for(session, row.uuid)
 
+    if row.object_layers is not None:
+        # N layers are separated by N-1 spacings, so a single layer is zero thick.
+        data.object_total_thickness_m = sum(row.object_layer_spacing_m)
+
+    if row.photon_energy_eV is not None and row.photon_energy_eV > 0.0:
+        data.photon_wavelength_m = energy_eV_to_wavelength_m(row.photon_energy_eV)
+
     if row.photon_energy_eV is None or row.detector_distance_m is None:
         # Without these nothing downstream is meaningful; leave the derived block null.
         return data
@@ -104,8 +124,16 @@ async def product_to_read(session: AsyncSession, row: Product) -> ProductRead:
     data.object_plane_propagation_distance_m = _finite_or_none(
         geometry.object_plane_propagation_distance_m
     )
+    data.magnification = _finite_or_none(geometry.magnification)
 
     if detector is not None:
+        object_plane_pixel_geometry = geometry.object_plane_pixel_geometry
+
+        # A degenerate geometry reports a zero pitch rather than a divergent one.
+        if object_plane_pixel_geometry.width_m > 0.0 and object_plane_pixel_geometry.height_m > 0.0:
+            data.object_plane_pixel_width_m = object_plane_pixel_geometry.width_m
+            data.object_plane_pixel_height_m = object_plane_pixel_geometry.height_m
+
         data.fresnel_number = _finite_or_none(geometry.fresnel_number)
         data.detector_numerical_aperture = _finite_or_none(geometry.detector_numerical_aperture)
         data.depth_of_field_m = _finite_or_none(geometry.depth_of_field_m)

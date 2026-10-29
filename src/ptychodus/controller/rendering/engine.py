@@ -34,7 +34,7 @@ class VisualizationEngine(Observable, Observer):
                 self._color_axis,
                 acyclic_colormap,
             ),
-            display_name='Real',
+            display_name=ComplexComponent.REAL.display_name,
         )
 
         if is_complex:
@@ -47,7 +47,7 @@ class VisualizationEngine(Observable, Observer):
                     self._color_axis,
                     acyclic_colormap,
                 ),
-                display_name='Imaginary',
+                display_name=ComplexComponent.IMAGINARY.display_name,
             )
             renderers.register_plugin(
                 ColormapRenderer(
@@ -56,7 +56,7 @@ class VisualizationEngine(Observable, Observer):
                     self._color_axis,
                     acyclic_colormap,
                 ),
-                display_name='Amplitude',
+                display_name=ComplexComponent.AMPLITUDE.display_name,
             )
             renderers.register_plugin(
                 ColormapRenderer(
@@ -65,7 +65,7 @@ class VisualizationEngine(Observable, Observer):
                     self._color_axis,
                     cyclic_colormap,
                 ),
-                display_name='Phase',
+                display_name=ComplexComponent.PHASE_RAD.display_name,
             )
             renderers.register_plugin(
                 ColormapRenderer(
@@ -74,7 +74,7 @@ class VisualizationEngine(Observable, Observer):
                     self._color_axis,
                     acyclic_colormap,
                 ),
-                display_name='Phase (Unwrapped)',
+                display_name=ComplexComponent.UNWRAPPED_PHASE_RAD.display_name,
             )
             renderers.register_plugin(
                 CylindricalColorModelRenderer(

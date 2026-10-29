@@ -23,6 +23,16 @@ class RenderedImage(BaseModel):
     pixel_height_m: float = Field(description='Physical pixel height in meters.')
     shape_h_px: int = Field(description='Rendered image height in pixels.')
     shape_w_px: int = Field(description='Rendered image width in pixels.')
+    legend_rgba: list[list[float]] = Field(
+        default=[],
+        description=(
+            'Color legend as RGBA stops in [0, 1], evenly spaced from color_value_min '
+            'to color_value_max, or once around the hue wheel when legend_cyclic.'
+        ),
+    )
+    legend_cyclic: bool = Field(
+        default=False, description='True when the legend wraps around, as phase does.'
+    )
 
 
 class PlotImage(BaseModel):
@@ -40,10 +50,17 @@ class PlotImage(BaseModel):
 
 
 class OptionsRead(BaseModel):
-    """Enumeration of valid choices a client may pass to visualization endpoints."""
+    """Enumeration of valid choices a client may pass to visualization endpoints.
+
+    Each list holds the values the render endpoints accept. The label maps carry the
+    names the desktop shows for the same choices, keyed by those values.
+    """
 
     colormaps_linear: list[str]
     colormaps_cyclic: list[str]
     transforms: list[str]
     components: list[str]
     color_models: list[str]
+    transform_labels: dict[str, str] = {}
+    component_labels: dict[str, str] = {}
+    color_model_labels: dict[str, str] = {}

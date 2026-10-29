@@ -85,7 +85,9 @@ async def test_mcp_tools_registered_and_callable(
         'render_diffraction_aggregate',
         'render_probe',
         'render_probe_modes',
+        'render_object',
         'render_object_layer',
+        'render_fluorescence_summary',
         'render_fluorescence_element',
     }
     assert expected.issubset(names), f'missing MCP tools: {expected - names}'
@@ -125,7 +127,7 @@ async def test_mcp_get_visualization_options(bound_mcp: FastMCP) -> None:
     payload = _structured(result)
     assert 'amplitude' in payload['components']
     assert 'hsv_value' in payload['color_models']
-    assert payload['transforms'] == ['identity', 'sqrt', 'log2', 'log', 'log10']
+    assert payload['transforms'] == ['identity', 'log10', 'log2', 'log', 'sqrt']
 
 
 async def test_mcp_render_diffraction_pattern(
@@ -215,6 +217,30 @@ async def test_mcp_render_fluorescence_element(
     result = await bound_mcp.call_tool(
         'render_fluorescence_element', {'uuid': str(f), 'name': 'Fe'}
     )
+    _decode_image_content(result, expected_h=6, expected_w=10)
+
+
+async def test_mcp_render_object(
+    bound_mcp: FastMCP,
+    session_provider: SessionProvider,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
+) -> None:
+    p = seed_product()
+    await _ingest(session_provider, layout, layout.manifest_path('product', p))
+    result = await bound_mcp.call_tool('render_object', {'uuid': str(p)})
+    _decode_image_content(result, expected_h=16, expected_w=16)
+
+
+async def test_mcp_render_fluorescence_summary(
+    bound_mcp: FastMCP,
+    session_provider: SessionProvider,
+    layout: StoreLayout,
+    seed_fluorescence: Callable[..., UUID],
+) -> None:
+    f = seed_fluorescence(elements=['Fe', 'Cu'])
+    await _ingest(session_provider, layout, layout.manifest_path('fluorescence', f))
+    result = await bound_mcp.call_tool('render_fluorescence_summary', {'uuid': str(f)})
     _decode_image_content(result, expected_h=6, expected_w=10)
 
 

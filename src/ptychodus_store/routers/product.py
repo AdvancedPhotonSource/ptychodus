@@ -117,6 +117,19 @@ async def get_probe_modes_image(
     return render_complex(values, product.probes.get_pixel_geometry(), params)
 
 
+@router.get('/{uuid}/object/image', response_model=RenderedImage)
+async def get_object_image(
+    uuid: UUID,
+    session: SessionDep,
+    layout: LayoutDep,
+    params: RenderParamsDep,
+) -> RenderedImage:
+    """Render the object as the product of its layers, the transmission of the whole stack."""
+    product = await _load_product_or_404(uuid, session, layout)
+    values = product.object_.get_layers_flattened()
+    return render_complex(values, product.object_.get_pixel_geometry(), params)
+
+
 @router.get('/{uuid}/object/{layer}/image', response_model=RenderedImage)
 async def get_object_layer_image(
     uuid: UUID,

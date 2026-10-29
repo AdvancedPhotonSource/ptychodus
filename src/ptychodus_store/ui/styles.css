@@ -6,7 +6,7 @@
   --fg-muted: #9ea0a6;
   --accent: #4ea1ff;
   --border: #3a3b40;
-  --nav-w: 3.5rem;
+  --nav-w: 6.5rem;
   --left-w: 20rem;
   --left-min: 14rem;
   --divider: 4px;
@@ -41,19 +41,24 @@ body {
   gap: 0.25rem;
 }
 
+/* Text under the icon, as the desktop toolbar lays out its buttons. */
 .nav button {
-  width: 2.5rem;
-  height: 2.5rem;
-  padding: 0.375rem;
+  width: 5.75rem;
+  padding: 0.375rem 0.25rem;
   border: none;
   border-left: 3px solid transparent;
   background: transparent;
   color: var(--fg-muted);
   cursor: pointer;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 0.25rem;
   border-radius: 0 4px 4px 0;
+  font: inherit;
+  font-size: 0.8em;
+  line-height: 1.2;
 }
 .nav button:hover { background: var(--bg-panel-2); color: var(--fg); }
 .nav button.active {
@@ -62,15 +67,16 @@ body {
   color: var(--fg);
 }
 .nav button img {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.75rem;
+  height: 1.75rem;
   filter: invert(100%) brightness(85%);
   pointer-events: none;
 }
 .nav button.active img { filter: invert(100%) brightness(100%); }
 
 /* Child entries of a nav group: a rail down the left and an indent, the same
-   3px/14px the desktop nav uses, with a smaller icon to mark the second level. */
+   3px/14px the desktop nav uses, with the desktop's 3/4-size icon to mark the
+   second level. */
 .nav-group {
   display: flex;
   flex-direction: column;
@@ -78,9 +84,11 @@ body {
   margin-left: 14px;
 }
 
+.nav-group button { width: calc(5.75rem - 17px); }
+
 .nav-group button img {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1.3125rem;
+  height: 1.3125rem;
 }
 
 .nav-spacer { flex: 1; }
@@ -411,3 +419,81 @@ body {
 }
 
 .ribbon-group input[type='number'] { width: 7ch; }
+
+/* --- row state --------------------------------------------------------- */
+/* As the desktop shows an item still loading (italic) or one that failed
+   (struck through), both greyed out. */
+.row-pending,
+.row-failed { color: var(--fg-muted); }
+.row-pending { font-style: italic; }
+.row-failed { text-decoration: line-through; }
+.data-table tbody tr.row-pending td,
+.data-table tbody tr.row-failed td { color: var(--fg-muted); }
+
+/* --- repository totals ---------------------------------------------------- */
+.info-label {
+  padding: 0.5rem 0.25rem 0;
+  color: var(--fg-muted);
+  font-size: 0.85em;
+}
+
+/* --- ribbon buttons --------------------------------------------------- */
+.ribbon-group button {
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--fg);
+  border-radius: 3px;
+  cursor: pointer;
+  font: inherit;
+}
+.ribbon-group button:hover { border-color: var(--accent); }
+.ribbon-group button[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0a0a0a;
+}
+
+/* --- color legend ------------------------------------------------------ */
+/* Drawn over the image as the desktop paints it in the view's foreground: a bar
+   with five ticks at the right edge, or a disc in the corner for a cyclic map. */
+.image-panel .image-wrap { position: relative; }
+
+.color-legend {
+  position: absolute;
+  pointer-events: none;
+}
+
+.color-legend.linear {
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 0.375rem;
+  height: 9rem;
+}
+
+.color-legend-bar {
+  width: 1.25rem;
+  border: 2px solid #000;
+}
+
+.color-legend-ticks {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #fff;
+  font-size: 0.75em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 2px #000, 0 0 2px #000;
+  margin: -0.4em 0;
+}
+
+.color-legend.cyclic {
+  right: 0.75rem;
+  bottom: 0.75rem;
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  border: 2px solid #000;
+}

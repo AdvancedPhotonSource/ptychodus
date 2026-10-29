@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
+import numpy
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy import String, exists, func, select
@@ -91,6 +92,34 @@ async def _resolve_product_pixel_geometry(
     if not path.is_file():
         raise HTTPException(status_code=404, detail='product.h5 not present on disk')
     return load_product(path).object_.get_pixel_geometry()
+
+
+@router.get('/{uuid}/image', response_model=RenderedImage)
+async def get_fluorescence_summary_image(
+    uuid: UUID,
+    session: SessionDep,
+    layout: LayoutDep,
+    params: RenderParamsDep,
+    product_uuid: UUID | None = Query(
+        None,
+        description='Optional paired product for physical pixel geometry.',
+    ),
+) -> RenderedImage:
+    """Render the elementwise sum of every element map in the dataset."""
+    row = await repo.get_row(session, Fluorescence, uuid)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f'fluorescence {uuid} not found')
+    path = layout.resource_folder(ResourceKind.FLUORESCENCE, uuid) / 'fluorescence.h5'
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail='fluorescence.h5 not present on disk')
+
+    dataset = load_fluorescence_data(path)
+    if not len(dataset):
+        raise HTTPException(status_code=404, detail='fluorescence dataset has no element maps')
+
+    summary = numpy.sum([emap.counts_per_second for emap in dataset], axis=0)
+    pixel_geometry = await _resolve_product_pixel_geometry(product_uuid, session, layout)
+    return render_real(summary, pixel_geometry, params, value_label='counts/s')
 
 
 @router.get('/{uuid}/elements/{name}/image', response_model=RenderedImage)

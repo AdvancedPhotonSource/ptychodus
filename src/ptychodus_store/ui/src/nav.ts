@@ -48,7 +48,10 @@ export function renderNav(root: HTMLElement, current: string, onSelect: (route: 
     const img = document.createElement('img');
     img.src = `/ui/icons/${entry.icon}`;
     img.alt = '';
-    btn.appendChild(img);
+    // The label sits under the icon, as the desktop toolbar's buttons carry theirs.
+    const text = document.createElement('span');
+    text.textContent = entry.label;
+    btn.append(img, text);
     btn.addEventListener('click', () => onSelect(entry.route));
     return btn;
   };

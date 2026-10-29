@@ -6,6 +6,7 @@ from ptychodus_store.rendering.params import (
     RenderParams,
     coerce_render_params,
     render_params_dep,
+    visualization_options,
 )
 from ptychodus_store.rendering.render import (
     RenderParamsError,
@@ -29,4 +30,5 @@ __all__ = [
     'render_complex',
     'render_params_dep',
     'render_real',
+    'visualization_options',
 ]

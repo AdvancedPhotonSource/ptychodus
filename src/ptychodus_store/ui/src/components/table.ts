@@ -1,5 +1,7 @@
 /** Column-bearing, sortable table with an optional checkbox column. */
 
+import type { RowState } from '../format.js';
+
 export interface Column<T> {
   header: string;
   render: (row: T) => string;
@@ -9,8 +11,13 @@ export interface Column<T> {
 }
 
 export interface TableOptions<T> {
-  /** Adds a leading checkbox column, as the desktop Positions panel has. */
-  checkbox?: { header: string; onChange: (checked: T[]) => void };
+  /**
+   * Adds a checkbox column, as the desktop Positions panel has, before the column
+   * at `position` (default 0). `onChange` receives the checked rows in table order.
+   */
+  checkbox?: { header: string; onChange: (checked: T[]) => void; position?: number };
+  /** Styles a row whose data is not usable, with the reason as its tooltip. */
+  rowState?: (row: T) => RowState | null;
 }
 
 export interface DataTable<T> {
@@ -52,14 +59,17 @@ export function createTable<T>(
   let selectedIndex: number | null = null;
   const checked = new Set<T>();
 
-  if (options.checkbox) {
+  const checkPosition = options.checkbox?.position ?? 0;
+
+  const checkHeader = (): void => {
     const th = document.createElement('th');
     th.className = 'check-col';
-    th.textContent = options.checkbox.header;
+    th.textContent = options.checkbox!.header;
     trHead.appendChild(th);
-  }
+  };
 
   columns.forEach((col, i) => {
+    if (options.checkbox && i === checkPosition) checkHeader();
     const th = document.createElement('th');
     th.textContent = col.header;
     if (col.numeric) th.classList.add('numeric');
@@ -68,11 +78,18 @@ export function createTable<T>(
       sort =
         sort && sort.column === i ? { column: i, descending: !sort.descending } : { column: i, descending: false };
       draw();
+      // The checked rows are reported in table order, which a re-sort changes.
+      if (checked.size > 0) notifyChecked();
     });
     trHead.appendChild(th);
   });
 
+  if (options.checkbox && checkPosition >= columns.length) checkHeader();
   thead.appendChild(trHead);
+
+  const notifyChecked = (): void => {
+    options.checkbox?.onChange(sorted().filter((r) => checked.has(r)));
+  };
 
   function sorted(): T[] {
     if (sort === null) return rows;
@@ -92,8 +109,13 @@ export function createTable<T>(
 
     ordered.forEach((row, i) => {
       const tr = document.createElement('tr');
+      const state = options.rowState?.(row) ?? null;
+      if (state !== null) {
+        tr.classList.add(state.className);
+        tr.title = state.title;
+      }
 
-      if (options.checkbox) {
+      const checkCell = (): void => {
         const td = document.createElement('td');
         td.className = 'check-col';
         const box = document.createElement('input');
@@ -103,18 +125,21 @@ export function createTable<T>(
         box.addEventListener('change', () => {
           if (box.checked) checked.add(row);
           else checked.delete(row);
-          options.checkbox!.onChange(rows.filter((r) => checked.has(r)));
+          notifyChecked();
         });
         td.appendChild(box);
         tr.appendChild(td);
-      }
+      };
 
-      for (const col of columns) {
+      columns.forEach((col, c) => {
+        if (options.checkbox && c === checkPosition) checkCell();
         const td = document.createElement('td');
         if (col.numeric) td.classList.add('numeric');
         td.textContent = col.render(row);
         tr.appendChild(td);
-      }
+      });
+
+      if (options.checkbox && checkPosition >= columns.length) checkCell();
 
       if (i === selectedIndex) tr.classList.add('selected');
       tr.addEventListener('click', () => {
@@ -138,5 +163,5 @@ export function createTable<T>(
     draw();
   }
 
-  return { el, setRows, setSelected, getChecked: () => rows.filter((r) => checked.has(r)) };
+  return { el, setRows, setSelected, getChecked: () => sorted().filter((r) => checked.has(r)) };
 }

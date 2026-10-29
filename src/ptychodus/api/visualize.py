@@ -297,6 +297,16 @@ class ComplexComponent(Enum):
     UNWRAPPED_PHASE_RAD = auto()
 
     @property
+    def display_name(self) -> str:
+        match self:
+            case ComplexComponent.PHASE_RAD:
+                return 'Phase'
+            case ComplexComponent.UNWRAPPED_PHASE_RAD:
+                return 'Phase (Unwrapped)'
+
+        return self.name.title()
+
+    @property
     def is_cyclic(self) -> bool:
         return self is ComplexComponent.PHASE_RAD
 
@@ -327,6 +337,24 @@ class ScalarTransformation(Enum):
     LOG2 = auto()
     LOG = auto()
     LOG10 = auto()
+
+    @property
+    def simple_name(self) -> str:
+        return 'ln' if self is ScalarTransformation.LOG else self.name.lower()
+
+    @property
+    def display_name(self) -> str:
+        match self:
+            case ScalarTransformation.SQRT:
+                return 'Square Root'
+            case ScalarTransformation.LOG2:
+                return 'Logarithm (Base 2)'
+            case ScalarTransformation.LOG:
+                return 'Natural Logarithm'
+            case ScalarTransformation.LOG10:
+                return 'Logarithm (Base 10)'
+
+        return 'Identity'
 
     def decorate_text(self, text: str) -> str:
         match self:

@@ -69,6 +69,7 @@ __all__ = [
     'load_diffraction_data',
     'load_fluorescence_data',
     'load_product',
+    'read_photon_energy_eV',
     'save_cxi_diffraction',
     'save_cxi_product',
     'save_cxi_reconstruct_input',
@@ -302,7 +303,7 @@ class ProductFileKeys(StrEnum):
     LOSS_VALUES = 'loss_values'
 
 
-def _read_photon_energy_eV(h5_file: h5py.File) -> float:  # noqa: N802
+def read_photon_energy_eV(h5_file: h5py.File) -> float:  # noqa: N802
     """Read the photon energy, accepting the pre-rename attribute name.
 
     Unlike the other product attributes this one has no sensible default -- every
@@ -351,7 +352,7 @@ def load_product(file: Path) -> Product:
             name=name,
             comments=comments,
             detector_distance_m=float(h5_file.attrs[ProductFileKeys.DETECTOR_OBJECT_DISTANCE]),
-            photon_energy_eV=_read_photon_energy_eV(h5_file),
+            photon_energy_eV=read_photon_energy_eV(h5_file),
             probe_photon_count=probe_photon_count,
             exposure_time_s=exposure_time_s,
             mass_attenuation_m2_per_kg=mass_attenuation_m2_per_kg,

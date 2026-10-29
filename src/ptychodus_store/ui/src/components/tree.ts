@@ -1,6 +1,12 @@
+import type { RowState } from '../format.js';
+
 export interface TreeNode {
   id: string;
   label: string;
+  /** Styles a row whose data is not usable, with the reason as its tooltip. */
+  state?: RowState | null;
+  /** Hover text for the name; a row's state supersedes it. */
+  title?: string;
   /** Values for the columns after the name, in order. */
   cells?: string[];
   loadChildren?: () => Promise<TreeNode[]>;
@@ -23,7 +29,10 @@ export interface TreeRoot {
 const WINDOW_ROWS = 60;
 const ROW_PX = 22;
 
-export function createTree(columns: string[] = []): TreeRoot {
+/** A column header, with hover text where the header alone would mislead. */
+export type TreeColumn = string | { header: string; title: string };
+
+export function createTree(columns: TreeColumn[] = []): TreeRoot {
   const el = document.createElement('div');
   el.className = 'tree';
   let selectedId: string | null = null;
@@ -34,9 +43,14 @@ export function createTree(columns: string[] = []): TreeRoot {
   list.className = 'tree-list';
 
   if (columns.length > 0) {
-    for (const [i, name] of columns.entries()) {
+    for (const [i, column] of columns.entries()) {
       const cell = document.createElement('span');
-      cell.textContent = name;
+      if (typeof column === 'string') {
+        cell.textContent = column;
+      } else {
+        cell.textContent = column.header;
+        cell.title = column.title;
+      }
       if (i > 0) cell.classList.add('numeric');
       header.appendChild(cell);
     }
@@ -44,6 +58,15 @@ export function createTree(columns: string[] = []): TreeRoot {
   }
 
   el.appendChild(list);
+
+  function applyState(row: HTMLElement, node: TreeNode): void {
+    if (node.state) {
+      row.classList.add(node.state.className);
+      row.title = node.state.title;
+    } else if (node.title) {
+      row.title = node.title;
+    }
+  }
 
   function rowContent(node: TreeNode): DocumentFragment {
     const frag = document.createDocumentFragment();
@@ -105,6 +128,7 @@ export function createTree(columns: string[] = []): TreeRoot {
       const summary = document.createElement('summary');
       summary.dataset.nodeId = node.id;
       summary.appendChild(rowContent(node));
+      applyState(summary, node);
       if (node.id === selectedId) summary.classList.add('selected');
       if (node.onSelect) {
         summary.addEventListener('click', () => {
@@ -146,6 +170,7 @@ export function createTree(columns: string[] = []): TreeRoot {
       leaf.className = 'leaf';
       leaf.dataset.nodeId = node.id;
       leaf.appendChild(rowContent(node));
+      applyState(leaf, node);
       if (node.id === selectedId) leaf.classList.add('selected');
       leaf.addEventListener('click', () => {
         setSelected(node.id);

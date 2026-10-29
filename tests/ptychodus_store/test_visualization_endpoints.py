@@ -42,12 +42,25 @@ async def test_visualization_options(app_client: AsyncClient) -> None:
     resp = await app_client.get('/api/v1/visualization/options')
     assert resp.status_code == 200
     body = resp.json()
-    assert body['transforms'] == ['identity', 'sqrt', 'log2', 'log', 'log10']
+    assert body['transforms'] == ['identity', 'log10', 'log2', 'log', 'sqrt']
     assert 'amplitude' in body['components']
     assert 'phase_rad' in body['components']
     assert 'hsv_value' in body['color_models']
     assert len(body['colormaps_linear']) > 0
     assert 'gray' in body['colormaps_linear'] or 'gray' in body['colormaps_cyclic']
+
+
+async def test_visualization_options_follow_the_desktop(app_client: AsyncClient) -> None:
+    """Sorted as the desktop lists them, with the names its combo boxes show."""
+    body = (await app_client.get('/api/v1/visualization/options')).json()
+
+    assert body['colormaps_linear'] == sorted(body['colormaps_linear'])
+    assert body['colormaps_cyclic'] == sorted(body['colormaps_cyclic'])
+    assert body['transform_labels']['log'] == 'Natural Logarithm'
+    assert body['component_labels']['unwrapped_phase_rad'] == 'Phase (Unwrapped)'
+    assert body['color_model_labels']['hsv_value'] == 'HSV Value'
+    labels = [body['component_labels'][c] for c in body['components']]
+    assert labels == sorted(labels)
 
 
 async def test_diffraction_pattern_image(
@@ -343,3 +356,85 @@ async def test_positions_plot_404s_on_an_unknown_product(
 ) -> None:
     resp = await app_client.get('/api/v1/product/positions/image', params={'uuid': str(uuid4())})
     assert resp.status_code == 404
+
+
+@pytest.mark.parametrize(
+    ('params', 'cyclic'),
+    [
+        ({'component': 'amplitude'}, False),
+        ({'component': 'phase_rad', 'colormap': 'colorwheel'}, True),
+        ({'color_model': 'hsv_value'}, True),
+    ],
+)
+async def test_legend_matches_the_renderer(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
+    params: dict[str, str],
+    cyclic: bool,
+) -> None:
+    """Phase and the color models wrap around, so their legends are discs."""
+    p = seed_product()
+    await _ingest(db_engine, layout, layout.manifest_path('product', p))
+
+    body = (await app_client.get(f'/api/v1/product/{p}/object/0/image', params=params)).json()
+
+    assert body['legend_cyclic'] is cyclic
+    assert len(body['legend_rgba']) == 256
+    assert all(
+        len(stop) == 4 and all(0.0 <= c <= 1.0 for c in stop) for stop in body['legend_rgba']
+    )
+
+
+async def test_real_valued_legend_follows_the_colormap(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
+) -> None:
+    d = seed_diffraction()
+    await _ingest(db_engine, layout, layout.manifest_path('diffraction', d))
+
+    body = (
+        await app_client.get(
+            f'/api/v1/diffraction/{d}/patterns/aggregate/image', params={'colormap': 'gray'}
+        )
+    ).json()
+
+    assert body['legend_cyclic'] is False
+    # gray runs from black at the lower bound to white at the upper.
+    assert body['legend_rgba'][0][:3] == pytest.approx([0.0, 0.0, 0.0], abs=0.02)
+    assert body['legend_rgba'][-1][:3] == pytest.approx([1.0, 1.0, 1.0], abs=0.02)
+
+
+async def test_object_flattened_image(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
+) -> None:
+    """The object's own row shows the product of its layers, as the desktop's does."""
+    p = seed_product()
+    await _ingest(db_engine, layout, layout.manifest_path('product', p))
+
+    resp = await app_client.get(f'/api/v1/product/{p}/object/image')
+    assert resp.status_code == 200
+    _decode_png(resp.json(), expected_h=16, expected_w=16)
+
+
+async def test_fluorescence_summary_image(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_fluorescence: Callable[..., UUID],
+) -> None:
+    """The dataset's own row shows every element map summed, as the desktop's does."""
+    f = seed_fluorescence(elements=['Fe', 'Cu'])
+    await _ingest(db_engine, layout, layout.manifest_path('fluorescence', f))
+
+    resp = await app_client.get(f'/api/v1/fluorescence/{f}/image')
+    assert resp.status_code == 200
+    body = resp.json()
+    _decode_png(body, expected_h=6, expected_w=10)
+    assert body['value_label'] == 'counts/s'

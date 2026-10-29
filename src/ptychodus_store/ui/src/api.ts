@@ -1,12 +1,15 @@
 const API = '/api/v1';
 
-export type IngestState = 'valid' | 'invalid' | 'pending';
+/** Mirrors IngestState in db/base.py. */
+export type IngestState = 'DISCOVERED' | 'VALID' | 'INVALID' | 'MISSING_FILES' | 'ORPHANED';
 
 export type Polarization = 'left_circular' | 'right_circular';
 
 export interface DerivedFromEdge {
   kind: 'diffraction' | 'product' | 'fluorescence';
   uuid: string;
+  /** The target's display name; empty when the target is not indexed. */
+  label: string;
 }
 
 export interface Page<T> {
@@ -16,14 +19,19 @@ export interface Page<T> {
   offset: number;
 }
 
-/** Bookkeeping every indexed row carries; see _RowBase in routers/schemas.py. */
-/** Valid choices for the render parameters; enumerated live by the service. */
+/**
+ * Valid choices for the render parameters; enumerated live by the service, each list
+ * in the order the desktop presents it. The label maps give the desktop's names.
+ */
 export interface VisualizationOptions {
   colormaps_linear: string[];
   colormaps_cyclic: string[];
   transforms: string[];
   components: string[];
   color_models: string[];
+  transform_labels: Record<string, string>;
+  component_labels: Record<string, string>;
+  color_model_labels: Record<string, string>;
 }
 
 /** What the viewer ribbon currently asks for. */
@@ -46,6 +54,7 @@ export function renderQuery(params: Partial<RenderParams>): string {
   return parts.join('&');
 }
 
+/** Bookkeeping every indexed row carries; see _RowBase in routers/schemas.py. */
 export interface RowBase {
   uuid: string;
   folder_path: string;
@@ -73,6 +82,7 @@ export interface DiffractionRead extends RowBase {
   crop_center_x_px: number | null;
   crop_center_y_px: number | null;
 
+  // The assembled patterns, so the extent and pixel pitch are the processed ones.
   pattern_dtype: string | null;
   pattern_height_px: number | null;
   pattern_width_px: number | null;
@@ -94,6 +104,7 @@ export interface ProductRead extends RowBase {
   photon_energy_eV: number | null;
   probe_photon_count: number | null;
   exposure_time_s: number | null;
+  i0_photons_per_count: number | null;
   mass_attenuation_m2_per_kg: number | null;
   tomography_angle_deg: number | null;
   tilt_angle_deg: number | null;
@@ -107,10 +118,14 @@ export interface ProductRead extends RowBase {
   object_dtype: string | null;
   object_nbytes: number | null;
   object_layer_spacing_m: number[];
+  object_total_thickness_m: number | null;
 
   probe_modes: number | null;
   probe_height_px: number | null;
   probe_width_px: number | null;
+  probe_pixel_width_m: number | null;
+  probe_pixel_height_m: number | null;
+  probe_coherence: number | null;
   probe_dtype: string | null;
   probe_nbytes: number | null;
   probe_mode_relative_power: number[];
@@ -120,14 +135,18 @@ export interface ProductRead extends RowBase {
   scan_length_m: number | null;
   scan_nbytes: number | null;
 
-  // Derived on read by compute_product_geometry. The last three additionally need
+  // Derived on read by compute_product_geometry. The last five additionally need
   // the detector, so they are null unless derived_from names an indexed diffraction
   // dataset. Non-finite results also arrive as null -- JSON has no infinity.
+  photon_wavelength_m: number | null;
   probe_wavenumber_per_m: number | null;
   probe_angular_wavenumber_rad_per_m: number | null;
   probe_photon_flux_per_s: number | null;
   probe_power_W: number | null;
   object_plane_propagation_distance_m: number | null;
+  magnification: number | null;
+  object_plane_pixel_width_m: number | null;
+  object_plane_pixel_height_m: number | null;
   fresnel_number: number | null;
   detector_numerical_aperture: number | null;
   depth_of_field_m: number | null;
@@ -141,6 +160,7 @@ export interface FluorescenceRead extends RowBase {
 
   element_names: string[];
   element_counts: number[];
+  element_nbytes: number[];
   map_height_px: number | null;
   map_width_px: number | null;
   nbytes: number | null;
@@ -163,6 +183,9 @@ export interface RenderedImage {
   pixel_height_m: number;
   shape_h_px: number;
   shape_w_px: number;
+  /** RGBA stops in [0, 1] from color_value_min to color_value_max, or around the wheel. */
+  legend_rgba: [number, number, number, number][];
+  legend_cyclic: boolean;
 }
 
 async function get<T>(path: string): Promise<T> {
@@ -192,6 +215,9 @@ export const api = {
   listProduct: (limit = 200, offset = 0) =>
     get<Page<ProductRead>>(`/product?limit=${limit}&offset=${offset}`),
   getProduct: (uuid: string) => get<ProductRead>(`/product/${uuid}`),
+  // The product of every layer, which the desktop shows for the object itself.
+  productObjectFlattenedImage: (uuid: string, params: Partial<RenderParams> = {}) =>
+    get<RenderedImage>(`/product/${uuid}/object/image?${renderQuery(params)}`),
   productObjectImage: (uuid: string, layer: number, params: Partial<RenderParams> = {}) =>
     get<RenderedImage>(`/product/${uuid}/object/${layer}/image?${renderQuery(params)}`),
   // The per-mode render: a route the service has always had and the UI never called.
@@ -216,6 +242,15 @@ export const api = {
   getFluorescence: (uuid: string) => get<FluorescenceRead>(`/fluorescence/${uuid}`),
   // product_uuid supplies the pixel geometry; without it the service falls back to a
   // 1 um placeholder and the caption's physical size is wrong.
+  fluorescenceSummaryImage: (
+    uuid: string,
+    productUuid?: string,
+    params: Partial<RenderParams> = {}
+  ) =>
+    get<RenderedImage>(
+      `/fluorescence/${uuid}/image?` +
+        renderQuery({ ...params, ...(productUuid ? { product_uuid: productUuid } : {}) })
+    ),
   fluorescenceElementImage: (
     uuid: string,
     name: string,

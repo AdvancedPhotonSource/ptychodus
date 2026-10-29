@@ -11,7 +11,16 @@ FastAPI service that indexes on-disk ptychodus artifacts (campaigns, diffraction
 
 The browser UI is intentionally **read-only**. It browses artifacts already ingested into the storage root and offers `.h5` downloads from each detail view.
 
-Within that limit it mirrors the desktop app: the navigation rail carries the same entries in the same nesting, the tables and trees carry the same columns as the PyQt repository views, the product detail panel lists the same derived quantities as the desktop property table, and the viewer offers the same colormap, transform and data-range controls. Two columns are absent because the files cannot supply them — **Builder**, which `product.h5` does not record, and the diffraction **Counts**, which would need a pass over every pattern at ingest.
+Within that limit it mirrors the desktop app: the navigation rail carries the same entries in the same nesting, labelled under each icon; the tables and trees carry the same columns, child rows and number formatting as the PyQt repository views, with the same totals beneath them; the product detail panel lists the same rows as the desktop property table; and the viewer offers the same renderers, transforms and colormaps in the same order and with the same defaults, along with a data range written back after each render and a color legend.
+
+Some desktop details are absent because the files cannot supply them:
+
+- **Builder**, which `product.h5` does not record.
+- The diffraction **Counts**, which would need a pass over every pattern at ingest.
+- The raw detector's extent and **Physical Pixel** pitch. `diffraction.h5` holds the assembled patterns, after cropping and binning, so Width, Height and **Processed Pixel** describe those instead.
+- The diffraction frame groups, whose labels are not persisted. Frames hang directly beneath their dataset.
+
+Others are absent by choice: the image tools (pan and zoom, save, ruler, rectangle histogram, line cut, Fourier) and the Measured/Enhanced fluorescence toggle, since enhancing is computation. The web viewer adds what the desktop lacks: a **clip** option, a caption with the physical pixel size, and an About menu on the rail.
 
 Panels with no web counterpart are the ones that write or dispatch: Settings, Processing, Globus, Genesis, Automation and Agent, along with every analysis dialog. Those remain desktop-only (`uv run ptychodus`). Campaigns and lineage are the reverse — a store-only grouping with no desktop counterpart, served over REST and MCP for agents and scripts but not browsed. Any writes to the storage root happen out of band: the desktop app, batch runs (`uv run ptychodus -b reconstruct ...`), or the streaming processor.
 

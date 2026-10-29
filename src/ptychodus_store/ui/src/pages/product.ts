@@ -1,8 +1,16 @@
 import { api, type ProductRead } from '../api.js';
 import { createDownloadBar } from '../components/download_bar.js';
 import { createTable } from '../components/table.js';
-import { buildPageLayout } from '../layout.js';
-import { fmt, fmtBytes, scale } from '../format.js';
+import { buildPageLayout, infoLabel } from '../layout.js';
+import {
+  MISSING,
+  fmt,
+  fmtBytes,
+  ingestRowState,
+  infoText,
+  scale,
+  sumBytes,
+} from '../format.js';
 
 export async function mountProduct(root: HTMLElement): Promise<void> {
   const { page, left, right, setActiveTab } = buildPageLayout('product');
@@ -14,9 +22,11 @@ export async function mountProduct(root: HTMLElement): Promise<void> {
   showEmpty(detail);
 
   let items: ProductRead[] = [];
+  let total = 0;
   try {
     const listing = await api.listProduct();
     items = listing.items;
+    total = listing.total;
   } catch (err) {
     left.replaceChildren(errorBlock(err as Error));
     return;
@@ -30,10 +40,7 @@ export async function mountProduct(root: HTMLElement): Promise<void> {
   const table = createTable<ProductRead>(
     [
       { header: 'Name', render: (p) => p.name ?? p.uuid.slice(0, 8) },
-      {
-        header: 'Diffraction\nDataset',
-        render: (p) => p.derived_from.find((e) => e.kind === 'diffraction')?.uuid.slice(0, 8) ?? '—',
-      },
+      { header: 'Diffraction\nDataset', render: datasetName },
       {
         header: 'Detector-Object\nDistance [m]',
         render: (p) => fmt(p.detector_distance_m),
@@ -52,6 +59,7 @@ export async function mountProduct(root: HTMLElement): Promise<void> {
         sortKey: (p) => p.probe_photon_count,
         numeric: true,
       },
+      { header: 'Far Field', render: (p) => farFieldText(p.far_field) },
       {
         header: 'Pixel Width\n[nm]',
         render: (p) => fmt(scale(p.object_pixel_width_m, 1e9)),
@@ -74,9 +82,10 @@ export async function mountProduct(root: HTMLElement): Promise<void> {
     (row) => {
       setActiveTab('right');
       showDetail(detail, row);
-    }
+    },
+    { rowState: ingestRowState }
   );
-  left.replaceChildren(table.el);
+  left.replaceChildren(table.el, infoLabel(infoText('Products', total, items.map(totalBytes))));
   table.setRows(items);
 }
 
@@ -94,30 +103,34 @@ function showDetail(host: HTMLElement, p: ProductRead): void {
 
   const dl = document.createElement('dl');
   dl.className = 'detail-list';
+  // In the order and with the labels of the desktop's product property table.
   const rows: [string, string][] = [
     ['UUID', p.uuid],
     ['State', p.ingest_state],
-    ['Photon Wavelength [nm]', fmt(scale(reciprocal(p.probe_wavenumber_per_m), 1e9))],
-    ['Photon Wavenumber [1/nm]', fmt(scale(p.probe_wavenumber_per_m, 1e-9))],
-    ['Photon Angular Wavenumber [rad/nm]', fmt(scale(p.probe_angular_wavenumber_rad_per_m, 1e-9))],
+    ['Photon Wavelength [nm]', fmt(scale(p.photon_wavelength_m, 1e9))],
+    ['Probe Wavenumber [1/nm]', fmt(scale(p.probe_wavenumber_per_m, 1e-9))],
+    ['Probe Angular Wavenumber [rad/nm]', fmt(scale(p.probe_angular_wavenumber_rad_per_m, 1e-9))],
     ['Probe Photon Flux [ph/s]', fmt(p.probe_photon_flux_per_s)],
     ['Probe Power [W]', fmt(p.probe_power_W)],
-    ['Object Plane Pixel Width [nm]', fmt(scale(p.object_pixel_width_m, 1e9))],
-    ['Object Plane Pixel Height [nm]', fmt(scale(p.object_pixel_height_m, 1e9))],
+    ['Object Plane Pixel Width [nm]', fmt(scale(p.object_plane_pixel_width_m, 1e9))],
+    ['Object Plane Pixel Height [nm]', fmt(scale(p.object_plane_pixel_height_m, 1e9))],
     ['Exposure Time [s]', fmt(p.exposure_time_s)],
+    ['I0 Calibration [photons/count]', fmt(p.i0_photons_per_count)],
     ['Mass Attenuation [m²/kg]', fmt(p.mass_attenuation_m2_per_kg)],
     ['Tomography Angle [deg]', fmt(p.tomography_angle_deg)],
     ['Tilt Angle [deg]', fmt(p.tilt_angle_deg)],
-    ['Polarization', p.polarization ?? '—'],
+    ['Polarization', p.polarization ?? '(unset)'],
     ['Fresnel Number', fmt(p.fresnel_number)],
     ['Detector Numerical Aperture', fmt(p.detector_numerical_aperture)],
     ['Depth of Field [nm]', fmt(scale(p.depth_of_field_m, 1e9))],
+    ['Magnification', fmt(p.magnification)],
     [
-      'Diffraction Dataset',
-      p.derived_from.find((e) => e.kind === 'diffraction')?.uuid ?? '—',
+      'Object-Plane Propagation Distance [mm]',
+      fmt(scale(p.object_plane_propagation_distance_m, 1e3)),
     ],
+    ['Diffraction Dataset', datasetName(p)],
     ['Focus-Object Distance [mm]', fmt(scale(p.focus_object_distance_m, 1e3))],
-    ['Far Field', p.far_field === null ? '—' : p.far_field ? 'Far Field' : 'Near Field'],
+    ['Far Field', farFieldText(p.far_field)],
   ];
   for (const [k, v] of rows) {
     const dt = document.createElement('dt');
@@ -138,9 +151,6 @@ function showDetail(host: HTMLElement, p: ProductRead): void {
   }
 }
 
-
-
-
 function errorBlock(err: Error): HTMLElement {
   const el = document.createElement('div');
   el.style.color = '#ff8080';
@@ -158,14 +168,18 @@ function emptyBlock(msg: string): HTMLElement {
   return el;
 }
 
-/** Wavelength from the wavenumber the service derived, so nothing is recomputed here. */
-function reciprocal(x: number | null): number | null {
-  return x === null || x === 0 ? null : 1 / x;
+/** The diffraction dataset a product derives from, by name, as the desktop shows it. */
+function datasetName(p: ProductRead): string {
+  const edge = p.derived_from.find((e) => e.kind === 'diffraction');
+  if (edge === undefined) return MISSING;
+  return edge.label || edge.uuid.slice(0, 8);
+}
+
+function farFieldText(farField: boolean | null): string {
+  if (farField === null) return MISSING;
+  return farField ? 'Far Field' : 'Near Field';
 }
 
 function totalBytes(p: ProductRead): number | null {
-  const parts = [p.probe_nbytes, p.object_nbytes, p.scan_nbytes].filter(
-    (n): n is number => n !== null
-  );
-  return parts.length === 0 ? null : parts.reduce((a, b) => a + b, 0);
+  return sumBytes([p.probe_nbytes, p.object_nbytes, p.scan_nbytes]);
 }

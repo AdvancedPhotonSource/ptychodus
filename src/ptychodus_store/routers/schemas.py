@@ -36,6 +36,10 @@ class CampaignRead(_RowBase):
 class DerivedFromEdge(BaseModel):
     kind: Literal['diffraction', 'product', 'fluorescence']
     uuid: UUID
+    # The target's display name -- a diffraction dataset's label, a product's name --
+    # so a client can show what the edge points at without a second request. Empty
+    # when the target is not indexed.
+    label: str = ''
 
 
 class DiffractionRead(_RowBase):
@@ -54,6 +58,9 @@ class DiffractionRead(_RowBase):
     crop_center_x_px: int | None
     crop_center_y_px: int | None
 
+    # The assembled patterns: diffraction.h5 records the stack after cropping and
+    # binning, so the extent and pixel pitch below are the processed ones. The raw
+    # detector's are not persisted.
     pattern_dtype: str | None
     pattern_height_px: int | None
     pattern_width_px: int | None
@@ -73,8 +80,9 @@ class ProductRead(_RowBase):
     focus_object_distance_m: float | None
     far_field: bool | None
     photon_energy_eV: float | None  # noqa: N815
-    probe_photon_count: int | None
+    probe_photon_count: float | None
     exposure_time_s: float | None
+    i0_photons_per_count: float | None = None
     mass_attenuation_m2_per_kg: float | None
     tomography_angle_deg: float | None
     tilt_angle_deg: float | None = None
@@ -88,6 +96,9 @@ class ProductRead(_RowBase):
     probe_modes: int | None
     probe_height_px: int | None
     probe_width_px: int | None
+    probe_pixel_width_m: float | None = None
+    probe_pixel_height_m: float | None = None
+    probe_coherence: float | None = None
     num_scan_points: int | None
     num_loss_epochs: int | None
     scan_length_m: float | None = None
@@ -99,8 +110,13 @@ class ProductRead(_RowBase):
     probe_mode_relative_power: list[float] = []
     object_layer_spacing_m: list[float] = []
 
+    # Sum of the layer spacings and the photon energy's wavelength, derived on read
+    # like the block below.
+    object_total_thickness_m: float | None = None
+    photon_wavelength_m: float | None = None
+
     # Derived on read from the columns above; never stored, so the formula has one
-    # home in ptychodus.api.propagate. The last three additionally need the detector,
+    # home in ptychodus.api.propagate. The last five additionally need the detector,
     # which product.h5 does not record -- they are null unless the manifest's
     # derived_from names a diffraction dataset this store has indexed.
     probe_wavenumber_per_m: float | None = None
@@ -108,6 +124,9 @@ class ProductRead(_RowBase):
     probe_photon_flux_per_s: float | None = None
     probe_power_W: float | None = None  # noqa: N815
     object_plane_propagation_distance_m: float | None = None
+    magnification: float | None = None
+    object_plane_pixel_width_m: float | None = None
+    object_plane_pixel_height_m: float | None = None
     fresnel_number: float | None = None
     detector_numerical_aperture: float | None = None
     depth_of_field_m: float | None = None
@@ -120,6 +139,7 @@ class FluorescenceRead(_RowBase):
 
     element_names: list[str]
     element_counts: list[float] = []
+    element_nbytes: list[int] = []
     map_height_px: int | None
     map_width_px: int | None
     nbytes: int | None = None

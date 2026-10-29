@@ -1,8 +1,8 @@
 import { api, type ProductRead } from '../api.js';
 import { createImagePanel } from '../components/image_panel.js';
 import { createTable } from '../components/table.js';
-import { buildPageLayout } from '../layout.js';
-import { fmt, fmtBytes } from '../format.js';
+import { buildPageLayout, infoLabel } from '../layout.js';
+import { fmtBytes, fmtFixed, fmtInt, ingestRowState, infoText } from '../format.js';
 
 export async function mountPositions(root: HTMLElement): Promise<void> {
   const { page, left, right, setActiveTab } = buildPageLayout('positions');
@@ -13,8 +13,11 @@ export async function mountPositions(root: HTMLElement): Promise<void> {
   image.setEmpty('Tick one or more scans to plot them.');
 
   let items: ProductRead[] = [];
+  let total = 0;
   try {
-    items = (await api.listProduct()).items;
+    const listing = await api.listProduct();
+    items = listing.items;
+    total = listing.total;
   } catch (err) {
     left.replaceChildren(errorBlock(err as Error));
     return;
@@ -37,21 +40,30 @@ export async function mountPositions(root: HTMLElement): Promise<void> {
   const table = createTable<ProductRead>(
     [
       { header: 'Name', render: labelFor },
-      { header: 'Points', render: (p) => fmt(p.num_scan_points), sortKey: (p) => p.num_scan_points, numeric: true },
+      {
+        header: 'Points',
+        render: (p) => fmtInt(p.num_scan_points),
+        sortKey: (p) => p.num_scan_points,
+        numeric: true,
+      },
       {
         header: 'Length [m]',
-        render: (p) => fmt(p.scan_length_m),
+        render: (p) => fmtFixed(p.scan_length_m, 6),
         sortKey: (p) => p.scan_length_m,
         numeric: true,
       },
       { header: 'Size', render: (p) => fmtBytes(p.scan_nbytes), sortKey: (p) => p.scan_nbytes, numeric: true },
     ],
-    // Row click plots that scan alone; the checkboxes overlay a selection.
-    (row) => plot([row]),
-    { checkbox: { header: 'Plot', onChange: plot } }
+    // As on the desktop, a click only selects; the Plot checkboxes choose what is
+    // drawn, in table order.
+    () => undefined,
+    { checkbox: { header: 'Plot', onChange: plot, position: 1 }, rowState: ingestRowState }
   );
 
-  left.replaceChildren(table.el);
+  left.replaceChildren(
+    table.el,
+    infoLabel(infoText('Positions', total, items.map((p) => p.scan_nbytes)))
+  );
   table.setRows(items);
 }
 

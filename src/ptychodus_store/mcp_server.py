@@ -9,6 +9,7 @@ from pathlib import Path
 from base64 import b64decode
 from uuid import UUID
 
+import numpy
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.utilities.types import Image as MCPImage
@@ -19,13 +20,6 @@ from ptychodus.api.constants import LengthUnit
 from ptychodus.api.diffraction import Polarization
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import load_diffraction_data, load_fluorescence_data, load_product
-from ptychodus.api.visualize import (
-    ComplexComponent,
-    CylindricalColorModel,
-    ScalarTransformation,
-    cyclic_colormap_names,
-    linear_colormap_names,
-)
 
 from ptychodus_store.db import repositories as repo
 from ptychodus_store.db.base import IngestState
@@ -38,6 +32,7 @@ from ptychodus_store.rendering import (
     build_visualization_real,
     coerce_render_params,
     product_to_png_bytes,
+    visualization_options,
 )
 from ptychodus_store.rendering.params import InvalidRenderParamError
 from ptychodus_store.rendering.plot import ScanPath, render_scan_paths
@@ -46,6 +41,7 @@ from ptychodus_store.routers._convert import (
     diffraction_to_read,
     fluorescence_to_read,
     product_to_read,
+    row_label,
 )
 from ptychodus_store.routers.schemas import (
     CampaignRead,
@@ -316,7 +312,6 @@ def create_mcp_server() -> FastMCP:
         """Walk the derivation DAG up and down from a node."""
         from ptychodus_store.routers.lineage import (
             _find_campaign,
-            _label_for,
             _resolve_node,
             _walk_ancestors,
             _walk_descendants,
@@ -328,7 +323,7 @@ def create_mcp_server() -> FastMCP:
             if resolved is None:
                 return None
             kind, row = resolved
-            node = LineageNode(kind=kind, uuid=target, label=_label_for(row))
+            node = LineageNode(kind=kind, uuid=target, label=row_label(row))
             ancestors = await _walk_ancestors(session, target)
             descendants = await _walk_descendants(session, target)
             campaign = await _find_campaign(session, target, ancestors)
@@ -370,13 +365,7 @@ def create_mcp_server() -> FastMCP:
     @mcp.tool()
     async def get_visualization_options() -> OptionsRead:
         """Enumerate valid choices for colormap / transform / component / color_model."""
-        return OptionsRead(
-            colormaps_linear=list(linear_colormap_names()),
-            colormaps_cyclic=list(cyclic_colormap_names()),
-            transforms=[member.name.lower() for member in ScalarTransformation],
-            components=[member.name.lower() for member in ComplexComponent],
-            color_models=[member.name.lower() for member in CylindricalColorModel],
-        )
+        return visualization_options()
 
     @mcp.tool()
     async def render_diffraction_pattern(
@@ -501,6 +490,35 @@ def create_mcp_server() -> FastMCP:
         return MCPImage(data=product_to_png_bytes(vp), format='png')
 
     @mcp.tool()
+    async def render_object(
+        uuid: str,
+        colormap: str = 'gray',
+        transform: str = 'identity',
+        component: str | None = None,
+        color_model: str | None = None,
+        value_min: float | None = None,
+        value_max: float | None = None,
+        clip: bool = False,
+    ) -> MCPImage:
+        """Render the object as the product of its layers, the transmission of the whole stack."""
+        target = UUID(uuid)
+        await _ensure_row_exists(ResourceKind.PRODUCT, target)
+        path = _resolve_resource_file(ResourceKind.PRODUCT, target, 'product.h5')
+        product = load_product(path)
+        params = _coerce_render_params_or_error(
+            colormap, transform, component, color_model, value_min, value_max, clip
+        )
+        try:
+            vp = build_visualization_complex(
+                product.object_.get_layers_flattened(),
+                product.object_.get_pixel_geometry(),
+                params,
+            )
+        except RenderParamsError as exc:
+            raise ToolError(str(exc)) from exc
+        return MCPImage(data=product_to_png_bytes(vp), format='png')
+
+    @mcp.tool()
     async def render_object_layer(
         uuid: str,
         layer: int,
@@ -568,6 +586,44 @@ def create_mcp_server() -> FastMCP:
         )
         return MCPImage(data=b64decode(plot.png_base64), format='png')
 
+    async def _fluorescence_pixel_geometry(product_uuid: str | None) -> PixelGeometry:
+        if product_uuid is None:
+            return _DEFAULT_FLUORESCENCE_PIXEL_GEOMETRY
+
+        product_target = UUID(product_uuid)
+        await _ensure_row_exists(ResourceKind.PRODUCT, product_target)
+        product_path = _resolve_resource_file(ResourceKind.PRODUCT, product_target, 'product.h5')
+        return load_product(product_path).object_.get_pixel_geometry()
+
+    @mcp.tool()
+    async def render_fluorescence_summary(
+        uuid: str,
+        product_uuid: str | None = None,
+        colormap: str = 'gray',
+        transform: str = 'identity',
+        value_min: float | None = None,
+        value_max: float | None = None,
+        clip: bool = False,
+    ) -> MCPImage:
+        """Render the elementwise sum of every element map in a fluorescence dataset."""
+        target = UUID(uuid)
+        await _ensure_row_exists(ResourceKind.FLUORESCENCE, target)
+        path = _resolve_resource_file(ResourceKind.FLUORESCENCE, target, 'fluorescence.h5')
+        dataset = load_fluorescence_data(path)
+        if not len(dataset):
+            raise ToolError('fluorescence dataset has no element maps')
+
+        summary = numpy.sum([emap.counts_per_second for emap in dataset], axis=0)
+        pixel_geometry = await _fluorescence_pixel_geometry(product_uuid)
+        params = _coerce_render_params_or_error(
+            colormap, transform, None, None, value_min, value_max, clip
+        )
+        try:
+            vp = build_visualization_real(summary, pixel_geometry, params, value_label='counts/s')
+        except RenderParamsError as exc:
+            raise ToolError(str(exc)) from exc
+        return MCPImage(data=product_to_png_bytes(vp), format='png')
+
     @mcp.tool()
     async def render_fluorescence_element(
         uuid: str,
@@ -590,15 +646,7 @@ def create_mcp_server() -> FastMCP:
             raise ToolError(f'element {name!r} not found; available: [{available}]')
         emap = matches[0]
 
-        if product_uuid is not None:
-            product_target = UUID(product_uuid)
-            await _ensure_row_exists(ResourceKind.PRODUCT, product_target)
-            product_path = _resolve_resource_file(
-                ResourceKind.PRODUCT, product_target, 'product.h5'
-            )
-            pixel_geometry = load_product(product_path).object_.get_pixel_geometry()
-        else:
-            pixel_geometry = _DEFAULT_FLUORESCENCE_PIXEL_GEOMETRY
+        pixel_geometry = await _fluorescence_pixel_geometry(product_uuid)
 
         params = _coerce_render_params_or_error(
             colormap, transform, None, None, value_min, value_max, clip

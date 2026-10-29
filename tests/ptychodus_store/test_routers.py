@@ -232,3 +232,71 @@ async def test_detector_dependent_quantities_need_the_lineage_edge(
 
     # The five that need no detector are present either way.
     assert without_edge['probe_photon_flux_per_s'] == pytest.approx(1.0e7)
+
+
+async def test_product_reports_every_desktop_property(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_diffraction: Callable[..., UUID],
+    seed_product: Callable[..., UUID],
+):
+    """Magnification, the object-plane pitch, wavelength and thickness, as the desktop."""
+    from ptychodus.api.constants import energy_eV_to_wavelength_m
+    from ptychodus.api.geometry import ImageExtent, PixelGeometry
+    from ptychodus.api.propagate import compute_product_geometry
+
+    d = seed_diffraction()
+    linked = seed_product(derived_from=[{'kind': 'diffraction', 'uuid': str(d)}])
+    orphan = seed_product()
+    for m in (
+        layout.manifest_path('diffraction', d),
+        layout.manifest_path('product', linked),
+        layout.manifest_path('product', orphan),
+    ):
+        await _ingest(app_client, db_engine, layout, m)
+
+    with_edge = (await app_client.get(f'/api/v1/product/{linked}')).json()
+    without_edge = (await app_client.get(f'/api/v1/product/{orphan}')).json()
+
+    # The fixture's geometry: 9 keV at 1.5 m onto 12 x 8 pixels of 55 um.
+    expected = compute_product_geometry(
+        photon_energy_eV=9000.0,
+        probe_photon_count=1.0e6,
+        exposure_time_s=0.1,
+        detector_distance_m=1.5,
+        detector_extent=ImageExtent(width_px=12, height_px=8),
+        detector_pixel_geometry=PixelGeometry(width_m=55e-6, height_m=55e-6),
+    )
+
+    for body in (with_edge, without_edge):
+        assert body['photon_wavelength_m'] == pytest.approx(energy_eV_to_wavelength_m(9000.0))
+        # No focusing optic, so no magnification.
+        assert body['magnification'] == pytest.approx(1.0)
+        # One layer has no spacing.
+        assert body['object_total_thickness_m'] == pytest.approx(0.0)
+
+    pitch = expected.object_plane_pixel_geometry
+    assert with_edge['object_plane_pixel_width_m'] == pytest.approx(pitch.width_m)
+    assert with_edge['object_plane_pixel_height_m'] == pytest.approx(pitch.height_m)
+    # The pitch follows from the detector, which only the lineage edge supplies.
+    assert without_edge['object_plane_pixel_width_m'] is None
+    assert without_edge['object_plane_pixel_height_m'] is None
+
+
+async def test_derived_from_edges_carry_the_target_name(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StoreLayout,
+    seed_product: Callable[..., UUID],
+    seed_fluorescence: Callable[..., UUID],
+):
+    """A client names what an edge points at, as the desktop does, without a lookup."""
+    p = seed_product()
+    f = seed_fluorescence(derived_from=[{'kind': 'product', 'uuid': str(p)}])
+    for m in (layout.manifest_path('product', p), layout.manifest_path('fluorescence', f)):
+        await _ingest(app_client, db_engine, layout, m)
+
+    body = (await app_client.get(f'/api/v1/fluorescence/{f}')).json()
+
+    assert body['derived_from'] == [{'kind': 'product', 'uuid': str(p), 'label': 'test-product'}]

@@ -14,6 +14,7 @@ from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.visualize import (
     ComplexComponent,
     VisualizationProduct,
+    get_colormap_by_name,
     visualize_complex_component,
     visualize_complex_values,
     visualize_real_values,
@@ -98,11 +99,34 @@ def product_to_png_bytes(vp: VisualizationProduct) -> bytes:
     return buf.getvalue()
 
 
-def _product_to_response(vp: VisualizationProduct) -> RenderedImage:
+def _legend(params: RenderParams, *, is_complex: bool) -> tuple[list[list[float]], bool]:
+    """Colors spanning the color axis, and whether the axis wraps around.
+
+    A colormap's legend runs from the lower to the upper bound of the color axis. A
+    color model encodes phase as hue, so its legend is the hue wheel at full amplitude,
+    drawn as a disc like the cyclic colormaps'.
+    """
+    num_stops = 256
+    x = numpy.linspace(0.0, 1.0, num_stops)
+
+    if is_complex and params.color_model is not None:
+        rgba = params.color_model.render_rgba(x, numpy.ones_like(x))
+        return rgba.tolist(), True
+
+    component = params.component or ComplexComponent.AMPLITUDE
+    is_cyclic = is_complex and component.is_cyclic
+    rgba = get_colormap_by_name(params.colormap)(x)
+    return numpy.asarray(rgba).tolist(), is_cyclic
+
+
+def _product_to_response(
+    vp: VisualizationProduct, params: RenderParams, *, is_complex: bool
+) -> RenderedImage:
     png_bytes = product_to_png_bytes(vp)
     pixel_geometry = vp.get_pixel_geometry()
     color_range = vp.get_color_value_range()
     rgba = vp.get_image_rgba()
+    legend_rgba, legend_cyclic = _legend(params, is_complex=is_complex)
     return RenderedImage(
         png_base64=base64.b64encode(png_bytes).decode('ascii'),
         value_label=vp.get_value_label(),
@@ -112,6 +136,8 @@ def _product_to_response(vp: VisualizationProduct) -> RenderedImage:
         pixel_height_m=float(pixel_geometry.height_m),
         shape_h_px=int(rgba.shape[0]),
         shape_w_px=int(rgba.shape[1]),
+        legend_rgba=legend_rgba,
+        legend_cyclic=legend_cyclic,
     )
 
 
@@ -126,7 +152,7 @@ def render_real(
         vp = build_visualization_real(values, pixel_geometry, params, value_label)
     except RenderParamsError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return _product_to_response(vp)
+    return _product_to_response(vp, params, is_complex=False)
 
 
 def render_complex(
@@ -139,4 +165,4 @@ def render_complex(
         vp = build_visualization_complex(values, pixel_geometry, params)
     except RenderParamsError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return _product_to_response(vp)
+    return _product_to_response(vp, params, is_complex=True)

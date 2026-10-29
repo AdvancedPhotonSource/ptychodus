@@ -83,3 +83,64 @@ def test_introspect_fluorescence(tmp_path: Path) -> None:
     result = introspect_fluorescence(path)
     assert result['element_names'] == ['Fe', 'Cu']
     assert result['map_shape'] == (6, 9)
+
+
+def test_introspect_product_mirrors_the_desktop_property_table(tmp_path: Path) -> None:
+    """The fields the desktop shows that need more than a root attribute read."""
+    path = tmp_path / 'product.h5'
+    modes = np.stack([np.full((8, 8), 2.0), np.full((8, 8), 1.0)]).astype(np.complex64)
+    with h5py.File(path, 'w') as f:
+        f.attrs['probe_photon_count'] = 1.5e9
+        f.attrs['i0_photons_per_count'] = 4.25
+        # (coherent, incoherent, h, w): the second coherent mode must not count.
+        probe = f.create_dataset('probe', data=np.stack([modes, modes]))
+        probe.attrs['pixel_width_m'] = 7e-9
+        probe.attrs['pixel_height_m'] = 9e-9
+
+    result = introspect_product(path)
+
+    # Read as a float: the API types the count as one, and an int cast would truncate.
+    assert result['probe_photon_count'] == pytest.approx(1.5e9)
+    assert result['i0_photons_per_count'] == pytest.approx(4.25)
+    # The probe's own pitch, which product.h5 keeps apart from the object's.
+    assert result['probe_pixel_width_m'] == pytest.approx(7e-9)
+    assert result['probe_pixel_height_m'] == pytest.approx(9e-9)
+    # The desktop lists the incoherent modes of the first coherent mode.
+    assert result['probe_shape'] == (2, 8, 8)
+    # Mode powers 4:1, so the shares are 0.8 and 0.2 and the coherence their root
+    # sum of squares.
+    assert result['probe_mode_relative_power'] == pytest.approx([0.8, 0.2])
+    assert result['probe_coherence'] == pytest.approx(np.sqrt(0.8**2 + 0.2**2))
+
+
+def test_introspect_product_without_i0_calibration(tmp_path: Path) -> None:
+    """Files written before the I0 calibration existed simply lack it."""
+    path = tmp_path / 'product.h5'
+    with h5py.File(path, 'w') as f:
+        f.attrs['name'] = 'old'
+
+    result = introspect_product(path)
+
+    assert result['i0_photons_per_count'] is None
+    assert result['probe_coherence'] is None
+
+
+def test_introspect_fluorescence_element_sizes(tmp_path: Path) -> None:
+    path = tmp_path / 'fluorescence.h5'
+    with h5py.File(path, 'w') as f:
+        group = f.require_group('/MAPS/XRF_Analyzed/NNLS')
+        group.create_dataset('Counts_Per_Sec', data=np.zeros((2, 6, 9), dtype=np.float32))
+        group.create_dataset('Channel_Names', data=np.array(['Fe', 'Cu'], dtype='S8'))
+
+    result = introspect_fluorescence(path)
+
+    assert result['element_nbytes'] == [6 * 9 * 4, 6 * 9 * 4]
+
+
+def test_introspect_product_reads_the_legacy_energy_attribute(tmp_path: Path) -> None:
+    """Products written before the rename spell it probe_energy_eV; the desktop reads both."""
+    path = tmp_path / 'product.h5'
+    with h5py.File(path, 'w') as f:
+        f.attrs['probe_energy_eV'] = 6722.0
+
+    assert introspect_product(path)['photon_energy_eV'] == pytest.approx(6722.0)

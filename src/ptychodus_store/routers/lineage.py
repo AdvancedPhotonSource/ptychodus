@@ -10,15 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ptychodus_store.db import repositories as repo
 from ptychodus_store.db.models import Campaign, DerivationEdge, Diffraction
-from ptychodus_store.routers._convert import campaign_to_read
+from ptychodus_store.routers._convert import campaign_to_read, row_label
 from ptychodus_store.routers.deps import SessionDep
 from ptychodus_store.routers.schemas import LineageNode, LineageRead, ResourceKindLiteral
 
 router = APIRouter(tags=['lineage'])
-
-
-def _label_for(row: object) -> str:
-    return str(getattr(row, 'label', '') or getattr(row, 'name', '') or '')
 
 
 async def _resolve_node(
@@ -51,7 +47,7 @@ async def _walk_ancestors(session: AsyncSession, root: UUID) -> list[LineageNode
             if resolved is None:
                 continue
             kind, row = resolved
-            out.append(LineageNode(kind=kind, uuid=edge.target_uuid, label=_label_for(row)))
+            out.append(LineageNode(kind=kind, uuid=edge.target_uuid, label=row_label(row)))
             queue.append(edge.target_uuid)
     return out
 
@@ -80,7 +76,7 @@ async def _walk_descendants(session: AsyncSession, root: UUID) -> list[LineageNo
             if resolved is None:
                 continue
             kind, row = resolved
-            out.append(LineageNode(kind=kind, uuid=edge.source_uuid, label=_label_for(row)))
+            out.append(LineageNode(kind=kind, uuid=edge.source_uuid, label=row_label(row)))
             queue.append(edge.source_uuid)
     return out
 
@@ -103,7 +99,7 @@ async def get_lineage(uuid: UUID, session: SessionDep) -> LineageRead:
     if resolved is None:
         raise HTTPException(status_code=404, detail=f'no resource with uuid {uuid}')
     kind, row = resolved
-    node = LineageNode(kind=kind, uuid=uuid, label=_label_for(row))
+    node = LineageNode(kind=kind, uuid=uuid, label=row_label(row))
 
     ancestors = await _walk_ancestors(session, uuid)
     descendants = await _walk_descendants(session, uuid)

@@ -16,6 +16,8 @@ from ptychodus.api.visualize import (
     linear_colormap_names,
 )
 
+from ptychodus_store.rendering.schemas import OptionsRead
+
 E = TypeVar('E', bound=Enum)
 
 
@@ -125,3 +127,23 @@ def render_params_dep(
 
 
 RenderParamsDep = Annotated[RenderParams, Depends(render_params_dep)]
+
+
+def visualization_options() -> OptionsRead:
+    """Every choice the render parameters accept, ordered as the desktop lists them.
+
+    The desktop keeps each list sorted by its display name, so these are too.
+    """
+    transforms = sorted(ScalarTransformation, key=lambda member: member.display_name)
+    components = sorted(ComplexComponent, key=lambda member: member.display_name)
+    color_models = sorted(CylindricalColorModel, key=lambda member: member.display_name)
+    return OptionsRead(
+        colormaps_linear=sorted(linear_colormap_names()),
+        colormaps_cyclic=sorted(cyclic_colormap_names()),
+        transforms=[member.name.lower() for member in transforms],
+        components=[member.name.lower() for member in components],
+        color_models=[member.name.lower() for member in color_models],
+        transform_labels={member.name.lower(): member.display_name for member in transforms},
+        component_labels={member.name.lower(): member.display_name for member in components},
+        color_model_labels={member.name.lower(): member.display_name for member in color_models},
+    )

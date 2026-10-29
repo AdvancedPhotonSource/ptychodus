@@ -9,7 +9,12 @@ import h5py
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.io import DiffractionFileKeys, ProductFileKeys, load_fluorescence_data
+from ptychodus.api.io import (
+    DiffractionFileKeys,
+    ProductFileKeys,
+    load_fluorescence_data,
+    read_photon_energy_eV,
+)
 from ptychodus.api.probe import Probe
 
 
@@ -84,15 +89,16 @@ def introspect_diffraction(path: Path) -> dict[str, Any]:
         raise IntrospectionError(f'{path}: {exc}') from exc
 
 
-def _probe_mode_relative_power(probe: Any) -> list[float]:
-    """Fraction of the probe's power in each incoherent mode.
+def _probe_modes(probe: Any) -> Probe | None:
+    """The incoherent modes the viewer shows, as a :class:`Probe`.
 
-    The one place introspection reads array data rather than shapes: the powers are a
-    reduction over the probe, which is megabytes rather than the gigabytes a pattern
-    stack would be. :class:`Probe` owns the normalisation, so this does not restate it.
+    The one place introspection reads array data rather than shapes: the mode powers
+    are a reduction over the probe, which is megabytes rather than the gigabytes a
+    pattern stack would be. :class:`Probe` owns the normalisation, so this does not
+    restate it.
     """
     if not isinstance(probe, h5py.Dataset):
-        return []
+        return None
 
     array = probe[()]
 
@@ -102,14 +108,10 @@ def _probe_mode_relative_power(probe: Any) -> list[float]:
         array = array[0]
 
     if array.ndim != 3:
-        return []
+        return None
 
     # The pixel geometry plays no part in a power ratio; Probe merely requires one.
-    modes = Probe(array=array, pixel_geometry=PixelGeometry(width_m=1.0, height_m=1.0))
-    return [
-        float(modes.get_incoherent_mode_relative_power(i))
-        for i in range(modes.num_incoherent_modes)
-    ]
+    return Probe(array=array, pixel_geometry=PixelGeometry(width_m=1.0, height_m=1.0))
 
 
 def _scan_path_length_m(h5_file: h5py.File) -> float | None:
@@ -135,11 +137,14 @@ def introspect_product(path: Path) -> dict[str, Any]:
     Returns a dict of HDF5-derived fields:
       * name, comments
       * detector_distance_m, focus_object_distance_m, photon_energy_eV,
-        probe_photon_count, exposure_time_s, mass_attenuation_m2_per_kg,
-        tomography_angle_deg, tilt_angle_deg, polarization, far_field
+        probe_photon_count, exposure_time_s, i0_photons_per_count,
+        mass_attenuation_m2_per_kg, tomography_angle_deg, tilt_angle_deg,
+        polarization, far_field
       * object_shape:        tuple[int, int, int] | None — (layers, h, w)
       * object_pixel_width_m, object_pixel_height_m: float | None
-      * probe_shape:         tuple[int, int, int] | None — (modes, h, w)
+      * probe_shape:         tuple[int, int, int] | None — (incoherent modes, h, w)
+      * probe_pixel_width_m, probe_pixel_height_m: float | None
+      * probe_mode_relative_power: list[float]; probe_coherence: float | None
       * num_scan_points:     int | None
       * num_loss_epochs:     int
     """
@@ -166,6 +171,13 @@ def introspect_product(path: Path) -> dict[str, Any]:
                 text = str(raw)
                 return text or None
 
+            photon_energy_eV: float | None  # noqa: N806
+            try:
+                # Accepts the attribute's pre-rename spelling, as loading the product does.
+                photon_energy_eV = read_photon_energy_eV(f)  # noqa: N806
+            except (KeyError, TypeError, ValueError):
+                photon_energy_eV = None  # noqa: N806
+
             obj = f.get(ProductFileKeys.OBJECT_ARRAY)
             probe = f.get(ProductFileKeys.PROBE_ARRAY)
             positions = f.get(ProductFileKeys.PROBE_POSITION_INDEXES)
@@ -180,13 +192,27 @@ def introspect_product(path: Path) -> dict[str, Any]:
                 object_pixel_height_m = _attr(obj, ProductFileKeys.OBJECT_PIXEL_HEIGHT, cast=float)
 
             probe_shape: tuple[int, int, int] | None = None
+            probe_pixel_width_m: float | None = None
+            probe_pixel_height_m: float | None = None
             if isinstance(probe, h5py.Dataset):
                 shape = tuple(int(x) for x in probe.shape)
-                if len(shape) == 3:
-                    probe_shape = (shape[0], shape[1], shape[2])
-                elif len(shape) == 4:
-                    # (coherent, incoherent, h, w) — collapse coherent x incoherent into modes
-                    probe_shape = (shape[0] * shape[1], shape[2], shape[3])
+                if len(shape) >= 3:
+                    # (..., incoherent, h, w): a 4-D probe leads with its coherent modes,
+                    # and the modes listed are the first coherent mode's incoherent ones.
+                    probe_shape = (shape[-3], shape[-2], shape[-1])
+                probe_pixel_width_m = _attr(probe, ProductFileKeys.PROBE_PIXEL_WIDTH, cast=float)
+                probe_pixel_height_m = _attr(probe, ProductFileKeys.PROBE_PIXEL_HEIGHT, cast=float)
+
+            modes = _probe_modes(probe)
+            probe_mode_relative_power: list[float] = []
+            probe_coherence: float | None = None
+            if modes is not None:
+                probe_mode_relative_power = [
+                    float(modes.get_incoherent_mode_relative_power(i))
+                    for i in range(modes.num_incoherent_modes)
+                ]
+                coherence = float(modes.get_coherence())
+                probe_coherence = coherence if numpy.isfinite(coherence) else None
 
             num_scan_points: int | None = None
             if isinstance(positions, h5py.Dataset):
@@ -204,7 +230,10 @@ def introspect_product(path: Path) -> dict[str, Any]:
             return {
                 'name': name,
                 'comments': comments,
-                'probe_mode_relative_power': _probe_mode_relative_power(probe),
+                'probe_mode_relative_power': probe_mode_relative_power,
+                'probe_coherence': probe_coherence,
+                'probe_pixel_width_m': probe_pixel_width_m,
+                'probe_pixel_height_m': probe_pixel_height_m,
                 'probe_dtype': str(probe.dtype) if isinstance(probe, h5py.Dataset) else None,
                 'probe_nbytes': _dataset_nbytes(probe),
                 'object_dtype': str(obj.dtype) if isinstance(obj, h5py.Dataset) else None,
@@ -217,9 +246,10 @@ def introspect_product(path: Path) -> dict[str, Any]:
                 'detector_distance_m': _root_attr(ProductFileKeys.DETECTOR_OBJECT_DISTANCE, float),
                 'focus_object_distance_m': _root_attr(ProductFileKeys.FOCUS_OBJECT_DISTANCE, float),
                 'far_field': _root_attr(ProductFileKeys.FAR_FIELD, bool),
-                'photon_energy_eV': _root_attr(ProductFileKeys.PHOTON_ENERGY, float),
-                'probe_photon_count': _root_attr(ProductFileKeys.PROBE_PHOTON_COUNT, int),
+                'photon_energy_eV': photon_energy_eV,
+                'probe_photon_count': _root_attr(ProductFileKeys.PROBE_PHOTON_COUNT, float),
                 'exposure_time_s': _root_attr(ProductFileKeys.EXPOSURE_TIME, float),
+                'i0_photons_per_count': _root_attr(ProductFileKeys.I0_PHOTONS_PER_COUNT, float),
                 'mass_attenuation_m2_per_kg': _root_attr(ProductFileKeys.MASS_ATTENUATION, float),
                 'tomography_angle_deg': _root_attr(ProductFileKeys.TOMOGRAPHY_ANGLE, float),
                 'tilt_angle_deg': _root_attr(ProductFileKeys.TILT_ANGLE, float),
@@ -238,7 +268,8 @@ def introspect_product(path: Path) -> dict[str, Any]:
 def introspect_fluorescence(path: Path) -> dict[str, Any]:
     """Read element names and map shape from a fluorescence.h5 file (XRF-Maps layout).
 
-    Returns a dict with `element_names: list[str]` and `map_shape: tuple[int, int] | None`.
+    Returns a dict with `element_names: list[str]`, `map_shape: tuple[int, int] | None`,
+    and per-element `element_counts` and `element_nbytes`.
     Delegates to :func:`ptychodus.api.io.load_fluorescence_data`, which recognises the
     v10 NNLS/Fitted and legacy v9 layouts.
     """
@@ -262,5 +293,6 @@ def introspect_fluorescence(path: Path) -> dict[str, Any]:
         'element_names': element_names,
         'map_shape': map_shape,
         'element_counts': element_counts,
+        'element_nbytes': [int(emap.nbytes) for emap in dataset],
         'nbytes': int(sum(emap.counts_per_second.nbytes for emap in dataset)),
     }

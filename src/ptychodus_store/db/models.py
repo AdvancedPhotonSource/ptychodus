@@ -130,8 +130,9 @@ class Product(Base):
     focus_object_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
     far_field: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     photon_energy_eV: Mapped[float | None] = mapped_column(Float, nullable=True)  # noqa: N815
-    probe_photon_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    probe_photon_count: Mapped[float | None] = mapped_column(Float, nullable=True)
     exposure_time_s: Mapped[float | None] = mapped_column(Float, nullable=True)
+    i0_photons_per_count: Mapped[float | None] = mapped_column(Float, nullable=True)
     mass_attenuation_m2_per_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
     tomography_angle_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
     tilt_angle_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -144,6 +145,9 @@ class Product(Base):
     probe_modes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     probe_height_px: Mapped[int | None] = mapped_column(Integer, nullable=True)
     probe_width_px: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    probe_pixel_width_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    probe_pixel_height_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    probe_coherence: Mapped[float | None] = mapped_column(Float, nullable=True)
     num_scan_points: Mapped[int | None] = mapped_column(Integer, nullable=True)
     num_loss_epochs: Mapped[int | None] = mapped_column(Integer, nullable=True)
     scan_length_m: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -188,6 +192,7 @@ class Fluorescence(Base):
     # HDF5-derived
     element_names: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     element_counts: Mapped[list[float]] = mapped_column(JSON, default=list, nullable=False)
+    element_nbytes: Mapped[list[int]] = mapped_column(JSON, default=list, nullable=False)
     nbytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     map_height_px: Mapped[int | None] = mapped_column(Integer, nullable=True)
     map_width_px: Mapped[int | None] = mapped_column(Integer, nullable=True)
