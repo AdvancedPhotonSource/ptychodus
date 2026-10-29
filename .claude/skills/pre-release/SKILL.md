@@ -49,7 +49,7 @@ Then run Sections 6, 7, 9 and 10 in order. They must not overlap — with each o
 
 ### Section 1 — API modules present in `docs/source/api.md`
 
-For every `src/ptychodus/api/**/*.py` file, confirm `docs/source/api.md` contains a matching `.. automodule:: ptychodus.api.<dotted.name>` directive. The scan is recursive, so subpackage modules (`preprocess/`, `simulate/`) are covered under their dotted names. A path component starting with `_` is skipped at any depth — that covers `__init__.py`, `simulate/_phase_unwrap.py`, and any future private subpackage.
+For every `src/ptychodus/api/**/*.py` file, confirm `docs/source/api.md` contains a matching `.. automodule:: ptychodus.api.<dotted.name>` directive. The scan is recursive, so subpackage modules (`preprocess/`, `simulate/`) are covered under their dotted names. A path component starting with `_` is skipped at any depth — that covers `__init__.py`, any `_`-prefixed helper module, and any future private subpackage.
 
 Do not enumerate with a flat `ls src/ptychodus/api/*.py`, and do not match the directive with a `[a-z_]+` character class: the former misses every subpackage module, and the latter has no `.` so `preprocess.diffraction` truncates to `preprocess`. The two errors cancel out and the section reports `PASS` while blind to an undocumented subpackage module.
 
@@ -97,7 +97,7 @@ Ask the user to confirm the heading text before writing.
 
 ### Section 2 — Minimal docstring coverage in `src/ptychodus/api/`
 
-For each non-private module in `src/ptychodus/api/`, verify:
+For each non-private module in `src/ptychodus/api/`, subpackages included and `_`-prefixed path components skipped at any depth as in Section 1, verify:
 
 - Module has a top-of-file docstring.
 - Every top-level `class` has a docstring on its first statement.
@@ -108,9 +108,10 @@ Run this AST scan:
 ```sh
 uv run python -c "
 import ast, pathlib
+root = pathlib.Path('src/ptychodus/api')
 missing = []
-for p in sorted(pathlib.Path('src/ptychodus/api').glob('*.py')):
-    if p.name.startswith('_'):
+for p in sorted(root.rglob('*.py')):
+    if any(part.startswith('_') for part in p.relative_to(root).parts):
         continue
     tree = ast.parse(p.read_text())
     if not (tree.body and isinstance(tree.body[0], ast.Expr) and isinstance(tree.body[0].value, ast.Constant) and isinstance(tree.body[0].value.value, str)):
@@ -374,12 +375,14 @@ wheel=$(ls "$out"/ptychodus-*.whl)
 bare=$(mktemp -d -p "$(dirname "$(uv cache dir)")" ptychodus-bare.XXXXXX)
 for py in 3.11 3.12 3.13; do
     (
-        uv venv -q "$bare/$py" --python "$py" \
-        && uv pip install -q --python "$bare/$py/bin/python" "$wheel" pytest pytest-xdist \
-        && "$bare/$py/bin/ptychodus" --version \
-        && "$bare/$py/bin/python" -m pytest tests/ -q -p no:cacheprovider -n auto --dist loadfile
-    ) >"$bare/$py.log" 2>&1
-    echo $? >"$bare/$py.rc" &
+        (
+            uv venv -q "$bare/$py" --python "$py" \
+            && uv pip install -q --python "$bare/$py/bin/python" "$wheel" pytest pytest-xdist \
+            && "$bare/$py/bin/ptychodus" --version \
+            && "$bare/$py/bin/python" -m pytest tests/ -q -p no:cacheprovider -n auto --dist loadfile
+        ) >"$bare/$py.log" 2>&1
+        echo $? >"$bare/$py.rc"
+    ) &
 done
 wait
 for py in 3.11 3.12 3.13; do printf '%s %s\n' "$(cat "$bare/$py.rc")" "py$py"; done
