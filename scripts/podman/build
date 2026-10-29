@@ -1,33 +1,38 @@
 #!/usr/bin/env bash
-# Build the CPU, CUDA, ROCm, and XPU ptychodus container images with the
-# current ptychodus version threaded in as a build arg and included in the
-# image tag.
+# Build the ptychodus container images, with the ptychodus version threaded
+# in as a build arg and included in the image tag.
 #
 # Tag format:
 #   ptychodus:<tag-safe-version>-<backend>
 #
-#   backend ∈ { cpu, cuda12.8, cuda13.0, cuda13.2, rocm7.2.4, xpu }
+#   backend ∈ { cpu, cuda12.6, cuda13.0, cuda13.2, rocm7.2.4, xpu, dev }
 #
-# The PEP 440 version goes into the image verbatim via the PTYCHODUS_VERSION
-# build arg, but OCI tags only accept [A-Za-z0-9._-], so characters outside
-# that set are replaced with `_` in the tag. In practice this is the `+` of a
-# dev checkout's local segment: 1.5.2.dev14+g79157a2b2 tags as
-# 1.5.2.dev14_g79157a2b2, while a clean release tag is unchanged.
+# Every backend but `dev` is a release image: it installs ptychodus from PyPI,
+# the release named by PTYCHODUS_VERSION or else the latest one, which this
+# script reads from PyPI so the tag names exactly what the image holds. `dev`
+# is the developer image (containers/Dockerfile.dev), installed from this
+# checkout and tagged with its setuptools_scm version; it is built only when
+# named, and it ignores PTYCHODUS_VERSION, so current code is never tagged as
+# an old release.
 #
-# Dectris is intentionally excluded: containers/Dockerfile.dectris installs
-# ptychodus from PyPI rather than the checkout, so a version-in-tag would
-# misrepresent the image. Build it separately with a plain `podman build
-# -f containers/Dockerfile.dectris -t ptychodus:dectris .`.
+# OCI tags only accept [A-Za-z0-9._-], so characters outside that set are
+# replaced with `_` in the tag. In practice this is the `+` of a dev
+# checkout's local segment: 1.5.2.dev14+g79157a2b2 tags as
+# 1.5.2.dev14_g79157a2b2, while a release version is unchanged.
+#
+# Dectris is intentionally excluded: containers/Dockerfile.dectris is a
+# separate Ubuntu image that installs an unpinned ptychodus, so a
+# version-in-tag would misrepresent it. Build it separately with a plain
+# `podman build -f containers/Dockerfile.dectris -t ptychodus:dectris containers/`.
 #
 # Usage:
 #   scripts/podman/build                                # cpu + all cuda + rocm + xpu
 #   scripts/podman/build cpu cuda13.0                   # subset from the matrix below
+#   scripts/podman/build dev                            # the developer image
 #
 # Env-var overrides:
-#   PTYCHODUS_VERSION   PEP 440 version to bake in (default: `uv run --with
-#                       setuptools-scm python -m setuptools_scm` in the
-#                       checkout, matching what a normal pip install would
-#                       derive from git).
+#   PTYCHODUS_VERSION   release to install in the release images (default:
+#                       the latest version on PyPI). Ignored by `dev`.
 #   CONTAINER_ENGINE    build engine (default: podman; e.g. docker)
 #   BASE_REGISTRY       registry serving the upstream base images (default:
 #                       docker.io). Point it at a mirror for an air-gapped or
@@ -35,10 +40,12 @@
 #                       registry through this arg rather than relying on the
 #                       host's unqualified-search list, so a build never needs
 #                       a TTY to disambiguate a short name.
-#   PTYCHO_FM_DIST      directory holding the prebuilt ptycho-fm wheel that
-#                       containers/Dockerfile.cuda installs (default:
-#                       ../ptycho-fm/dist beside the checkout). Set it to the
-#                       empty string to build without the PtychoFM backend.
+#   PTYCHOPINN_SRC      checkout of PtychoPINN to build its wheel from
+#                       (default: ../PtychoPINN beside this checkout).
+#   PTYCHO_FM_SRC       checkout of ptycho-fm to build its wheel from
+#                       (default: ../ptycho-fm beside this checkout).
+#                       Set either to the empty string to build without that
+#                       backend. Only the cpu, cuda and dev images use them.
 #
 # Lint with: shellcheck scripts/podman/build
 
@@ -54,8 +61,10 @@ ROCM_VERSION=7.2.4
 
 # Pair each CUDA_VERSION with a PYTORCH_VERSION that is actually published
 # on Docker Hub as pytorch/pytorch:${PYTORCH_VERSION}-cuda${CUDA_VERSION}-cudnn9-devel.
-# The containers/Dockerfile.cuda default (2.12.0) is not published for
-# CUDA 12.8, so that row overrides.
+# PyTorch publishes no CUDA 12.8 build after 2.11, and its cu128 and cu13x
+# builds carry no kernels below sm_75, so cuda12.6 is the row that serves
+# Pascal and Volta GPUs. Keep the ptychi-cuda* extras in pyproject.toml in
+# step with these rows.
 #
 # scripts/podman/ptychodus discovers the CUDA variants from the tags this
 # script leaves in podman storage and launches the newest one the host driver
@@ -63,20 +72,34 @@ ROCM_VERSION=7.2.4
 # selectable -- there is no matching list to update in the launcher.
 declare -A VARIANT_ARGS=(
     [cpu]="-f containers/Dockerfile.cpu"
-    [cuda12.8]="-f containers/Dockerfile.cuda --build-arg CUDA_VERSION=12.8 --build-arg PYTORCH_VERSION=2.11.0"
-    [cuda13.0]="-f containers/Dockerfile.cuda --build-arg CUDA_VERSION=13.0 --build-arg PYTORCH_VERSION=2.12.0"
-    [cuda13.2]="-f containers/Dockerfile.cuda --build-arg CUDA_VERSION=13.2 --build-arg PYTORCH_VERSION=2.12.0"
+    [cuda12.6]="-f containers/Dockerfile.cuda --build-arg CUDA_VERSION=12.6 --build-arg PYTORCH_VERSION=2.14.1"
+    [cuda13.0]="-f containers/Dockerfile.cuda --build-arg CUDA_VERSION=13.0 --build-arg PYTORCH_VERSION=2.14.1"
+    [cuda13.2]="-f containers/Dockerfile.cuda --build-arg CUDA_VERSION=13.2 --build-arg PYTORCH_VERSION=2.14.1"
     [rocm${ROCM_VERSION}]="-f containers/Dockerfile.rocm --build-arg ROCM_VERSION=${ROCM_VERSION}"
     [xpu]="-f containers/Dockerfile.xpu"
+    [dev]="-f containers/Dockerfile.dev"
 )
 
-DEFAULT_VARIANTS=(cpu cuda12.8 cuda13.0 cuda13.2 "rocm${ROCM_VERSION}" xpu)
+# The release images need nothing from the checkout but containers/, so that
+# is their build context; only the developer image copies the checkout itself.
+declare -A VARIANT_CONTEXT=(
+    [dev]=.
+)
+
+DEFAULT_VARIANTS=(cpu cuda12.6 cuda13.0 cuda13.2 "rocm${ROCM_VERSION}" xpu)
 
 # --- Helpers -----------------------------------------------------------------
 
 die() {
     printf 'build: %s\n' "$*" >&2
     exit 1
+}
+
+# OCI tags allow only [A-Za-z0-9._-] after a leading alphanumeric/underscore,
+# so a PEP 440 local segment ('+g79157a2b2') is rejected outright. Sanitize for
+# the tag only; the build arg keeps the real version.
+tag_safe() {
+    printf '%s' "${1//[^A-Za-z0-9._-]/_}"
 }
 
 # --- Setup -------------------------------------------------------------------
@@ -91,40 +114,6 @@ script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P) \
 repo_root=$(git -C "$script_dir" rev-parse --show-toplevel) \
     || die "$script_dir is not inside a git checkout; run this script from a ptychodus clone"
 cd "$repo_root" || die "cannot enter the ptychodus checkout at $repo_root"
-
-# PtychoFM is published on no package index, and containers/Dockerfile.cuda can
-# only read files inside the build context, so stage the prebuilt wheel into the
-# checkout for the duration of the build and remove it again on the way out. The
-# trap covers the failure and Ctrl-C paths too: a wheel left behind in
-# containers/wheels/ would silently be baked into every later image.
-PTYCHO_FM_DIST="${PTYCHO_FM_DIST-$repo_root/../ptycho-fm/dist}"
-WHEEL_STAGE="$repo_root/containers/wheels"
-
-cleanup_wheel_stage() {
-    rm -rf "$WHEEL_STAGE"
-}
-trap cleanup_wheel_stage EXIT
-
-if [[ -n "$PTYCHO_FM_DIST" ]]; then
-    mkdir -p "$WHEEL_STAGE" \
-        || die "cannot create the wheel staging directory $WHEEL_STAGE"
-    cp "$PTYCHO_FM_DIST"/ptycho_fm-*.whl "$WHEEL_STAGE/" \
-        || die "no ptycho_fm-*.whl in $PTYCHO_FM_DIST (set PTYCHO_FM_DIST= to build without PtychoFM)"
-fi
-
-if [[ -n "${PTYCHODUS_VERSION:-}" ]]; then
-    VERSION="$PTYCHODUS_VERSION"
-else
-    command -v uv >/dev/null 2>&1 \
-        || die "uv not on PATH; set PTYCHODUS_VERSION explicitly (PEP 440) instead"
-    VERSION=$(uv run --quiet --with setuptools-scm python -m setuptools_scm) \
-        || die "setuptools_scm failed; set PTYCHODUS_VERSION explicitly (PEP 440) instead"
-fi
-
-# OCI tags allow only [A-Za-z0-9._-] after a leading alphanumeric/underscore,
-# so a PEP 440 local segment ('+g79157a2b2') is rejected outright. Sanitize for
-# the tag only; PTYCHODUS_VERSION keeps the real version.
-TAG_VERSION="${VERSION//[^A-Za-z0-9._-]/_}"
 
 ENGINE="${CONTAINER_ENGINE:-podman}"
 command -v "$ENGINE" >/dev/null 2>&1 \
@@ -144,17 +133,125 @@ else
     done
 fi
 
+needs_release=0
+needs_checkout=0
+needs_backends=0
+for v in "${variants[@]}"; do
+    case "$v" in
+        dev) needs_checkout=1 ;;
+        *) needs_release=1 ;;
+    esac
+    case "$v" in
+        cpu|cuda*|dev) needs_backends=1 ;;
+    esac
+done
+
+# --- Versions ----------------------------------------------------------------
+
+RELEASE_VERSION=""
+if (( needs_release )); then
+    if [[ -n "${PTYCHODUS_VERSION:-}" ]]; then
+        RELEASE_VERSION="$PTYCHODUS_VERSION"
+    else
+        RELEASE_VERSION=$(curl -fsS https://pypi.org/pypi/ptychodus/json \
+            | python3 -c 'import json, sys; print(json.load(sys.stdin)["info"]["version"])') \
+            || die "cannot read the latest ptychodus release from PyPI; set PTYCHODUS_VERSION"
+    fi
+fi
+
+CHECKOUT_VERSION=""
+if (( needs_checkout )); then
+    command -v uv >/dev/null 2>&1 \
+        || die "uv not on PATH; it derives the dev image's version from this checkout"
+    CHECKOUT_VERSION=$(uv run --quiet --with setuptools-scm python -m setuptools_scm) \
+        || die "setuptools_scm cannot derive a version from this checkout"
+fi
+
+# --- Backend wheels ----------------------------------------------------------
+
+# PtychoPINN and PtychoFM are published on no package index, and a Dockerfile
+# can only read files inside its build context, so build each one's wheel from
+# its sibling checkout and stage it in containers/wheels/ for the duration of
+# the build. Each wheel is built from a shared clone of the checkout's HEAD:
+# committed code only, never whatever is half-edited in the working tree, and
+# with the git metadata setuptools_scm needs. PtychoPINN's clone is patched
+# first: its pyproject lists TensorFlow, which ptychodus's backend
+# (ptycho_torch) never imports, and caps Python below 3.12, which would
+# otherwise refuse every interpreter the images ship. The trap covers the
+# failure and Ctrl-C paths too: a wheel left behind in containers/wheels/
+# would silently be baked into every later image.
+PTYCHOPINN_SRC="${PTYCHOPINN_SRC-$repo_root/../PtychoPINN}"
+PTYCHO_FM_SRC="${PTYCHO_FM_SRC-$repo_root/../ptycho-fm}"
+WHEEL_STAGE="$repo_root/containers/wheels"
+clone_root=""
+
+cleanup() {
+    rm -f "$WHEEL_STAGE"/*.whl
+    if [[ -n "$clone_root" ]]; then
+        rm -rf "$clone_root"
+    fi
+}
+trap cleanup EXIT
+
+# Run inside PtychoPINN's clone, before its wheel is built.
+patch_ptychopinn() {
+    sed -i \
+        -e '/^[[:space:]]*"tensorflow/d' \
+        -e 's/^requires-python = .*/requires-python = ">=3.10"/' \
+        pyproject.toml
+}
+
+# Clone $1 into $2 and build the clone's wheel into the staging directory, after
+# running the optional patch function $3 inside the clone.
+build_backend_wheel() {
+    local source=$1 clone=$2 patch=${3:-}
+    git clone --quiet --shared "$source" "$clone" \
+        || die "cannot clone $source"
+    if [[ -n "$patch" ]]; then
+        (cd "$clone" && "$patch") || die "cannot patch the clone of $source"
+    fi
+    # Built inside the clone and moved, because uv also drops a catch-all
+    # .gitignore into its output directory, which would hide the tracked
+    # README there.
+    uv build --quiet --wheel --out-dir "$clone/dist" "$clone" \
+        || die "cannot build a wheel from $source"
+    mv "$clone"/dist/*.whl "$WHEEL_STAGE/" \
+        || die "no wheel was built from $source"
+}
+
+if (( needs_backends )) && [[ -n "$PTYCHOPINN_SRC$PTYCHO_FM_SRC" ]]; then
+    command -v uv >/dev/null 2>&1 || die "uv not on PATH; it builds the backend wheels"
+    clone_root=$(mktemp -d) || die "cannot create a scratch directory"
+
+    if [[ -n "$PTYCHOPINN_SRC" ]]; then
+        [[ -d "$PTYCHOPINN_SRC/.git" ]] \
+            || die "no PtychoPINN checkout at $PTYCHOPINN_SRC (set PTYCHOPINN_SRC= to build without it)"
+        build_backend_wheel "$PTYCHOPINN_SRC" "$clone_root/ptychopinn" patch_ptychopinn
+    fi
+
+    if [[ -n "$PTYCHO_FM_SRC" ]]; then
+        [[ -d "$PTYCHO_FM_SRC/.git" ]] \
+            || die "no ptycho-fm checkout at $PTYCHO_FM_SRC (set PTYCHO_FM_SRC= to build without it)"
+        build_backend_wheel "$PTYCHO_FM_SRC" "$clone_root/ptycho-fm"
+    fi
+fi
+
 # --- Build -------------------------------------------------------------------
 
 for backend in "${variants[@]}"; do
-    tag="ptychodus:${TAG_VERSION}-${backend}"
-    printf '\n=== %s (version=%s) ===\n' "$tag" "$VERSION"
+    if [[ "$backend" == dev ]]; then
+        version="$CHECKOUT_VERSION"
+    else
+        version="$RELEASE_VERSION"
+    fi
+    tag="ptychodus:$(tag_safe "$version")-${backend}"
+    printf '\n=== %s (version=%s) ===\n' "$tag" "$version"
     # VARIANT_ARGS entries are space-separated argv, but the strict-mode IFS
     # set above contains no space, so unquoted word-splitting would hand the
     # engine one giant argument. Split on spaces explicitly instead.
     IFS=' ' read -r -a variant_args <<<"${VARIANT_ARGS[$backend]}"
     "$ENGINE" build "${variant_args[@]}" \
-        --build-arg "PTYCHODUS_VERSION=$VERSION" \
+        --build-arg "PTYCHODUS_VERSION=$version" \
         --build-arg "BASE_REGISTRY=$BASE_REGISTRY" \
-        -t "$tag" .
+        -t "$tag" "${VARIANT_CONTEXT[$backend]:-containers}"
 done

@@ -8,7 +8,7 @@ Ptychodus is a ptychography data-analysis application that ingests instrument da
 
 ```sh
 uv sync --extra globus --extra gui --extra ptychi   # dev install; ptychi is CPU torch
-uv sync --extra globus --extra gui --extra ptychi-cuda128  # GPU: match nvidia-smi's CUDA ceiling
+uv sync --extra globus --extra gui --extra ptychi-cuda130  # GPU: match nvidia-smi's CUDA ceiling
 uv run ptychodus                                    # GUI
 uv run ptychodus -b reconstruct -i <in> -o <out>    # batch — reads StandardFileLayout in <in>/
 uv run pytest                                       # tests
@@ -16,7 +16,7 @@ uv run ruff check . && uv run ruff format --check . # lint + format
 uv run mypy src/ptychodus scripts tests             # types (wider than CI's)
 ```
 
-Container builds: `scripts/podman/build` (Dockerfiles in [containers/](containers/); tags `ptychodus:<version>-<variant>` over the script's `DEFAULT_VARIANTS` — CPU, each supported CUDA, ROCm, XPU); the launcher `scripts/podman/ptychodus` auto-detects the GPU family and, on NVIDIA, the newest built CUDA variant the host driver supports. Docs: `make -C docs html`.
+Container builds: `scripts/podman/build` (Dockerfiles in [containers/](containers/); tags `ptychodus:<version>-<variant>` over the script's `DEFAULT_VARIANTS` — CPU, each supported CUDA, ROCm, XPU). Release images install the PyPI release named by `PTYCHODUS_VERSION`, or the latest, and keep their base image's accelerator torch; `Dockerfile.dev` (variant `dev`, built on request) installs the checkout and backs the devcontainer; the script builds the PtychoPINN and PtychoFM wheels from sibling checkouts; the launcher `scripts/podman/ptychodus` auto-detects the GPU family and, on NVIDIA, the newest built CUDA variant the host driver supports. Docs: `make -C docs html`.
 
 Other entry points (`ptychodus-reconstruct`, `ptychodus-webapp` and the rest) are in [pyproject.toml](pyproject.toml) `[project.scripts]`, with modules in [src/ptychodus/cli/](src/ptychodus/cli/). Unpackaged operator tooling — the podman wrapper, the per-facility HPC token/submit helpers — lives in the top-level [scripts/](scripts/) and runs from a checkout, e.g. `python scripts/genesis/ptychodus_iri_tokens.py`.
 

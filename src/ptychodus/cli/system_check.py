@@ -131,7 +131,7 @@ def main() -> int:
             )
             print('  A CUDA major version bump is not covered by minor version compatibility.')
             print('  Fix: install the torch build matching the driver, e.g.')
-            print('    uv sync --extra ptychi-cuda128')
+            print('    uv sync --extra ptychi-cuda126')
 
     if args.require_cuda and driver_cuda_version is not None and not is_cuda_available:
         print(

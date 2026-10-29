@@ -13,6 +13,7 @@ explicit environment rather than the real one.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 import sys
 
 import pytest
@@ -201,18 +202,8 @@ def _probed_gpus() -> list[Device]:
     return gpus
 
 
-def test_the_probe_reports_devices_a_child_can_actually_see() -> None:
-    """The parent asks in a child, so it never holds the context it is describing."""
-    torch = pytest.importorskip('torch')
-
-    devices = _probed_devices()
-    assert [d.identifier for d in devices[1:]] == [f'cuda:{n}' for n in range(len(devices) - 1)]
-    assert all(d.name for d in devices)
-    assert not torch.cuda.is_initialized()
-
-
-def _cuda_uuids(environment: dict[str, str]) -> list[str]:
-    """Ask a child spawned under *environment* which physical devices it can see."""
+def _ask_a_child(entry_point: str, environment: dict[str, str] | None = None) -> Any:
+    """Run a ``subprocess_child_fixtures`` entry point and return what it reports."""
     from ptychodus.api.reconstruct import ReconstructorMessage
     from ptychodus.api.spawn import run_subprocess
 
@@ -220,16 +211,37 @@ def _cuda_uuids(environment: dict[str, str]) -> list[str]:
 
     try:
         with run_subprocess(
-            'subprocess_child_fixtures:probe_cuda_uuids', None, environment=environment
+            f'subprocess_child_fixtures:{entry_point}', None, environment=environment
         ) as events:
             for event in events:
                 if event[0] == ReconstructorMessage.OUTPUT:
-                    uuids: list[str] = event[1]
-                    return uuids
+                    return event[1]
     finally:
         sys.path.pop(0)
 
-    return []
+    return None
+
+
+def test_the_probe_reports_devices_a_child_can_actually_see() -> None:
+    """The parent asks in a child, so it never holds the context it is describing.
+
+    Checked from a fresh process rather than this one: whether the pytest process
+    holds a CUDA context depends on what ran before, not on the probe.
+    """
+    pytest.importorskip('torch')
+
+    identifiers, all_named, cuda_initialized = _ask_a_child('probe_devices_from_a_clean_process')
+
+    assert identifiers[0] == CPU.identifier
+    assert identifiers[1:] == [f'cuda:{n}' for n in range(len(identifiers) - 1)]
+    assert all_named
+    assert not cuda_initialized
+
+
+def _cuda_uuids(environment: dict[str, str]) -> list[str]:
+    """Ask a child spawned under *environment* which physical devices it can see."""
+    uuids: list[str] = _ask_a_child('probe_cuda_uuids', environment) or []
+    return uuids
 
 
 def test_a_restriction_reaches_the_child_and_not_merely_the_environment() -> None:

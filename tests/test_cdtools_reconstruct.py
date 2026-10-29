@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 from typing import Any
+from unittest import mock
+import contextlib
 
 import numpy
 import pytest
@@ -101,7 +103,19 @@ def _run(parameters: ReconstructInput, options: CDToolsOptions) -> list[Reconstr
         options=build_reconstructor()._dump_reconstruct_options(parameters, options),
         input_=parameters,
     )
-    run_reconstruct(payload, queue)  # type: ignore[arg-type]
+    # Pinning the device is not enough on its own: from torch 2.14, Optimizer.step()
+    # asks torch.accelerator for the current stream, which initialises CUDA on any GPU
+    # host even when every parameter is on the CPU. Hiding the accelerator makes that
+    # check return early; nothing else in the run consults it.
+    hide_accelerator = (
+        mock.patch.object(torch.accelerator, 'current_accelerator', return_value=None)
+        if hasattr(torch, 'accelerator')
+        else contextlib.nullcontext()
+    )
+
+    with hide_accelerator:
+        run_reconstruct(payload, queue)  # type: ignore[arg-type]
+
     assert all(tag is ReconstructorMessage.OUTPUT for tag, _ in queue.items)
     return [output for _, output in queue.items]
 

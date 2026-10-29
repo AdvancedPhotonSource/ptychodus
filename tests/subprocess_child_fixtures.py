@@ -3,8 +3,9 @@
 The ``spawn``-context child imports this module by dotted path, so it must be
 resolvable on the child's ``sys.path``; the test module puts the tests
 directory there before spawning. Not collected by pytest (the filename does
-not match ``test_*.py``). Uses no GPU frameworks. Do not import from
-application code.
+not match ``test_*.py``). Only the device-probing entry points import a GPU
+framework, and only when they run, so importing this module never does. Do not
+import from application code.
 """
 
 from __future__ import annotations
@@ -212,6 +213,25 @@ def probe_cuda_uuids(_payload: Any, queue: SimpleQueue[Any]) -> None:
         for index in range(torch.cuda.device_count())
     ]
     queue.put((ReconstructorMessage.OUTPUT, uuids))
+
+
+def probe_devices_from_a_clean_process(_payload: Any, queue: SimpleQueue[Any]) -> None:
+    """Probe the devices from a process that has never touched CUDA, and say whether it now has.
+
+    Reports the identifiers, whether every device carries a name, and whether this
+    process holds a CUDA context once the probe returns.
+    """
+    import torch
+
+    from ptychodus.api.devices import probe_devices
+
+    devices = probe_devices()
+    report = (
+        [device.identifier for device in devices],
+        all(device.name for device in devices),
+        torch.cuda.is_initialized(),
+    )
+    queue.put((ReconstructorMessage.OUTPUT, report))
 
 
 def emit_unpicklable(payload: Any, queue: Any) -> None:
