@@ -18,6 +18,12 @@ from .reconstruct import DeviceEnvironment
 
 
 class VSPILinearOperator(LinearOperator):
+    """Forward operator of virtual single-pixel imaging (VSPI).
+
+    Maps an object-plane image to the signal at each probe position, blurred by the
+    normalized probe intensity.
+    """
+
     def __init__(self, product: Product) -> None:
         """
         M: number of XRF positions

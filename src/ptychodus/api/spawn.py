@@ -217,6 +217,8 @@ def _child_main(
 
 @dataclass
 class _RunState:
+    """A spawned child process and the queue it reports on."""
+
     process: SpawnProcess
     queue: SimpleQueue[Any]
 

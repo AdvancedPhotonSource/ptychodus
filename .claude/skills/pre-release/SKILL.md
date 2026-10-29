@@ -203,21 +203,26 @@ Two details in that script are load-bearing:
 **4a. Extras named in `README.md` all exist in `pyproject.toml`.**
 
 ```sh
-# Extract extras from README.md install commands.
+# Extras named in install commands, both `ptychodus[a,b]` and `uv sync --extra a`.
 # Anchor on `ptychodus[...]` so Markdown link labels ([Ptychodus], [uv]) don't match:
-grep -oE 'ptychodus\[[a-z,]+\]' README.md | sed 's/.*\[//; s/\]//' | tr ',' '\n' | sort -u
+extras() { grep -hoE 'ptychodus\[[a-z0-9,-]+\]|--extra [a-z0-9-]+' "$@" \
+  | sed -E 's/^ptychodus\[//; s/\]$//; s/^--extra //' | tr ',' '\n' | sort -u; }
 
 # Extras declared in pyproject.toml:
-uv run python -c "
+declared() { uv run python -c "
 import tomllib
 with open('pyproject.toml','rb') as f:
     p = tomllib.load(f)
 for k in sorted(p['project']['optional-dependencies']):
     print(k)
-"
+"; }
+
+comm -23 <(extras README.md) <(declared)   # prints each undeclared extra
 ```
 
-`PASS` if the README extras are a subset of the pyproject extras. `FAIL` with the missing extras.
+The character class admits digits and hyphens on purpose: with `[a-z,]+`, `ptychodus[ptychi-cuda128]` fails to match at all and the extra slips past unchecked.
+
+`PASS` if `comm` prints nothing. `FAIL` with the extras it prints.
 
 **Suggested fix**: either add the extra to `pyproject.toml` (rare — usually intentional) or remove/rename the extra reference in `README.md`.
 
@@ -249,11 +254,17 @@ done
 
 **5b. Extras named in `docs/source/getting_started.md` install commands exist in pyproject.**
 
-Same technique as 4a but against getting_started.md.
+With the helpers from 4a:
 
-**5c. The `uv sync` command in README.md uses currently-supported extras.**
+```sh
+comm -23 <(extras docs/source/getting_started.md) <(declared)
+```
 
-Parse the `uv sync --extra <x> --extra <y> ...` line in README.md and confirm each extra is in `pyproject.toml`.
+`PASS` if it prints nothing.
+
+**5c. The `uv sync` commands in README.md use currently-supported extras.**
+
+Covered by 4a: `extras` also reads `--extra <name>`, so README's `uv sync` lines are already in the set it checks. Report 5c with 4a's result rather than running it twice.
 
 ---
 

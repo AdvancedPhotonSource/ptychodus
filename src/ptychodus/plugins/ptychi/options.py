@@ -45,7 +45,7 @@ class PtyChiOptions(BaseModel):
 
     task: SkipValidation[PtychographyTaskOptions]
     num_sync_epochs: int = Field(
-        1,
+        25,
         ge=1,
         title='Update Interval:',
         description='Number of epochs between reports of intermediate results.',

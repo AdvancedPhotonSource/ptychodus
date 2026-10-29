@@ -208,7 +208,7 @@ def test_copy_preserves_trim_parameters(builder_name: str) -> None:
         builder = _make_cartesian_line_builder(settings, 5)
     else:
         reader = _StubPositionFileReader(_make_line(5))
-        builder = FromFileProbePositionsBuilder(_make_rng(), settings, reader)  # type: ignore[assignment]
+        builder = FromFileProbePositionsBuilder(_make_rng(), settings, reader)
 
     builder.num_discard_at_start.set_value(2)
     builder.num_discard_at_end.set_value(3)
