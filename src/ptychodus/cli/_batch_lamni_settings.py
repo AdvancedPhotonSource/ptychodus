@@ -31,6 +31,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ptychodus.api.affine import AffineTransform
+from ptychodus.plugins.aps31id_lamni.scan_directory import locate_scan_directory
 from ptychodus.plugins.aps31id_lamni.scan_table import APS31IDEScanRecord
 
 __all__ = [
@@ -55,9 +56,6 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
-
-# Scans live under eiger_4 in blocks of a thousand.
-_SCAN_BLOCK_SIZE = 1000
 
 
 class _Section(BaseModel):
@@ -213,24 +211,23 @@ class BatchSettings(_Section):
         return self
 
     @property
-    def experiment_root(self) -> Path:
-        """The experiment directory, accepting either it or the ``data`` directory inside."""
+    def data_dir(self) -> Path:
+        """The directory holding ``dat-files``, ``scan_positions`` and ``eiger_4``.
+
+        An experiment keeps them either under a ``data`` subdirectory or at its top level;
+        ``data`` wins when both are present. The ``data`` directory itself is accepted too,
+        since it is a top-level layout in its own right.
+        """
         folder = self.paths.experiment_folder
 
-        if (folder / 'data' / 'dat-files').is_dir():
-            return folder
-
-        if (folder / 'dat-files').is_dir():
-            return folder.parent
+        for candidate in (folder / 'data', folder):
+            if (candidate / 'dat-files').is_dir():
+                return candidate
 
         raise ValueError(
             f'{folder} is not a 31-ID-E experiment directory: expected a "dat-files" '
             'subdirectory either directly inside it or under a "data" subdirectory.'
         )
-
-    @property
-    def data_dir(self) -> Path:
-        return self.experiment_root / 'data'
 
     @property
     def scan_table_file(self) -> Path:
@@ -247,9 +244,7 @@ class BatchSettings(_Section):
         rather than assumed. An ambiguous match is an error: picking one arbitrarily would
         reconstruct an unpredictable subset.
         """
-        block_start = (scan_no // _SCAN_BLOCK_SIZE) * _SCAN_BLOCK_SIZE
-        block = f'S{block_start:05d}-{block_start + _SCAN_BLOCK_SIZE - 1:05d}'
-        scan_dir = self.data_dir / 'eiger_4' / block / f'S{scan_no:05d}'
+        scan_dir = locate_scan_directory(self.data_dir / 'eiger_4', scan_no)
 
         candidates = sorted(
             path for path in scan_dir.glob(f'*_{scan_no:05d}_*.h5') if '_master_' not in path.name

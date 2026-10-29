@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -336,16 +337,24 @@ def test_a_cpu_only_host_fans_out_across_nothing(monkeypatch: pytest.MonkeyPatch
 
 
 def _experiment(
-    tmp_path: Path, *, scan_start: int | None = None, scan_end: int | None = None
+    tmp_path: Path,
+    *,
+    scan_start: int | None = None,
+    scan_end: int | None = None,
+    layout: Literal['data', 'flat'] = 'data',
 ) -> BatchSettings:
-    """Settings over a tmp experiment tree holding the real scan table."""
-    dat_files = tmp_path / 'experiment' / 'data' / 'dat-files'
+    """Settings over a tmp experiment tree holding the real scan table.
+
+    ``layout`` places ``dat-files`` under a ``data`` subdirectory or at the top level.
+    """
+    experiment = tmp_path / 'experiment'
+    dat_files = (experiment / 'data' if layout == 'data' else experiment) / 'dat-files'
     dat_files.mkdir(parents=True)
     shutil.copy(_SCAN_TABLE, dat_files / 'tomography_scannumbers.txt')
 
     return BatchSettings(
         paths=Paths(
-            experiment_folder=tmp_path / 'experiment',
+            experiment_folder=experiment,
             output_products_folder=tmp_path / 'out',
         ),
         batch=Batch(label='BOREAS_3d_50um', scan_start=scan_start, scan_end=scan_end),
@@ -375,6 +384,45 @@ def test_the_plan_carries_the_rotation_angle_each_product_is_stamped_with(
 def test_an_empty_selection_is_an_error_rather_than_an_empty_run(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
         plan_batch_lamni(_experiment(tmp_path, scan_start=9000))
+
+
+def test_an_experiment_without_a_data_subdirectory_is_planned_the_same(
+    tmp_path: Path,
+) -> None:
+    settings = _experiment(tmp_path, layout='flat')
+    experiment = tmp_path / 'experiment'
+
+    assert settings.scan_table_file == experiment / 'dat-files' / 'tomography_scannumbers.txt'
+    assert settings.position_file(188) == experiment / 'scan_positions' / 'scan_00188.dat'
+    assert [record.scan_no for record in plan_batch_lamni(settings)] == [188, 189, 190, 368, 369]
+
+
+def test_the_data_subdirectory_wins_over_a_top_level_one(tmp_path: Path) -> None:
+    settings = _experiment(tmp_path)
+    top_level = tmp_path / 'experiment' / 'dat-files'
+    top_level.mkdir()
+    # An empty table plans nothing, which is an error: reading it would fail the plan.
+    (top_level / 'tomography_scannumbers.txt').touch()
+
+    assert [record.scan_no for record in plan_batch_lamni(settings)] == [188, 189, 190, 368, 369]
+
+
+def test_the_data_directory_itself_is_accepted(tmp_path: Path) -> None:
+    settings = _experiment(tmp_path)
+    data_dir = tmp_path / 'experiment' / 'data'
+    settings.paths.experiment_folder = data_dir
+
+    assert settings.data_dir == data_dir
+
+
+def test_the_diffraction_file_is_found_in_a_block_of_any_size(tmp_path: Path) -> None:
+    settings = _experiment(tmp_path)
+    scan_dir = tmp_path / 'experiment' / 'data' / 'eiger_4' / 'S00100-00199' / 'S00188'
+    scan_dir.mkdir(parents=True)
+    (scan_dir / 'run_00188_master_000000000000.h5').touch()
+    (scan_dir / 'run_00188_000000000000.h5').touch()
+
+    assert settings.diffraction_file(188) == scan_dir / 'run_00188_000000000000.h5'
 
 
 def test_a_folder_that_is_not_an_experiment_directory_is_an_error(tmp_path: Path) -> None:

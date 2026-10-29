@@ -196,6 +196,8 @@ initial_object:
   object_padding_px: 512
 ```
 
+The experiment folder holds `dat-files`, `scan_positions` and `eiger_4` either under a `data` subdirectory or directly at its top level; when both are present, `data` wins.
+
 ```sh
 $ ptychodus-reconstruct-batch-lamni --batch-settings batch.yaml --dry-run
 $ ptychodus-reconstruct-batch-lamni --batch-settings batch.yaml --ptychi-options lsqml.yaml

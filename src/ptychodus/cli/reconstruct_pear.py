@@ -122,6 +122,7 @@ from ptychodus.cli._reconstruct_common import (
     run_reconstruction,
     save_assembled_diffraction,
 )
+from ptychodus.plugins.aps31id_lamni.scan_directory import locate_scan_directory
 
 logger = logging.getLogger('reconstruct_pear')
 
@@ -445,10 +446,11 @@ def _resolve_inputs(params: PearParameters, readers: _Readers) -> tuple[Path, Pa
         diffraction = base / 'ptycho' / f'{scan:03d}' / f'{scan:03d}_00001_0.h5'
         positions = base / 'positions' / f'{scan:03d}' / f'{scan:03d}_00001_0.dat'
     elif instrument in ('lynx', 'lynx_v2'):
-        block_start = (scan // 1000) * 1000
-        block = f'S{block_start:05d}-{block_start + 999:05d}'
         stem = f'scan_{scan:05d}_000' if instrument == 'lynx_v2' else f'run_{scan:05d}_000000000000'
-        diffraction = base / 'data' / 'eiger_4' / block / f'S{scan:05d}' / f'{stem}.h5'
+        # Only looked up when needed, so a missing block cannot defeat an explicit override.
+        diffraction = explicit_diffraction or (
+            locate_scan_directory(base / 'data' / 'eiger_4', scan) / f'{stem}.h5'
+        )
         positions = base / 'data' / 'scan_positions' / f'scan_{scan:05d}.dat'
     elif instrument in ('velo', 'velociprobe'):
         diffraction = base / 'ptycho' / f'fly{scan:03d}' / f'fly{scan:03d}_master.h5'
