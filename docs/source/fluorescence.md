@@ -4,27 +4,35 @@ Ptychodus can sharpen an X-ray fluorescence dataset measured alongside a ptychog
 
 ## Running an enhancement
 
-From the workflow API, open a product and enhance a fluorescence file against it:
+`ptychodus-enhance` enhances a fluorescence dataset against a product file, such as the `product.h5` that `ptychodus-reconstruct` writes:
 
-```python
-from pathlib import Path
-
-from ptychodus.model import ModelCore
-
-with ModelCore(Path('settings.ini')) as model:
-    product_api = model.workflow_api.load_product(Path('product.h5'), file_type='HDF5')
-    product_api.enhance_fluorescence_local(
-        Path('fluorescence.h5'),
-        Path('fluorescence_enhanced.h5'),
-        algorithm='vspi',
-        algorithm_parameters={'max_iterations': 50},
-        block=True,
-    )
+```sh
+$ ptychodus-enhance --product out/product.h5 --fluorescence 2xfm_0123.mda.h5 \
+    --algorithm vspi -o out/fluorescence.h5
 ```
 
-`algorithm` selects an enhancer by the name it is registered under, and `None` runs the one the settings select. `algorithm_parameters` overrides that enhancer's options by field name for this run only: the settings are left as they were, and a name the enhancer does not declare is logged and ignored.
+The enhanced dataset is written in the format the measured one was read in (`--file-type`, `XRF-Maps` by default), and the output must differ from both inputs. Nothing is written unless the enhancer runs to completion, so an interrupted run leaves no partially enhanced file. `--dry-run` reads and checks the inputs and options without enhancing.
 
-In batch mode, an input directory holding `fluorescence.h5` is enhanced with the enhancer the settings select once the reconstruction finishes.
+An enhancer runs at its default options unless an options file is given. `--print-options` writes one, naming the enhancer and its fields by their declared names:
+
+```sh
+$ ptychodus-enhance --print-options vspi > vspi.yaml
+$ ptychodus-enhance --product out/product.h5 --fluorescence 2xfm_0123.mda.h5 \
+    --options vspi.yaml -o out/fluorescence.h5
+```
+
+```yaml
+# vspi fluorescence enhancer options, at their defaults. Save this,
+# edit it, and pass it back with --options.
+algorithm: vspi
+options:
+  # Tikhonov regularization of the least-squares solve; zero applies none.
+  damping_factor: 0.0
+  # Upper bound on LSMR iterations per element map.
+  max_iterations: 100
+```
+
+The file names its own enhancer, so `--algorithm` is not needed beside it; passing a different one is an error. Fields the file omits keep their defaults, and a field the enhancer does not declare is an error rather than being ignored.
 
 ## Enhancers and their settings
 

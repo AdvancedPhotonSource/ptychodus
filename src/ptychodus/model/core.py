@@ -290,6 +290,10 @@ class ModelCore:
             if output_fluorescence_path.is_file():
                 logger.warning('Output fluorescence file will be overwritten!')
 
+            logger.warning(
+                'Batch-mode fluorescence enhancement is deprecated and will be removed. '
+                'Reconstruct with ptychodus-reconstruct, then enhance with ptychodus-enhance.'
+            )
             logger.info('Enhancing fluorescence...')
 
             output_product_api.enhance_fluorescence_local(
