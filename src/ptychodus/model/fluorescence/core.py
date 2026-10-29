@@ -12,7 +12,7 @@ from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
 
 from ..parameters import PluginChooserParameter
-from ..processing.devices import DeviceSelection
+from ..devices import DeviceSelection
 from ..processing.parameter_store import OptionsBranch, ProcessingParameterStore
 from ..product import ProductAPI, ProductRepository
 from ..task_manager import TaskManager

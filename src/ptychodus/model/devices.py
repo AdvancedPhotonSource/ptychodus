@@ -1,4 +1,4 @@
-"""The devices a reconstruction may use, probed once and chosen by settings.
+"""The devices a spawned backend may use, probed once and chosen by settings.
 
 The probe costs a spawned child that imports torch, so it is taken on first
 request rather than at startup: a run that never asks which devices exist

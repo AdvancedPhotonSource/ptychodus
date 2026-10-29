@@ -28,7 +28,7 @@ from ptychodus.api.spawn import ChildError
 from ptychodus.model.fluorescence import ENHANCER_LIBRARY, FluorescenceCore
 from ptychodus.model.fluorescence.core import _BRANCHES_BY_ENHANCER
 from ptychodus.model.processing import ProcessingParameterStore
-from ptychodus.model.processing.devices import DeviceSelection
+from ptychodus.model.devices import DeviceSelection
 from ptychodus.plugins.fluorescence import TwoStepFluorescenceEnhancer, VSPIFluorescenceEnhancer
 from ptychodus.plugins.fluorescence.deconvolution import DeconvolutionMethod
 from ptychodus.plugins.fluorescence.two_step import TwoStepOptions

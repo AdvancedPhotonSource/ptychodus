@@ -14,7 +14,7 @@ from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .api import ProcessingAPI, ProcessingAlgorithmParameter
 from . import _ptychi_sections, _ptycho_fm_sections
-from .devices import DeviceSelection
+from ..devices import DeviceSelection
 from .monitor import ProcessingTaskMonitor
 from .parameter_store import OptionsBranch, OptionsSection, ProcessingParameterStore
 from .settings import ProcessingSettings
