@@ -197,12 +197,15 @@ class ProductWorkflowAPI(ABC):
         input_file_type: str | None = None,
         output_file_type: str | None = None,
         algorithm: str | None = None,
+        algorithm_parameters: Mapping[str, Any] | None = None,
         block: bool = False,
     ) -> None:
         """Run fluorescence enhancement locally and write the result to output_path.
 
-        ``algorithm`` names an enhancement strategy, not a reconstructor, so
-        it has no library beside it.
+        ``algorithm`` names an enhancer, not a reconstructor, so it has no
+        library beside it; None runs the one settings select.
+        ``algorithm_parameters`` overrides the selected enhancer's options by
+        declared field name, for this run only: settings are left as they were.
 
         Blocks until completion when block is True, otherwise returns immediately.
         """

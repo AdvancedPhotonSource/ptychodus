@@ -232,6 +232,7 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
         input_file_type: str | None = None,
         output_file_type: str | None = None,
         algorithm: str | None = None,
+        algorithm_parameters: Mapping[str, Any] | None = None,
         block: bool = False,
     ) -> None:
         item_index = self._fluorescence_api.open_measured_dataset(
@@ -240,6 +241,7 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
         self._fluorescence_api.enhance(
             item_index,
             algorithm=algorithm,
+            algorithm_parameters=algorithm_parameters,
             output_file_path=output_path,
             output_file_type=output_file_type,
             block=block,

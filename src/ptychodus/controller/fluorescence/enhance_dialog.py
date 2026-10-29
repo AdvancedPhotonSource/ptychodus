@@ -6,68 +6,20 @@ from PyQt5.QtWidgets import QWidget
 from ptychodus.api.observer import Observable, Observer
 
 from ...model.fluorescence import (
+    ENHANCER_LIBRARY,
     FluorescenceCore,
     FluorescenceItemState,
-    FluorescenceSettings,
     FluorescenceTaskMonitor,
-    PtychozoonFluorescenceEnhancer,
-    TwoStepFluorescenceEnhancer,
-    VSPIFluorescenceEnhancer,
 )
 from ...view.fluorescence import (
     FluorescenceEnhanceDialog,
     FluorescenceStatusView,
 )
 from ...view.widgets import ExceptionDialog
-from ..parameters import ComboBoxParameterViewController, ParameterViewBuilder
+from ..parameters import ComboBoxParameterViewController
+from ..processing.generated import GeneratedViewControllerFactory
 
 logger = logging.getLogger(__name__)
-
-
-def _build_two_step_widget(core: FluorescenceCore) -> QWidget:
-    builder = ParameterViewBuilder()
-    builder.add_combo_box(
-        core.upscaling_strategy_parameter,
-        core.upscaling_strategy_parameter.choices(),
-        'Upscaling Strategy:',
-    )
-    builder.add_combo_box(
-        core.deconvolution_strategy_parameter,
-        core.deconvolution_strategy_parameter.choices(),
-        'Deconvolution Strategy:',
-    )
-    return _build_page(builder)
-
-
-def _build_vspi_widget(settings: FluorescenceSettings) -> QWidget:
-    builder = ParameterViewBuilder()
-    builder.add_decimal_line_edit(settings.vspi_damping_factor, 'Damping Factor:')
-    builder.add_spin_box(settings.vspi_max_iterations, 'Max Iterations:')
-    return _build_page(builder)
-
-
-def _build_ptychozoon_widget(settings: FluorescenceSettings) -> QWidget:
-    builder = ParameterViewBuilder()
-    builder.add_decimal_line_edit(settings.ptychozoon_damping_factor, 'Damping Factor:')
-    builder.add_decimal_line_edit(settings.ptychozoon_gradient_smoothness, 'Gradient Smoothness:')
-    builder.add_spin_box(settings.ptychozoon_max_iterations, 'Max Iterations:')
-    builder.add_decimal_line_edit(settings.ptychozoon_atol, 'A Tolerance:')
-    builder.add_decimal_line_edit(settings.ptychozoon_btol, 'B Tolerance:')
-    builder.add_spin_box(settings.ptychozoon_checkpoint_interval, 'Checkpoint Interval:')
-    builder.add_check_box(settings.ptychozoon_use_gpu, 'Use GPU:')
-    builder.add_spin_box(settings.ptychozoon_gpu_device_index, 'CUDA Device Index:')
-    return _build_page(builder)
-
-
-def _build_page(builder: ParameterViewBuilder) -> QWidget:
-    """Build a stacked-widget page, matching the zero margins the old views used."""
-    widget = builder.build_widget()
-    layout = widget.layout()
-
-    if layout is not None:
-        layout.setContentsMargins(0, 0, 0, 0)
-
-    return widget
 
 
 class FluorescenceStatusController(Observer):
@@ -119,12 +71,7 @@ class FluorescenceEnhanceDialogController(Observer):
     the panel handles saving the enhanced result.
     """
 
-    def __init__(
-        self,
-        core: FluorescenceCore,
-        *,
-        has_ptychozoon: bool,
-    ) -> None:
+    def __init__(self, core: FluorescenceCore) -> None:
         super().__init__()
         task_monitor = core.task_monitor
         self._api = core.fluorescence_api
@@ -140,19 +87,15 @@ class FluorescenceEnhanceDialogController(Observer):
             task_monitor, self._dialog.status_view
         )
 
-        # Keyed by display name rather than by index: the chooser sorts its plugins by
-        # display name, so page insertion order is not the combo-box order.
+        # One page per registered enhancer, laid out from what it declares by the
+        # builder the reconstructor panels use. Keyed by name rather than by index:
+        # the chooser sorts its plugins by display name, so page insertion order is
+        # not the combo-box order.
+        factory = GeneratedViewControllerFactory(ENHANCER_LIBRARY, core.enhancer_parameter_store)
         parameters_view = self._dialog.parameters_view
         self._pages: dict[str, QWidget] = {
-            TwoStepFluorescenceEnhancer.DISPLAY_NAME: _build_two_step_widget(core),
-            VSPIFluorescenceEnhancer.DISPLAY_NAME: _build_vspi_widget(core.settings),
+            name: factory.create_view_controller(name) for name in core.enhancer_parameter.choices()
         }
-
-        # Only present when ptychozoon is installed.
-        if has_ptychozoon:
-            self._pages[PtychozoonFluorescenceEnhancer.DISPLAY_NAME] = _build_ptychozoon_widget(
-                core.settings
-            )
 
         for page in self._pages.values():
             parameters_view.stacked_widget.addWidget(page)

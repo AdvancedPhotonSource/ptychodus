@@ -144,7 +144,9 @@ class ProcessingCore:
                         sections(reconstructor.name, reconstructor.get_default_options()),
                     )
                 else:
-                    self.parameter_store.register_declared(name, reconstructor, branches)
+                    self.parameter_store.register_declared(
+                        name, reconstructor.name, reconstructor.get_default_options(), branches
+                    )
 
                 # Placement is ptychodus's to decide, so it is attached here
                 # rather than passed through every backend's factory.

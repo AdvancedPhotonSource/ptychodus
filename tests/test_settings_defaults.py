@@ -30,6 +30,8 @@ import warnings
 from ptychodus.api.plugins import PluginChooser, PluginRegistry
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.declared import declare_in, describe
+from ptychodus.model.fluorescence import ENHANCER_LIBRARY
+from ptychodus.model.fluorescence.core import _BRANCHES_BY_ENHANCER
 from ptychodus.model.processing import ProcessingParameterStore
 from ptychodus.model.processing.core import _BRANCHES_BY_LIBRARY, _SECTIONS_BY_LIBRARY
 
@@ -119,13 +121,51 @@ def _register_declared_sections(registry: SettingsRegistry) -> None:
 
         for reconstructor in plugin.strategy:
             if branches is not None:
-                store.register_declared(plugin.display_name, reconstructor, branches)
+                store.register_declared(
+                    plugin.display_name,
+                    reconstructor.name,
+                    reconstructor.get_default_options(),
+                    branches,
+                )
             elif sections is not None:
                 store.register(
                     plugin.display_name,
                     reconstructor,
                     sections(reconstructor.name, reconstructor.get_default_options()),
                 )
+
+    # Fluorescence enhancers reach the store the same way, under the groups their
+    # table names.
+    for enhancer in PluginRegistry.load_plugins().fluorescence_enhancers:
+        enhancer_branches = _BRANCHES_BY_ENHANCER.get(enhancer.simple_name)
+
+        if enhancer_branches is not None:
+            store.register_declared(
+                ENHANCER_LIBRARY,
+                enhancer.simple_name,
+                enhancer.strategy.get_default_options(),
+                enhancer_branches,
+            )
+
+
+def absent_enhancers() -> list[str]:
+    """Enhancers the table names that did not register on this machine.
+
+    An optional enhancer registers only where the package it wraps is installed, so
+    the groups it contributes are genuinely absent elsewhere. Unlike a reconstructor
+    backend, the table names its groups whether or not it registered.
+    """
+    registered = {
+        plugin.simple_name for plugin in PluginRegistry.load_plugins().fluorescence_enhancers
+    }
+    return sorted(set(_BRANCHES_BY_ENHANCER) - registered)
+
+
+def enhancer_groups(enhancers: Iterable[str]) -> set[str]:
+    """The groups the table names for *enhancers*."""
+    return {
+        branch.group_name for name in enhancers for branch in _BRANCHES_BY_ENHANCER.get(name, ())
+    }
 
 
 def _construct_settings_under(
@@ -259,8 +299,8 @@ def test_settings_defaults_match_golden() -> None:
     # everything else: skipping outright would stop pinning every other
     # subsystem too, which is far more surface than the backend costs.
     golden = GOLDEN_PATH.read_text()
-    absent = absent_backends()
-    unpinned = declared_groups(absent, golden)
+    absent = absent_backends() + absent_enhancers()
+    unpinned = declared_groups(absent_backends(), golden) | enhancer_groups(absent_enhancers())
     expected = _without_groups(golden, unpinned)
 
     if absent:
@@ -329,14 +369,16 @@ if __name__ == '__main__':
     # Refuse rather than quietly drop what this machine cannot build: a
     # regeneration run without every backend installed would delete those
     # groups from the fixture, and the deletion reads as an intended removal.
-    missing = absent_backends()
+    missing = absent_backends() + absent_enhancers()
 
     if missing:
+        dropped = declared_groups(absent_backends(), GOLDEN_PATH.read_text()) | enhancer_groups(
+            absent_enhancers()
+        )
         raise SystemExit(
             f'Refusing to regenerate: {", ".join(sorted(missing))} '
             f'{"is" if len(missing) == 1 else "are"} not installed, so '
-            f'{len(declared_groups(missing, GOLDEN_PATH.read_text()))} '
-            'settings groups would be dropped.'
+            f'{len(dropped)} settings groups would be dropped.'
         )
 
     GOLDEN_PATH.write_text(render_settings())
@@ -354,3 +396,15 @@ def test_every_backend_named_in_the_section_table_is_a_registered_library() -> N
         plugin.display_name for plugin in PluginRegistry.load_plugins().reconstructor_libraries
     }
     assert set(_SECTIONS_BY_LIBRARY) <= registered
+
+
+def test_every_registered_enhancer_names_its_settings_groups() -> None:
+    """The table is keyed on a registered name, so a rename would drop its settings.
+
+    An enhancer whose name no longer matches registers no groups and runs on its
+    defaults, which reads exactly like one that declares nothing.
+    """
+    registered = {
+        plugin.simple_name for plugin in PluginRegistry.load_plugins().fluorescence_enhancers
+    }
+    assert registered <= set(_BRANCHES_BY_ENHANCER)

@@ -71,24 +71,21 @@ CHILD_ONLY_MODULES = (
     'ptychozoon',  # fluorescence backend; vspi_enhance pulls CuPy
 )
 
-# The exceptions, named in full. Each is a configuration or data-structure
-# submodule the parent reaches so it can build the payload it ships to the
-# child, rather than duplicating the fields:
+# The exceptions, named in full. Each is a configuration submodule the parent
+# reaches so it can build the payload it ships to the child, rather than
+# duplicating the fields:
 #
-# - ``ptychozoon.data_structures`` and ``ptychozoon.settings`` pull in only
-#   numpy, dataclasses, enum and typing.
 # - ``ptycho_fm.config`` is pydantic schema and nothing else, which is what
 #   lets ptychodus declare PtychoFM's parameters from upstream's own model
 #   instead of restating them. ``tests/test_ptycho_fm_sections.py`` measures
 #   that cost; this list permits it.
 #
-# Any other submodule of either package is a regression if it lands in the
-# parent's ``sys.modules``.
+# ptychozoon has no exception: its child builds every ptychozoon object from
+# ptychodus types, so the parent never imports the package at all. Any other
+# submodule of either package is a regression if it lands in the parent's
+# ``sys.modules``.
 ALLOWED_CHILD_SUBMODULES = frozenset(
     {
-        'ptychozoon',
-        'ptychozoon.data_structures',
-        'ptychozoon.settings',
         'ptycho_fm',
         'ptycho_fm.config',
     }

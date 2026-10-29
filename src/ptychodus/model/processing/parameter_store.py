@@ -19,6 +19,8 @@ from typing import Any
 import copy
 import logging
 
+from pydantic import BaseModel
+
 from ptychodus.api.parameters import Parameter, ParameterGroup
 from ptychodus.api.reconstruct import Reconstructor
 from ptychodus.api.settings import SettingsRegistry
@@ -218,7 +220,8 @@ class ProcessingParameterStore:
     def register_declared(
         self,
         library: str,
-        reconstructor: Reconstructor,
+        algorithm: str,
+        defaults: BaseModel,
         branches: Sequence[OptionsBranch] = (),
     ) -> None:
         """Generate the live parameters for a backend that declares its own options.
@@ -227,9 +230,12 @@ class ProcessingParameterStore:
         field names are the keys, the bounds and display text are already on the
         fields, and nothing is overlaid or adapted. A backend reaches this
         instead of the other when it has nothing for a policy to say.
+
+        Takes the name and the declaration rather than the object declaring them,
+        so anything that states its options can be registered under the name it
+        was registered by, whether or not it names itself.
         """
-        key = _compose_key(library, reconstructor.name)
-        defaults = reconstructor.get_default_options()
+        key = _compose_key(library, algorithm)
         bound: list[_BoundBranch] = []
 
         for branch in branches:

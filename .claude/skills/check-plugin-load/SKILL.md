@@ -57,7 +57,7 @@ for p in r.probe_file_readers:
 ```
 
 Categories on `PluginRegistry` (see [src/ptychodus/api/plugins.py](../../src/ptychodus/api/plugins.py)):
-`bad_pixels_file_readers`, `diffraction_file_readers` / `_writers`, `probe_position_file_readers` / `_writers`, `fresnel_zone_plates`, `probe_file_readers` / `_writers`, `object_file_readers` / `_writers`, `product_file_readers` / `_writers`, `file_based_workflows`, `fluorescence_file_readers` / `_writers`, `upscaling_strategies`, `deconvolution_strategies`.
+`bad_pixels_file_readers`, `diffraction_file_readers` / `_writers`, `probe_position_file_readers` / `_writers`, `fresnel_zone_plates`, `probe_file_readers` / `_writers`, `object_file_readers` / `_writers`, `product_file_readers` / `_writers`, `file_based_workflows`, `fluorescence_file_readers` / `_writers`, `fluorescence_enhancers`.
 
 ### 5. Report findings
 

@@ -6,6 +6,7 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import overload
 
+from pydantic import BaseModel
 from scipy.sparse.linalg import LinearOperator
 import numpy
 
@@ -13,6 +14,7 @@ from .typing import RealArrayType
 from .files import FileReader, FileWriter
 from .interpolate import BarycentricArrayInterpolator
 from .product import Product
+from .reconstruct import DeviceEnvironment
 
 
 class VSPILinearOperator(LinearOperator):
@@ -125,29 +127,67 @@ class FluorescenceEnhancerInput:
 
 @dataclass(frozen=True)
 class FluorescenceEnhancerOutput:
-    """Enhancement result yielded at each step: updated dataset and progress."""
+    """Enhancement result yielded at each step: updated dataset and progress.
+
+    ``progress_goal`` is what ``progress`` counts towards, reported by the run
+    rather than predicted before it: how far an enhancement has to go depends on
+    the options it was handed and the dataset it is working through. Zero means
+    unknown, which a progress bar reads as indeterminate.
+    """
 
     dataset: FluorescenceDataset
     progress: int = 0
+    progress_goal: int = 0
 
 
 class FluorescenceEnhancer(ABC):
-    """Abstract interface for algorithms that enhance fluorescence datasets using ptychography."""
+    """An algorithm that enhances a fluorescence dataset using ptychography, and its options.
 
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        pass
+    Holds no settings of its own and is configured per call, so two callers can
+    drive the same one with different values. It does not name itself either;
+    the name a person selects it by is the one it was registered under.
+
+    An enhancer knows nothing about where its option values come from. Its
+    options may state what a field *is* -- its unit, its bounds -- but never
+    where a value for it is found.
+    """
 
     @abstractmethod
-    def get_progress_goal(self) -> int:
-        pass
+    def get_default_options(self) -> BaseModel:
+        """Return this enhancer's options, populated with their defaults.
+
+        A description, not live state: plain pydantic carrying values, types,
+        ranges, enums and the words to put beside each field. A caller edits a
+        copy and passes it back as ``options``, and its type is what an incoming
+        ``options`` is validated against.
+
+        An instance rather than the class, because a field declared with a
+        ``default_factory`` reports its class-level default as undefined. Only an
+        instance carries the value such a field actually starts at.
+        """
 
     @abstractmethod
     def enhance(
-        self, parameters: FluorescenceEnhancerInput
+        self, input_: FluorescenceEnhancerInput, *, options: BaseModel
     ) -> Iterator[FluorescenceEnhancerOutput]:
         pass
+
+
+class SubprocessFluorescenceEnhancer(FluorescenceEnhancer):
+    """An enhancer whose work runs in a spawned child rather than in this process.
+
+    Carries only where that child may run. Placement says nothing about the
+    algorithm, so it is neither declared in the options nor passed through
+    :meth:`enhance`; whatever owns the device selection attaches it after
+    construction.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        # Where the work runs, which is the spawning process's to decide and
+        # not the backend's. Replaced after construction by whatever owns the
+        # selection; until then a child sees every device this process does.
+        self.device_environment: DeviceEnvironment = dict
 
 
 class FluorescenceFileReader(FileReader[FluorescenceDataset]):
@@ -156,19 +196,3 @@ class FluorescenceFileReader(FileReader[FluorescenceDataset]):
 
 class FluorescenceFileWriter(FileWriter[FluorescenceDataset]):
     """Plugin interface for writing fluorescence datasets."""
-
-
-class UpscalingStrategy(ABC):
-    """Remaps element concentrations from the regular scan grid to the upscaled grid using ptychography-corrected probe positions."""
-
-    @abstractmethod
-    def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
-        pass
-
-
-class DeconvolutionStrategy(ABC):
-    """Deconvolves the probe kernel from the accumulated array to enhance the element map."""
-
-    @abstractmethod
-    def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
-        pass

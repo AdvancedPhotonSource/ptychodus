@@ -26,10 +26,9 @@ from .diffraction import (
 )
 from .files import FileHandler
 from .fluorescence import (
-    DeconvolutionStrategy,
+    FluorescenceEnhancer,
     FluorescenceFileReader,
     FluorescenceFileWriter,
-    UpscalingStrategy,
 )
 from .object import ObjectFileReader, ObjectFileWriter, Object
 from .observer import Observable
@@ -282,8 +281,8 @@ class PluginRegistry:
         self.fluorescence_file_readers = PluginChooser[FluorescenceFileReader]()
         self.fluorescence_file_writers = PluginChooser[FluorescenceFileWriter]()
         self.training_data_file_writers = PluginChooser[TrainingDataFileWriter]()
-        self.upscaling_strategies = PluginChooser[UpscalingStrategy]()
-        self.deconvolution_strategies = PluginChooser[DeconvolutionStrategy]()
+        # A fluorescence enhancer is offered the way an object model is.
+        self.fluorescence_enhancers = PluginChooser[FluorescenceEnhancer]()
         # A reconstructor backend is discovered the same way a file format is:
         # by registering itself, rather than by being named somewhere. An
         # instance like every other chooser holds, which a backend can supply
