@@ -1,15 +1,15 @@
 """Guard the import boundaries that keep ``api/`` usable on its own.
 
 ``ptychodus.api`` is the domain layer: it holds no application state and depends on
-nothing else in ptychodus, so a consumer such as ``ptychodus_store`` can take it without
-taking the GUI session along. Three packages must therefore never import
+nothing else in ptychodus, so a consumer such as ``ptychodus.webapp`` can take it without
+taking the GUI session along. Three subpackages must therefore never import
 ``ptychodus.model``, ``ptychodus.view`` or ``ptychodus.controller``:
 
 - ``ptychodus.api`` itself, whose whole purpose is that boundary;
 - ``ptychodus.plugins``, which registers into ``api``'s plugin catalogs and is loaded by
   ``api`` -- a plugin reaching back into ``model`` would make the catalogs depend on the
   layer that builds selection over them;
-- ``ptychodus_store``, a separate package that reads ``api`` only.
+- ``ptychodus.webapp``, the read-only web service, which reads ``api`` only.
 
 The scan is an AST walk rather than an import so it holds on a bare install, and it
 reads every import in a module, including the deferred ones inside a function body.
@@ -18,7 +18,6 @@ reads every import in a module, including the deferred ones inside a function bo
 from __future__ import annotations
 
 from collections.abc import Iterator
-from importlib.util import find_spec
 from pathlib import Path
 import ast
 
@@ -27,15 +26,6 @@ import pytest
 import ptychodus
 
 _PTYCHODUS_ROOT = Path(ptychodus.__file__).parent
-
-
-def _store_root() -> Path | None:
-    spec = find_spec('ptychodus_store')
-
-    if spec is None or spec.origin is None:
-        return None
-
-    return Path(spec.origin).parent
 
 
 def _modules(root: Path, package: str) -> Iterator[tuple[Path, str]]:
@@ -85,18 +75,9 @@ def _violations(root: Path, package: str) -> list[str]:
     return found
 
 
-@pytest.mark.parametrize('subpackage', ['api', 'plugins'])
+@pytest.mark.parametrize('subpackage', ['api', 'plugins', 'webapp'])
 def test_subpackage_imports_nothing_above_api(subpackage: str) -> None:
     assert _violations(_PTYCHODUS_ROOT / subpackage, f'ptychodus.{subpackage}') == []
-
-
-def test_store_imports_nothing_above_api() -> None:
-    root = _store_root()
-
-    if root is None:
-        pytest.skip('ptychodus_store is not installed')
-
-    assert _violations(root, 'ptychodus_store') == []
 
 
 def test_relative_imports_that_climb_out_of_api_are_caught(tmp_path: Path) -> None:

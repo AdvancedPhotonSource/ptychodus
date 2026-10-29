@@ -1,17 +1,17 @@
-"""Setuptools shim that builds the ptychodus_store frontend before packaging.
+"""Setuptools shim that builds the ptychodus.webapp frontend before packaging.
 
 The main project configuration lives in pyproject.toml; this file only exists to
-register build_py/sdist subclasses that run `tsc` in src/ptychodus_store/ui/ so
+register build_py/sdist subclasses that run `tsc` in src/ptychodus/webapp/ui/ so
 release artifacts ship the compiled UI without requiring maintainers to remember
 a pre-build step. The ui/dist/ output stays gitignored (see .gitignore and the
-`ptychodus_store/ui/` bullet under CLAUDE.md Conventions); it reaches the sdist
+`webapp/ui/` bullet under CLAUDE.md Conventions); it reaches the sdist
 through [tool.setuptools.package-data], which is why sdist has to compile it too
 -- setuptools finalizes build_py to collect package data but never runs it.
 
 The compile is best-effort by default: building from a release sdist finds
 ui/dist/ already present and needs no Node toolchain, and building from a bare
 checkout without `tsc` warns and ships without the web UI rather than failing.
-Set PTYCHODUS_STORE_REQUIRE_UI_BUILD=1 to make a missing or stale UI fatal --
+Set PTYCHODUS_WEBAPP_REQUIRE_UI_BUILD=1 to make a missing or stale UI fatal --
 the documented release command does exactly that.
 """
 
@@ -27,12 +27,12 @@ from setuptools import setup  # type: ignore[import-untyped]
 from setuptools.command.build_py import build_py  # type: ignore[import-untyped]
 from setuptools.command.sdist import sdist  # type: ignore[import-untyped]
 
-UI_DIR = Path(__file__).parent / 'src' / 'ptychodus_store' / 'ui'
+UI_DIR = Path(__file__).parent / 'src' / 'ptychodus' / 'webapp' / 'ui'
 DIST_ENTRY = UI_DIR / 'dist' / 'main.js'
-REQUIRE_ENV = 'PTYCHODUS_STORE_REQUIRE_UI_BUILD'
+REQUIRE_ENV = 'PTYCHODUS_WEBAPP_REQUIRE_UI_BUILD'
 
 INSTALL_HINT = (
-    'ptychodus_store frontend build requires `tsc` on PATH.\n'
+    'ptychodus.webapp frontend build requires `tsc` on PATH.\n'
     '  Install: `npm install -g typescript`, or use nodeenv:\n'
     '    uv tool install nodeenv\n'
     '    nodeenv --node=lts --prebuilt ~/.local/node-lts\n'
@@ -71,7 +71,7 @@ def _build_ui() -> None:
         if DIST_ENTRY.is_file():
             sys.stderr.write('Using the prebuilt (possibly stale) ui/dist/.\n')
         else:
-            sys.stderr.write('Building without the ptychodus-store web UI.\n')
+            sys.stderr.write('Building without the ptychodus-webapp web UI.\n')
 
         return
 

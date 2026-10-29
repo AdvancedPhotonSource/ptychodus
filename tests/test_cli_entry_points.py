@@ -31,7 +31,7 @@ def _console_scripts() -> list[tuple[str, str, str]]:
 def test_entry_point_imports_and_exposes_its_callable(
     command: str, module: str, function: str
 ) -> None:
-    if module.startswith('ptychodus_store'):
+    if module.startswith('ptychodus.webapp'):
         pytest.importorskip('fastapi')
 
     if module.startswith('ptychodus.cli.reconstruct_'):
@@ -45,7 +45,7 @@ def test_entry_point_imports_and_exposes_its_callable(
 def test_entry_point_prints_help_and_exits_zero(
     command: str, module: str, function: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    if module.startswith('ptychodus_store'):
+    if module.startswith('ptychodus.webapp'):
         pytest.importorskip('fastapi')
 
     if module.startswith('ptychodus.cli.reconstruct_'):

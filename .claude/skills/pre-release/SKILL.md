@@ -28,7 +28,7 @@ Launch each section's command with `run <section-name> <command>`, then `wait`, 
 
 ```sh
 uv lock --check || uv lock --upgrade
-uv sync --extra docs --extra gui --extra globus --extra ptychi --extra store --dry-run
+uv sync --extra docs --extra gui --extra globus --extra ptychi --extra webapp --dry-run
 ```
 
 `--check` answers "is this lock consistent with the manifest", not "is this lock current" — the two come apart. Plain `uv lock` is conservative and keeps any pin that still satisfies the manifest, so a lock can pass `--check` while carrying resolutions inherited from a manifest that no longer exists. Only `--upgrade` re-resolves. Measured here: after the `ptychopinn`/`ptycho-fm` path sources were dropped, a plain `uv lock` still pinned `torch 2.6.0` from the PtychoPINN era; `--upgrade` moved it to `2.14.1`.
@@ -36,7 +36,7 @@ uv sync --extra docs --extra gui --extra globus --extra ptychi --extra store --d
 Then read the dry-run diff. Sync for real only when it is empty or confined to the extras being added. A torch or CUDA version moving, an editable install reverting to a registry release, or packages being removed all mean the lock is stale — fix that first, because the gate would otherwise report `PASS` for an environment nobody has.
 
 ```sh
-uv sync --extra docs --extra gui --extra globus --extra ptychi --extra store
+uv sync --extra docs --extra gui --extra globus --extra ptychi --extra webapp
 ```
 
 `ptychi` is the CPU torch extra, which is what this audit wants: no release check needs a GPU, and the CUDA variants (`ptychi-cuda128` and friends) are mutually exclusive with it. Section 5c below validates the extras README names against `pyproject.toml`, so both lists have to move together.
@@ -285,11 +285,11 @@ make -C docs clean
 make -C docs html SPHINXOPTS="-W --keep-going"
 ```
 
-The sync happens once at the top of Phase B, not here. A bare `uv sync --extra docs` at this point would uninstall `gui`, `globus`, `ptychi`, and `store` before Section 7 runs — see "Why the phases".
+The sync happens once at the top of Phase B, not here. A bare `uv sync --extra docs` at this point would uninstall `gui`, `globus`, `ptychi`, and `webapp` before Section 7 runs — see "Why the phases".
 
 `PASS` if exit code 0. `FAIL` on any warning or error.
 
-**Suggested fix**: hand the first warning to the user. Common causes: undocumented cross-references, autodoc import failures (usually a missing extra — retry with `uv sync --extra docs --extra ptychi --extra globus --extra gui --extra store` if autodoc can't import a module), duplicate labels. Not auto-fixable.
+**Suggested fix**: hand the first warning to the user. Common causes: undocumented cross-references, autodoc import failures (usually a missing extra — retry with `uv sync --extra docs --extra ptychi --extra globus --extra gui --extra webapp` if autodoc can't import a module), duplicate labels. Not auto-fixable.
 
 *Note*: `-W` is strict, and the prose sources are expected to build clean — treat any warning originating in `docs/source/*.md` as a regression introduced by the change under review. Warnings raised from `src/ptychodus/api/*.py` docstrings (reStructuredText syntax errors surfaced by autodoc) are a known pre-existing backlog; report the count and the first offender, but do not fold fixing them into the release gate.
 
@@ -328,7 +328,7 @@ with open('pyproject.toml','rb') as f:
 
 ### Section 9 — Distribution artifacts
 
-The release artifacts are what PyPI users actually get, and nothing else in this audit inspects them. In particular the `ptychodus-store` web UI is compiled TypeScript that is gitignored, so it can silently go missing from a build.
+The release artifacts are what PyPI users actually get, and nothing else in this audit inspects them. In particular the `ptychodus-webapp` web UI is compiled TypeScript that is gitignored, so it can silently go missing from a build.
 
 First, fail if a stale `build/` tree is present — `setuptools` reuses `build/lib/`, so a leftover from an earlier build can ship outdated modules:
 
@@ -340,8 +340,8 @@ Then build both artifacts into a temp directory with the UI requirement enforced
 
 ```sh
 out=$(mktemp -d)
-PTYCHODUS_STORE_REQUIRE_UI_BUILD=1 uv build --no-sources --out-dir "$out" || echo "FAIL: uv build"
-ts=$(find src/ptychodus_store/ui/src -name '*.ts' | wc -l)
+PTYCHODUS_WEBAPP_REQUIRE_UI_BUILD=1 uv build --no-sources --out-dir "$out" || echo "FAIL: uv build"
+ts=$(find src/ptychodus/webapp/ui/src -name '*.ts' | wc -l)
 sdist=$(tar -tzf "$out"/ptychodus-*.tar.gz | grep -c 'ui/dist/.*\.js$')
 wheel=$(unzip -Z1 "$out"/ptychodus-*.whl | grep -c 'ui/dist/.*\.js$')
 echo "ts=$ts sdist=$sdist wheel=$wheel"
@@ -461,7 +461,7 @@ The `--oneline` view gives you the merge granularity (usually one bullet per mer
 
 These constraints force Phase B to be serial. Do not re-flatten the phases without addressing them:
 
-- **`uv sync` is exact by default.** It uninstalls anything outside the extras named on that one invocation (`--inexact` opts out). A narrow `uv sync --extra docs` therefore strips `gui`, `globus`, `ptychi`, and `store` — which silently narrows Section 7's pytest collection and inflates Section 3's "modules skipped at load" count. That is why the sync is hoisted to the top of Phase B and names every extra at once.
+- **`uv sync` is exact by default.** It uninstalls anything outside the extras named on that one invocation (`--inexact` opts out). A narrow `uv sync --extra docs` therefore strips `gui`, `globus`, `ptychi`, and `webapp` — which silently narrows Section 7's pytest collection and inflates Section 3's "modules skipped at load" count. That is why the sync is hoisted to the top of Phase B and names every extra at once.
 - **`uv build` and `uv sync` contend on the same project lock.** Section 9 must not overlap Section 6 or the hoisted sync.
 - **Section 9's stale-`build/` guard only means something if nothing else is building.** A concurrent build would create the very directory the guard is checking for.
 - **Section 10 installs the wheel Section 9 builds**, so it runs after it. Its environments live in a temp directory and never touch the project's lock or `.venv`, which is why its three Pythons may run concurrently with each other, though not with Phase A.

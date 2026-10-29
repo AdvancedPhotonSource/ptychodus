@@ -12,7 +12,7 @@ Every line of every ``.py`` file is classified exactly once, in this order of pr
 Files directly under ``src/ptychodus`` are reported together on a ``(top level)`` row.
 
     python scripts/count_lines.py
-    python scripts/count_lines.py --package src/ptychodus_store
+    python scripts/count_lines.py --package src/ptychodus/webapp
 
 No packaged dependency — this file is intentionally not shipped with the wheel.
 """

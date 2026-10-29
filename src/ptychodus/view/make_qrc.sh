@@ -1,6 +1,6 @@
 #!/bin/sh
 # Regenerate resources.py from resources.qrc.
-# All referenced icons live in ../../ptychodus_store/ui/icons/ (see the README there
+# All referenced icons live in ../webapp/ui/icons/ (see the README there
 # for how to add or update icons).
 set -e
 pyrcc5 resources.qrc -o resources.py

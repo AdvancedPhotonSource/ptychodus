@@ -50,7 +50,7 @@ ptychodus-reconstruct-polar = "ptychodus.cli.reconstruct_polar:main"
 ptychodus-reconstruct-subprocess = "ptychodus.cli.reconstruct_subprocess:main"
 ptychodus-reconstruct-velociprobe = "ptychodus.cli.reconstruct_velociprobe:main"
 ptychodus-system-check = "ptychodus.cli.system_check:main"
-ptychodus-store = "ptychodus_store.cli:main"
+ptychodus-webapp = "ptychodus.webapp.cli:main"
 
 # PtychoPINN and PtychoFM are published on no index, so they cannot
 # be named here the way ptychi is -- this table ships as the wheel's
@@ -73,7 +73,7 @@ ptychi-cuda128 = ["ptychi==2.3.*", "torch>=2.4", "torchvision"]
 ptychi-cuda130 = ["ptychi==2.3.*", "torch>=2.4", "torchvision"]
 ptychi-cuda132 = ["ptychi==2.3.*", "torch>=2.4", "torchvision"]
 ptychozoon = ["ptychozoon"]
-store = [
+webapp = [
     "fastapi>=0.115",
     "fastmcp>=3",
     "uvicorn[standard]>=0.30",
@@ -88,7 +88,7 @@ xraydb = ["xraydb>=4.5"]
 [tool.setuptools.package-data]
 "ptychodus" = ["py.typed"]
 "ptychodus.plugins.mda" = ["xdrlib-PSF-LICENSE.txt"]
-"ptychodus_store" = [
+"ptychodus.webapp" = [
     "ui/index.html",
     "ui/styles.css",
     "ui/dist/**/*.js",

@@ -84,6 +84,6 @@ jobs:
           python-version: "3.11"
           cache: pip
       - name: Install ptychodus + mypy
-        run: pip install '.[store]' mypy pytest pytest-asyncio pyqt5-stubs types-psutil types-pyyaml
+        run: pip install '.[webapp]' mypy pytest pytest-asyncio pyqt5-stubs types-psutil types-pyyaml
       - name: mypy
-        run: mypy src/ptychodus src/ptychodus_store scripts tests
+        run: mypy src/ptychodus scripts tests

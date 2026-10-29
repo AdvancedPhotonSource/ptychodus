@@ -1,26 +1,26 @@
 ---
 name: add-nav-icon
-description: Add a navigation-bar icon to ptychodus in both the PyQt GUI and the ptychodus_store web UI. Covers SVG placement, Qt resource compilation with the manual typing fix that pyrcc5 clobbers, ViewCore wiring, nav.ts wiring, and the tsc rebuild. Use when the user says "add a nav icon", "add a toolbar icon", "wire up an icon for the new X panel", or is following up on add-core / a new panel.
+description: Add a navigation-bar icon to ptychodus in both the PyQt GUI and the ptychodus.webapp web UI. Covers SVG placement, Qt resource compilation with the manual typing fix that pyrcc5 clobbers, ViewCore wiring, nav.ts wiring, and the tsc rebuild. Use when the user says "add a nav icon", "add a toolbar icon", "wire up an icon for the new X panel", or is following up on add-core / a new panel.
 ---
 
 # add-nav-icon
 
-Ptychodus has two navigation surfaces that share icon assets: the PyQt5 toolbar in `ViewCore` and the browser nav bar in `ptychodus_store`. SVGs live once in [`src/ptychodus_store/ui/icons/`](../../src/ptychodus_store/ui/icons/); the PyQt side pulls them in via a Qt resource file compiled to `resources.py`, and the web UI pulls them straight from the FastAPI static mount. This skill wires a new icon through both.
+Ptychodus has two navigation surfaces that share icon assets: the PyQt5 toolbar in `ViewCore` and the browser nav bar in `ptychodus.webapp`. SVGs live once in [`src/ptychodus/webapp/ui/icons/`](../../src/ptychodus/webapp/ui/icons/); the PyQt side pulls them in via a Qt resource file compiled to `resources.py`, and the web UI pulls them straight from the FastAPI static mount. This skill wires a new icon through both.
 
 ## Step 1 — Add the SVG
 
-Drop the SVG into [`src/ptychodus_store/ui/icons/`](../../src/ptychodus_store/ui/icons/). Do not put icons anywhere else — the `.qrc` file uses a relative path (`../../ptychodus_store/ui/icons/…`) to reach exactly this directory.
+Drop the SVG into [`src/ptychodus/webapp/ui/icons/`](../../src/ptychodus/webapp/ui/icons/). Do not put icons anywhere else — the `.qrc` file uses a relative path (`../webapp/ui/icons/…`) to reach exactly this directory.
 
 - Kebab-case filename (e.g. `my-icon.svg`).
 - `fill="currentColor"` so CSS themes work.
-- Font Awesome 7.1.0 (CC BY 4.0) is the house style. See [`icons/Font-Awesome-LICENSE.txt`](../../src/ptychodus_store/ui/icons/Font-Awesome-LICENSE.txt) for attribution and [`icons/README.md`](../../src/ptychodus_store/ui/icons/README.md) for the update procedure.
+- Font Awesome 7.1.0 (CC BY 4.0) is the house style. See [`icons/Font-Awesome-LICENSE.txt`](../../src/ptychodus/webapp/ui/icons/Font-Awesome-LICENSE.txt) for attribution and [`icons/README.md`](../../src/ptychodus/webapp/ui/icons/README.md) for the update procedure.
 
 ## Step 2 — Register in the Qt resource file
 
 Add one line to [`src/ptychodus/view/resources.qrc`](../../src/ptychodus/view/resources.qrc), keeping the list alphabetized by `alias`:
 
 ```xml
-<file alias="my-feature">../../ptychodus_store/ui/icons/my-icon.svg</file>
+<file alias="my-feature">../webapp/ui/icons/my-icon.svg</file>
 ```
 
 The `alias` is what code references as `:/icons/my-feature`. Convention: alias matches the panel concept, not the filename (e.g. `atom.svg` is aliased `fluorescence`).
@@ -75,7 +75,7 @@ If the new panel belongs nested under a parent (Products or Processing today), a
 
 ## Step 5 — Wire it into the web UI
 
-Add one entry to the `NAV` array in [`src/ptychodus_store/ui/src/nav.ts`](../../src/ptychodus_store/ui/src/nav.ts):
+Add one entry to the `NAV` array in [`src/ptychodus/webapp/ui/src/nav.ts`](../../src/ptychodus/webapp/ui/src/nav.ts):
 
 ```typescript
 { route: 'my-feature', label: 'My Label', icon: 'my-icon.svg' },
@@ -92,23 +92,23 @@ Add one entry to the `NAV` array in [`src/ptychodus_store/ui/src/nav.ts`](../../
 Diffraction          Products (children: Positions, Probe, Object)          Fluorescence
 ```
 
-Entries present in `ViewCore` but deliberately absent here are the panels that write or dispatch — Settings, Processing, Globus, Genesis, Automation, Agent — and `src/ptychodus_store/README.md` says so. A new panel of that kind needs no `nav.ts` entry; add it to that list instead.
+Entries present in `ViewCore` but deliberately absent here are the panels that write or dispatch — Settings, Processing, Globus, Genesis, Automation, Agent — and `src/ptychodus/webapp/README.md` says so. A new panel of that kind needs no `nav.ts` entry; add it to that list instead.
 
 Routing is keyed by `route`, and `main.ts` walks the tree, so a nested entry needs a `PAGES` entry exactly like a top-level one.
 
-No backend router change is needed. FastAPI already serves `src/ptychodus_store/ui/` at `/ui/` via the `StaticFiles` mount in [`src/ptychodus_store/app.py`](../../src/ptychodus_store/app.py), so a new SVG in `ui/icons/` is automatically reachable at `/ui/icons/my-icon.svg`.
+No backend router change is needed. FastAPI already serves `src/ptychodus/webapp/ui/` at `/ui/` via the `StaticFiles` mount in [`src/ptychodus/webapp/app.py`](../../src/ptychodus/webapp/app.py), so a new SVG in `ui/icons/` is automatically reachable at `/ui/icons/my-icon.svg`.
 
 ## Step 6 — Rebuild the TypeScript
 
 ```sh
-cd src/ptychodus_store/ui
+cd src/ptychodus/webapp/ui
 tsc
 ```
 
-No bundler, no framework — plain `tsc` compiles `src/**/*.ts` into `dist/` (see `tsconfig.json`). Restart the store server so the fresh compiled JS is loaded; `tsc --watch` is fine for iteration.
+No bundler, no framework — plain `tsc` compiles `src/**/*.ts` into `dist/` (see `tsconfig.json`). Restart the webapp server so the fresh compiled JS is loaded; `tsc --watch` is fine for iteration.
 
 ## Verify
 
 - **PyQt:** `uv run ptychodus` — the new icon appears at the correct toolbar position (top-level or nested), highlights on click, and swaps in the associated left/right panels.
-- **Web UI:** run the `store-dev` skill, load the browser UI, confirm the icon renders in the nav bar (network tab should show a 200 for `/ui/icons/my-icon.svg`).
+- **Web UI:** run the `webapp-dev` skill, load the browser UI, confirm the icon renders in the nav bar (network tab should show a 200 for `/ui/icons/my-icon.svg`).
 - **CI gate:** run the `pre-push` skill. If `pyrcc5` wiped the typing fix, `ruff` will fail with `N802` on `qInitResources` / `qCleanupResources` — reapply Step 3 and re-run.

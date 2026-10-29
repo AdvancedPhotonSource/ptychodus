@@ -401,7 +401,7 @@ def test_pipeline_compute_output_dtype_folds_over_steps() -> None:
 
 
 def test_pipeline_serializes_and_round_trips() -> None:
-    """Pydantic tagged-union round-trip so `ptychodus_store` can persist a pipeline."""
+    """Pydantic tagged-union round-trip so `ptychodus.webapp` can persist a pipeline."""
     original = _pipeline(
         FilterValuesStep(lower_bound=1, upper_bound=99),
         BinningStep(bin_size_x=2, bin_size_y=2),

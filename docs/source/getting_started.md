@@ -251,7 +251,7 @@ VS Code will build the image and reopen the workspace inside the container.
 
 The version is derived from the git tag by `setuptools-scm` — there is no version string to edit anywhere in the tree. Tag first, then build.
 
-The `ptychodus-store` web UI is compiled TypeScript that is not tracked in git. Both the `sdist` and `build_py` steps compile it, so the release sdist and wheel each carry `ptychodus_store/ui/dist/`, and consumers installing from PyPI never need Node. Setting `PTYCHODUS_STORE_REQUIRE_UI_BUILD=1` turns a missing or stale UI into a build failure instead of a warning — always set it when publishing, so a release can never ship a stale or empty UI.
+The `ptychodus-webapp` web UI is compiled TypeScript that is not tracked in git. Both the `sdist` and `build_py` steps compile it, so the release sdist and wheel each carry `ptychodus/webapp/ui/dist/`, and consumers installing from PyPI never need Node. Setting `PTYCHODUS_WEBAPP_REQUIRE_UI_BUILD=1` turns a missing or stale UI into a build failure instead of a warning — always set it when publishing, so a release can never ship a stale or empty UI.
 
 ### Prepare
 
@@ -278,24 +278,24 @@ The `ptychodus-store` web UI is compiled TypeScript that is not tracked in git. 
    $ npm install -g typescript
    ```
 
-   See the "Rebuild the frontend" section of `src/ptychodus_store/README.md` for the UI development workflow.
+   See the "Rebuild the frontend" section of `src/ptychodus/webapp/README.md` for the UI development workflow.
 
 ### Build and verify
 
 1. Build the sdist and wheel into `./dist/`. `--no-sources` is required: `[tool.uv.sources]` pins `torch` and `torchvision` to a specific index, which must not leak into the published metadata.
 
    ```sh
-   $ PTYCHODUS_STORE_REQUIRE_UI_BUILD=1 uv build --no-sources
+   $ PTYCHODUS_WEBAPP_REQUIRE_UI_BUILD=1 uv build --no-sources
    ```
 
-   The equivalent with `build` is `PTYCHODUS_STORE_REQUIRE_UI_BUILD=1 python -m build`.
+   The equivalent with `build` is `PTYCHODUS_WEBAPP_REQUIRE_UI_BUILD=1 python -m build`.
 
 2. Confirm the compiled UI is in **both** artifacts. Each count must equal the number of TypeScript sources:
 
    ```sh
    $ tar -tzf dist/ptychodus-*.tar.gz | grep -c 'ui/dist/.*\.js$'
    $ unzip -Z1 dist/ptychodus-*.whl | grep -c 'ui/dist/.*\.js$'
-   $ find src/ptychodus_store/ui/src -name '*.ts' | wc -l
+   $ find src/ptychodus/webapp/ui/src -name '*.ts' | wc -l
    ```
 
 3. Confirm the metadata renders on PyPI:

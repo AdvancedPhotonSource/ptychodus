@@ -1,6 +1,6 @@
 ---
 name: check-layers
-description: Verify api/model/view+controller layer boundary compliance across the ptychodus source tree — no upward imports (api must not depend on model/view/controller; model must not depend on view/controller; ptychodus_store must not depend on ptychodus.model or ptychodus.view). Use when refactoring, before merging structural changes, or when the user asks to audit the architecture.
+description: Verify api/model/view+controller layer boundary compliance across the ptychodus source tree — no upward imports (api must not depend on model/view/controller; model must not depend on view/controller; ptychodus.webapp must not depend on ptychodus.model or ptychodus.view). Use when refactoring, before merging structural changes, or when the user asks to audit the architecture.
 ---
 
 # check-layers
@@ -11,7 +11,7 @@ CLAUDE.md documents a strict three-layer separation:
 - `src/ptychodus/model/` — application logic; depends on `api/` and `plugins/`.
 - `src/ptychodus/plugins/` — discovered plugins; depends on `api/` only, never on `model/`.
 - `src/ptychodus/view/` and `src/ptychodus/controller/` — GUI; may depend on `api/` and `model/`.
-- `src/ptychodus_store/` — separate package; reads from `ptychodus.api` only, never from `ptychodus.model` or `ptychodus.view`.
+- `src/ptychodus/webapp/` — the web service, a subpackage that reads from `ptychodus.api` only, never from `ptychodus.model` or `ptychodus.view`.
 
 This skill greps for violations and reports file:line for anything out of place.
 
@@ -47,7 +47,7 @@ Expected: no output. If found, the code should move to `view/` or `controller/`.
 
 ### 4. plugins/ must not import model/, view/, or controller/
 
-A plugin is loaded by `api/plugins.py`, which `model/` builds on, so an import back into `model/` inverts the layering and risks a cycle at discovery time. [tests/test_layering.py](../../tests/test_layering.py) enforces this rule, the api rule and the store rule in CI, including deferred imports inside function bodies; the greps here are the quick local check.
+A plugin is loaded by `api/plugins.py`, which `model/` builds on, so an import back into `model/` inverts the layering and risks a cycle at discovery time. [tests/test_layering.py](../../tests/test_layering.py) enforces this rule, the api rule and the webapp rule in CI, including deferred imports inside function bodies; the greps here are the quick local check.
 
 ```sh
 grep -rn --include='*.py' -E "^(from|import)[[:space:]]+ptychodus\.(model|view|controller)" src/ptychodus/plugins/
@@ -56,10 +56,10 @@ grep -rn --include='*.py' -E "^from[[:space:]]+\.\.\.(model|view|controller)" sr
 
 Expected: no output. The second form catches the relative spelling a plugin is more likely to reach for.
 
-### 5. ptychodus_store/ must not import ptychodus.model or ptychodus.view
+### 5. webapp/ must not import ptychodus.model or ptychodus.view
 
 ```sh
-grep -rn --include='*.py' -E "^(from|import)[[:space:]]+ptychodus\.(model|view|controller)" src/ptychodus_store/
+grep -rn --include='*.py' -E "^(from|import)[[:space:]]+ptychodus\.(model|view|controller)" src/ptychodus/webapp/
 ```
 
 Expected: no output.

@@ -52,7 +52,7 @@ class ChatTerminal:
         )
         # TODO(mcp-followup): when settings.mcp_server_url is non-empty, pass
         # toolsets=[MCPServerStreamableHTTP(url=...)] so the agent can call
-        # ptychodus_store tools (see src/ptychodus_store/mcp_server.py).
+        # ptychodus.webapp tools (see src/ptychodus/webapp/mcp_server.py).
         agent = Agent(
             model,
             system_prompt=self._settings.system_prompt.get_value(),

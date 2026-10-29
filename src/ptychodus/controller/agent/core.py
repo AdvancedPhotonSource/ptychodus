@@ -196,7 +196,7 @@ class AgentController(QObject):
         )
         self._mcp_server_url_view_controller = LineEditParameterViewController(
             settings.mcp_server_url,
-            tool_tip='Optional MCP server URL (e.g. ptychodus_store at http://localhost:8000/mcp).',
+            tool_tip='Optional MCP server URL (e.g. ptychodus-webapp at http://localhost:8000/mcp).',
         )
 
         group_box_layout = QFormLayout()
