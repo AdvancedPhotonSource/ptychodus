@@ -20,7 +20,6 @@ from ptychodus.api.diffraction import DiffractionMetadata, DiffractionArray
 from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.workflow import WorkflowAPI
 
 from .agent import AgentCore
@@ -31,15 +30,11 @@ from .fluorescence import FluorescenceCore
 from .genesis import GenesisCore
 from .globus import GlobusCore
 from .memory import MemoryPresenter
+from .plugins import PluginChooser
 from .processing import ProcessingCore
 from .product import PositionsStreamingContext, ProductCore
-from .ptychi import PtyChiReconstructorLibrary
-from .ptychonn import PtychoNNReconstructorLibrary
-from .ptycho_fm import PtychoFMReconstructorLibrary
-from .ptychopinn import PtychoPINNReconstructorLibrary
-from .ptychopinn_torch import PtychoPINNTorchReconstructorLibrary
+from .settings import SettingsRegistry
 from .task_manager import TaskManager
-from .visualization import VisualizationEngine
 from .workflow import ConcreteWorkflowAPI
 
 logger = logging.getLogger(__name__)
@@ -108,70 +103,49 @@ class ModelCore:
         self.diffraction_core = DiffractionCore(
             self._task_manager,
             self.settings_registry,
-            self.plugin_registry.bad_pixels_file_readers,
-            self.plugin_registry.diffraction_file_readers,
-            self.plugin_registry.diffraction_file_writers,
+            PluginChooser(self.plugin_registry.bad_pixels_file_readers),
+            PluginChooser(self.plugin_registry.diffraction_file_readers),
+            PluginChooser(self.plugin_registry.diffraction_file_writers),
             self.settings_registry,
+            PluginChooser(self.plugin_registry.background_file_readers),
+            PluginChooser(self.plugin_registry.flat_field_file_readers),
         )
         self.product_core = ProductCore(
             self.rng,
             self.settings_registry,
             self.diffraction_core.diffraction_api,
-            self.plugin_registry.probe_position_file_readers,
-            self.plugin_registry.probe_position_file_writers,
+            self.plugin_registry.probe_position_generators,
+            PluginChooser(self.plugin_registry.probe_position_file_readers),
+            PluginChooser(self.plugin_registry.probe_position_file_writers),
+            self.plugin_registry.probe_generators,
             self.plugin_registry.fresnel_zone_plates,
             self.plugin_registry.kb_mirrors,
-            self.plugin_registry.probe_file_readers,
-            self.plugin_registry.probe_file_writers,
-            self.plugin_registry.object_file_readers,
-            self.plugin_registry.object_file_writers,
-            self.plugin_registry.product_file_readers,
-            self.plugin_registry.product_file_writers,
+            PluginChooser(self.plugin_registry.probe_file_readers),
+            PluginChooser(self.plugin_registry.probe_file_writers),
+            self.plugin_registry.object_generators,
+            PluginChooser(self.plugin_registry.object_file_readers),
+            PluginChooser(self.plugin_registry.object_file_writers),
+            PluginChooser(self.plugin_registry.product_file_readers),
+            PluginChooser(self.plugin_registry.product_file_writers),
             self.settings_registry,
             self._task_manager,
-        )
-        self.pattern_visualization_engine = VisualizationEngine(is_complex=False)
-        self.summary_visualization_engine = VisualizationEngine(is_complex=False)
-        self.probe_visualization_engine = VisualizationEngine(is_complex=True)
-        self.object_visualization_engine = VisualizationEngine(is_complex=True)
-
-        self.ptychi_reconstructor_library = PtyChiReconstructorLibrary(
-            self.settings_registry,
-            self.is_developer_mode_enabled,
-        )
-        self.ptychonn_reconstructor_library = PtychoNNReconstructorLibrary(
-            self.settings_registry, self.is_developer_mode_enabled
-        )
-        self.ptychopinn_reconstructor_library = PtychoPINNReconstructorLibrary(
-            self.settings_registry, self.is_developer_mode_enabled
-        )
-        self.ptychopinn_torch_reconstructor_library = PtychoPINNTorchReconstructorLibrary(
-            self.settings_registry, self.is_developer_mode_enabled
-        )
-        self.ptycho_fm_reconstructor_library = PtychoFMReconstructorLibrary(
-            self.settings_registry, self.is_developer_mode_enabled
         )
         self.processing_core = ProcessingCore(
             self._task_manager,
             self.settings_registry,
             self.product_core.product_api,
-            [
-                self.ptychi_reconstructor_library,
-                self.ptychonn_reconstructor_library,
-                self.ptychopinn_reconstructor_library,
-                self.ptychopinn_torch_reconstructor_library,
-                self.ptycho_fm_reconstructor_library,
-            ],
+            PluginChooser(self.plugin_registry.reconstructor_libraries),
+            self.plugin_registry.training_data_file_writers,
         )
         self.fluorescence_core = FluorescenceCore(
             self._task_manager,
             self.settings_registry,
             self.product_core.product_api,
             self.product_core.product_repository,
-            self.plugin_registry.upscaling_strategies,
-            self.plugin_registry.deconvolution_strategies,
-            self.plugin_registry.fluorescence_file_readers,
-            self.plugin_registry.fluorescence_file_writers,
+            PluginChooser(self.plugin_registry.fluorescence_enhancers),
+            self.processing_core.device_selection,
+            PluginChooser(self.plugin_registry.fluorescence_file_readers),
+            PluginChooser(self.plugin_registry.fluorescence_file_writers),
             self.settings_registry,
         )
         self.analysis_core = AnalysisCore(
@@ -208,7 +182,7 @@ class ModelCore:
             self._task_manager,
             self.settings_registry,
             self.workflow_api,
-            self.plugin_registry.file_based_workflows,
+            PluginChooser(self.plugin_registry.file_based_workflows),
         )
         self.agent_core = AgentCore(self.settings_registry)
 
@@ -271,7 +245,7 @@ class ModelCore:
             model_path = input_directory / f'{StandardFileLayout.MODEL_BASENAME}{ext}'
 
             if model_path.is_file():
-                processing_api.load_model_from_file(model_path)
+                processing_api.load_model(model_path)
             else:
                 logger.info(
                     f'No model file found at {model_path}; '
@@ -297,6 +271,14 @@ class ModelCore:
             except Exception as exc:
                 logger.error(f'Reconstruction failed: {type(exc).__name__}: {exc}')
                 return ExitCode.FAILURE
+
+            if not output_product_path.is_file():
+                # Nothing raised and nothing was written, which is a failure
+                # even though no step reported one: an empty output directory
+                # is not a reconstruction, and a batch queue branches on the
+                # exit code rather than reading the log.
+                logger.error(f'Reconstruction wrote no product to {output_product_path}!')
+                return ExitCode.FAILURE
         else:
             logger.error('Input product is not a file!')
             return ExitCode.USAGE
@@ -309,6 +291,10 @@ class ModelCore:
             if output_fluorescence_path.is_file():
                 logger.warning('Output fluorescence file will be overwritten!')
 
+            logger.warning(
+                'Batch-mode fluorescence enhancement is deprecated and will be removed. '
+                'Reconstruct with ptychodus-reconstruct, then enhance with ptychodus-enhance.'
+            )
             logger.info('Enhancing fluorescence...')
 
             output_product_api.enhance_fluorescence_local(
@@ -331,6 +317,13 @@ class ModelCore:
             return ExitCode.USAGE
 
         input_product_path = input_directory / StandardFileLayout.PRODUCT
+
+        if not self.processing_core.processing_api.is_reconstructor_trainable():
+            # Refused here so the status says so. A request to train something
+            # that cannot is a usage error, and a batch queue branches on the
+            # exit code rather than reading the log.
+            logger.error('The selected algorithm cannot train!')
+            return ExitCode.USAGE
 
         if input_product_path.is_file():
             input_product_api = self.workflow_api.load_product(

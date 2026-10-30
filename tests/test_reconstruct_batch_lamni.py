@@ -12,24 +12,33 @@ beamline data. What is covered is everything that decides *what* a run would do.
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
 pytest.importorskip('ptychi')
 
+from ptychodus.api.devices import Device  # noqa: E402
+from ptychodus.api.exit_codes import ExitCode  # noqa: E402
 from ptychodus.api.object import compute_uniform_layer_spacing_m  # noqa: E402
 from ptychodus.cli import reconstruct_batch_lamni  # noqa: E402
 from ptychodus.cli._batch_lamni_settings import (  # noqa: E402
     Batch,
     BatchSettings,
+    Paths,
+    dump_batch_settings,
     load_batch_settings,
     load_batch_settings_from_text,
     record_payload,
     select_label,
     select_records,
 )
-from ptychodus.plugins.aps31id_lamni._scan_table import APS31IDEScanRecord  # noqa: E402
+from ptychodus.cli.reconstruct_batch_lamni import BatchResult, plan_batch_lamni  # noqa: E402
+from ptychodus.plugins.aps31id_lamni.scan_table import APS31IDEScanRecord  # noqa: E402
+
+_SCAN_TABLE = Path(__file__).parent / 'data' / 'lamni' / 'tomography_scannumbers.txt'
 
 _MINIMAL = """
 paths:
@@ -299,41 +308,247 @@ def test_the_record_payload_is_plain_data() -> None:
 # physical devices. These pin the composition between the two.
 
 
+def test_the_fanout_runs_one_worker_per_accelerator(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The CPU is a device to the shared probe, but not something to fan out across."""
+    probed = [
+        Device('cpu', 'CPU'),
+        Device('cuda:0', 'A'),
+        Device('cuda:1', 'B'),
+    ]
+    monkeypatch.setattr(reconstruct_batch_lamni, 'probe_devices', lambda: probed)
+
+    assert [d.identifier for d in reconstruct_batch_lamni.visible_accelerators()] == [
+        'cuda:0',
+        'cuda:1',
+    ]
+
+
+def test_a_cpu_only_host_fans_out_across_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(reconstruct_batch_lamni, 'probe_devices', lambda: [Device('cpu', 'CPU')])
+    assert reconstruct_batch_lamni.visible_accelerators() == []
+
+
+# --- the Python API --------------------------------------------------------------------
+#
+# A caller that already holds a BatchSettings drives the same batch the command does. What
+# is pinned here is everything that decides *what* such a run would do: the selection it
+# resolves, the settings text it archives when there is no file to copy, and the account it
+# returns. The fan-out itself still needs GPUs and real data.
+
+
+def _experiment(
+    tmp_path: Path,
+    *,
+    scan_start: int | None = None,
+    scan_end: int | None = None,
+    layout: Literal['data', 'flat'] = 'data',
+) -> BatchSettings:
+    """Settings over a tmp experiment tree holding the real scan table.
+
+    ``layout`` places ``dat-files`` under a ``data`` subdirectory or at the top level.
+    """
+    experiment = tmp_path / 'experiment'
+    dat_files = (experiment / 'data' if layout == 'data' else experiment) / 'dat-files'
+    dat_files.mkdir(parents=True)
+    shutil.copy(_SCAN_TABLE, dat_files / 'tomography_scannumbers.txt')
+
+    return BatchSettings(
+        paths=Paths(
+            experiment_folder=experiment,
+            output_products_folder=tmp_path / 'out',
+        ),
+        batch=Batch(label='BOREAS_3d_50um', scan_start=scan_start, scan_end=scan_end),
+    )
+
+
+def test_the_plan_selects_one_tomogram_in_acquisition_order(tmp_path: Path) -> None:
+    selected = plan_batch_lamni(_experiment(tmp_path))
+
+    assert [record.scan_no for record in selected] == [188, 189, 190, 368, 369]
+
+
+def test_the_plan_honors_the_scan_range(tmp_path: Path) -> None:
+    selected = plan_batch_lamni(_experiment(tmp_path, scan_start=189, scan_end=368))
+
+    assert [record.scan_no for record in selected] == [189, 190, 368]
+
+
+def test_the_plan_carries_the_rotation_angle_each_product_is_stamped_with(
+    tmp_path: Path,
+) -> None:
+    selected = plan_batch_lamni(_experiment(tmp_path, scan_start=188, scan_end=188))
+
+    assert selected[0].encoder_angle_deg == pytest.approx(-90.0461)
+
+
+def test_an_empty_selection_is_an_error_rather_than_an_empty_run(tmp_path: Path) -> None:
+    with pytest.raises(ValueError):
+        plan_batch_lamni(_experiment(tmp_path, scan_start=9000))
+
+
+def test_an_experiment_without_a_data_subdirectory_is_planned_the_same(
+    tmp_path: Path,
+) -> None:
+    settings = _experiment(tmp_path, layout='flat')
+    experiment = tmp_path / 'experiment'
+
+    assert settings.scan_table_file == experiment / 'dat-files' / 'tomography_scannumbers.txt'
+    assert settings.position_file(188) == experiment / 'scan_positions' / 'scan_00188.dat'
+    assert [record.scan_no for record in plan_batch_lamni(settings)] == [188, 189, 190, 368, 369]
+
+
+def test_the_data_subdirectory_wins_over_a_top_level_one(tmp_path: Path) -> None:
+    settings = _experiment(tmp_path)
+    top_level = tmp_path / 'experiment' / 'dat-files'
+    top_level.mkdir()
+    # An empty table plans nothing, which is an error: reading it would fail the plan.
+    (top_level / 'tomography_scannumbers.txt').touch()
+
+    assert [record.scan_no for record in plan_batch_lamni(settings)] == [188, 189, 190, 368, 369]
+
+
+def test_the_data_directory_itself_is_accepted(tmp_path: Path) -> None:
+    settings = _experiment(tmp_path)
+    data_dir = tmp_path / 'experiment' / 'data'
+    settings.paths.experiment_folder = data_dir
+
+    assert settings.data_dir == data_dir
+
+
+def test_the_diffraction_file_is_found_in_a_block_of_any_size(tmp_path: Path) -> None:
+    settings = _experiment(tmp_path)
+    scan_dir = tmp_path / 'experiment' / 'data' / 'eiger_4' / 'S00100-00199' / 'S00188'
+    scan_dir.mkdir(parents=True)
+    (scan_dir / 'run_00188_master_000000000000.h5').touch()
+    (scan_dir / 'run_00188_000000000000.h5').touch()
+
+    assert settings.diffraction_file(188) == scan_dir / 'run_00188_000000000000.h5'
+
+
+def test_a_folder_that_is_not_an_experiment_directory_is_an_error(tmp_path: Path) -> None:
+    settings = BatchSettings(
+        paths=Paths(experiment_folder=tmp_path, output_products_folder=tmp_path / 'out')
+    )
+
+    with pytest.raises(ValueError):
+        plan_batch_lamni(settings)
+
+
+# --- the archived settings -------------------------------------------------------------
+
+
+def test_dumped_settings_reload_unchanged() -> None:
+    """A run built from an object archives a rendering of it, and workers rebuild from it.
+
+    Both copies would otherwise describe a different run than the one that happened.
+    """
+    settings = _settings()
+
+    assert load_batch_settings_from_text(dump_batch_settings(settings)) == settings
+
+
+def test_dumped_settings_reload_unchanged_with_every_section_set() -> None:
+    settings = _settings(
+        """
+batch:
+  label: sample_A
+  scan_start: 1000
+  scan_end: 2400
+  exclude_scans: [1140]
+  overwrite_existing_products: true
+initial_probe:
+  probe_source: file
+  probe_from_file:
+    file_path: /probe.h5
+  num_probe_modes: 4
+initial_object:
+  num_slices: 3
+  object_thickness_m: 1.5e-06
+positions:
+  affine_matrix: [[1.0, 0.0, 3.0], [0.0, 1.0, -4.0]]
+metadata_overrides:
+  detector_distance_m: 1.92
+  probe_energy_eV: 8800.0
+diffraction:
+  crop_extent_px: 128
+  bad_pixels_file: /mask.npy
+misc:
+  num_sync_epochs: 10
+  continue_on_error: true
+"""
+    )
+
+    assert load_batch_settings_from_text(dump_batch_settings(settings)) == settings
+
+
+# --- the result ------------------------------------------------------------------------
+
+
 @pytest.mark.parametrize(
-    ('inherited', 'probed', 'expected'),
+    ('failed', 'reason', 'expected'),
     [
-        # Nothing inherited: the two numberings coincide.
-        (None, ['gpu (cuda:0)', 'gpu (cuda:1)'], ['0', '1']),
-        # A full mask is the identity, which is the case that hides the bug.
-        ('0,1', ['gpu (cuda:0)', 'gpu (cuda:1)'], ['0', '1']),
-        # One device allocated, and not the first: the probe still calls it cuda:0.
-        ('1', ['gpu (cuda:0)'], ['1']),
-        ('3', ['gpu (cuda:0)'], ['3']),
-        # A reordered or sparse allocation maps positionally.
-        ('2,5', ['gpu (cuda:0)', 'gpu (cuda:1)'], ['2', '5']),
-        ('5,2', ['gpu (cuda:0)', 'gpu (cuda:1)'], ['5', '2']),
-        # Whitespace is tolerated, as a hand-written allocation may carry it.
-        (' 2 , 5 ', ['gpu (cuda:0)', 'gpu (cuda:1)'], ['2', '5']),
-        # A mask of UUIDs composes the same way, because entries are copied not parsed.
-        ('GPU-abc,GPU-def', ['gpu (cuda:0)', 'gpu (cuda:1)'], ['GPU-abc', 'GPU-def']),
-        # No devices at all, however that came about.
-        ('', [], []),
-        (None, [], []),
-        # A CPU-only probe reports no cuda ordinal to map.
-        (None, ['cpu'], []),
+        ((), None, ExitCode.SUCCESS),
+        ((1042,), None, ExitCode.FAILURE),
+        ((), 'SIGINT', ExitCode.CANCELLED),
+        # A cancellation the first failure requested still reports as cancelled, because
+        # the scans after it were never attempted.
+        ((1042,), 'a scan failed', ExitCode.CANCELLED),
     ],
 )
-def test_device_ordinals_compose_with_an_inherited_mask(
-    monkeypatch: pytest.MonkeyPatch,
-    inherited: str | None,
-    probed: list[str],
-    expected: list[str],
+def test_the_exit_code_reports_cancellation_ahead_of_failure(
+    failed: tuple[int, ...], reason: str | None, expected: ExitCode
 ) -> None:
-    if inherited is None:
-        monkeypatch.delenv('CUDA_VISIBLE_DEVICES', raising=False)
-    else:
-        monkeypatch.setenv('CUDA_VISIBLE_DEVICES', inherited)
+    result = BatchResult(
+        selected=(1042,),
+        succeeded=(),
+        skipped=(),
+        failed=failed,
+        cancelled=(),
+        cancellation_reason=reason,
+    )
 
-    monkeypatch.setattr(reconstruct_batch_lamni, 'probe_devices_via_subprocess', lambda: probed)
+    assert result.exit_code == expected
 
-    assert reconstruct_batch_lamni.visible_cuda_devices() == expected
+
+def test_every_exported_name_resolves() -> None:
+    """``__all__`` is the surface a caller imports; a rename has to be deliberate."""
+    for name in reconstruct_batch_lamni.__all__:
+        assert hasattr(reconstruct_batch_lamni, name), name
+
+
+class TestNearFieldOverrides:
+    """The batch path declares the regime in its settings file, and defaults to far field."""
+
+    def test_both_keys_default_to_unset(self) -> None:
+        # None, not False: an existing batch file stays exactly as far field as it was.
+        overrides = _settings().metadata_overrides
+
+        assert overrides.far_field is None
+        assert overrides.focus_object_distance_m is None
+
+    def test_the_keys_round_trip_through_yaml(self) -> None:
+        settings = _settings("""
+metadata_overrides:
+  far_field: false
+  focus_object_distance_m: -0.0008
+""")
+
+        assert settings.metadata_overrides.far_field is False
+        assert settings.metadata_overrides.focus_object_distance_m == pytest.approx(-8.0e-4)
+
+    def test_declaring_near_field_alone_leaves_the_distance_to_the_defocus(self) -> None:
+        """The zone-plate defocus already states it, so a batch need not repeat it."""
+        settings = _settings("""
+metadata_overrides:
+  far_field: false
+""")
+
+        assert settings.metadata_overrides.focus_object_distance_m is None
+        assert settings.initial_probe.simulated_probe.fzp_defocus_m == pytest.approx(800.0e-6)
+
+    def test_an_unknown_regime_key_is_still_rejected(self) -> None:
+        with pytest.raises(ValueError):
+            _settings("""
+metadata_overrides:
+  near_field: true
+""")

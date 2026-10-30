@@ -15,8 +15,10 @@ from ptychodus.api.diffraction import (
     SimpleDiffractionArray,
     SimpleDiffractionDataset,
 )
+from ptychodus.api.files import FileFormat
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.typing import RealArrayType
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.product import LossValue, Product, ProductFileReader, ProductMetadata
 from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 
@@ -39,12 +41,18 @@ def _get_scalar(npz_file: numpy.lib.npyio.NpzFile, key: str, fallback: float) ->
         return fallback
 
 
-def _coords_in_pixels(scan_x: numpy.ndarray, scan_y: numpy.ndarray) -> bool:
+def _coords_in_pixels(scan_x: RealArrayType, scan_y: RealArrayType) -> bool:
     max_abs = max(float(numpy.max(numpy.abs(scan_x))), float(numpy.max(numpy.abs(scan_y))))
     return max_abs > PIXEL_COORDINATE_THRESHOLD_M
 
 
 class SLACDiffractionFileReader(DiffractionFileReader):
+    def get_file_description(self) -> str:
+        return 'SLAC NumPy Zipped Archive'
+
+    def get_file_extensions(self) -> set[str]:
+        return FileFormat.NPZ.extensions
+
     def read(self, file_path: Path) -> DiffractionDataset:
         with numpy.load(file_path) as npz_file:
             patterns = numpy.transpose(npz_file['diffraction'], [2, 0, 1])
@@ -73,6 +81,12 @@ class SLACDiffractionFileReader(DiffractionFileReader):
 
 
 class SLACProductFileReader(ProductFileReader):
+    def get_file_description(self) -> str:
+        return 'SLAC NumPy Zipped Archive'
+
+    def get_file_extensions(self) -> set[str]:
+        return FileFormat.NPZ.extensions
+
     def read(self, file_path: Path) -> Product:
         with numpy.load(file_path) as npz_file:
             scan_x = numpy.asarray(npz_file['xcoords_start'])
@@ -131,7 +145,7 @@ class SLACProductFileReader(ProductFileReader):
         return Product(
             metadata=metadata,
             probe_positions=ProbePositionSequence(point_list),
-            probes=ProbeSequence(array=probe_array, opr_weights=None, pixel_geometry=None),
+            probes=ProbeEnsemble(array=probe_array, opr_weights=None, pixel_geometry=None),
             object_=Object(
                 array=object_array,
                 pixel_geometry=None,
@@ -146,15 +160,12 @@ class SLACProductFileReader(ProductFileReader):
 
 def register_plugins(registry: PluginRegistry) -> None:
     SIMPLE_NAME: Final[str] = 'SLAC_NPZ'  # noqa: N806
-    DISPLAY_NAME: Final[str] = 'SLAC NumPy Zipped Archive (*.npz)'  # noqa: N806
 
     registry.diffraction_file_readers.register_plugin(
         SLACDiffractionFileReader(),
         simple_name=SIMPLE_NAME,
-        display_name=DISPLAY_NAME,
     )
     registry.register_product_file_reader_with_adapters(
         SLACProductFileReader(),
         simple_name=SIMPLE_NAME,
-        display_name=DISPLAY_NAME,
     )

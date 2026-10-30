@@ -7,13 +7,14 @@ run manually with PYTHONPATH pointing at the sibling checkout:
         uv run --no-sync python scripts/smoke_ptycho_fm.py [--cpu]
 
 Drives the child entry points directly (no GUI, no subprocess) so failures
-surface as ordinary tracebacks.
+surface as ordinary tracebacks. Covers both training objectives, each
+``coupled_decoder_mode`` and each offered loss -- everything that needs a real
+ptycho_fm to prove.
 """
 
 from __future__ import annotations
 
 import argparse
-import pickle
 import queue
 import sys
 import tempfile
@@ -24,25 +25,25 @@ import numpy
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.reconstruct import ReconstructInput
-from ptychodus.api.settings import SettingsRegistry
-from ptychodus.model.ptycho_fm._payload import ReconstructPayload, TrainPayload
-from ptychodus.model.ptycho_fm._subprocess import run_reconstruct, run_train
-from ptychodus.model.ptycho_fm.reconstructor import _build_config, build_reconstructor
-from ptychodus.model.ptycho_fm.settings import (
-    PtychoFMDataSettings,
-    PtychoFMInferenceSettings,
-    PtychoFMModelSettings,
-    PtychoFMTrainingSettings,
+from ptychodus.api.reconstruct import (
+    ReconstructInput,
+    ReconstructorMessage,
+    SubprocessOperation,
+    SubprocessPayload,
 )
-from ptychodus.model.processing.subprocess_reconstructor import (
-    TAG_MODEL_SAVED,
-    TAG_OUTPUT,
-    TAG_TRAIN_OUTPUT,
+from ptychodus.plugins.ptycho_fm._subprocess import (
+    run_reconstruct,
+    run_train,
 )
+from ptychodus.plugins.ptycho_fm.reconstructor import (
+    build_reconstruct_config,
+    build_train_config,
+)
+from ptychodus.plugins.ptycho_fm.options import PtychoFMOptions, default_options
+from ptychodus.plugins.ptycho_fm.training_file import PtychoFMTrainingDataFileWriter
 
 # Small enough to train in seconds. The decoder upsamples the token grid by
 # 2**num_stages, so (img_size / patch_size) * 2**num_stages must come back to
@@ -54,33 +55,33 @@ N_PATTERNS = 12
 OBJECT_SIZE = 96
 
 
-def _settings() -> tuple[Any, Any, Any, Any]:
-    registry = SettingsRegistry()
-    data = PtychoFMDataSettings(registry)
-    model = PtychoFMModelSettings(registry)
-    training = PtychoFMTrainingSettings(registry)
-    inference = PtychoFMInferenceSettings(registry)
+def _options() -> PtychoFMOptions:
+    options = default_options()
 
-    model.img_size.set_value(IMG_SIZE)
-    model.patch_size.set_value(PATCH_SIZE)
-    model.embed_dim.set_value(64)
-    model.depth.set_value(2)
-    model.num_heads.set_value(2)
-    model.decoder_base_channels.set_value(8)
-    model.decoder_latent_dim.set_value(64)
-    model.decoder_num_stages.set_value(NUM_STAGES)
+    options.model.encoder.img_size = IMG_SIZE
+    options.model.encoder.patch_size = PATCH_SIZE
+    options.model.encoder.embed_dim = 64
+    options.model.encoder.depth = 2
+    options.model.encoder.num_heads = 2
+    options.model.decoder.base_channels = 8
+    options.model.decoder.latent_dim = 64
+    options.model.decoder.num_stages = NUM_STAGES
+    # Pinned so the baseline phases cover the uncoupled path; the mode sweep
+    # below is the only place that varies it. None is how the declaration
+    # spells it; the settings file spells the same thing 'none'.
+    options.model.coupled_decoder_mode = None
 
-    data.max_probe_modes.set_value(2)
-    data.num_workers.set_value(0)
+    options.data.max_probe_modes = 2
+    options.data.num_workers = 0
 
-    training.epochs.set_value(2)
-    training.batch_size.set_value(4)
-    training.loss_function.set_value('mse')
+    options.training.epochs = 2
+    options.training.batch_size = 4
+    options.training.loss_function = 'mse'
 
-    inference.batch_size.set_value(4)
-    inference.central_crop.set_value(8)
-    inference.pad.set_value(4)
-    return data, model, training, inference
+    options.inference.batch_size = 4
+    options.inference.central_crop = 8
+    options.inference.pad = 4
+    return options
 
 
 def _product(pattern_size: int) -> Product:
@@ -118,7 +119,7 @@ def _product(pattern_size: int) -> Product:
     return Product(
         metadata=metadata,
         probe_positions=ProbePositionSequence(positions),
-        probes=ProbeSequence(array=probe_array, opr_weights=None, pixel_geometry=pixel_geometry),
+        probes=ProbeEnsemble(array=probe_array, opr_weights=None, pixel_geometry=pixel_geometry),
         object_=Object(
             array=object_array,
             layer_spacing_m=[],
@@ -134,7 +135,7 @@ def _reconstruct_input(pattern_size: int) -> ReconstructInput:
     patterns = rng.poisson(50.0, (N_PATTERNS, pattern_size, pattern_size)).astype(numpy.float32)
     return ReconstructInput(
         diffraction_patterns=patterns,
-        bad_pixels=numpy.zeros((pattern_size, pattern_size), dtype=numpy.bool_),
+        bad_pixels=numpy.zeros((pattern_size, pattern_size), dtype=numpy.bool),
         product=_product(pattern_size),
     )
 
@@ -146,49 +147,52 @@ def _drain(q: queue.Queue[Any]) -> list[Any]:
     return events
 
 
-def check_export_validation(data: Any, model: Any, training: Any, inference: Any) -> None:
-    """The exporter must refuse a product whose patterns are not img_size square."""
-    reconstructor = build_reconstructor('Supervised', data, model, inference, training)
+def check_export_validation() -> None:
+    """The writer must refuse a probe that does not match the patterns."""
+    writer = PtychoFMTrainingDataFileWriter()
+    mismatched = ReconstructInput(
+        diffraction_patterns=_reconstruct_input(IMG_SIZE).diffraction_patterns,
+        bad_pixels=numpy.zeros((IMG_SIZE, IMG_SIZE), dtype=numpy.bool),
+        product=_product(IMG_SIZE // 2),
+    )
 
     with tempfile.TemporaryDirectory() as tmp:
         stem = Path(tmp) / 'scan'
         try:
-            reconstructor.export_training_data(stem, _reconstruct_input(IMG_SIZE // 2))
+            writer.write(stem, mismatched)
         except ValueError as exc:
-            print(f'  [ok] export rejected undersized patterns: {exc}')
+            print(f'  [ok] export rejected a mismatched probe: {exc}')
         else:
-            raise AssertionError('export_training_data accepted a wrongly-sized product')
+            raise AssertionError('the writer accepted a probe that does not match the patterns')
 
-        reconstructor.export_training_data(stem, _reconstruct_input(IMG_SIZE))
+        writer.write(stem, _reconstruct_input(IMG_SIZE))
         produced = sorted(p.name for p in Path(tmp).iterdir())
         assert produced == ['scan_dp.hdf5', 'scan_para.hdf5'], produced
         print(f'  [ok] export wrote {produced}')
 
 
-def run_training(
-    mode: str, data: Any, model: Any, training: Any, inference: Any, out_dir: Path
-) -> tuple[Path, list[float]]:
-    reconstructor = build_reconstructor(mode, data, model, inference, training)
+def run_training(mode: str, options: PtychoFMOptions, out_dir: Path) -> tuple[Path, list[float]]:
     in_dir = out_dir / 'input'
     in_dir.mkdir(parents=True, exist_ok=True)
-    reconstructor.export_training_data(in_dir / 'scan', _reconstruct_input(IMG_SIZE))
+    PtychoFMTrainingDataFileWriter().write(in_dir / 'scan', _reconstruct_input(IMG_SIZE))
 
     model_dir = out_dir / 'output'
-    payload = TrainPayload(
-        name=mode,
-        config=_build_config(mode, data, model, training, inference),
-        input_path=in_dir,
-        output_path=model_dir,
+    payload = SubprocessPayload(
+        operation=SubprocessOperation.TRAIN,
+        reconstructor=mode,
+        options=build_train_config(mode, options),
+        input_directory=in_dir,
+        output_directory=model_dir,
     )
     q: queue.Queue[Any] = queue.Queue()
     run_train(payload, q)  # type: ignore[arg-type]
 
     events = _drain(q)
-    train_outputs = [pickle.loads(e[1]) for e in events if e[0] == TAG_TRAIN_OUTPUT]
-    saved = [e[1] for e in events if e[0] == TAG_MODEL_SAVED]
+    train_outputs = [e[1] for e in events if e[0] == ReconstructorMessage.TRAIN_OUTPUT]
+    saved = [e[1] for e in events if e[0] == ReconstructorMessage.MODEL_SAVED]
 
     assert len(train_outputs) == 2, f'expected 2 TrainOutput, got {len(train_outputs)}'
-    assert len(saved) == 1, f'expected 1 TAG_MODEL_SAVED, got {len(saved)}'
+    assert len(saved) == 1, f'expected 1 ReconstructorMessage.MODEL_SAVED, got {len(saved)}'
     assert Path(saved[0]).is_file(), saved[0]
 
     losses = [lv.value for lv in train_outputs[-1].training_loss]
@@ -196,19 +200,20 @@ def run_training(
     return Path(saved[0]), losses
 
 
-def run_inference(checkpoint: Path, data: Any, model: Any, training: Any, inference: Any) -> None:
+def run_inference(checkpoint: Path, options: PtychoFMOptions) -> None:
     parameters = _reconstruct_input(IMG_SIZE)
-    payload = ReconstructPayload(
-        name='Supervised',
-        config=_build_config('Supervised', data, model, training, inference),
+    payload = SubprocessPayload(
+        operation=SubprocessOperation.RECONSTRUCT,
+        reconstructor='Supervised',
+        options=build_reconstruct_config('Supervised', options),
         model_path=checkpoint,
-        reconstruct_input=parameters,
+        input_=parameters,
     )
     q: queue.Queue[Any] = queue.Queue()
     run_reconstruct(payload, q)  # type: ignore[arg-type]
 
     events = _drain(q)
-    outputs = [pickle.loads(e[1]) for e in events if e[0] == TAG_OUTPUT]
+    outputs = [e[1] for e in events if e[0] == ReconstructorMessage.OUTPUT]
     assert len(outputs) == 1, f'expected 1 ReconstructOutput, got {len(outputs)}'
 
     array = outputs[0].product.object_.get_array()
@@ -220,6 +225,83 @@ def run_inference(checkpoint: Path, data: Any, model: Any, training: Any, infere
         f'  [ok] inference: progress={outputs[0].progress}, shape={array.shape}, '
         f'|obj| range [{numpy.abs(array).min():.4g}, {numpy.abs(array).max():.4g}]'
     )
+
+
+def check_coupled_decoder_modes(options: PtychoFMOptions) -> None:
+    """Train and infer under each decoder mode, and prove the mode is honoured.
+
+    An inference-only model ignores the probe entirely, so a mode that silently
+    collapsed to the uncoupled class would still produce a plausible object.
+    Differing loss traces are what rules that out.
+    """
+    options.training.loss_function = 'mse'
+    original_mode = options.model.coupled_decoder_mode
+    losses_by_mode: dict[str, list[float]] = {}
+
+    for coupled_decoder_mode in ('none', 'real_imag', 'amp_phase'):
+        options.model.coupled_decoder_mode = coupled_decoder_mode
+
+        with tempfile.TemporaryDirectory() as tmp:
+            checkpoint, losses = run_training(
+                'Unsupervised', options, Path(tmp) / coupled_decoder_mode
+            )
+            losses_by_mode[coupled_decoder_mode] = losses
+            run_inference(checkpoint, options)
+
+    distinct = {tuple(losses) for losses in losses_by_mode.values()}
+    assert len(distinct) == len(losses_by_mode), (
+        f'decoder modes produced identical losses ({losses_by_mode}); the mode is not honoured'
+    )
+    print('  [ok] the three decoder modes optimize distinct architectures')
+    options.model.coupled_decoder_mode = original_mode
+
+
+def check_mode_mismatch_is_reported(options: PtychoFMOptions) -> None:
+    """A checkpoint loaded under the wrong mode must name the mode, not the keys."""
+    options.training.loss_function = 'mse'
+    original_mode = options.model.coupled_decoder_mode
+    options.model.coupled_decoder_mode = 'amp_phase'
+
+    with tempfile.TemporaryDirectory() as tmp:
+        checkpoint, _ = run_training('Unsupervised', options, Path(tmp) / 'mismatch')
+
+        options.model.coupled_decoder_mode = None
+        payload = SubprocessPayload(
+            operation=SubprocessOperation.RECONSTRUCT,
+            reconstructor='Unsupervised',
+            options=build_reconstruct_config('Unsupervised', options),
+            model_path=checkpoint,
+            input_=_reconstruct_input(IMG_SIZE),
+        )
+        q: queue.Queue[Any] = queue.Queue()
+
+        try:
+            run_reconstruct(payload, q)  # type: ignore[arg-type]
+        except ValueError as exc:
+            assert 'state dict' in str(exc), f'unhelpful message: {exc}'
+            print(f'  [ok] mismatch reported: {str(exc).splitlines()[0][:80]}...')
+        else:
+            raise AssertionError('loading an amp_phase checkpoint as uncoupled did not raise')
+
+    options.model.coupled_decoder_mode = original_mode
+
+
+def check_offered_losses(options: PtychoFMOptions) -> None:
+    """Each loss ptychodus offers trains to a finite value."""
+    original_mode = options.model.coupled_decoder_mode
+    options.model.coupled_decoder_mode = None
+
+    for loss_function in ('mse', 'l1', 'smooth_l1'):
+        options.training.loss_function = loss_function
+
+        with tempfile.TemporaryDirectory() as tmp:
+            _, losses = run_training('Unsupervised', options, Path(tmp) / loss_function)
+
+        assert all(numpy.isfinite(value) for value in losses), f'{loss_function}: {losses}'
+        print(f'  [ok] {loss_function}: finite losses {losses}')
+
+    options.training.loss_function = 'mse'
+    options.model.coupled_decoder_mode = original_mode
 
 
 def main() -> int:
@@ -236,18 +318,16 @@ def main() -> int:
 
     print(f'torch {torch.__version__}, cuda available: {torch.cuda.is_available()}')
 
-    data, model, training, inference = _settings()
+    options = _options()
 
     print('1. export validation')
-    check_export_validation(data, model, training, inference)
+    check_export_validation()
 
     losses_by_mode = {}
     with tempfile.TemporaryDirectory() as tmp:
         print('2. training')
         for mode in ('Supervised', 'Unsupervised'):
-            checkpoint, losses = run_training(
-                mode, data, model, training, inference, Path(tmp) / mode
-            )
+            checkpoint, losses = run_training(mode, options, Path(tmp) / mode)
             losses_by_mode[mode] = losses
             if mode == 'Supervised':
                 supervised_checkpoint = checkpoint
@@ -258,7 +338,16 @@ def main() -> int:
         print('  [ok] the two modes optimize different objectives')
 
         print('3. inference')
-        run_inference(supervised_checkpoint, data, model, training, inference)
+        run_inference(supervised_checkpoint, options)
+
+    print('4. coupled decoder modes')
+    check_coupled_decoder_modes(options)
+
+    print('5. checkpoint/mode mismatch')
+    check_mode_mismatch_is_reported(options)
+
+    print('6. offered losses')
+    check_offered_losses(options)
 
     print('\nAll smoke checks passed.')
     return 0

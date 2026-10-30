@@ -27,11 +27,11 @@ $ python -m pip install ptychodus[globus,gui,ptychi]
    ```
 
    ```{note}
-   The `ptychi` extra installs a **CPU** build of PyTorch. For GPU reconstruction, replace it with the extra matching the CUDA ceiling your driver reports on the `nvidia-smi` banner line — `ptychi-cuda128`, `ptychi-cuda130` or `ptychi-cuda132`. These mirror the CUDA versions the container variants are built for, and they are mutually exclusive.
+   The `ptychi` extra installs a **CPU** build of PyTorch. For GPU reconstruction, replace it with the extra matching the CUDA ceiling your driver reports on the `nvidia-smi` banner line — `ptychi-cuda126`, `ptychi-cuda130` or `ptychi-cuda132`. These mirror the CUDA versions the container variants are built for, and they are mutually exclusive. PyTorch's CUDA 13 builds carry no kernels for GPUs older than Turing, so a Pascal or Volta GPU (a V100, for example) takes `ptychi-cuda126` whatever its driver reports.
 
    A PyTorch build newer than the driver's ceiling is not rescued by minor version compatibility: `torch.cuda.is_available()` comes back false and reconstruction silently runs on the CPU. Run `ptychodus-system-check` to see the driver ceiling, the PyTorch build and whether the two agree, or `ptychodus-system-check --require-cuda` to make a mismatch a non-zero exit.
 
-   The pinning lives in `[tool.uv.sources]`, which only uv reads. `pip install ptychodus[ptychi-cuda128]` installs whatever PyTorch PyPI serves — with pip, select the build yourself with `--index-url https://download.pytorch.org/whl/cu128`.
+   The pinning lives in `[tool.uv.sources]`, which only uv reads. `pip install ptychodus[ptychi-cuda126]` installs whatever PyTorch PyPI serves — with pip, select the build yourself with `--index-url https://download.pytorch.org/whl/cu126`.
    ```
 
 4. To upgrade ptychodus, use uv tool upgrade:
@@ -73,40 +73,58 @@ $ python -m pip install ptychodus[globus,gui,ptychi]
 
 ## Container image variants
 
-The repository ships one Dockerfile per accelerator family under `containers/`. Pick the variant that matches your hardware and select an explicit file with `-f`:
+The repository ships one release Dockerfile per accelerator family under `containers/`, plus a developer image. Pick the variant that matches your hardware and select an explicit file with `-f`:
 
-| Dockerfile | Use it for |
-| --- | --- |
-| `containers/Dockerfile.cpu` | CPU-only hosts (no GPU; ptychi runs on CPU torch) |
-| `containers/Dockerfile.cuda` | NVIDIA GPUs (e.g. ALCF Polaris, NERSC Perlmutter); CUDA minor version is a build ARG |
-| `containers/Dockerfile.rocm` | AMD GPUs (e.g. OLCF Frontier); ROCm is a build ARG |
-| `containers/Dockerfile.xpu` | Intel XPU (e.g. ALCF Aurora); base tag is a build ARG |
-| `containers/Dockerfile.dectris` | Ubuntu 24.04 + PtychoPINN alongside ptychi, for Dectris detector workstations; installs from PyPI (not the checkout) and is outside `scripts/podman/build` |
+| Dockerfile | Use it for | Compute device and torch |
+| --- | --- | --- |
+| `containers/Dockerfile.cpu` | CPU-only hosts; GUI and every backend the image carries | CPU; torch from the PyTorch CPU index |
+| `containers/Dockerfile.cuda` | NVIDIA GPUs (e.g. ALCF Polaris, NERSC Perlmutter); GUI and the same backends as the CPU image | CUDA; the `pytorch/pytorch` base image's torch, CUDA minor version a build ARG |
+| `containers/Dockerfile.rocm` | AMD GPUs (e.g. OLCF Frontier); headless, pty-chi only | ROCm; the `rocm/pytorch` base image's torch |
+| `containers/Dockerfile.xpu` | Intel XPU (e.g. ALCF Aurora); headless, pty-chi only | XPU; the `intel/intel-extension-for-pytorch` base image's torch |
+| `containers/Dockerfile.dev` | the developer image: ptychodus installed from the checkout, which the VS Code Dev Container builds | CPU, as `Dockerfile.cpu` |
+| `containers/Dockerfile.dectris` | Ubuntu 24.04 + PtychoPINN alongside ptychi, for Dectris detector workstations; installs an unpinned ptychodus and is outside `scripts/podman/build` | the CUDA torch PyPI serves |
 
-The GPU files default to recent versions and expose `--build-arg` knobs to switch:
+The release images install a released ptychodus from PyPI: the version named by the `PTYCHODUS_VERSION` build arg, or the latest release when it is unset. An unpinned build reuses its cached layer after a new release, so pin the version or pass `--no-cache`. Each GPU image keeps its base image's accelerator build of torch: the install pins the torch already in the image, so no dependency can make pip replace it with PyPI's generic build.
 
-- `containers/Dockerfile.cuda`: `CUDA_VERSION` (default `13.0`), `PYTORCH_VERSION`, `CUDNN_VERSION`. The base image is `pytorch/pytorch:${PYTORCH_VERSION}-cuda${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel`; override any args if a given combination isn't published upstream. That base image's `python3` is the distro-managed system Python, so ptychodus is installed into a `--system-site-packages` venv at **`/opt/venv`** which reuses the CUDA-matched torch the base image already ships.
+The CPU, CUDA and developer images carry the GUI and the reconstruction backends — pty-chi, cdtools, PtychoPINN and PtychoFM. PtychoPINN and PtychoFM are published on no package index, so [scripts/podman/build](../../scripts/podman/build) builds their wheels from sibling checkouts (`PTYCHOPINN_SRC`, `PTYCHO_FM_SRC`, defaulting to `../PtychoPINN` and `../ptycho-fm`) and stages them in the build context; a plain `podman build` leaves both out. The ROCm and XPU images are for batch and HPC use, with pty-chi as their only backend and no GUI.
+
+The files default to recent versions and expose `--build-arg` knobs to switch:
+
+- `containers/Dockerfile.cpu` and `containers/Dockerfile.dev`: `PYTORCH_VERSION` (default `2.14.1`), installed from the PyTorch CPU index.
+- `containers/Dockerfile.cuda`: `CUDA_VERSION` (default `13.0`), `PYTORCH_VERSION` (default `2.14.1`), `CUDNN_VERSION`. The base image is `pytorch/pytorch:${PYTORCH_VERSION}-cuda${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel`; override any args if a given combination isn't published upstream. That base image's `python3` is the distro-managed system Python, so ptychodus is installed into a `--system-site-packages` venv at **`/opt/venv`** which reuses the CUDA-matched torch the base image already ships.
 - `containers/Dockerfile.rocm`: `ROCM_VERSION` (default `7.2.4`, the published patch release on the OLCF Frontier line), `UBUNTU_VERSION`, `PYTHON_VERSION`, `PYTORCH_VERSION`. Base image is `rocm/pytorch:rocm${ROCM_VERSION}_ubuntu${UBUNTU_VERSION}_py${PYTHON_VERSION}_pytorch_release_${PYTORCH_VERSION}`; it already provides a venv at `/opt/venv` holding the ROCm-built torch, and ptychodus installs into it.
 - `containers/Dockerfile.xpu`: `BASE_TAG` (default `2.8.10-xpu`). Base image is `intel/intel-extension-for-pytorch:${BASE_TAG}`, which ships torch and `intel_extension_for_pytorch` built for XPU; pin to a dated tag for reproducibility.
+- Every release Dockerfile: `PTYCHODUS_VERSION`, the release to install (default: the latest). In `containers/Dockerfile.dev` it is instead the version reported for the checkout (default `0+dev`).
+- Every Dockerfile, the CPU, developer and Dectris ones included: `BASE_REGISTRY` (default `docker.io`) supplies the registry the base image is pulled from. Pinning it keeps a build resolving the same way on any host rather than through whatever unqualified-search list `registries.conf` happens to carry — under podman's `short-name-mode = "enforcing"` an unqualified name that is not already in local storage prompts for a registry, which fails outright with no TTY, as in a script or CI job. Point it at a mirror for an air-gapped or proxied site; [scripts/podman/build](../../scripts/podman/build) forwards an environment variable of the same name.
+
+The CUDA variants built by [scripts/podman/build](../../scripts/podman/build) differ in the driver they need and in the GPUs their PyTorch build carries kernels for:
+
+| Variant | `nvidia-smi` CUDA ceiling | GPU architectures |
+| --- | --- | --- |
+| `cuda12.6` | 12.6 or newer | Maxwell through Hopper (`sm_50`–`sm_90`) |
+| `cuda13.0` | 13.0 or newer | Turing through Blackwell (`sm_75`–`sm_120`) |
+| `cuda13.2` | 13.2 or newer | Turing through Blackwell (`sm_75`–`sm_120`) |
+
+Take the newest variant the driver allows, unless the GPU predates Turing — a V100 or a Pascal card — which needs `cuda12.6` whatever the driver reports. A Blackwell GPU needs a CUDA 13 driver.
 
 ## Podman
 
-The repository ships [scripts/podman/build](../../scripts/podman/build), a helper that builds every backend in one shot and threads the checkout's PEP 440 version (from `setuptools_scm`) into both the tag and the image so `ptychodus --version` inside the container reports the real value instead of the `setuptools_scm` fallback. Tags follow the pytorch/pytorch shape: **`ptychodus:<version>-<backend>`**, where `<backend>` is `cpu`, `cuda12.8`, `cuda13.0`, `cuda13.2`, `rocm7.2.4`, or `xpu`. OCI tags accept only `[A-Za-z0-9._-]`, so any character outside that set is replaced with `_` in the tag — a dev checkout's `1.5.2.dev14+g79157a2b2` tags as **`1.5.2.dev14_g79157a2b2`** while the image itself still reports the true PEP 440 version. The launcher applies the same substitution to `PTYCHODUS_VERSION`, so either spelling pins the same image.
+The repository ships [scripts/podman/build](../../scripts/podman/build), a helper that builds every release backend in one shot. It reads the latest ptychodus release from PyPI, or takes `PTYCHODUS_VERSION`, and passes that version to each image, so the tag names exactly the release the image installs. The developer image, backend `dev`, is built only when named; it is tagged with the checkout's PEP 440 version (from `setuptools_scm`) and ignores `PTYCHODUS_VERSION`, so current code is never tagged as an old release. Tags follow the pytorch/pytorch shape: **`ptychodus:<version>-<backend>`**, where `<backend>` is `cpu`, `cuda12.6`, `cuda13.0`, `cuda13.2`, `rocm7.2.4`, `xpu`, or `dev`. OCI tags accept only `[A-Za-z0-9._-]`, so any character outside that set is replaced with `_` in the tag — a dev checkout's `1.5.2.dev14+g79157a2b2` tags as **`1.5.2.dev14_g79157a2b2`** while the image itself still reports the true PEP 440 version. The launcher applies the same substitution to `PTYCHODUS_VERSION`, so either spelling pins the same image.
 
 ```sh
-$ scripts/podman/build                       # cpu + cuda12.8/13.0/13.2 + rocm7.2.4 + xpu
+$ scripts/podman/build                       # cpu + cuda12.6/13.0/13.2 + rocm7.2.4 + xpu
 $ scripts/podman/build cpu cuda13.0          # subset
-$ PTYCHODUS_VERSION=1.5.1 scripts/podman/build cuda13.0    # explicit version → ptychodus:1.5.1-cuda13.0
+$ PTYCHODUS_VERSION=1.8.0 scripts/podman/build cuda13.0    # explicit release → ptychodus:1.8.0-cuda13.0
+$ scripts/podman/build dev                   # developer image from this checkout
 $ CONTAINER_ENGINE=docker scripts/podman/build cpu         # use docker instead
 ```
 
-Dectris and any CUDA/PyTorch pair not in the matrix above are outside the helper. Invoke the engine directly and pick your own tag:
+Dectris and any CUDA/PyTorch pair not in the matrix above are outside the helper. Invoke the engine directly and pick your own tag. The release images need only `containers/` as their build context; a direct build leaves out PtychoPINN and PtychoFM unless their wheels are staged in `containers/wheels/`:
 
 ```sh
-$ VER=$(uv run --with setuptools-scm python -m setuptools_scm)
-$ podman build -f containers/Dockerfile.dectris -t ptychodus:dectris .
-$ podman build --build-arg PTYCHODUS_VERSION="$VER" --build-arg CUDA_VERSION=12.6 \
-    -f containers/Dockerfile.cuda -t "ptychodus:${VER}-cuda12.6" .
+$ podman build -f containers/Dockerfile.dectris -t ptychodus:dectris containers/
+$ podman build --build-arg PTYCHODUS_VERSION=1.8.0 --build-arg CUDA_VERSION=13.4 \
+    --build-arg PYTORCH_VERSION=2.15.0 -f containers/Dockerfile.cuda -t ptychodus:1.8.0-cuda13.4 containers/
 ```
 
 Run container
@@ -133,8 +151,7 @@ $ CONTAINER_ENGINE=docker scripts/podman/build cuda13.0
 or directly:
 
 ```sh
-$ VER=$(uv run --with setuptools-scm python -m setuptools_scm)
-$ docker build --build-arg PTYCHODUS_VERSION="$VER" -f containers/Dockerfile.cuda -t "ptychodus:${VER}-cuda13.0" .
+$ docker build --build-arg PTYCHODUS_VERSION=1.8.0 -f containers/Dockerfile.cuda -t ptychodus:1.8.0-cuda13.0 containers/
 ```
 
 Run container
@@ -197,7 +214,7 @@ Sanity check:
 $ ptychodus --version
 ```
 
-stderr will show a one-line notice such as `ptychodus: using image localhost/ptychodus:1.5.1-cuda12.8 (detected: nvidia, driver CUDA 12.8)` — the wrapper reads the driver's CUDA ceiling from `nvidia-smi`, takes the `ptychodus:*-cuda<X.Y>` tags present in local podman storage as the candidates, and launches the newest one that ceiling allows. stdout prints the version reported by the in-container `ptychodus`.
+stderr will show a one-line notice such as `ptychodus: using image localhost/ptychodus:1.5.1-cuda13.0 (detected: nvidia, driver CUDA 13.0)` — the wrapper reads the driver's CUDA ceiling from `nvidia-smi`, takes the `ptychodus:*-cuda<X.Y>` tags present in local podman storage as the candidates, and launches the newest one that ceiling allows. stdout prints the version reported by the in-container `ptychodus`.
 
 ### Usage
 
@@ -209,6 +226,8 @@ $ PTYCHODUS_VERSION=1.5.1 ptychodus                  # pin the version, keep GPU
 $ PTYCHODUS_IMAGE=ptychodus:1.5.1-cpu ptychodus      # force a specific image
 $ PTYCHODUS_QUIET=1 ptychodus -v                     # silent, version only
 ```
+
+On AMD and Intel hosts the wrapper selects the ROCm or XPU image, which has no GUI, so only `-b` batch invocations work there.
 
 File paths passed via `-i`, `-o`, `-s`, or as positional arguments resolve naturally as long as they live under `$HOME`, the current directory, or one of the auto-mounted beamline roots (`/local`, `/gdata`).
 
@@ -230,15 +249,17 @@ The NVIDIA row is different: it is only the **fallback** used when `nvidia-smi` 
 - **"cannot open display"** — confirm `$DISPLAY` is set in the shell, then run `xhost +local:` once per X session. Wayland desktops work via XWayland as long as `$DISPLAY` is set (the default on GNOME and KDE).
 - **"podman: command not found"** — ask facility IT to install rootless podman.
 - **"host NVIDIA driver supports CUDA \<= \<X.Y\>, but every ptychodus CUDA image in podman storage is newer"** — the driver predates every CUDA variant that has been built. Build one no newer than the reported ceiling, choosing it from the matrix at the top of `scripts/podman/build`, or upgrade the driver.
+- **"PyQt5 not found."** — the selected image is headless, as the ROCm and XPU images are. Run a `-b` batch invocation, or use the CPU image for the GUI with `PTYCHODUS_IMAGE=ptychodus:1.5.1-cpu`.
+- **"no kernel image is available for execution on the device"** — the wrapper matches the image to the driver, not to the GPU, so a pre-Turing GPU on a CUDA 13 driver gets an image without kernels for it. Pin `PTYCHODUS_IMAGE=ptychodus:1.5.1-cuda12.6`.
 - **Wrong GPU family or CUDA version detected** — override with `PTYCHODUS_IMAGE=ptychodus:1.5.1-cpu` (or any other versioned tag).
 - **Wrong ptychodus version picked, or you want an older release** — set `PTYCHODUS_VERSION=1.5.1`. Use it rather than `PTYCHODUS_IMAGE` whenever the backend is not the thing you are changing: the pin keeps GPU and CUDA detection, while `PTYCHODUS_IMAGE` skips both and makes you name the backend yourself.
-- **"no ptychodus:\<version\>-\<suffix\> image found"** — that version/backend pairing was never built. The message lists the versions built for that backend and the backends built for that version; build the missing one from a checkout of that version, or drop the pin.
+- **"no ptychodus:\<version\>-\<suffix\> image found"** — that version/backend pairing was never built. The message lists the versions built for that backend and the backends built for that version; build the missing one with `PTYCHODUS_VERSION=<version> scripts/podman/build <backend>`, which installs exactly that release from PyPI, or drop the pin.
 - **Files written by the container are owned by root** — rootless `--userns=keep-id` is not in effect; check `podman info` for `rootless: true`.
 - **"permission denied" on a path argument** — the path is outside the bind-mounted set. Run from under `$HOME` or one of the beamline roots, or add the path to `BEAMLINE_MOUNTS` at the top of the wrapper. A symlinked home (`/home/beams/$USER` → `/home/beams0/$USER`) is mounted under both spellings, so an absolute path in either form resolves.
 
 ## VS Code Dev Container
 
-The repository includes a [Dev Container](https://containers.dev/) configuration at `.devcontainer/devcontainer.json` that builds from `containers/Dockerfile.cpu` — the safe default for contributors without a local GPU. GPU users can edit the `dockerfile:` field to point at `containers/Dockerfile.cuda` (or `containers/Dockerfile.rocm`) before reopening in the container.
+The repository includes a [Dev Container](https://containers.dev/) configuration at `.devcontainer/devcontainer.json` that builds the developer image, `containers/Dockerfile.dev` — the safe default for contributors without a local GPU — and installs the checkout editable on top. GPU users can instead point the `dockerfile:` field at `../containers/Dockerfile.cuda` (or `../containers/Dockerfile.rocm`) before reopening in the container; those are release images built from `containers/` alone, so set `context:` to `../containers` as well.
 
 1. Install the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension for VS Code.
 
@@ -250,7 +271,7 @@ VS Code will build the image and reopen the workspace inside the container.
 
 The version is derived from the git tag by `setuptools-scm` — there is no version string to edit anywhere in the tree. Tag first, then build.
 
-The `ptychodus-store` web UI is compiled TypeScript that is not tracked in git. Both the `sdist` and `build_py` steps compile it, so the release sdist and wheel each carry `ptychodus_store/ui/dist/`, and consumers installing from PyPI never need Node. Setting `PTYCHODUS_STORE_REQUIRE_UI_BUILD=1` turns a missing or stale UI into a build failure instead of a warning — always set it when publishing, so a release can never ship a stale or empty UI.
+The `ptychodus-webapp` web UI is compiled TypeScript that is not tracked in git. Both the `sdist` and `build_py` steps compile it, so the release sdist and wheel each carry `ptychodus/webapp/ui/dist/`, and consumers installing from PyPI never need Node. Setting `PTYCHODUS_WEBAPP_REQUIRE_UI_BUILD=1` turns a missing or stale UI into a build failure instead of a warning — always set it when publishing, so a release can never ship a stale or empty UI.
 
 ### Prepare
 
@@ -277,24 +298,24 @@ The `ptychodus-store` web UI is compiled TypeScript that is not tracked in git. 
    $ npm install -g typescript
    ```
 
-   See the "Rebuild the frontend" section of `src/ptychodus_store/README.md` for the UI development workflow.
+   See the "Rebuild the frontend" section of `src/ptychodus/webapp/README.md` for the UI development workflow.
 
 ### Build and verify
 
-1. Build the sdist and wheel into `./dist/`. `--no-sources` is required: `[tool.uv.sources]` points `ptychopinn` at a local checkout, which must not leak into the published metadata.
+1. Build the sdist and wheel into `./dist/`. `--no-sources` is required: `[tool.uv.sources]` pins `torch` and `torchvision` to a specific index, which must not leak into the published metadata.
 
    ```sh
-   $ PTYCHODUS_STORE_REQUIRE_UI_BUILD=1 uv build --no-sources
+   $ PTYCHODUS_WEBAPP_REQUIRE_UI_BUILD=1 uv build --no-sources
    ```
 
-   The equivalent with `build` is `PTYCHODUS_STORE_REQUIRE_UI_BUILD=1 python -m build`.
+   The equivalent with `build` is `PTYCHODUS_WEBAPP_REQUIRE_UI_BUILD=1 python -m build`.
 
 2. Confirm the compiled UI is in **both** artifacts. Each count must equal the number of TypeScript sources:
 
    ```sh
    $ tar -tzf dist/ptychodus-*.tar.gz | grep -c 'ui/dist/.*\.js$'
    $ unzip -Z1 dist/ptychodus-*.whl | grep -c 'ui/dist/.*\.js$'
-   $ find src/ptychodus_store/ui/src -name '*.ts' | wc -l
+   $ find src/ptychodus/webapp/ui/src -name '*.ts' | wc -l
    ```
 
 3. Confirm the metadata renders on PyPI:

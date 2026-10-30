@@ -1,22 +1,25 @@
-from collections.abc import Iterator
 from pathlib import Path
 import logging
-
 
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.diffraction import (
     BadPixels,
     BadPixelsFileReader,
+    DetectorBackground,
     CropRegion,
     DiffractionArray,
     DiffractionDatasetLayoutNode,
     DiffractionFileReader,
     DiffractionFileWriter,
     DiffractionMetadata,
+    FlatField,
+    PixelMap,
+    PixelMapFileReader,
     SimpleDiffractionDataset,
 )
-from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
 
+from ..file_types import FileTypeChooser
+from ..plugins import PluginChooser, PluginChooserParameter
 from .dataset import AssembledDiffractionDataset
 from .repository import DiffractionDatasetRepository
 from .settings import DiffractionSettings
@@ -52,6 +55,8 @@ class DiffractionAPI:
         file_writer_chooser: PluginChooser[DiffractionFileWriter],
         bad_pixels_file_reader_parameter: PluginChooserParameter[BadPixelsFileReader],
         file_reader_parameter: PluginChooserParameter[DiffractionFileReader],
+        background_file_reader_chooser: PluginChooser[PixelMapFileReader],
+        flat_field_file_reader_chooser: PluginChooser[PixelMapFileReader],
     ) -> None:
         super().__init__()
         self._diffraction_settings = diffraction_settings
@@ -59,8 +64,11 @@ class DiffractionAPI:
         self._bad_pixels_file_reader_chooser = bad_pixels_file_reader_chooser
         self._file_reader_chooser = file_reader_chooser
         self._file_writer_chooser = file_writer_chooser
+        self.file_writers = FileTypeChooser(file_writer_chooser)
         self._bad_pixels_file_reader_parameter = bad_pixels_file_reader_parameter
         self._file_reader_parameter = file_reader_parameter
+        self._background_file_reader_chooser = background_file_reader_chooser
+        self._flat_field_file_reader_chooser = flat_field_file_reader_chooser
 
     def get_repository(self) -> DiffractionDatasetRepository:
         return self._repository
@@ -90,6 +98,10 @@ class DiffractionAPI:
         crop_region: CropRegion | None = None,
         bad_pixels_file_path: Path | None = None,
         bad_pixels_file_type: str | None = None,
+        background_file_path: Path | None = None,
+        background_file_type: str | None = None,
+        flat_field_file_path: Path | None = None,
+        flat_field_file_type: str | None = None,
         process_patterns: bool = True,
         block: bool = False,
     ) -> int:
@@ -120,6 +132,12 @@ class DiffractionAPI:
 
         if bad_pixels_file_path is not None:
             self._apply_bad_pixels_from_file(dataset, bad_pixels_file_path, bad_pixels_file_type)
+
+        if background_file_path is not None:
+            dataset.set_background(self.load_background(background_file_path, background_file_type))
+
+        if flat_field_file_path is not None:
+            dataset.set_flat_field(self.load_flat_field(flat_field_file_path, flat_field_file_type))
 
         if block:
             dataset.load_all_arrays(process_patterns=process_patterns, block=True)
@@ -168,6 +186,69 @@ class DiffractionAPI:
             return
         self._apply_bad_pixels_from_file(dataset, file_path, file_type)
 
+    def _read_pixel_map(
+        self,
+        description: str,
+        chooser: PluginChooser[PixelMapFileReader],
+        file_path: Path,
+        file_type: str | None,
+    ) -> PixelMap:
+        if not file_path.is_file():
+            raise FileNotFoundError(f'Invalid {description} file path "{file_path}"')
+
+        if file_type is not None:
+            chooser.set_current_plugin(file_type)
+
+        plugin = chooser.get_current_plugin()
+        logger.debug(f'Reading "{file_path}" as "{plugin.simple_name}"')
+
+        try:
+            return plugin.strategy.read(file_path)
+        except Exception as exc:
+            raise RuntimeError(f'Failed to load {description} from "{file_path}"') from exc
+
+    def load_background(self, file_path: Path, file_type: str | None = None) -> DetectorBackground:
+        """Load a measured detector background from disk without applying it."""
+        return self._read_pixel_map(
+            'background', self._background_file_reader_chooser, file_path, file_type
+        )
+
+    def load_flat_field(self, file_path: Path, file_type: str | None = None) -> FlatField:
+        """Load a flat-field response from disk without applying it."""
+        return self._read_pixel_map(
+            'flat field', self._flat_field_file_reader_chooser, file_path, file_type
+        )
+
+    def apply_background(
+        self, dataset_index: int, file_path: Path, file_type: str | None = None
+    ) -> None:
+        """Load a background from disk and give it to an already-open dataset.
+
+        It replaces any background the dataset's source carried.
+        """
+        try:
+            dataset = self._repository[dataset_index]
+        except IndexError:
+            logger.warning(f'Cannot apply background: no dataset at index {dataset_index}')
+            return
+
+        dataset.set_background(self.load_background(file_path, file_type))
+
+    def apply_flat_field(
+        self, dataset_index: int, file_path: Path, file_type: str | None = None
+    ) -> None:
+        """Load a flat field from disk and give it to an already-open dataset.
+
+        It replaces any flat field the dataset's source carried.
+        """
+        try:
+            dataset = self._repository[dataset_index]
+        except IndexError:
+            logger.warning(f'Cannot apply flat field: no dataset at index {dataset_index}')
+            return
+
+        dataset.set_flat_field(self.load_flat_field(file_path, file_type))
+
     def load_all_arrays(
         self, *, dataset_index: int, process_patterns: bool = True, block: bool = False
     ) -> None:
@@ -187,13 +268,6 @@ class DiffractionAPI:
     def get_file_writer_chooser(self) -> PluginChooser[DiffractionFileWriter]:
         return self._file_writer_chooser
 
-    def get_save_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_writer_chooser:
-            yield plugin.display_name
-
-    def get_save_file_filter(self) -> str:
-        return self._file_writer_chooser.get_current_plugin().display_name
-
     def save_patterns(self, file_path: Path, file_type: str, *, dataset_index: int) -> None:
         try:
             dataset = self._repository[dataset_index]
@@ -201,8 +275,7 @@ class DiffractionAPI:
             logger.warning(f'Cannot save patterns: no dataset at index {dataset_index}')
             return
 
-        self._file_writer_chooser.set_current_plugin(file_type)
-        plugin = self._file_writer_chooser.get_current_plugin()
+        plugin = self.file_writers.select(file_type)
         logger.debug(f'Writing "{file_path}" as "{plugin.simple_name}"')
         plugin.strategy.write(file_path, dataset)
 

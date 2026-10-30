@@ -1,10 +1,10 @@
 import logging
 
 from ptychodus.api.diffraction import Polarization
-from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import Product, ProductFileReader
 
 from ..diffraction import AssembledDiffractionDataset
+from ..plugins import PluginChooser
 from .geometry import ProductGeometryProvider
 from .item import ProductRepositoryItem, ProductState
 from .metadata import MetadataRepositoryItem
@@ -15,6 +15,21 @@ from .probe_positions import ProbePositionsRepositoryItemFactory
 from .settings import ProductSettings
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_product_name(name: str, dataset: AssembledDiffractionDataset | None) -> str:
+    """The name a new product takes, given what its creator asked for.
+
+    An explicit name wins. Failing that, the sample the diffraction data was taken from,
+    where the file records one. An empty result leaves the choice to ProductSettings.name.
+    """
+    if name:
+        return name
+
+    if dataset is None:
+        return ''
+
+    return dataset.get_metadata().sample_name or ''
 
 
 class ProductRepositoryItemFactory:
@@ -39,8 +54,8 @@ class ProductRepositoryItemFactory:
     def _bind_dataset_geometry(
         geometry: ProductGeometryProvider, dataset: AssembledDiffractionDataset | None
     ) -> None:
-        """Push the dataset's processed detector extent and pixel geometry into
-        ``geometry`` so probe & object items built next see a valid geometry inside
+        """Push the dataset, and its processed detector extent and pixel geometry, into
+        ``geometry`` so probe & object items built next see valid data inside
         their own __init__ rebuild. This keeps the observer-triggered rebuild that
         fires later (from ProductRepositoryItem._bind_dataset) a no-op — the setters
         short-circuit on unchanged values, avoiding a spurious rebuild during
@@ -48,6 +63,7 @@ class ProductRepositoryItemFactory:
         the repository)."""
         if dataset is None:
             return
+        geometry.set_diffraction_dataset(dataset)
         geometry.set_detector_extent(dataset.get_processed_image_extent())
         geometry.set_detector_pixel_geometry(dataset.get_processed_pixel_geometry())
 
@@ -66,12 +82,13 @@ class ProductRepositoryItemFactory:
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
         far_field: bool | None = None,
+        i0_photons_per_count: float | None = None,
         dataset: AssembledDiffractionDataset | None = None,
     ) -> ProductRepositoryItem:
         metadata_item = MetadataRepositoryItem(
             self._settings,
             self._repository,
-            name=name,
+            name=resolve_product_name(name, dataset),
             comments=comments,
             detector_distance_m=detector_distance_m,
             focus_object_distance_m=focus_object_distance_m,
@@ -83,13 +100,16 @@ class ProductRepositoryItemFactory:
             tilt_angle_deg=tilt_angle_deg,
             polarization=polarization,
             far_field=far_field,
+            i0_photons_per_count=i0_photons_per_count,
         )
 
         scan_item = self._scan_item_factory.create()
         geometry = ProductGeometryProvider(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create(geometry)
-        object_item = self._object_item_factory.create(geometry)
+        object_item = self._object_item_factory.create(
+            geometry, probe_supplier=probe_item.get_probes
+        )
 
         return ProductRepositoryItem(
             parent=self._repository,
@@ -124,13 +144,16 @@ class ProductRepositoryItemFactory:
             tilt_angle_deg=product.metadata.tilt_angle_deg,
             polarization=product.metadata.polarization,
             far_field=product.metadata.far_field,
+            i0_photons_per_count=product.metadata.i0_photons_per_count,
         )
 
         scan_item = self._scan_item_factory.create(product.probe_positions)
         geometry = ProductGeometryProvider(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create(geometry, product.probes)
-        object_item = self._object_item_factory.create(geometry, product.object_)
+        object_item = self._object_item_factory.create(
+            geometry, product.object_, probe_supplier=probe_item.get_probes
+        )
 
         return ProductRepositoryItem(
             parent=self._repository,
@@ -152,7 +175,9 @@ class ProductRepositoryItemFactory:
         scan_item = self._scan_item_factory.create()
         geometry = ProductGeometryProvider(metadata_item, scan_item)
         probe_item = self._probe_item_factory.create(geometry)
-        object_item = self._object_item_factory.create(geometry)
+        object_item = self._object_item_factory.create(
+            geometry, probe_supplier=probe_item.get_probes
+        )
         return ProductRepositoryItem(
             parent=self._repository,
             metadata_item=metadata_item,
@@ -182,12 +207,21 @@ class ProductRepositoryItemFactory:
             else:
                 return self.create_from_product(product, dataset=dataset)
 
-        metadata_item = MetadataRepositoryItem(self._settings, self._repository)
+        metadata_item = MetadataRepositoryItem(
+            self._settings, self._repository, name=resolve_product_name('', dataset)
+        )
         scan_item = self._scan_item_factory.create_from_settings()
         geometry = ProductGeometryProvider(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
-        probe_item = self._probe_item_factory.create_from_settings(geometry, dataset=dataset)
-        object_item = self._object_item_factory.create_from_settings(geometry, dataset=dataset)
+        has_diffraction_data = dataset is not None
+        probe_item = self._probe_item_factory.create_from_settings(
+            geometry, has_diffraction_data=has_diffraction_data
+        )
+        object_item = self._object_item_factory.create_from_settings(
+            geometry,
+            has_diffraction_data=has_diffraction_data,
+            probe_supplier=probe_item.get_probes,
+        )
 
         item = ProductRepositoryItem(
             parent=self._repository,

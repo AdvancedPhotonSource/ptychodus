@@ -25,6 +25,7 @@ from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import BadPixels, CropRegion
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import StandardFileLayout, save_product
+from ptychodus.api.propagate import compute_magnification
 from ptychodus.api.object import (
     LayerFillMode,
     Object,
@@ -35,9 +36,9 @@ from ptychodus.api.object import (
 )
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import DiffractionPrepPipeline, FilterValuesStep
-from ptychodus.api.probe import ProbeGeometry, ProbeSequence, resample_probe_sequence
+from ptychodus.api.probe import ProbeGeometry, ProbeEnsemble, resample_probe_ensemble
 from ptychodus.api.probe_positions import ProbePositionSequence
-from ptychodus.api.product import Product, ProductMetadata
+from ptychodus.api.product import Product, ProductMetadata, reconcile_defocus_distance_m
 from ptychodus.api.reconstruct import prepare_reconstruct_input
 from ptychodus.api.simulate.object import generate_uniform_object
 from ptychodus.api.simulate.probe import (
@@ -47,8 +48,11 @@ from ptychodus.api.simulate.probe import (
 )
 from ptychodus.cli._batch_lamni_settings import BatchSettings
 from ptychodus.cli._reconstruct_common import (
+    estimate_incident_beam_from_assembled_data,
     CancellationToken,
     invalid_count_threshold,
+    resolve_flag,
+    resolve_focus_object_distance_m,
     resolve_quantity,
     run_reconstruction,
     save_assembled_diffraction,
@@ -153,9 +157,11 @@ def _build_initial_probe(
     probe_geometry: ProbeGeometry,
     *,
     photon_wavelength_m: float,
-    num_patterns: int,
+    num_positions: int,
     rng: numpy.random.Generator,
-) -> ProbeSequence:
+    far_field: bool,
+    focus_object_distance_m: float,
+) -> ProbeEnsemble:
     """The starting probe: the zone-plate model, or one file shared by every scan."""
     initial = settings.initial_probe
 
@@ -163,12 +169,16 @@ def _build_initial_probe(
         preset = initial.simulated_probe.fzp_preset
         logger.info('Simulating the initial probe from zone plate preset "%s"', preset)
         zone_plate = registry.fresnel_zone_plates.get_strategy_by_name(preset)
-        probes = ProbeSequence(
+        probes = ProbeEnsemble(
             array=generate_fresnel_zone_plate_probe(
                 probe_geometry,
                 zone_plate,
                 photon_wavelength_m=photon_wavelength_m,
-                defocus_distance_m=initial.simulated_probe.fzp_defocus_m,
+                # The same displacement the product states, in the probe's frame. In far
+                # field the resolver leaves the focus at zero, so this is fzp_defocus_m.
+                defocus_distance_m=reconcile_defocus_distance_m(
+                    focus_object_distance_m, initial.simulated_probe.fzp_defocus_m
+                ),
             ).get_array(),
             opr_weights=None,
             pixel_geometry=probe_geometry.get_pixel_geometry(),
@@ -183,7 +193,7 @@ def _build_initial_probe(
         # probe pitch follows the wavelength and detector distance, and both are resolved
         # per scan. A no-op whenever they agree, and it is what lets a warm start come
         # from a reconstruction done at a different resolution.
-        probes = resample_probe_sequence(reader.read(file_path), probe_geometry)
+        probes = resample_probe_ensemble(reader.read(file_path), probe_geometry)
 
     probe = probes.get_probe_no_opr()
 
@@ -196,7 +206,7 @@ def _build_initial_probe(
         rng,
         probe,
         num_cmodes=initial.num_opr_modes,
-        num_diffraction_patterns=num_patterns,
+        num_positions=num_positions,
     )
 
 
@@ -205,8 +215,9 @@ def _build_initial_object(
     registry: PluginRegistry,
     positions: ProbePositionSequence,
     probe_geometry: ProbeGeometry,
+    mean_amplitude_transmission: float,
 ) -> Object:
-    """The starting object: transparent, or one file shared by every scan."""
+    """The starting object: uniformly absorbing, or one file shared by every scan."""
     initial = settings.initial_object
     num_slices = initial.num_slices
     thickness_m = initial.object_thickness_m or 0.0
@@ -216,8 +227,9 @@ def _build_initial_object(
     )
 
     if initial.object_source == 'simulated':
-        # Unit amplitude and zero phase: a guess that asserts nothing about the sample.
-        object_ = generate_uniform_object(object_geometry)
+        # Uniform and zero phase: a guess that asserts no structure, but carries the
+        # mean transmission the patterns imply so the exit wave predicts their totals.
+        object_ = generate_uniform_object(object_geometry, amplitude=mean_amplitude_transmission)
 
         if num_slices > 1:
             object_ = resize_object_layers(
@@ -310,6 +322,27 @@ def reconstruct_one_scan(
         level=logging.DEBUG,
     )
 
+    far_field = resolve_flag(
+        logger,
+        'Far field',
+        overrides.far_field,
+        metadata.far_field,
+        True,
+        'metadata_overrides.far_field',
+        level=logging.DEBUG,
+    )
+    focus_object_distance_m = (
+        0.0
+        if far_field
+        else resolve_focus_object_distance_m(
+            logger,
+            overrides.focus_object_distance_m,
+            metadata.focus_object_distance_m,
+            settings.initial_probe.simulated_probe.fzp_defocus_m,
+            level=logging.DEBUG,
+        )
+    )
+
     if metadata.detector_pixel_geometry is None:
         raise ValueError('The diffraction file records no detector pixel size!')
 
@@ -370,27 +403,45 @@ def reconstruct_one_scan(
         )
 
     photon_wavelength_m = energy_eV_to_wavelength_m(photon_energy_eV)
-    probe_geometry = ProbeGeometry.from_far_field(
-        assembled_data.get_pixel_geometry(),
-        assembled_data.get_image_extent(),
-        wavelength_m=photon_wavelength_m,
-        distance_m=detector_distance_m,
-    )
+    if far_field:
+        probe_geometry = ProbeGeometry.from_far_field(
+            assembled_data.get_pixel_geometry(),
+            assembled_data.get_image_extent(),
+            wavelength_m=photon_wavelength_m,
+            distance_m=detector_distance_m,
+        )
+    else:
+        magnification = compute_magnification(detector_distance_m, focus_object_distance_m)
+        logger.debug('Magnification: %g', magnification)
+        probe_geometry = ProbeGeometry.from_near_field(
+            assembled_data.get_pixel_geometry(),
+            assembled_data.get_image_extent(),
+            magnification=magnification,
+        )
 
     rng = numpy.random.default_rng(settings.misc.seed)
-    probe_sequence = _build_initial_probe(
+    probe_ensemble = _build_initial_probe(
         settings,
         registry,
         probe_geometry,
         photon_wavelength_m=photon_wavelength_m,
-        num_patterns=num_patterns,
+        num_positions=len(positions),
         rng=rng,
+        far_field=far_field,
+        focus_object_distance_m=focus_object_distance_m,
     )
-    object_ = _build_initial_object(settings, registry, positions, probe_geometry)
+    incident_beam = estimate_incident_beam_from_assembled_data(assembled_data, positions)
+    object_ = _build_initial_object(
+        settings,
+        registry,
+        positions,
+        probe_geometry,
+        incident_beam.mean_amplitude_transmission,
+    )
     logger.info('Object geometry: %d layer(s)', object_.num_layers)
 
     probe_photon_count = (
-        float(assembled_data.get_probe_photon_count())
+        incident_beam.incident_photon_count
         if overrides.probe_photon_count is None
         else overrides.probe_photon_count
     )
@@ -405,6 +456,8 @@ def reconstruct_one_scan(
             name=f'scan{request.scan_no:05d}_{request.label}',
             comments=request.text,
             detector_distance_m=detector_distance_m,
+            focus_object_distance_m=focus_object_distance_m,
+            far_field=far_field,
             photon_energy_eV=photon_energy_eV,
             probe_photon_count=probe_photon_count,
             exposure_time_s=float(metadata.exposure_time_s or 0.0),
@@ -412,7 +465,7 @@ def reconstruct_one_scan(
             tomography_angle_deg=tomography_angle_deg,
         ),
         probe_positions=positions,
-        probes=probe_sequence,
+        probes=probe_ensemble,
         object_=object_,
         losses=[],
     )

@@ -5,7 +5,6 @@ import logging
 
 import numpy
 
-from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.affine import AffineTransform, transform_probe_positions
 from ptychodus.api.probe_positions import (
     ProbePosition,
@@ -13,6 +12,7 @@ from ptychodus.api.probe_positions import (
     ProbePositionSequence,
 )
 
+from ...parameters import ParameterGroup
 from .settings import ProbePositionsSettings
 
 logger = logging.getLogger(__name__)

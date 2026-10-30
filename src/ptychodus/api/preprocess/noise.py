@@ -4,10 +4,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from scipy import ndimage
 import numpy
 
 from ..geometry import Interval
-from ..typing import RealArrayType
+from ..typing import BooleanArrayType, NumberArrayType, RealArrayType
+
+__all__ = [
+    'RobustStatistics',
+    'compute_robust_statistics',
+    'estimate_filtered_noise_floor',
+    'estimate_noise_floor',
+    'subtract_noise_floor',
+]
 
 
 @dataclass(frozen=True)
@@ -144,3 +153,80 @@ def estimate_noise_floor(
         return compute_robust_statistics(fallback)
 
     return compute_robust_statistics(background_pool)
+
+
+def estimate_filtered_noise_floor(
+    image: NumberArrayType,
+    *,
+    bad_pixels: BooleanArrayType | None = None,
+    fall_back_to_border: bool = False,
+) -> tuple[RealArrayType, RobustStatistics]:
+    """Median-filter an image and estimate the noise floor of what remains.
+
+    A 3x3 median filter suppresses hot pixels and other isolated outliers, then
+    :func:`estimate_noise_floor` runs over the filtered values of the good pixels, those
+    not flagged in *bad_pixels*. When its histogram is unimodal the estimate falls back
+    to the whole pool, or, with *fall_back_to_border*, to the outermost ring of filtered
+    pixels: the right pool for an image whose signal sits in the middle, such as a probe.
+
+    Returns the filtered image, as float64, and the noise-floor statistics.
+    """
+    filtered = ndimage.median_filter(image.astype(numpy.float64), size=3)
+    values = filtered if bad_pixels is None else filtered[numpy.logical_not(bad_pixels)]
+    fallback_values = None
+
+    if fall_back_to_border:
+        fallback_values = numpy.concatenate(
+            [
+                filtered[0, :].ravel(),
+                filtered[-1, :].ravel(),
+                filtered[1:-1, 0].ravel(),
+                filtered[1:-1, -1].ravel(),
+            ]
+        )
+
+    return filtered, estimate_noise_floor(values, fallback_values=fallback_values)
+
+
+def subtract_noise_floor(
+    image: NumberArrayType,
+    *,
+    bad_pixels: BooleanArrayType | None = None,
+    mad_threshold: float = 4.5,
+    fall_back_to_border: bool = False,
+    keep_filtered: bool = True,
+) -> tuple[RealArrayType, RobustStatistics]:
+    """Remove the noise floor from an image, keeping only significant signal.
+
+    The image is filtered and its noise floor estimated as by
+    :func:`estimate_filtered_noise_floor`. The background median is subtracted
+    everywhere, and pixels whose filtered value is below ``median + mad_threshold * MAD``
+    are set to zero, so a pixel either keeps its full height above the background or
+    drops out. With *keep_filtered*, the heights kept are the filtered ones, which no hot
+    pixel survives; without it they are the image's own, so fine structure and sharp
+    edges that a median filter would erode are kept, and the filter only decides which
+    pixels are signal.
+
+    Keeping the full height is what makes the result fit to weigh with: a profile's
+    centroid, second moments, half maximum and encircled energy are those of the
+    measured signal, truncated only where it sinks into the noise. Lowering every pixel
+    by the threshold instead would take the same amount from the dim wings as from the
+    bright core, and narrow every width it is used to measure. Larger *mad_threshold*
+    rejects more noise and truncates more of the wings. *bad_pixels* only keeps flagged
+    pixels out of the noise statistics; their filtered values are treated like any other.
+
+    Returns the background-subtracted, masked image and the noise-floor statistics.
+
+    Raises:
+        ValueError: if *mad_threshold* is negative.
+    """
+    if mad_threshold < 0.0:
+        raise ValueError(f'mad_threshold must be non-negative, got {mad_threshold}')
+
+    filtered, statistics = estimate_filtered_noise_floor(
+        image, bad_pixels=bad_pixels, fall_back_to_border=fall_back_to_border
+    )
+    significant = filtered >= statistics.get_significance_threshold(mad_threshold)
+    heights = filtered if keep_filtered else image.astype(numpy.float64)
+    signal = numpy.where(significant, heights - statistics.median, 0.0)
+    return numpy.clip(signal, 0.0, None), statistics

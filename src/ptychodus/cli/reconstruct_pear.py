@@ -4,7 +4,7 @@
 The parameter file is the one PEAR's batch loop writes before spawning a worker, so
 this script substitutes for a ``ptycho_recon`` invocation on the same inputs. Every
 stage below runs through ``ptychodus.api``; only the pty-chi task boundary comes from
-``ptychodus.model.ptychi.task``, as in ``reconstruct_lamni.py``.
+``ptychodus.plugins.ptychi.task``, as in ``reconstruct_lamni.py``.
 
 Scope and limitations
 ---------------------
@@ -94,6 +94,7 @@ from ptychodus.api.object import (
 )
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.plugins import PluginRegistry
+from ptychodus.api.typing import ComplexArrayType
 from ptychodus.api.preprocess.diffraction import (
     DiffractionPrepPipeline,
     DiffractionPrepStepUnion,
@@ -102,7 +103,7 @@ from ptychodus.api.preprocess.diffraction import (
     VerticalFlipStep,
 )
 from ptychodus.api.affine import AffineTransform, transform_probe_positions
-from ptychodus.api.probe import Probe, ProbeGeometry, ProbeSequence, shift_probe
+from ptychodus.api.probe import Probe, ProbeGeometry, ProbeEnsemble, shift_probe
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.propagate import (
@@ -116,10 +117,12 @@ from ptychodus.api.simulate.probe import (
     propagate_probe,
 )
 from ptychodus.cli._reconstruct_common import (
+    estimate_incident_beam_from_assembled_data,
     install_signal_handlers,
     run_reconstruction,
     save_assembled_diffraction,
 )
+from ptychodus.plugins.aps31id_lamni.scan_directory import locate_scan_directory
 
 logger = logging.getLogger('reconstruct_pear')
 
@@ -299,7 +302,7 @@ def _batch_size(params: PearParameters, num_patterns: int) -> int:
 
 
 def _output_directory(
-    params: PearParameters, options: LSQMLOptions, probe: ProbeSequence, pattern_width_px: int
+    params: PearParameters, options: LSQMLOptions, probe: ProbeEnsemble, pattern_width_px: int
 ) -> Path:
     """Build the settings-encoding output directory name.
 
@@ -443,10 +446,11 @@ def _resolve_inputs(params: PearParameters, readers: _Readers) -> tuple[Path, Pa
         diffraction = base / 'ptycho' / f'{scan:03d}' / f'{scan:03d}_00001_0.h5'
         positions = base / 'positions' / f'{scan:03d}' / f'{scan:03d}_00001_0.dat'
     elif instrument in ('lynx', 'lynx_v2'):
-        block_start = (scan // 1000) * 1000
-        block = f'S{block_start:05d}-{block_start + 999:05d}'
         stem = f'scan_{scan:05d}_000' if instrument == 'lynx_v2' else f'run_{scan:05d}_000000000000'
-        diffraction = base / 'data' / 'eiger_4' / block / f'S{scan:05d}' / f'{stem}.h5'
+        # Only looked up when needed, so a missing block cannot defeat an explicit override.
+        diffraction = explicit_diffraction or (
+            locate_scan_directory(base / 'data' / 'eiger_4', scan) / f'{stem}.h5'
+        )
         positions = base / 'data' / 'scan_positions' / f'scan_{scan:05d}.dat'
     elif instrument in ('velo', 'velociprobe'):
         diffraction = base / 'ptycho' / f'fly{scan:03d}' / f'fly{scan:03d}_master.h5'
@@ -574,7 +578,7 @@ def _cluster_burst_positions(
     )
 
 
-def _set_num_incoherent_modes(array: numpy.ndarray, num_modes: int) -> numpy.ndarray:
+def _set_num_incoherent_modes(array: ComplexArrayType, num_modes: int) -> ComplexArrayType:
     """Pad with copies of the last mode, or truncate, to reach *num_modes*."""
     if array.shape[0] >= num_modes:
         return array[:num_modes]
@@ -600,9 +604,6 @@ def _build_lsqml_options(params: PearParameters, num_patterns: int) -> LSQMLOpti
     data_options.free_space_propagation_distance_m = (
         math.nan if params.near_field_ptycho else math.inf
     )
-
-    if params.near_field_ptycho:
-        data_options.fft_shift = False
 
     object_options = options.object_options
     object_options.optimizable = True
@@ -710,9 +711,6 @@ def _build_lsqml_options(params: PearParameters, num_patterns: int) -> LSQMLOpti
     reconstructor_options.forward_model_options.diffraction_pattern_blur_sigma = (
         params.diffraction_pattern_blur
     )
-
-    if params.near_field_ptycho:
-        reconstructor_options.forward_model_options.pad_for_shift = 50
 
     return options
 
@@ -907,7 +905,7 @@ def main() -> ExitCode:
     else:
         logger.info('Reading the initial probe from %s', probe_file)
         probe_reader = registry.probe_file_readers.get_strategy_by_name(params.init_probe_file_type)
-        probe_array = probe_reader.read(probe_file)[0].get_array()
+        probe_array = probe_reader.read(probe_file).get_probe_no_opr().get_array()
 
     probe_array = _set_num_incoherent_modes(probe_array, num_incoherent_modes)
     probe = Probe(array=probe_array, pixel_geometry=probe_geometry.get_pixel_geometry())
@@ -928,12 +926,14 @@ def main() -> ExitCode:
             propagation_distance_m=propagation_mm * 1e-3,
         )
 
-    probe_sequence = generate_coherent_probe_modes(
+    probe_ensemble = generate_coherent_probe_modes(
         rng,
         probe,
         num_cmodes=max(1, params.number_opr_modes + 1),
-        num_diffraction_patterns=num_patterns,
+        num_positions=len(positions),
     )
+
+    incident_beam = estimate_incident_beam_from_assembled_data(assembled_data, positions)
 
     # --- initial object ---
     number_of_slices = max(1, params.number_of_slices)
@@ -943,7 +943,11 @@ def main() -> ExitCode:
     object_file = params.path_to_init_object
 
     if object_file is None:
-        object_ = generate_uniform_object(object_geometry)
+        # Uniform, but carrying the mean transmission the patterns imply, so the exit
+        # wave predicts their totals rather than the unobstructed beam.
+        object_ = generate_uniform_object(
+            object_geometry, amplitude=incident_beam.mean_amplitude_transmission
+        )
 
         if number_of_slices > 1:
             object_ = resize_object_layers(
@@ -1025,7 +1029,7 @@ def main() -> ExitCode:
             comments=f'Reconstructed from {args.params.name}',
             detector_distance_m=detector_distance_m,
             photon_energy_eV=params.beam_energy_kev * 1.0e3,
-            probe_photon_count=float(assembled_data.get_probe_photon_count()),
+            probe_photon_count=incident_beam.incident_photon_count,
             exposure_time_s=float(raw_metadata.exposure_time_s or 0.0),
             mass_attenuation_m2_per_kg=0.0,
             tomography_angle_deg=0.0,
@@ -1033,7 +1037,7 @@ def main() -> ExitCode:
             far_field=not params.near_field_ptycho,
         ),
         probe_positions=positions,
-        probes=probe_sequence,
+        probes=probe_ensemble,
         object_=object_,
         losses=[],
     )
@@ -1043,7 +1047,7 @@ def main() -> ExitCode:
     # The parameter file already names where a run belongs -- `recon_dir_base`, or the
     # per-instrument convention derived from `data_directory` -- so there is no output
     # argument to supersede it. That directory becomes the standard-layout root.
-    output_directory = _output_directory(params, options, probe_sequence, image_extent.width_px)
+    output_directory = _output_directory(params, options, probe_ensemble, image_extent.width_px)
     diffraction_file = StandardFileLayout.DIFFRACTION.path(output_directory)
     options_file = StandardFileLayout.PTYCHI_OPTIONS.path(output_directory)
     product_file = StandardFileLayout.PRODUCT.path(output_directory)
@@ -1069,7 +1073,7 @@ def main() -> ExitCode:
             options.reconstructor_options.batch_size,
             options.reconstructor_options.batching_mode.name,
             options.reconstructor_options.noise_model.name,
-            probe_sequence.get_array().shape,
+            probe_ensemble.get_array().shape,
             object_.get_array().shape,
         )
         logger.info('Nothing written: stopping before the reconstruction.')

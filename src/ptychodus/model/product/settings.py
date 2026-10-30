@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.settings import SettingsRegistry
+from ..observer import Observable, Observer
+from ..settings import SettingsRegistry
 
 
 class ProductSettings(Observable, Observer):
@@ -39,6 +39,28 @@ class ProductSettings(Observable, Observer):
         self.tilt_angle_deg = self._group.create_real_parameter('TiltAngleInDegrees', 0.0)
         self.polarization = self._group.create_string_parameter('Polarization', '')
         self.far_field = self._group.create_boolean_parameter('FarField', True)
+        # Zero means the I0 the probe positions carry is uncalibrated.
+        self.i0_photons_per_count = self._group.create_real_parameter(
+            'I0PhotonsPerCount', 0.0, minimum=0.0
+        )
+
+        # Measure the defocus from the parallax between bright-field images when a
+        # product is created, which sets focus_object_distance_m above and so reaches
+        # every probe builder through resolve_defocus_distance_m. Off by default: it
+        # costs one binned pass over the patterns, and it only answers in far field.
+        self.estimate_defocus_from_parallax = self._group.create_boolean_parameter(
+            'EstimateDefocusFromParallax', False
+        )
+        self.parallax_bin_size_px = self._group.create_integer_parameter(
+            'ParallaxBinSizeInPixels', 4, minimum=1
+        )
+        self.parallax_min_significance = self._group.create_real_parameter(
+            'ParallaxMinSignificance', 3.0, minimum=0.0
+        )
+        self.parallax_min_defocus_dof = self._group.create_real_parameter(
+            'ParallaxMinDefocusDof', 1.0, minimum=0.0
+        )
+        self.parallax_rtol = self._group.create_real_parameter('ParallaxRtol', 0.5, minimum=0.0)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:

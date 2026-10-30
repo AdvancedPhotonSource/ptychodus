@@ -22,6 +22,7 @@ from ptychodus.api.assemble import (
     assemble_dataset,
     compute_array_offsets,
     compute_assembled_patterns_shape,
+    compute_dataset_total_counts,
     default_max_workers,
     preprocess_array,
 )
@@ -52,6 +53,15 @@ FRAME_SHAPE = (4, 4)
 
 def _array(label: str, first_index: int, num_patterns: int, fill: int) -> SimpleDiffractionArray:
     return make_array(label, first_index, num_patterns, fill, frame_shape=FRAME_SHAPE)
+
+
+def _float_array(
+    label: str, first_index: int, num_patterns: int, *, frame_shape: tuple[int, int] = FRAME_SHAPE
+) -> SimpleDiffractionArray:
+    """A constant float32 array of 3s, for planting non-finite values in."""
+    patterns = numpy.full((num_patterns, *frame_shape), 3.0, dtype=numpy.float32)
+    indexes = numpy.arange(first_index, first_index + num_patterns, dtype=numpy.intp)
+    return SimpleDiffractionArray(label, indexes, patterns)
 
 
 # ---------- compute_array_offsets ----------
@@ -92,7 +102,7 @@ def test_bad_pixels_shape_must_match_the_detector_extent() -> None:
     dataset = make_dataset([_array('a', 0, 3, 1)], (4, 4))
     override = numpy.zeros((8, 8), dtype=numpy.bool_)
 
-    with pytest.raises(ValueError, match='detector extent'):
+    with pytest.raises(ValueError, match='Bad pixels shape'):
         compute_assembled_patterns_shape(dataset, bad_pixels=override)
 
 
@@ -199,44 +209,6 @@ def test_missing_geometry_raises_rather_than_defaulting_to_zero() -> None:
 
     with pytest.raises(ValueError, match='pixel geometry'):
         allocate_assembled_data(dataset)
-
-
-# ---------- AssembledDiffractionData.get_probe_photon_count ----------
-
-
-def test_photon_count_is_the_brightest_pattern_total() -> None:
-    patterns = numpy.stack(
-        [
-            numpy.full((4, 4), 1, dtype=numpy.int32),  # sum = 16
-            numpy.full((4, 4), 5, dtype=numpy.int32),  # sum = 80
-            numpy.full((4, 4), 2, dtype=numpy.int32),  # sum = 32
-        ]
-    )
-    array = SimpleDiffractionArray('a', numpy.arange(3, dtype=numpy.intp), patterns)
-
-    data = assemble_dataset(make_dataset([array], (4, 4)))
-
-    assert data.get_probe_photon_count() == 80
-
-
-def test_photon_count_excludes_bad_pixels() -> None:
-    patterns = numpy.full((2, 4, 4), 3, dtype=numpy.int32)
-    patterns[:, 0, 0] = 1000  # masked, must not dominate
-    array = SimpleDiffractionArray('a', numpy.arange(2, dtype=numpy.intp), patterns)
-    bad = numpy.zeros((4, 4), dtype=numpy.bool_)
-    bad[0, 0] = True
-
-    data = assemble_dataset(make_dataset([array], (4, 4), bad_pixels=bad))
-
-    assert data.get_probe_photon_count() == 45  # 15 good pixels x 3
-
-
-def test_photon_count_of_an_unfilled_buffer_is_zero() -> None:
-    """Regression: .max() on an empty reduction used to raise from the GUI button."""
-    dataset = make_dataset([], (4, 4), num_patterns_per_array=[4])
-
-    assert allocate_assembled_data(dataset).get_probe_photon_count() == 0
-    assert AssembledDiffractionData.create_null().get_probe_photon_count() == 0
 
 
 # ---------- preprocess_array ----------
@@ -575,198 +547,6 @@ def test_assemble_accepts_an_empty_array_list_with_reserved_capacity() -> None:
     assert data.get_indexes().size == 0
 
 
-# ---------- probe_photon_counts on AssembledDiffractionData ----------
-
-
-def _bare_data(
-    num_patterns: int = 3,
-    *,
-    probe_photon_counts: numpy.ndarray | None = None,
-    fill: int = 4,
-) -> AssembledDiffractionData:
-    patterns = numpy.full((num_patterns, 4, 4), fill, dtype=numpy.int32)
-    return AssembledDiffractionData(
-        indexes=numpy.arange(num_patterns, dtype=numpy.intp),
-        patterns=patterns,
-        pixel_geometry=GEOMETRY,
-        bad_pixels=numpy.zeros((4, 4), dtype=numpy.bool_),
-        probe_photon_counts=probe_photon_counts,
-    )
-
-
-def test_missing_probe_photon_counts_falls_back_to_total_counts() -> None:
-    data = _bare_data(num_patterns=3, fill=4)  # total_counts = 4 * 16 = 64 per pattern
-
-    assert not data.has_measured_probe_photon_counts()
-    numpy.testing.assert_array_equal(data.get_probe_photon_counts(), [64, 64, 64])
-    numpy.testing.assert_array_equal(data.get_probe_photon_counts(), data.get_total_counts())
-    assert data.get_probe_photon_count() == 64
-
-
-def test_measured_probe_photon_counts_take_priority_over_total_counts() -> None:
-    measured = numpy.array([100.0, 500.0, 200.0], dtype=numpy.float64)
-    data = _bare_data(num_patterns=3, fill=4, probe_photon_counts=measured)
-
-    assert data.has_measured_probe_photon_counts()
-    numpy.testing.assert_array_equal(data.get_probe_photon_counts(), measured)
-    # Scalar backward-compat: max of measured, not max of total counts.
-    assert data.get_probe_photon_count() == 500
-
-
-def test_probe_photon_counts_wrong_ndim_is_rejected() -> None:
-    with pytest.raises(ValueError, match='probe photon counts'):
-        _bare_data(probe_photon_counts=numpy.zeros((3, 2), dtype=numpy.float64))
-
-
-def test_probe_photon_counts_wrong_length_is_rejected() -> None:
-    with pytest.raises(ValueError, match='probe photon counts'):
-        _bare_data(num_patterns=3, probe_photon_counts=numpy.zeros(4, dtype=numpy.float64))
-
-
-def test_probe_photon_counts_reject_non_finite() -> None:
-    partial = numpy.array([100.0, numpy.nan, 200.0], dtype=numpy.float64)
-    with pytest.raises(ValueError, match='finite and non-negative'):
-        _bare_data(num_patterns=3, fill=4, probe_photon_counts=partial)
-
-
-def test_probe_photon_counts_reject_negative() -> None:
-    negative = numpy.array([100.0, -1.0, 200.0], dtype=numpy.float64)
-    with pytest.raises(ValueError, match='finite and non-negative'):
-        _bare_data(num_patterns=3, fill=4, probe_photon_counts=negative)
-
-
-# ---------- Hz -> counts bridge through preprocess_array / assemble_dataset ----------
-
-
-def _array_with_flux(
-    label: str,
-    first_index: int,
-    num_patterns: int,
-    fill: int,
-    flux_per_s: numpy.ndarray | None,
-) -> SimpleDiffractionArray:
-    patterns = numpy.full((num_patterns, 4, 4), fill, dtype=numpy.int32)
-    indexes = numpy.arange(first_index, first_index + num_patterns, dtype=numpy.intp)
-    return SimpleDiffractionArray(label, indexes, patterns, probe_photon_flux_per_s=flux_per_s)
-
-
-def test_preprocess_array_converts_flux_Hz_to_counts_using_exposure() -> None:  # noqa: N802
-    flux_per_s = numpy.array([1000.0, 2000.0, 500.0], dtype=numpy.float64)
-    array = _array_with_flux('a', 0, 3, 4, flux_per_s)
-    good = numpy.zeros((4, 4), dtype=numpy.bool_)
-
-    block = preprocess_array(
-        array,
-        raw_bad_pixels=good,
-        processed_bad_pixels=good,
-        raw_pixel_geometry=GEOMETRY,
-        exposure_time_s=0.5,
-    )
-
-    assert block.has_measured_probe_photon_counts()
-    numpy.testing.assert_array_equal(block.get_probe_photon_counts(), [500.0, 1000.0, 250.0])
-
-
-def test_preprocess_array_drops_flux_when_exposure_is_missing(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    flux_per_s = numpy.array([1000.0, 2000.0], dtype=numpy.float64)
-    array = _array_with_flux('a', 0, 2, 4, flux_per_s)
-    good = numpy.zeros((4, 4), dtype=numpy.bool_)
-
-    with caplog.at_level('WARNING', logger='ptychodus.api.assemble'):
-        block = preprocess_array(
-            array,
-            raw_bad_pixels=good,
-            processed_bad_pixels=good,
-            raw_pixel_geometry=GEOMETRY,
-            exposure_time_s=None,
-        )
-
-    assert not block.has_measured_probe_photon_counts()
-    assert 'exposure_time_s' in caplog.text
-
-
-def test_preprocess_array_drops_flux_when_exposure_is_zero(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    flux_per_s = numpy.array([1000.0, 2000.0], dtype=numpy.float64)
-    array = _array_with_flux('a', 0, 2, 4, flux_per_s)
-    good = numpy.zeros((4, 4), dtype=numpy.bool_)
-
-    with caplog.at_level('WARNING', logger='ptychodus.api.assemble'):
-        block = preprocess_array(
-            array,
-            raw_bad_pixels=good,
-            processed_bad_pixels=good,
-            raw_pixel_geometry=GEOMETRY,
-            exposure_time_s=0.0,
-        )
-
-    assert not block.has_measured_probe_photon_counts()
-    assert 'exposure_time_s' in caplog.text
-
-
-def test_counts_filter_keeps_probe_photon_counts_aligned_with_patterns() -> None:
-    good = numpy.zeros((2, 2), dtype=numpy.bool_)
-    patterns = numpy.stack(
-        [
-            numpy.full((2, 2), 1, dtype=numpy.int32),  # sum = 4  (dropped)
-            numpy.full((2, 2), 5, dtype=numpy.int32),  # sum = 20 (kept)
-            numpy.full((2, 2), 10, dtype=numpy.int32),  # sum = 40 (kept)
-        ]
-    )
-    flux_per_s = numpy.array([100.0, 500.0, 200.0], dtype=numpy.float64)
-    array = SimpleDiffractionArray(
-        'a', numpy.array([7, 8, 9], dtype=numpy.intp), patterns, probe_photon_flux_per_s=flux_per_s
-    )
-
-    block = preprocess_array(
-        array,
-        raw_bad_pixels=good,
-        processed_bad_pixels=good,
-        raw_pixel_geometry=GEOMETRY,
-        exposure_time_s=1.0,
-        total_counts_lower_bound=10,
-    )
-
-    numpy.testing.assert_array_equal(block.get_indexes(), [8, 9])
-    numpy.testing.assert_array_equal(block.get_probe_photon_counts(), [500.0, 200.0])
-
-
-def test_assemble_dataset_allocates_counts_buffer_only_when_flux_is_available() -> None:
-    flux_per_s = numpy.array([10.0, 20.0, 30.0], dtype=numpy.float64)
-
-    with_flux = make_dataset(
-        [_array_with_flux('a', 0, 3, 4, flux_per_s)], (4, 4), exposure_time_s=0.5
-    )
-    data = assemble_dataset(with_flux)
-
-    assert data.has_measured_probe_photon_counts()
-    numpy.testing.assert_array_equal(data.get_probe_photon_counts(), [5.0, 10.0, 15.0])
-
-    without_flux = make_dataset([_array('a', 0, 3, 4)], (4, 4), exposure_time_s=0.5)
-    data_no_flux = assemble_dataset(without_flux)
-
-    assert not data_no_flux.has_measured_probe_photon_counts()
-    # Fallback path is total counts (fill=4, 4x4 patterns => 64 per pattern).
-    numpy.testing.assert_array_equal(data_no_flux.get_probe_photon_counts(), [64, 64, 64])
-
-
-def test_assemble_dataset_uses_fallback_when_any_array_lacks_flux() -> None:
-    flux_per_s = numpy.array([10.0, 20.0], dtype=numpy.float64)
-    a_with = _array_with_flux('a', 0, 2, 4, flux_per_s)
-    b_without = _array('b', 2, 2, 5)  # No flux -> no counts buffer reserved.
-
-    dataset = make_dataset([a_with, b_without], (4, 4), exposure_time_s=0.5)
-
-    data = assemble_dataset(dataset)
-
-    # All-or-nothing: any array without flux -> no buffer -> fallback path used.
-    assert not data.has_measured_probe_photon_counts()
-    numpy.testing.assert_array_equal(data.get_probe_photon_counts(), data.get_total_counts())
-
-
 class TestGetImageExtent:
     def test_matches_last_two_dims_of_the_stored_patterns(self) -> None:
         # A single 5x7 pattern to prove the width_px/height_px axis assignment.
@@ -929,3 +709,124 @@ def test_an_explicit_worker_count_is_passed_through(monkeypatch: pytest.MonkeyPa
     assemble_dataset(_three_arrays(), max_workers=3)
 
     assert sizes == [3]
+
+
+# ---------- non-finite values ----------
+
+
+def test_assemble_masks_a_pixel_that_is_non_finite_in_any_frame(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """One NaN masks its pixel for every frame of every array, and the value is zeroed."""
+    first = _float_array('a', 0, 2)
+    second = _float_array('b', 2, 2)
+    cast(numpy.ndarray, second.get_patterns())[1, 2, 3] = numpy.nan
+    dataset = make_dataset([first, second], FRAME_SHAPE)
+    reported: list[numpy.ndarray] = []
+
+    with caplog.at_level('WARNING', logger='ptychodus.api.assemble'):
+        data = assemble_dataset(dataset, on_nonfinite_pixels=reported.append, max_workers=1)
+
+    patterns = data.get_patterns()
+    assert numpy.isfinite(patterns).all()
+    assert patterns[3, 2, 3] == 0.0
+    assert data.get_bad_pixels()[2, 3]
+    assert data.get_bad_pixels().sum() == 1
+    assert len(reported) == 1
+    assert reported[0].shape == FRAME_SHAPE
+    assert reported[0][2, 3]
+    assert 'NaN or infinite' in caplog.text
+
+
+def test_assemble_reports_non_finite_pixels_in_detector_coordinates() -> None:
+    """After a load-time crop, the reported mask is placed back on the full detector."""
+    array = _float_array('a', 0, 1, frame_shape=(8, 8))
+    cast(numpy.ndarray, array.get_patterns())[0, 3, 4] = numpy.inf
+    dataset = make_dataset([array], (8, 8))
+    region = CropRegion(x_range=(2, 6), y_range=(2, 6))
+    reported: list[numpy.ndarray] = []
+
+    data = assemble_dataset(
+        dataset, read_region=region, on_nonfinite_pixels=reported.append, max_workers=1
+    )
+
+    assert data.get_bad_pixels().shape == (4, 4)
+    assert data.get_bad_pixels()[1, 2]
+    assert reported[0].shape == (8, 8)
+    assert reported[0][3, 4]
+    assert reported[0].sum() == 1
+
+
+def test_assemble_leaves_the_supplied_bad_pixels_untouched() -> None:
+    """Masking non-finite pixels widens the buffer's mask without writing to the caller's."""
+    array = _float_array('a', 0, 1)
+    cast(numpy.ndarray, array.get_patterns())[0, 0, 1] = numpy.nan
+    supplied = numpy.zeros(FRAME_SHAPE, dtype=bool)
+    dataset = make_dataset([array], FRAME_SHAPE, bad_pixels=supplied)
+
+    data = assemble_dataset(dataset, max_workers=1)
+
+    assert data.get_bad_pixels()[0, 1]
+    assert not supplied.any()
+
+
+def test_assemble_follows_non_finite_pixels_through_the_pipeline() -> None:
+    """The masked pixel is binned like any bad pixel: its whole bin becomes bad."""
+    array = _float_array('a', 0, 1)
+    cast(numpy.ndarray, array.get_patterns())[0, 3, 0] = numpy.nan
+    dataset = make_dataset([array], FRAME_SHAPE)
+    pipeline = DiffractionPrepPipeline(steps=(BinningStep(bin_size_x=2, bin_size_y=2),))
+
+    data = assemble_dataset(dataset, pipeline, max_workers=1)
+
+    expected = numpy.array([[False, False], [True, False]])
+    numpy.testing.assert_array_equal(data.get_bad_pixels(), expected)
+    assert data.get_patterns()[0, 1, 0] == pytest.approx(3.0 * 3)
+
+
+def test_integer_patterns_skip_the_non_finite_check() -> None:
+    """Integer data cannot hold NaN; it is assembled as before with nothing reported."""
+    dataset = make_dataset([_array('a', 0, 2, fill=5)], FRAME_SHAPE)
+    reported: list[numpy.ndarray] = []
+
+    data = assemble_dataset(dataset, on_nonfinite_pixels=reported.append, max_workers=1)
+
+    assert not reported
+    assert not data.get_bad_pixels().any()
+
+
+def test_preprocess_array_masks_non_finite_pixels_in_its_block() -> None:
+    array = _float_array('a', 0, 2)
+    cast(numpy.ndarray, array.get_patterns())[0, 1, 1] = -numpy.inf
+    clean = numpy.zeros(FRAME_SHAPE, dtype=bool)
+    reported: list[numpy.ndarray] = []
+
+    block = preprocess_array(
+        array,
+        raw_bad_pixels=clean,
+        processed_bad_pixels=clean,
+        raw_pixel_geometry=GEOMETRY,
+        on_nonfinite_pixels=reported.append,
+    )
+
+    assert block.get_bad_pixels()[1, 1]
+    assert block.get_patterns()[0, 1, 1] == 0.0
+    assert reported[0][1, 1]
+
+
+def test_total_counts_exclude_non_finite_pixels() -> None:
+    array = _float_array('a', 0, 2)
+    cast(numpy.ndarray, array.get_patterns())[1, 0, 0] = numpy.nan
+    dataset = make_dataset([array], FRAME_SHAPE)
+
+    counts = compute_dataset_total_counts(dataset, max_workers=1)
+
+    numpy.testing.assert_array_equal(counts.total_counts[1], 3.0 * 15)
+    assert numpy.isfinite(counts.total_counts).all()
+
+
+def test_add_bad_pixels_rejects_a_mismatched_shape() -> None:
+    data = allocate_assembled_data(make_dataset([_array('a', 0, 1, fill=1)], FRAME_SHAPE))
+
+    with pytest.raises(ValueError, match='shape'):
+        data.add_bad_pixels(numpy.zeros((2, 2), dtype=bool))

@@ -10,7 +10,7 @@ import logging
 
 import pytest
 
-from ptychodus.plugins.aps31id_lamni._scan_table import (
+from ptychodus.plugins.aps31id_lamni.scan_table import (
     APS31IDEScanRecord,
     read_aps31ide_scan_table,
 )

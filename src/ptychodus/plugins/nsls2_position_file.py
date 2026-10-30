@@ -15,6 +15,12 @@ logger = logging.getLogger(__name__)
 
 
 class NSLS2Style1PositionFileReader(ProbePositionFileReader):
+    def get_file_description(self) -> str:
+        return 'NSLS-II 3-ID HXN Style 1 Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
+
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()
 
@@ -33,6 +39,12 @@ class NSLS2Style1PositionFileReader(ProbePositionFileReader):
 
 
 class NSLS2Style2PositionFileReader(ProbePositionFileReader):
+    def get_file_description(self) -> str:
+        return 'NSLS-II 3-ID HXN Style 2 Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
+
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()
 
@@ -54,10 +66,8 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         NSLS2Style1PositionFileReader(),
         simple_name='NSLS_II_1',
-        display_name='NSLS-II 3-ID HXN Style 1 Files (*.h5 *.hdf5)',
     )
     registry.probe_position_file_readers.register_plugin(
         NSLS2Style2PositionFileReader(),
         simple_name='NSLS_II_2',
-        display_name='NSLS-II 3-ID HXN Style 2 Files (*.h5 *.hdf5)',
     )

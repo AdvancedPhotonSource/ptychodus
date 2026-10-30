@@ -2,10 +2,10 @@ from __future__ import annotations
 import logging
 
 from PyQt5.QtCore import QModelIndex
-from PyQt5.QtWidgets import QInputDialog
+from PyQt5.QtWidgets import QInputDialog, QStatusBar
 
 from ptychodus.api.geometry import GeometryNotDefinedError
-from ptychodus.api.observer import Observable, Observer
+from ptychodus.model.observer import Observable, Observer
 
 from ...model.fluorescence import (
     FluorescenceAPI,
@@ -16,14 +16,16 @@ from ...model.fluorescence import (
 )
 from ...model.product import ProductRepository
 from ...view.fluorescence import FluorescenceView
+from ...view.image import ImageView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
 from ..helpers import connect_triggered_signal, create_brush_for_editable_cell
 from ..image import ImageController
+from ..rendering import VisualizationEngine
 from .editor import FluorescenceEditorViewController
 from .enhance_dialog import FluorescenceEnhanceDialogController
 from ..product.core import ProductRepositoryComboProxyModel, ProductRepositoryTableModel
-from .repository_tree_model import COL_PRODUCT, FluorescenceRepositoryTreeModel, DisplayMode
+from .repository_tree_model import Column, FluorescenceRepositoryTreeModel, DisplayMode
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +50,9 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
         product_repository: ProductRepository,
         product_table_model: ProductRepositoryTableModel,
         view: FluorescenceView,
-        image_controller: ImageController,
+        image_view: ImageView,
         enhance_dialog_controller: FluorescenceEnhanceDialogController,
+        status_bar: QStatusBar,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
@@ -57,7 +60,12 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
         self._api = api
         self._product_repository = product_repository
         self._view = view
-        self._image_controller = image_controller
+        self._image_controller = ImageController(
+            VisualizationEngine(is_complex=False),
+            image_view,
+            status_bar,
+            file_dialog_factory,
+        )
         self._enhance_dialog_controller = enhance_dialog_controller
         self._file_dialog_factory = file_dialog_factory
         self._task_monitor = api.get_task_monitor()
@@ -72,7 +80,7 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
         )
         view.tree_view.setModel(self._tree_model)
         view.tree_view.setItemDelegateForColumn(
-            COL_PRODUCT, ComboBoxItemDelegate(self._product_combo_model, view.tree_view)
+            Column.PRODUCT.index, ComboBoxItemDelegate(self._product_combo_model, view.tree_view)
         )
         header = view.tree_view.header()
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
@@ -225,8 +233,8 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
         file_path, name_filter = self._file_dialog_factory.get_open_file_path(
             self._view,
             title,
-            name_filters=list(self._api.get_open_file_filters()),
-            selected_name_filter=self._api.get_open_file_filter(),
+            name_filters=self._api.file_readers.get_filters(),
+            selected_name_filter=self._api.file_readers.get_filter(),
         )
         if not file_path:
             return
@@ -272,8 +280,8 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
         file_path, name_filter = self._file_dialog_factory.get_save_file_path(
             self._view,
             title,
-            name_filters=list(self._api.get_save_file_filters()),
-            selected_name_filter=self._api.get_save_file_filter(),
+            name_filters=self._api.file_writers.get_filters(),
+            selected_name_filter=self._api.file_writers.get_filter(),
         )
         if not file_path:
             return

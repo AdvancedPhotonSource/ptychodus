@@ -1,4 +1,6 @@
-from enum import IntEnum
+from __future__ import annotations
+
+from enum import Enum, IntEnum
 from typing import Any, Final
 import logging
 
@@ -11,11 +13,18 @@ from PyQt5.QtCore import (
     Qt,
 )
 from PyQt5.QtGui import QBrush
-from PyQt5.QtWidgets import QComboBox, QStyledItemDelegate, QStyleOptionViewItem, QWidget
+from PyQt5.QtWidgets import (
+    QComboBox,
+    QMessageBox,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+    QWidget,
+)
 
 from ptychodus.api.constants import LengthUnit
 from ptychodus.api.diffraction import Polarization
-from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.parallax import ParallaxEstimate
+from ptychodus.model.observer import Observable, Observer
 
 from ...model.diffraction import (
     AssembledDiffractionDataset,
@@ -23,43 +32,71 @@ from ...model.diffraction import (
     DiffractionDatasetRepositoryObserver,
 )
 from ..diffraction.dataset import UNBOUND_DATASET, DiffractionDatasetComboModel
-from ...model.product import ProductRepositoryItem
+from ...model.product import ProductAPI, ProductRepositoryItem
 from ...view.product import ProductEditorDialog
 from ..helpers import create_brush_for_editable_cell
 
 logger = logging.getLogger(__name__)
 
 
-class _Row(IntEnum):
-    """Row order of ProductPropertyTableModel.
+class _Row(Enum):
+    """Every row of ProductPropertyTableModel: its order, its label and whether it edits.
+
+    The member value pairs the display label with editability, and the position comes
+    from declaration order rather than being written out, so a row cannot be added to
+    the ordering and forgotten in the labels or the editable set. Those were three
+    structures that had to be kept aligned by hand, and nothing could pin that
+    alignment: CLAUDE.md puts this file outside the tested surface.
 
     An enum rather than module-level ints so that ``match`` arms are value patterns:
     a bare name would be a capture pattern that swallows every row.
     """
 
-    PHOTON_WAVELENGTH_NM = 0
-    PROBE_WAVENUMBER_PER_NM = 1
-    PROBE_ANGULAR_WAVENUMBER_RAD_PER_NM = 2
-    PROBE_PHOTON_FLUX_PER_S = 3
-    PROBE_POWER_W = 4
-    OBJECT_PLANE_PIXEL_WIDTH_NM = 5
-    OBJECT_PLANE_PIXEL_HEIGHT_NM = 6
-    EXPOSURE_TIME_S = 7
-    MASS_ATTENUATION_M2_PER_KG = 8
-    TOMOGRAPHY_ANGLE_DEG = 9
-    TILT_ANGLE_DEG = 10
-    POLARIZATION = 11
-    FRESNEL_NUMBER = 12
-    DETECTOR_NUMERICAL_APERTURE = 13
-    DEPTH_OF_FIELD_NM = 14
-    DIFFRACTION_DATASET = 15
-    FOCUS_OBJECT_DISTANCE_MM = 16
-    FAR_FIELD = 17
+    PHOTON_WAVELENGTH_NM = ('Photon Wavelength [nm]', False)
+    PROBE_WAVENUMBER_PER_NM = ('Probe Wavenumber [1/nm]', False)
+    PROBE_ANGULAR_WAVENUMBER_RAD_PER_NM = ('Probe Angular Wavenumber [rad/nm]', False)
+    PROBE_PHOTON_FLUX_PER_S = ('Probe Photon Flux [ph/s]', False)
+    PROBE_POWER_W = ('Probe Power [W]', False)
+    OBJECT_PLANE_PIXEL_WIDTH_NM = ('Object Plane Pixel Width [nm]', False)
+    OBJECT_PLANE_PIXEL_HEIGHT_NM = ('Object Plane Pixel Height [nm]', False)
+    EXPOSURE_TIME_S = ('Exposure Time [s]', True)
+    I0_PHOTONS_PER_COUNT = ('I0 Calibration [photons/count]', True)
+    MASS_ATTENUATION_M2_PER_KG = ('Mass Attenuation [m\u00b2/kg]', True)
+    TOMOGRAPHY_ANGLE_DEG = ('Tomography Angle [deg]', True)
+    TILT_ANGLE_DEG = ('Tilt Angle [deg]', True)
+    POLARIZATION = ('Polarization', True)
+    FRESNEL_NUMBER = ('Fresnel Number', False)
+    DETECTOR_NUMERICAL_APERTURE = ('Detector Numerical Aperture', False)
+    DEPTH_OF_FIELD_NM = ('Depth of Field [nm]', False)
+    MAGNIFICATION = ('Magnification', False)
+    OBJECT_PLANE_PROPAGATION_DISTANCE_MM = ('Object-Plane Propagation Distance [mm]', False)
+    DIFFRACTION_DATASET = ('Diffraction Dataset', True)
+    FOCUS_OBJECT_DISTANCE_MM = ('Focus-Object Distance [mm]', True)
+    FAR_FIELD = ('Far Field', True)
+
+    def __init__(self, label: str, editable: bool) -> None:
+        self.label = label
+        self.editable = editable
+        # Members already defined when this one is constructed, which is its position.
+        self.index = len(self.__class__.__members__)
+
+    @classmethod
+    def from_index(cls, index: int) -> _Row:
+        """The row at `index`.
+
+        Raises:
+            IndexError: for a row outside the table, which the model's own
+                ``rowCount`` makes impossible and so would be a bug rather than input.
+        """
+        if index < 0:
+            raise IndexError(f'Row index {index} is negative.')
+
+        return list(cls)[index]
 
 
 # The regime is a two-state physical property, so the cell reads as a named choice
 # rather than a bare True/False.
-_FAR_FIELD_CHOICES: Final[dict[bool, str]] = {True: 'Far Field', False: 'Near Field'}
+FAR_FIELD_CHOICES: Final[dict[bool, str]] = {True: 'Far Field', False: 'Near Field'}
 
 
 class _Col(IntEnum):
@@ -71,20 +108,6 @@ class _Col(IntEnum):
 
     PROPERTY = 0
     VALUE = 1
-
-
-_EDITABLE_ROWS = frozenset(
-    {
-        _Row.EXPOSURE_TIME_S,
-        _Row.MASS_ATTENUATION_M2_PER_KG,
-        _Row.TOMOGRAPHY_ANGLE_DEG,
-        _Row.TILT_ANGLE_DEG,
-        _Row.POLARIZATION,
-        _Row.DIFFRACTION_DATASET,
-        _Row.FOCUS_OBJECT_DISTANCE_MM,
-        _Row.FAR_FIELD,
-    }
-)
 
 
 class ProductPropertyTableModel(QAbstractTableModel):
@@ -100,34 +123,15 @@ class ProductPropertyTableModel(QAbstractTableModel):
         self._diffraction_repository = diffraction_repository
         self._editable_item_brush = editable_item_brush
         self._header = ['Property', 'Value']
-        self._properties = [
-            'Photon Wavelength [nm]',
-            'Probe Wavenumber [1/nm]',
-            'Probe Angular Wavenumber [rad/nm]',
-            'Probe Photon Flux [ph/s]',
-            'Probe Power [W]',
-            'Object Plane Pixel Width [nm]',
-            'Object Plane Pixel Height [nm]',
-            'Exposure Time [s]',
-            'Mass Attenuation [m\u00b2/kg]',
-            'Tomography Angle [deg]',
-            'Tilt Angle [deg]',
-            'Polarization',
-            'Fresnel Number',
-            'Detector Numerical Aperture',
-            'Depth of Field [nm]',
-            'Diffraction Dataset',
-            'Focus-Object Distance [mm]',
-            'Far Field',
-        ]
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
 
         # Only the Value column is editable: the Property column holds the row's
         # read-only label, and setData keys off the row alone.
-        if index.isValid() and index.column() == _Col.VALUE and index.row() in _EDITABLE_ROWS:
-            value |= Qt.ItemFlag.ItemIsEditable
+        if index.isValid() and index.column() == _Col.VALUE:
+            if _Row.from_index(index.row()).editable:
+                value |= Qt.ItemFlag.ItemIsEditable
 
         return value
 
@@ -145,14 +149,14 @@ class ProductPropertyTableModel(QAbstractTableModel):
             if role == Qt.ItemDataRole.DisplayRole:
                 match index.column():
                     case _Col.PROPERTY:
-                        return self._properties[index.row()]
+                        return _Row.from_index(index.row()).label
                     case _Col.VALUE:
                         metadata_item = self._product_item.get_metadata_item()
                         geometry = self._product_item.get_geometry()
                         values = geometry.get_derived_values()
                         nm_per_m = LengthUnit.NANOMETER.meters_per_unit
 
-                        match index.row():
+                        match _Row.from_index(index.row()):
                             case _Row.PHOTON_WAVELENGTH_NM:
                                 return f'{LengthUnit.NANOMETER.convert(geometry.photon_wavelength_m):.4g}'
                             case _Row.PROBE_WAVENUMBER_PER_NM:
@@ -171,6 +175,8 @@ class ProductPropertyTableModel(QAbstractTableModel):
                                 return f'{LengthUnit.NANOMETER.convert(height_m):.4g}'
                             case _Row.EXPOSURE_TIME_S:
                                 return f'{metadata_item.exposure_time_s.get_value():.4g}'
+                            case _Row.I0_PHOTONS_PER_COUNT:
+                                return f'{metadata_item.i0_photons_per_count.get_value():.4g}'
                             case _Row.MASS_ATTENUATION_M2_PER_KG:
                                 return f'{metadata_item.mass_attenuation_m2_per_kg.get_value():.4g}'
                             case _Row.TOMOGRAPHY_ANGLE_DEG:
@@ -190,6 +196,12 @@ class ProductPropertyTableModel(QAbstractTableModel):
                                 # Diverges as the aperture vanishes, and formats as 'inf'.
                                 depth_m = values.depth_of_field_m
                                 return f'{LengthUnit.NANOMETER.convert(depth_m):.4g}'
+                            case _Row.MAGNIFICATION:
+                                return f'{values.magnification:.4g}'
+                            case _Row.OBJECT_PLANE_PROPAGATION_DISTANCE_MM:
+                                # Diverges at zero magnification, and formats as 'inf'.
+                                distance_m = values.object_plane_propagation_distance_m
+                                return f'{LengthUnit.MILLIMETER.convert(distance_m):.4g}'
                             case _Row.DIFFRACTION_DATASET:
                                 dataset = self._product_item.get_dataset()
                                 return UNBOUND_DATASET if dataset is None else dataset.get_name()
@@ -197,7 +209,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
                                 distance_m = metadata_item.focus_object_distance_m.get_value()
                                 return f'{LengthUnit.MILLIMETER.convert(distance_m):.4g}'
                             case _Row.FAR_FIELD:
-                                return _FAR_FIELD_CHOICES[metadata_item.far_field.get_value()]
+                                return FAR_FIELD_CHOICES[metadata_item.far_field.get_value()]
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
                     return self._editable_item_brush
@@ -206,8 +218,8 @@ class ProductPropertyTableModel(QAbstractTableModel):
         if index.isValid() and index.column() == _Col.VALUE and role == Qt.ItemDataRole.EditRole:
             metadata_item = self._product_item.get_metadata_item()
 
-            match index.row():
-                case 7:
+            match _Row.from_index(index.row()):
+                case _Row.EXPOSURE_TIME_S:
                     try:
                         exposure_time_s = float(value)
                     except ValueError:
@@ -215,7 +227,15 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
                     metadata_item.exposure_time_s.set_value(exposure_time_s)
                     return True
-                case 8:
+                case _Row.I0_PHOTONS_PER_COUNT:
+                    try:
+                        i0_photons_per_count = float(value)
+                    except ValueError:
+                        return False
+
+                    metadata_item.i0_photons_per_count.set_value(i0_photons_per_count)
+                    return True
+                case _Row.MASS_ATTENUATION_M2_PER_KG:
                     try:
                         mass_attenuation_m2_per_kg = float(value)
                     except ValueError:
@@ -223,7 +243,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
                     metadata_item.mass_attenuation_m2_per_kg.set_value(mass_attenuation_m2_per_kg)
                     return True
-                case 9:
+                case _Row.TOMOGRAPHY_ANGLE_DEG:
                     try:
                         tomography_angle_deg = float(value)
                     except ValueError:
@@ -231,7 +251,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
                     metadata_item.tomography_angle_deg.set_value(tomography_angle_deg)
                     return True
-                case 10:
+                case _Row.TILT_ANGLE_DEG:
                     try:
                         tilt_angle_deg = float(value)
                     except ValueError:
@@ -239,7 +259,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
                     metadata_item.tilt_angle_deg.set_value(tilt_angle_deg)
                     return True
-                case 11:
+                case _Row.POLARIZATION:
                     text = str(value)
                     if text in ('', '(unset)'):
                         metadata_item.polarization.set_value('')
@@ -277,16 +297,16 @@ class ProductPropertyTableModel(QAbstractTableModel):
                 case _Row.FAR_FIELD:
                     text = str(value)
 
-                    if text not in _FAR_FIELD_CHOICES.values():
+                    if text not in FAR_FIELD_CHOICES.values():
                         return False
 
-                    metadata_item.far_field.set_value(text == _FAR_FIELD_CHOICES[True])
+                    metadata_item.far_field.set_value(text == FAR_FIELD_CHOICES[True])
                     return True
 
         return False
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
-        return len(self._properties)
+        return len(_Row)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._header)
@@ -295,25 +315,27 @@ class ProductPropertyTableModel(QAbstractTableModel):
 class _PropertyValueDelegate(QStyledItemDelegate):
     """Combobox editor for the combo-valued rows of the product-property table.
 
-    Attached with ``setItemDelegateForColumn(1, ...)`` so column sorting through
-    the proxy model cannot mis-target the row; only one delegate can be installed
-    per column, so this one serves both combo rows and dispatches on the mapped
-    source row. ``mapToSource`` recovers the row in the underlying
-    ProductPropertyTableModel — every other row falls through to the base delegate.
+    Attached to the Value column alone so column sorting through the proxy model
+    cannot mis-target the row; only one delegate can be installed per column, so this
+    one serves both combo rows and dispatches on the mapped source row.
+    ``mapToSource`` recovers the row in the underlying ProductPropertyTableModel —
+    every other row falls through to the base delegate.
     """
 
     def __init__(self, dataset_combo_model: DiffractionDatasetComboModel, parent: QWidget) -> None:
         super().__init__(parent)
         self._dataset_combo_model = dataset_combo_model
 
-    def _source_row(self, index: QModelIndex) -> int | None:
+    def _source_row(self, index: QModelIndex) -> _Row | None:
+        """The row this index addresses, or None for a column this delegate ignores."""
         if index.column() != _Col.VALUE:
             return None
+
         model = index.model()
         source_index = (
             model.mapToSource(index) if isinstance(model, QSortFilterProxyModel) else index
         )
-        return source_index.row()
+        return _Row.from_index(source_index.row())
 
     def createEditor(  # noqa: N802
         self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex
@@ -322,7 +344,7 @@ class _PropertyValueDelegate(QStyledItemDelegate):
             case _Row.FAR_FIELD:
                 combo = QComboBox(parent)
 
-                for text in _FAR_FIELD_CHOICES.values():
+                for text in FAR_FIELD_CHOICES.values():
                     combo.addItem(text, text)
 
                 return combo
@@ -369,12 +391,16 @@ class ProductEditorViewController(Observer, DiffractionDatasetRepositoryObserver
     def __init__(
         self,
         diffraction_repository: DiffractionDatasetRepository,
+        product_api: ProductAPI,
+        product_index: int,
         product: ProductRepositoryItem,
         table_model: ProductPropertyTableModel,
         dialog: ProductEditorDialog,
     ) -> None:
         super().__init__()
         self._diffraction_repository = diffraction_repository
+        self._product_api = product_api
+        self._product_index = product_index
         self._product = product
         self._table_model = table_model
         self._dialog = dialog
@@ -384,6 +410,8 @@ class ProductEditorViewController(Observer, DiffractionDatasetRepositoryObserver
         cls,
         diffraction_repository: DiffractionDatasetRepository,
         dataset_combo_model: DiffractionDatasetComboModel,
+        product_api: ProductAPI,
+        product_index: int,
         product: ProductRepositoryItem,
         parent: QWidget,
     ) -> None:
@@ -412,7 +440,9 @@ class ProductEditorViewController(Observer, DiffractionDatasetRepositoryObserver
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
         dialog.table_view.resizeRowsToContents()
 
-        view_controller = cls(diffraction_repository, product, table_model, dialog)
+        view_controller = cls(
+            diffraction_repository, product_api, product_index, product, table_model, dialog
+        )
         product.add_observer(view_controller)
         diffraction_repository.add_observer(view_controller)
         dialog.text_edit.textChanged.connect(view_controller._sync_view_to_model)
@@ -421,6 +451,9 @@ class ProductEditorViewController(Observer, DiffractionDatasetRepositoryObserver
 
         dialog.actions_view.estimate_probe_photon_count_button.clicked.connect(
             view_controller._estimate_probe_photon_count
+        )
+        dialog.actions_view.estimate_defocus_button.clicked.connect(
+            view_controller._estimate_defocus
         )
         dialog.finished.connect(view_controller._finish)
         dialog.open()
@@ -437,21 +470,45 @@ class ProductEditorViewController(Observer, DiffractionDatasetRepositoryObserver
         metadata = self._product.get_metadata_item()
         self._dialog.text_edit.setPlainText(metadata.comments.get_value())
 
-        self._dialog.actions_view.estimate_probe_photon_count_button.setEnabled(
-            self._product.get_dataset() is not None
+        has_dataset = self._product.get_dataset() is not None
+        self._dialog.actions_view.estimate_probe_photon_count_button.setEnabled(has_dataset)
+        self._dialog.actions_view.estimate_defocus_button.setEnabled(
+            has_dataset and metadata.far_field.get_value()
         )
 
     def _estimate_probe_photon_count(self) -> None:
-        metadata = self._product.get_metadata_item()
-        dataset = self._product.get_dataset()
-        if dataset is None:
+        if self._product.get_dataset() is None:
             logger.warning('Cannot estimate probe photon count: no diffraction dataset selected.')
             return
-        photon_count = dataset.get_assembled_data().get_probe_photon_count()
-        metadata.probe_photon_count.set_value(photon_count)
 
+        self._product.estimate_probe_photon_count()
         self._table_model.beginResetModel()
         self._table_model.endResetModel()
+
+    def _estimate_defocus(self) -> None:
+        self._dialog.actions_view.estimate_defocus_button.setEnabled(False)
+        self._product_api.estimate_defocus_from_parallax(
+            self._product_index, on_finished=self._report_defocus
+        )
+
+    def _report_defocus(self, estimate: ParallaxEstimate | None, applied: bool) -> None:
+        self._dialog.actions_view.estimate_defocus_button.setEnabled(True)
+
+        if estimate is None:
+            text = 'The parallax gives no defocus estimate; see the log.'
+        else:
+            text = (
+                f'Defocus {estimate.defocus_distance_m * 1e3:.4g} '
+                f'\u00b1 {estimate.standard_error_m * 1e3:.2g} mm\n'
+                f'Depth of focus {estimate.depth_of_focus_m * 1e3:.4g} mm\n'
+                + (
+                    'Resolved: the focus position is set.'
+                    if applied
+                    else 'Not resolved: the focus position is left as it was.'
+                )
+            )
+
+        QMessageBox.information(self._dialog, 'Estimate Defocus', text)
 
     def _finish(self, result: int) -> None:
         self._product.remove_observer(self)

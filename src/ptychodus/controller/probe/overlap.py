@@ -4,9 +4,10 @@ import math
 import numpy
 
 from ptychodus.api.constants import LengthUnit
+from ptychodus.api.files import FileFormat
 
 from ...model.analysis import ProbeOverlapAnalyzer, ProbeOverlapMetrics
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
 from ...view.probe import ProbeOverlapDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
@@ -17,7 +18,7 @@ from ..visualization import (
 
 logger = logging.getLogger(__name__)
 
-_SAVE_FILE_FILTER = 'NumPy Zipped Archive (*.npz)'
+_SAVE_FILE_FILTER = FileFormat.NPZ.file_filter
 _PLACEHOLDER = '—'
 
 
@@ -33,7 +34,6 @@ class ProbeOverlapViewController:
     def __init__(
         self,
         analyzer: ProbeOverlapAnalyzer,
-        engine: VisualizationEngine,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
@@ -42,6 +42,7 @@ class ProbeOverlapViewController:
         self._metrics: ProbeOverlapMetrics | None = None
         self._dialog = ProbeOverlapDialog()
 
+        engine = VisualizationEngine(is_complex=False)
         self._visualization_widget_controller = VisualizationWidgetController(
             engine,
             self._dialog.visualization_widget,

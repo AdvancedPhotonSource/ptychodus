@@ -3,9 +3,9 @@ from decimal import Decimal
 
 from PyQt5.QtCore import QStringListModel
 
-from ptychodus.api.observer import Observable, Observer
+from ptychodus.model.observer import Observable, Observer
 
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
 from ...view.visualization import VisualizationParametersView
 
 

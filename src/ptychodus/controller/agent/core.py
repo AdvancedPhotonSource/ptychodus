@@ -14,8 +14,8 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parameters import StringParameter
+from ptychodus.model.observer import Observable, Observer
+from ptychodus.model.parameters import StringParameter
 
 from ...model.agent import (
     AgentSettings,
@@ -196,7 +196,7 @@ class AgentController(QObject):
         )
         self._mcp_server_url_view_controller = LineEditParameterViewController(
             settings.mcp_server_url,
-            tool_tip='Optional MCP server URL (e.g. ptychodus_store at http://localhost:8000/mcp).',
+            tool_tip='Optional MCP server URL (e.g. ptychodus-webapp at http://localhost:8000/mcp).',
         )
 
         group_box_layout = QFormLayout()

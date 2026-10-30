@@ -19,10 +19,11 @@ import numpy
 from numpy.lib.npyio import NpzFile
 
 from ptychodus.api.diffraction import Polarization
+from ptychodus.api.files import FileFormat
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.product import (
     Product,
     ProductFileReader,
@@ -64,7 +65,6 @@ def _read_text(npz_file: NpzFile, key: str, default: str) -> str:
 
 class NPZProductFileIO(ProductFileReader, ProductFileWriter):
     SIMPLE_NAME: Final[str] = 'NPZ'
-    DISPLAY_NAME: Final[str] = 'Ptychodus NumPy Zipped Archive (*.npz)'
 
     NAME: Final[str] = 'name'
     COMMENTS: Final[str] = 'comments'
@@ -78,6 +78,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
     TILT_ANGLE: Final[str] = 'tilt_angle_deg'
     POLARIZATION: Final[str] = 'polarization'
     FAR_FIELD: Final[str] = 'far_field'
+    I0_PHOTONS_PER_COUNT: Final[str] = 'i0_photons_per_count'
 
     PROBE_ARRAY: Final[str] = 'probe'
     OPR_WEIGHTS: Final[str] = 'opr_weights'
@@ -99,6 +100,12 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
 
     LOSS_EPOCHS: Final[str] = 'loss_epochs'
     LOSS_VALUES: Final[str] = 'loss_values'
+
+    def get_file_description(self) -> str:
+        return 'Ptychodus NumPy Zipped Archive'
+
+    def get_file_extensions(self) -> set[str]:
+        return FileFormat.NPZ.extensions
 
     def _read_polarization(self, npz_file: NpzFile, file_path: Path) -> Polarization | None:
         raw = _read_array(npz_file, self.POLARIZATION)
@@ -129,6 +136,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
                 tilt_angle_deg=_read_real(npz_file, self.TILT_ANGLE, 0.0),
                 polarization=self._read_polarization(npz_file, file_path),
                 far_field=_read_boolean(npz_file, self.FAR_FIELD, True),
+                i0_photons_per_count=_read_real(npz_file, self.I0_PHOTONS_PER_COUNT, 0.0),
             )
 
             scan_indexes = npz_file[self.PROBE_POSITION_INDEXES]
@@ -163,7 +171,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
                     npz_file, self.PROBE_PIXEL_HEIGHT, object_pixel_geometry.height_m
                 ),
             )
-            probe = ProbeSequence(
+            probe = ProbeEnsemble(
                 array=npz_file[self.PROBE_ARRAY],
                 opr_weights=_read_array(npz_file, self.OPR_WEIGHTS),
                 pixel_geometry=probe_pixel_geometry,
@@ -225,6 +233,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
         contents[self.FOCUS_OBJECT_DISTANCE] = metadata.focus_object_distance_m
         contents[self.TILT_ANGLE] = metadata.tilt_angle_deg
         contents[self.FAR_FIELD] = metadata.far_field
+        contents[self.I0_PHOTONS_PER_COUNT] = metadata.i0_photons_per_count
 
         # savez cannot store None, so an absent key is how both formats spell "unpolarized".
         if metadata.polarization is not None:
@@ -277,10 +286,8 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.register_product_file_reader_with_adapters(
         npz_product_file_io,
         simple_name=NPZProductFileIO.SIMPLE_NAME,
-        display_name=NPZProductFileIO.DISPLAY_NAME,
     )
     registry.product_file_writers.register_plugin(
         npz_product_file_io,
         simple_name=NPZProductFileIO.SIMPLE_NAME,
-        display_name=NPZProductFileIO.DISPLAY_NAME,
     )

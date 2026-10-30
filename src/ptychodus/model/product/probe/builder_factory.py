@@ -1,29 +1,30 @@
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from pathlib import Path
+from typing import Any, Final
 import logging
 
 import numpy
 
-from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.plugins import PluginCatalog
 from ptychodus.api.probe import (
     OPRWeightPolicy,
     ProbeFileReader,
     ProbeFileWriter,
-    ProbeSequence,
+    ProbeEnsemble,
 )
-from ptychodus.api.simulate.probe import FresnelZonePlate, KirkpatrickBaezMirrorPair
+from ptychodus.api.simulate.probe import (
+    FresnelZonePlate,
+    KirkpatrickBaezMirrorPreset,
+    ProbeGenerator,
+)
 
-from ...diffraction import AssembledDiffractionDataset
-from .average_pattern import AveragePatternProbeBuilder
-from .builder import FromFileProbeBuilder, ProbeSequenceBuilder
-from .disk import DiskProbeBuilder
-from .fzp import FresnelZonePlateProbeBuilder
-from .hermite import HermiteProbeBuilder
-from .kb_mirror import KBMirrorProbeBuilder
-from .rect import RectangularProbeBuilder
+from ...declared import describe
+from ...file_types import FileTypeChooser
+from ...parameters import Parameter
+from ...plugins import PluginChooser
+from .builder import FromFileProbeBuilder, ProbeEnsembleBuilder
+from .plugin import PluginProbeBuilder
 from .settings import ProbeSettings
-from .super_gaussian import SuperGaussianProbeBuilder
-from .zernike import ZernikeProbeBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -33,60 +34,65 @@ class ProbeBuilderFactory(Iterable[str]):
         self,
         rng: numpy.random.Generator,
         settings: ProbeSettings,
-        fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
-        kb_mirror_chooser: PluginChooser[KirkpatrickBaezMirrorPair],
+        generator_chooser: PluginCatalog[ProbeGenerator],
+        fresnel_zone_plate_chooser: PluginCatalog[FresnelZonePlate],
+        kb_mirror_chooser: PluginCatalog[KirkpatrickBaezMirrorPreset],
         file_reader_chooser: PluginChooser[ProbeFileReader],
         file_writer_chooser: PluginChooser[ProbeFileWriter],
     ) -> None:
         super().__init__()
         self._rng = rng
         self._settings = settings
+        self._generators = generator_chooser
         self._fresnel_zone_plate_chooser = fresnel_zone_plate_chooser
         self._kb_mirror_chooser = kb_mirror_chooser
-        self._file_reader_chooser = file_reader_chooser
-        self._file_writer_chooser = file_writer_chooser
-        self._non_diffraction_builders: Mapping[str, Callable[[], ProbeSequenceBuilder]] = {
-            'disk': lambda: DiskProbeBuilder(rng, settings),
-            'fresnel_zone_plate': self._create_fresnel_zone_plate_builder,
-            'hermite': lambda: HermiteProbeBuilder(rng, settings),
-            'kb_mirror': self._create_kb_mirror_builder,
-            'rectangular': lambda: RectangularProbeBuilder(rng, settings),
-            'super_gaussian': lambda: SuperGaussianProbeBuilder(rng, settings),
-            'zernike': lambda: ZernikeProbeBuilder(rng, settings),
-        }
-        self._diffraction_builders: Mapping[
-            str, Callable[[AssembledDiffractionDataset], ProbeSequenceBuilder]
-        ] = {
-            'average_pattern': lambda dataset: AveragePatternProbeBuilder(rng, settings, dataset),
+        self.file_readers = FileTypeChooser(file_reader_chooser)
+        self.file_writers = FileTypeChooser(file_writer_chooser)
+
+        # Every registered generator, not only the one selected: the settings file holds
+        # one section for the probe and it must hold the same keys however the
+        # application was driven, so a model never chosen still contributes the keys it
+        # would be configured by.
+        self._parameters: dict[str, Mapping[str, Parameter[Any]]] = {
+            plugin.simple_name: settings.declare(
+                describe(plugin.strategy.get_default_options(), expand_num=True)
+            )
+            for plugin in generator_chooser
         }
 
     def __iter__(self) -> Iterator[str]:
-        yield from self._non_diffraction_builders
-        yield from self._diffraction_builders
+        for plugin in self._generators:
+            yield plugin.simple_name
 
-    def create(
-        self, name: str, *, dataset: AssembledDiffractionDataset | None = None
-    ) -> ProbeSequenceBuilder:
-        diffraction_factory = self._diffraction_builders.get(name)
-        if diffraction_factory is not None:
-            if dataset is None:
-                raise RuntimeError(
-                    f'Probe builder "{name}" requires an associated diffraction dataset.'
-                )
-            return diffraction_factory(dataset)
+    def create(self, name: str, *, has_diffraction_data: bool = False) -> ProbeEnsembleBuilder:
+        """Create the builder *name*, refusing one that needs data on a product without any."""
+        plugin = self._generators.find_plugin(name)
 
-        try:
-            factory = self._non_diffraction_builders[name]
-        except KeyError as exc:
-            raise KeyError(f'Unknown probe builder "{name}"!') from exc
-        return factory()
+        if plugin is None:
+            raise KeyError(f'Unknown probe builder "{name}"!')
 
-    def create_default(self) -> ProbeSequenceBuilder:
-        return next(iter(self._non_diffraction_builders.values()))()
+        if plugin.strategy.reads_diffraction_data and not has_diffraction_data:
+            raise RuntimeError(
+                f'Probe builder "{name}" requires an associated diffraction dataset.'
+            )
 
-    def create_from_settings(
-        self, *, dataset: AssembledDiffractionDataset | None = None
-    ) -> ProbeSequenceBuilder:
+        return PluginProbeBuilder(
+            self._rng,
+            self._settings,
+            plugin.simple_name,
+            plugin.strategy,
+            self._parameters[plugin.simple_name],
+            self._fresnel_zone_plate_chooser,
+            self._kb_mirror_chooser,
+        )
+
+    def create_default(self) -> ProbeEnsembleBuilder:
+        # Named rather than taken as the first the chooser holds: the chooser sorts by
+        # name, so that would silently make it whichever model sorts first.
+        default_generator: Final = 'disk'
+        return self.create(default_generator)
+
+    def create_from_settings(self, *, has_diffraction_data: bool = False) -> ProbeEnsembleBuilder:
         name = self._settings.builder.get_value()
         name_repaired = name.casefold()
 
@@ -96,24 +102,9 @@ class ProbeBuilderFactory(Iterable[str]):
                 self._settings.file_type.get_value(),
             )
 
-        return self.create(name_repaired, dataset=dataset)
+        return self.create(name_repaired, has_diffraction_data=has_diffraction_data)
 
-    def _create_fresnel_zone_plate_builder(self) -> ProbeSequenceBuilder:
-        return FresnelZonePlateProbeBuilder(
-            self._rng, self._settings, self._fresnel_zone_plate_chooser
-        )
-
-    def _create_kb_mirror_builder(self) -> ProbeSequenceBuilder:
-        return KBMirrorProbeBuilder(self._rng, self._settings, self._kb_mirror_chooser)
-
-    def get_open_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_reader_chooser:
-            yield plugin.display_name
-
-    def get_open_file_filter(self) -> str:
-        return self._file_reader_chooser.get_current_plugin().display_name
-
-    def read_probe_from_file(self, file_path: Path, file_filter: str) -> ProbeSequence:
+    def read_probe_from_file(self, file_path: Path, file_type: str) -> ProbeEnsemble:
         """Read a probe without binding it to a repository item.
 
         This is the probe the builder from `create_probe_from_file` would ingest, read
@@ -121,39 +112,27 @@ class ProbeBuilderFactory(Iterable[str]):
         before deciding how to ingest it. Read errors surface here rather than being
         swallowed by a rebuild.
         """
-        self._file_reader_chooser.set_current_plugin(file_filter)
-        file_type = self._file_reader_chooser.get_current_plugin().simple_name
-        logger.debug(f'Reading "{file_path}" as "{file_type}"')
-        file_reader = self._file_reader_chooser.get_current_plugin().strategy
-        return file_reader.read(file_path)
+        plugin = self.file_readers.select(file_type)
+        logger.debug(f'Reading "{file_path}" as "{plugin.simple_name}"')
+        return plugin.strategy.read(file_path)
 
     def create_probe_from_file(
         self,
         file_path: Path,
-        file_filter: str,
+        file_type: str,
         *,
         opr_weight_policy: OPRWeightPolicy | None = None,
-    ) -> ProbeSequenceBuilder:
-        self._file_reader_chooser.set_current_plugin(file_filter)
-        file_reader = self._file_reader_chooser.get_current_plugin().strategy
+    ) -> ProbeEnsembleBuilder:
+        plugin = self.file_readers.select(file_type)
 
         builder = FromFileProbeBuilder(
-            self._rng, self._settings, file_reader, opr_weight_policy=opr_weight_policy
+            self._rng, self._settings, plugin.strategy, opr_weight_policy=opr_weight_policy
         )
         builder.file_path.set_value(file_path)
-        builder.file_type.set_value(self._file_reader_chooser.get_current_plugin().simple_name)
+        builder.file_type.set_value(plugin.simple_name)
         return builder
 
-    def get_save_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_writer_chooser:
-            yield plugin.display_name
-
-    def get_save_file_filter(self) -> str:
-        return self._file_writer_chooser.get_current_plugin().display_name
-
-    def save_probe(self, file_path: Path, file_filter: str, probe: ProbeSequence) -> None:
-        self._file_writer_chooser.set_current_plugin(file_filter)
-        file_type = self._file_writer_chooser.get_current_plugin().simple_name
-        logger.debug(f'Writing "{file_path}" as "{file_type}"')
-        file_writer = self._file_writer_chooser.get_current_plugin().strategy
-        file_writer.write(file_path, probe)
+    def save_probe(self, file_path: Path, file_type: str, probe: ProbeEnsemble) -> None:
+        plugin = self.file_writers.select(file_type)
+        logger.debug(f'Writing "{file_path}" as "{plugin.simple_name}"')
+        plugin.strategy.write(file_path, probe)

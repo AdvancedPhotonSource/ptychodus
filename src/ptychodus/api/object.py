@@ -5,7 +5,6 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
-from pathlib import Path
 import logging
 import math
 
@@ -15,8 +14,11 @@ from scipy.ndimage import gaussian_filter
 from skimage.registration import phase_cross_correlation
 from skimage.restoration import unwrap_phase
 
-from .typing import ComplexArrayType, RealArrayType
+from .typing import ComplexArrayType, InexactArrayType, RealArrayType
+from .accumulate import DiffractionMoments
+from .assemble import AssembledDiffractionData
 from .constants import format_length
+from .files import FileReader, FileWriter
 from .fourier import fourier_shift_2d
 from .geometry import PixelGeometry
 from .interpolate import resample_along_axis
@@ -172,6 +174,16 @@ class ObjectGeometryProvider(ABC):
 
     @property
     @abstractmethod
+    def mean_amplitude_transmission(self) -> float:
+        """Modulus a uniform object of the sample's measured opacity would carry.
+
+        A generated object scaled to this predicts the pattern totals the data holds,
+        rather than predicting the unobstructed beam at every scan position. One where
+        no data says otherwise, which asserts a transparent sample.
+        """
+
+    @property
+    @abstractmethod
     def object_plane_propagation_distance_m(self) -> float:
         """Propagation distance of the equivalent parallel-beam geometry, ``z_d / M``.
 
@@ -181,6 +193,11 @@ class ObjectGeometryProvider(ABC):
         nothing keeps in step.
         """
 
+    @property
+    @abstractmethod
+    def far_field(self) -> bool:
+        """Whether the detector records the Fraunhofer diffraction pattern."""
+
     @abstractmethod
     def get_probe_positions(self) -> Sequence[ProbePosition]:
         pass
@@ -189,9 +206,32 @@ class ObjectGeometryProvider(ABC):
     def get_object_geometry(self) -> ObjectGeometry:
         pass
 
+    @abstractmethod
+    def get_assembled_data(self) -> AssembledDiffractionData | None:
+        """The diffraction data the product is bound to, or None while it is bound to none.
+
+        Read at the point of use rather than kept, so a builder copied into another
+        product, or a product rebound to other data, sees the data it has now.
+        """
+
+    @abstractmethod
+    def get_diffraction_moments(self) -> DiffractionMoments | None:
+        """The bound data's diffraction moments, or None while unbound or not yet computed.
+
+        Accumulated once from the assembled patterns, so a builder needing only their
+        statistics does not pass over every pattern itself.
+        """
+
 
 class Object:
-    """Complex transmission function stored as a (layers, height, width) array with spatial metadata."""
+    """Complex transmission function stored as a (layers, height, width) array with spatial metadata.
+
+    The array is dimensionless and nominally unit modulus where the sample is absent, so
+    an exit wave carries the probe's photon count through unchanged and a modulus below
+    one is absorption. Only the product of probe and object is constrained by diffraction
+    data, so rescaling one without the other re-gauges the pair rather than changing what
+    it predicts.
+    """
 
     def __init__(
         self,
@@ -235,7 +275,7 @@ class Object:
         return self._array
 
     @property
-    def dtype(self) -> numpy.dtype:
+    def dtype(self) -> numpy.dtype[numpy.complexfloating]:
         return self._array.dtype
 
     @property
@@ -331,7 +371,7 @@ class RegistrationQuantity(Enum):
     def is_shift_exact(self) -> bool:
         return self is RegistrationQuantity.COMPLEX
 
-    def extract(self, array: ComplexArrayType) -> numpy.ndarray:
+    def extract(self, array: ComplexArrayType) -> InexactArrayType:
         """Map a complex object array onto the quantity used for registration."""
         values = numpy.asarray(array)
 
@@ -358,7 +398,9 @@ class RegistrationQuantity(Enum):
                 )
 
 
-def _logarithmic_gradient(values: ComplexArrayType) -> tuple[numpy.ndarray, numpy.ndarray]:
+def _logarithmic_gradient(
+    values: ComplexArrayType,
+) -> tuple[ComplexArrayType, ComplexArrayType]:
     """Forward differences of ``log(O)`` along each axis, computed wrap-free.
 
     ``log(O[i + 1] / O[i])`` is the log-amplitude difference plus the phase
@@ -380,7 +422,7 @@ def _logarithmic_gradient(values: ComplexArrayType) -> tuple[numpy.ndarray, nump
     return gradient_y, gradient_x
 
 
-def _remove_gaussian_background(image: numpy.ndarray, sigma_px: float) -> numpy.ndarray:
+def _remove_gaussian_background(image: InexactArrayType, sigma_px: float) -> InexactArrayType:
     if sigma_px <= 0.0:
         return image
 
@@ -1294,19 +1336,9 @@ def compute_object_geometry(
     )
 
 
-class ObjectFileReader(ABC):
+class ObjectFileReader(FileReader[Object]):
     """Plugin interface for reading objects."""
 
-    @abstractmethod
-    def read(self, file_path: Path) -> Object:
-        """Read an object from file."""
-        pass
 
-
-class ObjectFileWriter(ABC):
+class ObjectFileWriter(FileWriter[Object]):
     """Plugin interface for writing objects."""
-
-    @abstractmethod
-    def write(self, file_path: Path, object_: Object) -> None:
-        """Write an object to file."""
-        pass

@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Final
 import csv
 
 from ptychodus.api.plugins import PluginRegistry
@@ -12,9 +13,17 @@ from ptychodus.api.probe_positions import (
 
 
 class DelimitedPositionFileReader(ProbePositionFileReader):
-    def __init__(self, delimiter: str, *, swap_xy: bool) -> None:
+    def __init__(self, delimiter: str, *, swap_xy: bool, description: str, extension: str) -> None:
         self._delimiter = delimiter
         self._swap_xy = swap_xy
+        self._description = description
+        self._extension = extension
+
+    def get_file_description(self) -> str:
+        return self._description
+
+    def get_file_extensions(self) -> set[str]:
+        return {self._extension}
 
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()
@@ -43,9 +52,17 @@ class DelimitedPositionFileReader(ProbePositionFileReader):
 
 
 class DelimitedPositionFileWriter(ProbePositionFileWriter):
-    def __init__(self, delimiter: str, swap_xy: bool) -> None:
+    def __init__(self, delimiter: str, swap_xy: bool, *, description: str, extension: str) -> None:
         self._delimiter = delimiter
         self._swap_xy = swap_xy
+        self._description = description
+        self._extension = extension
+
+    def get_file_description(self) -> str:
+        return self._description
+
+    def get_file_extensions(self) -> set[str]:
+        return {self._extension}
 
     def write(self, file_path: Path, positions: ProbePositionSequence) -> None:
         with file_path.open(mode='wt') as csv_file:
@@ -58,24 +75,28 @@ class DelimitedPositionFileWriter(ProbePositionFileWriter):
                 csv_file.write(line)
 
 
+_SPACE_DESCRIPTION: Final[str] = 'Space-Separated Values Files'
+_COMMA_DESCRIPTION: Final[str] = 'Comma-Separated Values Files'
+
+
 def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
-        DelimitedPositionFileReader(' ', swap_xy=False),
+        DelimitedPositionFileReader(
+            ' ', swap_xy=False, description=_SPACE_DESCRIPTION, extension='.txt'
+        ),
         simple_name='TXT',
-        display_name='Space-Separated Values Files (*.txt)',
     )
     registry.probe_position_file_writers.register_plugin(
-        DelimitedPositionFileWriter(' ', swap_xy=False),
+        DelimitedPositionFileWriter(' ', False, description=_SPACE_DESCRIPTION, extension='.txt'),
         simple_name='TXT',
-        display_name='Space-Separated Values Files (*.txt)',
     )
     registry.probe_position_file_readers.register_plugin(
-        DelimitedPositionFileReader(',', swap_xy=True),
+        DelimitedPositionFileReader(
+            ',', swap_xy=True, description=_COMMA_DESCRIPTION, extension='.csv'
+        ),
         simple_name='CSV',
-        display_name='Comma-Separated Values Files (*.csv)',
     )
     registry.probe_position_file_writers.register_plugin(
-        DelimitedPositionFileWriter(',', swap_xy=True),
+        DelimitedPositionFileWriter(',', True, description=_COMMA_DESCRIPTION, extension='.csv'),
         simple_name='CSV',
-        display_name='Comma-Separated Values Files (*.csv)',
     )

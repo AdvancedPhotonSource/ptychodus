@@ -8,13 +8,17 @@ import numpy.testing
 import pytest
 from pydantic import ValidationError
 
+from ptychodus.api.accumulate import compute_diffraction_moments
 from ptychodus.api.assemble import AssembledDiffractionData
+from ptychodus.api.diffraction import DetectorBackground
 from ptychodus.api.geometry import HermiteMode, ImageExtent, LegendreMode, PixelGeometry
 from ptychodus.api.probe import Probe, ProbeGeometry
 from ptychodus.api.simulate.probe import (
+    apply_defocus_phase,
     propagate_probe,
     DEFAULT_INCOHERENT_MODE_STRATEGY,
     FresnelZonePlate,
+    ProbeDerivativeStrategy,
     ProbeModeDecayType,
     ProbeMomentPolynomialStrategy,
     _gram_schmidt,
@@ -26,10 +30,12 @@ from ptychodus.api.simulate.probe import (
     generate_mirror_figure_error,
     generate_average_pattern_probe,
     generate_coherent_probe_modes,
+    generate_disk_probe,
     generate_fresnel_zone_plate_probe,
-    generate_hermite_probe,
+    generate_hermite_gauss_probe,
     RandomPhaseRampStrategy,
     generate_incoherent_probe_modes,
+    generate_rectangular_probe,
 )
 from ptychodus.api.propagate import (
     AngularSpectrumPropagator,
@@ -140,9 +146,7 @@ class TestGenerateCoherentProbeModes:
         num_cmodes = 2
         probe = self._make_multimode_probe(num_imodes=num_imodes)
 
-        result = generate_coherent_probe_modes(
-            rng, probe, num_cmodes=num_cmodes, num_diffraction_patterns=8
-        )
+        result = generate_coherent_probe_modes(rng, probe, num_cmodes=num_cmodes, num_positions=8)
 
         array = result.get_array()
         assert array.shape == (num_cmodes, num_imodes, probe.height_px, probe.width_px)
@@ -157,7 +161,7 @@ class TestGenerateCoherentProbeModes:
         rng = numpy.random.default_rng(12)
         probe = self._make_multimode_probe(num_imodes=3)
 
-        result = generate_coherent_probe_modes(rng, probe, num_cmodes=2, num_diffraction_patterns=8)
+        result = generate_coherent_probe_modes(rng, probe, num_cmodes=2, num_positions=8)
 
         weights = result.get_opr_weights()
         assert weights.shape == (8, 2)
@@ -167,7 +171,7 @@ class TestGenerateCoherentProbeModes:
         rng = numpy.random.default_rng(13)
         probe = self._make_multimode_probe(num_imodes=3)
 
-        result = generate_coherent_probe_modes(rng, probe, num_cmodes=1, num_diffraction_patterns=8)
+        result = generate_coherent_probe_modes(rng, probe, num_cmodes=1, num_positions=8)
 
         assert result.get_array().shape[0] == 1
         assert result.get_opr_weights_or_none() is None
@@ -182,18 +186,36 @@ def _probe_geometry(height_px: int = 16, width_px: int = 16) -> ProbeGeometry:
     )
 
 
-class TestGenerateHermiteProbe:
+# A grid fine and wide enough that sampling error stays well below the tolerances below:
+# both waists span many pixels, and three waists fit inside the half-width. Odd, so a
+# pixel sits exactly on each axis and exactly one waist out.
+_HG_GEOMETRY = ProbeGeometry(width_px=257, height_px=257, pixel_width_m=20e-9, pixel_height_m=20e-9)
+_HG_WAIST_X_M = 25 * 20e-9
+_HG_WAIST_Y_M = 15 * 20e-9
+
+
+def _hermite_gauss(modes: list[HermiteMode]) -> numpy.ndarray:
+    return generate_hermite_gauss_probe(
+        _HG_GEOMETRY, modes, beam_waist_x_m=_HG_WAIST_X_M, beam_waist_y_m=_HG_WAIST_Y_M
+    ).get_array()[0]
+
+
+def _power(array: numpy.ndarray) -> float:
+    return float(numpy.sum(numpy.abs(array) ** 2)) * 20e-9 * 20e-9
+
+
+class TestGenerateHermiteGaussProbe:
     def test_returns_probe_with_input_pixel_geometry(self) -> None:
         geometry = _probe_geometry()
-        result = generate_hermite_probe(
-            geometry, [HermiteMode(1.0, 0, 0)], width_m=1e-7, height_m=1e-7
+        result = generate_hermite_gauss_probe(
+            geometry, [HermiteMode(1.0, 0, 0)], beam_waist_x_m=1e-7, beam_waist_y_m=1e-7
         )
         assert result.get_pixel_geometry() == geometry.get_pixel_geometry()
 
     def test_returns_probe_with_geometry_shape(self) -> None:
         geometry = _probe_geometry(height_px=12, width_px=20)
-        result = generate_hermite_probe(
-            geometry, [HermiteMode(1.0, 1, 2)], width_m=1e-7, height_m=1e-7
+        result = generate_hermite_gauss_probe(
+            geometry, [HermiteMode(1.0, 1, 2)], beam_waist_x_m=1e-7, beam_waist_y_m=1e-7
         )
         array = result.get_array()
         # Probe packs incoherent modes in a leading dim: (num_modes, height, width).
@@ -202,56 +224,69 @@ class TestGenerateHermiteProbe:
 
     def test_empty_modes_returns_zero_probe(self) -> None:
         geometry = _probe_geometry()
-        result = generate_hermite_probe(geometry, [], width_m=1e-7, height_m=1e-7)
+        result = generate_hermite_gauss_probe(
+            geometry, [], beam_waist_x_m=1e-7, beam_waist_y_m=1e-7
+        )
         array = result.get_array()
         assert array.shape[-2:] == (geometry.height_px, geometry.width_px)
         numpy.testing.assert_array_equal(array, numpy.zeros_like(array))
 
-    def test_piston_mode_is_constant(self) -> None:
-        """A single HermiteMode(c, 0, 0) yields an array of constant value c."""
-        geometry = _probe_geometry()
-        coefficient = 1.7 - 0.3j
-        for scale_m in (1e-8, 1.0, 1e3):
-            result = generate_hermite_probe(
-                geometry, [HermiteMode(coefficient, 0, 0)], width_m=scale_m, height_m=scale_m
-            )
-            numpy.testing.assert_allclose(result.get_array(), coefficient)
-
     def test_linearity_over_modes(self) -> None:
         """Sum of probes from individual modes equals the probe from the combined list."""
-        geometry = _probe_geometry()
-        scale_m = 2e-7
         modes = [HermiteMode(2.0 + 1j, 1, 0), HermiteMode(-0.5j, 0, 2), HermiteMode(0.7, 2, 1)]
 
-        combined = generate_hermite_probe(
-            geometry, modes, width_m=scale_m, height_m=scale_m
-        ).get_array()
-        separate = sum(
-            generate_hermite_probe(geometry, [m], width_m=scale_m, height_m=scale_m).get_array()
-            for m in modes
-        )
+        combined = _hermite_gauss(modes)
+        separate = sum(_hermite_gauss([mode]) for mode in modes)
+
         numpy.testing.assert_allclose(combined, separate, atol=1e-12)
 
-    def test_width_inversely_scales_x_argument(self) -> None:
-        """For H_1(x) = 2x/width_m, doubling width_m halves the returned array."""
-        geometry = _probe_geometry()
-        mode = HermiteMode(1.0, 1, 0)
-        scale_m = 1e-7
-        small = generate_hermite_probe(
-            geometry, [mode], width_m=scale_m, height_m=scale_m
-        ).get_array()
-        large = generate_hermite_probe(
-            geometry, [mode], width_m=2.0 * scale_m, height_m=scale_m
-        ).get_array()
-        numpy.testing.assert_allclose(large, 0.5 * small, atol=1e-12)
+    def test_the_fundamental_mode_falls_to_one_over_e_squared_at_each_waist(self) -> None:
+        intensity = numpy.abs(_hermite_gauss([HermiteMode(1.0, 0, 0)])) ** 2
+        center = 128
 
-    def test_independent_axis_scaling(self) -> None:
-        """Doubling height_m halves the y-argument; x-argument is unaffected."""
-        geometry = _probe_geometry()
-        mode_y = HermiteMode(1.0, 0, 1)  # H_1(y) = 2y
-        small = generate_hermite_probe(geometry, [mode_y], width_m=1e-7, height_m=1e-7).get_array()
-        large = generate_hermite_probe(geometry, [mode_y], width_m=1e-7, height_m=2e-7).get_array()
-        numpy.testing.assert_allclose(large, 0.5 * small, atol=1e-12)
+        assert intensity[center, center + 25] / intensity[center, center] == pytest.approx(
+            numpy.exp(-2.0)
+        )
+        assert intensity[center + 15, center] / intensity[center, center] == pytest.approx(
+            numpy.exp(-2.0)
+        )
+
+    @pytest.mark.parametrize(
+        ('order_x', 'order_y'), [(m, n) for m in range(4) for n in range(4 - m)]
+    )
+    def test_each_mode_is_confined_to_a_few_waists(self, order_x: int, order_y: int) -> None:
+        """The envelope gives the probe a finite extent; bare polynomials filled the grid."""
+        intensity = numpy.abs(_hermite_gauss([HermiteMode(1.0, order_x, order_y)])) ** 2
+        coords = _HG_GEOMETRY.get_transverse_coordinates()
+        inside = (numpy.abs(coords.x_m) <= 3.0 * _HG_WAIST_X_M) & (
+            numpy.abs(coords.y_m) <= 3.0 * _HG_WAIST_Y_M
+        )
+
+        assert intensity[inside].sum() / intensity.sum() > 0.999
+
+    def test_the_first_modes_are_orthonormal(self) -> None:
+        orders = [(0, 0), (1, 0), (0, 1), (2, 0), (1, 1), (0, 2)]
+        arrays = [_hermite_gauss([HermiteMode(1.0, m, n)]) for m, n in orders]
+        gram = numpy.array([[numpy.vdot(a, b) * 20e-9 * 20e-9 for b in arrays] for a in arrays])
+
+        numpy.testing.assert_allclose(gram, numpy.eye(len(orders)), atol=1e-3)
+
+    def test_a_coefficient_scales_its_mode_power_by_its_squared_magnitude(self) -> None:
+        coefficient = 1.7 - 0.3j
+
+        power = _power(_hermite_gauss([HermiteMode(coefficient, 2, 1)]))
+
+        assert power == pytest.approx(abs(coefficient) ** 2, rel=1e-3)
+
+    @pytest.mark.parametrize(('waist_x_m', 'waist_y_m'), [(0.0, 1e-7), (1e-7, -1e-7)])
+    def test_a_non_positive_waist_is_refused(self, waist_x_m: float, waist_y_m: float) -> None:
+        with pytest.raises(ValueError, match='waists must be positive'):
+            generate_hermite_gauss_probe(
+                _probe_geometry(),
+                [HermiteMode(1.0, 0, 0)],
+                beam_waist_x_m=waist_x_m,
+                beam_waist_y_m=waist_y_m,
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -267,7 +302,12 @@ _BACKPROP_SAMPLE_PITCH_M = (
 )
 
 
-def _assembled_data(patterns: numpy.ndarray) -> AssembledDiffractionData:
+def _assembled_data(
+    patterns: numpy.ndarray,
+    *,
+    background: numpy.ndarray | None = None,
+    flat_field: numpy.ndarray | None = None,
+) -> AssembledDiffractionData:
     num_patterns, height_px, width_px = patterns.shape
     return AssembledDiffractionData(
         indexes=numpy.arange(num_patterns),
@@ -276,6 +316,23 @@ def _assembled_data(patterns: numpy.ndarray) -> AssembledDiffractionData:
             width_m=_BACKPROP_DETECTOR_PITCH_M, height_m=_BACKPROP_DETECTOR_PITCH_M
         ),
         bad_pixels=numpy.zeros((height_px, width_px), dtype=bool),
+        background=background,
+        flat_field=flat_field,
+    )
+
+
+def _average_pattern_probe(
+    geometry: ProbeGeometry, data: AssembledDiffractionData, **kwargs: Any
+) -> Probe:
+    """Estimate from assembled data, carrying its unapplied maps, as the builder does."""
+    return generate_average_pattern_probe(
+        geometry,
+        data.get_mean_pattern(),
+        detector_pixel_geometry=data.get_pixel_geometry(),
+        bad_pixels=data.get_bad_pixels(),
+        background=data.get_background(),
+        flat_field=data.get_flat_field(),
+        **kwargs,
     )
 
 
@@ -288,17 +345,57 @@ def _sample_plane_geometry() -> ProbeGeometry:
     )
 
 
-class TestGenerateAveragePatternProbe:
-    def test_conserves_energy_between_the_two_planes(self) -> None:
-        """Power is invariant across the propagation once each plane is weighted by its
-        own pixel area: ``sum|out|^2 dx_sample^2 == sum|in|^2 dx_detector^2``.
+def _round_trip_probe(probe: Probe, defocus_distance_m: float) -> Probe:
+    """The probe estimated from the far-field intensity of *probe* by the house model."""
+    forward = FresnelTransformPropagator(
+        PropagatorParameters(
+            wavelength_m=_BACKPROP_WAVELENGTH_M,
+            width_px=_BACKPROP_NUM_PX,
+            height_px=_BACKPROP_NUM_PX,
+            pixel_width_m=_BACKPROP_SAMPLE_PITCH_M,
+            pixel_height_m=_BACKPROP_SAMPLE_PITCH_M,
+            propagation_distance_m=_BACKPROP_DISTANCE_M,
+        )
+    )
+    patterns = intensity(forward.propagate(probe.get_array()[0]))[numpy.newaxis]
+    return _average_pattern_probe(
+        _sample_plane_geometry(),
+        _assembled_data(patterns),
+        photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
+        detector_distance_m=_BACKPROP_DISTANCE_M,
+        defocus_distance_m=defocus_distance_m,
+    )
 
-        This pins the upstream-plane pitch convention without needing phase, so it holds
-        for the sqrt-of-intensity input the estimator actually takes. The single-FFT
-        propagator's ``pixel_width_m`` names the plane at the smaller z, which for this
-        backward propagation is the *sample* plane. Parameterizing it with the detector
-        pitch instead scales the recovered power by ``(dx_sample / dx_detector)**4``
-        -- here a factor of about 1.4e-14.
+
+def _gaussian_waist() -> Probe:
+    coord = numpy.arange(_BACKPROP_NUM_PX) - _BACKPROP_NUM_PX // 2
+    array = numpy.exp(-(coord[:, None] ** 2 + coord[None, :] ** 2) / 50).astype(complex)
+    return Probe(
+        array=array,
+        pixel_geometry=PixelGeometry(
+            width_m=_BACKPROP_SAMPLE_PITCH_M, height_m=_BACKPROP_SAMPLE_PITCH_M
+        ),
+    )
+
+
+def _probe_overlap(estimate: Probe, truth: Probe) -> float:
+    a = estimate.get_array()[0].ravel()
+    b = truth.get_array()[0].ravel()
+    return float(abs(numpy.vdot(a, b)) / (numpy.linalg.norm(a) * numpy.linalg.norm(b)))
+
+
+class TestGenerateAveragePatternProbe:
+    def test_conserves_the_photon_count_between_the_two_planes(self) -> None:
+        """``sum|out|^2 == sum|in|^2``: the bare sum is the photon count the field
+        carries, and a pitch change must leave it alone.
+
+        Field arrays hold photons per pixel, not intensity per unit area, so neither
+        plane is weighted by its own pixel area -- the same contract
+        :func:`resample_probe_ensemble` states for the other way of changing pitch.
+        Because the propagators now preserve this sum whatever their pitch, the
+        parameterization itself is pinned by
+        :meth:`test_matches_an_explicit_back_propagation_on_the_sample_grid` rather
+        than by a scale error showing up here.
         """
         geometry = _sample_plane_geometry()
         rng = numpy.random.default_rng(0)
@@ -306,22 +403,45 @@ class TestGenerateAveragePatternProbe:
         envelope = numpy.exp(-(coord[:, None] ** 2 + coord[None, :] ** 2) / 100)
         patterns = (envelope * rng.uniform(0.5, 1.5, envelope.shape))[numpy.newaxis]
 
-        result = generate_average_pattern_probe(
+        result = _average_pattern_probe(
             geometry,
             _assembled_data(patterns),
             photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
             detector_distance_m=_BACKPROP_DISTANCE_M,
         )
 
-        detector_power = patterns[0].sum() * _BACKPROP_DETECTOR_PITCH_M**2
-        sample_power = intensity(result.get_array()[0]).sum() * _BACKPROP_SAMPLE_PITCH_M**2
-        assert sample_power == pytest.approx(detector_power, rel=1e-12)
+        detector_counts = patterns[0].sum()
+        sample_counts = intensity(result.get_array()[0]).sum()
+        assert sample_counts == pytest.approx(detector_counts, rel=1e-12)
+
+    def test_a_flat_phase_waist_returns_through_the_forward_model(self) -> None:
+        """The root of a waist's far field is its flat-phase spectrum, which transforms
+        back to the waist. Undoing the Fresnel transform's detector-plane phase as well
+        -- which the intensity never recorded -- carries it the whole detector distance
+        out of focus instead: an overlap near 0.07 rather than 1."""
+        waist = _gaussian_waist()
+
+        assert _probe_overlap(_round_trip_probe(waist, 0.0), waist) > 0.999
+
+    @pytest.mark.parametrize('defocus_m', [2.0e-3, -2.0e-3])
+    def test_a_defocused_probe_returns_with_its_curvature(self, defocus_m: float) -> None:
+        def defocused(distance_m: float) -> Probe:
+            return propagate_probe(
+                _gaussian_waist(),
+                photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
+                propagation_distance_m=distance_m,
+            )
+
+        estimate = _round_trip_probe(defocused(defocus_m), defocus_m)
+
+        assert _probe_overlap(estimate, defocused(defocus_m)) > 0.999
+        # The intensities agree at either sign; the curvature tells them apart.
+        assert _probe_overlap(estimate, defocused(-defocus_m)) < 0.9
 
     def test_recovers_the_forward_models_amplitude_scale(self) -> None:
         """Round-trip through the house forward model (sample -> detector at +z) and
-        back. Phase is lost to the sqrt-of-intensity step so the field itself cannot
-        return, but the recovered probe must carry the same total power as the original
-        -- which is false by four orders of magnitude on the wrong grid.
+        back: the recovered probe must carry the same total power as the original --
+        which is false by four orders of magnitude on the wrong grid.
         """
         geometry = _sample_plane_geometry()
         coord = numpy.arange(_BACKPROP_NUM_PX) - _BACKPROP_NUM_PX // 2
@@ -339,7 +459,7 @@ class TestGenerateAveragePatternProbe:
         )
         patterns = intensity(forward.propagate(probe))[numpy.newaxis]
 
-        result = generate_average_pattern_probe(
+        result = _average_pattern_probe(
             geometry,
             _assembled_data(patterns),
             photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
@@ -353,7 +473,7 @@ class TestGenerateAveragePatternProbe:
     def test_returns_the_declared_sample_plane_geometry(self) -> None:
         geometry = _sample_plane_geometry()
         patterns = numpy.ones((2, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
-        result = generate_average_pattern_probe(
+        result = _average_pattern_probe(
             geometry,
             _assembled_data(patterns),
             photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
@@ -362,12 +482,139 @@ class TestGenerateAveragePatternProbe:
         assert result.get_pixel_geometry() == geometry.get_pixel_geometry()
         assert result.get_array().shape[-2:] == (_BACKPROP_NUM_PX, _BACKPROP_NUM_PX)
 
+    def _envelope_patterns(self) -> numpy.ndarray:
+        coord = numpy.arange(_BACKPROP_NUM_PX) - _BACKPROP_NUM_PX // 2
+        envelope = numpy.exp(-(coord[:, None] ** 2 + coord[None, :] ** 2) / 100)
+        return numpy.stack([envelope, 2.0 * envelope])
+
+    def _estimate(self, patterns: numpy.ndarray, **maps: numpy.ndarray) -> numpy.ndarray:
+        result = _average_pattern_probe(
+            _sample_plane_geometry(),
+            _assembled_data(patterns, **maps),
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            detector_distance_m=_BACKPROP_DISTANCE_M,
+        )
+        return result.get_array()[0]
+
+    def test_a_carried_background_is_subtracted(self) -> None:
+        """A flat background left in the mean would back-propagate into a central spike."""
+        patterns = self._envelope_patterns()
+        background = numpy.full(patterns.shape[-2:], 3.0)
+
+        numpy.testing.assert_allclose(
+            self._estimate(patterns + background, background=background),
+            self._estimate(patterns),
+            atol=1e-12,
+        )
+
+    def test_a_carried_flat_field_is_divided_out(self) -> None:
+        patterns = self._envelope_patterns()
+        rng = numpy.random.default_rng(3)
+        flat_field = rng.uniform(0.5, 1.5, patterns.shape[-2:])
+
+        numpy.testing.assert_allclose(
+            self._estimate(patterns * flat_field, flat_field=flat_field),
+            self._estimate(patterns),
+            atol=1e-12,
+        )
+
+    def test_a_pixel_with_an_unusable_flat_field_is_inpainted(self) -> None:
+        """A response at or below the floor marks the pixel bad, and its value is filled
+        from its neighbours rather than zeroed, which would punch a hole that rings."""
+        patterns = numpy.ones((1, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
+        flat_field = numpy.ones(patterns.shape[-2:])
+        flat_field[5, 7] = 0.0
+        corrupted = patterns.copy()
+        corrupted[:, 5, 7] = 1.0e6
+
+        numpy.testing.assert_allclose(
+            self._estimate(corrupted, flat_field=flat_field),
+            self._estimate(patterns),
+            atol=1e-9,
+        )
+
+    def test_a_defocus_propagates_the_waist_by_that_distance(self) -> None:
+        patterns = self._envelope_patterns()
+        geometry = _sample_plane_geometry()
+        kwargs: dict[str, Any] = dict(
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M, detector_distance_m=_BACKPROP_DISTANCE_M
+        )
+        waist = _average_pattern_probe(geometry, _assembled_data(patterns), **kwargs)
+
+        defocused = _average_pattern_probe(
+            geometry, _assembled_data(patterns), defocus_distance_m=2.0e-6, **kwargs
+        )
+        unchanged = _average_pattern_probe(
+            geometry, _assembled_data(patterns), defocus_distance_m=0.0, **kwargs
+        )
+
+        expected = propagate_probe(
+            waist, photon_wavelength_m=_BACKPROP_WAVELENGTH_M, propagation_distance_m=2.0e-6
+        )
+        numpy.testing.assert_allclose(defocused.get_array(), expected.get_array(), atol=1e-12)
+        numpy.testing.assert_array_equal(unchanged.get_array(), waist.get_array())
+
+    def test_the_bright_field_threshold_removes_a_pedestal(self) -> None:
+        """An offset no background map accounts for is removed with the noise around the
+        bright field, which is what keeps it out of the back-propagated probe."""
+        coord = numpy.arange(_BACKPROP_NUM_PX) - _BACKPROP_NUM_PX // 2
+        bright_field = 1000.0 * (numpy.hypot(coord[:, None], coord[None, :]) <= 12)
+        rng = numpy.random.default_rng(8)
+        noisy = rng.poisson(bright_field + 0.1, size=(20, *bright_field.shape)).astype(float)
+        offset = noisy + 25.0
+
+        with_pedestal = self._estimate(offset)
+        thresholded = _average_pattern_probe(
+            _sample_plane_geometry(),
+            _assembled_data(offset),
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            detector_distance_m=_BACKPROP_DISTANCE_M,
+            bright_field_mad_threshold=4.5,
+        ).get_array()[0]
+        reference = self._estimate(bright_field[numpy.newaxis])
+
+        def error(probe: numpy.ndarray) -> float:
+            return float(numpy.linalg.norm(probe - reference) / numpy.linalg.norm(reference))
+
+        assert error(thresholded) < 0.05
+        assert error(with_pedestal) > 4 * error(thresholded)
+
+    def test_accumulated_moments_give_the_same_probe_as_the_assembled_maps(self) -> None:
+        patterns = self._envelope_patterns() * 100.0
+        background: DetectorBackground = numpy.full((_BACKPROP_NUM_PX, _BACKPROP_NUM_PX), 3.0)
+        raw = patterns + background
+        data = _assembled_data(raw, background=background)
+        moments = compute_diffraction_moments(
+            data.get_indexes(),
+            raw,
+            bad_pixels=data.get_bad_pixels(),
+            background=background,
+        )
+        assert moments is not None
+
+        from_moments = generate_average_pattern_probe(
+            _sample_plane_geometry(),
+            moments.mean_pattern(),
+            detector_pixel_geometry=data.get_pixel_geometry(),
+            bad_pixels=moments.bad_pixels,
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            detector_distance_m=_BACKPROP_DISTANCE_M,
+        )
+        from_maps = _average_pattern_probe(
+            _sample_plane_geometry(),
+            data,
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            detector_distance_m=_BACKPROP_DISTANCE_M,
+        )
+
+        numpy.testing.assert_allclose(from_moments.get_array(), from_maps.get_array(), atol=1e-9)
+
     def test_zero_detector_distance_raises(self) -> None:
         """Previously returned an all-NaN probe in silence: at z=0 the implied and
         declared pitches are both 0, so the existing isclose() guard passed."""
         patterns = numpy.ones((1, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
         with pytest.raises(ValueError, match='Detector distance must be nonzero'):
-            generate_average_pattern_probe(
+            _average_pattern_probe(
                 _sample_plane_geometry(),
                 _assembled_data(patterns),
                 photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
@@ -391,6 +638,45 @@ def _near_field_sample_geometry(magnification: float = _NEAR_FIELD_MAGNIFICATION
     )
 
 
+class TestGenerateAveragePatternProbeWithoutDetectorPitch:
+    """In far field one detector pixel is a frequency step of the probe grid, so the
+    detector pitch only cross-checks the grid; near field needs it for the magnification."""
+
+    def test_far_field_without_the_pitch_matches_far_field_with_a_consistent_one(self) -> None:
+        rng = numpy.random.default_rng(7)
+        mean_pattern = rng.uniform(0.0, 100.0, size=(_BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
+        common: dict[str, Any] = dict(
+            bad_pixels=numpy.zeros(mean_pattern.shape, dtype=bool),
+            photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            detector_distance_m=_BACKPROP_DISTANCE_M,
+            defocus_distance_m=1.0e-4,
+        )
+
+        checked = generate_average_pattern_probe(
+            _sample_plane_geometry(),
+            mean_pattern,
+            detector_pixel_geometry=PixelGeometry(
+                width_m=_BACKPROP_DETECTOR_PITCH_M, height_m=_BACKPROP_DETECTOR_PITCH_M
+            ),
+            **common,
+        )
+        unchecked = generate_average_pattern_probe(_sample_plane_geometry(), mean_pattern, **common)
+
+        numpy.testing.assert_array_equal(unchecked.get_array(), checked.get_array())
+        assert unchecked.get_pixel_geometry() == checked.get_pixel_geometry()
+
+    def test_near_field_without_the_pitch_is_rejected(self) -> None:
+        with pytest.raises(ValueError, match='detector pitch'):
+            generate_average_pattern_probe(
+                _near_field_sample_geometry(),
+                numpy.ones((_BACKPROP_NUM_PX, _BACKPROP_NUM_PX)),
+                bad_pixels=numpy.zeros((_BACKPROP_NUM_PX, _BACKPROP_NUM_PX), dtype=bool),
+                photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
+                detector_distance_m=_BACKPROP_DISTANCE_M,
+                far_field=False,
+            )
+
+
 class TestGenerateAveragePatternProbeNearField:
     """Near field back-propagates with the angular spectrum, which preserves pitch, so
     the probe lands on the grid the caller already declared and there is no output
@@ -401,7 +687,7 @@ class TestGenerateAveragePatternProbeNearField:
         patterns = numpy.ones((1, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
         geometry = _near_field_sample_geometry()
 
-        result = generate_average_pattern_probe(
+        result = _average_pattern_probe(
             geometry,
             _assembled_data(patterns),
             photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
@@ -420,7 +706,7 @@ class TestGenerateAveragePatternProbeNearField:
         patterns = numpy.ones((1, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
 
         assert _NEAR_FIELD_SAMPLE_PITCH_M != pytest.approx(_BACKPROP_SAMPLE_PITCH_M)
-        generate_average_pattern_probe(
+        _average_pattern_probe(
             _near_field_sample_geometry(),
             _assembled_data(patterns),
             photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
@@ -435,7 +721,7 @@ class TestGenerateAveragePatternProbeNearField:
         patterns = rng.random((3, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
         geometry = _near_field_sample_geometry()
 
-        result = generate_average_pattern_probe(
+        result = _average_pattern_probe(
             geometry,
             _assembled_data(patterns),
             photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
@@ -463,7 +749,7 @@ class TestGenerateAveragePatternProbeNearField:
         patterns = numpy.ones((1, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
 
         with pytest.raises(ValueError, match='does not match'):
-            generate_average_pattern_probe(
+            _average_pattern_probe(
                 _near_field_sample_geometry(),
                 _assembled_data(patterns),
                 photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
@@ -679,14 +965,14 @@ class TestGenerateFresnelZonePlateProbe:
     def test_conserves_energy_between_the_zone_plate_and_probe_planes(
         self, defocus_distance_m: float
     ) -> None:
-        """Pins the grid each direction actually outputs on, independent of phase.
+        """The probe carries the photon count the zone plate transmits.
 
-        The zone plate's open area is fixed by the optic: the transmission function is
-        unit-modulus on the annulus and zero elsewhere, so its power is just that area.
-        The generator promises the probe plane's pitch in both directions, so the probe's
-        area-weighted power must equal it. Parameterizing the backward branch on the
-        zone-plate pitch instead puts the output on a grid coarser by
-        ``(dx_fzp / dx_probe)**2``, and the powers part company.
+        The transmission function is unit-modulus on the annulus and zero elsewhere, so
+        its bare sum is just the open pixel count, and propagation to the probe plane
+        must preserve it: field arrays hold photons per pixel, so a pitch change leaves
+        the plain sum alone. Which grid each direction outputs on is pinned by
+        :meth:`test_both_directions_invert_to_the_same_transmission_function`, whose
+        inverse only lands back on a clean annulus for the right parameterization.
         """
         geometry = _fzp_probe_geometry()
 
@@ -697,12 +983,9 @@ class TestGenerateFresnelZonePlateProbe:
             defocus_distance_m=defocus_distance_m,
         )
 
-        fzp_pixel_geometry = _fzp_plane_pixel_geometry()
-        open_area_m2 = (
-            _zone_plate_annulus().sum() * fzp_pixel_geometry.width_m * fzp_pixel_geometry.height_m
-        )
-        probe_power = intensity(probe.get_array()[0]).sum() * _FZP_PROBE_PITCH_M**2
-        assert probe_power == pytest.approx(open_area_m2, rel=1e-9)
+        open_pixel_count = _zone_plate_annulus().sum()
+        probe_counts = intensity(probe.get_array()[0]).sum()
+        assert probe_counts == pytest.approx(open_pixel_count, rel=1e-9)
 
     def test_zero_total_distance_raises(self) -> None:
         """``defocus = -f`` collapses the conjugate grid; it must not return NaNs."""
@@ -762,6 +1045,296 @@ class TestPropagateProbe:
         back = propagate_probe(forward, photon_wavelength_m=1e-10, propagation_distance_m=-5e-5)
 
         numpy.testing.assert_allclose(back.get_array(), probe.get_array(), atol=1e-9)
+
+
+_DEFOCUS_WAVELENGTH_M = 1.0e-10
+# A 0.5 um disk on a 256 x 10 nm grid at 0.2 mm: unaliased, with Fresnel number 12.5,
+# so its focus is well resolved without wrapping the grid.
+_DEFOCUS_NUM_PX = 256
+_DEFOCUS_PITCH_M = 1.0e-8
+_DEFOCUS_DISK_RADIUS_M = 5.0e-7
+_DEFOCUS_DISTANCE_M = 2.0e-4
+
+
+def _defocus_geometry(
+    width_px: int = _DEFOCUS_NUM_PX,
+    height_px: int = _DEFOCUS_NUM_PX,
+    *,
+    pixel_width_m: float = _DEFOCUS_PITCH_M,
+    pixel_height_m: float = _DEFOCUS_PITCH_M,
+) -> ProbeGeometry:
+    return ProbeGeometry(
+        width_px=width_px,
+        height_px=height_px,
+        pixel_width_m=pixel_width_m,
+        pixel_height_m=pixel_height_m,
+    )
+
+
+def _peak_and_rms_width(probe: Probe) -> tuple[float, float]:
+    """Peak intensity and second-moment radius about the grid center."""
+    pixel_geometry = probe.get_pixel_geometry()
+    coords = _defocus_geometry(
+        probe.width_px,
+        probe.height_px,
+        pixel_width_m=pixel_geometry.width_m,
+        pixel_height_m=pixel_geometry.height_m,
+    ).get_transverse_coordinates()
+    image = numpy.sum(intensity(probe.get_array()), axis=0)
+    rms_width_m = numpy.sqrt(numpy.sum(image * numpy.square(coords.position_r_m)) / image.sum())
+    return float(image.max()), float(rms_width_m)
+
+
+def _fit_phase_curvature(probe: Probe, is_bright: numpy.ndarray) -> float:
+    """Fit ``a`` in ``phase = a r^2 + bx x + by y + c`` over the bright pixels, r in pixels.
+
+    Neighbour products give the wrapped phase gradient, which is the unwrapped one
+    wherever the phase is sampled finely enough; the fit is then linear in the
+    gradients, and the tilt terms absorb any offset of the curvature's center.
+    """
+    array = probe.get_array()[0]
+    height_px, width_px = array.shape
+    x_px = numpy.arange(width_px) - (width_px - 1) / 2
+    y_px = numpy.arange(height_px) - (height_px - 1) / 2
+
+    gradient_x = numpy.angle(array[:, 1:] * numpy.conj(array[:, :-1]))
+    gradient_y = numpy.angle(array[1:, :] * numpy.conj(array[:-1, :]))
+    is_bright_x = is_bright[:, 1:] & is_bright[:, :-1]
+    is_bright_y = is_bright[1:, :] & is_bright[:-1, :]
+    midpoint_x = numpy.broadcast_to(0.5 * (x_px[1:] + x_px[:-1]), gradient_x.shape)[is_bright_x]
+    midpoint_y = numpy.broadcast_to(
+        0.5 * (y_px[1:, numpy.newaxis] + y_px[:-1, numpy.newaxis]), gradient_y.shape
+    )[is_bright_y]
+
+    design = numpy.zeros((midpoint_x.size + midpoint_y.size, 3))
+    design[: midpoint_x.size, 0] = 2.0 * midpoint_x
+    design[: midpoint_x.size, 1] = 1.0
+    design[midpoint_x.size :, 0] = 2.0 * midpoint_y
+    design[midpoint_x.size :, 2] = 1.0
+    gradients = numpy.concatenate([gradient_x[is_bright_x], gradient_y[is_bright_y]])
+    solution, *_ = numpy.linalg.lstsq(design, gradients, rcond=None)
+    return float(solution[0])
+
+
+class TestApplyDefocusPhase:
+    """A probe sampled a signed distance z past its focus carries exp(+i pi r^2 / (lambda z)).
+
+    The sign is pinned against the codebase's own propagators rather than derived:
+    curvature that claims a focus behind the probe must focus there when propagated
+    back, and must match the curvature a zone plate produces past its focus.
+    """
+
+    @pytest.mark.parametrize('defocus_distance_m', [_DEFOCUS_DISTANCE_M, -_DEFOCUS_DISTANCE_M])
+    def test_propagating_back_by_the_defocus_reaches_the_focus(
+        self, defocus_distance_m: float, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        disk = generate_disk_probe(_defocus_geometry(), radius_m=_DEFOCUS_DISK_RADIUS_M)
+
+        with caplog.at_level('WARNING', logger='ptychodus.api.simulate.probe'):
+            defocused = apply_defocus_phase(
+                disk,
+                photon_wavelength_m=_DEFOCUS_WAVELENGTH_M,
+                defocus_distance_m=defocus_distance_m,
+            )
+
+        assert caplog.text == ''
+
+        aperture_peak, aperture_width_m = _peak_and_rms_width(defocused)
+        toward_peak, toward_width_m = _peak_and_rms_width(
+            propagate_probe(
+                defocused,
+                photon_wavelength_m=_DEFOCUS_WAVELENGTH_M,
+                propagation_distance_m=-defocus_distance_m,
+            )
+        )
+        away_peak, away_width_m = _peak_and_rms_width(
+            propagate_probe(
+                defocused,
+                photon_wavelength_m=_DEFOCUS_WAVELENGTH_M,
+                propagation_distance_m=+defocus_distance_m,
+            )
+        )
+
+        assert toward_peak > 100.0 * aperture_peak
+        assert toward_width_m < 0.5 * aperture_width_m
+        assert away_peak < aperture_peak
+        assert away_width_m > 1.5 * aperture_width_m
+
+    @pytest.mark.parametrize('defocus_distance_m', [1.0e-4, -1.0e-4])
+    def test_matches_the_curvature_of_a_zone_plate_past_its_focus(
+        self, defocus_distance_m: float
+    ) -> None:
+        geometry = _fzp_probe_geometry()
+        zone_plate_probe = generate_fresnel_zone_plate_probe(
+            geometry,
+            _FZP_ZONE_PLATE,
+            photon_wavelength_m=_FZP_WAVELENGTH_M,
+            defocus_distance_m=defocus_distance_m,
+        )
+        # The geometric cone of the zone plate at this defocus.
+        cone_radius_m = _FZP_ZONE_PLATE.get_numerical_aperture(_FZP_WAVELENGTH_M) * abs(
+            defocus_distance_m
+        )
+        disk_probe = apply_defocus_phase(
+            generate_disk_probe(geometry, radius_m=cone_radius_m),
+            photon_wavelength_m=_FZP_WAVELENGTH_M,
+            defocus_distance_m=defocus_distance_m,
+        )
+
+        zone_plate_amplitude = numpy.abs(zone_plate_probe.get_array()[0])
+        zone_plate_curvature = _fit_phase_curvature(
+            zone_plate_probe, zone_plate_amplitude > 0.3 * zone_plate_amplitude.max()
+        )
+        disk_curvature = _fit_phase_curvature(
+            disk_probe, numpy.abs(disk_probe.get_array()[0]) > 0.5
+        )
+
+        assert numpy.sign(zone_plate_curvature) == numpy.sign(defocus_distance_m)
+        assert numpy.sign(disk_curvature) == numpy.sign(defocus_distance_m)
+
+    def test_zero_defocus_returns_the_probe_unchanged(self) -> None:
+        probe = _make_single_mode_probe()
+
+        assert (
+            apply_defocus_phase(
+                probe, photon_wavelength_m=_DEFOCUS_WAVELENGTH_M, defocus_distance_m=0.0
+            )
+            is probe
+        )
+
+    def test_every_mode_takes_the_same_phase_and_keeps_its_power(self) -> None:
+        rng = numpy.random.default_rng(3)
+        array = rng.normal(size=(3, 32, 32)) + 1j * rng.normal(size=(3, 32, 32))
+        probe = Probe(array=array, pixel_geometry=PIXEL_GEOMETRY)
+
+        defocused = apply_defocus_phase(
+            probe, photon_wavelength_m=_DEFOCUS_WAVELENGTH_M, defocus_distance_m=1.0e-3
+        ).get_array()
+
+        numpy.testing.assert_allclose(
+            numpy.sum(intensity(defocused), axis=(-2, -1)),
+            numpy.sum(intensity(array), axis=(-2, -1)),
+        )
+        factor = defocused / array
+        numpy.testing.assert_allclose(factor[1], factor[0])
+        numpy.testing.assert_allclose(factor[2], factor[0])
+
+    def test_honors_a_non_square_pixel_on_a_non_square_grid(self) -> None:
+        width_px, height_px = 32, 24
+        pixel_width_m, pixel_height_m = 1.0e-8, 2.0e-8
+        geometry = _defocus_geometry(
+            width_px, height_px, pixel_width_m=pixel_width_m, pixel_height_m=pixel_height_m
+        )
+        flat = Probe(
+            array=numpy.ones((height_px, width_px), dtype=complex),
+            pixel_geometry=geometry.get_pixel_geometry(),
+        )
+
+        defocused = apply_defocus_phase(
+            flat, photon_wavelength_m=_DEFOCUS_WAVELENGTH_M, defocus_distance_m=1.0e-3
+        ).get_array()[0]
+
+        x_m = (numpy.arange(width_px) - (width_px - 1) / 2) * pixel_width_m
+        y_m = (numpy.arange(height_px) - (height_px - 1) / 2) * pixel_height_m
+        r2_m2 = numpy.square(x_m[numpy.newaxis, :]) + numpy.square(y_m[:, numpy.newaxis])
+        expected = numpy.exp(1j * numpy.pi * r2_m2 / (_DEFOCUS_WAVELENGTH_M * 1.0e-3))
+        numpy.testing.assert_allclose(defocused, expected, atol=1e-12)
+
+    def test_centers_the_curvature_between_the_middle_pixels(self) -> None:
+        """Centered anywhere but (N - 1) / 2, the curvature would add a tilt and lose
+        the point symmetry of the grid."""
+        flat = Probe(
+            array=numpy.ones((16, 20), dtype=complex),
+            pixel_geometry=PixelGeometry(width_m=1.0e-8, height_m=1.5e-8),
+        )
+
+        defocused = apply_defocus_phase(
+            flat, photon_wavelength_m=_DEFOCUS_WAVELENGTH_M, defocus_distance_m=1.0e-3
+        ).get_array()
+
+        numpy.testing.assert_allclose(defocused, defocused[..., ::-1, ::-1], rtol=1e-12)
+
+    @staticmethod
+    def _defocus_rectangle(
+        caplog: pytest.LogCaptureFixture, *, width_m: float, height_m: float
+    ) -> str:
+        """Defocus a rectangle 20 um downstream on a 64 x 10 nm grid; return the log."""
+        rectangle = generate_rectangular_probe(
+            _defocus_geometry(64, 64), width_m=width_m, height_m=height_m
+        )
+
+        with caplog.at_level('WARNING', logger='ptychodus.api.simulate.probe'):
+            apply_defocus_phase(
+                rectangle, photon_wavelength_m=_DEFOCUS_WAVELENGTH_M, defocus_distance_m=2.0e-5
+            )
+
+        return caplog.text
+
+    def test_warns_about_aliasing_along_x_alone(self, caplog: pytest.LogCaptureFixture) -> None:
+        # Nyquist is 5e7/m; the 0.5 um edge reaches 1.2e8/m and the 50 nm edge 1.2e7/m.
+        text = self._defocus_rectangle(caplog, width_m=5.0e-7, height_m=5.0e-8)
+
+        assert 'aliased along x' in text
+        assert 'aliased along y' not in text
+
+    def test_warns_about_aliasing_along_y_alone(self, caplog: pytest.LogCaptureFixture) -> None:
+        text = self._defocus_rectangle(caplog, width_m=5.0e-8, height_m=5.0e-7)
+
+        assert 'aliased along y' in text
+        assert 'aliased along x' not in text
+
+    def test_warns_about_a_small_fresnel_number(self, caplog: pytest.LogCaptureFixture) -> None:
+        # R^2 / (lambda z) = (100 nm)^2 / (1e-10 m * 1 mm) = 0.1
+        disk = generate_disk_probe(_defocus_geometry(64, 64), radius_m=1.0e-7)
+
+        with caplog.at_level('WARNING', logger='ptychodus.api.simulate.probe'):
+            apply_defocus_phase(
+                disk, photon_wavelength_m=_DEFOCUS_WAVELENGTH_M, defocus_distance_m=-1.0e-3
+            )
+
+        assert 'Fresnel number' in caplog.text
+        assert 'aliased' not in caplog.text
+
+    def test_fresnel_number_threshold_is_caller_adjustable(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        disk = generate_disk_probe(_defocus_geometry(), radius_m=_DEFOCUS_DISK_RADIUS_M)
+
+        with caplog.at_level('WARNING', logger='ptychodus.api.simulate.probe'):
+            apply_defocus_phase(
+                disk,
+                photon_wavelength_m=_DEFOCUS_WAVELENGTH_M,
+                defocus_distance_m=_DEFOCUS_DISTANCE_M,
+                min_fresnel_number=100.0,
+            )
+
+        assert 'Fresnel number' in caplog.text
+
+    def test_significance_threshold_decides_which_pixels_must_be_sampled(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A faint pixel far out aliases, but only counts once the threshold admits it."""
+        disk = generate_disk_probe(_defocus_geometry(128, 128), radius_m=1.0e-7)
+        array = disk.get_array().copy()
+        array[0, 64, 0] = 1.0e-3  # x = -0.635 um: 1.3e8/m at 50 um, beyond the 5e7/m limit
+        probe = Probe(array=array, pixel_geometry=disk.get_pixel_geometry())
+
+        with caplog.at_level('WARNING', logger='ptychodus.api.simulate.probe'):
+            apply_defocus_phase(
+                probe, photon_wavelength_m=_DEFOCUS_WAVELENGTH_M, defocus_distance_m=5.0e-5
+            )
+
+        assert caplog.text == ''
+
+        with caplog.at_level('WARNING', logger='ptychodus.api.simulate.probe'):
+            apply_defocus_phase(
+                probe,
+                photon_wavelength_m=_DEFOCUS_WAVELENGTH_M,
+                defocus_distance_m=5.0e-5,
+                significant_amplitude_ratio=1.0e-4,
+            )
+
+        assert 'aliased along x' in caplog.text
 
 
 _KB_NUM_PX = 256
@@ -936,8 +1509,8 @@ class TestKirkpatrickBaezMirror:
             # Pydantic coerces each mapping into a KirkpatrickBaezMirror; that
             # coercion is what the nested-validation message under test comes from.
             KirkpatrickBaezMirrorPair(
-                horizontal={**sound, 'focus_distance_m': 0.0},  # type: ignore[arg-type]
-                vertical=sound,  # type: ignore[arg-type]
+                horizontal={**sound, 'focus_distance_m': 0.0},
+                vertical=sound,
             )
 
     def test_reference_distance_is_the_mean_of_the_two_mirrors(self) -> None:
@@ -1048,23 +1621,17 @@ class TestGenerateKbMirrorProbe:
     def test_conserves_energy_between_the_pupil_and_probe_planes(
         self, defocus_distance_m: float
     ) -> None:
-        """Pins the grid each direction outputs on, independent of phase.
+        """The probe carries the photon count the pupil transmits.
 
-        The backward branch reuses the probe-plane pitch, so a sign slip in the pitch
-        selection would show up here as a scale error rather than as a wrong-looking probe.
+        The pupil mask is unit-modulus where open and zero elsewhere, so its bare sum is
+        the open pixel count, and propagation to the probe plane must preserve it: field
+        arrays hold photons per pixel, so a pitch change leaves the plain sum alone. A
+        slip in the pitch selection no longer shows up as a scale error here; it shows
+        up in :meth:`test_focus_width_matches_the_uniform_slit_prediction`, whose focus
+        width is a physical length and so depends on the grid.
         """
         mirrors = _kb_mirrors(1.5e-3, 1.0e-3)
-        pupil_pixel_geometry = compute_far_field_pixel_geometry(
-            _kb_probe_geometry().get_pixel_geometry(),
-            ImageExtent(width_px=_KB_NUM_PX, height_px=_KB_NUM_PX),
-            wavelength_m=_KB_WAVELENGTH_M,
-            propagation_distance_m=mirrors.get_reference_distance_m() + defocus_distance_m,
-        )
-        open_area_m2 = (
-            _kb_pupil_mask(mirrors, defocus_distance_m).sum()
-            * pupil_pixel_geometry.width_m
-            * pupil_pixel_geometry.height_m
-        )
+        open_pixel_count = _kb_pupil_mask(mirrors, defocus_distance_m).sum()
 
         probe = generate_kb_mirror_probe(
             _kb_probe_geometry(),
@@ -1072,9 +1639,9 @@ class TestGenerateKbMirrorProbe:
             photon_wavelength_m=_KB_WAVELENGTH_M,
             defocus_distance_m=defocus_distance_m,
         )
-        probe_power = intensity(probe.get_array()[0]).sum() * _KB_PROBE_PITCH_M**2
+        probe_counts = intensity(probe.get_array()[0]).sum()
 
-        assert probe_power == pytest.approx(open_area_m2, rel=1e-9)
+        assert probe_counts == pytest.approx(open_pixel_count, rel=1e-9)
 
     def test_rejects_a_vanishing_propagation_distance(self) -> None:
         mirrors = _kb_mirrors()
@@ -1617,6 +2184,7 @@ def _all_strategies() -> list[IncoherentModeStrategy]:
             coherence_length_y_m=1.2e-7,
         ),
         ProbeMomentPolynomialStrategy(),
+        ProbeDerivativeStrategy(),
     ]
 
 
@@ -1765,6 +2333,69 @@ class TestProbeMomentPolynomialStrategy:
 
         with pytest.raises(ValueError, match='no transverse extent'):
             generate_incoherent_probe_modes(Probe(array=spike, pixel_geometry=pixel_geometry), 3)
+
+
+class TestProbeDerivativeStrategy:
+    def _gaussian_probe(self, num_px: int = 64) -> tuple[Probe, numpy.ndarray, numpy.ndarray]:
+        pixel_geometry = PixelGeometry(width_m=1e-8, height_m=1e-8)
+        coordinate = numpy.arange(num_px) - num_px // 2
+        y, x = numpy.meshgrid(coordinate, coordinate, indexing='ij')
+        gaussian = numpy.exp(-(x**2 + y**2) / (2 * 4.0**2)).astype(complex)
+        return Probe(array=gaussian, pixel_geometry=pixel_geometry), x, y
+
+    @staticmethod
+    def _overlap(a: numpy.ndarray, b: numpy.ndarray) -> float:
+        a = a.ravel() / numpy.linalg.norm(a)
+        b = b.ravel() / numpy.linalg.norm(b)
+        return float(abs(numpy.vdot(a, b)))
+
+    def test_first_fill_modes_are_the_gradient(self) -> None:
+        """A Gaussian's derivatives are x*G and y*G, in that graded order."""
+        probe, x, y = self._gaussian_probe()
+        gaussian = probe.get_array()[0]
+
+        fill = ProbeDerivativeStrategy().build_fill_imodes(probe, 1, 2)
+
+        assert self._overlap(fill[0], x * gaussian) == pytest.approx(1.0, abs=1e-9)
+        assert self._overlap(fill[1], y * gaussian) == pytest.approx(1.0, abs=1e-9)
+
+    def test_second_order_mode_is_the_mixed_derivative(self) -> None:
+        probe, x, y = self._gaussian_probe()
+        gaussian = probe.get_array()[0]
+
+        fill = ProbeDerivativeStrategy().build_fill_imodes(probe, 1, 4)
+
+        # Orders run (1,0), (0,1), (2,0), (1,1): the fourth is d2/dxdy, i.e. x*y*G.
+        assert self._overlap(fill[3], x * y * gaussian) == pytest.approx(1.0, abs=1e-9)
+
+    def test_a_real_probe_has_derivatives_of_uniform_phase(self) -> None:
+        """Each derivative of a real field is real up to a global phase (a power of i).
+
+        The unpaired Nyquist bin is dropped for odd orders; kept, it would give the mode a
+        component of a different phase, i.e. a genuinely complex field.
+        """
+        probe, _, _ = self._gaussian_probe()
+
+        fill = ProbeDerivativeStrategy().build_fill_imodes(probe, 1, 5)
+
+        for mode in fill:
+            peak = mode.ravel()[numpy.argmax(numpy.abs(mode))]
+            numpy.testing.assert_allclose(
+                (mode * numpy.conj(peak) / abs(peak)).imag, 0.0, atol=1e-12 * abs(peak)
+            )
+
+    def test_decay_settings_set_the_weights(self) -> None:
+        strategy = ProbeDerivativeStrategy(
+            decay_type=ProbeModeDecayType.EXPONENTIAL, decay_ratio=0.5
+        )
+        numpy.testing.assert_allclose(
+            strategy.get_imode_weights(4), [1.0, 0.5, 0.25, 0.125], rtol=1e-12
+        )
+
+    @pytest.mark.parametrize('override', [{'decay_ratio': 0.0}, {'decay_ratio': -1.0}])
+    def test_rejects_invalid_arguments(self, override: dict) -> None:
+        with pytest.raises(ValueError):
+            ProbeDerivativeStrategy(**override)
 
 
 class TestGramSchmidt:

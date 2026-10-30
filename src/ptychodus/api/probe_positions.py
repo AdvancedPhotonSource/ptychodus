@@ -1,28 +1,36 @@
 """Probe position (scan point) data structures and file I/O plugin interfaces."""
 
 from __future__ import annotations
-from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import pairwise
-from pathlib import Path
-from typing import overload
+from typing import cast, overload, TypeVar
 
 import numpy
 
-from .typing import IntegerArrayType, RealArrayType
+from .files import FileReader, FileWriter
+from .interpolate import interpolate_at_indexes
+from .typing import BooleanArrayType, IntegerArrayType, RealArrayType
 
 
-def _read_only(array: numpy.ndarray) -> numpy.ndarray:
+_ArrayT = TypeVar('_ArrayT', bound=numpy.ndarray)
+
+
+def _read_only(array: _ArrayT) -> _ArrayT:
     """Return a non-writeable view, so a bulk accessor cannot become a back door to mutation."""
     view = array.view()
     view.flags.writeable = False
-    return view
+    return cast(_ArrayT, view)
 
 
 @dataclass(frozen=True)
 class ProbePosition:
-    """Probe position with its scan index and (x, y) physical coordinates in meters."""
+    """Probe position with its scan index and (x, y) physical coordinates in meters.
+
+    `probe_photon_count` is the I0 reading recorded for the exposure -- an upstream ion
+    chamber, diode or scaler -- in the units the instrument records it, photons only once
+    calibrated by :attr:`ptychodus.api.product.ProductMetadata.i0_photons_per_count`.
+    """
 
     index: int
     x_m: float
@@ -80,7 +88,7 @@ class ProbePositionSequence(Sequence[ProbePosition]):
         # immediately rather than silently degrading downstream weighting.
         num_points = len(indexes)
         if len(photon_counts) == 0:
-            self._probe_photon_counts: numpy.ndarray | None = None
+            self._probe_photon_counts: RealArrayType | None = None
         elif len(photon_counts) == num_points:
             counts_array = numpy.asarray(photon_counts, dtype=numpy.float64)
             bad = ~numpy.isfinite(counts_array) | (counts_array < 0.0)
@@ -157,13 +165,49 @@ class ProbePositionSequence(Sequence[ProbePosition]):
         """Return the y coordinates in meters, read-only and row-aligned with the indexes."""
         return _read_only(self._coordinates_m[:, -2])
 
-    def get_probe_photon_counts(self) -> numpy.ndarray | None:
-        """Return the per-position photon-count array, or ``None`` when the reader did not measure it.
+    def get_probe_photon_counts(self) -> RealArrayType | None:
+        """Return the per-position I0 readings, or ``None`` when the reader recorded none.
 
         The all-or-nothing invariant guaranteed at construction means the returned array,
         when non-None, is fully populated and 1:1 aligned with the index / coordinate arrays.
+        See :class:`ProbePosition` for their units.
         """
         return self._probe_photon_counts
+
+    def get_probe_photon_counts_by_index(self) -> dict[int, float]:
+        """Return the I0 readings keyed by scan index, empty when the reader recorded none.
+
+        Positions sharing a scan index average into one reading, so the mapping pairs with
+        diffraction patterns by index as the positions themselves do.
+        """
+        counts = self._probe_photon_counts
+
+        if counts is None or counts.size == 0:
+            return {}
+
+        unique_indexes = numpy.unique(self._indexes)
+        _, unique_counts = interpolate_at_indexes(self._indexes, counts, unique_indexes)
+        return {
+            int(index): float(count)
+            for index, count in zip(unique_indexes, unique_counts, strict=True)
+        }
+
+    def interpolate_at_indexes(
+        self, indexes: IntegerArrayType
+    ) -> tuple[BooleanArrayType, ProbePositionSequence]:
+        """The positions at other scan indexes, and which of those indexes have one.
+
+        Positions sharing an index average into one anchor, an index between anchors
+        takes the linearly interpolated position, and an index outside the range of the
+        anchors is left out rather than extrapolated. Returns the mask over *indexes*
+        marking those in range, and their positions in the order of *indexes*; photon
+        counts are not carried.
+        """
+        in_range, yx_m = interpolate_at_indexes(self._indexes, self._coordinates_m, indexes)
+        seq = ProbePositionSequence()
+        seq._indexes = numpy.asarray(indexes, dtype=numpy.intp)[in_range]
+        seq._coordinates_m = numpy.reshape(yx_m, (-1, 2))
+        return in_range, seq
 
     @property
     def nbytes(self) -> int:
@@ -182,22 +226,12 @@ class ProbePositionParseError(Exception):
     pass
 
 
-class ProbePositionFileReader(ABC):
+class ProbePositionFileReader(FileReader[ProbePositionSequence]):
     """Plugin interface for reading probe position files."""
 
-    @abstractmethod
-    def read(self, file_path: Path) -> ProbePositionSequence:
-        """Read probe positions from file."""
-        pass
 
-
-class ProbePositionFileWriter(ABC):
+class ProbePositionFileWriter(FileWriter[ProbePositionSequence]):
     """Plugin interface for writing probe position files."""
-
-    @abstractmethod
-    def write(self, file_path: Path, positions: ProbePositionSequence) -> None:
-        """Write probe positions to file."""
-        pass
 
 
 def calculate_scan_geometry(positions: Iterable[ProbePosition]) -> ScanGeometry | None:

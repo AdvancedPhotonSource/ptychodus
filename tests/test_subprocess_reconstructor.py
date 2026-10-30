@@ -19,15 +19,18 @@ import pytest
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
-from ptychodus.model.processing import _subprocess_protocol
-from ptychodus.model.processing._subprocess_protocol import ChildError
-from ptychodus.model.processing.subprocess_reconstructor import (
+from pydantic import BaseModel
+
+from ptychodus.api import spawn
+from ptychodus.api.reconstruct import (
+    ReconstructInput,
+    ReconstructOutput,
     SubprocessReconstructor,
 )
+from ptychodus.api.spawn import ChildError
 
 
 # The spawned child resolves the fixtures module by dotted path against the
@@ -57,7 +60,7 @@ def _minimal_product() -> Product:
     return Product(
         metadata=metadata,
         probe_positions=ProbePositionSequence([]),
-        probes=ProbeSequence(
+        probes=ProbeEnsemble(
             array=numpy.zeros((1, 1, 4, 4), dtype=numpy.complex64),
             opr_weights=None,
             pixel_geometry=pixel_geometry,
@@ -84,40 +87,71 @@ def _minimal_reconstruct_input() -> ReconstructInput:
 def test_reconstruct_streams_all_outputs_in_order() -> None:
     product = _minimal_product()
 
-    def build_payload(parameters: ReconstructInput, _loaded: Path | None) -> Any:
+    def dump_options(parameters: ReconstructInput, _options: BaseModel) -> Any:
         return {'n': 3, 'product': product}
 
     adapter = SubprocessReconstructor(
         name='FAKE',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:yield_n_outputs',
-        progress_goal_fn=lambda: 3,
-        build_reconstruct_payload=build_payload,
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='yield_n_outputs',
+        dump_reconstruct_options=dump_options,
     )
 
-    outputs = list(adapter.reconstruct(_minimal_reconstruct_input()))
+    outputs = list(
+        adapter.reconstruct(_minimal_reconstruct_input(), options=adapter.get_default_options())
+    )
 
     assert len(outputs) == 3
     assert [o.progress for o in outputs] == [1, 2, 3]
 
 
 def test_child_exception_propagates_as_child_error() -> None:
-    def build_payload(parameters: ReconstructInput, _loaded: Path | None) -> Any:
+    def dump_options(parameters: ReconstructInput, _options: BaseModel) -> Any:
         return {'message': 'boom'}
 
     adapter = SubprocessReconstructor(
         name='FAKE',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:raise_immediately',
-        progress_goal_fn=lambda: 0,
-        build_reconstruct_payload=build_payload,
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='raise_immediately',
+        dump_reconstruct_options=dump_options,
     )
 
     with pytest.raises(ChildError) as excinfo:
-        list(adapter.reconstruct(_minimal_reconstruct_input()))
+        list(
+            adapter.reconstruct(_minimal_reconstruct_input(), options=adapter.get_default_options())
+        )
 
     assert excinfo.value.child_exception_type == 'ValueError'
     # The original exception is picklable, so the parent got it back.
     assert isinstance(excinfo.value.child_exception, ValueError)
     assert 'boom' in str(excinfo.value.child_exception)
+
+
+def test_unpicklable_output_raises_child_error_rather_than_vanishing() -> None:
+    """A child puts the object itself, so the put is where pickling fails.
+
+    The failure must reach the parent: pickled on a feeder thread instead, the
+    message would be dropped and the parent would see a stream with no output.
+    """
+    adapter = SubprocessReconstructor(
+        name='FAKE',
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='emit_unpicklable',
+        dump_reconstruct_options=lambda parameters, options: {},
+    )
+
+    with pytest.raises(ChildError):
+        list(
+            adapter.reconstruct(_minimal_reconstruct_input(), options=adapter.get_default_options())
+        )
+
+
+def test_put_captures_the_object_before_the_child_modifies_it() -> None:
+    with spawn.run_subprocess(f'{FIXTURES_MODULE}:emit_then_modify_in_place', None) as events:
+        arrays = [event[1] for event in events if event[0] == 'array']
+
+    assert len(arrays) == 1
+    assert not numpy.any(arrays[0])
 
 
 class _ProcessRecordingContext:
@@ -150,19 +184,17 @@ def test_hanging_child_is_terminated_on_iterator_close(monkeypatch: pytest.Monke
 
     product = _minimal_product()
 
-    def build_payload(parameters: ReconstructInput, _loaded: Path | None) -> Any:
+    def dump_options(parameters: ReconstructInput, _options: BaseModel) -> Any:
         return {'product': product}
 
     recorded = _ProcessRecordingContext(multiprocessing.get_context('spawn'))
-    monkeypatch.setattr(
-        _subprocess_protocol.multiprocessing, 'get_context', lambda method: recorded
-    )
+    monkeypatch.setattr(spawn.multiprocessing, 'get_context', lambda method: recorded)
 
     adapter = SubprocessReconstructor(
         name='FAKE',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:emit_output_then_hang',
-        progress_goal_fn=lambda: 1,
-        build_reconstruct_payload=build_payload,
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='emit_output_then_hang',
+        dump_reconstruct_options=dump_options,
         terminate_grace_sec=1.0,
     )
 
@@ -170,7 +202,8 @@ def test_hanging_child_is_terminated_on_iterator_close(monkeypatch: pytest.Monke
     # generator suspended inside the context manager -- closing a generator that
     # was never advanced runs no cleanup, so this step is what arms the test.
     iterator = cast(
-        Generator[ReconstructOutput, None, None], adapter.reconstruct(_minimal_reconstruct_input())
+        Generator[ReconstructOutput, None, None],
+        adapter.reconstruct(_minimal_reconstruct_input(), options=adapter.get_default_options()),
     )
     next(iterator)
 
@@ -187,18 +220,20 @@ def test_hanging_child_is_terminated_on_iterator_close(monkeypatch: pytest.Monke
 def test_child_log_is_forwarded_to_parent_logger(caplog: pytest.LogCaptureFixture) -> None:
     product = _minimal_product()
 
-    def build_payload(parameters: ReconstructInput, _loaded: Path | None) -> Any:
+    def dump_options(parameters: ReconstructInput, _options: BaseModel) -> Any:
         return {'product': product, 'log_message': 'hello from the child'}
 
     adapter = SubprocessReconstructor(
         name='FAKE',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:emit_log_then_output',
-        progress_goal_fn=lambda: 1,
-        build_reconstruct_payload=build_payload,
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='emit_log_then_output',
+        dump_reconstruct_options=dump_options,
     )
 
     with caplog.at_level(logging.WARNING, logger=FIXTURES_MODULE):
-        outputs = list(adapter.reconstruct(_minimal_reconstruct_input()))
+        outputs = list(
+            adapter.reconstruct(_minimal_reconstruct_input(), options=adapter.get_default_options())
+        )
 
     assert len(outputs) == 1
     assert any('hello from the child' in rec.message for rec in caplog.records)
@@ -208,18 +243,20 @@ def test_settings_sync_message_invokes_callback() -> None:
     product = _minimal_product()
     seen: list[dict[str, dict[str, str]]] = []
 
-    def build_payload(parameters: ReconstructInput, _loaded: Path | None) -> Any:
+    def dump_options(parameters: ReconstructInput, _options: BaseModel) -> Any:
         return {'product': product, 'settings': {'GroupA': {'p': '42'}}}
 
     adapter = SubprocessReconstructor(
         name='FAKE',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:emit_settings_sync_then_output',
-        progress_goal_fn=lambda: 1,
-        build_reconstruct_payload=build_payload,
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='emit_settings_sync_then_output',
+        dump_reconstruct_options=dump_options,
         apply_settings_sync=seen.append,
     )
 
-    outputs = list(adapter.reconstruct(_minimal_reconstruct_input()))
+    outputs = list(
+        adapter.reconstruct(_minimal_reconstruct_input(), options=adapter.get_default_options())
+    )
 
     assert len(outputs) == 1
     assert seen == [{'GroupA': {'p': '42'}}]
@@ -229,26 +266,26 @@ def test_train_records_model_saved_path(tmp_path: Path) -> None:
     saved_path = tmp_path / 'ckpt.bin'
     saved_path.write_bytes(b'x')
 
-    def build_train_payload(input_path: Path, output_path: Path) -> Any:
+    def dump_train_options(_options: BaseModel) -> Any:
         return {'saved_path': str(saved_path)}
 
-    def build_reconstruct_payload(_p: ReconstructInput, _loaded: Path | None) -> Any:
+    def dump_reconstruct_options(_p: ReconstructInput, _options: BaseModel) -> Any:
         return {}
 
     adapter = SubprocessReconstructor(
         name='FAKE',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:hang_forever',
-        progress_goal_fn=lambda: 1,
-        build_reconstruct_payload=build_reconstruct_payload,
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='hang_forever',
+        dump_reconstruct_options=dump_reconstruct_options,
         is_trainable=True,
-        train_entry_point=f'{FIXTURES_MODULE}:train_and_save',
-        build_train_payload=build_train_payload,
+        train_function='train_and_save',
+        dump_train_options=dump_train_options,
         model_file_extension='.bin',
     )
 
     assert not adapter.is_model_loaded()
 
-    outputs = list(adapter.train(tmp_path, tmp_path))
+    outputs = list(adapter.train(tmp_path, tmp_path, options=adapter.get_default_options()))
 
     assert len(outputs) == 1
     assert outputs[0].progress == 1
@@ -263,24 +300,24 @@ def test_train_records_model_saved_path(tmp_path: Path) -> None:
 def test_non_trainable_train_raises() -> None:
     adapter = SubprocessReconstructor(
         name='FAKE',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:hang_forever',
-        progress_goal_fn=lambda: 1,
-        build_reconstruct_payload=lambda p, m: {},
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='hang_forever',
+        dump_reconstruct_options=lambda p, o: {},
     )
 
     with pytest.raises(NotImplementedError):
-        list(adapter.train(Path('/tmp'), Path('/tmp')))
+        list(adapter.train(Path('/tmp'), Path('/tmp'), options=adapter.get_default_options()))
 
 
 def test_save_without_load_or_train_raises() -> None:
     adapter = SubprocessReconstructor(
         name='FAKE',
-        reconstruct_entry_point=f'{FIXTURES_MODULE}:hang_forever',
-        progress_goal_fn=lambda: 1,
-        build_reconstruct_payload=lambda p, m: {},
+        child_module=FIXTURES_MODULE,
+        reconstruct_function='hang_forever',
+        dump_reconstruct_options=lambda p, o: {},
         is_trainable=True,
-        train_entry_point=f'{FIXTURES_MODULE}:train_and_save',
-        build_train_payload=lambda i, o: {},
+        train_function='train_and_save',
+        dump_train_options=lambda opts: {},
     )
 
     with pytest.raises(RuntimeError):

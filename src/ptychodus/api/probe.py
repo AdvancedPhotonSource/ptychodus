@@ -2,30 +2,35 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
-from typing import overload
 import logging
 import math
+from typing import cast
 
 import numpy
-import scipy.ndimage
 from scipy.fft import fft2
 
+from .accumulate import DiffractionMoments
+from .assemble import AssembledDiffractionData
 from .constants import format_length
+from .files import FileReader, FileWriter
 from .fourier import fourier_shift_2d
 from .geometry import ImageExtent, PixelGeometry
 from .interpolate import resample_along_axis
-from .preprocess.noise import estimate_noise_floor
+from .moments import compute_intensity_moments
+from .preprocess.diffraction import inpaint_bad_pixels
+from .preprocess.noise import subtract_noise_floor
+from .probe_positions import ProbePosition
 from .propagate import (
     PropagatedWavefield,
     compute_far_field_pixel_geometry,
     compute_near_field_pixel_geometry,
     intensity,
 )
-from .typing import ComplexArrayType, RealArrayType
+from .typing import BooleanArrayType, ComplexArrayType, RealArrayType
 
 logger = logging.getLogger(__name__)
 
@@ -241,18 +246,16 @@ def estimate_probe_size(
 
     The pipeline is:
 
-    1. **Pre-filter and noise floor.** The input is passed through a 3x3
-       median filter to suppress hot pixels and other isolated outliers
-       (matching :func:`ptychodus.api.preprocess.diffraction.estimate_beam_center`).
-       Background and noise scale are then estimated via
-       :func:`ptychodus.api.preprocess.noise.estimate_noise_floor`, which uses Otsu's
-       method on the filtered image to identify the background class when
-       the histogram is bimodal and falls back to median / median-absolute-
-       deviation over the outermost ring of pixels when it is not. The
-       filtered image is then shifted down by ``background + mad_threshold
-       * MAD`` and clipped to non-negative values. Larger ``mad_threshold``
-       is more aggressive at suppressing noise tails but increasingly
-       truncates real signal in the wings.
+    1. **Pre-filter and noise floor.** The input is cleaned by
+       :func:`ptychodus.api.preprocess.noise.subtract_noise_floor`: a 3x3
+       median filter suppresses hot pixels and other isolated outliers, Otsu's
+       method identifies the background class when the histogram is bimodal
+       and the outermost ring of pixels stands in for it when it is not, the
+       background is subtracted, and pixels below ``background + mad_threshold
+       * MAD`` are set to zero. Pixels above the threshold keep their full
+       height, so every width below is that of the measured profile, truncated
+       only where it sinks into the noise. Larger ``mad_threshold`` is more
+       aggressive at suppressing noise but truncates more of the wings.
     2. **Principal axes.** The centroid and intensity-weighted 2x2 covariance
        are computed on the cleaned image (in physical metres). Its eigenvectors
        define the major/minor axes; the tilt of each is reported in radians,
@@ -289,9 +292,9 @@ def estimate_probe_size(
             metres.
         energy_fraction: Fraction of cleaned total power that defines the
             encircled-energy diameter; must be in ``(0, 1]``.
-        mad_threshold: Soft-threshold level, in units of border-MAD, applied
-            above the estimated background. ``0.0`` disables thresholding
-            (background is still subtracted).
+        mad_threshold: Significance threshold, in units of MAD, above the
+            estimated background; pixels below it are set to zero. ``0.0``
+            keeps every pixel above the background.
 
     Raises:
         ValueError: If ``probe_intensity`` is not 2D, ``energy_fraction`` is
@@ -315,23 +318,12 @@ def estimate_probe_size(
 
     height_px, width_px = probe_intensity.shape
 
-    filtered = scipy.ndimage.median_filter(probe_intensity.astype(numpy.float64), size=3)
-
-    border = numpy.concatenate(
-        [
-            filtered[0, :].ravel(),
-            filtered[-1, :].ravel(),
-            filtered[1:-1, 0].ravel(),
-            filtered[1:-1, -1].ravel(),
-        ]
+    cleaned, _ = subtract_noise_floor(
+        probe_intensity, mad_threshold=mad_threshold, fall_back_to_border=True
     )
-    robust_statistics = estimate_noise_floor(filtered, fallback_values=border)
-    threshold = robust_statistics.get_significance_threshold(mad_threshold)
+    moments = compute_intensity_moments(cleaned)
 
-    cleaned = numpy.clip(filtered - threshold, 0.0, None)
-    total_power = cleaned.sum()
-
-    if total_power <= 0.0:
+    if not moments.total > 0.0:
         return ProbeSizeMetrics(
             major_axis_tilt_rad=0.0,
             minor_axis_tilt_rad=0.0,
@@ -342,19 +334,15 @@ def estimate_probe_size(
             encircled_energy_diameter_m=0.0,
         )
 
+    pixel_width_m = pixel_geometry.width_m
+    pixel_height_m = pixel_geometry.height_m
     y_idx, x_idx = numpy.mgrid[:height_px, :width_px]  # noqa: N806
-    x_m = (x_idx - (width_px - 1) / 2.0) * pixel_geometry.width_m
-    y_m = (y_idx - (height_px - 1) / 2.0) * pixel_geometry.height_m
+    dx = (x_idx - (width_px - 1) / 2.0 - moments.centroid_x_px) * pixel_width_m
+    dy = (y_idx - (height_px - 1) / 2.0 - moments.centroid_y_px) * pixel_height_m
 
-    centroid_x = (cleaned * x_m).sum() / total_power
-    centroid_y = (cleaned * y_m).sum() / total_power
-
-    dx = x_m - centroid_x
-    dy = y_m - centroid_y
-
-    mxx = (cleaned * dx * dx).sum() / total_power
-    myy = (cleaned * dy * dy).sum() / total_power
-    mxy = (cleaned * dx * dy).sum() / total_power
+    mxx = moments.covariance_xx_px2 * pixel_width_m**2
+    myy = moments.covariance_yy_px2 * pixel_height_m**2
+    mxy = moments.covariance_xy_px2 * pixel_width_m * pixel_height_m
     covariance = numpy.array([[mxx, mxy], [mxy, myy]])
 
     eigenvalues, eigenvectors = numpy.linalg.eigh(covariance)
@@ -405,6 +393,200 @@ def estimate_probe_size(
         rms_major_axis_length_m=float(rms_major_m),
         rms_minor_axis_length_m=float(rms_minor_m),
         encircled_energy_diameter_m=float(2.0 * encircled_radius),
+    )
+
+
+@dataclass(frozen=True)
+class ProbeExtent:
+    """A probe's angular spread, and the real-space sizes it implies at the object.
+
+    `spread_major_per_m` and `spread_minor_per_m` are the 1-sigma widths of the far-field
+    intensity, in cycles per meter, along its principal axes, the major tilted
+    `major_axis_tilt_rad` from x. The object sits `defocus_distance_m` past the focus.
+
+    Two kinds of size follow from them. A **beam** width is the probe's own second
+    moment, ``sigma**2 = sigma_0**2 + (lambda * z * sigma_q)**2`` with the
+    transform-limited waist ``sigma_0 = 1 / (4 pi sigma_q)``: exact for a Gaussian beam
+    at any defocus. An **aperture** width is the geometric shadow of the cone,
+    ``lambda * |z| * sigma_q``, which is what the hard-edged disk and rectangle
+    generators take as their size; it leaves out the diffraction tails around the
+    shadow, which carry second moment but are not part of the aperture. At zero defocus
+    there is no shadow, and the aperture width falls back to the waist.
+
+    Two measures say how far from focus the object sits. The **depth of focus**
+    ``lambda / NA**2`` depends on the spread alone, and the **Fresnel number** is the
+    defocus in units of it. The Fresnel number is also ``R**2 / (lambda |z|)`` for the
+    shadow radius ``R``, half of `disk_diameter_m`: below one, a curved hard-edged
+    aperture is no longer the geometric-optics model it stands for, and the probe is
+    within a few Rayleigh ranges ``1 / (4 pi lambda sigma_q**2)`` of its waist.
+    """
+
+    spread_major_per_m: float
+    spread_minor_per_m: float
+    major_axis_tilt_rad: float
+    photon_wavelength_m: float
+    defocus_distance_m: float
+
+    def _beam_width_m(self, spread_per_m: float) -> float:
+        waist_m = 1.0 / (4.0 * math.pi * spread_per_m)
+        return math.hypot(
+            waist_m, self.photon_wavelength_m * self.defocus_distance_m * spread_per_m
+        )
+
+    def _aperture_width_m(self, spread_per_m: float) -> float:
+        if self.defocus_distance_m == 0.0:
+            return 1.0 / (4.0 * math.pi * spread_per_m)
+
+        return self.photon_wavelength_m * abs(self.defocus_distance_m) * spread_per_m
+
+    def _along_x_and_y(self, along_major_m: float, along_minor_m: float) -> tuple[float, float]:
+        cos_tilt = math.cos(self.major_axis_tilt_rad)
+        sin_tilt = math.sin(self.major_axis_tilt_rad)
+        return (
+            math.hypot(along_major_m * cos_tilt, along_minor_m * sin_tilt),
+            math.hypot(along_major_m * sin_tilt, along_minor_m * cos_tilt),
+        )
+
+    def _isotropic(self, along_major_m: float, along_minor_m: float) -> float:
+        return math.sqrt((along_major_m**2 + along_minor_m**2) / 2.0)
+
+    @property
+    def beam_sigma_x_m(self) -> float:
+        major = self._beam_width_m(self.spread_major_per_m)
+        minor = self._beam_width_m(self.spread_minor_per_m)
+        return self._along_x_and_y(major, minor)[0]
+
+    @property
+    def beam_sigma_y_m(self) -> float:
+        major = self._beam_width_m(self.spread_major_per_m)
+        minor = self._beam_width_m(self.spread_minor_per_m)
+        return self._along_x_and_y(major, minor)[1]
+
+    @property
+    def beam_sigma_m(self) -> float:
+        """The isotropic beam width with the same mean variance, ``sqrt((a**2 + b**2) / 2)``."""
+        return self._isotropic(
+            self._beam_width_m(self.spread_major_per_m),
+            self._beam_width_m(self.spread_minor_per_m),
+        )
+
+    @property
+    def gaussian_fwhm_m(self) -> float:
+        """A Gaussian's full width at half maximum is ``2 sqrt(2 ln 2) sigma``."""
+        return 2.0 * math.sqrt(2.0 * math.log(2.0)) * self.beam_sigma_m
+
+    @property
+    def disk_diameter_m(self) -> float:
+        """A uniform disk of diameter ``D`` has ``sigma = D / 4`` along any axis."""
+        return 4.0 * self._isotropic(
+            self._aperture_width_m(self.spread_major_per_m),
+            self._aperture_width_m(self.spread_minor_per_m),
+        )
+
+    @property
+    def rectangle_width_m(self) -> float:
+        """A uniform rectangle of width ``W`` has ``sigma_x = W / sqrt(12)``."""
+        major = self._aperture_width_m(self.spread_major_per_m)
+        minor = self._aperture_width_m(self.spread_minor_per_m)
+        return math.sqrt(12.0) * self._along_x_and_y(major, minor)[0]
+
+    @property
+    def rectangle_height_m(self) -> float:
+        """A uniform rectangle of height ``H`` has ``sigma_y = H / sqrt(12)``."""
+        major = self._aperture_width_m(self.spread_major_per_m)
+        minor = self._aperture_width_m(self.spread_minor_per_m)
+        return math.sqrt(12.0) * self._along_x_and_y(major, minor)[1]
+
+    @property
+    def depth_of_focus_m(self) -> float:
+        """``lambda / NA**2 = 1 / (lambda q_max**2)``, with ``q_max = 2 sigma_q`` the radius
+        of the uniform disk of the same mean spread, as for `disk_diameter_m`."""
+        spread_per_m = self._isotropic(self.spread_major_per_m, self.spread_minor_per_m)
+        return 1.0 / (self.photon_wavelength_m * (2.0 * spread_per_m) ** 2)
+
+    @property
+    def fresnel_number(self) -> float:
+        """The defocus in depths of focus, ``|z| / depth_of_focus_m``; zero at focus."""
+        return abs(self.defocus_distance_m) / self.depth_of_focus_m
+
+
+def estimate_probe_extent(
+    mean_pattern: RealArrayType,
+    probe_geometry: ProbeGeometry,
+    *,
+    photon_wavelength_m: float,
+    defocus_distance_m: float,
+    bad_pixels: BooleanArrayType | None = None,
+    mad_threshold: float = 4.5,
+) -> ProbeExtent:
+    """Estimate the probe's real-space size from the second moments of its far-field intensity.
+
+    The mean diffraction pattern is the probe's power spectrum, attenuated and blurred
+    by the sample but not reshaped by it, so its second moments are the probe's angular
+    spread. They are measured by :func:`estimate_probe_size` on the pattern's
+    reciprocal-space grid, ``dq = 1 / (N * dx)`` with ``dx`` the probe pixel size, which
+    first removes the background and the noise around the bright field. The returned
+    :class:`ProbeExtent` turns that spread into the sizes the parametric probes take at
+    an object *defocus_distance_m* past the focus.
+
+    At zero defocus only the transform-limited waist is left, which describes a Gaussian
+    focus but only approximates the Airy-like focus of a hard-edged aperture; a warning
+    says so.
+
+    A bright field with a central stop -- a zone plate's annulus -- has more spread for
+    its outer radius than a full disk: the disk diameter reads ``sqrt(1 + (r_i /
+    r_o)**2)`` times the outer diameter, about 5% more at a stop of a third.
+
+    Pixels flagged in *bad_pixels* are inpainted before the moments are taken.
+    *mad_threshold* sets the noise rejection, as for :func:`estimate_probe_size`.
+
+    Raises:
+        ValueError: if *mean_pattern* does not have the probe's shape, or no signal
+            rises above the noise floor.
+    """
+    height_px, width_px = mean_pattern.shape[-2:]
+
+    if (width_px, height_px) != (probe_geometry.width_px, probe_geometry.height_px):
+        raise ValueError(
+            f'Mean pattern shape ({width_px}x{height_px} px) does not match the probe '
+            f'({probe_geometry.width_px}x{probe_geometry.height_px} px)!'
+        )
+
+    pattern = mean_pattern
+
+    if bad_pixels is not None:
+        # A float64 pattern inpaints to float64; the overload only promises the family.
+        pattern = cast(
+            RealArrayType, inpaint_bad_pixels(mean_pattern.astype(numpy.float64), bad_pixels)
+        )
+
+    spread = estimate_probe_size(
+        pattern,
+        PixelGeometry(
+            width_m=1.0 / (width_px * probe_geometry.pixel_width_m),
+            height_m=1.0 / (height_px * probe_geometry.pixel_height_m),
+        ),
+        mad_threshold=mad_threshold,
+    )
+    # The reported RMS lengths are 2 sigma, here in cycles per meter.
+    sigma_q_major = spread.rms_major_axis_length_m / 2.0
+    sigma_q_minor = spread.rms_minor_axis_length_m / 2.0
+
+    if not sigma_q_minor > 0.0:
+        raise ValueError('No signal rises above the noise floor of the mean pattern!')
+
+    if defocus_distance_m == 0.0:
+        logger.warning(
+            'No defocus: the probe extent is the transform-limited waist of a Gaussian beam, '
+            'which only approximates the focus of a hard-edged aperture.'
+        )
+
+    return ProbeExtent(
+        spread_major_per_m=sigma_q_major,
+        spread_minor_per_m=sigma_q_minor,
+        major_axis_tilt_rad=spread.major_axis_tilt_rad,
+        photon_wavelength_m=photon_wavelength_m,
+        defocus_distance_m=defocus_distance_m,
     )
 
 
@@ -822,6 +1004,17 @@ class ProbeGeometryProvider(ABC):
 
     @property
     @abstractmethod
+    def focus_object_distance_m(self) -> float:
+        """Signed position of the beam focus, with the origin at the object.
+
+        The beamline frame, +z downstream, so a focus upstream of the object -- the
+        ordinary magnifying geometry -- is negative. Zero means no focusing optic.
+        A probe formed by one is sampled this far past its focus, which is the same
+        displacement with the opposite sign.
+        """
+
+    @property
+    @abstractmethod
     def probe_photon_count(self) -> float:
         pass
 
@@ -848,9 +1041,35 @@ class ProbeGeometryProvider(ABC):
     def get_probe_geometry(self) -> ProbeGeometry:
         pass
 
+    @abstractmethod
+    def get_assembled_data(self) -> AssembledDiffractionData | None:
+        """The diffraction data the product is bound to, or None while it is bound to none.
+
+        Read at the point of use rather than kept, so a builder copied into another
+        product, or a product rebound to other data, sees the data it has now.
+        """
+
+    @abstractmethod
+    def get_diffraction_moments(self) -> DiffractionMoments | None:
+        """The bound data's diffraction moments, or None while unbound or not yet computed.
+
+        Accumulated once from the assembled patterns, so a builder needing only their
+        statistics does not pass over every pattern itself.
+        """
+
 
 class Probe:
-    """Probe (illumination function) stored as a (modes, height, width) complex array."""
+    """Probe (illumination function) stored as a (modes, height, width) complex array.
+
+    Amplitude is in photons per pixel, so ``sum(abs(array)**2)`` is the number of photons
+    the probe carries in one exposure -- a count, not an intensity per unit area. An
+    operation that changes the sampling therefore preserves that plain sum rather than an
+    area-weighted integral: both :func:`resample_probe_ensemble`, which re-expresses a
+    probe on a different pitch, and the propagators in :mod:`ptychodus.api.propagate`,
+    which carry a field to another plane, leave it unchanged. Diffraction patterns are
+    counted the same way, which is what makes the two comparable: a probe illuminating a
+    transparent object yields patterns totalling ``sum(abs(array)**2)``.
+    """
 
     def __init__(
         self,
@@ -893,7 +1112,7 @@ class Probe:
         return self._pixel_geometry
 
     @property
-    def dtype(self) -> numpy.dtype:
+    def dtype(self) -> numpy.dtype[numpy.complexfloating]:
         return self._array.dtype
 
     @property
@@ -964,10 +1183,14 @@ def shift_probe(probe: Probe, *, shift_y_px: float, shift_x_px: float) -> Probe:
     )
 
 
-class ProbeSequence(Sequence[Probe]):
+class ProbeEnsemble:
     """Position-dependent probe ensemble stored as a (coherent, incoherent, height, width) array.
 
-    Supports optional OPR (orthogonal probe relaxation) weights for per-position probe variation.
+    Supports optional OPR (orthogonal probe relaxation) weights for per-position probe
+    variation. Deliberately not a sequence: without OPR weights a single probe describes
+    every scan position, so there is no element count to report and no index that is out
+    of range. :meth:`get_probe` names what an index means instead, and
+    :attr:`num_opr_positions` answers how many positions the weights describe.
     """
 
     def __init__(
@@ -1016,16 +1239,16 @@ class ProbeSequence(Sequence[Probe]):
         self._pixel_geometry = pixel_geometry
 
     @classmethod
-    def from_probe(cls, probe: Probe) -> ProbeSequence:
-        """Wrap a single :class:`Probe` as a length-1 sequence with no OPR basis."""
+    def from_probe(cls, probe: Probe) -> ProbeEnsemble:
+        """Wrap a single :class:`Probe` as an ensemble with no OPR basis."""
         return cls(
             array=probe.get_array(),
             opr_weights=None,
             pixel_geometry=probe.get_pixel_geometry(),
         )
 
-    def copy(self) -> ProbeSequence:
-        return ProbeSequence(
+    def copy(self) -> ProbeEnsemble:
+        return ProbeEnsemble(
             self._array.copy(),
             None if self._opr_weights is None else self._opr_weights.copy(),
             None if self._pixel_geometry is None else self._pixel_geometry.copy(),
@@ -1050,7 +1273,7 @@ class ProbeSequence(Sequence[Probe]):
         return self._pixel_geometry
 
     @property
-    def dtype(self) -> numpy.dtype:
+    def dtype(self) -> numpy.dtype[numpy.complexfloating]:
         return self._array.dtype
 
     @property
@@ -1078,26 +1301,92 @@ class ProbeSequence(Sequence[Probe]):
     def width_px(self) -> int:
         return self._array.shape[3]
 
-    @overload
-    def __getitem__(self, index: int) -> Probe: ...
+    @property
+    def num_opr_positions(self) -> int | None:
+        """Probe positions the OPR weights describe.
 
-    @overload
-    def __getitem__(self, index: slice) -> Sequence[Probe]: ...
+        ``None`` when there are no weights, which is not zero positions but every
+        position: one probe then describes the whole scan.
+        """
+        return None if self._opr_weights is None else self._opr_weights.shape[0]
 
-    def __getitem__(self, index: int | slice) -> Probe | Sequence[Probe]:
-        if isinstance(index, slice):
-            # slice.indices normalizes implicit bounds, negative indexes, and
-            # out-of-range values against the sequence length.
-            return [self[idx] for idx in range(*index.indices(len(self)))]
+    def iter_position_probes(
+        self, positions: Sequence[ProbePosition]
+    ) -> Iterator[tuple[ProbePosition, Probe]]:
+        """Yield ``(scan_position, probe)`` pairs for every scan position, in order.
+
+        Without OPR weights one probe describes the whole scan and is yielded at every
+        position. With them each position takes its own weight row, and weights carrying
+        more rows than the scan has positions are left unused -- a scan that is a prefix
+        of the one that solved the probe still pairs row for row.
+
+        Raises:
+            ValueError: when the OPR weights describe fewer positions than the scan
+                holds, which leaves later positions with no row to take. Reconcile the
+                weights with an OPR weight policy before pairing them with this scan.
+        """
+        num_positions = len(positions)
+        num_opr_positions = self.num_opr_positions
+
+        if num_opr_positions is not None and num_opr_positions < num_positions:
+            raise ValueError(
+                f'Probe carries OPR weights for {num_opr_positions} probe position(s)'
+                f' but the product has {num_positions}!'
+            )
+
+        for index, position in enumerate(positions):
+            yield position, self.get_probe(index)
+
+    def get_probe(self, position_index: int) -> Probe:
+        """Return the probe at scan position ``position_index``.
+
+        Without OPR weights one probe describes the whole scan and every position
+        yields it. With them the index selects a weight row, which is why the valid
+        range is the row count rather than anything about the scan.
+
+        Raises:
+            IndexError: when ``position_index`` is negative, or when OPR weights are
+                present and it falls outside them. A position index is a non-negative
+                ordinal rather than a Python sequence index, so a negative value is
+                refused instead of counting from the end.
+        """
+        if position_index < 0:
+            raise IndexError(f'Probe position index {position_index} is negative!')
+
+        num_opr_positions = self.num_opr_positions
+
+        if num_opr_positions is not None and position_index >= num_opr_positions:
+            raise IndexError(
+                f'Probe position index {position_index} is out of range for OPR weights'
+                f' describing {num_opr_positions} position(s)!'
+            )
 
         array = self._array[0, :, :, :].copy()
 
         if self._opr_weights is not None:
             array[0, :, :] = numpy.tensordot(
-                self._opr_weights[index, :], self._array[:, 0, :, :], axes=1
+                self._opr_weights[position_index, :], self._array[:, 0, :, :], axes=1
             )
 
         return Probe(array, self.get_pixel_geometry())
+
+    def get_opr_basis(self) -> ComplexArrayType:
+        """Coherent modes at incoherent index 0, shape ``(num_coherent_modes, h, w)``.
+
+        This is the basis the OPR weights mix. It is the whole stack regardless of
+        whether weights are present; an ensemble without them simply never mixes it.
+        """
+        return self._array[:, 0, :, :]
+
+    def compose_opr_field(self, weights: RealArrayType) -> ComplexArrayType:
+        """Mix the coherent basis by ``weights`` into one complex field.
+
+        :meth:`get_probe` composes a position's dominant incoherent mode from that
+        position's weight row. Passing a row here gives the same field, and passing
+        anything else gives the field that weighting would produce -- a deviation
+        from the across-scan mean, for instance, which is not a stored row.
+        """
+        return numpy.tensordot(weights, self.get_opr_basis(), axes=1)
 
     def get_probe_no_opr(self) -> Probe:
         array = self._array[0, :, :, :].copy()
@@ -1112,9 +1401,6 @@ class ProbeSequence(Sequence[Probe]):
             pixel_width_m=pixel_geometry.width_m,
             pixel_height_m=pixel_geometry.height_m,
         )
-
-    def __len__(self) -> int:
-        return 1 if self._opr_weights is None else self._opr_weights.shape[0]
 
     def __repr__(self) -> str:
         return f'{self._array.dtype}{self._array.shape}'
@@ -1231,6 +1517,10 @@ class OPRModeSeries:
 
         return float(self.deviation_photon_count.mean() / mean_primary)
 
+    def get_mean_weight(self) -> RealArrayType:
+        """Across-scan mean of each coherent mode's weight, shape ``(num_modes,)``."""
+        return numpy.array([stat.mean_weight for stat in self.mode_statistics])
+
     def save_npz(self, file_path: Path) -> None:
         numpy.savez_compressed(
             file_path,
@@ -1240,7 +1530,7 @@ class OPRModeSeries:
             deviation_photon_count=self.deviation_photon_count,
             total_photon_count=self.total_photon_count,
             secondary_mode_photon_count=self.secondary_mode_photon_count,
-            mean_weight=numpy.array([stat.mean_weight for stat in self.mode_statistics]),
+            mean_weight=self.get_mean_weight(),
             weight_deviation=numpy.array([stat.weight_deviation for stat in self.mode_statistics]),
             variance_fraction=numpy.array(
                 [stat.variance_fraction for stat in self.mode_statistics]
@@ -1264,7 +1554,7 @@ def _evaluate_weight_quadratic_form(weight: RealArrayType, gram: RealArrayType) 
 
 
 def compute_opr_mode_series(
-    probes: ProbeSequence, *, variance_fraction_threshold: float = 0.95
+    probes: ProbeEnsemble, *, variance_fraction_threshold: float = 0.95
 ) -> OPRModeSeries:
     """Reduce an OPR probe ensemble to per-position diagnostics.
 
@@ -1370,9 +1660,9 @@ def _centered_grid_indexes(
     return offsets_px * (target_pixel_m / source_pixel_m) + (source_px - 1) / 2
 
 
-def resample_probe_sequence(
-    probes: ProbeSequence, target_geometry: ProbeGeometry, *, rel_tol: float = 1.0e-9
-) -> ProbeSequence:
+def resample_probe_ensemble(
+    probes: ProbeEnsemble, target_geometry: ProbeGeometry, *, rel_tol: float = 1.0e-9
+) -> ProbeEnsemble:
     """Re-express ``probes`` on ``target_geometry``, preserving the integrated power.
 
     A probe saved by a previous run samples the illumination at that run's pixel size,
@@ -1460,7 +1750,7 @@ def resample_probe_sequence(
     source_area_m2 = pixel_geometry.width_m * pixel_geometry.height_m
     target_area_m2 = target_geometry.pixel_width_m * target_geometry.pixel_height_m
 
-    return ProbeSequence(
+    return ProbeEnsemble(
         array=resampled * numpy.sqrt(target_area_m2 / source_area_m2),
         opr_weights=probes.get_opr_weights_or_none(),
         pixel_geometry=target_geometry.get_pixel_geometry(),
@@ -1499,7 +1789,7 @@ class OPRWeightPolicy(Enum):
     """Keep coherent mode 0 and drop the remaining modes along with the weights."""
 
 
-def _pixel_geometry_or_none(probes: ProbeSequence) -> PixelGeometry | None:
+def _pixel_geometry_or_none(probes: ProbeEnsemble) -> PixelGeometry | None:
     """Pixel geometry of ``probes``, or ``None`` when it records none."""
     try:
         return probes.get_pixel_geometry()
@@ -1509,12 +1799,12 @@ def _pixel_geometry_or_none(probes: ProbeSequence) -> PixelGeometry | None:
 
 def conform_opr_weights(
     rng: numpy.random.Generator,
-    probes: ProbeSequence,
+    probes: ProbeEnsemble,
     num_positions: int,
     policy: OPRWeightPolicy,
     *,
     small_value: float = 1.0e-6,
-) -> ProbeSequence:
+) -> ProbeEnsemble:
     """Re-express ``probes`` so its OPR weights describe ``num_positions`` probe positions.
 
     OPR weights carry one row per probe position, so a probe solved on one scan cannot
@@ -1532,7 +1822,7 @@ def conform_opr_weights(
     weights the modes lack.
 
     :attr:`OPRWeightPolicy.COLLAPSE` applies the mean row across every incoherent mode,
-    where :meth:`ProbeSequence.__getitem__` only ever rewrites incoherent mode 0 from the
+    where :meth:`ProbeEnsemble.get_probe` only ever rewrites incoherent mode 0 from the
     coherent basis.
 
     Args:
@@ -1574,7 +1864,7 @@ def conform_opr_weights(
             return probes
         case OPRWeightPolicy.AVERAGE if weights is not None:
             mean_row = weights.mean(axis=0)
-            return ProbeSequence(
+            return ProbeEnsemble(
                 array=array,
                 opr_weights=numpy.broadcast_to(mean_row, (num_positions, num_cmodes)).copy(),
                 pixel_geometry=pixel_geometry,
@@ -1585,14 +1875,14 @@ def conform_opr_weights(
         case OPRWeightPolicy.REINITIALIZE:
             reinitialized = small_value * rng.normal(size=(num_positions, num_cmodes))
             reinitialized[:, 0] = 1.0
-            return ProbeSequence(
+            return ProbeEnsemble(
                 array=array,
                 opr_weights=reinitialized,
                 pixel_geometry=pixel_geometry,
             )
         case OPRWeightPolicy.COLLAPSE if weights is not None:
             mean_row = weights.mean(axis=0)
-            return ProbeSequence(
+            return ProbeEnsemble(
                 array=numpy.tensordot(mean_row, array, axes=1).astype(array.dtype),
                 opr_weights=None,
                 pixel_geometry=pixel_geometry,
@@ -1601,26 +1891,16 @@ def conform_opr_weights(
             # DISCARD, and COLLAPSE with no mean row to weight by. Copying rather than
             # slicing keeps the discarded modes from staying resident behind a view of
             # the original buffer.
-            return ProbeSequence(
+            return ProbeEnsemble(
                 array=array[:1].copy(),
                 opr_weights=None,
                 pixel_geometry=pixel_geometry,
             )
 
 
-class ProbeFileReader(ABC):
+class ProbeFileReader(FileReader[ProbeEnsemble]):
     """Plugin interface for reading probe sequences."""
 
-    @abstractmethod
-    def read(self, file_path: Path) -> ProbeSequence:
-        """Read a probe sequence from file."""
-        pass
 
-
-class ProbeFileWriter(ABC):
+class ProbeFileWriter(FileWriter[ProbeEnsemble]):
     """Plugin interface for writing probe sequences."""
-
-    @abstractmethod
-    def write(self, file_path: Path, probes: ProbeSequence) -> None:
-        """Write a probe sequence to file."""
-        pass

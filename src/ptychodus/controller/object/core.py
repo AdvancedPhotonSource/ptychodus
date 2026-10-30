@@ -2,14 +2,15 @@ from __future__ import annotations
 import logging
 
 from PyQt5.QtCore import QModelIndex, QStringListModel
-from PyQt5.QtWidgets import QAbstractItemView, QDialog
+from PyQt5.QtWidgets import QAbstractItemView, QDialog, QStatusBar
 
-from ptychodus.api.observer import SequenceObserver
+from ptychodus.model.observer import SequenceObserver
 
 from ...model.analysis import FourierAnalyzer, FourierRingCorrelator, XMCDAnalyzer
 from ...model.product import ObjectAPI, ObjectRepository
 from ...model.product.object import ObjectRepositoryItem
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
+from ...view.image import ImageView
 from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
@@ -18,7 +19,7 @@ from ..image import ImageController
 from .editor_factory import ObjectEditorViewControllerFactory
 from .fourier import FourierAnalysisViewController
 from .frc import FourierRingCorrelationViewController
-from .tree_model import ObjectTreeModel, try_get_object
+from .tree_model import Column, ObjectTreeModel, try_get_object
 from .xmcd import XMCDViewController
 
 logger = logging.getLogger(__name__)
@@ -29,21 +30,23 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         self,
         repository: ObjectRepository,
         api: ObjectAPI,
-        image_controller: ImageController,
+        image_view: ImageView,
         correlator: FourierRingCorrelator,
         fourier_analyzer: FourierAnalyzer,
-        fourier_real_space_visualization_engine: VisualizationEngine,
-        fourier_reciprocal_space_visualization_engine: VisualizationEngine,
         xmcd_analyzer: XMCDAnalyzer,
-        xmcd_structural_visualization_engine: VisualizationEngine,
-        xmcd_magnetic_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
+        status_bar: QStatusBar,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._repository = repository
         self._api = api
-        self._image_controller = image_controller
+        self._image_controller = ImageController(
+            VisualizationEngine(is_complex=True),
+            image_view,
+            status_bar,
+            file_dialog_factory,
+        )
         self._view = view
         self._file_dialog_factory = file_dialog_factory
         self._tree_model = ObjectTreeModel(repository, api, create_brush_for_editable_cell(view))
@@ -54,14 +57,10 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         )
         self._fourier_view_controller = FourierAnalysisViewController(
             fourier_analyzer,
-            fourier_real_space_visualization_engine,
-            fourier_reciprocal_space_visualization_engine,
             file_dialog_factory,
         )
         self._xmcd_view_controller = XMCDViewController(
             xmcd_analyzer,
-            xmcd_structural_visualization_engine,
-            xmcd_magnetic_visualization_engine,
             file_dialog_factory,
             self._tree_model,
         )
@@ -78,7 +77,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         view.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         header = view.tree_view.header()
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
-        view.tree_view.setItemDelegateForColumn(2, builder_item_delegate)
+        view.tree_view.setItemDelegateForColumn(Column.BUILDER.index, builder_item_delegate)
         selection_model = view.tree_view.selectionModel()
 
         if selection_model is None:
@@ -141,8 +140,8 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         file_path, name_filter = self._file_dialog_factory.get_open_file_path(
             self._view,
             'Open Object',
-            name_filters=[nf for nf in self._api.get_open_file_filters()],
-            selected_name_filter=self._api.get_open_file_filter(),
+            name_filters=self._api.file_readers.get_filters(),
+            selected_name_filter=self._api.file_readers.get_filter(),
         )
 
         if file_path:
@@ -185,8 +184,8 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         file_path, name_filter = self._file_dialog_factory.get_save_file_path(
             self._view,
             'Save Object',
-            name_filters=[nameFilter for nameFilter in self._api.get_save_file_filters()],
-            selected_name_filter=self._api.get_save_file_filter(),
+            name_filters=self._api.file_writers.get_filters(),
+            selected_name_filter=self._api.file_writers.get_filter(),
         )
 
         if file_path:

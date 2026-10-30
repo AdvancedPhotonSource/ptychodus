@@ -1,9 +1,10 @@
 import logging
 
+from ptychodus.api.files import FileFormat
 from ptychodus.api.xmcd import XMCDResult
 
 from ...model.analysis import XMCDAnalyzer
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
 from ...view.object import XMCDDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
@@ -12,15 +13,13 @@ from .tree_model import ObjectTreeModel
 
 logger = logging.getLogger(__name__)
 
-_SAVE_FILE_FILTER = 'NumPy Zipped Archive (*.npz)'
+_SAVE_FILE_FILTER = FileFormat.NPZ.file_filter
 
 
 class XMCDViewController:
     def __init__(
         self,
         analyzer: XMCDAnalyzer,
-        structural_visualization_engine: VisualizationEngine,
-        magnetic_visualization_engine: VisualizationEngine,
         file_dialog_factory: FileDialogFactory,
         tree_model: ObjectTreeModel,
     ) -> None:
@@ -38,13 +37,13 @@ class XMCDViewController:
         self._dialog.parameters_view.save_button.clicked.connect(self._save_data)
 
         self._structural_image_controller = ImageController(
-            structural_visualization_engine,
+            VisualizationEngine(is_complex=True),
             self._dialog.structural_view,
             self._dialog.status_bar,
             file_dialog_factory,
         )
         self._magnetic_image_controller = ImageController(
-            magnetic_visualization_engine,
+            VisualizationEngine(is_complex=True),
             self._dialog.magnetic_view,
             self._dialog.status_bar,
             file_dialog_factory,

@@ -19,13 +19,18 @@ pytest.importorskip('ptychi')
 from ptychodus.api.assemble import AssembledDiffractionData  # noqa: E402
 from ptychodus.api.diffraction import (  # noqa: E402
     DiffractionIndexes,
-    DiffractionPatternCounts,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.geometry import PixelGeometry  # noqa: E402
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence  # noqa: E402
 from ptychodus.cli import _reconstruct_standard as rs  # noqa: E402
-from ptychodus.cli._reconstruct_standard import InstrumentProfile  # noqa: E402
+from ptychodus.cli._reconstruct_standard import InstrumentProfile
+from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.probe import ProbeGeometry
+from ptychodus.api.propagate import compute_magnification
+
+DETECTOR_PIXEL_M = 7.5e-5
+# noqa: E402
 
 from diffraction_dataset_fixtures import FailingArray, make_dataset  # noqa: E402
 
@@ -111,6 +116,12 @@ def test_unconditioned_profile_drops_the_conditioning_options() -> None:
         'max_valid_count',
         'bad_pixels_file',
         'bad_pixels_file_type',
+        'background_file',
+        'background_file_type',
+        'subtract_background',
+        'flat_field_file',
+        'flat_field_file_type',
+        'divide_flat_field',
     ):
         assert not hasattr(args, absent), absent
 
@@ -140,6 +151,55 @@ def test_logger_names_stay_per_driver() -> None:
         assert profile.logger_name == f'reconstruct_{name}'
 
 
+def test_every_profile_offers_prepare_only() -> None:
+    for name, profile in _profiles().items():
+        assert _defaults(profile).prepare_only is False, name
+
+
+def test_prepare_only_and_dry_run_are_exclusive() -> None:
+    parser = rs.build_standard_parser(_profiles()['2ide'])
+
+    with pytest.raises(SystemExit) as caught:
+        parser.parse_args(
+            [
+                '--diffraction-file',
+                'd',
+                '--position-file',
+                'p',
+                '--output-directory',
+                'o',
+                '--prepare-only',
+                '--dry-run',
+            ]
+        )
+
+    assert caught.value.code == 2
+
+
+def test_prepare_only_refuses_to_skip_the_patterns(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A prepared directory without diffraction.h5 cannot be reconstructed, so the
+    # combination is rejected before any file is read.
+    monkeypatch.setattr(
+        'sys.argv',
+        [
+            'ptychodus-reconstruct-2ide',
+            '--diffraction-file',
+            'd',
+            '--position-file',
+            'p',
+            '--output-directory',
+            'o',
+            '--prepare-only',
+            '--no-save-diffraction',
+        ],
+    )
+
+    with pytest.raises(SystemExit) as caught:
+        rs.run_standard_reconstruction(_profiles()['2ide'])
+
+    assert caught.value.code == 2
+
+
 # --- pattern filters ------------------------------------------------------------------
 
 
@@ -156,9 +216,7 @@ def test_mad_bounds_brackets_the_median_of_a_spread() -> None:
     assert upper < 1000.0
 
 
-def _assembled(
-    indexes: DiffractionIndexes, counts: DiffractionPatternCounts | None = None
-) -> AssembledDiffractionData:
+def _assembled(indexes: DiffractionIndexes) -> AssembledDiffractionData:
     """A real AssembledDiffractionData over constant 2x2 frames.
 
     The filters under test slice one of these and rebuild it, so they are handed
@@ -170,7 +228,6 @@ def _assembled(
         patterns=numpy.ones((indexes.size, 2, 2), dtype=numpy.uint16),
         pixel_geometry=PixelGeometry(width_m=1.0, height_m=1.0),
         bad_pixels=numpy.zeros((2, 2), dtype=numpy.bool_),
-        probe_photon_counts=counts,
     )
 
 
@@ -231,3 +288,121 @@ def test_total_counts_bounds_is_inert_when_both_options_are_off() -> None:
         None,
         None,
     )
+
+
+def test_select_patterns_keeps_the_detector_maps() -> None:
+    data = AssembledDiffractionData(
+        indexes=numpy.arange(3),
+        patterns=numpy.ones((3, 2, 2)),
+        pixel_geometry=PixelGeometry(width_m=1.0, height_m=1.0),
+        bad_pixels=numpy.zeros((2, 2), dtype=numpy.bool_),
+        background=numpy.full((2, 2), 4.0),
+        flat_field=numpy.full((2, 2), 0.5),
+    )
+
+    selected = rs._select_patterns(logger, data, numpy.array([True, False, True]), 'A filter')
+
+    numpy.testing.assert_array_equal(selected.get_background(), 4.0)
+    numpy.testing.assert_array_equal(selected.get_flat_field(), 0.5)
+
+
+def test_conditioning_profiles_offer_the_detector_map_options() -> None:
+    args = _defaults(_profiles()['12ide'])
+
+    assert args.background_file is None
+    assert args.background_file_type == 'NPY'
+    assert not args.subtract_background
+    assert args.flat_field_file is None
+    assert args.flat_field_file_type == 'NPY'
+    assert not args.divide_flat_field
+
+
+class TestNearFieldOptIn:
+    """Near field is declared, never inferred, and no existing run changes."""
+
+    def test_every_profile_defaults_to_far_field(self) -> None:
+        for name, profile in _profiles().items():
+            assert profile.default_far_field is True, name
+
+    def test_the_flag_is_unset_rather_than_false_by_default(self) -> None:
+        # The file may declare the regime, so "the user said nothing" has to stay
+        # distinguishable from "the user asked for far field".
+        for name, profile in _profiles().items():
+            assert _defaults(profile).near_field is None, name
+
+    def test_the_flag_is_accepted_with_a_focus_distance(self) -> None:
+        parser = rs.build_standard_parser(_profiles()['lamni'])
+
+        args = parser.parse_args(
+            [
+                '--diffraction-file',
+                'd',
+                '--position-file',
+                'p',
+                '--output-directory',
+                'o',
+                '--near-field',
+                '--focus-object-distance-m=-9e-4',
+            ]
+        )
+
+        assert args.near_field is True
+        assert args.focus_object_distance_m == pytest.approx(-9e-4)
+
+    def test_a_negative_focus_distance_needs_the_equals_form(self) -> None:
+        """The common case is negative, and argparse reads a bare -9e-4 as an option.
+
+        Its negative-number matcher only admits plain decimals, so scientific notation
+        has to be attached with '='. Pinned because the help text promises it.
+        """
+        parser = rs.build_standard_parser(_profiles()['lamni'])
+        base = [
+            '--diffraction-file',
+            'd',
+            '--position-file',
+            'p',
+            '--output-directory',
+            'o',
+        ]
+
+        assert parser.parse_args(
+            [*base, '--focus-object-distance-m', '-0.0009']
+        ).focus_object_distance_m == pytest.approx(-9e-4)
+
+        with pytest.raises(SystemExit):
+            parser.parse_args([*base, '--focus-object-distance-m', '-9e-4'])
+
+    def test_the_probe_propagation_distance_defaults_to_zero(self) -> None:
+        for name, profile in _profiles().items():
+            assert _defaults(profile).probe_propagation_distance_m == 0.0, name
+
+
+class TestNearFieldProbeGeometry:
+    """The regime decides how the detector grid maps onto the object."""
+
+    def _geometry(self, *, magnification: float) -> ProbeGeometry:
+        return ProbeGeometry.from_near_field(
+            PixelGeometry(width_m=DETECTOR_PIXEL_M, height_m=DETECTOR_PIXEL_M),
+            ImageExtent(width_px=64, height_px=64),
+            magnification=magnification,
+        )
+
+    def test_a_parallel_beam_samples_at_the_detector_pitch(self) -> None:
+        # No focusing optic means M = 1, where the angular spectrum preserves pitch.
+        geometry = self._geometry(magnification=compute_magnification(1.0, 0.0))
+
+        assert geometry.pixel_width_m == pytest.approx(DETECTOR_PIXEL_M)
+
+    def test_a_cone_beam_demagnifies_the_detector_pitch(self) -> None:
+        magnification = compute_magnification(1.0, -1.0e-3)
+        geometry = self._geometry(magnification=magnification)
+
+        assert magnification == pytest.approx(1001.0)
+        assert geometry.pixel_width_m == pytest.approx(DETECTOR_PIXEL_M / magnification)
+
+    def test_an_upstream_focus_magnifies_more_than_a_downstream_one(self) -> None:
+        """The sign is a real geometry choice, not a magnitude to take the absolute of."""
+        upstream = compute_magnification(1.0, -1.0e-3)
+        downstream = compute_magnification(1.0, +1.0e-3)
+
+        assert upstream > downstream

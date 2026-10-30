@@ -6,13 +6,20 @@ from typing import Final, Self
 import logging
 
 from ptychodus.api.assemble import (
+    CropSuggestion,
+    DetectorCorrections,
     DiffractionSummary,
     DiffractionTotalCounts,
     compute_dataset_total_counts,
+    suggest_crop_region,
     summarize_dataset,
 )
-from ptychodus.api.diffraction import BadPixels, CropRegion, DiffractionDataset
-from ptychodus.api.preprocess.diffraction import DiffractionPrepPipeline, DiffractionPrepPlan
+from ptychodus.api.diffraction import BadPixels, BeamCenter, CropRegion, DiffractionDataset
+from ptychodus.api.preprocess.diffraction import (
+    DiffractionPrepPipeline,
+    DiffractionPrepPlan,
+    estimate_beam_center,
+)
 
 from ..task_manager import ForegroundTaskManager, TaskManager
 from ..task_monitor import TaskProgressMonitor
@@ -27,7 +34,7 @@ __all__ = [
     'TotalCountsBackgroundTask',
 ]
 
-_TotalCountsKey = tuple[int, DiffractionPrepPlan, bool, str, str]
+_TotalCountsKey = tuple[int, DiffractionPrepPlan, tuple[object, ...]]
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +112,10 @@ class SummarizeBackgroundTask:
             if monitor.is_stopping:
                 # Preserve any prior summary; a cancelled run publishes nothing.
                 return
-            self._service._publish(summary)
+            bad_pixels = (
+                self._source.get_bad_pixels() if self._bad_pixels is None else self._bad_pixels
+            )
+            self._service._publish(summary, self._source, bad_pixels)
 
 
 class TotalCountsBackgroundTask:
@@ -127,6 +137,7 @@ class TotalCountsBackgroundTask:
         bad_pixels: BadPixels | None,
         read_region: CropRegion | None,
         cache_key: _TotalCountsKey,
+        corrections: DetectorCorrections | None = None,
     ) -> None:
         self._service = service
         self._source = source
@@ -134,6 +145,7 @@ class TotalCountsBackgroundTask:
         self._bad_pixels = bad_pixels
         self._read_region = read_region
         self._cache_key = cache_key
+        self._corrections = corrections
 
     def __call__(self) -> None:
         with self._service.task_monitor.run_as(self.ACTOR) as monitor:
@@ -142,6 +154,7 @@ class TotalCountsBackgroundTask:
                 self._pipeline,
                 bad_pixels=self._bad_pixels,
                 read_region=self._read_region,
+                corrections=self._corrections,
                 on_progress=monitor.update_progress,
                 should_stop=lambda: monitor.is_stopping,
             )
@@ -187,6 +200,8 @@ class DiffractionSummaryService:
         self._pipeline_builder = PrepPipelineBuilder(diffraction_settings)
         self.task_monitor = DiffractionSummaryTaskMonitor(task_manager)
         self._last_summary: DiffractionSummary | None = None
+        self._last_source: DiffractionDataset | None = None
+        self._last_bad_pixels: BadPixels | None = None
         self._last_run_id = 0
         self._last_total_counts: DiffractionTotalCounts | None = None
         self._last_total_counts_key: _TotalCountsKey | None = None
@@ -194,6 +209,48 @@ class DiffractionSummaryService:
 
     def get_last_summary(self) -> DiffractionSummary | None:
         return self._last_summary
+
+    def estimate_beam_center(self) -> BeamCenter:
+        """Estimate the beam center from the last summary's mean pattern.
+
+        The pattern is cut by the configured value filter first, as every pattern the
+        pipeline processes is. Raises ``ValueError`` when no summary has been published.
+        """
+        summary, _, _ = self._require_last_summary()
+        value_filter = self._pipeline_builder.get_value_filter()
+        mean_pattern = summary.mean_pattern
+        return estimate_beam_center(
+            mean_pattern if value_filter is None else value_filter.apply(mean_pattern)
+        )
+
+    def suggest_crop_region(self, beam_center: BeamCenter) -> CropSuggestion:
+        """Suggest the power-of-two crop about `beam_center` holding the last summary's signal.
+
+        The mean pattern is prepared as a load would prepare it -- the configured value
+        filter, then the detector corrections the current settings name -- over the mask
+        the summary was computed with. Raises ``ValueError`` when no summary has been
+        published or no signal rises above the noise floor, and the map loaders' errors
+        when a configured map file cannot be read.
+        """
+        summary, source, bad_pixels = self._require_last_summary()
+        return suggest_crop_region(
+            summary.mean_pattern,
+            beam_center,
+            source.get_metadata().detector_extent,
+            bad_pixels=bad_pixels,
+            value_filter=self._pipeline_builder.get_value_filter(),
+            corrections=self._load_corrections(source),
+        )
+
+    def _require_last_summary(self) -> tuple[DiffractionSummary, DiffractionDataset, BadPixels]:
+        summary = self._last_summary
+        source = self._last_source
+        bad_pixels = self._last_bad_pixels
+
+        if summary is None or source is None or bad_pixels is None:
+            raise ValueError('No summary has been computed yet.')
+
+        return summary, source, bad_pixels
 
     def get_last_run_id(self) -> int:
         """Monotonic counter incremented every time a summary is published.
@@ -224,8 +281,7 @@ class DiffractionSummaryService:
         try:
             key = self._build_total_counts_key(dataset_index)
         except ValueError:
-            # An incomplete plan (e.g. a bin size that does not divide the crop)
-            # cannot match anything that was measured.
+            # No dataset at that index, so there is nothing a cached pass could match.
             return True
 
         return key != self._last_total_counts_key
@@ -233,9 +289,9 @@ class DiffractionSummaryService:
     def _build_total_counts_key(self, dataset_index: int) -> _TotalCountsKey:
         """Identify a counts pass by everything that changes the numbers it yields.
 
-        Raises ``ValueError`` when the live settings do not describe a usable prep
-        plan. The bad-pixels mask enters the key by its settings rather than its
-        contents so the key stays free of file I/O.
+        Raises ``ValueError`` when there is no dataset at ``dataset_index``. The
+        bad-pixels mask and the detector maps enter the key by their settings rather
+        than their contents so the key stays free of file I/O.
         """
         repository = self._api.get_repository()
 
@@ -245,13 +301,22 @@ class DiffractionSummaryService:
         detector_extent = repository[dataset_index].get_source().get_metadata().detector_extent
         plan = self._pipeline_builder.get_plan(detector_extent)
 
-        return (
-            dataset_index,
-            plan,
-            self._detector_settings.bad_pixels_enabled.get_value(),
-            str(self._detector_settings.bad_pixels_file_path.get_value()),
-            self._detector_settings.bad_pixels_file_type.get_value(),
+        settings = self._detector_settings
+        detector_inputs = (
+            settings.bad_pixels_enabled.get_value(),
+            str(settings.bad_pixels_file_path.get_value()),
+            settings.bad_pixels_file_type.get_value(),
+            settings.background_enabled.get_value(),
+            str(settings.background_file_path.get_value()),
+            settings.background_file_type.get_value(),
+            settings.subtract_background.get_value(),
+            settings.flat_field_enabled.get_value(),
+            str(settings.flat_field_file_path.get_value()),
+            settings.flat_field_file_type.get_value(),
+            settings.divide_flat_field.get_value(),
+            settings.flat_field_floor.get_value(),
         )
+        return (dataset_index, plan, detector_inputs)
 
     def compute_total_counts(self, dataset_index: int, *, force: bool = False) -> bool:
         """Kick off a background counts pass for the dataset at ``dataset_index``.
@@ -273,10 +338,17 @@ class DiffractionSummaryService:
             raise ValueError('Pending dataset has no arrays to measure.')
 
         bad_pixels = self._load_bad_pixels()
+        corrections = self._load_corrections(source)
         plan = key[1]
         self._task_manager.put_background_task(
             TotalCountsBackgroundTask(
-                self, source, plan.pipeline, bad_pixels, plan.read_region, key
+                self,
+                source,
+                plan.pipeline,
+                bad_pixels,
+                plan.read_region,
+                key,
+                corrections=corrections,
             )
         )
         return True
@@ -305,6 +377,36 @@ class DiffractionSummaryService:
         bad_pixels = self._load_bad_pixels()
         self._task_manager.put_background_task(SummarizeBackgroundTask(self, source, bad_pixels))
 
+    def _load_corrections(self, source: DiffractionDataset) -> DetectorCorrections:
+        """Build the detector corrections a load would use, from files the settings name.
+
+        A map whose file is not enabled falls back to the one the source carries.
+        """
+        settings = self._detector_settings
+        background = (
+            self._api.load_background(
+                settings.background_file_path.get_value(),
+                settings.background_file_type.get_value(),
+            )
+            if settings.background_enabled.get_value()
+            else source.get_background()
+        )
+        flat_field = (
+            self._api.load_flat_field(
+                settings.flat_field_file_path.get_value(),
+                settings.flat_field_file_type.get_value(),
+            )
+            if settings.flat_field_enabled.get_value()
+            else source.get_flat_field()
+        )
+        return DetectorCorrections(
+            background=background,
+            flat_field=flat_field,
+            subtract_background=settings.subtract_background.get_value(),
+            divide_flat_field=settings.divide_flat_field.get_value(),
+            flat_field_floor=settings.flat_field_floor.get_value(),
+        )
+
     def _load_bad_pixels(self) -> BadPixels | None:
         """Load the configured bad-pixels mask, or None when the override is off."""
         if not self._detector_settings.bad_pixels_enabled.get_value():
@@ -315,7 +417,9 @@ class DiffractionSummaryService:
             self._detector_settings.bad_pixels_file_type.get_value(),
         )
 
-    def _publish(self, summary: DiffractionSummary) -> None:
+    def _publish(
+        self, summary: DiffractionSummary, source: DiffractionDataset, bad_pixels: BadPixels
+    ) -> None:
         """Called on the background thread inside ``SummarizeBackgroundTask`` to
         publish a winning summary. The monitor's ``__exit__`` fires immediately
         after (on the same thread) and its foreground-queued notification is
@@ -323,6 +427,8 @@ class DiffractionSummaryService:
         read ``get_last_summary()``.
         """
         self._last_summary = summary
+        self._last_source = source
+        self._last_bad_pixels = bad_pixels
         self._last_run_id += 1
 
     def _publish_total_counts(

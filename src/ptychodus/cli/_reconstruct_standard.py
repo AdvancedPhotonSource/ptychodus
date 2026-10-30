@@ -8,6 +8,11 @@ what the fallback geometry is when a file records none, and how the files are de
 :func:`run_standard_reconstruction` runs the pipeline, so a driver is a profile and a
 ``main()`` rather than a copy of the pipeline.
 
+A driver can also stop after the preparation: ``--prepare-only`` writes the assembled
+patterns, the initial product and the aligned pty-chi options as a prepared directory and
+exits, and ``ptychodus-reconstruct`` runs the reconstruction from that directory later,
+on another node or with other options, without reading the raw files again.
+
 Two instruments vary more than a constant. A reader whose patterns arrive already cropped and
 centered sets ``conditions_patterns=False``, which drops the conditioning stage and the
 options that drive it. An instrument that wants the MAD and end-trim pattern filters sets
@@ -24,9 +29,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy
+from ptychi.api.options.task import PtychographyTaskOptions
 
 from ptychodus.api.assemble import (
     AssembledDiffractionData,
+    DetectorCorrections,
     assemble_dataset,
     compute_dataset_total_counts,
 )
@@ -38,42 +45,53 @@ from ptychodus.api.diffraction import (
     DiffractionMetadata,
 )
 from ptychodus.api.exit_codes import ExitCode
+from ptychodus.api.typing import BooleanArrayType, RealArrayType
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.io import StandardFileLayout
+from ptychodus.api.io import StandardFileLayout, save_product
 from ptychodus.api.object import compute_object_geometry
+from ptychodus.api.propagate import compute_magnification
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import (
     DiffractionPrepPipeline,
     FilterValuesStep,
 )
 from ptychodus.api.preprocess.noise import compute_robust_statistics
-from ptychodus.api.probe import Probe, ProbeGeometry, ProbeSequence
+from ptychodus.api.probe import Probe, ProbeGeometry, ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePositionSequence
-from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.reconstruct import prepare_reconstruct_input
+from ptychodus.api.product import Product, ProductMetadata, reconcile_defocus_distance_m
 from ptychodus.api.simulate.object import generate_uniform_object
 from ptychodus.api.simulate.probe import (
     generate_average_pattern_probe,
     generate_coherent_probe_modes,
     generate_fresnel_zone_plate_probe,
     generate_incoherent_probe_modes,
+    rescale_probe_intensity,
 )
 from ptychodus.cli import (
     DirectoryType,
+    add_detector_map_arguments,
     add_log_level_argument,
     configure_logging,
     positive_int,
+    positive_int_or_auto,
+    read_detector_corrections,
 )
 from ptychodus.cli._reconstruct_common import (
     add_print_ptychi_options_argument,
+    estimate_incident_beam_from_assembled_data,
     add_ptychi_options_argument,
     install_signal_handlers,
     invalid_count_threshold,
+    is_main_process,
     load_ptychi_options,
+    pair_patterns_with_positions,
     resolve_crop_region,
+    resolve_flag,
+    resolve_focus_object_distance_m,
     resolve_quantity,
     run_reconstruction,
     save_assembled_diffraction,
+    save_ptychi_options,
 )
 
 __all__ = ['InstrumentProfile', 'build_standard_parser', 'run_standard_reconstruction']
@@ -99,6 +117,10 @@ class InstrumentProfile:
     # None means the file must record a pixel size and it is an error when it does not.
     default_detector_pixel_size_m: float | None = None
 
+    # Near field is opt-in everywhere: no instrument declares it by default, so no
+    # existing run changes behavior.
+    default_far_field: bool = True
+
     default_fzp_preset: str = ''
     default_fzp_defocus_m: float = 0.0
     default_bad_pixels_reader: str = 'NPY_Bad_Pixels'
@@ -110,6 +132,8 @@ class InstrumentProfile:
     offers_detector_pixel_size: bool = False
     # True adds --probe-photon-count, for a layout whose recorded flux is worth overriding.
     offers_probe_photon_count: bool = False
+    # Incident photons per unit of the I0 the positions carry; zero leaves I0 uncalibrated.
+    default_i0_photons_per_count: float = 0.0
     # True adds the MAD and end-trim pattern filters. They are instrument-agnostic; this
     # only decides which instruments offer them.
     offers_pattern_filters: bool = False
@@ -140,7 +164,8 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
         help=(
             'Destination directory, written in the ptychodus standard layout: '
             'diffraction.h5, ptychi_options.yaml, per-epoch product.NNNNNN.h5 '
-            'checkpoints, and the final product.h5.'
+            'checkpoints, and the final product.h5. With --prepare-only, the prepared '
+            'directory: diffraction.h5, the initial product.h5 and ptychi_options.yaml.'
         ),
     )
     parser.add_argument(
@@ -152,9 +177,11 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
     if profile.conditions_patterns:
         parser.add_argument(
             '--crop-extent-px',
-            type=positive_int,
+            type=positive_int_or_auto,
             default=None,
-            help='Square crop side in raw detector pixels, about the beam center. Omit to skip.',
+            help='Square crop side in raw detector pixels, about the beam center, or "auto" '
+            'for the smallest power of two holding the signal above the noise floor. '
+            'Omit to skip.',
         )
         parser.add_argument(
             '--beam-center-x-px',
@@ -222,6 +249,7 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
             default=profile.default_bad_pixels_reader,
             help='Name of the bad-pixel file reader plugin.',
         )
+        add_detector_map_arguments(parser)
 
     parser.add_argument(
         '--probe-file',
@@ -247,6 +275,39 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
         type=float,
         default=profile.default_fzp_defocus_m,
         help='Defocus from the zone-plate focal plane. Ignored without --fzp-preset.',
+    )
+    parser.add_argument(
+        '--near-field',
+        action='store_true',
+        # None, not False: the file may declare the regime, and "unset" has to stay
+        # distinguishable from "the user asked for far field".
+        default=None,
+        help=(
+            'Reconstruct in the near field: the object is sampled at the detector pitch '
+            'demagnified, rather than through the Fraunhofer relation.'
+        ),
+    )
+    parser.add_argument(
+        '--focus-object-distance-m',
+        type=float,
+        default=None,
+        help=(
+            'Signed position of the beam focus with the origin at the object, so a focus '
+            'upstream is negative. Near field only; defaults to the negated '
+            '--fzp-defocus-m, which states the same displacement in the opposite frame. '
+            'Attach a negative value with "=" -- argparse reads a bare -9e-4 as an '
+            'option name, though -0.0009 is fine.'
+        ),
+    )
+    parser.add_argument(
+        '--probe-propagation-distance-m',
+        type=float,
+        default=0.0,
+        help=(
+            'Propagate the data-derived initial probe this far after back-propagating it, '
+            'to refine where the probe plane sits. Ignored with --fzp-preset or '
+            '--probe-file.'
+        ),
     )
     parser.add_argument(
         '--num-probe-modes',
@@ -282,6 +343,14 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
             help='Override the per-snapshot probe photon count.',
         )
     parser.add_argument(
+        '--i0-photons-per-count',
+        type=_non_negative_float,
+        default=profile.default_i0_photons_per_count,
+        help='Incident photons per unit of the I0 the probe positions carry, which sets the '
+        'probe photon count and the object transmission from I0. Zero (the default unless '
+        'the instrument names one) leaves I0 to correct beam decay only.',
+    )
+    parser.add_argument(
         '--tomography-angle-deg',
         type=float,
         default=None,
@@ -289,10 +358,21 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
     )
     add_ptychi_options_argument(parser)
     add_print_ptychi_options_argument(parser)
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         '--dry-run',
         action='store_true',
         help='Build everything and report the resolved configuration without reconstructing.',
+    )
+    mode.add_argument(
+        '--prepare-only',
+        action='store_true',
+        help=(
+            'Stop before reconstructing: write diffraction.h5, the initial product.h5 and the '
+            'aligned ptychi_options.yaml to the output directory and exit. Reconstruct it '
+            'later with "ptychodus-reconstruct -i OUTPUT_DIR -o RESULT_DIR". '
+            '--num-sync-epochs does not apply.'
+        ),
     )
     add_log_level_argument(parser)
     return parser
@@ -331,7 +411,16 @@ def _add_pattern_filter_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _mad_bounds(values: numpy.ndarray, k: float) -> tuple[float, float]:
+def _non_negative_float(text: str) -> float:
+    value = float(text)
+
+    if not value >= 0.0:
+        raise argparse.ArgumentTypeError(f'expected a non-negative number, got {text!r}')
+
+    return value
+
+
+def _mad_bounds(values: RealArrayType, k: float) -> tuple[float, float]:
     """Symmetric MAD interval about the median, excluding non-positive values.
 
     Reproduces the beamline script's ``_mad_mask(x, k, require_positive=True)``, zero-MAD
@@ -345,7 +434,7 @@ def _mad_bounds(values: numpy.ndarray, k: float) -> tuple[float, float]:
 def _select_patterns(
     logger: logging.Logger,
     assembled_data: AssembledDiffractionData,
-    keep: numpy.ndarray,
+    keep: BooleanArrayType,
     reason: str,
 ) -> AssembledDiffractionData:
     """Return the patterns `keep` selects, as a new AssembledDiffractionData.
@@ -372,18 +461,13 @@ def _select_patterns(
         int(keep.sum()),
     )
 
-    photon_counts = (
-        assembled_data.get_probe_photon_counts()[keep]
-        if assembled_data.has_measured_probe_photon_counts()
-        else None
-    )
-
     return AssembledDiffractionData(
         indexes=assembled_data.get_indexes()[keep],
         patterns=assembled_data.get_patterns()[keep],
         pixel_geometry=assembled_data.get_pixel_geometry(),
         bad_pixels=assembled_data.get_bad_pixels(),
-        probe_photon_counts=photon_counts,
+        background=assembled_data.get_background(),
+        flat_field=assembled_data.get_flat_field(),
     )
 
 
@@ -394,6 +478,7 @@ def _total_counts_bounds(
     pipeline: DiffractionPrepPipeline | None,
     bad_pixels: BadPixels | None,
     read_region: CropRegion | None,
+    corrections: DetectorCorrections | None = None,
 ) -> tuple[int | None, int | None]:
     """Resolve the total-counts window from --min-total-counts and --dp-mad-k.
 
@@ -410,7 +495,11 @@ def _total_counts_bounds(
 
     logger.info('Measuring per-pattern total counts for the --dp-mad-k window')
     measured = compute_dataset_total_counts(
-        raw_dataset, pipeline, bad_pixels=bad_pixels, read_region=read_region
+        raw_dataset,
+        pipeline,
+        bad_pixels=bad_pixels,
+        read_region=read_region,
+        corrections=corrections,
     )
     mad_lower, mad_upper = _mad_bounds(measured.total_counts.astype(float), args.dp_mad_k)
 
@@ -539,6 +628,28 @@ def _resolve_detector_pixel_size(
     return from_file
 
 
+def _warn_unused_probe_propagation(
+    logger: logging.Logger, args: argparse.Namespace, source: str
+) -> None:
+    """Say so when the propagation knob was set but the probe did not come from the data.
+
+    It applies to the back-propagated average pattern only, so on an instrument whose
+    profile carries a zone-plate preset it would otherwise be silently inert.
+    """
+    if args.probe_propagation_distance_m == 0.0:
+        return
+
+    # A zone-plate probe has its own way to move; a file-supplied one has none, so
+    # offering --fzp-defocus-m there would be advice the user cannot take.
+    remedy = ' Use --fzp-defocus-m to move a zone-plate probe.' if source == '--fzp-preset' else ''
+    logger.warning(
+        '--probe-propagation-distance-m %g is ignored: the initial probe came from %s.%s',
+        args.probe_propagation_distance_m,
+        source,
+        remedy,
+    )
+
+
 def _build_initial_probe(
     logger: logging.Logger,
     args: argparse.Namespace,
@@ -548,8 +659,18 @@ def _build_initial_probe(
     *,
     photon_wavelength_m: float,
     detector_distance_m: float,
+    far_field: bool,
+    focus_object_distance_m: float,
+    probe_photon_count: float,
 ) -> Probe:
-    """The probe the reconstruction starts from: a warm start, a zone plate, or the data."""
+    """The probe the reconstruction starts from: a warm start, a zone plate, or the data.
+
+    A generated probe is normalized to *probe_photon_count*, so its array carries the
+    photons the illumination delivers and is comparable with the patterns it will be
+    refined against. A warm start is left at the intensity it was reconstructed at:
+    rescaling it would decouple it from a matching object, because the data constrains
+    the product of the two and not either alone.
+    """
     if args.probe_file is not None:
         logger.info('Reading the initial probe from %s', args.probe_file)
         probe_reader = registry.probe_file_readers.get_strategy_by_name(args.probe_file_type)
@@ -565,16 +686,26 @@ def _build_initial_probe(
                 'Reconstruct with the same --crop-extent-px that produced it.'
             )
 
+        _warn_unused_probe_propagation(logger, args, '--probe-file')
         return Probe(array=array, pixel_geometry=probe_geometry.get_pixel_geometry())
 
     if args.fzp_preset:
+        _warn_unused_probe_propagation(logger, args, '--fzp-preset')
         logger.info('Simulating the initial probe from zone plate preset "%s"', args.fzp_preset)
         zone_plate = registry.fresnel_zone_plates.get_strategy_by_name(args.fzp_preset)
-        return generate_fresnel_zone_plate_probe(
-            probe_geometry,
-            zone_plate,
-            photon_wavelength_m=photon_wavelength_m,
-            defocus_distance_m=args.fzp_defocus_m,
+        return rescale_probe_intensity(
+            generate_fresnel_zone_plate_probe(
+                probe_geometry,
+                zone_plate,
+                photon_wavelength_m=photon_wavelength_m,
+                # The same displacement the product states, in the probe's frame. In far
+                # field the resolver leaves the focus at zero, so this is --fzp-defocus-m
+                # unchanged.
+                defocus_distance_m=reconcile_defocus_distance_m(
+                    focus_object_distance_m, args.fzp_defocus_m
+                ),
+            ),
+            probe_photon_count,
         )
 
     # No zone-plate preset applies, so the cold start comes from the data:
@@ -582,11 +713,63 @@ def _build_initial_probe(
     # optic at all, which is what lets one script shape serve zone plates, KB
     # mirrors and pinholes alike.
     logger.info('Estimating the initial probe by back-propagating the mean pattern')
-    return generate_average_pattern_probe(
+    probe = generate_average_pattern_probe(
         probe_geometry,
-        assembled_data,
+        assembled_data.get_mean_pattern(),
+        detector_pixel_geometry=assembled_data.get_pixel_geometry(),
+        bad_pixels=assembled_data.get_bad_pixels(),
+        background=assembled_data.get_background(),
+        flat_field=assembled_data.get_flat_field(),
         photon_wavelength_m=photon_wavelength_m,
         detector_distance_m=detector_distance_m,
+        far_field=far_field,
+        defocus_distance_m=args.probe_propagation_distance_m,
+    )
+
+    # The mean pattern carries the mean transmitted photons, which is less than the
+    # incident photon count wherever the sample absorbs; the probe states the illumination.
+    return rescale_probe_intensity(probe, probe_photon_count)
+
+
+def _write_prepared_directory(
+    logger: logging.Logger,
+    output_directory: Path,
+    assembled_data: AssembledDiffractionData,
+    product: Product,
+    options: PtychographyTaskOptions,
+) -> None:
+    """Write what a reconstruction starts from, so it can run later without the raw files.
+
+    The product is written unpaired -- every position the file recorded, with its I0 --
+    because pairing is deterministic and the reconstruction redoes it. It is still done
+    once here so that patterns and positions that do not overlap fail now rather than in a
+    queued job. The options are aligned against the paired product, which is the one that
+    will run, so a file the reconstruction would reject is rejected here as well.
+    """
+    product_file = StandardFileLayout.PRODUCT.path(output_directory)
+    previous_products = sorted(output_directory.glob(f'{product_file.stem}*{product_file.suffix}'))
+
+    if previous_products:
+        logger.warning(
+            'Overwriting %s with an initial product; %d product file(s) were already in %s, '
+            'which looks like an earlier reconstruction.',
+            product_file.name,
+            len(previous_products),
+            output_directory,
+        )
+
+    save_assembled_diffraction(logger, output_directory, assembled_data, skip=False)
+    reconstruct_input = pair_patterns_with_positions(logger, assembled_data, product)
+
+    if is_main_process():
+        logger.info('Writing %s', product_file)
+        save_product(product_file, product)
+
+    save_ptychi_options(logger, options, reconstruct_input.product, output_directory)
+    logger.info(
+        'Prepared %s; reconstruct it with: ptychodus-reconstruct -i %s -o RESULT_DIR',
+        output_directory,
+        output_directory,
     )
 
 
@@ -595,19 +778,27 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
 
     Parses the command line, assembles the dataset, builds an initial product and runs
     pty-chi to convergence, writing the standard layout into ``--output-directory``.
+    With ``--prepare-only`` it stops ahead of pty-chi instead, and writes a prepared
+    directory that ``ptychodus-reconstruct`` takes as its input.
 
     To reconstruct with something other than stock LSQML, pass a pty-chi options file with
     ``--ptychi-options``; any ptychodus run writes one to ``ptychi_options.yaml``, and
     its algorithm stamp selects the reconstructor.
     """
     logger = logging.getLogger(profile.logger_name)
-    args = build_standard_parser(profile).parse_args()
+    parser = build_standard_parser(profile)
+    args = parser.parse_args()
+
+    if args.prepare_only and args.no_save_diffraction:
+        parser.error('--prepare-only needs diffraction.h5; drop --no-save-diffraction.')
 
     configure_logging(args)
 
     # Installed before the first long operation, so a cancel during the file reads is
-    # already honored. Nothing earlier than this is interruptible.
-    cancellation = install_signal_handlers()
+    # already honored. Nothing earlier than this is interruptible. A run that only prepares
+    # has no partial result worth stopping politely for, so there Ctrl-C keeps its default
+    # and ends the process at once.
+    cancellation = None if args.prepare_only else install_signal_handlers()
 
     registry = PluginRegistry.load_plugins()
     diffraction_reader = registry.diffraction_file_readers.get_strategy_by_name(
@@ -648,12 +839,33 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         None,
         '--photon-energy-eV',
     )
+    far_field = resolve_flag(
+        logger,
+        'Far field',
+        False if args.near_field else None,
+        metadata.far_field,
+        profile.default_far_field,
+        '--near-field',
+    )
+    # Only meaningful in the near field, where it sets the magnification. In far field
+    # the sampling does not depend on it, so deriving one would be noise.
+    focus_object_distance_m = (
+        0.0
+        if far_field
+        else resolve_focus_object_distance_m(
+            logger,
+            args.focus_object_distance_m,
+            metadata.focus_object_distance_m,
+            args.fzp_defocus_m,
+        )
+    )
     detector_pixel_size_m = _resolve_detector_pixel_size(logger, args, metadata, profile)
     raw_pixel_geometry = PixelGeometry(
         width_m=detector_pixel_size_m, height_m=detector_pixel_size_m
     )
 
     bad_pixels: BadPixels | None = None
+    corrections: DetectorCorrections | None = None
     pipeline: DiffractionPrepPipeline | None = None
     read_region: CropRegion | None = None
     lower_counts: int | None = None
@@ -683,6 +895,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             )
             bad_pixels = bad_pixels_reader.read(args.bad_pixels_file)
 
+        corrections = read_detector_corrections(registry, args, raw_dataset)
         read_region = resolve_crop_region(
             logger,
             raw_dataset,
@@ -691,9 +904,10 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             beam_center_y_px=args.beam_center_y_px,
             bad_pixels=bad_pixels,
             value_filter=value_filter,
+            corrections=corrections,
         )
         lower_counts, upper_counts = _total_counts_bounds(
-            logger, args, raw_dataset, pipeline, bad_pixels, read_region
+            logger, args, raw_dataset, pipeline, bad_pixels, read_region, corrections
         )
 
     logger.info('Assembling diffraction patterns')
@@ -705,6 +919,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             bad_pixels=bad_pixels,
             raw_pixel_geometry=raw_pixel_geometry,
             read_region=read_region,
+            corrections=corrections,
             total_counts_lower_bound=lower_counts,
             total_counts_upper_bound=upper_counts,
         )
@@ -741,13 +956,36 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         num_patterns = assembled_data.get_num_patterns()
 
     photon_wavelength_m = energy_eV_to_wavelength_m(photon_energy_eV)
-    probe_geometry = ProbeGeometry.from_far_field(
-        assembled_data.get_pixel_geometry(),
-        assembled_data.get_image_extent(),
-        wavelength_m=photon_wavelength_m,
-        distance_m=detector_distance_m,
-    )
+    # Keyed off the declaration rather than off a magnification of one: a near-field
+    # scan with no focusing optic is a parallel beam at M = 1, and sampling that through
+    # the Fraunhofer relation would still be wrong.
+    if far_field:
+        probe_geometry = ProbeGeometry.from_far_field(
+            assembled_data.get_pixel_geometry(),
+            assembled_data.get_image_extent(),
+            wavelength_m=photon_wavelength_m,
+            distance_m=detector_distance_m,
+        )
+    else:
+        magnification = compute_magnification(detector_distance_m, focus_object_distance_m)
+        logger.info('Magnification: %g', magnification)
+        probe_geometry = ProbeGeometry.from_near_field(
+            assembled_data.get_pixel_geometry(),
+            assembled_data.get_image_extent(),
+            magnification=magnification,
+        )
     logger.info('Probe geometry: %s', probe_geometry)
+
+    # Resolved before the probe is built, because a generated probe is normalized to it.
+    incident_beam = estimate_incident_beam_from_assembled_data(
+        assembled_data, positions, i0_photons_per_count=args.i0_photons_per_count
+    )
+    probe_photon_count_override = getattr(args, 'probe_photon_count', None)
+    probe_photon_count = (
+        incident_beam.incident_photon_count
+        if probe_photon_count_override is None
+        else float(probe_photon_count_override)
+    )
 
     rng = numpy.random.default_rng(args.seed)
     probe = _build_initial_probe(
@@ -758,32 +996,33 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         assembled_data,
         photon_wavelength_m=photon_wavelength_m,
         detector_distance_m=detector_distance_m,
+        far_field=far_field,
+        focus_object_distance_m=focus_object_distance_m,
+        probe_photon_count=probe_photon_count,
     )
 
     if args.num_probe_modes > 1:
         probe = generate_incoherent_probe_modes(probe, args.num_probe_modes)
 
-    probe_sequence: ProbeSequence = generate_coherent_probe_modes(
+    probe_ensemble: ProbeEnsemble = generate_coherent_probe_modes(
         rng,
         probe,
         num_cmodes=args.num_opr_modes,
-        num_diffraction_patterns=num_patterns,
+        num_positions=len(positions),
     )
-    logger.info('Probe: %s', probe_sequence.get_array().shape)
+    logger.info('Probe: %s', probe_ensemble.get_array().shape)
 
     object_geometry = compute_object_geometry(
         positions, probe_geometry, padding_px=args.object_padding_px
     )
     logger.info('Object geometry: %s', object_geometry)
 
-    # Deviations = 0 gives a flat unit-amplitude, zero-phase field.
-    object_ = generate_uniform_object(object_geometry)
-
-    probe_photon_count_override = getattr(args, 'probe_photon_count', None)
-    probe_photon_count = (
-        float(assembled_data.get_probe_photon_count())
-        if probe_photon_count_override is None
-        else float(probe_photon_count_override)
+    # Uniform, but not transparent: scaled to the mean transmission the patterns imply,
+    # so the exit wave predicts the totals the detector recorded instead of the
+    # unobstructed beam. Absorption belongs here rather than in the probe, which has to
+    # go on meaning the incident illumination that probe_photon_count states.
+    object_ = generate_uniform_object(
+        object_geometry, amplitude=incident_beam.mean_amplitude_transmission
     )
 
     product = Product(
@@ -791,6 +1030,8 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             name=profile.product_name,
             comments=f'Reconstructed from {args.diffraction_file.name}',
             detector_distance_m=detector_distance_m,
+            focus_object_distance_m=focus_object_distance_m,
+            far_field=far_field,
             photon_energy_eV=photon_energy_eV,
             probe_photon_count=probe_photon_count,
             exposure_time_s=float(metadata.exposure_time_s or 0.0),
@@ -798,20 +1039,25 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             tomography_angle_deg=(
                 0.0 if args.tomography_angle_deg is None else float(args.tomography_angle_deg)
             ),
+            i0_photons_per_count=args.i0_photons_per_count,
         ),
         probe_positions=positions,
-        probes=probe_sequence,
+        probes=probe_ensemble,
         object_=object_,
         losses=[],
     )
 
-    options = load_ptychi_options(args.ptychi_options)
+    options = load_ptychi_options(args.ptychi_options, far_field=far_field)
     num_epochs = int(options.reconstructor_options.num_epochs)
 
     output_directory = args.output_directory
     diffraction_file = StandardFileLayout.DIFFRACTION.path(output_directory)
     options_file = StandardFileLayout.PTYCHI_OPTIONS.path(output_directory)
     product_file = StandardFileLayout.PRODUCT.path(output_directory)
+
+    if args.prepare_only:
+        _write_prepared_directory(logger, output_directory, assembled_data, product, options)
+        return ExitCode.SUCCESS
 
     if args.dry_run:
         # Stops ahead of align_task_options_with_product, so a dry run exercises the
@@ -821,7 +1067,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             'Dry run: %d patterns, %d epochs, probe %s, object %s.',
             num_patterns,
             num_epochs,
-            probe_sequence.get_array().shape,
+            probe_ensemble.get_array().shape,
             object_.get_array().shape,
         )
         logger.info('Would write %s', product_file)
@@ -839,25 +1085,13 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         logger.info('Nothing written: stopping before the pty-chi option alignment.')
         return ExitCode.SUCCESS
 
+    # Narrowed for the checker: only --prepare-only skips the handlers, and it returned above.
+    assert cancellation is not None
+
     save_assembled_diffraction(
         logger, output_directory, assembled_data, skip=args.no_save_diffraction
     )
-
-    reconstruct_input = prepare_reconstruct_input(assembled_data, product)
-    num_paired = reconstruct_input.diffraction_patterns.shape[0]
-
-    if num_paired < num_patterns:
-        # Ordinary on a scan that was stopped mid-raster: the detector keeps the line it
-        # was on, the position record truncates at its last completed line, and the
-        # patterns past that end have no position to pair with.
-        logger.warning(
-            'Paired %d of %d assembled patterns; %d had no probe position, which is'
-            ' expected when the detector recorded more scan lines than the position file.',
-            num_paired,
-            num_patterns,
-            num_patterns - num_paired,
-        )
-
+    reconstruct_input = pair_patterns_with_positions(logger, assembled_data, product)
     run_reconstruction(
         logger,
         reconstruct_input,

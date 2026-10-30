@@ -1,10 +1,11 @@
+from collections.abc import Callable
 import logging
 
 import numpy
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
+from ptychodus.api.probe import ProbeEnsemble
 
-from ...diffraction import AssembledDiffractionDataset
 from .builder import FromMemoryObjectBuilder
 from .builder_factory import ObjectBuilderFactory
 from .item import ObjectRepositoryItem
@@ -49,7 +50,11 @@ class ObjectRepositoryItemFactory:
             )
 
     def create(
-        self, geometry_provider: ObjectGeometryProvider, object_: Object | None = None
+        self,
+        geometry_provider: ObjectGeometryProvider,
+        object_: Object | None = None,
+        *,
+        probe_supplier: Callable[[], ProbeEnsemble] | None = None,
     ) -> ObjectRepositoryItem:
         if object_ is None:
             builder = self._builder_factory.create_default()
@@ -57,18 +62,25 @@ class ObjectRepositoryItemFactory:
             self._warn_if_conditioning_ignored()
             builder = FromMemoryObjectBuilder(self._settings, object_)
 
-        return ObjectRepositoryItem(geometry_provider, self._settings, builder)
+        return ObjectRepositoryItem(
+            geometry_provider, self._settings, builder, probe_supplier=probe_supplier
+        )
 
     def create_from_settings(
         self,
         geometry_provider: ObjectGeometryProvider,
         *,
-        dataset: AssembledDiffractionDataset | None = None,
+        has_diffraction_data: bool = False,
+        probe_supplier: Callable[[], ProbeEnsemble] | None = None,
     ) -> ObjectRepositoryItem:
         try:
-            builder = self._builder_factory.create_from_settings(dataset=dataset)
+            builder = self._builder_factory.create_from_settings(
+                has_diffraction_data=has_diffraction_data
+            )
         except Exception as exc:
             logger.error(''.join(exc.args))
             builder = self._builder_factory.create_default()
 
-        return ObjectRepositoryItem(geometry_provider, self._settings, builder)
+        return ObjectRepositoryItem(
+            geometry_provider, self._settings, builder, probe_supplier=probe_supplier
+        )

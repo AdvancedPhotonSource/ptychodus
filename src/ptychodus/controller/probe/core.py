@@ -2,10 +2,10 @@ from __future__ import annotations
 import logging
 
 from PyQt5.QtCore import QModelIndex, QStringListModel
-from PyQt5.QtWidgets import QAbstractItemView, QDialog
+from PyQt5.QtWidgets import QAbstractItemView, QDialog, QStatusBar
 
-from ptychodus.api.observer import SequenceObserver
 from ptychodus.api.probe import OPRWeightPolicy
+from ptychodus.model.observer import SequenceObserver
 
 from ...model.analysis import (
     IlluminationMapper,
@@ -16,7 +16,8 @@ from ...model.analysis import (
 )
 from ...model.product import ProbeAPI, ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
+from ...view.image import ImageView
 from ...view.probe import OPRWeightPolicyDialog
 from ...view.repository import RepositoryTreeView
 from ...view.widgets import (
@@ -32,7 +33,7 @@ from .illumination import IlluminationViewController
 from .opr import OPRModeViewController
 from .overlap import ProbeOverlapViewController
 from .propagator import ProbePropagationViewController
-from .tree_model import ProbeTreeModel, try_get_probe
+from .tree_model import Column, ProbeTreeModel, try_get_probe
 
 logger = logging.getLogger(__name__)
 
@@ -42,44 +43,43 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         self,
         repository: ProbeRepository,
         api: ProbeAPI,
-        image_controller: ImageController,
+        image_view: ImageView,
         propagator: ProbePropagator,
         propagator_settings: ProbePropagatorSettings,
-        propagator_visualization_engine: VisualizationEngine,
         illumination_mapper: IlluminationMapper,
-        illumination_visualization_engine: VisualizationEngine,
         overlap_analyzer: ProbeOverlapAnalyzer,
-        overlap_visualization_engine: VisualizationEngine,
         opr_mode_analyzer: OPRModeAnalyzer,
-        opr_mode_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
+        status_bar: QStatusBar,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._repository = repository
         self._api = api
-        self._image_controller = image_controller
+        self._image_controller = ImageController(
+            VisualizationEngine(is_complex=True),
+            image_view,
+            status_bar,
+            file_dialog_factory,
+        )
         self._view = view
         self._file_dialog_factory = file_dialog_factory
         self._tree_model = ProbeTreeModel(repository, api, create_brush_for_editable_cell(view))
         self._editor_factory = ProbeEditorViewControllerFactory()
 
         self._propagation_view_controller = ProbePropagationViewController(
-            propagator, propagator_settings, propagator_visualization_engine, file_dialog_factory
+            propagator, propagator_settings, file_dialog_factory
         )
         self._illumination_view_controller = IlluminationViewController(
             illumination_mapper,
-            illumination_visualization_engine,
             file_dialog_factory,
         )
         self._overlap_view_controller = ProbeOverlapViewController(
             overlap_analyzer,
-            overlap_visualization_engine,
             file_dialog_factory,
         )
         self._opr_mode_view_controller = OPRModeViewController(
             opr_mode_analyzer,
-            opr_mode_visualization_engine,
             file_dialog_factory,
             view,
         )
@@ -97,8 +97,8 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         header = view.tree_view.header()
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
         power_item_delegate = ProgressBarItemDelegate(view.tree_view)
-        view.tree_view.setItemDelegateForColumn(1, power_item_delegate)
-        view.tree_view.setItemDelegateForColumn(2, builder_item_delegate)
+        view.tree_view.setItemDelegateForColumn(Column.RELATIVE_POWER.index, power_item_delegate)
+        view.tree_view.setItemDelegateForColumn(Column.BUILDER.index, builder_item_delegate)
         selection_model = view.tree_view.selectionModel()
 
         if selection_model is None:
@@ -180,8 +180,8 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         file_path, name_filter = self._file_dialog_factory.get_open_file_path(
             self._view,
             'Open Probe',
-            name_filters=[nf for nf in self._api.get_open_file_filters()],
-            selected_name_filter=self._api.get_open_file_filter(),
+            name_filters=self._api.file_readers.get_filters(),
+            selected_name_filter=self._api.file_readers.get_filter(),
         )
 
         if file_path:
@@ -249,8 +249,8 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         file_path, name_filter = self._file_dialog_factory.get_save_file_path(
             self._view,
             'Save Probe',
-            name_filters=[nf for nf in self._api.get_save_file_filters()],
-            selected_name_filter=self._api.get_save_file_filter(),
+            name_filters=self._api.file_writers.get_filters(),
+            selected_name_filter=self._api.file_writers.get_filter(),
         )
 
         if file_path:

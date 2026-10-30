@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from unittest.mock import MagicMock
 
+from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.product import LossValue
 from ptychodus.model.product.item import ProductRepositoryItem, ProductState
 
@@ -81,11 +82,24 @@ def _make_item(
     return item, mocks
 
 
+def _make_dataset() -> MagicMock:
+    """A dataset mock whose assembled data is real and whose moments are pending.
+
+    Binding a dataset estimates the sample transmission from its moments, which is
+    arithmetic rather than a call to record, so the mock reports none yet and the
+    estimate waits for them.
+    """
+    dataset = MagicMock()
+    dataset.get_assembled_data.return_value = AssembledDiffractionData.create_null()
+    dataset.get_diffraction_moments.return_value = None
+    return dataset
+
+
 def _make_source_and_stub() -> tuple[ProductRepositoryItem, ProductRepositoryItem, _Mocks, _Mocks]:
     # The stub holds the name the caller asked for; the source was built while the stub
     # already occupied it, so it carries the collision-avoidance counter.
     source, source_mocks = _make_item(
-        losses=[LossValue(epoch=1, value=0.5)], dataset=MagicMock(), name='scan-1'
+        losses=[LossValue(epoch=1, value=0.5)], dataset=_make_dataset(), name='scan-1'
     )
     stub, stub_mocks = _make_item(losses=[], dataset=None, name='scan')
     return source, stub, source_mocks, stub_mocks

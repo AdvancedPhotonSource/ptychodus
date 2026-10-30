@@ -3,9 +3,9 @@ from abc import abstractmethod, ABC
 import logging
 
 from ptychodus.api.diffraction import Polarization
-from ptychodus.api.parameters import Parameter, ParameterGroup
 from ptychodus.api.product import ProductMetadata
 
+from ..parameters import Parameter, ParameterGroup
 from .settings import ProductSettings
 
 logger = logging.getLogger(__name__)
@@ -66,6 +66,7 @@ class MetadataRepositoryItem(ParameterGroup):
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
         far_field: bool | None = None,
+        i0_photons_per_count: float | None = None,
     ) -> None:
         super().__init__()
         self._settings = settings
@@ -147,6 +148,13 @@ class MetadataRepositoryItem(ParameterGroup):
 
         self._add_parameter('far_field', self.far_field)
 
+        self.i0_photons_per_count = settings.i0_photons_per_count.copy()
+
+        if i0_photons_per_count is not None:
+            self.i0_photons_per_count.set_value(i0_photons_per_count)
+
+        self._add_parameter('i0_photons_per_count', self.i0_photons_per_count)
+
     def assign(self, metadata: ProductMetadata) -> None:
         self.name.set_value(metadata.name)
         self.comments.set_value(metadata.comments)
@@ -162,6 +170,7 @@ class MetadataRepositoryItem(ParameterGroup):
             metadata.polarization.value if metadata.polarization is not None else ''
         )
         self.far_field.set_value(metadata.far_field)
+        self.i0_photons_per_count.set_value(metadata.i0_photons_per_count)
 
     def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
@@ -181,6 +190,7 @@ class MetadataRepositoryItem(ParameterGroup):
             tilt_angle_deg=self.tilt_angle_deg.get_value(),
             polarization=self._parse_polarization(self.polarization.get_value()),
             far_field=self.far_field.get_value(),
+            i0_photons_per_count=self.i0_photons_per_count.get_value(),
         )
 
     @staticmethod

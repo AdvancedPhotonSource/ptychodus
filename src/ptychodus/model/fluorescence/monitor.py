@@ -4,6 +4,8 @@ from pathlib import Path
 import logging
 import time
 
+from pydantic import BaseModel
+
 from ptychodus.api.fluorescence import (
     FluorescenceDataset,
     FluorescenceEnhancer,
@@ -72,6 +74,7 @@ class FluorescenceTaskMonitor(TaskProgressMonitor):
 class EnhanceFluorescenceBackgroundTask:
     task_monitor: FluorescenceTaskMonitor
     enhancer: FluorescenceEnhancer
+    options: BaseModel
     dataset: FluorescenceDataset
     product: Product
     item: FluorescenceRepositoryItem
@@ -81,14 +84,14 @@ class EnhanceFluorescenceBackgroundTask:
     def __call__(self) -> None:
         try:
             with self.task_monitor as monitor:
-                progress_goal = self.enhancer.get_progress_goal()
-                monitor.update_progress(0, progress_goal)
+                # Indeterminate until the run reports how far it has to go.
+                monitor.update_progress(0, 0)
                 tic = time.perf_counter()
                 last_dataset: FluorescenceDataset | None = None
-                parameters = FluorescenceEnhancerInput(dataset=self.dataset, product=self.product)
+                input_ = FluorescenceEnhancerInput(dataset=self.dataset, product=self.product)
 
-                for output in self.enhancer.enhance(parameters):
-                    monitor.update_progress(output.progress, progress_goal)
+                for output in self.enhancer.enhance(input_, options=self.options):
+                    monitor.update_progress(output.progress, output.progress_goal)
                     monitor.update_enhanced(self.item, output.dataset)
                     last_dataset = output.dataset
 

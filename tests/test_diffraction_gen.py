@@ -19,7 +19,8 @@ import pytest
 from ptychodus.api.simulate.diffraction import generate_diffraction_data
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import Probe, ProbeEnsemble
+from ptychodus.api.simulate.probe import rescale_probe_intensity
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.propagate import (
@@ -62,8 +63,8 @@ def _pixel_geometry() -> PixelGeometry:
     return PixelGeometry(width_m=_PIXEL_SIZE_M, height_m=_PIXEL_SIZE_M)
 
 
-def _make_probe_seq(array: numpy.ndarray) -> ProbeSequence:
-    return ProbeSequence(array=array, opr_weights=None, pixel_geometry=_pixel_geometry())
+def _make_probe_seq(array: numpy.ndarray) -> ProbeEnsemble:
+    return ProbeEnsemble(array=array, opr_weights=None, pixel_geometry=_pixel_geometry())
 
 
 def _random_probe(rng: numpy.random.Generator, num_modes: int = 1) -> numpy.ndarray:
@@ -167,6 +168,32 @@ class TestOutputProperties:
 
         assert pg.width_m == pytest.approx(lambda_z / probe_geometry.width_m)
         assert pg.height_m == pytest.approx(lambda_z / probe_geometry.height_m)
+
+    @pytest.mark.parametrize('far_field', [True, False])
+    def test_round_trips_the_probe_photon_count(self, far_field: bool) -> None:
+        """A probe normalized to ``probe_photon_count`` against a transparent object
+        simulates patterns carrying exactly that many photons.
+
+        The end-to-end statement of the scaling convention: a field array holds photons
+        per pixel, so ``sum|P|^2`` is the photon count, propagation to the detector
+        leaves it alone, and the pattern totals the estimator reads back recover what
+        went in. Parameterized over both regimes because they take different
+        propagators, and only the far-field one changes pitch.
+        """
+        photon_count = 1.0e6
+        coord = numpy.arange(_PROBE_PX) - _PROBE_PX // 2
+        disk = ((coord[:, None] ** 2 + coord[None, :] ** 2) < 12**2).astype(complex)
+        probe = rescale_probe_intensity(
+            Probe(array=disk, pixel_geometry=_pixel_geometry()), photon_count
+        ).get_array()
+
+        metadata = dataclasses.replace(_metadata(), far_field=far_field)
+        product = dataclasses.replace(_make_product([_center_pos()], probe), metadata=metadata)
+
+        result = generate_diffraction_data(product)
+
+        assert result.get_patterns()[0].sum() == pytest.approx(photon_count, rel=1e-9)
+        assert result.get_total_counts().max() == pytest.approx(photon_count, rel=1e-6)
 
 
 # ---------------------------------------------------------------------------
@@ -333,7 +360,7 @@ class TestMultiPositionWithoutOpr:
             ProbePosition(index=1, x_m=0.0, y_m=0.0),
             ProbePosition(index=2, x_m=+8 * _PIXEL_SIZE_M, y_m=0.0),
         ]
-        # _make_probe_seq constructs a ProbeSequence with opr_weights=None.
+        # _make_probe_seq constructs a ProbeEnsemble with opr_weights=None.
         product = _make_product(positions, probe, _flat_object())
 
         result = generate_diffraction_data(product)
@@ -468,3 +495,56 @@ class TestNearField:
 
         expected = _far_field_intensity(probe[0], product)
         numpy.testing.assert_allclose(result.get_pattern(0), expected, rtol=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# Detector maps
+# ---------------------------------------------------------------------------
+
+
+class TestDetectorMaps:
+    def test_flat_field_scales_and_background_adds_before_noise(self) -> None:
+        probe = _random_probe(numpy.random.default_rng(10))
+        product = _make_product([_center_pos()], probe)
+        flat_field = numpy.linspace(0.5, 1.5, _PROBE_PX * _PROBE_PX).reshape(_PROBE_PX, _PROBE_PX)
+        background = numpy.full((_PROBE_PX, _PROBE_PX), 2.5)
+
+        ideal = generate_diffraction_data(product).get_pattern(0)
+        detected = generate_diffraction_data(product, background=background, flat_field=flat_field)
+
+        numpy.testing.assert_allclose(detected.get_pattern(0), flat_field * ideal + background)
+
+    def test_the_maps_travel_with_the_simulated_data(self) -> None:
+        probe = _random_probe(numpy.random.default_rng(11))
+        background = numpy.full((_PROBE_PX, _PROBE_PX), 1.0)
+
+        result = generate_diffraction_data(
+            _make_product([_center_pos()], probe), background=background
+        )
+
+        numpy.testing.assert_array_equal(result.get_background(), background)
+        assert result.get_flat_field() is None
+
+    def test_a_map_off_the_pattern_grid_is_rejected(self) -> None:
+        probe = _random_probe(numpy.random.default_rng(12))
+
+        with pytest.raises(ValueError, match='Flat field shape'):
+            generate_diffraction_data(
+                _make_product([_center_pos()], probe), flat_field=numpy.ones((3, 3))
+            )
+
+    def test_noise_is_drawn_around_the_detected_intensity(self) -> None:
+        probe = _random_probe(numpy.random.default_rng(13))
+        product = _make_product([_center_pos()], probe)
+        background = numpy.full((_PROBE_PX, _PROBE_PX), 50.0)
+        expected = generate_diffraction_data(product, background=background).get_pattern(0)
+        rng = numpy.random.default_rng(14)
+
+        draws = numpy.stack(
+            [
+                generate_diffraction_data(product, rng, background=background).get_pattern(0)
+                for _ in range(200)
+            ]
+        )
+
+        numpy.testing.assert_allclose(draws.mean(axis=0).mean(), expected.mean(), rtol=0.02)

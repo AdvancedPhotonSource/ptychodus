@@ -21,15 +21,15 @@ from matplotlib.figure import Figure
 
 from ptychodus.api.diffraction import CropRegion, DiffractionPattern
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.preprocess.diffraction import FilterValuesStep
+from ptychodus.model.observer import Observable, Observer
 
 from ....model.diffraction import (
     DiffractionSettings,
     DiffractionSummaryService,
     PrepPipelineBuilder,
 )
-from ....model.visualization import VisualizationEngine
+from ...rendering import VisualizationEngine
 from ....view.image import ImageView
 from ....view.widgets import ExceptionDialog, TaskStatusView
 
@@ -57,19 +57,17 @@ class SummaryPanelViewController(Observer):
     fresh :class:`DiffractionSummary` when the service's run-id advances.
 
     - mean_pattern renders in an :class:`ImageView` backed by its own dedicated
-      :class:`VisualizationEngine` (``ModelCore.summary_visualization_engine``,
-      distinct from ``pattern_visualization_engine`` used by the main diffraction
-      pane) with a live crop-rectangle overlay driven by the crop settings. The
-      two engines are kept separate so autoscaling the mean_pattern's color
-      range does not disturb whatever range the user set on the main pane, and
-      vice versa.
+      :class:`VisualizationEngine`, with a live crop-rectangle overlay driven by
+      the crop settings. That engine is separate from the one behind the main
+      diffraction pane so autoscaling the mean_pattern's color range does not
+      disturb whatever range the user set on the main pane, and vice versa.
     - total_counts is plotted on a log-y matplotlib axes with live threshold
       lines driven by the total-counts settings.
 
     The displayed frame is a live preview: the value filter from the current
     :class:`DiffractionPrepPlan` is applied to the cached mean_pattern on every
-    settings change. Only that one step is previewed. Binning, upsample,
-    padding, and the flip/transpose steps change the frame's extent and
+    settings change. Only that one step is previewed. Binning, padding, and
+    the flip/transpose steps change the frame's extent and
     orientation, so applying them here would stop the pane reading as a view of
     the detector; crop is likewise shown as an overlay rather than applied. The
     frame therefore stays at full detector extent in raw detector coordinates,
@@ -87,7 +85,6 @@ class SummaryPanelViewController(Observer):
         self,
         diffraction_settings: DiffractionSettings,
         summary_service: DiffractionSummaryService,
-        summary_visualization_engine: VisualizationEngine,
         extent_source: DetectorExtentSource,
         status_bar: QStatusBar,
         file_dialog_factory: FileDialogFactory,
@@ -110,7 +107,7 @@ class SummaryPanelViewController(Observer):
         # --- mean_pattern image view (top) ---
         self._image_view = ImageView()
         self._image_controller = ImageController(
-            summary_visualization_engine,
+            VisualizationEngine(is_complex=False),
             self._image_view,
             status_bar,
             file_dialog_factory,
@@ -371,15 +368,7 @@ class SummaryPanelViewController(Observer):
             # Settings edits while collapsed cost nothing; _on_toggled refreshes.
             return
 
-        try:
-            plan = self._pipeline_builder.get_plan(self._extent_source.get_extent())
-        except ValueError:
-            # Transient while the user types a bin size that does not divide the
-            # crop extent. Binning is not previewed, but get_plan still validates
-            # it. Hold the last good frame -- a modal dialog per keystroke would
-            # make the spin boxes unusable.
-            logger.debug('Skipping preview refresh; incomplete prep plan.', exc_info=True)
-            return
+        plan = self._pipeline_builder.get_plan(self._extent_source.get_extent())
 
         frame = self._raw_mean_pattern
         step = next((s for s in plan.pipeline.steps if isinstance(s, FilterValuesStep)), None)

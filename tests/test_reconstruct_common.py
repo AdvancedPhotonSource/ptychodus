@@ -26,15 +26,16 @@ import pytest
 
 pytest.importorskip('ptychi')
 
-from ptychodus.api.assemble import AssembledDiffractionData
+from ptychodus.api.assemble import AssembledDiffractionData, CropSuggestion, DetectorCorrections
 from ptychodus.api.diffraction import BeamCenter, CropRegion
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.preprocess.diffraction import FilterValuesStep
+from ptychodus.api.preprocess.diffraction import FilterValuesStep, SignalRadius
+from ptychodus.api.preprocess.noise import RobustStatistics
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
+from ptychodus.api.reconstruct import PositionIndexFilter, ReconstructInput, ReconstructOutput
 from ptychi.api import LSQMLOptions
 
 # Deliberately imported at module scope: this file already does
@@ -46,10 +47,15 @@ from ptychodus.cli._reconstruct_common import (  # noqa: E402
     install_signal_handlers,
     is_main_process,
     load_ptychi_options,
+    pair_patterns_with_positions,
+    resolve_flag,
+    resolve_focus_object_distance_m,
+    resolve_ptychi_options_file,
     run_reconstruction,
     save_assembled_diffraction,
+    save_ptychi_options,
 )
-from ptychodus.model.ptychi.task import (  # noqa: E402
+from ptychodus.plugins.ptychi.task import (  # noqa: E402
     dump_task_options,
     dump_task_options_yaml,
 )
@@ -87,7 +93,7 @@ def _make_reconstruct_input() -> ReconstructInput:
         center=ObjectCenter(x_m=0.0, y_m=0.0),
         layer_spacing_m=[],
     )
-    probes = ProbeSequence(
+    probes = ProbeEnsemble(
         array=(
             rng.standard_normal((1, 1, PROBE_HEIGHT_PX, PROBE_WIDTH_PX))
             + 1j * rng.standard_normal((1, 1, PROBE_HEIGHT_PX, PROBE_WIDTH_PX))
@@ -649,6 +655,131 @@ def test_load_ptychi_options_reads_stdin_for_a_dash(
     assert loaded.reconstructor_options.num_epochs == 5
 
 
+# --- prepared directories ----------------------------------------------------------------
+#
+# A prepared directory is read by both ptychodus-reconstruct and the subprocess driver, so
+# how its options file is chosen, how its options are written, and what pairing reports are
+# pinned here once.
+
+
+def test_an_explicit_options_file_wins(tmp_path: Path) -> None:
+    (tmp_path / 'ptychi_options.yaml').write_text('{}')
+    chosen = tmp_path / 'elsewhere.json'
+
+    assert resolve_ptychi_options_file(logging.getLogger('test'), chosen, tmp_path) == chosen
+
+
+def test_the_stdin_sentinel_is_passed_through(tmp_path: Path) -> None:
+    # ``-`` is not a path to probe for; resolving it against the input directory would
+    # turn an in-memory handoff into a missing file.
+    (tmp_path / 'ptychi_options.yaml').write_text('{}')
+    stdin = _reconstruct_common._STDIN_ARGUMENT
+
+    assert resolve_ptychi_options_file(logging.getLogger('test'), stdin, tmp_path) == stdin
+
+
+def test_the_staged_options_are_used_when_present(tmp_path: Path) -> None:
+    staged = tmp_path / 'ptychi_options.yaml'
+    staged.write_text('{}')
+
+    assert resolve_ptychi_options_file(logging.getLogger('test'), None, tmp_path) == staged
+
+
+def test_a_missing_staged_options_file_falls_back_rather_than_failing(
+    caplog: pytest.LogCaptureFixture, tmp_path: Path
+) -> None:
+    # A directory staged by hand carries no options, and an error would make that ordinary
+    # invocation the failing one.
+    with caplog.at_level('WARNING', logger='test'):
+        assert resolve_ptychi_options_file(logging.getLogger('test'), None, tmp_path) is None
+
+    assert any('stock options' in record.getMessage() for record in caplog.records)
+
+
+def test_the_stock_fallback_follows_the_propagation_regime() -> None:
+    assert type(load_ptychi_options(None, far_field=True)).__name__ == 'LSQMLOptions'
+    assert type(load_ptychi_options(None, far_field=False)).__name__ == 'BHOptions'
+
+
+def test_saved_options_are_aligned_and_read_back(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _set_rank(monkeypatch, 0, rank_variable=None)
+    options = LSQMLOptions()
+    options.reconstructor_options.num_epochs = 9
+
+    aligned = save_ptychi_options(
+        logging.getLogger('test'), options, _make_reconstruct_input().product, tmp_path
+    )
+    loaded = load_ptychi_options(tmp_path / 'ptychi_options.yaml')
+
+    # The pixel size comes from the product, not from the options handed in.
+    assert aligned.object_options.pixel_size_m == pytest.approx(PIXEL_M)
+    assert loaded.object_options.pixel_size_m == pytest.approx(PIXEL_M)
+    assert loaded.reconstructor_options.num_epochs == 9
+
+
+def test_saved_options_are_aligned_but_not_written_on_a_secondary_rank(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _set_rank(monkeypatch, 1, rank_variable=None)
+
+    aligned = save_ptychi_options(
+        logging.getLogger('test'), LSQMLOptions(), _make_reconstruct_input().product, tmp_path
+    )
+
+    assert aligned.object_options.pixel_size_m == pytest.approx(PIXEL_M)
+    assert not (tmp_path / 'ptychi_options.yaml').exists()
+
+
+def _product_with_positions(num_positions: int) -> Product:
+    product = _make_reconstruct_input().product
+    return Product(
+        metadata=product.metadata,
+        probe_positions=ProbePositionSequence(list(product.probe_positions)[:num_positions]),
+        probes=product.probes,
+        object_=product.object_,
+        losses=[],
+    )
+
+
+def test_pairing_every_pattern_is_quiet(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level('WARNING', logger='test'):
+        reconstruct_input = pair_patterns_with_positions(
+            logging.getLogger('test'), _assembled_data(), _product_with_positions(NUM_PATTERNS)
+        )
+
+    assert reconstruct_input.diffraction_patterns.shape[0] == NUM_PATTERNS
+    assert not caplog.records
+
+
+def test_patterns_past_the_last_position_are_reported(caplog: pytest.LogCaptureFixture) -> None:
+    # The last pattern index lies outside the position range, so it is dropped rather
+    # than extrapolated -- a stopped scan, which is worth a warning but not an error.
+    with caplog.at_level('WARNING', logger='test'):
+        reconstruct_input = pair_patterns_with_positions(
+            logging.getLogger('test'), _assembled_data(), _product_with_positions(NUM_PATTERNS - 1)
+        )
+
+    assert reconstruct_input.diffraction_patterns.shape[0] == NUM_PATTERNS - 1
+    assert any('Paired 2 of 3' in record.getMessage() for record in caplog.records)
+
+
+def test_patterns_an_index_filter_excludes_are_not_reported(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level('WARNING', logger='test'):
+        reconstruct_input = pair_patterns_with_positions(
+            logging.getLogger('test'),
+            _assembled_data(),
+            _product_with_positions(NUM_PATTERNS),
+            index_filter=PositionIndexFilter.EVEN,
+        )
+
+    assert reconstruct_input.diffraction_patterns.shape[0] < NUM_PATTERNS
+    assert not caplog.records
+
+
 # --- resolve_crop_region ---------------------------------------------------------------
 #
 # Shared between the standard pipeline and the batch-LamNI loop, which previously carried
@@ -677,6 +808,9 @@ class _FakeDataset:
 
     def get_metadata(self) -> _FakeMetadata:
         return self._metadata
+
+    def get_bad_pixels(self) -> numpy.ndarray:
+        return numpy.zeros(self._metadata.detector_extent.get_shape(), dtype=bool)
 
 
 def _resolve(dataset: _FakeDataset, **kwargs: object) -> CropRegion | None:
@@ -793,3 +927,191 @@ def test_the_value_filter_is_applied_to_the_mean_pattern_before_estimating(
     assert len(seen) == 1
     # The fake mean pattern holds a 9, which the filter's upper bound of 5 zeroes.
     assert seen[0].max() <= 5
+
+
+def _signal_radius(radius_px: int) -> SignalRadius:
+    return SignalRadius(
+        radius_px=radius_px,
+        radial_profile=numpy.zeros(1),
+        noise_floor=RobustStatistics(median=0.0, median_absolute_deviation=1.0),
+        threshold=4.5,
+    )
+
+
+class _FakeSuggest:
+    """Stands in for suggest_crop_region with a fixed radius, recording what it was handed."""
+
+    def __init__(self, radius_px: int) -> None:
+        self._radius_px = radius_px
+        self.calls: list[dict[str, Any]] = []
+
+    def __call__(
+        self,
+        mean_pattern: numpy.ndarray,
+        beam_center: BeamCenter,
+        detector_extent: ImageExtent,
+        **kwargs: Any,
+    ) -> CropSuggestion:
+        self.calls.append({'mean_pattern': mean_pattern, **kwargs})
+
+        if self._radius_px < 1:
+            raise ValueError('No signal rises above the noise floor about the beam center.')
+
+        return CropSuggestion(
+            signal=_signal_radius(self._radius_px),
+            region=CropRegion.from_smallest_pow2(beam_center, self._radius_px, detector_extent),
+        )
+
+
+class _CountingSummarize:
+    def __init__(self) -> None:
+        self.num_calls = 0
+
+    def __call__(self, dataset: object, bad_pixels: object = None) -> _FakeSummary:
+        self.num_calls += 1
+        return _FakeSummary()
+
+
+def test_an_auto_extent_is_the_power_of_two_holding_the_signal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', _CountingSummarize())
+    monkeypatch.setattr(_reconstruct_common, 'suggest_crop_region', _FakeSuggest(20))
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), BeamCenter(x_px=200, y_px=300))
+
+    region = _resolve(dataset, crop_extent_px='auto')
+
+    assert region == CropRegion.from_center_extent(
+        BeamCenter(x_px=200, y_px=300), ImageExtent(width_px=64, height_px=64)
+    )
+
+
+def test_an_auto_extent_shares_one_summary_with_the_beam_center_estimate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    summarize = _CountingSummarize()
+    monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', summarize)
+    monkeypatch.setattr(
+        _reconstruct_common, 'estimate_beam_center', lambda pattern: BeamCenter(x_px=256, y_px=256)
+    )
+    monkeypatch.setattr(_reconstruct_common, 'suggest_crop_region', _FakeSuggest(40))
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), beam_center=None)
+
+    region = _resolve(dataset, crop_extent_px='auto')
+
+    assert summarize.num_calls == 1
+    assert region is not None
+    assert region.width_px == 128
+
+
+def test_an_auto_extent_hands_the_filter_and_corrections_over_unapplied(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """suggest_crop_region applies both, so the extent path must not cut the mean itself."""
+    suggest = _FakeSuggest(20)
+    monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', _CountingSummarize())
+    monkeypatch.setattr(_reconstruct_common, 'suggest_crop_region', suggest)
+    value_filter = FilterValuesStep(lower_bound=0, upper_bound=5)
+    corrections = DetectorCorrections(subtract_background=True)
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), BeamCenter(x_px=256, y_px=256))
+
+    _resolve(dataset, crop_extent_px='auto', value_filter=value_filter, corrections=corrections)
+
+    (call,) = suggest.calls
+    assert call['value_filter'] is value_filter
+    assert call['corrections'] is corrections
+    # The fake mean pattern holds a 9, which the filter would have zeroed.
+    assert call['mean_pattern'].max() == 9
+
+
+def test_an_auto_extent_filling_the_detector_reads_the_whole_frame(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', _CountingSummarize())
+    monkeypatch.setattr(_reconstruct_common, 'suggest_crop_region', _FakeSuggest(1000))
+    dataset = _FakeDataset(ImageExtent(width_px=256, height_px=256), BeamCenter(x_px=128, y_px=128))
+
+    assert _resolve(dataset, crop_extent_px='auto') is None
+
+
+def test_an_auto_extent_without_signal_is_an_error_naming_the_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', _CountingSummarize())
+    monkeypatch.setattr(_reconstruct_common, 'suggest_crop_region', _FakeSuggest(0))
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), BeamCenter(x_px=256, y_px=256))
+
+    with pytest.raises(ValueError, match='noise floor.*Give --crop-extent-px explicitly'):
+        _resolve(dataset, crop_extent_px='auto')
+
+
+class TestResolveFlag:
+    """Provenance matters as much as the value: a guessed regime must look guessed."""
+
+    def test_the_command_line_wins(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.INFO):
+            assert resolve_flag(logging.getLogger(), 'Far field', False, True, True, '--x') is False
+
+        assert '--x' in caplog.text
+
+    def test_the_file_wins_over_the_fallback(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.INFO):
+            assert resolve_flag(logging.getLogger(), 'Far field', None, False, True, '--x') is False
+
+        assert 'diffraction file' in caplog.text
+
+    def test_the_fallback_says_it_guessed(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.INFO):
+            assert resolve_flag(logging.getLogger(), 'Far field', None, None, True, '--x') is True
+
+        assert 'built-in default' in caplog.text
+
+
+class TestResolveFocusObjectDistance:
+    """The focus is stated in two frames; the resolver reconciles them."""
+
+    def test_derives_the_negated_defocus(self) -> None:
+        # A probe sampled 800 um past its focus puts the focus 800 um upstream.
+        resolved = resolve_focus_object_distance_m(logging.getLogger(), None, None, 800.0e-6)
+
+        assert resolved == pytest.approx(-800.0e-6)
+
+    def test_a_zero_defocus_derives_the_no_optic_sentinel(self) -> None:
+        assert resolve_focus_object_distance_m(logging.getLogger(), None, None, 0.0) == 0.0
+
+    def test_the_file_beats_the_derivation(self) -> None:
+        resolved = resolve_focus_object_distance_m(logging.getLogger(), None, -21.873e-3, 800.0e-6)
+
+        assert resolved == pytest.approx(-21.873e-3)
+
+    def test_an_explicit_value_beats_both(self) -> None:
+        resolved = resolve_focus_object_distance_m(
+            logging.getLogger(), -9.0e-4, -21.873e-3, 800.0e-6
+        )
+
+        assert resolved == pytest.approx(-9.0e-4)
+
+    def test_an_explicit_value_agreeing_with_the_defocus_is_quiet(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.WARNING):
+            resolve_focus_object_distance_m(logging.getLogger(), -800.0e-6, None, 800.0e-6)
+
+        assert not caplog.records
+
+    def test_an_explicit_value_disagreeing_warns_but_is_honored(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.WARNING):
+            resolved = resolve_focus_object_distance_m(logging.getLogger(), -9.0e-4, None, 800.0e-6)
+
+        assert resolved == pytest.approx(-9.0e-4)
+        assert len(caplog.records) == 1
+
+
+class TestOptionsFallbackFollowsTheRegime:
+    def test_far_field_falls_back_to_lsqml(self) -> None:
+        assert type(load_ptychi_options(None)).__name__ == 'LSQMLOptions'
+
+    def test_near_field_falls_back_to_bh(self) -> None:
+        assert type(load_ptychi_options(None, far_field=False)).__name__ == 'BHOptions'

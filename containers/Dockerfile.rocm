@@ -1,14 +1,11 @@
+ARG BASE_REGISTRY=docker.io
 ARG ROCM_VERSION=7.2.4
 ARG UBUNTU_VERSION=24.04
 ARG PYTHON_VERSION=3.12
 ARG PYTORCH_VERSION=2.10.0
-FROM rocm/pytorch:rocm${ROCM_VERSION}_ubuntu${UBUNTU_VERSION}_py${PYTHON_VERSION}_pytorch_release_${PYTORCH_VERSION}
+FROM ${BASE_REGISTRY}/rocm/pytorch:rocm${ROCM_VERSION}_ubuntu${UBUNTU_VERSION}_py${PYTHON_VERSION}_pytorch_release_${PYTORCH_VERSION}
 
 ARG PTYCHODUS_VERSION
-ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PTYCHODUS=${PTYCHODUS_VERSION}
-
-WORKDIR /app
-COPY . /src
 
 # The base image already provides a venv at /opt/venv, first on its PATH, and
 # the ROCm-built torch lives inside it; pip therefore installs into that venv,
@@ -19,12 +16,19 @@ COPY . /src
 # resolves --system-site-packages against the base interpreter rather than the
 # parent venv, so the ROCm torch would drop off sys.path and pip would pull a
 # CUDA build from PyPI onto an AMD image.
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends libqt5gui5 && \
-    rm -rf /var/lib/apt/lists/* && \
-    python3 -m pip install --no-cache-dir --upgrade pip && \
-    python3 -m pip install --no-cache-dir \
-        /src[globus,gui,ptychi] && \
-    rm -rf /src
+#
+# This is a headless image for batch and HPC use, with pty-chi as its only
+# backend; the GUI needs the CPU or CUDA image. ptychodus comes from PyPI: the
+# release named by PTYCHODUS_VERSION, or the latest one when it is unset. An
+# unpinned build reuses its cached layer after a new release, so pin it or
+# pass --no-cache. /tmp/constraints.txt pins the base image's torch, and
+# torchvision when it ships one, so no dependency can make pip swap the
+# ROCm build for PyPI's generic torch; pip backtracks or fails instead.
+RUN python3 -m pip install --no-cache-dir --upgrade pip && \
+    python3 -c 'import importlib.metadata as m; [print(f"{d}=={m.version(d)}") for d in ("torch", "torchvision") if d in {x.metadata["Name"] for x in m.distributions()}]' \
+        > /tmp/constraints.txt && \
+    python3 -m pip install --no-cache-dir -c /tmp/constraints.txt \
+        "ptychodus[ptychi]${PTYCHODUS_VERSION:+==$PTYCHODUS_VERSION}" && \
+    rm /tmp/constraints.txt
 
 CMD ["python3", "-m", "ptychodus"]

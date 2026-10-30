@@ -10,6 +10,11 @@ something archivable, and the file is the *only* source: a tuning value that is 
 cannot be set. That is what lets the copy written beside each scan's output stand as the
 record of how that scan was reconstructed.
 
+A run driven from Python starts from a :class:`BatchSettings` object and has no file text
+to pass on. :func:`dump_batch_settings` renders one, so such a run archives a canonical
+spelling of the settings that were actually used -- every default written out, and no
+comments -- rather than bytes nobody typed.
+
 Unknown keys are rejected rather than ignored. This file has no writer but a person, so a
 key that does not resolve is a typo, and silently running with a different value than the
 one that was typed is the failure worth preventing.
@@ -18,17 +23,32 @@ one that was typed is the failure worth preventing.
 from __future__ import annotations
 
 import logging
+from enum import StrEnum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ptychodus.api.affine import AffineTransform
-from ptychodus.plugins.aps31id_lamni._scan_table import APS31IDEScanRecord
+from ptychodus.plugins.aps31id_lamni.scan_directory import locate_scan_directory
+from ptychodus.plugins.aps31id_lamni.scan_table import APS31IDEScanRecord
 
 __all__ = [
+    'Batch',
     'BatchSettings',
+    'Diffraction',
+    'InitialObject',
+    'InitialProbe',
+    'MetadataOverrides',
+    'Misc',
+    'ObjectFromFile',
+    'Paths',
+    'Positions',
+    'WorkerMessage',
+    'ProbeFromFile',
+    'SimulatedProbe',
+    'dump_batch_settings',
     'load_batch_settings',
     'load_batch_settings_from_text',
     'select_label',
@@ -36,9 +56,6 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
-
-# Scans live under eiger_4 in blocks of a thousand.
-_SCAN_BLOCK_SIZE = 1000
 
 
 class _Section(BaseModel):
@@ -66,7 +83,7 @@ class ProbeFromFile(_Section):
 
 
 class SimulatedProbe(_Section):
-    fzp_preset: str = 'APS_LamNI'
+    fzp_preset: str = 'APS 31-ID-E LamNI'
     fzp_defocus_m: float = 800.0e-6
 
 
@@ -145,10 +162,16 @@ class MetadataOverrides(_Section):
     probe_energy_eV: float | None = None  # noqa: N815
     probe_photon_count: float | None = None
     tomography_angle_deg: float | None = None
+    # Near field is opt-in: None leaves every existing batch far field, as it was.
+    far_field: bool | None = None
+    # Signed, origin at the object, so a focus upstream is negative. Near field only;
+    # defaults to the negated simulated_probe.fzp_defocus_m.
+    focus_object_distance_m: float | None = None
 
 
 class Diffraction(_Section):
-    crop_extent_px: int | None = Field(default=None, ge=1)
+    # 'auto' suggests the smallest power of two holding the signal above the noise floor.
+    crop_extent_px: Annotated[int, Field(ge=1)] | Literal['auto'] | None = None
     beam_center_x_px: int | None = None
     beam_center_y_px: int | None = None
     min_total_counts: int | None = None
@@ -188,24 +211,23 @@ class BatchSettings(_Section):
         return self
 
     @property
-    def experiment_root(self) -> Path:
-        """The experiment directory, accepting either it or the ``data`` directory inside."""
+    def data_dir(self) -> Path:
+        """The directory holding ``dat-files``, ``scan_positions`` and ``eiger_4``.
+
+        An experiment keeps them either under a ``data`` subdirectory or at its top level;
+        ``data`` wins when both are present. The ``data`` directory itself is accepted too,
+        since it is a top-level layout in its own right.
+        """
         folder = self.paths.experiment_folder
 
-        if (folder / 'data' / 'dat-files').is_dir():
-            return folder
-
-        if (folder / 'dat-files').is_dir():
-            return folder.parent
+        for candidate in (folder / 'data', folder):
+            if (candidate / 'dat-files').is_dir():
+                return candidate
 
         raise ValueError(
             f'{folder} is not a 31-ID-E experiment directory: expected a "dat-files" '
             'subdirectory either directly inside it or under a "data" subdirectory.'
         )
-
-    @property
-    def data_dir(self) -> Path:
-        return self.experiment_root / 'data'
 
     @property
     def scan_table_file(self) -> Path:
@@ -222,9 +244,7 @@ class BatchSettings(_Section):
         rather than assumed. An ambiguous match is an error: picking one arbitrarily would
         reconstruct an unpredictable subset.
         """
-        block_start = (scan_no // _SCAN_BLOCK_SIZE) * _SCAN_BLOCK_SIZE
-        block = f'S{block_start:05d}-{block_start + _SCAN_BLOCK_SIZE - 1:05d}'
-        scan_dir = self.data_dir / 'eiger_4' / block / f'S{scan_no:05d}'
+        scan_dir = locate_scan_directory(self.data_dir / 'eiger_4', scan_no)
 
         candidates = sorted(
             path for path in scan_dir.glob(f'*_{scan_no:05d}_*.h5') if '_master_' not in path.name
@@ -273,6 +293,18 @@ def load_batch_settings_from_text(text: str, source: str = '<text>') -> BatchSet
 def load_batch_settings(file_path: Path) -> BatchSettings:
     """Read and validate the settings file."""
     return load_batch_settings_from_text(file_path.read_text(), str(file_path))
+
+
+def dump_batch_settings(settings: BatchSettings) -> str:
+    """Render settings as the YAML text a worker rebuilds from and a run archives.
+
+    The inverse of :func:`load_batch_settings_from_text`, for a run whose settings were
+    built rather than read: there is no file text to carry, so one is written from the
+    object. ``mode='json'`` renders the ``Path`` fields as strings, which is what
+    ``safe_dump`` can represent and what loading turns back into paths; ``sort_keys=False``
+    keeps the sections in the order they are declared, for a file meant to be read.
+    """
+    return yaml.safe_dump(settings.model_dump(mode='json'), sort_keys=False)
 
 
 def select_label(records: list[APS31IDEScanRecord], requested: str | None) -> str:
@@ -327,6 +359,22 @@ def select_records(
     # is not guaranteed to be sorted.
     selected.sort(key=lambda record: record.scan_no)
     return selected
+
+
+class WorkerMessage(StrEnum):
+    """What a worker has to say about the scan it was given.
+
+    Here rather than in either process because the worker is reached by name and
+    the parent must not import it, and this module is already what the two agree
+    on: it renders the record that goes out, so it names the tag that comes back.
+
+    A string enum because the value is what travels. The value is the worker's
+    own word and means a scan-completion record -- not a reconstruction result,
+    which is a different child's vocabulary and travels under its own tag.
+    """
+
+    SCAN_RESULT = 'scan_result'
+    """One scan has finished, with whether it ran to completion."""
 
 
 def record_payload(record: APS31IDEScanRecord) -> dict[str, Any]:

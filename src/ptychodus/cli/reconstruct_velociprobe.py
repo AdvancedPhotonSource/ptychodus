@@ -41,7 +41,7 @@ PROFILE = InstrumentProfile(
         'FresnelZonePlate plugin preset for the model probe. Defaults to the VelociProbe '
         'zone plate. Ignored with --probe-file.'
     ),
-    default_fzp_preset='APS_Velociprobe',
+    default_fzp_preset='APS 33-ID-C VelociProbe',
 )
 
 

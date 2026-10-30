@@ -2,17 +2,27 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 import logging
+import math
 import threading
 
+from ptychodus.api.accumulate import compute_diffraction_moments, estimate_incident_beam
 from ptychodus.api.diffraction import Polarization
-from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.parallax import ParallaxEstimate, estimate_defocus_from_parallax
+from ptychodus.api.preprocess.diffraction import BinningStep
 from ptychodus.api.probe import OPRWeightPolicy
-from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter
+from ptychodus.api.product import (
+    Product,
+    ProductFileReader,
+    ProductFileWriter,
+    ProductMetadata,
+)
 
 from ..diffraction import AssembledDiffractionDataset
+from ..file_types import FileTypeChooser
+from ..plugins import PluginChooser
 from ..task_manager import TaskManager
 from .item import ProductRepositoryItem, ProductState
-from .item_factory import ProductRepositoryItemFactory
+from .item_factory import ProductRepositoryItemFactory, resolve_product_name
 from .monitor import ProductTaskMonitor
 from .object.builder_factory import ObjectBuilderFactory
 from .object.settings import ObjectSettings
@@ -64,6 +74,8 @@ class ProbePositionsAPI:
         self._settings = settings
         self._repository = repository
         self._builder_factory = builder_factory
+        self.file_readers = builder_factory.file_readers
+        self.file_writers = builder_factory.file_writers
 
     def create_streaming_context(self) -> PositionsStreamingContext:
         return PositionsStreamingContext()
@@ -114,12 +126,6 @@ class ProbePositionsAPI:
 
         item.set_builder(builder)
 
-    def get_open_file_filters(self) -> Iterator[str]:
-        return self._builder_factory.get_open_file_filters()
-
-    def get_open_file_filter(self) -> str:
-        return self._builder_factory.get_open_file_filter()
-
     def open_probe_positions(
         self, index: int, file_path: Path, *, file_type: str | None = None
     ) -> None:
@@ -152,12 +158,6 @@ class ProbePositionsAPI:
 
         destination_item.assign_item(source_item)
 
-    def get_save_file_filters(self) -> Iterator[str]:
-        return self._builder_factory.get_save_file_filters()
-
-    def get_save_file_filter(self) -> str:
-        return self._builder_factory.get_save_file_filter()
-
     def save_scan(self, index: int, file_path: Path, file_type: str) -> None:
         try:
             item = self._repository[index]
@@ -177,6 +177,8 @@ class ProbeAPI:
         self._settings = settings
         self._repository = repository
         self._builder_factory = builder_factory
+        self.file_readers = builder_factory.file_readers
+        self.file_writers = builder_factory.file_writers
 
     def builder_names(self) -> Iterator[str]:
         return iter(self._builder_factory)
@@ -196,7 +198,9 @@ class ProbeAPI:
         dataset = self._repository.get_dataset(index)
 
         try:
-            builder = self._builder_factory.create(builder_name, dataset=dataset)
+            builder = self._builder_factory.create(
+                builder_name, has_diffraction_data=dataset is not None
+            )
         except (KeyError, RuntimeError) as exc:
             logger.warning(f'Failed to create builder {builder_name}: {exc}')
             return
@@ -225,18 +229,14 @@ class ProbeAPI:
         dataset = self._repository.get_dataset(index)
 
         try:
-            builder = self._builder_factory.create_from_settings(dataset=dataset)
+            builder = self._builder_factory.create_from_settings(
+                has_diffraction_data=dataset is not None
+            )
         except (KeyError, RuntimeError) as exc:
             logger.warning(f'Failed to create builder from settings: {exc}')
             return
 
         item.set_builder(builder)
-
-    def get_open_file_filters(self) -> Iterator[str]:
-        return self._builder_factory.get_open_file_filters()
-
-    def get_open_file_filter(self) -> str:
-        return self._builder_factory.get_open_file_filter()
 
     def peek_opr_weights(
         self, file_path: Path, *, file_type: str | None = None
@@ -299,12 +299,6 @@ class ProbeAPI:
 
         destination_item.assign_item(source_item)
 
-    def get_save_file_filters(self) -> Iterator[str]:
-        return self._builder_factory.get_save_file_filters()
-
-    def get_save_file_filter(self) -> str:
-        return self._builder_factory.get_save_file_filter()
-
     def save_probe(self, index: int, file_path: Path, file_type: str) -> None:
         try:
             item = self._repository[index]
@@ -324,6 +318,8 @@ class ObjectAPI:
         self._settings = settings
         self._repository = repository
         self._builder_factory = builder_factory
+        self.file_readers = builder_factory.file_readers
+        self.file_writers = builder_factory.file_writers
 
     def builder_names(self) -> Iterator[str]:
         return iter(self._builder_factory)
@@ -343,7 +339,9 @@ class ObjectAPI:
         dataset = self._repository.get_dataset(index)
 
         try:
-            builder = self._builder_factory.create(builder_name, dataset=dataset)
+            builder = self._builder_factory.create(
+                builder_name, has_diffraction_data=dataset is not None
+            )
         except (KeyError, RuntimeError) as exc:
             logger.warning(f'Failed to create builder {builder_name}: {exc}')
             return
@@ -372,18 +370,14 @@ class ObjectAPI:
         dataset = self._repository.get_dataset(index)
 
         try:
-            builder = self._builder_factory.create_from_settings(dataset=dataset)
+            builder = self._builder_factory.create_from_settings(
+                has_diffraction_data=dataset is not None
+            )
         except (KeyError, RuntimeError) as exc:
             logger.warning(f'Failed to create builder from settings: {exc}')
             return
 
         item.set_builder(builder)
-
-    def get_open_file_filters(self) -> Iterator[str]:
-        return self._builder_factory.get_open_file_filters()
-
-    def get_open_file_filter(self) -> str:
-        return self._builder_factory.get_open_file_filter()
 
     def open_object(self, index: int, file_path: Path, *, file_type: str | None = None) -> None:
         builder = self._builder_factory.create_object_from_file(
@@ -415,12 +409,6 @@ class ObjectAPI:
 
         destination_item.assign_item(source_item)
 
-    def get_save_file_filters(self) -> Iterator[str]:
-        return self._builder_factory.get_save_file_filters()
-
-    def get_save_file_filter(self) -> str:
-        return self._builder_factory.get_save_file_filter()
-
     def save_object(self, index: int, file_path: Path, file_type: str) -> None:
         try:
             item = self._repository[index]
@@ -444,8 +432,8 @@ class ProductAPI:
         self._settings = settings
         self._repository = repository
         self._item_factory = item_factory
-        self._file_reader_chooser = file_reader_chooser
-        self._file_writer_chooser = file_writer_chooser
+        self.file_readers = FileTypeChooser(file_reader_chooser)
+        self.file_writers = FileTypeChooser(file_writer_chooser)
         self._task_manager = task_manager
         self._task_monitor = task_monitor
         self._queue_lock = threading.Lock()
@@ -489,7 +477,9 @@ class ProductAPI:
         dataset's load task finishes (via the shared FIFO background worker)."""
         if dataset is None or not dataset.is_load_in_progress():
             item = build()
-            return self._repository.insert_product(item)
+            index = self._repository.insert_product(item)
+            self._maybe_estimate_defocus(index, block=True)
+            return index
 
         finished_event = dataset.get_last_load_finished_event()
 
@@ -502,7 +492,9 @@ class ProductAPI:
             if error is not None:
                 raise RuntimeError('Diffraction dataset failed to load') from error
             item = build()
-            return self._repository.insert_product(item)
+            index = self._repository.insert_product(item)
+            self._maybe_estimate_defocus(index, block=True)
+            return index
 
         stub = self._item_factory.create_pending_stub(name=stub_name)
         index = self._repository.insert_product(stub)
@@ -540,6 +532,7 @@ class ProductAPI:
 
                     stub.copy_contents_from(real)
                     stub.set_state(ProductState.READY)
+                    self._maybe_estimate_defocus(index, block=False)
                 finally:
                     self._end_queued_product()
 
@@ -550,7 +543,7 @@ class ProductAPI:
 
     def insert_new_product(
         self,
-        name: str = 'Unnamed',
+        name: str = '',
         *,
         comments: str = '',
         detector_distance_m: float | None = None,
@@ -563,6 +556,7 @@ class ProductAPI:
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
         far_field: bool | None = None,
+        i0_photons_per_count: float | None = None,
         dataset: AssembledDiffractionDataset | None = None,
         block: bool = True,
     ) -> int:
@@ -580,10 +574,13 @@ class ProductAPI:
                 tilt_angle_deg=tilt_angle_deg,
                 polarization=polarization,
                 far_field=far_field,
+                i0_photons_per_count=i0_photons_per_count,
                 dataset=dataset,
             )
 
-        return self._insert_via_queue(dataset, build, block=block, stub_name=name)
+        return self._insert_via_queue(
+            dataset, build, block=block, stub_name=resolve_product_name(name, dataset)
+        )
 
     def insert_product(
         self,
@@ -619,17 +616,177 @@ class ProductAPI:
         def build() -> ProductRepositoryItem:
             return self._item_factory.create_from_settings(dataset=dataset)
 
-        return self._insert_via_queue(dataset, build, block=block, stub_name='Unnamed')
+        return self._insert_via_queue(
+            dataset, build, block=block, stub_name=resolve_product_name('', dataset)
+        )
 
     def get_item(self, product_index: int) -> ProductRepositoryItem:
         return self._repository[product_index]
 
-    def get_open_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_reader_chooser:
-            yield plugin.display_name
+    def estimate_defocus_from_parallax(
+        self,
+        product_index: int,
+        *,
+        block: bool = False,
+        bin_size_px: int | None = None,
+        minimum_significance: float | None = None,
+        minimum_defocus_dof: float | None = None,
+        on_finished: Callable[[ParallaxEstimate | None, bool], None] | None = None,
+    ) -> None:
+        """Measure the defocus from the parallax between bright-field images.
 
-    def get_open_file_filter(self) -> str:
-        return self._file_reader_chooser.get_current_plugin().display_name
+        One pass over the bound patterns, binned *bin_size_px* detector pixels a side and
+        corrected for beam decay by I0, gives :func:`estimate_defocus_from_parallax`'s
+        estimate. When :meth:`ParallaxEstimate.is_resolved` holds for the thresholds, the
+        product's focus position is set to the negated defocus; a focus the product
+        already stated is replaced, and a disagreement reported. Every threshold defaults
+        to the corresponding product setting. *on_finished* receives the estimate, None
+        when none could be made, and whether it was applied. Far field only.
+
+        The pass runs in the background unless *block*, which runs it inline so the focus
+        position is set by the time this returns.
+        """
+        settings = self._settings
+        bins = settings.parallax_bin_size_px.get_value() if bin_size_px is None else bin_size_px
+        significance = (
+            settings.parallax_min_significance.get_value()
+            if minimum_significance is None
+            else minimum_significance
+        )
+        defocus_dof = (
+            settings.parallax_min_defocus_dof.get_value()
+            if minimum_defocus_dof is None
+            else minimum_defocus_dof
+        )
+        item = self._repository[product_index]
+        dataset = item.get_dataset()
+        metadata = item.get_metadata_item().get_metadata()
+
+        def finish(estimate: ParallaxEstimate | None, applied: bool) -> None:
+            if on_finished is not None:
+                on_finished(estimate, applied)
+
+        if dataset is None:
+            logger.warning('No diffraction data to estimate the defocus from.')
+            finish(None, False)
+            return
+
+        if not metadata.far_field:
+            logger.warning('The defocus is estimated from far-field parallax only.')
+            finish(None, False)
+            return
+
+        data = dataset.get_assembled_data()
+        positions = item.get_probe_positions_item().get_probe_positions()
+        geometry = item.get_geometry()
+        object_geometry = geometry.get_object_geometry()
+        probe_geometry = geometry.get_probe_geometry()
+
+        def estimate_in_background() -> Callable[[], None]:
+            estimate: ParallaxEstimate | None = None
+
+            try:
+                moments = compute_diffraction_moments(
+                    data.get_indexes(),
+                    data.get_patterns(),
+                    bad_pixels=data.get_bad_pixels(),
+                    background=data.get_background(),
+                    flat_field=data.get_flat_field(),
+                    binning=BinningStep(bin_size_x=bins, bin_size_y=bins),
+                )
+
+                if moments is not None:
+                    moments = estimate_incident_beam(
+                        moments,
+                        positions.get_probe_photon_counts_by_index(),
+                        i0_photons_per_count=metadata.i0_photons_per_count,
+                    ).moments
+                    estimate = estimate_defocus_from_parallax(
+                        moments,
+                        positions,
+                        object_geometry,
+                        probe_geometry,
+                        photon_wavelength_m=metadata.photon_wavelength_m,
+                    )
+            except Exception:
+                logger.exception('Failed to estimate the defocus from the parallax!')
+
+            def apply_in_foreground() -> None:
+                applied = estimate is not None and estimate.is_resolved(
+                    minimum_significance=significance,
+                    minimum_defocus_dof=defocus_dof,
+                )
+
+                if estimate is None:
+                    logger.warning('The parallax gives no defocus estimate.')
+                elif applied:
+                    logger.info(
+                        f'Parallax defocus {estimate.defocus_distance_m * 1e3:.4g} '
+                        f'+/- {estimate.standard_error_m * 1e3:.2g} mm; setting the focus position.'
+                    )
+                    self._warn_if_defocus_disagrees(metadata, estimate.defocus_distance_m)
+                    item.get_metadata_item().focus_object_distance_m.set_value(
+                        -estimate.defocus_distance_m
+                    )
+                else:
+                    logger.warning(
+                        f'Parallax defocus {estimate.defocus_distance_m * 1e3:.4g} '
+                        f'+/- {estimate.standard_error_m * 1e3:.2g} mm is not resolved; '
+                        'leaving the focus position.'
+                    )
+
+                finish(estimate, applied)
+
+            return apply_in_foreground
+
+        if block:
+            estimate_in_background()()
+        else:
+            self._task_manager.put_background_task(estimate_in_background)
+
+    def _warn_if_defocus_disagrees(self, metadata: ProductMetadata, measured_m: float) -> None:
+        """Report a measured defocus that contradicts the one the product already stated.
+
+        A sign difference is a flipped or transposed detector, and a large one a mistyped
+        focus; both are worth saying out loud, because the measurement replaces the stated
+        value either way.
+        """
+        stated_m = metadata.defocus_distance_m
+
+        if stated_m == 0.0:
+            return
+
+        rtol = self._settings.parallax_rtol.get_value()
+
+        if math.copysign(1.0, measured_m) != math.copysign(1.0, stated_m) or abs(
+            measured_m - stated_m
+        ) > rtol * abs(stated_m):
+            logger.warning(
+                f'The parallax measures a defocus of {measured_m * 1e3:.4g} mm against the '
+                f'{stated_m * 1e3:.4g} mm the product stated; replacing it.'
+            )
+
+    def _maybe_estimate_defocus(self, product_index: int, *, block: bool) -> None:
+        """Measure the defocus of a freshly inserted product, where the settings ask.
+
+        Only while the product states no focus of its own: a stated one is a measurement
+        or a design value the user supplied, and nothing about creating a product is a
+        reason to overrule it.
+        """
+        if not self._settings.estimate_defocus_from_parallax.get_value():
+            return
+
+        item = self._repository[product_index]
+
+        if item.get_dataset() is None:
+            return
+
+        metadata = item.get_metadata_item().get_metadata()
+
+        if metadata.focus_object_distance_m != 0.0 or not metadata.far_field:
+            return
+
+        self.estimate_defocus_from_parallax(product_index, block=block)
 
     def open_product(
         self,
@@ -640,15 +797,11 @@ class ProductAPI:
         block: bool = True,
     ) -> int:
         if file_path.is_file():
-            if file_type is not None:
-                self._file_reader_chooser.set_current_plugin(file_type)
-
-            file_type = self._file_reader_chooser.get_current_plugin().simple_name
-            logger.debug(f'Reading "{file_path}" as "{file_type}"')
-            file_reader = self._file_reader_chooser.get_current_plugin().strategy
+            plugin = self.file_readers.select(file_type)
+            logger.debug(f'Reading "{file_path}" as "{plugin.simple_name}"')
 
             try:
-                product = file_reader.read(file_path)
+                product = plugin.strategy.read(file_path)
             except Exception as exc:
                 raise RuntimeError(f'Failed to read "{file_path}"') from exc
             else:
@@ -667,13 +820,6 @@ class ProductAPI:
 
         item.set_name(new_name)
 
-    def get_save_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_writer_chooser:
-            yield plugin.display_name
-
-    def get_save_file_filter(self) -> str:
-        return self._file_writer_chooser.get_current_plugin().display_name
-
     def save_product(self, index: int, file_path: Path, *, file_type: str | None = None) -> None:
         try:
             item = self._repository[index]
@@ -681,10 +827,6 @@ class ProductAPI:
             logger.warning(f'Failed to save product {index}!')
             return
 
-        if file_type is not None:
-            self._file_writer_chooser.set_current_plugin(file_type)
-
-        file_type = self._file_writer_chooser.get_current_plugin().simple_name
-        logger.debug(f'Writing "{file_path}" as "{file_type}"')
-        writer = self._file_writer_chooser.get_current_plugin().strategy
-        writer.write(file_path, item.get_product())
+        plugin = self.file_writers.select(file_type)
+        logger.debug(f'Writing "{file_path}" as "{plugin.simple_name}"')
+        plugin.strategy.write(file_path, item.get_product())

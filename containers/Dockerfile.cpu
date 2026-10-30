@@ -1,23 +1,45 @@
-FROM python:3.13-slim-trixie
+ARG BASE_REGISTRY=docker.io
+FROM ${BASE_REGISTRY}/python:3.14-slim-trixie
 
 ARG PTYCHODUS_VERSION
-ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PTYCHODUS=${PTYCHODUS_VERSION}
+ARG PYTORCH_VERSION=2.14.1
 
-WORKDIR /app
-COPY . /src
+COPY wheels/ /tmp/wheels/
 
-# Pre-install CPU-only torch from the PyTorch CPU index so the later
-# pip install of ptychi sees torch as already satisfied and does NOT
-# pull a CUDA-flavored torch wheel from PyPI.
+# Four details are load-bearing:
+#
+#   * ptychodus comes from PyPI: the release named by PTYCHODUS_VERSION, or
+#     the latest one when it is unset. An unpinned build reuses its cached
+#     layer after a new release, so pin it or pass --no-cache.
+#   * torch and torchvision come from the PyTorch CPU index, pinned to
+#     PYTORCH_VERSION. torchvision is named with torch so it resolves to the
+#     matching CPU build rather than PyPI's, which is built against a
+#     different torch.
+#   * /tmp/constraints.txt pins the torch just installed. cdtools, ptychi and
+#     the staged backends all depend on torch; without the pin, one asking for
+#     a newer torch makes pip quietly swap in PyPI's CUDA build. With it, pip
+#     backtracks to an older release of that package or fails the resolve
+#     naming it.
+#   * Backends published on no index (PtychoPINN, PtychoFM) arrive as wheels
+#     that scripts/podman/build builds from sibling checkouts and stages in
+#     containers/wheels/. The glob is optional: a plain build omits them.
+#     Everything goes into a SINGLE pip invocation so one resolution pass
+#     reconciles their floors with ptychodus's.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libqt5gui5 && \
     rm -rf /var/lib/apt/lists/* && \
     python3 -m pip install --root-user-action=ignore --no-cache-dir --upgrade pip && \
     python3 -m pip install --root-user-action=ignore --no-cache-dir \
         --index-url https://download.pytorch.org/whl/cpu \
-        torch && \
+        "torch==${PYTORCH_VERSION}" torchvision && \
+    python3 -c 'import importlib.metadata as m; [print(f"{d}=={m.version(d)}") for d in ("torch", "torchvision") if d in {x.metadata["Name"] for x in m.distributions()}]' \
+        > /tmp/constraints.txt && \
+    set -- "ptychodus[cdtools,gui,ptychi]${PTYCHODUS_VERSION:+==$PTYCHODUS_VERSION}" && \
+    for whl in /tmp/wheels/*.whl; do \
+        if [ -e "$whl" ]; then set -- "$@" "$whl"; fi; \
+    done && \
     python3 -m pip install --root-user-action=ignore --no-cache-dir \
-        /src[globus,gui,ptychi] && \
-    rm -rf /src
+        -c /tmp/constraints.txt "$@" && \
+    rm -rf /tmp/wheels /tmp/constraints.txt
 
 CMD ["python3", "-m", "ptychodus"]

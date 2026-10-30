@@ -1,10 +1,15 @@
-"""Probe generation functions: geometric apertures, zone plates, KB mirrors, Zernike modes, Hermite modes, and OPR ensembles."""
+"""Probe generation functions: geometric apertures, zone plates, KB mirrors, Zernike modes, Hermite-Gauss modes, and OPR ensembles.
+
+Also home to :class:`ProbeGenerator`, the interface a probe model is offered through. It
+sits beside the functions because it is how they are reached: a generator states what it
+accepts and turns one set of those values into a probe, and the functions below are what
+it turns them with.
+"""
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
 from enum import IntEnum, auto
 import logging
 import math
@@ -16,19 +21,98 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from ..constants import TWO_PI, TWO_PI_J
 from ..typing import ComplexArrayType, RealArrayType
 from ..geometry import HermiteMode, ImageExtent, LegendreMode, PixelGeometry, ZernikeMode
-from ..probe import Probe, ProbeGeometry, ProbeSequence, ProbeTransverseCoordinates
+from ..moments import compute_intensity_moments
+from ..probe import (
+    Probe,
+    ProbeEnsemble,
+    ProbeGeometry,
+    ProbeGeometryProvider,
+    ProbeTransverseCoordinates,
+)
+from ..product import reconcile_defocus_distance_m
 from ..propagate import (
     AngularSpectrumPropagator,
     FresnelTransformPropagator,
-    Propagator,
     PropagatorParameters,
     compute_far_field_pixel_geometry,
     intensity,
 )
-from ..assemble import AssembledDiffractionData
+from ..assemble import DetectorCorrections
+from ..diffraction import BadPixels, DetectorBackground, DiffractionPattern, FlatField
+from ..preprocess.diffraction import inpaint_bad_pixels
+from ..preprocess.noise import subtract_noise_floor
 
 
 logger = logging.getLogger(__name__)
+
+
+class ProbeGenerator(ABC):
+    """A probe model, and the options it accepts.
+
+    Stateless and configured per call: a generator holds no settings of its own, so it
+    costs nothing to construct and two callers can drive the same one with different
+    values at the same time. It does not name itself either; the name a person selects
+    it by is the one it was registered under.
+
+    A generator is a complete description of one kind of probe and knows nothing about
+    where its option values come from. Its options may state what a field *is* -- its
+    unit, its bounds, the measured quantity it corresponds to -- but never where a value
+    for it is found.
+
+    What it returns is raw: a single incoherent mode, at whatever intensity the model
+    produces. Expanding modes and normalizing the photon count are separate concerns
+    from describing an illumination, and a generator that applied either would be
+    applying it twice.
+    """
+
+    @abstractmethod
+    def get_default_options(self) -> BaseModel:
+        """Return this generator's options, populated with their defaults.
+
+        A description, not live state: plain pydantic carrying values, types, ranges,
+        enums and the words to put beside each field. A caller edits a copy and passes
+        it back as ``options``, and its type is what an incoming ``options`` is
+        validated against.
+
+        An instance rather than the class, because a field declared with a
+        ``default_factory`` reports its class-level default as undefined. Only an
+        instance carries the value such a field actually starts at.
+        """
+
+    @abstractmethod
+    def generate(self, options: BaseModel, geometry_provider: ProbeGeometryProvider) -> Probe:
+        """Return the probe *options* describe, sampled on the provider's probe grid.
+
+        Raises:
+            GeometryNotDefinedError: while something the probe depends on is not yet
+                available, which a caller should treat as "not yet" rather than as a
+                failure.
+        """
+
+    @property
+    def reads_diffraction_data(self) -> bool:
+        """Whether :meth:`generate` reads the diffraction data, not only the geometry.
+
+        Such a probe goes stale when the data changes under an unchanged detector
+        geometry, which the geometry alone does not announce.
+        """
+        return False
+
+
+def resolve_defocus_distance_m(
+    geometry_provider: ProbeGeometryProvider,
+    defocus_distance_m: float,
+    *,
+    rel_tol: float = 1.0e-6,
+) -> float:
+    """How far past its focus a probe is sampled, deferring to the product.
+
+    See :func:`ptychodus.api.product.reconcile_defocus_distance_m`, which this applies
+    to the provider's focus-object distance and the probe's own *defocus_distance_m*.
+    """
+    return reconcile_defocus_distance_m(
+        geometry_provider.focus_object_distance_m, defocus_distance_m, rel_tol=rel_tol
+    )
 
 
 def rescale_probe_intensity(probe: Probe, new_intensity: float) -> Probe:
@@ -77,6 +161,99 @@ def propagate_probe(
         array=propagator.propagate(probe.get_array()),
         pixel_geometry=pixel_geometry,
     )
+
+
+def apply_defocus_phase(
+    probe: Probe,
+    *,
+    photon_wavelength_m: float,
+    defocus_distance_m: float,
+    significant_amplitude_ratio: float = 1.0e-2,
+    min_fresnel_number: float = 1.0,
+) -> Probe:
+    """Give every incoherent mode the curvature of a beam sampled past its focus.
+
+    The propagators here use ``exp(+ikz)``, so a probe sampled a signed distance *z*
+    past its focus carries ``exp(+i pi (x^2 + y^2) / (lambda z))``: *z* > 0 lies
+    downstream of the focus and the wave diverges, *z* < 0 lies upstream and it
+    converges. ``x`` and ``y`` are measured in meters from the pixel ``(N - 1) / 2``,
+    the center the amplitude generators use, so the curvature adds no tilt; each axis
+    keeps its own pixel size. The factor is a pure phase, so the power is unchanged,
+    and *z* = 0 returns *probe* itself.
+
+    Two sampling checks run over the pixels whose combined amplitude is at least
+    *significant_amplitude_ratio* times the peak; lowering it lets a fainter tail
+    count. A warning is logged for each axis on which the local frequency
+    ``|x| / (lambda |z|)`` exceeds the Nyquist limit ``1 / (2 dx)``, where the phase
+    aliases. Another is logged when the Fresnel number ``R^2 / (lambda |z|)`` of that
+    region falls below *min_fresnel_number*: a hard-edged aperture with curvature is a
+    geometric-optics model, which holds only at a large Fresnel number.
+    """
+    if defocus_distance_m == 0.0:
+        return probe
+
+    coords = _probe_geometry(probe).get_transverse_coordinates()
+    phase = numpy.pi * (numpy.square(coords.x_m) + numpy.square(coords.y_m))
+    phase /= photon_wavelength_m * defocus_distance_m
+    array = probe.get_array()
+    pixel_geometry = probe.get_pixel_geometry()
+
+    _warn_about_defocus_sampling(
+        numpy.sqrt(numpy.sum(intensity(array), axis=-3)),
+        coords,
+        pixel_geometry,
+        wavelength_defocus_m2=photon_wavelength_m * abs(defocus_distance_m),
+        significant_amplitude_ratio=significant_amplitude_ratio,
+        min_fresnel_number=min_fresnel_number,
+    )
+
+    return Probe(array=array * numpy.exp(1j * phase), pixel_geometry=pixel_geometry)
+
+
+def _warn_about_defocus_sampling(
+    amplitude: RealArrayType,
+    coords: ProbeTransverseCoordinates,
+    pixel_geometry: PixelGeometry,
+    *,
+    wavelength_defocus_m2: float,
+    significant_amplitude_ratio: float,
+    min_fresnel_number: float,
+) -> None:
+    """Warn when a defocus phase aliases, or when its region is too small to curve."""
+    peak_amplitude = amplitude.max()
+
+    if not peak_amplitude > 0.0:
+        return
+
+    is_significant = amplitude >= significant_amplitude_ratio * peak_amplitude
+
+    for axis, position_m, pixel_size_m in (
+        ('x', coords.x_m, pixel_geometry.width_m),
+        ('y', coords.y_m, pixel_geometry.height_m),
+    ):
+        local_frequency_per_m = numpy.abs(position_m[is_significant]).max() / wavelength_defocus_m2
+        nyquist_frequency_per_m = 0.5 / pixel_size_m
+
+        if local_frequency_per_m > nyquist_frequency_per_m:
+            logger.warning(
+                'Defocus phase is aliased along %s: its local frequency reaches %g/m, '
+                'beyond the %g/m Nyquist limit. Use a finer probe pixel size or a larger '
+                'defocus distance.',
+                axis,
+                local_frequency_per_m,
+                nyquist_frequency_per_m,
+            )
+
+    radius_m = coords.position_r_m[is_significant].max()
+    fresnel_number = radius_m**2 / wavelength_defocus_m2
+
+    if fresnel_number < min_fresnel_number:
+        logger.warning(
+            'Defocused probe has Fresnel number %.3g, below %.3g; a curved aperture is a '
+            'geometric-optics model and diffraction dominates here.',
+            fresnel_number,
+            min_fresnel_number,
+        )
 
 
 def generate_disk_probe(
@@ -129,27 +306,63 @@ def generate_super_gaussian_probe(
 
 def generate_average_pattern_probe(
     geometry: ProbeGeometry,
-    assembled_data: AssembledDiffractionData,
+    mean_pattern: DiffractionPattern | RealArrayType,
     *,
+    bad_pixels: BadPixels,
     photon_wavelength_m: float,
     detector_distance_m: float,
+    detector_pixel_geometry: PixelGeometry | None = None,
     far_field: bool = True,
+    background: DetectorBackground | None = None,
+    flat_field: FlatField | None = None,
+    defocus_distance_m: float = 0.0,
+    bright_field_mad_threshold: float | None = None,
     rtol: float = 1.0e-3,
 ) -> Probe:
-    """Back-propagate the square root of the mean diffraction pattern to estimate the probe.
+    """Back-propagate the square root of a mean diffraction pattern to estimate the probe.
 
-    Far field back-propagates with the single-FFT Fresnel transform, whose output pitch
-    is ``lambda * |z| / (N * dx_det)``; that pitch must match what *geometry* declares
-    for the returned Probe to be self-consistent, so it is checked against *rtol*.
+    Far field takes the square root as the probe's angular spectrum with a flat phase,
+    so its inverse Fourier transform -- unitary, preserving the photon count -- is the
+    beam at its waist, on the grid *geometry* describes: one detector pixel is one
+    frequency step ``1 / (N * dx)`` of it. The phase the Fresnel transform adds across
+    the detector, ``pi * u**2 / (lambda * z)``, is not the probe's, and the intensity
+    does not record it, so it is not undone; doing so would carry the waist the whole
+    detector distance out of focus. The detector pitch is therefore not needed. Given
+    one, the pitch the patterns imply, ``lambda * |z| / (N * dx_det)``, must match what
+    *geometry* declares for the returned Probe to be self-consistent, so it is checked
+    against *rtol*.
 
     Near field back-propagates with the angular spectrum, which preserves pitch, so the
     probe lands on the grid *geometry* already describes and there is no output pitch to
     check. The sample grid is the detector grid demagnified, which pins the magnification
-    at ``dx_det / dx_probe`` and the equivalent parallel-beam distance at ``z_d / M``.
+    at ``dx_det / dx_probe`` and the equivalent parallel-beam distance at ``z_d / M``; the
+    detector pitch is required.
+
+    A *background* or *flat_field* the mean still carries is removed as ``(mean -
+    background) / flat_field``, clipped at zero, before the square root. Otherwise a
+    flat background would back-propagate into a bright spot at the probe center. Pass
+    only maps the mean has not had applied, so none is removed twice. Bad pixels,
+    including those the maps make unusable, are inpainted from their neighbours rather
+    than zeroed: a zeroed pixel inside the bright field punches a hole in it that rings
+    through the back-propagated probe.
+
+    With *bright_field_mad_threshold*, the far-field mean keeps only its bright field:
+    :func:`ptychodus.api.preprocess.noise.subtract_noise_floor` removes the background
+    pedestal -- diffuse scattering, or an offset no background map accounts for -- and
+    zeroes what lies within that many MADs of it. The median filter only decides which
+    pixels belong to the bright field; those that do keep their measured values, so its
+    edge is not eroded. The near-field mean is a hologram
+    rather than a bright field and is left whole.
+
+    The returned probe is the field in the plane the patterns' geometry describes, or,
+    for a nonzero *defocus_distance_m*, that field propagated the signed distance
+    further by :func:`propagate_probe`. A flat-phase square root back-propagates to the
+    beam at its waist, so the defocus is how far past the focus the object sits.
 
     Raises ValueError if the diffraction-pattern shape is inconsistent with *geometry*,
-    if the detector distance is zero, or -- far field only -- if the implied
-    sample-plane pixel size disagrees with *geometry*.
+    if the detector distance is zero, if a near-field mean has no detector pitch, or --
+    far field with a detector pitch -- if the implied sample-plane pixel size disagrees
+    with *geometry*.
     """
     if detector_distance_m == 0.0:
         raise ValueError(
@@ -157,7 +370,24 @@ def generate_average_pattern_probe(
             'the Fresnel-transform output pixel size lambda*z/(N*dx_det) vanishes at z=0.'
         )
 
-    detector_intensity = numpy.mean(assembled_data.get_patterns(), axis=0)
+    corrections = DetectorCorrections(
+        background=background,
+        flat_field=flat_field,
+        subtract_background=True,
+        divide_flat_field=True,
+    )
+    usable_bad_pixels = corrections.apply_to_bad_pixels(bad_pixels)
+    corrected = corrections.apply(numpy.asarray(mean_pattern)[numpy.newaxis])[0]
+    detector_intensity = inpaint_bad_pixels(corrected.astype(numpy.float64), usable_bad_pixels)
+
+    if far_field and bright_field_mad_threshold is not None:
+        detector_intensity, _ = subtract_noise_floor(
+            detector_intensity,
+            bad_pixels=usable_bad_pixels,
+            mad_threshold=bright_field_mad_threshold,
+            keep_filtered=False,
+        )
+
     height_px, width_px = detector_intensity.shape[-2:]
 
     if (width_px, height_px) != (geometry.width_px, geometry.height_px):
@@ -166,40 +396,25 @@ def generate_average_pattern_probe(
             f'geometry ({geometry.width_px}x{geometry.height_px} px); resample patterns first.'
         )
 
-    detector_pixel_geometry = assembled_data.get_pixel_geometry()
     probe_pixel_geometry = geometry.get_pixel_geometry()
+    array: ComplexArrayType
 
     if far_field:
-        implied_geometry = ProbeGeometry.from_far_field(
-            detector_pixel_geometry,
-            ImageExtent(width_px=width_px, height_px=height_px),
-            wavelength_m=photon_wavelength_m,
-            distance_m=detector_distance_m,
-        )
-
-        if not numpy.isclose(
-            implied_geometry.pixel_width_m, geometry.pixel_width_m, rtol=rtol
-        ) or not numpy.isclose(implied_geometry.pixel_height_m, geometry.pixel_height_m, rtol=rtol):
-            raise ValueError(
-                'Fresnel-transform output pixel size '
-                f'({implied_geometry.pixel_width_m:.3e} x '
-                f'{implied_geometry.pixel_height_m:.3e} m) does not match '
-                f'probe geometry ({geometry.pixel_width_m:.3e} x '
-                f'{geometry.pixel_height_m:.3e} m) within rtol={rtol}.'
+        if detector_pixel_geometry is not None:
+            _check_far_field_pitch(
+                geometry, detector_pixel_geometry, photon_wavelength_m, detector_distance_m, rtol
             )
 
-        # Backward propagation, so PropagatorParameters' pitch describes the *output*
-        # (upstream) plane -- the sample plane, not the detector.
-        propagator_parameters = PropagatorParameters(
-            wavelength_m=photon_wavelength_m,
-            width_px=width_px,
-            height_px=height_px,
-            pixel_width_m=probe_pixel_geometry.width_m,
-            pixel_height_m=probe_pixel_geometry.height_m,
-            propagation_distance_m=-detector_distance_m,
+        array = numpy.fft.fftshift(
+            numpy.fft.ifft2(numpy.fft.ifftshift(numpy.sqrt(detector_intensity)), norm='ortho')
         )
-        propagator: Propagator = FresnelTransformPropagator(propagator_parameters)
     else:
+        if detector_pixel_geometry is None:
+            raise ValueError(
+                'A near-field mean pattern needs the detector pitch, which sets the '
+                'magnification it is demagnified by.'
+            )
+
         # The sample grid is the detector grid demagnified, so the pitch ratio is the
         # magnification and no separate output-pitch check is possible or needed:
         # angular spectrum returns the field on the grid it was given.
@@ -212,11 +427,49 @@ def generate_average_pattern_probe(
             pixel_height_m=probe_pixel_geometry.height_m,
             propagation_distance_m=-detector_distance_m / magnification,
         )
-        propagator = AngularSpectrumPropagator(propagator_parameters)
+        array = AngularSpectrumPropagator(propagator_parameters).propagate(
+            numpy.sqrt(detector_intensity).astype(complex)
+        )
 
-    array = propagator.propagate(numpy.sqrt(detector_intensity).astype(complex))
+    probe = Probe(array=array, pixel_geometry=probe_pixel_geometry)
 
-    return Probe(array=array, pixel_geometry=probe_pixel_geometry)
+    # Skipped at zero: the angular spectrum is the identity there, but only after a full
+    # transform pair.
+    if defocus_distance_m != 0.0:
+        probe = propagate_probe(
+            probe,
+            photon_wavelength_m=photon_wavelength_m,
+            propagation_distance_m=defocus_distance_m,
+        )
+
+    return probe
+
+
+def _check_far_field_pitch(
+    geometry: ProbeGeometry,
+    detector_pixel_geometry: PixelGeometry,
+    photon_wavelength_m: float,
+    detector_distance_m: float,
+    rtol: float,
+) -> None:
+    """Raise unless the Fresnel transform's output pitch is the pitch *geometry* declares."""
+    implied_geometry = ProbeGeometry.from_far_field(
+        detector_pixel_geometry,
+        ImageExtent(width_px=geometry.width_px, height_px=geometry.height_px),
+        wavelength_m=photon_wavelength_m,
+        distance_m=detector_distance_m,
+    )
+
+    if not numpy.isclose(
+        implied_geometry.pixel_width_m, geometry.pixel_width_m, rtol=rtol
+    ) or not numpy.isclose(implied_geometry.pixel_height_m, geometry.pixel_height_m, rtol=rtol):
+        raise ValueError(
+            'Fresnel-transform output pixel size '
+            f'({implied_geometry.pixel_width_m:.3e} x '
+            f'{implied_geometry.pixel_height_m:.3e} m) does not match '
+            f'probe geometry ({geometry.pixel_width_m:.3e} x '
+            f'{geometry.pixel_height_m:.3e} m) within rtol={rtol}.'
+        )
 
 
 class FresnelZonePlate(BaseModel):
@@ -419,6 +672,29 @@ class KirkpatrickBaezMirrorPair(BaseModel):
         sampling but not the field at the focus.
         """
         return 0.5 * (self.horizontal.focus_distance_m + self.vertical.focus_distance_m)
+
+
+class KirkpatrickBaezMirrorPreset(BaseModel):
+    """A Kirkpatrick-Baez pair as measured on an instrument, flattened axis by axis.
+
+    The nested :class:`KirkpatrickBaezMirrorPair` is what the simulation reads; this is
+    the same optic spelled as one flat record, one field per mirror quantity, which is
+    the shape a set of named values takes. Each field carries the bounds of the
+    :class:`KirkpatrickBaezMirror` field it mirrors.
+
+    The source distance is left out because the simulation never reads it, and the
+    astigmatism and defocus because they describe how the pair is aligned rather than
+    the pair itself.
+    """
+
+    model_config = ConfigDict(frozen=True, extra='forbid', allow_inf_nan=False)
+
+    horizontal_acceptance_length_m: float = Field(gt=0.0)
+    horizontal_grazing_angle_rad: float = Field(gt=0.0, lt=0.5 * numpy.pi)
+    horizontal_focus_distance_m: float = Field(gt=0.0)
+    vertical_acceptance_length_m: float = Field(gt=0.0)
+    vertical_grazing_angle_rad: float = Field(gt=0.0, lt=0.5 * numpy.pi)
+    vertical_focus_distance_m: float = Field(gt=0.0)
 
 
 def generate_mirror_figure_error(
@@ -755,21 +1031,58 @@ def generate_zernike_probe(
     )
 
 
-def generate_hermite_probe(
+def _hermite_gauss_norm(order: int, beam_waist_m: float) -> float:
+    """The factor normalizing the one-dimensional Hermite-Gauss mode *order* to unit power.
+
+    ``(2 / pi)**(1/4) / sqrt(2**order * order! * w)``, evaluated through ``lgamma`` so a
+    high order does not overflow the factorial before the square root brings it back.
+    """
+    log_norm = 0.25 * math.log(2.0 / math.pi) - 0.5 * (
+        order * math.log(2.0) + math.lgamma(order + 1) + math.log(beam_waist_m)
+    )
+    return math.exp(log_norm)
+
+
+def generate_hermite_gauss_probe(
     geometry: ProbeGeometry,
     polynomial: Iterable[HermiteMode],
     *,
-    width_m: float,
-    height_m: float,
+    beam_waist_x_m: float,
+    beam_waist_y_m: float,
 ) -> Probe:
-    """Generate a probe as a superposition of 2D Hermite polynomial modes with characteristic widths *width_m* (x) and *height_m* (y)."""
+    """Generate a probe as a superposition of Hermite-Gauss modes.
+
+    Mode ``(m, n)`` is ``N_m N_n H_m(sqrt(2) x / w_x) H_n(sqrt(2) y / w_y)
+    exp(-x**2 / w_x**2 - y**2 / w_y**2)``. The waist ``w`` along each axis is the radius
+    at which the intensity of mode ``(0, 0)`` falls to ``1 / e**2`` of its peak.
+
+    Each one-dimensional factor is normalized to unit power, ``N_m = (2 / pi)**(1/4) /
+    sqrt(2**m m! w)``, so a mode's coefficient is its amplitude relative to the other
+    modes rather than being inflated by the growth of ``H_m``. The Gaussian envelope
+    gives every mode a finite extent, about ``sqrt(2 m + 1) w`` along its axis: the
+    scale of the polynomial and the size of the probe are one width, not two.
+
+    Raises:
+        ValueError: if either waist is not positive.
+    """
+    if beam_waist_x_m <= 0.0 or beam_waist_y_m <= 0.0:
+        raise ValueError(
+            f'Hermite-Gauss waists must be positive (got {beam_waist_x_m}, {beam_waist_y_m}).'
+        )
+
     coords = geometry.get_transverse_coordinates()
-    x = coords.x_m / width_m
-    y = coords.y_m / height_m
-    array = numpy.zeros_like(x, dtype=complex)
+    u = math.sqrt(2.0) * coords.x_m / beam_waist_x_m
+    v = math.sqrt(2.0) * coords.y_m / beam_waist_y_m
+    array = numpy.zeros_like(u, dtype=complex)
 
     for mode in polynomial:
-        array += mode(x, y)
+        norm = _hermite_gauss_norm(mode.order_x, beam_waist_x_m) * _hermite_gauss_norm(
+            mode.order_y, beam_waist_y_m
+        )
+        array += norm * mode(u, v)
+
+    # exp(-x**2 / w**2) is exp(-u**2 / 2) in the scaled coordinate.
+    array *= numpy.exp(-0.5 * (u * u + v * v))
 
     return Probe(
         array=array,
@@ -1035,53 +1348,6 @@ class GaussianSchellStrategy(IncoherentModeStrategy):
         )
 
 
-@dataclass(frozen=True)
-class _ProbeMoments:
-    """Intensity-weighted centroid and variance of a probe, in meters."""
-
-    center_x_m: float
-    center_y_m: float
-    variance_x_m2: float
-    variance_y_m2: float
-
-
-def _compute_probe_moments(
-    probe_intensity: RealArrayType, coordinates: ProbeTransverseCoordinates
-) -> _ProbeMoments:
-    """Return the plain intensity-weighted first and second moments of a probe.
-
-    No filtering, thresholding or background subtraction: the caller wants the length
-    scale of the distribution it passed in, not an estimate of where a cleaned-up beam
-    would sit.
-
-    Raises ValueError when the total intensity is non-positive, or when either variance
-    vanishes, since neither a centroid nor a width is defined in those cases.
-    """
-    total = probe_intensity.sum()
-
-    if total <= 0.0:
-        raise ValueError('Cannot take moments of a probe with non-positive total intensity!')
-
-    center_x_m = (coordinates.x_m * probe_intensity).sum() / total
-    center_y_m = (coordinates.y_m * probe_intensity).sum() / total
-    variance_x_m2 = (numpy.square(coordinates.x_m - center_x_m) * probe_intensity).sum() / total
-    variance_y_m2 = (numpy.square(coordinates.y_m - center_y_m) * probe_intensity).sum() / total
-
-    if variance_x_m2 <= 0.0 or variance_y_m2 <= 0.0:
-        raise ValueError(
-            'Probe intensity has no transverse extent on at least one axis, so it sets no '
-            'length scale; a probe confined to a single row or column cannot seed '
-            'polynomial modes.'
-        )
-
-    return _ProbeMoments(
-        center_x_m=float(center_x_m),
-        center_y_m=float(center_y_m),
-        variance_x_m2=float(variance_x_m2),
-        variance_y_m2=float(variance_y_m2),
-    )
-
-
 def _graded_polynomial_orders(num_orders: int) -> list[tuple[int, int]]:
     """Return *num_orders* polynomial order pairs, graded by increasing total degree.
 
@@ -1152,14 +1418,33 @@ class ProbeMomentPolynomialStrategy(IncoherentModeStrategy):
 
     def build_fill_imodes(self, probe: Probe, first_imode: int, num_fill: int) -> ComplexArrayType:
         array_in = probe.get_array()
+        pixel_geometry = probe.get_pixel_geometry()
         coords = _probe_geometry(probe).get_transverse_coordinates()
-        moments = _compute_probe_moments(numpy.sum(intensity(array_in), axis=-3), coords)
+
+        # The plain intensity moments, with no filtering, thresholding or background
+        # subtraction: the length scale of the distribution as given.
+        moments = compute_intensity_moments(numpy.sum(intensity(array_in), axis=-3))
+
+        if not moments.total > 0.0:
+            raise ValueError('Cannot take moments of a probe with non-positive total intensity!')
+
+        variance_x_m2 = moments.covariance_xx_px2 * pixel_geometry.width_m**2
+        variance_y_m2 = moments.covariance_yy_px2 * pixel_geometry.height_m**2
+
+        if not (variance_x_m2 > 0.0 and variance_y_m2 > 0.0):
+            raise ValueError(
+                'Probe intensity has no transverse extent on at least one axis, so it sets no '
+                'length scale; a probe confined to a single row or column cannot seed '
+                'polynomial modes.'
+            )
 
         # Dimensionless offsets: a polynomial in meters would span tens of decades
         # between its lowest and highest order for no gain, since scaling a mode by a
         # constant leaves the orthogonalized result unchanged.
-        u = (coords.x_m - moments.center_x_m) / math.sqrt(moments.variance_x_m2)
-        v = (coords.y_m - moments.center_y_m) / math.sqrt(moments.variance_y_m2)
+        u = (coords.x_m - moments.centroid_x_px * pixel_geometry.width_m) / math.sqrt(variance_x_m2)
+        v = (coords.y_m - moments.centroid_y_px * pixel_geometry.height_m) / math.sqrt(
+            variance_y_m2
+        )
         damping = numpy.exp(
             -(numpy.square(u) + numpy.square(v)) / (2.0 * numpy.square(self._damping_width))
         )
@@ -1169,6 +1454,76 @@ class ProbeMomentPolynomialStrategy(IncoherentModeStrategy):
         return numpy.stack(
             [
                 numpy.power(u, order_x) * numpy.power(v, order_y) * dominant_mode * damping
+                for order_x, order_y in orders
+            ]
+        )
+
+
+def _spectral_axis(size: int, order: int) -> RealArrayType:
+    """Return the FFT-ordered frequency indexes along one axis raised to *order*.
+
+    The indexes are integers, which fixes each mode only up to a scale that the caller
+    renormalizes. For an odd order the unpaired Nyquist bin of an even-length axis is
+    zeroed: it has no sign, so keeping it would make the derivative of a field that is
+    real in that direction come out complex.
+    """
+    frequency = numpy.fft.fftfreq(size) * size
+    values = numpy.power(frequency, order)
+
+    if order % 2 == 1 and size % 2 == 0:
+        values[size // 2] = 0.0
+
+    return values
+
+
+class ProbeDerivativeStrategy(IncoherentModeStrategy):
+    """Fill with spatial derivatives of the dominant mode, the modes that scan jitter makes.
+
+    A probe displaced by a small random offset ``d`` is ``P(r - d) ~ P - d . grad P``, so
+    positional vibration during an exposure adds incoherent power along the first
+    derivatives of the dominant mode, and larger excursions reach the higher ones. A fill
+    mode is the derivative ``d^(m+n) P / dx^m dy^n``, taken exactly by multiplying the
+    dominant mode's spectrum by ``kx^m ky^n``. Orders are graded by total degree and skip
+    the constant term, which would only reproduce the dominant mode. Circular products
+    ``(kx + i ky)^a (kx - i ky)^b`` span the same space within each degree, so they would
+    change the basis but not what orthogonalization keeps.
+
+    This is the Fourier counterpart of :class:`ProbeMomentPolynomialStrategy`, whose
+    real-space polynomials correspond to derivatives in angle: source size and angular
+    jitter rather than positional jitter.
+
+    Weights come from a decay profile, as nothing in the construction predicts how power
+    divides among the orders.
+    """
+
+    def __init__(
+        self,
+        *,
+        decay_type: ProbeModeDecayType = ProbeModeDecayType.EXPONENTIAL,
+        decay_ratio: float = 0.5,
+    ) -> None:
+        _validate_decay_ratio(decay_type, decay_ratio)
+        self._decay_type = decay_type
+        self._decay_ratio = decay_ratio
+
+    def get_imode_weights(self, num_imodes: int) -> RealArrayType:
+        return numpy.asarray(
+            self._decay_type.get_weights(num_imodes, self._decay_ratio), dtype=float
+        )
+
+    def build_fill_imodes(self, probe: Probe, first_imode: int, num_fill: int) -> ComplexArrayType:
+        dominant_mode = probe.get_array()[0, :, :].astype(complex)
+        height_px, width_px = dominant_mode.shape
+        spectrum = numpy.fft.fft2(dominant_mode)
+        orders = _graded_polynomial_orders(num_fill + 1)[1:]
+
+        return numpy.stack(
+            [
+                numpy.fft.ifft2(
+                    spectrum
+                    * _spectral_axis(height_px, order_y)[:, numpy.newaxis]
+                    * _spectral_axis(width_px, order_x)[numpy.newaxis, :]
+                )
                 for order_x, order_y in orders
             ]
         )
@@ -1310,15 +1665,21 @@ def generate_coherent_probe_modes(
     probe: Probe,
     *,
     num_cmodes: int,
-    num_diffraction_patterns: int,
+    num_positions: int,
     small_value: float = 1.0e-6,
     normalize_cmodes: bool = True,
-) -> ProbeSequence:
-    """Build an OPR ProbeSequence with *num_cmodes* coherent modes and random per-scan weights."""
+) -> ProbeEnsemble:
+    """Build an OPR ProbeEnsemble with *num_cmodes* coherent modes and random weights.
+
+    The weights hold one row per probe position, so *num_positions* is the length of
+    the product's position sequence, duplicates and surplus points included. Pairing
+    rows with diffraction patterns is left to the index matcher, which conditions them
+    as it does the coordinates.
+    """
     opr_weights: RealArrayType | None = None
 
     if num_cmodes > 1:
-        opr_weights = small_value * rng.normal(size=(num_diffraction_patterns, num_cmodes))
+        opr_weights = small_value * rng.normal(size=(num_positions, num_cmodes))
         opr_weights[:, 0] = 1.0
 
     array_in = probe.get_array()
@@ -1336,7 +1697,7 @@ def generate_coherent_probe_modes(
 
     array_out[0, :, :, :] = array_in[:, :, :]
 
-    return ProbeSequence(
+    return ProbeEnsemble(
         array=array_out,
         opr_weights=opr_weights,
         pixel_geometry=probe.get_pixel_geometry(),

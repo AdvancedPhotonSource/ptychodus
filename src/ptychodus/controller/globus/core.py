@@ -9,14 +9,14 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ptychodus.api.observer import SequenceObserver
+from ptychodus.model.observer import SequenceObserver
 
 from ...model.globus import GlobusAuthorizer, GlobusSettings, GlobusStatus, GlobusStatusRepository
 from ..data import FileDialogFactory
 from ..parameters import ParameterViewBuilder, PathLineEditParameterViewController
 from .authorization import GlobusAuthorizationController
 from .status import GlobusStatusViewController
-from .table_model import GlobusStatusTableModel
+from .table_model import Column, GlobusStatusTableModel
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +109,7 @@ class GlobusController(SequenceObserver[GlobusStatus]):
         view.setLayout(layout)
 
     def _handle_table_view_clicked(self, index: QModelIndex) -> None:
-        if index.column() == 5:
+        if Column.from_index(index.column()) is Column.RUN_ID:
             url = index.data(Qt.ItemDataRole.UserRole)
             logger.info(f'Opening URL: "{url.toString()}"')
             QDesktopServices.openUrl(url)

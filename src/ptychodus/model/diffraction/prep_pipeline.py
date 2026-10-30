@@ -10,7 +10,6 @@ from ptychodus.api.preprocess.diffraction import (
     HorizontalFlipStep,
     PaddingStep,
     TransposeStep,
-    UpsampleStep,
     VerticalFlipStep,
 )
 from ptychodus.api.geometry import ImageExtent, Interval
@@ -44,6 +43,21 @@ class PrepPipelineBuilder:
     def __init__(self, settings: DiffractionSettings) -> None:
         self._settings = settings
 
+    def get_value_filter(self) -> FilterValuesStep | None:
+        """The value cut the pipeline opens with, or None when neither bound is enabled.
+
+        Extent-neutral, so it applies equally to a raw-detector frame such as a summary
+        pattern.
+        """
+        s = self._settings
+        lower = s.value_lower_bound.get_value() if s.value_lower_bound_enabled.get_value() else None
+        upper = s.value_upper_bound.get_value() if s.value_upper_bound_enabled.get_value() else None
+
+        if lower is None and upper is None:
+            return None
+
+        return FilterValuesStep(lower_bound=lower, upper_bound=upper)
+
     def get_plan(self, detector_extent: ImageExtent | None = None) -> DiffractionPrepPlan:
         """Snapshot live diffraction settings as a load-time crop plus a pipeline.
 
@@ -53,7 +67,7 @@ class PrepPipelineBuilder:
         plan must pass an extent.
 
         Pipeline canonical order after the load-time crop:
-        filter → binning → upsample → padding → hflip → vflip → transpose.
+        filter → binning → padding → hflip → vflip → transpose.
         """
         s = self._settings
         steps: list[DiffractionPrepStepUnion] = []
@@ -61,10 +75,9 @@ class PrepPipelineBuilder:
         # Value filter: extent-neutral, no clamping. Commutes with the load-time
         # crop, so keeping it in the residual pipeline (post-crop) is equivalent
         # to filtering the full frames.
-        lower = s.value_lower_bound.get_value() if s.value_lower_bound_enabled.get_value() else None
-        upper = s.value_upper_bound.get_value() if s.value_upper_bound_enabled.get_value() else None
-        if lower is not None or upper is not None:
-            steps.append(FilterValuesStep(lower_bound=lower, upper_bound=upper))
+        value_filter = self.get_value_filter()
+        if value_filter is not None:
+            steps.append(value_filter)
 
         # Crop hoisted to load time as read_region -- passed to
         # DiffractionArray.get_patterns() so HDF5 readers slice at the file
@@ -112,17 +125,21 @@ class PrepPipelineBuilder:
                 pre_h = None
             bin_x = _clamp_size(s.bin_size_x.get_value(), pre_w)
             bin_y = _clamp_size(s.bin_size_y.get_value(), pre_h)
-            if pre_w is not None and pre_h is not None and (pre_w % bin_x or pre_h % bin_y):
-                raise ValueError(
-                    f'Invalid binning size! (input=({pre_w}, {pre_h}), bin=({bin_x}, {bin_y}))'
-                )
+            if pre_w is not None and pre_h is not None:
+                dropped_x = pre_w % bin_x
+                dropped_y = pre_h % bin_y
+
+                # Reported once per plan rather than once per frame, and only where
+                # something is actually discarded.
+                if dropped_x or dropped_y:
+                    logger.warning(
+                        f'Binning {pre_w}x{pre_h} by ({bin_x}, {bin_y}) leaves a partial'
+                        f' block; discarding {dropped_x} column(s) and {dropped_y} row(s)'
+                        ' at the far edge.'
+                    )
             steps.append(BinningStep(bin_size_x=bin_x, bin_size_y=bin_y))
 
-        # Upsample / padding / flips / transpose: no clamping needed.
-        if s.upsample_enabled.get_value():
-            factor = s.upsample_factor.get_value()
-            if factor > 1:
-                steps.append(UpsampleStep(factor=factor))
+        # Padding / flips / transpose: no clamping needed.
         if s.padding_enabled.get_value():
             steps.append(PaddingStep(pad_x=s.pad_x.get_value(), pad_y=s.pad_y.get_value()))
         if s.hflip.get_value():

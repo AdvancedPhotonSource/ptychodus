@@ -17,6 +17,7 @@ from ptychodus.api.metrics import (
     ApodizationWindow,
     FourierRingCorrelation,
     ReconstructionResiduals,
+    SpectralSNRConvention,
     compute_fourier_ring_correlation,
     compute_illumination_scoring_region,
     compute_mean_absolute_error,
@@ -24,13 +25,14 @@ from ptychodus.api.metrics import (
     compute_object_comparison,
     compute_peak_signal_to_noise_ratio,
     compute_power_spectral_density,
+    compute_probe_comparison,
     compute_r_factor,
     compute_reconstruction_residuals,
     compute_root_mean_square_error,
     compute_structural_similarity,
 )
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble, shift_probe
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructionAmbiguities
@@ -664,6 +666,44 @@ class TestAverageSignalToNoiseRatio:
         assert numpy.isnan(frc.get_average_signal_to_noise_ratio())
 
 
+class TestSpectralSNRConvention:
+    def test_default_is_half_split(self):
+        assert _make_frc([0.5]).convention is SpectralSNRConvention.HALF_SPLIT
+        arr = numpy.random.default_rng(0).standard_normal((16, 16)) + 0j
+        frc = compute_fourier_ring_correlation(arr, arr, 1e-6, 1e-6)
+        assert frc.convention is SpectralSNRConvention.HALF_SPLIT
+
+    def test_repeat_halves_the_snr_of_half_split(self):
+        # A repeat pair reports one image, not the average of two: F / (1 - F).
+        half_split = _make_frc([0.5, 0.2, 0.0])
+        repeat = replace(half_split, convention=SpectralSNRConvention.REPEAT)
+        numpy.testing.assert_allclose(
+            repeat.get_spectral_signal_to_noise_ratio(),
+            0.5 * half_split.get_spectral_signal_to_noise_ratio(),
+        )
+        assert repeat.get_average_signal_to_noise_ratio() == pytest.approx(
+            0.5 * half_split.get_average_signal_to_noise_ratio()
+        )
+
+    def test_repeat_threshold_inverts_to_snr_over_snr_plus_one(self):
+        # SSNR = 2 inverts to FRC = 2 / (2 + 1) under the repeat convention.
+        frc = replace(_make_frc([1.0, 0.8, 0.5, 0.2]), convention=SpectralSNRConvention.REPEAT)
+        assert frc.get_resolution_m_at_signal_to_noise_threshold(2.0) == pytest.approx(
+            frc.get_resolution_m(2.0 / 3.0)
+        )
+
+    def test_compute_records_the_convention_without_changing_the_correlation(self):
+        rng = numpy.random.default_rng(1)
+        a = rng.standard_normal((32, 32)) + 1j * rng.standard_normal((32, 32))
+        b = a + 0.5 * (rng.standard_normal((32, 32)) + 1j * rng.standard_normal((32, 32)))
+        half_split = compute_fourier_ring_correlation(a, b, 1e-6, 1e-6)
+        repeat = compute_fourier_ring_correlation(
+            a, b, 1e-6, 1e-6, convention=SpectralSNRConvention.REPEAT
+        )
+        assert repeat.convention is SpectralSNRConvention.REPEAT
+        numpy.testing.assert_array_equal(repeat.correlation, half_split.correlation)
+
+
 class TestResolutionAtSignalToNoiseThreshold:
     def test_snr_two_matches_frc_threshold_one_half(self):
         # SSNR = 2 inverts to FRC = 2 / (2 + 2) = 0.5.
@@ -935,11 +975,11 @@ def _make_object(
     )
 
 
-def _make_probes() -> ProbeSequence:
+def _make_probes() -> ProbeEnsemble:
     rng = numpy.random.default_rng(1)
     shape = (1, 1, _PROBE_HEIGHT_PX, _PROBE_WIDTH_PX)
     array = (rng.standard_normal(shape) + 1j * rng.standard_normal(shape)).astype(numpy.complex128)
-    return ProbeSequence(
+    return ProbeEnsemble(
         array=array,
         opr_weights=None,
         pixel_geometry=PixelGeometry(width_m=_PIXEL_M, height_m=_PIXEL_M),
@@ -1181,6 +1221,249 @@ class TestObjectComparison:
         numpy.testing.assert_array_equal(
             comparison.test_phase, numpy.angle(comparison.test_complex)
         )
+
+
+def _replace_object_array(obj: Object, array: numpy.ndarray) -> Object:
+    return Object(
+        array=array,
+        pixel_geometry=obj.get_pixel_geometry().copy(),
+        center=obj.get_center().copy(),
+        layer_spacing_m=list(obj.layer_spacing_m),
+    )
+
+
+class TestIlluminationWeightedAmbiguities:
+    """Fit the ambiguities where the sample was scanned, not over the initializer border."""
+
+    _ROWS = slice(6, 26)
+    _COLUMNS = slice(8, 32)
+
+    def _products(self) -> tuple[Product, Product, ReconstructionAmbiguities]:
+        reference = _make_product()
+        reference_array = numpy.ones((1, _OBJ_HEIGHT_PX, _OBJ_WIDTH_PX), dtype=complex)
+        reference_array[0, self._ROWS, self._COLUMNS] = reference.object_.get_array()[
+            0, self._ROWS, self._COLUMNS
+        ]
+        reference = replace(
+            reference, object_=_replace_object_array(reference.object_, reference_array)
+        )
+        applied = ReconstructionAmbiguities(
+            object_scale_factor=1.7,
+            phase_offset_rad=0.3,
+            phase_ramp_x_rad_per_m=1.0e8,
+            phase_ramp_y_rad_per_m=-5.0e7,
+        )
+        # Only the scanned region carries the ambiguity; the border is the initializer,
+        # identical in both products, as an unscanned region is.
+        perturbed = _apply_ambiguity_to_object(reference.object_, applied).get_array()
+        test_array = reference_array.copy()
+        test_array[0, self._ROWS, self._COLUMNS] = perturbed[0, self._ROWS, self._COLUMNS]
+        test = replace(reference, object_=_replace_object_array(reference.object_, test_array))
+        return reference, test, applied
+
+    def test_the_unscanned_border_biases_an_unweighted_estimate(self) -> None:
+        reference, test, applied = self._products()
+
+        estimate = compute_object_comparison(reference=reference, test=test).ambiguities
+
+        assert estimate.object_scale_factor != pytest.approx(applied.object_scale_factor, rel=1e-2)
+
+    def test_illumination_weights_recover_the_ambiguities(self) -> None:
+        reference, test, applied = self._products()
+        photon_number = numpy.zeros((_OBJ_HEIGHT_PX, _OBJ_WIDTH_PX))
+        photon_number[self._ROWS, self._COLUMNS] = 100.0
+        region = compute_illumination_scoring_region(
+            _make_illumination_map(photon_number), (_OBJ_HEIGHT_PX, _OBJ_WIDTH_PX)
+        )
+
+        estimate = compute_object_comparison(
+            reference=reference, test=test, weights=region.get_array_weights()
+        ).ambiguities
+
+        assert estimate.object_scale_factor == pytest.approx(applied.object_scale_factor, rel=1e-6)
+        assert estimate.phase_offset_rad == pytest.approx(applied.phase_offset_rad, abs=1e-6)
+        assert estimate.phase_ramp_x_rad_per_m == pytest.approx(
+            applied.phase_ramp_x_rad_per_m, rel=1e-6
+        )
+        assert estimate.phase_ramp_y_rad_per_m == pytest.approx(
+            applied.phase_ramp_y_rad_per_m, rel=1e-6
+        )
+
+    def test_array_weights_embed_the_region_in_place(self) -> None:
+        photon_number = numpy.zeros((32, 40))
+        photon_number[6:26, 10:34] = 100.0
+        region = compute_illumination_scoring_region(
+            _make_illumination_map(photon_number), (32, 40)
+        )
+
+        array_weights = region.get_array_weights()
+
+        assert array_weights.shape == (32, 40)
+        numpy.testing.assert_array_equal(region.crop(array_weights), region.weights)
+        assert array_weights.sum() == pytest.approx(region.weights.sum())
+
+
+_CMP_PROBE_PX = 32
+
+
+def _structured_modes(num_modes: int, *, seed: int = 4) -> numpy.ndarray:
+    """Smooth, structured, linearly independent modes on a half-integer centered grid."""
+    rng = numpy.random.default_rng(seed)
+    coordinate = numpy.arange(_CMP_PROBE_PX) - (_CMP_PROBE_PX - 1) / 2
+    y, x = numpy.meshgrid(coordinate, coordinate, indexing='ij')
+    envelope = numpy.exp(-(x**2 + y**2) / (2 * 5.0**2))
+    modes = []
+
+    for _ in range(num_modes):
+        coefficients = rng.standard_normal(6) + 1j * rng.standard_normal(6)
+        polynomial = sum(
+            c * x**a * y**b / 5.0 ** (a + b)
+            for c, (a, b) in zip(coefficients, [(0, 0), (1, 0), (0, 1), (2, 0), (1, 1), (0, 2)])
+        )
+        modes.append(envelope * polynomial)
+
+    return numpy.stack(modes)
+
+
+def _probe_product(modes: numpy.ndarray, *, opr_weights: numpy.ndarray | None = None) -> Product:
+    array = modes if modes.ndim == 4 else modes[numpy.newaxis]
+    return replace(
+        _make_product(),
+        probes=ProbeEnsemble(
+            array=array.astype(numpy.complex128),
+            opr_weights=opr_weights,
+            pixel_geometry=PixelGeometry(width_m=_PIXEL_M, height_m=_PIXEL_M),
+        ),
+    )
+
+
+class TestProbeComparison:
+    def test_identical_probes_agree(self) -> None:
+        product = _probe_product(_structured_modes(3))
+
+        comparison = compute_probe_comparison(product, product)
+
+        assert comparison.normalized_fidelity == pytest.approx(1.0, abs=1e-10)
+        assert comparison.normalized_rms_error == pytest.approx(0.0, abs=1e-5)
+
+    def test_the_mode_decomposition_does_not_matter(self) -> None:
+        """A unitary remix (which also reorders and rephases), and an isometry onto more
+        modes, describe the same density matrix, so they must compare as identical."""
+        modes = _structured_modes(2)
+        rng = numpy.random.default_rng(9)
+        unitary, _ = numpy.linalg.qr(rng.standard_normal((2, 2)) + 1j * rng.standard_normal((2, 2)))
+        isometry, _ = numpy.linalg.qr(
+            rng.standard_normal((3, 2)) + 1j * rng.standard_normal((3, 2))
+        )
+        reference = _probe_product(modes)
+
+        for remixed in (
+            numpy.tensordot(unitary, modes, axes=1),
+            modes[::-1] * numpy.exp(1j * numpy.array([0.4, -1.1]))[:, None, None],
+            numpy.tensordot(isometry, modes, axes=1),
+        ):
+            comparison = compute_probe_comparison(reference, _probe_product(remixed))
+
+            assert comparison.normalized_fidelity == pytest.approx(1.0, abs=1e-9)
+            assert comparison.normalized_rms_error == pytest.approx(0.0, abs=1e-4)
+
+    def test_a_single_mode_reduces_to_the_phase_aligned_rms_error(self) -> None:
+        reference_mode = _structured_modes(1, seed=1)
+        test_mode = reference_mode * numpy.exp(0.7j) + 0.2 * _structured_modes(1, seed=2)
+
+        comparison = compute_probe_comparison(
+            _probe_product(reference_mode), _probe_product(test_mode)
+        )
+
+        p = reference_mode.ravel()
+        q = comparison.test_probe.get_array().ravel()
+        overlap = numpy.vdot(q, p)
+        aligned_error = numpy.linalg.norm(p - q * overlap / abs(overlap)) / numpy.linalg.norm(p)
+        assert comparison.normalized_rms_error == pytest.approx(aligned_error, rel=1e-6)
+
+    def test_orthogonal_probes_have_zero_fidelity(self) -> None:
+        """Equal intensities register at zero shift, and an odd sign flip is orthogonal."""
+        coordinate = numpy.arange(_CMP_PROBE_PX) - (_CMP_PROBE_PX - 1) / 2
+        symmetric = numpy.exp(-(coordinate[None, :] ** 2 + coordinate[:, None] ** 2) / 50.0)
+        reference_mode = symmetric[numpy.newaxis].astype(complex)
+        test_mode = reference_mode * numpy.sign(coordinate)[None, None, :]
+
+        comparison = compute_probe_comparison(
+            _probe_product(reference_mode), _probe_product(test_mode)
+        )
+
+        assert comparison.normalized_fidelity == pytest.approx(0.0, abs=1e-12)
+        assert comparison.normalized_rms_error == pytest.approx(numpy.sqrt(2.0), rel=1e-9)
+
+    def test_a_probe_shift_is_recovered_apart_from_the_object_shift(self) -> None:
+        modes = _structured_modes(2)
+        reference = _probe_product(modes)
+        pixel_geometry = PixelGeometry(width_m=_PIXEL_M, height_m=_PIXEL_M)
+        shifted = shift_probe(
+            reference.probes.get_probe_no_opr(), shift_y_px=1.3, shift_x_px=-0.7
+        ).get_array()
+        test = replace(
+            reference,
+            probes=ProbeEnsemble(
+                array=shifted[numpy.newaxis], opr_weights=None, pixel_geometry=pixel_geometry
+            ),
+        )
+
+        comparison = compute_probe_comparison(reference, test)
+
+        assert comparison.probe_shift_x_px == pytest.approx(0.7, abs=0.011)
+        assert comparison.probe_shift_y_px == pytest.approx(-1.3, abs=0.011)
+        assert comparison.object_shift_x_px == pytest.approx(0.0, abs=0.02)
+        assert comparison.object_shift_y_px == pytest.approx(0.0, abs=0.02)
+        assert comparison.normalized_fidelity == pytest.approx(1.0, abs=1e-3)
+
+    def test_the_coupled_scale_and_ramp_are_removed_first(self) -> None:
+        """The object carries the ambiguity and the probe its complement, as a solver leaves them."""
+        reference = _probe_product(_structured_modes(2))
+        applied = ReconstructionAmbiguities(
+            object_scale_factor=2.0,
+            phase_offset_rad=0.5,
+            phase_ramp_x_rad_per_m=8.0e7,
+            phase_ramp_y_rad_per_m=-6.0e7,
+        )
+        probe_coords = reference.probes.get_geometry().get_transverse_coordinates()
+        probe_ramp = (
+            applied.phase_ramp_x_rad_per_m * probe_coords.x_m
+            + applied.phase_ramp_y_rad_per_m * probe_coords.y_m
+        )
+        complement = numpy.exp(-1j * (applied.phase_offset_rad + probe_ramp)) / 2.0
+        test = replace(
+            reference,
+            object_=_apply_ambiguity_to_object(reference.object_, applied),
+            probes=ProbeEnsemble(
+                array=reference.probes.get_array() * complement,
+                opr_weights=None,
+                pixel_geometry=reference.probes.get_pixel_geometry(),
+            ),
+        )
+
+        comparison = compute_probe_comparison(reference, test)
+
+        assert comparison.normalized_fidelity == pytest.approx(1.0, abs=1e-8)
+        assert comparison.normalized_rms_error == pytest.approx(0.0, abs=1e-4)
+
+    def test_an_opr_ensemble_is_represented_by_its_mean_probe(self) -> None:
+        basis = _structured_modes(2)
+        ensemble = _probe_product(
+            basis[:, numpy.newaxis], opr_weights=numpy.array([[1.0, 0.0], [0.0, 1.0]])
+        )
+        mean_probe = _probe_product(0.5 * (basis[0] + basis[1])[numpy.newaxis])
+
+        comparison = compute_probe_comparison(mean_probe, ensemble)
+
+        assert comparison.normalized_fidelity == pytest.approx(1.0, abs=1e-10)
+
+    def test_mismatched_probe_shapes_raise(self) -> None:
+        small = _probe_product(_structured_modes(1)[:, :16, :16])
+        large = _probe_product(_structured_modes(1))
+
+        with pytest.raises(ValueError, match='shape mismatch'):
+            compute_probe_comparison(small, large)
 
 
 class TestObjectComparisonMetricsIntegration:

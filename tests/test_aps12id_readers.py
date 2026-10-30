@@ -1,10 +1,11 @@
-"""Tests for the APS 12-ID-E processed-HDF5 and TIFF readers, and the pre-APS-U
-Bionanoprobe position reader.
+"""Tests for the APS 12-ID-E readers -- the 2026 master-file layout, processed HDF5, TIFF
+and valid-pixel mask -- and the pre-APS-U Bionanoprobe position reader.
 
-Fixtures are synthetic: no 12-ID-E or pre-APS-U Bionanoprobe data was available when
-these were written, so they pin the readers against the documented layouts rather than
-against a real acquisition. Treat a failure here as a reader regression and a surprise
-from real data as a fixture that needs correcting.
+Fixtures are synthetic. The 2026 fixtures reproduce the layout observed in 12-ID-E data
+from 2026_2 on; the processed, TIFF and Bionanoprobe fixtures pin the readers against
+the documented layouts, as no such data was available when they were written. Treat a
+failure here as a reader regression and a surprise from real data as a fixture that
+needs correcting.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import pytest
 import tifffile
 
 from ptychodus.plugins.aps02id_bnp_position_file import BionanoprobeMAPSPositionFileReader
+from ptychodus.plugins.aps12id_file import APS12IDDiffractionFileReader, APS12IDPositionFileReader
 from ptychodus.plugins.aps12id_processed_file import (
     APS12IDProcessedDiffractionFileReader,
     APS12IDProcessedPositionFileReader,
@@ -25,6 +27,7 @@ from ptychodus.plugins.aps12id_tiff_file import (
     APS12IDTIFFDiffractionFileReader,
     APS12IDTIFFPositionFileReader,
 )
+from ptychodus.plugins.bad_pixels import APS12IDValidPixelMaskFileReader
 from ptychodus.api.probe_positions import ProbePositionParseError
 
 _NM = 1e-9
@@ -34,6 +37,190 @@ _DETECTOR_H = 6
 _DETECTOR_W = 5
 _POINTS_PER_LINE = 3
 _NUM_LINES = 2
+
+
+_MM = 1e-3
+
+
+def _write_master(
+    scan_directory: Path,
+    *,
+    positions_mm: numpy.ndarray | None,
+    exposure: bool = True,
+    sample_name: str | None = 'siemens_star',
+) -> Path:
+    """A 2026 master file holding the geometry and, when given, the nominal positions."""
+    scan_directory.mkdir(parents=True, exist_ok=True)
+    master = scan_directory / 'sample_0042_master.h5'
+
+    with h5py.File(master, 'w') as h5_file:
+        h5_file['/entry/instrument/monochromator/monoE'] = 8.0
+        h5_file['/entry/instrument/detector/distance'] = 10000.0
+        h5_file['/entry/instrument/detector/x_pixel_size'] = 0.172
+        h5_file['/entry/instrument/detector/y_pixel_size'] = 0.175
+        h5_file['/entry/sample/theta'] = 15.0
+
+        if exposure:
+            h5_file['/entry/instrument/detector/ExposureTime'] = 0.002
+
+        if sample_name is not None:
+            h5_file['/entry/sample/sample_name'] = sample_name
+
+        if positions_mm is not None:
+            h5_file['/entry/sample/positions'] = positions_mm
+
+    return master
+
+
+def _frame(value: int) -> numpy.ndarray:
+    """One detector frame with a module-gap (-1) pixel and a dead (-2) pixel."""
+    frame = numpy.full((_DETECTOR_H, _DETECTOR_W), value, dtype=numpy.int32)
+    frame[0, 0] = -1
+    frame[1, 2] = -2
+    return frame
+
+
+def _write_step_scan(directory: Path, num_points: int = 3) -> Path:
+    """A step scan: a master plus one file per point, each holding a single 2-D frame."""
+    scan_directory = directory / 'ptycho' / 'S0042'
+    positions_mm = numpy.array([[0.001 * point, -0.002 * point] for point in range(num_points)])
+    master = _write_master(scan_directory, positions_mm=positions_mm)
+
+    for point in range(num_points):
+        with h5py.File(scan_directory / f'sample_0042_{point + 1:05d}.h5', 'w') as h5_file:
+            h5_file['/entry/data/data'] = _frame(point)
+
+    return master
+
+
+class TestAPS12IDReaders:
+    def test_step_scan_reads_one_array_per_frame_file(self, tmp_path: Path) -> None:
+        master = _write_step_scan(tmp_path)
+
+        dataset = APS12IDDiffractionFileReader().read(master)
+        indexes = numpy.concatenate([array.get_indexes() for array in dataset])
+
+        assert dataset.get_metadata().num_patterns_per_array == [1, 1, 1]
+        numpy.testing.assert_array_equal(indexes, numpy.arange(3))
+        assert [int(array.get_patterns()[0, -1, -1]) for array in dataset] == [0, 1, 2]
+
+    def test_fly_scan_reads_a_stack_from_one_file(self, tmp_path: Path) -> None:
+        scan_directory = tmp_path / 'S0042'
+        master = _write_master(scan_directory, positions_mm=None)
+
+        with h5py.File(scan_directory / 'sample_0042_00001.h5', 'w') as h5_file:
+            h5_file['/entry/data/data'] = numpy.stack([_frame(value) for value in range(4)])
+
+        dataset = APS12IDDiffractionFileReader().read(master)
+
+        assert dataset.get_metadata().num_patterns_per_array == [4]
+        numpy.testing.assert_array_equal(dataset[0].get_indexes(), numpy.arange(4))
+
+    def test_metadata_comes_from_the_master_in_ptychodus_units(self, tmp_path: Path) -> None:
+        metadata = APS12IDDiffractionFileReader().read(_write_step_scan(tmp_path)).get_metadata()
+
+        assert metadata.photon_energy_eV == pytest.approx(8000.0)
+        assert metadata.exposure_time_s == pytest.approx(0.002)
+        assert metadata.detector_distance_m == pytest.approx(10.0)
+        assert metadata.detector_pixel_geometry is not None
+        assert metadata.detector_pixel_geometry.width_m == pytest.approx(172e-6)
+        assert metadata.detector_pixel_geometry.height_m == pytest.approx(175e-6)
+        assert metadata.tomography_angle_deg == pytest.approx(15.0)
+        assert metadata.sample_name == 'siemens_star'
+        assert metadata.detector_extent.width_px == _DETECTOR_W
+        assert metadata.detector_extent.height_px == _DETECTOR_H
+
+    def test_an_unrecorded_field_is_left_unset(self, tmp_path: Path) -> None:
+        """A master predating a field must read as None, not fail."""
+        scan_directory = tmp_path / 'S0042'
+        master = _write_master(scan_directory, positions_mm=None, exposure=False, sample_name=None)
+
+        with h5py.File(scan_directory / 'sample_0042_00001.h5', 'w') as h5_file:
+            h5_file['/entry/data/data'] = _frame(0)
+
+        metadata = APS12IDDiffractionFileReader().read(master).get_metadata()
+
+        assert metadata.exposure_time_s is None
+        assert metadata.sample_name is None
+
+    def test_negative_pixels_are_bad(self, tmp_path: Path) -> None:
+        bad_pixels = (
+            APS12IDDiffractionFileReader().read(_write_step_scan(tmp_path)).get_bad_pixels()
+        )
+
+        expected = numpy.zeros((_DETECTOR_H, _DETECTOR_W), dtype=bool)
+        expected[0, 0] = True
+        expected[1, 2] = True
+        numpy.testing.assert_array_equal(bad_pixels, expected)
+
+    def test_any_scan_file_is_an_entry_point(self, tmp_path: Path) -> None:
+        master = _write_step_scan(tmp_path)
+        raw_positions = tmp_path / 'positions' / 'S0042' / 'sample_0042_00001.h5'
+        raw_positions.parent.mkdir(parents=True)
+        raw_positions.touch()
+
+        for entry in (master, master.with_name('sample_0042_00002.h5'), raw_positions):
+            dataset = APS12IDDiffractionFileReader().read(entry)
+            positions = APS12IDPositionFileReader().read(entry)
+
+            assert dataset.get_metadata().file_path == master
+            assert len(dataset) == 3
+            assert len(positions) == 3
+
+    def test_frame_files_of_another_scan_are_ignored(self, tmp_path: Path) -> None:
+        master = _write_step_scan(tmp_path)
+
+        with h5py.File(master.with_name('other_0042_00001.h5'), 'w') as h5_file:
+            h5_file['/entry/data/data'] = _frame(9)
+
+        assert len(APS12IDDiffractionFileReader().read(master)) == 3
+
+    def test_an_unreadable_frame_file_ends_the_scan(self, tmp_path: Path) -> None:
+        """Skipping it would pair every later frame with the wrong position."""
+        master = _write_step_scan(tmp_path, num_points=4)
+        master.with_name('sample_0042_00003.h5').write_bytes(b'not hdf5')
+
+        dataset = APS12IDDiffractionFileReader().read(master)
+
+        assert [array.get_label() for array in dataset] == [
+            'sample_0042_00001',
+            'sample_0042_00002',
+        ]
+
+    def test_a_scan_without_a_master_is_rejected(self, tmp_path: Path) -> None:
+        with h5py.File(tmp_path / 'sample_042_00001.h5', 'w') as h5_file:
+            h5_file['/entry/data/data'] = _frame(0)
+
+        with pytest.raises(ValueError, match='No master file'):
+            APS12IDDiffractionFileReader().read(tmp_path / 'sample_042_00001.h5')
+
+        with pytest.raises(ProbePositionParseError, match='No master file'):
+            APS12IDPositionFileReader().read(tmp_path / 'sample_042_00001.h5')
+
+    def test_positions_scale_from_millimeters_in_traversal_order(self, tmp_path: Path) -> None:
+        positions = APS12IDPositionFileReader().read(_write_step_scan(tmp_path))
+
+        assert [point.index for point in positions] == [0, 1, 2]
+        assert [point.x_m for point in positions] == pytest.approx([0.0, 1e-6, 2e-6])
+        assert [point.y_m for point in positions] == pytest.approx([0.0, -2e-6, -4e-6])
+
+    def test_a_master_without_positions_is_rejected(self, tmp_path: Path) -> None:
+        master = _write_master(tmp_path / 'S0042', positions_mm=None)
+
+        with pytest.raises(ProbePositionParseError, match='records no scan positions'):
+            APS12IDPositionFileReader().read(master)
+
+    def test_valid_pixel_mask_stored_as_uint8(self, tmp_path: Path) -> None:
+        valid = numpy.ones((_DETECTOR_H, _DETECTOR_W), dtype=numpy.uint8)
+        valid[2, 3] = 0
+        mask_file = tmp_path / 'pixel_mask.h5'
+
+        with h5py.File(mask_file, 'w') as h5_file:
+            h5_file['valid_pixel_mask'] = valid
+
+        bad_pixels = APS12IDValidPixelMaskFileReader().read(mask_file)
+
+        numpy.testing.assert_array_equal(bad_pixels, valid == 0)
 
 
 def _write_processed_scan(directory: Path, *, beam_center_yx: tuple[float, float] | None) -> Path:

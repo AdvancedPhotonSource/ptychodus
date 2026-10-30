@@ -1,16 +1,19 @@
+ARG BASE_REGISTRY=docker.io
 ARG CUDA_VERSION=13.0
-ARG PYTORCH_VERSION=2.12.0
+ARG PYTORCH_VERSION=2.14.1
 ARG CUDNN_VERSION=9
-FROM pytorch/pytorch:${PYTORCH_VERSION}-cuda${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel
+FROM ${BASE_REGISTRY}/pytorch/pytorch:${PYTORCH_VERSION}-cuda${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel
 
 ARG PTYCHODUS_VERSION
-ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PTYCHODUS=${PTYCHODUS_VERSION} \
-    VIRTUAL_ENV=/opt/venv \
+ENV VIRTUAL_ENV=/opt/venv \
     PATH=/opt/venv/bin:$PATH
 
-WORKDIR /app
-COPY . /src
+COPY wheels/ /tmp/wheels/
 
+# ptychodus comes from PyPI: the release named by PTYCHODUS_VERSION, or the
+# latest one when it is unset. An unpinned build reuses its cached layer after
+# a new release, so pin it or pass --no-cache.
+#
 # The base image's python3 is the distro-managed system Python, which carries
 # the PEP 668 EXTERNALLY-MANAGED marker and refuses a plain `pip install`, so
 # ptychodus goes into a venv. Three details are load-bearing:
@@ -27,34 +30,33 @@ COPY . /src
 #     for the `python3 -m venv` call, so a bare `python3` later in this same
 #     RUN would still reach the system interpreter and trip PEP 668 again.
 #
-# PtychoFM (distribution `ptycho-fm`, import package `ptycho_fm`) is published
-# on no index, so it cannot be named as an extra the way ptychi is. Instead
-# scripts/podman/build stages a prebuilt wheel into containers/wheels/, which
-# the `COPY . /src` above delivers to /src/containers/wheels/ and the trailing
-# `rm -rf /src` removes again. Three more details:
+# Two more concern what goes on top:
 #
-#   * The glob is optional on purpose. A non-matching glob expands to the
-#     literal pattern, which `[ -e ]` then rejects, so a plain `podman build
-#     -f containers/Dockerfile.cuda .` with nothing staged still produces a
-#     working image -- just without the PtychoFM backend.
-#   * The wheel and /src[...] go into a SINGLE pip invocation so one resolution
-#     pass reconciles ptychi's and ptycho-fm's constraints together. Installing
-#     them in sequence lets the second call quietly downgrade what the first
-#     pinned; ptycho-fm floors numpy, h5py and scipy well above ptychodus.
-#   * ptycho-fm asks for torch>=2.6.0, which the base image's CUDA build
-#     already satisfies through --system-site-packages, so this pulls no torch
-#     from PyPI. A `torch.__version__` without a +cuXXX suffix in the built
-#     image means that went wrong.
+#   * /tmp/constraints.txt pins the base image's torch and torchvision.
+#     cdtools, ptychi and the staged backends all depend on torch; without the
+#     pin, one asking for a newer torch makes pip quietly install a second,
+#     generic torch from PyPI. With it, pip backtracks to an older release of
+#     that package or fails the resolve naming it. A `torch.__version__`
+#     without a +cuXXX suffix in the built image means that went wrong.
+#   * Backends published on no index (PtychoPINN, PtychoFM) arrive as wheels
+#     that scripts/podman/build builds from sibling checkouts and stages in
+#     containers/wheels/. The glob is optional: a plain `podman build -f
+#     containers/Dockerfile.cuda containers/` omits them. Everything goes into
+#     a SINGLE pip invocation so one resolution pass reconciles their floors
+#     with ptychodus's.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libqt5gui5 python3-venv && \
     rm -rf /var/lib/apt/lists/* && \
     python3 -m venv --system-site-packages "${VIRTUAL_ENV}" && \
     "${VIRTUAL_ENV}/bin/python" -m pip install --no-cache-dir --upgrade pip && \
-    set -- '/src[globus,gui,ptychi]' && \
-    for whl in /src/containers/wheels/*.whl; do \
+    "${VIRTUAL_ENV}/bin/python" -c 'import importlib.metadata as m; [print(f"{d}=={m.version(d)}") for d in ("torch", "torchvision") if d in {x.metadata["Name"] for x in m.distributions()}]' \
+        > /tmp/constraints.txt && \
+    set -- "ptychodus[cdtools,gui,ptychi]${PTYCHODUS_VERSION:+==$PTYCHODUS_VERSION}" && \
+    for whl in /tmp/wheels/*.whl; do \
         if [ -e "$whl" ]; then set -- "$@" "$whl"; fi; \
     done && \
-    "${VIRTUAL_ENV}/bin/python" -m pip install --no-cache-dir "$@" && \
-    rm -rf /src
+    "${VIRTUAL_ENV}/bin/python" -m pip install --no-cache-dir \
+        -c /tmp/constraints.txt "$@" && \
+    rm -rf /tmp/wheels /tmp/constraints.txt
 
 CMD ["python3", "-m", "ptychodus"]

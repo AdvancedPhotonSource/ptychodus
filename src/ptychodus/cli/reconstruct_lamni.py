@@ -43,7 +43,7 @@ PROFILE = InstrumentProfile(
         'FresnelZonePlate plugin preset for the model probe. Defaults to the LamNI zone '
         'plate, the defocus matching the LYNX config. Ignored with --probe-file.'
     ),
-    default_fzp_preset='APS_LamNI',
+    default_fzp_preset='APS 31-ID-E LamNI',
     default_fzp_defocus_m=800e-6,
 )
 

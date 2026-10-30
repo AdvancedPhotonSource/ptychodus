@@ -1,0 +1,1023 @@
+"""Where each pty-chi option is persisted in ptychodus's flat settings layout.
+
+pty-chi declares its options as a nested tree; ptychodus persists eleven flat
+sections. This is the whole of the difference: which branch feeds which section,
+what each key is called, which fields are not surfaced, and the handful that
+change shape on the way out.
+
+It lives here rather than beside the backend because a plugin never names an INI
+key, and **it is transitional**: when the Qt panels retire and the nested
+declaration goes straight to the web UI, this file goes with them.
+
+A hidden field is hidden for one of two reasons, kept apart below because they
+read alike and mean opposite things: ptychodus either fills it from the product
+at reconstruct time, or does not offer it at all.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from typing import Any, Final
+import math
+
+from ..declared import fields_of
+from .flatten import (
+    BitField,
+    BoolEnum,
+    Overlay,
+    FlatteningPolicy,
+    OptionalGate,
+    OptionalRange,
+    Sentinel,
+    StructuralAdapter,
+)
+from .parameter_store import OptionsSection
+
+__all__ = ['sections_for']
+
+# Every optimizable branch carries a plan whose three visible fields sit directly
+# under that branch's prefix; its scheduler fields are not surfaced.
+# pty-chi rejects exactly zero where a field is declared strictly positive,
+# and a ptychodus bound is inclusive and clamping, so the closest inclusive
+# minimum stands in for one. Far below any default declared against such a
+# bound, and indistinguishable from the excluded value in use.
+_STRICTLY_POSITIVE = 1.0e-12
+
+_PLAN = 'optimization_plan'
+_PLAN_HIDDEN = ('step_size_scheduler_class', 'step_size_scheduler_options')
+
+
+def _plans(*branches: str) -> dict[str, str]:
+    """Make each branch's own plan transparent, so its keys take the branch prefix."""
+    return {f'{b}.{_PLAN}': '' for b in branches}
+
+
+def _plan_noise(*branches: str) -> set[str]:
+    paths = {_PLAN, *(f'{b}.{_PLAN}' for b in branches)}
+    return {f'{p}.{f}' for p in paths for f in _PLAN_HIDDEN}
+
+
+def _optimizer_noise(*branches: str) -> set[str]:
+    return {'optimizer_params', *(f'{b}.optimizer_params' for b in branches)}
+
+
+def _extras(instance: Any, base: type) -> set[str]:
+    """Fields an algorithm's subclass adds, which ptychodus files under that algorithm."""
+    return set(fields_of(type(instance))) - set(fields_of(base))
+
+
+def _stops(*branches: str) -> dict[str, StructuralAdapter]:
+    """Every plan's ``stop`` is persisted as -1 when the plan runs to the end."""
+    paths = {_PLAN, *(f'{b}.{_PLAN}' for b in branches)}
+    return {f'{p}.stop': Sentinel('Stop', value_type=int, sentinel=-1) for p in paths}
+
+
+_OBJECT_BRANCHES = (
+    'slice_spacing_options',
+    'l1_norm_constraint',
+    'l2_norm_constraint',
+    'smoothness_constraint',
+    'total_variation',
+    'hard_limits_magnitude_phase',
+    'remove_grid_artifacts',
+    'multislice_regularization',
+    'remove_object_probe_ambiguity',
+)
+
+_PROBE_BRANCHES = (
+    'power_constraint',
+    'orthogonalize_incoherent_modes',
+    'orthogonalize_opr_modes',
+    'support_constraint',
+    'center_constraint',
+)
+
+_POSITION_BRANCHES = ('correction_options', 'affine_transform_constraint')
+_OPR_BRANCHES = ('smoothing',)
+
+
+_OBJECT_OVERLAYS: Mapping[str, Overlay] = {
+    'optimizable': Overlay('Optimize Object', 'Whether the object is optimizable'),
+    'optimizer': Overlay('Optimizer:'),
+    'step_size': Overlay('Step Size:', 'Optimizer step size (learning rate).', minimum=0.0),
+    'patch_interpolation_method': Overlay(
+        'Patch Interpolator:',
+        'Interpolation method used for sampling the object and for subpixel shifts of the probe',
+    ),
+    'build_preconditioner_with_all_modes': Overlay(
+        'Build Preconditioner with All Modes',
+        'Build the illumination preconditioner from the summed intensity of all probe modes.',
+    ),
+    'slice_spacing_options.optimizable': Overlay(
+        'Optimize Slice Spacing', 'Whether to optimize the slice spacing'
+    ),
+    'slice_spacing_options.optimizer': Overlay('Optimizer:'),
+    'slice_spacing_options.step_size': Overlay(
+        'Step Size:', 'Optimizer step size (learning rate).', minimum=0.0
+    ),
+    'l1_norm_constraint.enabled': Overlay(
+        'Constrain L\u2081 Norm', 'Whether to constrain the L\u2081 norm'
+    ),
+    'l1_norm_constraint.weight': Overlay(
+        'Weight:', 'Weight of the L\u2081 norm constraint (0 or less disables it).', minimum=0.0
+    ),
+    'l2_norm_constraint.enabled': Overlay(
+        'Constrain L\u2082 Norm', 'Whether to constrain the L\u2082 norm'
+    ),
+    'l2_norm_constraint.weight': Overlay(
+        'Weight:', 'Weight of the L\u2082 norm constraint (0 or less disables it).', minimum=0.0
+    ),
+    'smoothness_constraint.enabled': Overlay(
+        'Constrain Smoothness',
+        'Whether to constrain smoothness in the real and imaginary components of the object',
+    ),
+    'smoothness_constraint.alpha': Overlay(
+        'Alpha:',
+        'Relaxation smoothing constant; must be in (0, 1/8], with maximal smoothing at 1/8.',
+    ),
+    'total_variation.enabled': Overlay(
+        'Constrain Total Variation', 'Whether to constrain the total variation'
+    ),
+    'total_variation.weight': Overlay(
+        'Weight:', 'Weight of the total variation constraint (0 or less disables it).', minimum=0.0
+    ),
+    'remove_grid_artifacts.enabled': Overlay(
+        'Remove Grid Artifacts',
+        "Whether to remove grid artifacts in the object's phase at the end of an epoch.",
+    ),
+    'remove_grid_artifacts.period_x_m': Overlay(
+        'Period X:', 'Horizontal period of grid artifacts in meters'
+    ),
+    'remove_grid_artifacts.period_y_m': Overlay(
+        'Period Y:', 'Vertical period of grid artifacts in meters'
+    ),
+    'remove_grid_artifacts.window_size': Overlay(
+        'Window Size [px]:', 'Window size for grid artifact removal in pixels'
+    ),
+    'remove_grid_artifacts.direction': Overlay('Direction:', 'Direction of grid artifact removal'),
+    'remove_grid_artifacts.component': Overlay(
+        'Component:', 'Component of the object to apply grid artifact removal to'
+    ),
+    'multislice_regularization.enabled': Overlay(
+        'Regularize Multislice',
+        'Whether to regularize multislice objects using cross-slice smoothing',
+    ),
+    'multislice_regularization.weight': Overlay(
+        'Weight:',
+        'Weight of the cross-slice smoothing regularization for multislice objects '
+        '(0 disables it).',
+        minimum=0.0,
+    ),
+    'multislice_regularization.unwrap_phase': Overlay(
+        'Unwrap Phase',
+        'Whether to unwrap the phase of the object during multislice regularization',
+    ),
+    'multislice_regularization.unwrap_image_grad_method': Overlay(
+        'Gradient Method:', 'Method for calculating the phase gradient during phase unwrapping'
+    ),
+    'multislice_regularization.unwrap_image_integration_method': Overlay(
+        'Integration Method:',
+        'Method for integrating the phase gradient during phase unwrapping',
+    ),
+    'remove_object_probe_ambiguity.enabled': Overlay(
+        'Remove Object Probe Ambiguity', 'Whether to remove object-probe ambiguity'
+    ),
+    'hard_limits_magnitude_phase.enabled': Overlay(
+        'Constrain Hard Limits',
+        'Whether to apply hard magnitude/phase limits to the object',
+    ),
+    'EnableAbs': Overlay('Limit Magnitude', 'Whether to apply magnitude limits'),
+    'AbsMin': Overlay('Magnitude Min:', 'Minimum magnitude value', minimum=0.0),
+    'AbsMax': Overlay('Magnitude Max:', 'Maximum magnitude value', minimum=0.0),
+    'EnablePhase': Overlay('Limit Phase', 'Whether to apply phase limits'),
+    'PhaseMinDeg': Overlay('Phase Min [deg]:', 'Minimum phase value in degrees'),
+    'PhaseMaxDeg': Overlay('Phase Max [deg]:', 'Maximum phase value in degrees'),
+}
+
+
+def _object_policy(extras: set[str]) -> FlatteningPolicy:
+    return FlatteningPolicy(
+        hidden=frozenset(
+            # Filled from the product at reconstruct time.
+            {
+                'initial_guess',
+                'slice_spacings_m',
+                'pixel_size_m',
+                'pixel_size_aspect_ratio',
+                'position_origin_coords',
+            }
+            # Not surfaced.
+            | {'determine_position_origin_coords_by', 'power_constraint.probe_power'}
+            | _plan_noise(*_OBJECT_BRANCHES)
+            | _optimizer_noise(*_OBJECT_BRANCHES)
+            | extras
+        ),
+        prefixes={
+            _PLAN: 'OptimizationPlan',
+            'slice_spacing_options': 'OptimizeSliceSpacing',
+            'l1_norm_constraint': 'ConstrainL1Norm',
+            'l2_norm_constraint': 'ConstrainL2Norm',
+            'smoothness_constraint': 'ConstrainSmoothness',
+            'total_variation': 'ConstrainTotalVariation',
+            'hard_limits_magnitude_phase': 'ConstrainHardLimits',
+            'remove_grid_artifacts': 'RemoveGridArtifacts',
+            'multislice_regularization': 'RegularizeMultislice',
+            'remove_object_probe_ambiguity': 'RemoveObjectProbeAmbiguity',
+            **_plans(*_OBJECT_BRANCHES),
+        },
+        renames={
+            'optimizable': 'IsOptimizable',
+            'remove_grid_artifacts.window_size': 'WindowSizeInPixels',
+            'multislice_regularization.unwrap_image_grad_method': 'UnwrapPhaseImageGradientMethod',
+            'multislice_regularization.unwrap_image_integration_method': 'UnwrapPhaseImageIntegrationMethod',
+        },
+        structural={
+            'hard_limits_magnitude_phase.abs_lim': OptionalRange(
+                'EnableAbs', 'AbsMin', 'AbsMax', fallback=(0.0, 1.0)
+            ),
+            # pty-chi takes the phase limit in radians; ptychodus has always
+            # written it in degrees, so the keys carry degrees and the scale
+            # is what rebuilds the declared pair.
+            'hard_limits_magnitude_phase.phase_lim': OptionalRange(
+                'EnablePhase',
+                'PhaseMinDeg',
+                'PhaseMaxDeg',
+                fallback=(-180.0, 180.0),
+                scale=math.pi / 180.0,
+            ),
+            **_stops(*_OBJECT_BRANCHES),
+        },
+        overlays=_OBJECT_OVERLAYS,
+    )
+
+
+_PROBE_OVERLAYS: Mapping[str, Overlay] = {
+    'optimizable': Overlay('Optimize Probe', 'Whether the probe is optimizable'),
+    'optimizer': Overlay('Optimizer:'),
+    'step_size': Overlay('Step Size:', 'Optimizer step size (learning rate).', minimum=0.0),
+    'eigenmode_update_relaxation': Overlay(
+        'Relax Eigenmode Update:', 'Separate step size (relaxation) for the eigenmode update.'
+    ),
+    'power_constraint.enabled': Overlay('Constrain Power', 'Whether to constrain probe power'),
+    'power_constraint.scale_object': Overlay(
+        'Scale Object',
+        'Scale the object inversely when the probe power is constrained; otherwise only '
+        'the probe is rescaled.',
+    ),
+    'orthogonalize_incoherent_modes.enabled': Overlay(
+        'Orthogonalize Incoherent Modes', 'Whether to orthogonalize incoherent probe modes'
+    ),
+    'orthogonalize_incoherent_modes.method': Overlay(
+        'Method:', 'Method to use for incoherent mode orthogonalization'
+    ),
+    'orthogonalize_incoherent_modes.sort_by_occupancy': Overlay(
+        'Sort By Occupancy',
+        'Keep modes sorted so the highest-occupancy mode is the first shared mode.',
+    ),
+    'orthogonalize_opr_modes.enabled': Overlay(
+        'Orthogonalize OPR Modes', 'Whether to orthogonalize OPR modes'
+    ),
+    'support_constraint.enabled': Overlay(
+        'Constrain Support',
+        'When enabled, the probe will be shrinkwrapped so that small values are set to zero',
+    ),
+    'support_constraint.threshold': Overlay(
+        'Threshold:',
+        'Shrinkwrap threshold: probe pixels below this fraction of the blurred maximum are '
+        'set to zero.',
+    ),
+    'support_constraint.fixed_probe_support': Overlay(
+        'Method:',
+        'Optional fixed support mask (ellipse or rectangle) applied before shrinkwrapping.',
+    ),
+    'center_constraint.enabled': Overlay(
+        'Constrain Center',
+        'When enabled, the probe center of mass will be constrained to the center of the '
+        'probe array',
+    ),
+    'center_constraint.use_total_intensity_for_com': Overlay(
+        'Use Intensity for Mass Centroid',
+        'Use the total probe intensity for the center-of-mass calculation instead of the '
+        "dominant shared mode's magnitude.",
+    ),
+    'center_constraint.center_modes_individually': Overlay(
+        'Center Modes Individually', 'When checked, each probe mode will be centered independently'
+    ),
+}
+
+
+def _probe_policy(extras: set[str]) -> FlatteningPolicy:
+    return FlatteningPolicy(
+        hidden=frozenset(
+            {
+                'initial_guess',
+                'pixel_size_m',
+                'pixel_size_aspect_ratio',
+                'power_constraint.probe_power',
+            }
+            | {
+                'support_constraint.fixed_probe_support_params',
+                'center_constraint.use_intensity_for_com',
+            }
+            | _plan_noise(*_PROBE_BRANCHES)
+            | _optimizer_noise(*_PROBE_BRANCHES)
+            | extras
+        ),
+        prefixes={
+            _PLAN: 'OptimizationPlan',
+            'power_constraint': 'ConstrainProbePower',
+            'orthogonalize_incoherent_modes': 'OrthogonalizeIncoherentModes',
+            'orthogonalize_opr_modes': 'OrthogonalizeOPRModes',
+            'support_constraint': 'ConstrainSupport',
+            'center_constraint': 'ConstrainCenter',
+            **_plans(*_PROBE_BRANCHES),
+        },
+        renames={
+            'optimizable': 'IsOptimizable',
+            'support_constraint.fixed_probe_support': 'Method',
+            'center_constraint.use_total_intensity_for_com': '/UseTotalIntensityForCOM',
+            # The prefix already says Center.
+            'center_constraint.center_modes_individually': 'ModesIndividually',
+        },
+        overlays=_PROBE_OVERLAYS,
+        structural=dict(_stops(*_PROBE_BRANCHES)),
+    )
+
+
+_POSITION_OVERLAYS: Mapping[str, Overlay] = {
+    'optimizable': Overlay(
+        'Optimize Probe Positions', 'Whether the probe positions are optimizable'
+    ),
+    'optimizer': Overlay('Optimizer:'),
+    'step_size': Overlay('Step Size:', 'Optimizer step size (learning rate).', minimum=0.0),
+    'constrain_position_mean': Overlay(
+        'Constrain Centroid',
+        'Whether to subtract the mean from positions after updating positions',
+    ),
+    'correction_options.correction_type': Overlay(
+        'Correction Type:', 'Algorithm used to calculate the position correction update'
+    ),
+    'correction_options.differentiation_method': Overlay(
+        'Differentiation Method:',
+        'Method for computing the object gradient (GRADIENT correction only); '
+        'FOURIER_DIFFERENTIATION is usually fastest.',
+    ),
+    'correction_options.cross_correlation_scale': Overlay(
+        'Scale:', 'Upsampling factor of the cross-correlation in real space'
+    ),
+    'correction_options.cross_correlation_real_space_width': Overlay(
+        'Real Space Width:', 'Width of the cross-correlation in real-space'
+    ),
+    'correction_options.cross_correlation_probe_threshold': Overlay(
+        'Probe Threshold:',
+        'Probe intensity threshold used to calculate the probe mask',
+        maximum=1.0,
+    ),
+    'correction_options.clip_update_magnitude_by_mad': Overlay(
+        'Clip Update Magnitude by MAD',
+        'Whether to clip the update magnitude by the median absolute deviation',
+    ),
+    'ChooseSliceForCorrection': Overlay(
+        'Slice For Correction:',
+        'Specify the object slice used for position correction; otherwise the middle slice '
+        'is used.',
+    ),
+    'SliceForCorrection': Overlay(
+        'Slice:', 'Slice that is used for position correction (0-based index)', minimum=0
+    ),
+    'LimitUpdateMagnitude': Overlay(
+        'Limit Update Magnitude:', 'Whether to limit the update magnitude'
+    ),
+    'UpdateMagnitudeLimit': Overlay(
+        'Limit:',
+        'Maximum allowed magnitude of position update in each axis',
+        minimum=_STRICTLY_POSITIVE,
+    ),
+    'affine_transform_constraint.enabled': Overlay(
+        'Constrain Affine Transform',
+        'Fit an affine transform from the initial to the current positions and penalize '
+        'positions that deviate from it.',
+    ),
+    'affine_transform_constraint.degrees_of_freedom': Overlay(
+        'Degrees of Freedom:',
+        'Which components of the affine transform are fitted and constrained.',
+        minimum=0,
+        # One name per bit, in the order the bit field below sets them. An
+        # integer key carrying a choice list is a chosen subset rather than a
+        # single pick, so this is both the labels and the width of the field.
+        choices=('Translation', 'Rotation', 'Scaling', 'Shearing', 'Asymmetry'),
+    ),
+    'affine_transform_constraint.position_weight_update_interval': Overlay(
+        'Weight Update Interval:', 'Number of epochs between position weight updates.'
+    ),
+    'affine_transform_constraint.apply_constraint': Overlay(
+        'Apply Constraint',
+        'Apply the fitted transform to the positions; when off, weights are still computed '
+        'for logging but positions are unchanged.',
+    ),
+    'affine_transform_constraint.max_expected_error': Overlay(
+        'Max Expected Error [px]:',
+        'Maximum expected position error in pixels; used only to estimate friction in the '
+        'affine constraint.',
+    ),
+    '/OverrideAffineTransformUpdateFlexibility': Overlay(
+        'Override Update Flexibility:',
+        'When checked, the affine transform update flexibility will be overridden',
+    ),
+    'OverrideUpdateFlexibility': Overlay(
+        'Flexibility:',
+        'Update flexibility value (0 = rigid, 1 = fully flexible)',
+        minimum=0.0,
+        maximum=1.0,
+    ),
+}
+
+
+def _affine_degrees_of_freedom() -> BitField:
+    """The affine degrees of freedom, persisted as the bit field ptychodus writes.
+
+    Bit order is the settings contract and is older than the upstream enum, so
+    the members are named here in that order rather than read off the enum,
+    whose declaration order pty-chi is free to change. The overlay above names
+    the same bits in the same order, which is what an editor shows beside them.
+    """
+    from ptychi.api import AffineDegreesOfFreedom
+
+    return BitField(
+        'DegreesOfFreedom',
+        (
+            AffineDegreesOfFreedom.TRANSLATION,
+            AffineDegreesOfFreedom.ROTATION,
+            AffineDegreesOfFreedom.SCALE,
+            AffineDegreesOfFreedom.SHEAR,
+            AffineDegreesOfFreedom.ASYMMETRY,
+        ),
+    )
+
+
+def _position_policy(extras: set[str]) -> FlatteningPolicy:
+    return FlatteningPolicy(
+        hidden=frozenset(
+            {'position_x_px', 'position_y_px'}
+            | _plan_noise('affine_transform_constraint')
+            | _optimizer_noise()
+            | extras
+        ),
+        prefixes={
+            _PLAN: 'OptimizationPlan',
+            'correction_options': '',
+            'affine_transform_constraint': 'ConstrainAffineTransform',
+            **_plans('affine_transform_constraint'),
+        },
+        renames={
+            'optimizable': 'IsOptimizable',
+            'correction_options.clip_update_magnitude_by_mad': 'ClipUpdateMagnitudeByMAD',
+            'affine_transform_constraint.max_expected_error': 'MaxExpectedErrorInPixels',
+        },
+        structural={
+            'correction_options.slice_for_correction': OptionalGate(
+                'ChooseSliceForCorrection', 'SliceForCorrection', value_type=int, fallback=0
+            ),
+            'correction_options.update_magnitude_limit': OptionalGate(
+                'LimitUpdateMagnitude', 'UpdateMagnitudeLimit', fallback=0.1
+            ),
+            'affine_transform_constraint.override_update_flexibility': OptionalGate(
+                '/OverrideAffineTransformUpdateFlexibility',
+                'OverrideUpdateFlexibility',
+                fallback=0.5,
+            ),
+            'affine_transform_constraint.degrees_of_freedom': _affine_degrees_of_freedom(),
+            **_stops('affine_transform_constraint'),
+        },
+        overlays=_POSITION_OVERLAYS,
+    )
+
+
+# Ported from the panels, because an upstream declaration carries no text. The
+# wording is deliberately short: each sits inside a group box that supplies the
+# rest of the context, and a group box's own title is the label of the key its
+# branch collapses onto.
+#
+# A plan's Start/Stop/Stride triple carries no text. The panels render all
+# twenty-six of them as one composite row labelled 'Plan:', so that label is the
+# same everywhere and belongs to whatever draws the composite, not here.
+_OPR_OVERLAYS: Mapping[str, Overlay] = {
+    'optimizable': Overlay(
+        'Orthogonal Probe Relaxation', 'Master switch for optimizing OPR mode weights.'
+    ),
+    'optimizer': Overlay('Optimizer:'),
+    'step_size': Overlay('Step Size:', 'Optimizer step size (learning rate).', minimum=0.0),
+    'optimize_eigenmode_weights': Overlay(
+        'Optimize Eigenmode Weights',
+        'Whether to optimize eigenmode weights (i.e., the weights of the second and '
+        'following OPR modes)',
+    ),
+    'optimize_intensity_variation': Overlay(
+        'Optimize Intensities',
+        'Whether to optimize intensity variation (i.e., the weight of the first OPR mode)',
+    ),
+    'update_relaxation': Overlay(
+        'Relax Update:', 'Separate step size (relaxation) for the OPR mode weight update.'
+    ),
+    'EnablePrimaryModeWeightFloor': Overlay(
+        'Primary Mode Weight Floor',
+        'Clamp the weight of the primary (0th) OPR mode to a lower bound',
+    ),
+    'PrimaryModeWeightFloor': Overlay(
+        'Floor:', 'Lower bound applied to the primary OPR mode weight.', minimum=0.0
+    ),
+    'smoothing.enabled': Overlay('Smooth OPR Mode Weights', 'Smooth the OPR mode weights'),
+    'smoothing.method': Overlay(
+        'Smoothing Method:',
+        'Method for smoothing OPR mode weights (MEDIAN filter or POLYNOMIAL fit).',
+    ),
+    'smoothing.polynomial_degree': Overlay(
+        'Polynomial Degree:',
+        'Degree of the polynomial used for smoothing OPR mode weights',
+        maximum=10,
+    ),
+}
+
+
+def _opr_policy(extras: set[str]) -> FlatteningPolicy:
+    return FlatteningPolicy(
+        hidden=frozenset(
+            {'initial_weights'}
+            | _plan_noise(*_OPR_BRANCHES)
+            | _optimizer_noise(*_OPR_BRANCHES)
+            | extras
+        ),
+        prefixes={
+            _PLAN: 'OptimizationPlan',
+            'smoothing': 'SmoothModeWeights',
+            **_plans(*_OPR_BRANCHES),
+        },
+        renames={
+            'optimizable': 'IsOptimizable',
+            'smoothing.method': '/SmoothingMethod',
+            'smoothing.polynomial_degree': '/PolynomialSmoothingDegree',
+        },
+        overlays=_OPR_OVERLAYS,
+        structural={
+            'primary_mode_weight_floor': OptionalGate(
+                'EnablePrimaryModeWeightFloor', 'PrimaryModeWeightFloor'
+            ),
+            **_stops(*_OPR_BRANCHES),
+        },
+    )
+
+
+_RECONSTRUCTOR_OVERLAYS: Mapping[str, Overlay] = {
+    'num_epochs': Overlay('Number of Epochs:', 'Number of epochs to run'),
+    'batch_size': Overlay('Batch Size:', 'Number of data to process in each minibatch'),
+    'batching_mode': Overlay('Batch Mode:'),
+    'use_double_precision_for_fft': Overlay(
+        'Use Double Precision for FFT',
+        'Use double precision for critical FFT operations, overriding the compute precision.',
+    ),
+    'allow_nondeterministic_algorithms': Overlay(
+        'Allow Nondeterministic Algorithms',
+        'Allow nondeterministic algorithms in the patch-placement path PyTorch runs, '
+        'where they can be faster but cause larger run-to-run variation. The path taken '
+        'on CUDA instead reduces deterministically, so this has no effect there.',
+    ),
+    'UseDoublePrecision': Overlay(
+        'Use Double Precision', 'Floating point precision to use for computation'
+    ),
+    'EnableExcludeMeasuredPixelsBelow': Overlay(
+        'Exclude Measured Pixels Below',
+        'When enabled, measured pixels below the threshold will be excluded',
+    ),
+    'ExcludeMeasuredPixelsBelow': Overlay(
+        'Threshold:',
+        'Gradients for measured pixels with intensity at or below this threshold are zeroed.',
+    ),
+    'forward_model_options.low_memory_mode': Overlay(
+        'Use Low Memory Mode',
+        'When checked, forward propagation of ptychography will be done using less '
+        'vectorized code. This reduces the speed, but also lowers memory usage',
+    ),
+    'forward_model_options.shift_operator': Overlay(
+        'Shift Operator:',
+        'How the object is sampled under the probe. AUTO shifts the whole slice '
+        'periodically for a near-field product whose probe exceeds 80% of the object '
+        'in both dimensions, and samples patches otherwise. FULL_OBJECT always shifts '
+        'the whole slice and ignores Pad For Shift; PATCH always samples patches.',
+    ),
+    # Typed optional upstream, but zero is its own default and its own
+    # meaning -- no padding -- so ptychodus offers the count rather than a
+    # switch, and never sends the absent value.
+    'forward_model_options.pad_for_shift': Overlay(
+        'Pad For Shift:',
+        'Number of pixels to pad arrays (with border values) before shifting. A '
+        'near-field product raises this from zero on its own; a value set here is '
+        'kept.',
+        minimum=0,
+        annotation=int,
+    ),
+    'EnableDiffractionPatternBlur': Overlay(
+        'Blur Diffraction Patterns',
+        'When enabled, diffraction patterns will be blurred with a Gaussian kernel',
+    ),
+    'DiffractionPatternBlurSigma': Overlay(
+        'Sigma:',
+        'Sigma (in pixels) of the Gaussian kernel used to blur simulated diffraction patterns.',
+        minimum=0.0,
+    ),
+}
+
+_DATA_OVERLAYS: Mapping[str, Overlay] = {
+    'save_data_on_device': Overlay(
+        'Save Data on Device', 'Keep the diffraction data on the compute device (e.g. GPU).'
+    ),
+}
+
+
+def _forward_models() -> type:
+    """pty-chi's forward-model enum, which is the half of that field ptychodus offers.
+
+    Upstream types the field as the enum *or* any class implementing the
+    model. A settings key cannot hold a class, so ptychodus offers the named
+    models and the enum is what the key means.
+    """
+    from ptychi.api import ForwardModels
+
+    return ForwardModels
+
+
+def _algorithm_overlays() -> Mapping[str, Overlay]:
+    return {
+        # Reconstructor-branch additions, which ptychodus files under the algorithm.
+        'loss_function': Overlay('Loss Function:', 'Loss function to optimize'),
+        'forward_model_class': Overlay(
+            'Forward Model:',
+            'Forward model class',
+            annotation=_forward_models(),
+        ),
+        'exit_wave_update_relaxation': Overlay(
+            'Exit Wave Update Relaxation:', 'Relaxation multiplier for the exit wave update'
+        ),
+        'chunk_length': Overlay('Chunk Length:'),
+        'beta': Overlay('Beta:'),
+        'method': Overlay(
+            'BH Method:',
+            'Reconstruction algorithm: GD (gradient descent, for batched updates) or '
+            'CG (conjugate gradients, faster with a single batch).',
+            # Declared upstream as a bare string, so the two it accepts are named here.
+            choices=('GD', 'CG'),
+        ),
+        'noise_model': Overlay('Noise Model:', 'Noise model to use'),
+        'gaussian_noise_std': Overlay(
+            'Gaussian Noise Deviation:',
+            'Standard deviation of the Gaussian noise (used only with the Gaussian noise model).',
+        ),
+        'single_slice_solve_obj_prb_step_size_jointly': Overlay(
+            'Solve Object/Probe Step Size Jointly (Single Slice)',
+            'When checked, object and probe step lengths are solved simultaneously in '
+            'single-slice mode',
+        ),
+        'multislice_solve_obj_prb_step_size_jointly': Overlay(
+            'Solve Object/Probe Step Size Jointly (Multislice)',
+            'When checked, object and probe step lengths are solved simultaneously in multislice mode',
+        ),
+        'solve_step_sizes_only_using_first_probe_mode': Overlay(
+            'Solve Step Sizes Only Using First Probe Mode',
+            'When checked, the step sizes will be calculated using only the first probe mode',
+        ),
+        'momentum_acceleration_gain': Overlay(
+            'Momentum Acceleration Gain:',
+            'Gain of momentum acceleration for object and probe; 0 disables it.',
+        ),
+        'optimal_step_size_scaler': Overlay(
+            'Optimal Step Size Scaler:',
+            'Scaler applied to the solved optimal step size.',
+        ),
+        'AutoMomentumAccelerationGradientMixingFactor': Overlay(
+            'Use Gradient Mixing Factor',
+            'Mixing factor of the current gradient into the accumulated velocity; set to 1 to '
+            'reproduce PtychoShelves.',
+        ),
+        # Named once for both branches that persist it, which agree on the floor.
+        'MomentumAccelerationGradientMixingFactor': Overlay('Mixing Factor:', minimum=0.0),
+        'rescale_probe_intensity_in_first_epoch': Overlay(
+            'Rescale Probe Intensity In First Epoch',
+            'When checked, the probe intensity will be rescaled on the first epoch',
+        ),
+        'preconditioning_damping_factor': Overlay(
+            'Preconditioning Damping Factor:',
+            'Damping factor for preconditioning the object update',
+        ),
+        'momentum_acceleration_memory': Overlay(
+            'Position Momentum Memory:',
+            'Number of previous epochs used to estimate friction in probe-position momentum '
+            'acceleration.',
+        ),
+        'AutoMomentumGradientMixingFactor': Overlay(
+            'Use Position Gradient Mixing Factor',
+            'Mixing factor of the current position update into the accumulated velocity; set to '
+            '1 to reproduce foldslice.',
+        ),
+        # Branch additions other than the reconstructor's.
+        'amplitude_clamp_limit': Overlay(
+            'Amplitude Clamp Limit:',
+            'Maximum object amplitude; larger values are clamped to this limit.',
+        ),
+        'alpha': Overlay('Alpha:', maximum=1.0),
+        'multimodal_update': Overlay(
+            'Multimodal Update',
+            'Compute the object update direction summed over all probe modes rather than only '
+            'the first mode.',
+        ),
+    }
+
+
+def _precision() -> BoolEnum:
+    """The compute precision, which ptychodus offers as single or double.
+
+    pty-chi names three floating point types; ptychodus persists a boolean, so
+    both members it stands for have to be named or the switch decodes to
+    nothing.
+    """
+    from ptychi.api import Dtypes
+
+    return BoolEnum('UseDoublePrecision', when_true=Dtypes.FLOAT64, when_false=Dtypes.FLOAT32)
+
+
+def _reconstructor_policy(extras: set[str], *, ignores_batching: bool = False) -> FlatteningPolicy:
+    """The shared half of ``reconstructor_options``; the rest is the algorithm's own."""
+    # Two of the three keys an algorithm retaining the whole exit-wave stack
+    # has no use for; the third is ptychodus's own and sits on the wrapper.
+    batching: Final = frozenset({'batch_size', 'batching_mode'})
+    return FlatteningPolicy(
+        panel_hidden=batching if ignores_batching else frozenset(),
+        hidden=frozenset(
+            {
+                # Both halves of the clustering switch: ptychodus persists one
+                # count whose zero means off, which is a shape the declaration
+                # does not have, so the backend states it instead.
+                'compact_mode_update_clustering',
+                'compact_mode_update_clustering_stride',
+                'default_device',
+                'random_seed',
+                'displayed_loss_function',
+            }
+            | extras
+        ),
+        prefixes={'forward_model_options': ''},
+        renames={
+            'num_epochs': 'NumEpochs',
+            'use_double_precision_for_fft': 'UseDoublePrecisionForFFT',
+            'forward_model_options.low_memory_mode': 'UseLowMemoryMode',
+            'forward_model_options.pad_for_shift': 'PadForShift',
+            'forward_model_options.shift_operator': 'ShiftOperator',
+        },
+        structural={
+            'default_dtype': _precision(),
+            'exclude_measured_pixels_below': OptionalGate(
+                'EnableExcludeMeasuredPixelsBelow', 'ExcludeMeasuredPixelsBelow'
+            ),
+            'forward_model_options.diffraction_pattern_blur_sigma': OptionalGate(
+                'EnableDiffractionPatternBlur', 'DiffractionPatternBlurSigma', fallback=1.0
+            ),
+        },
+        overlays=_RECONSTRUCTOR_OVERLAYS,
+    )
+
+
+def _data_policy() -> FlatteningPolicy:
+    return FlatteningPolicy(
+        # All but one are filled from the product at reconstruct time. `fft_shift` is
+        # among them rather than a choice: it states whether the detector plane pty-chi
+        # compares against has DC at a corner, which the propagation regime settles.
+        hidden=frozenset(
+            {
+                'data',
+                'fft_shift',
+                'free_space_propagation_distance_m',
+                'wavelength_m',
+                'valid_pixel_mask',
+            }
+        ),
+        overlays=_DATA_OVERLAYS,
+    )
+
+
+_ALGORITHM_GROUPS: Mapping[str, str] = {
+    'Autodiff': 'PtyChiAutodiff',
+    'BH': 'PtyChiBH',
+    'DM': 'PtyChiDM',
+    'LSQML': 'PtyChiLSQML',
+    'PIE': 'PtyChiPIE',
+    'ePIE': 'PtyChiPIE',
+    'rPIE': 'PtyChiPIE',
+    'RAAR': 'PtyChiRAAR',
+}
+
+
+# Where the pty-chi options sit inside what the backend declares. The
+# declaration wraps them so that the one knob ptychodus adds has somewhere to
+# live that is not inside a class pty-chi stamps its own name into.
+_TASK = 'task'
+
+
+def _wrapper_policy(*, ignores_batching: bool = False) -> FlatteningPolicy:
+    """The ptychodus-owned keys beside the task options, which are the two."""
+    # Clustering is a batching concern like the other two, and is here rather
+    # than beside them only because ptychodus shapes it as one count where
+    # pty-chi has a flag and a stride.
+    clustering: Final = frozenset({'compact_mode_update_clustering'})
+    return FlatteningPolicy(
+        hidden=frozenset({_TASK}),
+        panel_hidden=clustering if ignores_batching else frozenset(),
+    )
+
+
+def sections_for(algorithm: str, options: Any) -> Sequence[OptionsSection]:
+    """Return the settings sections backing *algorithm*, given its declared options.
+
+    The shared sections hide whatever the algorithm's subclass adds to each
+    branch, because ptychodus files those additions under the algorithm's own
+    group rather than the shared one.
+    """
+    from ptychi.api.options.base import (
+        ObjectOptions,
+        OPRModeWeightsOptions,
+        ProbeOptions,
+        ProbePositionOptions,
+        ReconstructorOptions,
+    )
+
+    # Algorithms that retain the full exit-wave stack between epochs. They
+    # ignore the batch size and size their working set from chunk_length
+    # instead, so the three batching keys mean nothing to them -- but the keys
+    # are shared with the six algorithms that do read them, so every algorithm
+    # persists all three and only the panel knows the difference.
+    batch_blind: Final = frozenset({'DM', 'RAAR'})
+
+    task = options.task
+    ignores_batching = algorithm in batch_blind
+
+    return [
+        OptionsSection('PtyChi', policy=_wrapper_policy(ignores_batching=ignores_batching)),
+        OptionsSection(
+            'PtyChi',
+            root_path=f'{_TASK}.reconstructor_options',
+            policy=_reconstructor_policy(
+                _extras(task.reconstructor_options, ReconstructorOptions),
+                ignores_batching=ignores_batching,
+            ),
+        ),
+        OptionsSection('PtyChi', root_path=f'{_TASK}.data_options', policy=_data_policy()),
+        OptionsSection(
+            'PtyChiObject',
+            root_path=f'{_TASK}.object_options',
+            policy=_object_policy(_extras(task.object_options, ObjectOptions)),
+        ),
+        OptionsSection(
+            'PtyChiProbe',
+            root_path=f'{_TASK}.probe_options',
+            policy=_probe_policy(_extras(task.probe_options, ProbeOptions)),
+        ),
+        OptionsSection(
+            'PtyChiProbePosition',
+            root_path=f'{_TASK}.probe_position_options',
+            policy=_position_policy(_extras(task.probe_position_options, ProbePositionOptions)),
+        ),
+        OptionsSection(
+            'PtyChiOPR',
+            root_path=f'{_TASK}.opr_mode_weight_options',
+            policy=_opr_policy(_extras(task.opr_mode_weight_options, OPRModeWeightsOptions)),
+        ),
+        *_algorithm_sections(algorithm, task),
+    ]
+
+
+# Additions ptychodus does not surface: pty-chi's experimental branches, and the
+# free-form parameter bag beside the Autodiff forward model.
+_UNSURFACED_EXTRAS = frozenset({'experimental', 'forward_model_params'})
+
+
+def _only_extras(instance: Any, base: type) -> frozenset[str]:
+    """Hide everything the base class already declares, leaving the additions."""
+    shared = set(fields_of(base)) & set(fields_of(type(instance)))
+    return frozenset(shared | _UNSURFACED_EXTRAS)
+
+
+_AUTO_MIXING = OptionalGate(
+    'AutoMomentumAccelerationGradientMixingFactor',
+    'MomentumAccelerationGradientMixingFactor',
+    inverted=True,
+)
+
+
+def _algorithm_sections(algorithm: str, task: Any) -> Sequence[OptionsSection]:
+    """The group holding whatever this algorithm adds to each shared branch."""
+    from ptychi.api.options.base import (
+        ObjectOptions,
+        OPRModeWeightsOptions,
+        ProbeOptions,
+        ProbePositionOptions,
+        ReconstructorOptions,
+    )
+
+    group = _ALGORITHM_GROUPS[algorithm]
+    branches: Sequence[
+        tuple[str, type, str, Mapping[str, Overlay], Mapping[str, StructuralAdapter]]
+    ] = (
+        (
+            'reconstructor_options',
+            ReconstructorOptions,
+            '',
+            {},
+            _RECONSTRUCTOR_EXTRA_ADAPTERS,
+        ),
+        ('object_options', ObjectOptions, 'Object', _OBJECT_EXTRA_OVERLAYS, {}),
+        ('probe_options', ProbeOptions, 'Probe', _PROBE_EXTRA_OVERLAYS, {}),
+        (
+            'probe_position_options',
+            ProbePositionOptions,
+            'ProbePosition',
+            _POSITION_EXTRA_OVERLAYS,
+            {
+                'momentum_acceleration_gradient_mixing_factor': OptionalGate(
+                    'AutoMomentumGradientMixingFactor',
+                    'MomentumAccelerationGradientMixingFactor',
+                    inverted=True,
+                )
+            },
+        ),
+        ('opr_mode_weight_options', OPRModeWeightsOptions, 'OPR', {}, {}),
+    )
+    algorithm_overlays = _algorithm_overlays()
+    sections: list[OptionsSection] = []
+
+    for path, base, prefix, branch_overlays, structural in branches:
+        root = getattr(task, path)
+
+        if not _extras(root, base) - _UNSURFACED_EXTRAS:
+            continue
+
+        sections.append(
+            OptionsSection(
+                group,
+                root_path=f'{_TASK}.{path}',
+                policy=FlatteningPolicy(
+                    base_prefix=prefix,
+                    hidden=_only_extras(root, base),
+                    renames=_RECONSTRUCTOR_EXTRA_NAMES if path == 'reconstructor_options' else {},
+                    overlays={**algorithm_overlays, **branch_overlays},
+                    structural=structural,
+                ),
+            )
+        )
+
+    return sections
+
+
+_RECONSTRUCTOR_EXTRA_NAMES: Mapping[str, str] = {
+    'multislice_solve_obj_prb_step_size_jointly': 'MultisliceSolveObjectProbeStepSizeJointly',
+    'single_slice_solve_obj_prb_step_size_jointly': 'SingleSliceSolveObjectProbeStepSizeJointly',
+}
+
+# A name that means something different on each branch that declares it. The
+# algorithm's own group shows every branch's additions side by side, so a word
+# that reads unambiguously in the branch it came from need not read that way
+# here -- and 'rho' means a different quantity on each branch besides.
+_OBJECT_EXTRA_OVERLAYS: Mapping[str, Overlay] = {
+    'optimal_step_size_scaler': Overlay(
+        'Object Optimal Step Size Scaler:',
+        'Scaler applied to the solved optimal step size for the object update.',
+    ),
+    'inertia': Overlay(
+        'Object Inertia:', 'Inertia of the object update; should be between 0 and 1.'
+    ),
+    'alpha': Overlay('Object Alpha:', 'Relaxation of the object update.', maximum=1.0),
+}
+
+_PROBE_EXTRA_OVERLAYS: Mapping[str, Overlay] = {
+    'optimal_step_size_scaler': Overlay(
+        'Probe Optimal Step Size Scaler:',
+        'Scaler applied to the solved optimal step size for the probe update.',
+    ),
+    'inertia': Overlay('Probe Inertia:', 'Inertia of the probe update; should be between 0 and 1.'),
+    'alpha': Overlay('Probe Alpha:', 'Relaxation of the probe update.', maximum=1.0),
+    'rho': Overlay(
+        'BH Probe Rho:',
+        'Scaling factor for the probe relative to the object (~1 near-field, 0.1 far-field).',
+    ),
+}
+
+_POSITION_EXTRA_OVERLAYS: Mapping[str, Overlay] = {
+    'momentum_acceleration_gain': Overlay(
+        'Position Momentum Gain:',
+        'Gain of probe-position momentum acceleration; 0 disables it.',
+    ),
+    'rho': Overlay(
+        'BH Probe Position Rho:',
+        'Scaling factor for probe positions relative to the object (~0.1 near-field, 1 far-field).',
+    ),
+}
+
+_RECONSTRUCTOR_EXTRA_ADAPTERS: Mapping[str, StructuralAdapter] = {
+    'momentum_acceleration_gradient_mixing_factor': _AUTO_MIXING,
+}

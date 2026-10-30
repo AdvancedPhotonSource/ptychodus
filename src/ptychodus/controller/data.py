@@ -3,7 +3,7 @@ from pathlib import Path
 
 from PyQt5.QtWidgets import QDialog, QFileDialog, QWidget
 
-from ptychodus.api.observer import Observable
+from ptychodus.model.observer import Observable
 
 
 class FileDialogFactory(Observable):

@@ -7,21 +7,31 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from sys import getsizeof
 from pathlib import Path
-from typing import overload, Any, TypeAlias
+from typing import cast, overload, TypeAlias, TypeVar
 
 import numpy
 
+from .files import FileReader, FileWriter
 from .geometry import ImageExtent, PixelGeometry
 
-BadPixels: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.bool_]]
-DiffractionPatternDType: TypeAlias = numpy.dtype[numpy.integer[Any] | numpy.floating[Any]]
+BadPixels: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.bool]]
+PixelMap: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.floating]]
+"""Any per-pixel detector quantity on the detector extent, in floating point.
+
+The shape a background, a flat field or an unlabeled map read from a file all
+share. Where the quantity is known, prefer the alias that names it.
+"""
+DetectorBackground: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.floating]]
+"""Additive per-pixel signal present without the sample, in counts per frame."""
+FlatField: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.floating]]
+"""Per-pixel response to uniform illumination; a measurement is corrected by dividing by it."""
+DiffractionPatternDType: TypeAlias = numpy.dtype[numpy.integer | numpy.floating]
 DiffractionPatternCounts: TypeAlias = numpy.ndarray[tuple[int], DiffractionPatternDType]
 DiffractionPattern: TypeAlias = numpy.ndarray[tuple[int, int], DiffractionPatternDType]
 DiffractionPatterns: TypeAlias = numpy.ndarray[tuple[int, int, int], DiffractionPatternDType]
-DiffractionIndexes: TypeAlias = numpy.ndarray[tuple[int], numpy.dtype[numpy.integer[Any]]]
-DiffractionPatternPhotonFluxes: TypeAlias = numpy.ndarray[
-    tuple[int], numpy.dtype[numpy.floating[Any]]
-]
+DiffractionIndexes: TypeAlias = numpy.ndarray[tuple[int], numpy.dtype[numpy.integer]]
+
+_ArrayT = TypeVar('_ArrayT', bound=numpy.ndarray)
 
 
 @dataclass(frozen=True)
@@ -107,6 +117,25 @@ class CropRegion:
         size = 1 << ((2 * max_radius).bit_length() - 1)
         return cls.from_center_extent(center, ImageExtent(width_px=size, height_px=size))
 
+    @classmethod
+    def from_smallest_pow2(
+        cls, center: BeamCenter, radius_px: int, detector_extent: ImageExtent
+    ) -> CropRegion:
+        """Smallest power-of-two square centered at `center` whose half-side reaches `radius_px`.
+
+        The side is the smallest power of two at least ``2 * radius_px`` (1 for a radius of
+        0), capped at the :meth:`from_largest_pow2` square, so a radius running off the
+        detector yields the largest square that fits rather than one that overhangs. A
+        `center` on or outside the detector boundary yields the same zero-size region.
+        """
+        largest = cls.from_largest_pow2(center, detector_extent)
+        size = min(1 << max(0, 2 * radius_px - 1).bit_length(), largest.width_px)
+
+        if size < 1:
+            return largest
+
+        return cls.from_center_extent(center, ImageExtent(width_px=size, height_px=size))
+
     def clamp_to_detector_extent(self, detector_extent: ImageExtent) -> CropRegion:
         """Return a new region shrunk and shifted so its window fits inside `detector_extent`.
 
@@ -127,10 +156,10 @@ class CropRegion:
             y_range=(y_start, y_start + height),
         )
 
-    def apply_to(self, data: numpy.ndarray) -> numpy.ndarray:
+    def apply_to(self, data: _ArrayT) -> _ArrayT:
         """Slice the last two axes of `data` to this region; leading axes pass through."""
         leading = (slice(None),) * (data.ndim - 2)
-        return data[(*leading, self.y_slice, self.x_slice)]
+        return cast(_ArrayT, data[(*leading, self.y_slice, self.x_slice)])
 
 
 class DiffractionArray(ABC):
@@ -156,16 +185,6 @@ class DiffractionArray(ABC):
     def get_num_patterns(self) -> int:
         return self.get_patterns().shape[0]
 
-    def get_probe_photon_flux_per_s(self) -> DiffractionPatternPhotonFluxes | None:
-        """Per-pattern incident probe photon flux (photons per second).
-
-        Beamline readers with hardware flux measurements (ion chamber, BPM,
-        ring-current-normalized upstream reading) override this. The default
-        returns None to signal no measurement is available, and downstream
-        assembly falls back to per-pattern detector totals.
-        """
-        return None
-
 
 class SimpleDiffractionArray(DiffractionArray):
     """Concrete DiffractionArray backed by in-memory numpy arrays."""
@@ -175,13 +194,11 @@ class SimpleDiffractionArray(DiffractionArray):
         label: str,
         indexes: DiffractionIndexes,
         patterns: DiffractionPatterns,
-        probe_photon_flux_per_s: DiffractionPatternPhotonFluxes | None = None,
     ) -> None:
         super().__init__()
         self._label = label
         self._indexes = indexes
         self._patterns = patterns
-        self._probe_photon_flux_per_s = probe_photon_flux_per_s
 
     def get_label(self) -> str:
         return self._label
@@ -194,15 +211,9 @@ class SimpleDiffractionArray(DiffractionArray):
             return self._patterns
         return read_region.apply_to(self._patterns)
 
-    def get_probe_photon_flux_per_s(self) -> DiffractionPatternPhotonFluxes | None:
-        return self._probe_photon_flux_per_s
-
     @property
     def nbytes(self) -> int:
-        sz = self._indexes.nbytes + self._patterns.nbytes
-        if self._probe_photon_flux_per_s is not None:
-            sz += self._probe_photon_flux_per_s.nbytes
-        return sz
+        return self._indexes.nbytes + self._patterns.nbytes
 
 
 class Polarization(StrEnum):
@@ -223,6 +234,8 @@ class DiffractionMetadata:
     pattern_dtype: DiffractionPatternDType
     detector_extent: ImageExtent
     detector_distance_m: float | None = None
+    focus_object_distance_m: float | None = None
+    far_field: bool | None = None
     detector_pixel_geometry: PixelGeometry | None = None
     beam_center: BeamCenter | None = None
     photon_energy_eV: float | None = None  # noqa: N815
@@ -231,6 +244,7 @@ class DiffractionMetadata:
     tomography_angle_deg: float | None = None
     tilt_angle_deg: float | None = None
     polarization: Polarization | None = None
+    sample_name: str | None = None
     file_path: Path | None = None
 
     @property
@@ -239,6 +253,8 @@ class DiffractionMetadata:
         sz += getsizeof(self.pattern_dtype)
         sz += getsizeof(self.detector_extent)
         sz += getsizeof(self.detector_distance_m)
+        sz += getsizeof(self.focus_object_distance_m)
+        sz += getsizeof(self.far_field)
         sz += getsizeof(self.detector_pixel_geometry)
         sz += getsizeof(self.beam_center)
         sz += getsizeof(self.photon_energy_eV)
@@ -247,6 +263,7 @@ class DiffractionMetadata:
         sz += getsizeof(self.tomography_angle_deg)
         sz += getsizeof(self.tilt_angle_deg)
         sz += getsizeof(self.polarization)
+        sz += getsizeof(self.sample_name)
         sz += getsizeof(self.file_path)
         return sz
 
@@ -302,7 +319,8 @@ class DiffractionDataset(Sequence[DiffractionArray], ABC):
 
     Every dataset owns a bad-pixel mask; callers can always rely on
     ``get_bad_pixels()`` returning a real array, defaulting to all-good pixels
-    when the source data did not include a mask.
+    when the source data did not include a mask. A measured detector background
+    and flat field are optional and absent unless the source carries them.
     """
 
     @abstractmethod
@@ -317,6 +335,27 @@ class DiffractionDataset(Sequence[DiffractionArray], ABC):
     def get_bad_pixels(self) -> BadPixels:
         pass
 
+    def get_background(self) -> DetectorBackground | None:
+        """Measured additive background on the detector extent, or None if unknown."""
+        return None
+
+    def get_flat_field(self) -> FlatField | None:
+        """Measured flat-field response on the detector extent, or None if unknown."""
+        return None
+
+
+def validate_pixel_map(
+    pixel_map: BadPixels | PixelMap | None, expected_shape: tuple[int, ...], *, name: str
+) -> None:
+    """Raise ValueError unless a per-pixel map is absent or has `expected_shape`.
+
+    A map is any array with one value per detector pixel: a bad-pixel mask, a
+    background or a flat field. `name` begins the message, so the caller says which
+    map was wrong.
+    """
+    if pixel_map is not None and pixel_map.shape != expected_shape:
+        raise ValueError(f'{name} shape {pixel_map.shape} does not match {expected_shape}.')
+
 
 class SimpleDiffractionDataset(DiffractionDataset):
     """Concrete DiffractionDataset backed by a list of DiffractionArray objects."""
@@ -327,6 +366,9 @@ class SimpleDiffractionDataset(DiffractionDataset):
         contents_tree: DiffractionDatasetLayoutNode,
         array_list: Sequence[DiffractionArray],
         bad_pixels: BadPixels | None = None,
+        *,
+        background: DetectorBackground | None = None,
+        flat_field: FlatField | None = None,
     ) -> None:
         super().__init__()
         self._metadata = metadata
@@ -336,14 +378,14 @@ class SimpleDiffractionDataset(DiffractionDataset):
         extent = metadata.detector_extent
 
         if bad_pixels is None:
-            bad_pixels = numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool_)
-        elif bad_pixels.shape != extent.get_shape():
-            raise ValueError(
-                f'Bad pixels shape {bad_pixels.shape} does not match '
-                f'detector extent {extent.get_shape()}.'
-            )
+            bad_pixels = numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool)
 
+        validate_pixel_map(bad_pixels, extent.get_shape(), name='Bad pixels')
+        validate_pixel_map(background, extent.get_shape(), name='Background')
+        validate_pixel_map(flat_field, extent.get_shape(), name='Flat field')
         self._bad_pixels = bad_pixels
+        self._background = background
+        self._flat_field = flat_field
 
     @classmethod
     def create_null(cls, file_path: Path | None = None) -> SimpleDiffractionDataset:
@@ -361,6 +403,12 @@ class SimpleDiffractionDataset(DiffractionDataset):
     def get_bad_pixels(self) -> BadPixels:
         return self._bad_pixels
 
+    def get_background(self) -> DetectorBackground | None:
+        return self._background
+
+    def get_flat_field(self) -> FlatField | None:
+        return self._flat_field
+
     @overload
     def __getitem__(self, index: int) -> DiffractionArray: ...
 
@@ -374,28 +422,20 @@ class SimpleDiffractionDataset(DiffractionDataset):
         return len(self._array_list)
 
 
-class DiffractionFileReader(ABC):
+class DiffractionFileReader(FileReader[DiffractionDataset]):
     """Plugin interface for reading diffraction files."""
 
-    @abstractmethod
-    def read(self, file_path: Path) -> DiffractionDataset:
-        """Read a diffraction dataset from file."""
-        pass
 
-
-class DiffractionFileWriter(ABC):
+class DiffractionFileWriter(FileWriter[DiffractionDataset]):
     """Plugin interface for writing diffraction files."""
 
-    @abstractmethod
-    def write(self, file_path: Path, dataset: DiffractionDataset) -> None:
-        """Write a diffraction dataset to file."""
-        pass
 
-
-class BadPixelsFileReader(ABC):
+class BadPixelsFileReader(FileReader[BadPixels]):
     """Plugin interface for reading bad-pixel mask files."""
 
-    @abstractmethod
-    def read(self, file_path: Path) -> BadPixels:
-        """Read a bad-pixel mask from file."""
-        pass
+
+class PixelMapFileReader(FileReader[PixelMap]):
+    """Plugin interface for reading a per-pixel detector map, such as a background or flat field.
+
+    The map read is two-dimensional and floating point.
+    """

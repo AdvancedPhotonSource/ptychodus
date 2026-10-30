@@ -1,43 +1,120 @@
-"""Reconstructor interfaces, I/O data containers, and product standardization."""
+"""Reconstructor interfaces, I/O data containers, and product standardization.
+
+Also home to :class:`SubprocessReconstructor`, the adapter that runs a backend
+in a spawned child so the parent process never acquires a GPU context. It sits
+beside the interface it implements because it implements the whole of it, and
+the only thing it adds is where the work happens.
+"""
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, fields
-from enum import auto, Enum
+from enum import auto, Enum, StrEnum
+from importlib.metadata import PackageNotFoundError, version
+from importlib import import_module
+from importlib.util import find_spec
+from multiprocessing.queues import SimpleQueue
 from pathlib import Path
+from typing import Any
 import logging
+import shutil
 
 import numpy
+from pydantic import BaseModel
 
 from .assemble import AssembledDiffractionData
-from .diffraction import BadPixels, DiffractionPatterns
+from .files import FileWriter
+from .diffraction import (
+    BadPixels,
+    DetectorBackground,
+    DiffractionPatterns,
+    FlatField,
+)
 from .geometry import ImageExtent
+from .interpolate import interpolate_at_indexes
 from .object import Object
-from .probe import ProbeSequence
+from .probe import ProbeEnsemble
 from .probe_positions import ProbePositionSequence, ProbePosition
 from .product import LossValue, Product
 from .propagate import compute_full_aperture_fresnel_number
+from .spawn import run_subprocess
 from .typing import RealArrayType
+
+__all__ = [
+    'ApplySettingsSync',
+    'DefaultOptions',
+    'DeviceEnvironment',
+    'DumpReconstructOptions',
+    'DumpTrainOptions',
+    'NoOptions',
+    'NullReconstructor',
+    'PositionIndexFilter',
+    'ReconstructInput',
+    'ReconstructionAmbiguities',
+    'ReconstructOutput',
+    'Reconstructor',
+    'ReconstructorLibrary',
+    'ReconstructorMessage',
+    'ResolveModelPath',
+    'SaveModel',
+    'SubprocessOperation',
+    'SubprocessPayload',
+    'SubprocessReconstructor',
+    'TrainOutput',
+    'TrainableReconstructor',
+    'TrainingDataFileWriter',
+    'prepare_reconstruct_input',
+    'warn_if_propagation_regime_disagrees',
+]
 
 logger = logging.getLogger(__name__)
 
 
+class NoOptions(BaseModel):
+    """Declared by a reconstructor that does not yet describe its options.
+
+    A reconstructor states what it accepts by returning a pydantic object from
+    :meth:`Reconstructor.get_default_options`. Until a backend declares one it keeps
+    reading whatever configuration it already holds, and this stands in so that
+    callers can build the ``options`` argument uniformly.
+    """
+
+
 @dataclass(frozen=True)
 class ReconstructInput:
-    """All data required to start a reconstruction: patterns, bad-pixel mask, and initial product."""
+    """All data required to start a reconstruction: patterns, bad-pixel mask, and initial product.
+
+    `background` and `flat_field` are measured detector maps the patterns have not
+    been corrected for, on the pattern grid; each is None when absent or already
+    applied. A flat field is the detector's response, so a model prediction is
+    multiplied by it and the background added to compare with the patterns.
+    """
 
     diffraction_patterns: DiffractionPatterns
     bad_pixels: BadPixels
     product: Product
+    background: DetectorBackground | None = None
+    flat_field: FlatField | None = None
+
+
+class TrainingDataFileWriter(FileWriter[ReconstructInput]):
+    """Plugin interface for writing what a trainable reconstructor learns from."""
 
 
 @dataclass(frozen=True)
 class ReconstructOutput:
-    """Reconstruction result yielded at each iteration: updated product, progress, and status code."""
+    """Reconstruction result yielded at each iteration.
+
+    ``progress_goal`` is what ``progress`` counts towards, reported by the run
+    rather than predicted before it: a backend that resolves its own iteration
+    count can only say so once it has started. Zero means unknown, which a
+    progress bar reads as indeterminate.
+    """
 
     product: Product
     progress: int = 0
+    progress_goal: int = 0
     status: int = 0
 
 
@@ -49,22 +126,40 @@ class Reconstructor(ABC):
     def name(self) -> str:
         pass
 
-    @abstractmethod
-    def get_progress_goal(self) -> int:
-        pass
+    def get_default_options(self) -> BaseModel:
+        """Return this reconstructor's options, populated with their defaults.
+
+        A description, not live state: plain pydantic carrying values, types,
+        ranges, enums and nesting. A caller edits a copy and passes it back as
+        ``options``; the settings layer generates live parameters from it, and
+        its type is what an incoming ``options`` is validated against.
+
+        An instance rather than the class, because a field declared with a
+        ``default_factory`` reports its class-level default as undefined. Only
+        an instance carries the value such a field actually starts at.
+
+        Override when the backend declares its options.
+        """
+        return NoOptions()
 
     @abstractmethod
-    def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
+    def reconstruct(
+        self, input_: ReconstructInput, *, options: BaseModel
+    ) -> Iterator[ReconstructOutput]:
         pass
 
 
 @dataclass(frozen=True)
 class TrainOutput:
-    """Training result yielded at each step: loss curves, progress, and status code."""
+    """Training result yielded at each step: loss curves, progress, and status code.
+
+    ``progress_goal`` is reported by the run, as for :class:`ReconstructOutput`.
+    """
 
     training_loss: Sequence[LossValue] = field(default_factory=list)
     validation_loss: Sequence[LossValue] = field(default_factory=list)
     progress: int = 0
+    progress_goal: int = 0
     status: int = 0
 
 
@@ -80,7 +175,7 @@ class TrainableReconstructor(Reconstructor):
         pass
 
     @abstractmethod
-    def load_model_from_file(self, file_path: Path) -> None:
+    def load_model(self, file_path: Path) -> None:
         pass
 
     @abstractmethod
@@ -94,20 +189,20 @@ class TrainableReconstructor(Reconstructor):
         pass
 
     @abstractmethod
-    def get_training_data_file_filter(self) -> str:
-        pass
-
-    @abstractmethod
-    def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
-        pass
-
-    @abstractmethod
-    def train(self, input_path: Path, output_path: Path) -> Iterator[TrainOutput]:
+    def train(
+        self, input_directory: Path, output_directory: Path, *, options: BaseModel
+    ) -> Iterator[TrainOutput]:
+        """Train from a StandardFileLayout in *input_directory*, writing to *output_directory*."""
         pass
 
 
-class NullReconstructor(TrainableReconstructor):
-    """No-op TrainableReconstructor used as a placeholder when no algorithm is available."""
+class NullReconstructor(Reconstructor):
+    """Stands in for a selection that resolves to no reconstructor at all.
+
+    A plain :class:`Reconstructor` rather than a trainable one, deliberately:
+    there is nothing here to train, so a test for trainability should say so
+    rather than find a stub. Reconstructing yields nothing.
+    """
 
     def __init__(self, name: str) -> None:
         self._name = name
@@ -116,73 +211,515 @@ class NullReconstructor(TrainableReconstructor):
     def name(self) -> str:
         return self._name
 
-    def get_progress_goal(self) -> int:
-        return 0
-
-    def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
+    def reconstruct(
+        self, input_: ReconstructInput, *, options: BaseModel
+    ) -> Iterator[ReconstructOutput]:
         yield from ()
+
+
+class ReconstructorMessage(StrEnum):
+    """What a reconstructor's child has to say, beside what the transport owns.
+
+    One place names every message :class:`SubprocessReconstructor` acts on,
+    so a backend writing a child can see the whole vocabulary without
+    reading the adapter. A string enum, because the tag is pickled to the
+    parent and a child writing the bare string must still compare equal.
+
+    What rides with each is fixed by the tag:
+
+    - ``OUTPUT`` -- a :class:`ReconstructOutput`
+    - ``TRAIN_OUTPUT`` -- a :class:`TrainOutput`
+    - ``MODEL_SAVED`` -- the path, as a string, the child wrote a checkpoint to
+    - ``SETTINGS_SYNC`` -- ``{group_name: {parameter_name: value_as_string}}``
+    """
+
+    OUTPUT = 'output'
+    TRAIN_OUTPUT = 'train_output'
+    MODEL_SAVED = 'model_saved'
+    SETTINGS_SYNC = 'settings_sync'
+
+
+class SubprocessOperation(StrEnum):
+    """What a child was spawned to do, and so which payload fields are filled."""
+
+    RECONSTRUCT = 'reconstruct'
+    TRAIN = 'train'
+
+    @property
+    def child_function(self) -> str:
+        """What a backend following the convention calls this operation's entry point.
+
+        Derived from the operation rather than tabulated beside it, so the
+        two cannot disagree and a backend reading this knows the rule rather
+        than a pair of names.
+        """
+        return f'run_{self.value}'
+
+
+@dataclass(frozen=True)
+class SubprocessPayload:
+    """What a child is handed, whichever backend and whichever operation.
+
+    One envelope rather than a pair of dataclasses per backend, so every
+    child reads the same shape and a new backend states only what goes in
+    ``options``. Which fields are filled follows from ``operation``:
+    reconstructing supplies ``input_`` and, where a backend loads one,
+    ``model_path``; training supplies the two directories.
+
+    ``options`` is the subset of the declaration this operation's child
+    reads, in the form that child consumes -- usually a mapping, since
+    dumping only what is read keeps a reconstruct payload free of
+    training-only values. A declaration that cannot dump itself to a mapping
+    without changing what it holds travels as the object it built instead;
+    the payload is pickled either way, so nothing is gained by a round trip
+    that would coerce the values on the way through.
+    """
+
+    operation: SubprocessOperation
+    reconstructor: str
+    options: Any
+    # Where the child code lives. Derived from the library that built this
+    # reconstructor rather than written down, so there is no dotted string to
+    # go stale when a module moves.
+    child_module: str = ''
+    child_function: str = ''
+    input_: ReconstructInput | None = None
+    input_directory: Path | None = None
+    output_directory: Path | None = None
+    model_path: Path | None = None
+
+    def require_input(self) -> ReconstructInput:
+        """The data to reconstruct, or a complaint naming what was missing.
+
+        A child is spawned for one operation and reads the fields that
+        operation fills. Asking rather than assuming turns a payload built
+        wrong into one message here, instead of an attribute error on None
+        several frames into a GPU framework.
+        """
+        if self.input_ is None:
+            raise ValueError(f'{self.reconstructor}: {self.operation} payload carries no input.')
+
+        return self.input_
+
+    def require_model_path(self) -> Path:
+        """The model to load, or a complaint naming what was missing."""
+        if self.model_path is None:
+            raise ValueError(
+                f'{self.reconstructor}: {self.operation} payload carries no model path.'
+            )
+
+        return self.model_path
+
+    def require_directories(self) -> tuple[Path, Path]:
+        """The directories to read from and write to, or a complaint."""
+        if self.input_directory is None or self.output_directory is None:
+            raise ValueError(
+                f'{self.reconstructor}: {self.operation} payload carries no directories.'
+            )
+
+        return self.input_directory, self.output_directory
+
+
+# Type aliases for the callbacks each backend supplies.
+DumpReconstructOptions = Callable[[ReconstructInput, BaseModel], Any]
+"""(reconstruct_input, options) -> the subset of the declaration the child reads."""
+
+DumpTrainOptions = Callable[[BaseModel], Any]
+"""(options) -> the subset of the declaration the training child reads."""
+
+ResolveModelPath = Callable[[Path | None], Path]
+"""(path recorded by load_model) -> the path the child loads from.
+
+Runs parent-side, before the child is spawned, so a backend that unpacks an
+archive or picks a file out of a bundle directory does it once and complains
+here rather than in the child when there is nothing to load.
+"""
+
+SaveModel = Callable[[Path, Path], None]
+"""(source_path_loaded_by_child, destination_path) -> None. Runs parent-side."""
+
+ApplySettingsSync = Callable[[dict[str, dict[str, str]]], None]
+"""Optional handler for the settings a child reports back; see ReconstructorMessage."""
+
+DefaultOptions = Callable[[], BaseModel]
+"""() -> a fresh object describing what this backend accepts, at its defaults."""
+
+DeviceEnvironment = Callable[[], Mapping[str, str]]
+"""() -> the environment entries restricting a child to the chosen devices."""
+
+
+class SubprocessReconstructor(TrainableReconstructor):
+    """Parent-side adapter that runs any reconstructor in a fresh subprocess.
+
+    Wraps any backend reachable as a child-side entry point, so a caller can
+    dispatch to it without importing a GPU framework. When ``is_trainable`` is
+    False the trainable methods raise :class:`NotImplementedError`, so the
+    object is still a single kind that needs no special-casing in a list.
+
+    The parent-side object holds no GPU state. It stores:
+
+    - the module its child code lives in, stamped on by its library,
+    - backend-supplied callbacks that dump options and save models,
+    - the loaded-model path (as recorded by ``load_model`` /
+      remembered from the last ``train`` call).
+
+    Each ``reconstruct()`` / ``train()`` call spawns exactly one child; the
+    child dies before the call returns, and the iterator yields the same
+    per-iteration output an in-process backend would.
+
+    **Trainable-model lifecycle.** ``load_model`` records the path and nothing
+    else -- the fresh inference child does the real load, once per call.
+    ``save_model`` copies or archives that path to the destination through a
+    backend-supplied callback, so a backend persisting one file and a backend
+    persisting a whole bundle directory share this adapter unchanged.
+    """
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        dump_reconstruct_options: DumpReconstructOptions,
+        child_module: str = '',
+        reconstruct_function: str = '',
+        default_options: DefaultOptions = NoOptions,
+        resolve_model_path: ResolveModelPath | None = None,
+        is_trainable: bool = False,
+        train_function: str = '',
+        dump_train_options: DumpTrainOptions | None = None,
+        model_file_filter: str = '',
+        model_file_extension: str = '',
+        save_model: SaveModel | None = None,
+        apply_settings_sync: ApplySettingsSync | None = None,
+        terminate_grace_sec: float = 10.0,
+    ) -> None:
+        super().__init__()
+        self._name = name
+        self._dump_reconstruct_options = dump_reconstruct_options
+        self._reconstruct_function = reconstruct_function
+        self._default_options = default_options
+        self._resolve_model_path = resolve_model_path
+        self._is_trainable = is_trainable
+        self._train_function = train_function
+        self._dump_train_options = dump_train_options
+
+        # Where this reconstructor's child code lives. Stamped by the library
+        # that builds it, which is the thing that knows; set directly only by
+        # a caller building one outside a library.
+        self.child_module = child_module
+        self._model_file_filter = model_file_filter
+        self._model_file_extension = model_file_extension
+        self._save_model_fn = save_model
+        self._apply_settings_sync = apply_settings_sync
+        self._terminate_grace_sec = terminate_grace_sec
+
+        self._loaded_model_path: Path | None = None
+        # Where the work runs, which is the spawning process's to decide and
+        # not the backend's. Replaced after construction by whatever owns the
+        # selection; until then a child sees every device this process does.
+        self.device_environment: DeviceEnvironment = dict
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def is_trainable(self) -> bool:
+        return self._is_trainable
+
+    def get_default_options(self) -> BaseModel:
+        # A fresh object per call, so a caller editing what it was handed
+        # cannot change what the next caller is handed.
+        return self._default_options()
+
+    def reconstruct(
+        self, input_: ReconstructInput, *, options: BaseModel
+    ) -> Iterator[ReconstructOutput]:
+        payload = SubprocessPayload(
+            operation=SubprocessOperation.RECONSTRUCT,
+            reconstructor=self._name,
+            options=self._dump_reconstruct_options(input_, options),
+            child_module=self.child_module,
+            child_function=self._reconstruct_function,
+            input_=input_,
+            model_path=(
+                self._loaded_model_path
+                if self._resolve_model_path is None
+                else self._resolve_model_path(self._loaded_model_path)
+            ),
+        )
+
+        with run_subprocess(
+            _DISPATCH_ENTRY_POINT,
+            payload,
+            terminate_grace_sec=self._terminate_grace_sec,
+            environment=self.device_environment(),
+        ) as events:
+            for event in events:
+                tag = event[0]
+                if tag == ReconstructorMessage.OUTPUT:
+                    yield event[1]
+                elif tag == ReconstructorMessage.SETTINGS_SYNC:
+                    if self._apply_settings_sync is not None:
+                        try:
+                            self._apply_settings_sync(event[1])
+                        except Exception:
+                            logger.exception('Failed to apply settings sync from subprocess.')
+                else:
+                    logger.debug(
+                        f'{self._name}: dropping unrecognized subprocess message tag {tag!r}'
+                    )
 
     def is_model_loaded(self) -> bool:
-        return False
+        return self._loaded_model_path is not None
 
     def get_model_file_filter(self) -> str:
-        return ''
+        return self._model_file_filter
 
-    def load_model_from_file(self, file_path: Path) -> None:
-        pass
+    def load_model(self, file_path: Path) -> None:
+        # Parent-side: just remember the path. The child does the actual load
+        # (which touches GPU frameworks) per reconstruct/train call.
+        self._loaded_model_path = file_path
 
     def get_model_file_extension(self) -> str:
-        return ''
+        return self._model_file_extension
 
     def save_model(self, file_path: Path) -> None:
-        pass
+        if self._loaded_model_path is None:
+            raise RuntimeError(
+                f'Cannot save {self._name} model: no model has been loaded or trained.'
+            )
+        if self._save_model_fn is not None:
+            self._save_model_fn(self._loaded_model_path, file_path)
+        else:
+            shutil.copyfile(self._loaded_model_path, file_path)
 
-    def get_training_data_file_filter(self) -> str:
-        return ''
+    def train(
+        self, input_directory: Path, output_directory: Path, *, options: BaseModel
+    ) -> Iterator[TrainOutput]:
+        if not self._is_trainable:
+            raise NotImplementedError(f'{self._name} does not support training.')
+        if self._dump_train_options is None:
+            raise NotImplementedError(f'{self._name} does not support training.')
 
-    def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
-        pass
+        payload = SubprocessPayload(
+            operation=SubprocessOperation.TRAIN,
+            reconstructor=self._name,
+            options=self._dump_train_options(options),
+            child_module=self.child_module,
+            child_function=self._train_function,
+            input_directory=input_directory,
+            output_directory=output_directory,
+        )
 
-    def train(self, input_path: Path, output_path: Path) -> Iterator[TrainOutput]:
-        yield from ()
+        with run_subprocess(
+            _DISPATCH_ENTRY_POINT,
+            payload,
+            terminate_grace_sec=self._terminate_grace_sec,
+            environment=self.device_environment(),
+        ) as events:
+            for event in events:
+                tag = event[0]
+                if tag == ReconstructorMessage.TRAIN_OUTPUT:
+                    yield event[1]
+                elif tag == ReconstructorMessage.MODEL_SAVED:
+                    self._loaded_model_path = Path(event[1])
+                elif tag == ReconstructorMessage.SETTINGS_SYNC:
+                    if self._apply_settings_sync is not None:
+                        try:
+                            self._apply_settings_sync(event[1])
+                        except Exception:
+                            logger.exception('Failed to apply settings sync from subprocess.')
+                else:
+                    logger.debug(
+                        f'{self._name}: dropping unrecognized subprocess message tag {tag!r}'
+                    )
+
+
+def _child_module_for(library_class: type) -> str:
+    """The module a library's reconstructors run their children in.
+
+    Derived from where the library class lives rather than written down by
+    the backend: a plugin lives in a package of its own and keeps its child
+    entry points in one module there, so the path follows from the class and
+    cannot disagree with it.
+    """
+    package, _, _ = library_class.__module__.rpartition('.')
+    return f'{package}._subprocess'
+
+
+# Module scope, and underscored, for the reason tests/test_subprocess_entry_points.py
+# states: it discovers entry points by AST-scanning module-level assignments whose
+# name carries ENTRY, so inlining this into its one reader would drop it from that
+# guard with nothing to show for it.
+_DISPATCH_ENTRY_POINT = 'ptychodus.api.reconstruct:_run_in_child'
+
+
+def _run_in_child(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None:
+    """Import the backend the payload names and hand it the payload.
+
+    Runs in the child. One entry point for every backend and both
+    operations, so what varies is data rather than a dotted string written
+    per backend per operation -- a string that resolves only when a child is
+    actually spawned, and so goes stale without anything noticing.
+
+    Only the module this payload names is imported. Rebuilding the plugin
+    registry here would work too, and would cost a second of importing every
+    plugin to recover a mapping the parent already had.
+    """
+    if not payload.child_module:
+        raise ValueError(
+            f'{payload.reconstructor}: no child module to run {payload.operation} in. '
+            'A reconstructor is given one by the library that builds it.'
+        )
+
+    # Coerced rather than trusted: a payload is unpickled from another
+    # process, and a bare string where the member was still names the
+    # operation. An unknown one says so here instead of failing to find a
+    # function nobody named.
+    function = payload.child_function or SubprocessOperation(payload.operation).child_function
+    module = import_module(payload.child_module)
+
+    try:
+        entry = getattr(module, function)
+    except AttributeError:
+        raise AttributeError(
+            f'{payload.reconstructor}: {payload.child_module} defines no "{function}".'
+        ) from None
+
+    entry(payload, queue)
 
 
 class ReconstructorLibrary(Iterable[Reconstructor], ABC):
-    """Iterable collection of Reconstructor instances provided by a plugin library."""
+    """Iterable collection of Reconstructor instances provided by a plugin library.
 
-    def __init__(self, logger_name: str) -> None:
+    A library does not name itself. What a person selecting an algorithm sees
+    is the name it was registered under, which the plugin registry holds
+    beside it -- so a library carries only what it needs to find and report
+    its own package: ``distribution`` is what that package is called on PyPI,
+    the name a version lives under, and ``requires`` lists the modules the
+    library cannot work without.
+
+    What a library offers is settled on first use rather than at
+    construction, because registration happens in every process that loads
+    plugins including the many that never reconstruct. However it turns out,
+    it is announced: a library that builds reports the version it built
+    against, one whose packages are absent says so, and one whose packages
+    are present but will not import says *that*, as a warning carrying the
+    traceback, since it is a fault rather than a choice.
+    """
+
+    def __init__(
+        self, logger_name: str, distribution: str, *, requires: Sequence[str] = ()
+    ) -> None:
         super().__init__()
         self._logger = logging.getLogger(logger_name)
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        pass
-
-    def log_levels(self) -> Iterable[str]:
-        return ('CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG')
+        self._distribution = distribution
+        self._requires = tuple(requires)
+        self._reconstructors: list[Reconstructor] | None = None
 
     def get_logger(self) -> logging.Logger:
         return self._logger
 
-    def get_log_level(self) -> str:
-        level = self._logger.getEffectiveLevel()
-        return logging.getLevelName(level)
+    def is_available(self) -> bool:
+        """Report whether every module this library needs can be located.
 
-    def set_log_level(self, name: str) -> None:
-        name_before = self.get_log_level()
+        Names are resolved without being imported, so asking costs nothing in
+        a process that will never reconstruct. It is a precondition and not a
+        promise: a module that resolves can still fail to import, which is
+        why building is guarded separately.
+        """
+        return all(find_spec(module) is not None for module in self._requires)
+
+    def get_version(self) -> str:
+        """Return the installed version of the package this wraps, or 'unknown'.
+
+        Which build produced a result is the first question asked when two
+        machines disagree, so this is logged where a reconstruction's own log
+        records it rather than only reported by a diagnostic command.
+        """
+        try:
+            return version(self._distribution)
+        except PackageNotFoundError:
+            return 'unknown'
+
+    def log_version(self) -> None:
+        """Record the version through this library's own logger.
+
+        Its own, not the module's: the logger named at construction is the one
+        a task monitor attaches a handler to, so anything logged elsewhere
+        never reaches whatever is watching the run.
+
+        Reported under the distribution name, because a library is not told
+        what it was registered as and this is the name whose version it is.
+        """
+        self._logger.info(f'{self._distribution} {self.get_version()}')
+
+    def __iter__(self) -> Iterator[Reconstructor]:
+        if self._reconstructors is None:
+            self._reconstructors = self._enumerate()
+
+        return iter(self._reconstructors)
+
+    def _enumerate(self) -> list[Reconstructor]:
+        """Build once, reporting either outcome through this library's logger."""
+        if not self.is_available():
+            self._logger.info(f'{self._distribution} not found.')
+            return []
 
         try:
-            self._logger.setLevel(name)
-        except ValueError:
-            self._logger.error(f'Bad log level "{name}".')
+            reconstructors = list(self._build())
+        except ImportError:
+            # Locating a module does not execute it, so a package that is
+            # present but unusable -- a dependency of its own missing, a
+            # partial install -- is only discovered here. Said differently
+            # from the branch above, and louder: not installing a backend is
+            # a choice, while installing one that cannot import is a fault
+            # nobody asked for, and a run that silently proceeds without it
+            # is the failure worth reporting. The traceback goes with it as
+            # the only thing that names what is actually broken.
+            self._logger.warning(
+                f'{self._distribution} is installed but failed to import; '
+                'this backend is disabled.',
+                exc_info=True,
+            )
+            return []
 
-        name_after = self.get_log_level()
-        self._logger.info(f'Changed {self.name} logging level {name_before} -> {name_after}')
+        self.log_version()
+        self._locate_child_code(reconstructors)
+        return reconstructors
+
+    def _locate_child_code(self, reconstructors: Iterable[Reconstructor]) -> None:
+        """Tell each reconstructor where its child code lives.
+
+        One already carrying a module keeps it, which is how a backend
+        laid out differently -- or a caller building one in a test -- says so.
+        """
+        child_module = _child_module_for(type(self))
+
+        for reconstructor in reconstructors:
+            if isinstance(reconstructor, SubprocessReconstructor):
+                if not reconstructor.child_module:
+                    reconstructor.child_module = child_module
+
+    @abstractmethod
+    def _build(self) -> Iterable[Reconstructor]:
+        """Create the reconstructors, importing whatever they need.
+
+        Called at most once, and only after ``is_available`` has agreed, so
+        an implementation imports its backend directly rather than guarding.
+        """
 
 
 class PositionIndexFilter(Enum):
-    """Filter scan points by scan index."""
+    """Filter scan points by scan index.
+
+    ``ODD`` and ``EVEN`` split a scan into two interleaved halves by index parity. How
+    the halves sit on the sample follows from how the scan is numbered: a raster
+    numbered by a running count is split into a checkerboard when a line holds an odd
+    number of points, and into alternating columns when it holds an even number. Line-
+    major indexes (``line * stride + column`` with an even stride) always split into
+    columns, so each half keeps the full step along the lines and doubles it across them.
+    """
 
     ALL = auto()
     ODD = auto()
@@ -213,11 +750,18 @@ def prepare_reconstruct_input(
       interpolated from neighboring anchors;
     - pattern indexes outside the position-index range are dropped (no extrapolation).
 
-    Positions whose index has no matching pattern naturally do not appear in the output. The OPR
-    caveat below is unchanged from the prior implementation; interpolation makes the misalignment
-    worse because interpolated entries have no natural OPR row at all.
+    Positions whose index has no matching pattern naturally do not appear in the output.
+
+    OPR weights carry one row per probe position, and are conditioned exactly as the
+    coordinates are: filtered, averaged over duplicate indexes and interpolated at the
+    pattern indexes. The output therefore holds one weight row per output pattern, in the
+    same order as the output positions.
+
+    Raises:
+        ValueError: If the OPR weights do not have one row per probe position, if the
+            index filter eliminates every pattern or position, or if no position index
+            overlaps the pattern indexes.
     """
-    # TODO also filter OPR weights
     pattern_indexes = assembled_data.get_indexes()
     valid_patterns = assembled_data.get_patterns()
 
@@ -226,7 +770,7 @@ def prepare_reconstruct_input(
 
     pattern_keep = numpy.fromiter(
         (index_filter(int(i)) for i in pattern_indexes),
-        dtype=numpy.bool_,
+        dtype=numpy.bool,
         count=pattern_indexes.size,
     )
     filtered_pattern_indexes = pattern_indexes[pattern_keep]
@@ -238,10 +782,18 @@ def prepare_reconstruct_input(
     pos_y_all = product.probe_positions.get_coordinates_y_m()
 
     pos_photon_counts_all = product.probe_positions.get_probe_photon_counts()
+    opr_weights_all = product.probes.get_opr_weights_or_none()
+
+    if opr_weights_all is not None and opr_weights_all.shape[0] != n_positions:
+        raise ValueError(
+            f'OPR weights have {opr_weights_all.shape[0]} rows but the product has'
+            f' {n_positions} probe positions; each row belongs to one probe position.'
+            ' Choose an OPR weight policy (Average or Reinitialize) to conform them.'
+        )
 
     pos_keep = numpy.fromiter(
         (index_filter(int(i)) for i in pos_indexes_all),
-        dtype=numpy.bool_,
+        dtype=numpy.bool,
         count=n_positions,
     )
     pos_indexes = pos_indexes_all[pos_keep]
@@ -252,31 +804,14 @@ def prepare_reconstruct_input(
     if filtered_pattern_indexes.size == 0 or pos_indexes.size == 0:
         raise ValueError('Index filter eliminated all pattern indexes and/or all position indexes.')
 
-    # Average duplicate position indexes. numpy.unique sorts ascending, so
-    # the resulting (unique_pos_indexes, mean_x, mean_y) triple is the
-    # canonical interpolation anchor set.
-    unique_pos_indexes, inverse = numpy.unique(pos_indexes, return_inverse=True)
-    counts = numpy.bincount(inverse)
-    mean_x = numpy.bincount(inverse, weights=pos_x) / counts
-    mean_y = numpy.bincount(inverse, weights=pos_y) / counts
-
-    # Averaging duplicate-index photon counts uses the arithmetic mean because the
-    # position readers store per-trigger integrated *counts* over equal-length trigger
-    # windows -- each duplicate is an independent sample of the same per-trigger count.
-    # A harmonic or geometric mean would only apply if a future reader supplied true
-    # rates (Hz) over unequal integration windows. NaN placeholders (positions whose
-    # reader did not supply a count) propagate through bincount -> mean, marking the
-    # anchor invalid so the subsequent interp yields NaN for any pattern index derived
-    # from it.
-    mean_photon_counts: numpy.ndarray | None = None
-    if pos_photon_counts is not None:
-        mean_photon_counts = numpy.bincount(inverse, weights=pos_photon_counts) / counts
-
-    lo = unique_pos_indexes[0]
-    hi = unique_pos_indexes[-1]
-    in_range_mask = (filtered_pattern_indexes >= lo) & (filtered_pattern_indexes <= hi)
+    # Duplicate position indexes average into one anchor; pattern indexes between
+    # anchors are interpolated and those beyond them dropped.
+    in_range_mask, coordinates = interpolate_at_indexes(
+        pos_indexes, numpy.column_stack((pos_x, pos_y)), filtered_pattern_indexes
+    )
     in_range_pattern_indexes = filtered_pattern_indexes[in_range_mask]
     in_range_pattern_offsets = filtered_pattern_offsets[in_range_mask]
+    unique_pos_indexes = numpy.unique(pos_indexes)
 
     if in_range_pattern_indexes.size == 0:
         pat_lo = filtered_pattern_indexes[0]
@@ -284,25 +819,39 @@ def prepare_reconstruct_input(
         raise ValueError(
             'No probe positions overlap the diffraction pattern indexes; '
             f'pattern indexes span [{pat_lo}, {pat_hi}] and position indexes '
-            f'span [{lo}, {hi}].'
+            f'span [{unique_pos_indexes[0]}, {unique_pos_indexes[-1]}].'
         )
 
-    # When unique_pos_indexes.size == 1, lo == hi, so only pattern indexes
-    # equal to that single anchor survive the in_range trim -- and those
-    # match exactly, never requiring interpolation. So the "need >= 2
-    # anchors to interpolate" rule is enforced by the in_range trim itself;
-    # no separate guard is needed.
+    # With a single anchor the range is one index wide, so every surviving pattern
+    # index matches it exactly; the range trim enforces the "two anchors to
+    # interpolate" rule with no separate guard.
     exact_match = numpy.isin(in_range_pattern_indexes, unique_pos_indexes)
+    x_coords = coordinates[:, 0]
+    y_coords = coordinates[:, 1]
 
-    # numpy.interp returns the exact value at coincident xp entries and
-    # linearly interpolates between them. Out-of-range is impossible here
-    # because in_range_mask already trimmed to [lo, hi].
-    x_coords = numpy.interp(in_range_pattern_indexes, unique_pos_indexes, mean_x)
-    y_coords = numpy.interp(in_range_pattern_indexes, unique_pos_indexes, mean_y)
-    photon_counts: numpy.ndarray | None = None
-    if mean_photon_counts is not None:
-        photon_counts = numpy.interp(
-            in_range_pattern_indexes, unique_pos_indexes, mean_photon_counts
+    # Averaging duplicate-index photon counts uses the arithmetic mean because the
+    # position readers store per-trigger integrated *counts* over equal-length trigger
+    # windows -- each duplicate is an independent sample of the same per-trigger count.
+    # A harmonic or geometric mean would only apply if a future reader supplied true
+    # rates (Hz) over unequal integration windows. NaN placeholders (positions whose
+    # reader did not supply a count) propagate through the mean, marking the anchor
+    # invalid so any pattern index interpolated from it comes out NaN.
+    photon_counts: RealArrayType | None = None
+    if pos_photon_counts is not None:
+        _, photon_counts = interpolate_at_indexes(
+            pos_indexes, pos_photon_counts, filtered_pattern_indexes
+        )
+
+    probes = product.probes
+    if opr_weights_all is not None:
+        opr_weights = opr_weights_all[pos_keep]
+        _, mean_weights = interpolate_at_indexes(pos_indexes, opr_weights, filtered_pattern_indexes)
+        opr_weights_out = mean_weights.astype(opr_weights.dtype)
+
+        probes = ProbeEnsemble(
+            array=probes.get_array(),
+            opr_weights=opr_weights_out,
+            pixel_geometry=probes.get_pixel_geometry(),
         )
 
     n_averaged = pos_indexes.size - unique_pos_indexes.size
@@ -332,16 +881,18 @@ def prepare_reconstruct_input(
     product = Product(
         metadata=product.metadata,
         probe_positions=ProbePositionSequence(point_list),
-        # OPR weight rows are still array-indexed by the original scan
-        # ordering, not by the merged-and-interpolated subset. Correct only
-        # when matched positions are contiguous from zero with no
-        # interpolation; latent misalignment otherwise.
-        probes=product.probes,
+        probes=probes,
         object_=product.object_,
         losses=product.losses,
     )
 
-    return ReconstructInput(patterns, assembled_data.get_bad_pixels(), product)
+    return ReconstructInput(
+        patterns,
+        assembled_data.get_bad_pixels(),
+        product,
+        background=assembled_data.get_background(),
+        flat_field=assembled_data.get_flat_field(),
+    )
 
 
 def warn_if_propagation_regime_disagrees(
@@ -356,7 +907,9 @@ def warn_if_propagation_regime_disagrees(
     describes -- and the consequence is a reconstruction on the wrong sample-plane
     sampling, which fails as a bad image rather than as an error. The object-plane
     Fresnel number is the regime indicator: much less than one is far field, much
-    greater is near field.
+    greater is near field. A far-field declaration is judged at the detector distance,
+    because its sampling does not depend on the magnification and a focus only curves
+    the probe; a near-field one at the demagnified distance ``z_d / M``.
 
     Raising `far_field_fresnel_number` tolerates a more transitional geometry before
     objecting to a far-field declaration; lowering `near_field_fresnel_number` does the
@@ -370,7 +923,11 @@ def warn_if_propagation_regime_disagrees(
 
     try:
         probe_geometry = product.probes.get_geometry()
-        propagation_distance_m = metadata.detector_distance_m / metadata.magnification
+        propagation_distance_m = (
+            metadata.detector_distance_m
+            if metadata.far_field
+            else metadata.detector_distance_m / metadata.magnification
+        )
         fresnel_number = compute_full_aperture_fresnel_number(
             probe_geometry.get_pixel_geometry(),
             ImageExtent(width_px=probe_geometry.width_px, height_px=probe_geometry.height_px),
@@ -502,7 +1059,7 @@ class ReconstructionAmbiguities:
             1j * (self.phase_offset_rad + probe_ramp)
         )
         opr_weights = probes.get_opr_weights_or_none()
-        standardized_probes = ProbeSequence(
+        standardized_probes = ProbeEnsemble(
             array=(probe_array * probe_correction).astype(probe_array.dtype),
             opr_weights=None if opr_weights is None else opr_weights.copy(),
             pixel_geometry=probes.get_pixel_geometry().copy(),

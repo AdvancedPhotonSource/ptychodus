@@ -23,8 +23,8 @@ Run the `check-layers` skill after wiring to confirm you haven't accidentally in
 Create `src/ptychodus/model/<feature>/settings.py`. Follow the pattern in [src/ptychodus/model/analysis/settings.py](../../src/ptychodus/model/analysis/settings.py):
 
 ```python
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.settings import SettingsRegistry
+from ..observer import Observable, Observer
+from ..settings import SettingsRegistry
 
 
 class <Feature>Settings(Observable, Observer):
@@ -38,12 +38,16 @@ class <Feature>Settings(Observable, Observer):
             'NumberOfIterations', 1000, minimum=1
         )
         # create_real_parameter, create_boolean_parameter, create_string_parameter,
-        # create_path_parameter — see api/parametric.py for the full menu.
+        # create_path_parameter — see model/parameters.py for the full menu.
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:
             self.notify_observers()
 ```
+
+**Two idioms exist; this is the one to use.** A hand-written `*Settings` class, which builds its own group and names its own keys, backs every subsystem except the reconstructor backends. Those are migrating to the other idiom: the backend returns a nested pydantic object from `Reconstructor.get_default_options()` describing what it accepts, and `model/processing/` generates the live parameters, the INI keys and the display text from it. That path is reached only through `ProcessingParameterStore`, so a new `*Core` cannot use it — write the class above.
+
+What the new idiom is worth copying for is its discipline: a parameter states its bounds and its display text where it is declared, not in the controller that renders it. A hand-written class can do the first half today by passing `minimum=` and `maximum=`, and should.
 
 Preserve unit suffixes on physical quantities (e.g. `probe_energy_eV`, `pixel_width_m`) — CLAUDE.md notes these are accepted via `# noqa: N815` and reviewers expect them.
 
@@ -82,13 +86,15 @@ Create `src/ptychodus/controller/<feature>/` with the `*ViewController` that bri
 
 ## PluginChooser binding for settings-driven selection
 
-If your feature has a "current selected implementation" (e.g. current file reader), bind a `PluginChooser` to a `StringParameter` in your settings:
+If your feature has a "current selected implementation" (e.g. current file reader), take a `PluginChooser` (from `model/plugins.py`) and wrap it in a `PluginChooserParameter` over the backing `StringParameter`. For a registry category, `ModelCore` builds the chooser once, as `PluginChooser(self.plugin_registry.<category>)`, and passes it in; never wrap the same catalog a second time, because that second chooser would hold its own selection:
 
 ```python
-self.file_reader_chooser.synchronize_with_parameter(self.settings.file_type)
+self.file_reader_parameter = PluginChooserParameter(file_reader_chooser, self.settings.file_type)
 ```
 
-`synchronize_with_parameter` in [src/ptychodus/api/plugins.py](../../src/ptychodus/api/plugins.py) sets up the two-way binding: parameter value ↔ current plugin.
+A category the feature only looks plugins up in, with no selection, takes the read-only `PluginCatalog` from `api/plugins.py` instead of a chooser.
+
+`PluginChooserParameter` in [src/ptychodus/model/plugins.py](../../src/ptychodus/model/plugins.py) owns the two-way binding and the translation between the two name spaces: its own value space is display names, while the settings parameter stores the canonical simple name. The chooser itself holds no settings.
 
 ## Verify
 

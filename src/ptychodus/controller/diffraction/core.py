@@ -22,16 +22,16 @@ from ...model.diffraction import (
 )
 from .detector_extent import DetectorExtentSource
 from ...model.product import ProductRepository, ProductSettings
-from ...model.visualization import VisualizationEngine
-from ...view.diffraction import DiffractionView
-from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate, TaskStatusView
+from ..rendering import VisualizationEngine
+from ...view.diffraction import DiffractionImageView, DiffractionView
+from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate
 from ..data import FileDialogFactory
 from ..helpers import connect_triggered_signal
 from ..image import ImageController
 from ..parameters import CheckBoxParameterViewController
 from ..task_status import TaskStatusController
 from ..product.core import ProductRepositoryComboProxyModel, ProductRepositoryTableModel
-from .dataset import DiffractionTreeModel
+from .dataset import Column, DiffractionTreeModel
 from .dataset_editor import DatasetEditorViewController
 from .wizard import OpenDatasetWizardController
 
@@ -52,10 +52,8 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         diffraction_simulator: DiffractionSimulator,
         diffraction_simulator_settings: DiffractionSimulatorSettings,
         view: DiffractionView,
-        status_view: TaskStatusView,
-        image_controller: ImageController,
+        image_view: DiffractionImageView,
         summary_service: DiffractionSummaryService,
-        summary_visualization_engine: VisualizationEngine,
         status_bar: QStatusBar,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
@@ -69,7 +67,12 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         )
         self._diffraction_simulator = diffraction_simulator
         self._view = view
-        self._image_controller = image_controller
+        self._image_controller = ImageController(
+            VisualizationEngine(is_complex=False),
+            image_view.image_view,
+            status_bar,
+            file_dialog_factory,
+        )
         self._file_dialog_factory = file_dialog_factory
         self._per_dataset_observers: dict[int, _PerDatasetObserver] = {}
         self._wizard_controller = OpenDatasetWizardController(
@@ -80,11 +83,10 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
             diffraction_api,
             repository,
             summary_service,
-            summary_visualization_engine,
             status_bar,
             file_dialog_factory,
         )
-        self._status_controller = TaskStatusController(task_monitor, status_view)
+        self._status_controller = TaskStatusController(task_monitor, image_view.status_view)
         self._tree_model = DiffractionTreeModel(repository)
 
         view.tree_view.setModel(self._tree_model)
@@ -92,7 +94,7 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         header = view.tree_view.header()
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
         counts_item_delegate = ProgressBarItemDelegate(view.tree_view)
-        view.tree_view.setItemDelegateForColumn(1, counts_item_delegate)
+        view.tree_view.setItemDelegateForColumn(Column.COUNTS.index, counts_item_delegate)
         selection_model = view.tree_view.selectionModel()
 
         if selection_model is None:
@@ -202,8 +204,8 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         file_path, name_filter = self._file_dialog_factory.get_save_file_path(
             self._view,
             'Save Diffraction File',
-            name_filters=[nf for nf in self._diffraction_api.get_save_file_filters()],
-            selected_name_filter=self._diffraction_api.get_save_file_filter(),
+            name_filters=self._diffraction_api.file_writers.get_filters(),
+            selected_name_filter=self._diffraction_api.file_writers.get_filter(),
         )
 
         if file_path:

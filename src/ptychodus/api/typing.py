@@ -12,14 +12,23 @@ alias next to the class that produces or consumes it. See ``BadPixels``,
 in :mod:`ptychodus.api.diffraction` for the reference pattern.
 """
 
-from typing import Any, TypeAlias
+from typing import TypeAlias
 
 import numpy
 import numpy.typing
 
-BooleanArrayType: TypeAlias = numpy.typing.NDArray[numpy.bool_]
-IntegerArrayType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
-RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
-ComplexArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
-InexactArrayType: TypeAlias = numpy.typing.NDArray[numpy.inexact[Any]]
+BooleanArrayType: TypeAlias = numpy.typing.NDArray[numpy.bool]
+IntegerArrayType: TypeAlias = numpy.typing.NDArray[numpy.integer]
+RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating]
+ComplexArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating]
+InexactArrayType: TypeAlias = numpy.typing.NDArray[numpy.inexact]
 NumberArrayType: TypeAlias = numpy.typing.NDArray[numpy.number]
+
+AnyArrayType: TypeAlias = numpy.typing.NDArray[numpy.generic]
+"""An array of any dtype, for code that inspects one without constraining it.
+
+Reach for this only where no dtype family is promised: a step that branches on
+``dtype`` to decide what it was handed, or a file-format boundary that returns
+whatever a dataset happens to hold. It is a statement that the dtype is unknown,
+not a way to skip naming one that is known.
+"""

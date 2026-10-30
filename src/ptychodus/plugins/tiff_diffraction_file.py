@@ -20,6 +20,7 @@ from ptychodus.api.diffraction import (
     DiffractionPatterns,
     SimpleDiffractionDataset,
 )
+from ptychodus.api.files import FileFormat
 from ptychodus.api.plugins import PluginRegistry
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,15 @@ class TiffDiffractionPatternArray(DiffractionArray):
 
 
 class TiffDiffractionFileReader(DiffractionFileReader):
+    def __init__(self, description: str) -> None:
+        self._description = description
+
+    def get_file_description(self) -> str:
+        return self._description
+
+    def get_file_extensions(self) -> set[str]:
+        return FileFormat.TIFF.extensions
+
     def _get_file_series(self, file_path: Path) -> tuple[Mapping[int, Path], str]:
         """Collect the members of one numbered TIFF series, keyed by frame number.
 
@@ -139,26 +149,24 @@ class TiffDiffractionFileReader(DiffractionFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    file_reader = TiffDiffractionFileReader()
+    # One reader per registration: the series logic is stateless, so the instruments
+    # that write this format differ only in the name the filter shows.
     registry.diffraction_file_readers.register_plugin(
-        file_reader,
+        TiffDiffractionFileReader(FileFormat.TIFF.description),
         simple_name='TIFF',
-        display_name='Tagged Image File Format Files (*.tif *.tiff)',
     )
     registry.diffraction_file_readers.register_plugin(
-        file_reader,
+        TiffDiffractionFileReader('CNM/APS 26-ID-C Hard X-ray Nanoprobe Files'),
         simple_name='CNM_APS_HXN_TIFF',
-        display_name='CNM/APS 26-ID-C Hard X-ray Nanoprobe Files (*.tif *.tiff)',
     )
     registry.diffraction_file_readers.register_plugin(
-        file_reader,
+        TiffDiffractionFileReader('APS 34-ID-E Microdiffraction Files'),
         simple_name='APS_34IDE',
-        display_name='APS 34-ID-E Microdiffraction Files (*.tif *.tiff)',
     )
 
 
 if __name__ == '__main__':
     file_path = Path(sys.argv[1])
-    reader = TiffDiffractionFileReader()
+    reader = TiffDiffractionFileReader(FileFormat.TIFF.description)
     tiff_file = reader.read(file_path)
     print(tiff_file)

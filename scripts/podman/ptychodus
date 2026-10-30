@@ -364,11 +364,11 @@ if ! podman image exists "$IMAGE"; then
                 "$suffix" "$(list_or_none "$(versions_for_suffix "$suffix")")"
             printf '  Backends built for %s: %s\n' \
                 "$version_pin" "$(list_or_none "$(backends_for_version "$version_pin")")"
-            # Not `PTYCHODUS_VERSION=... scripts/podman/build`: over there the
-            # same variable only relabels the tag, so suggesting it would
-            # invite tagging current code as an old release.
-            printf '  Build it from a %s checkout with:\n' "$version_pin"
-            printf '    scripts/podman/build %s\n' "$suffix"
+            # The release images install the named release from PyPI, so any
+            # checkout can build an old version; only the dev image, which
+            # this lookup never selects, would need a checkout of it.
+            printf '  Build it from the repository root with:\n'
+            printf '    PTYCHODUS_VERSION=%s scripts/podman/build %s\n' "$version_pin" "$suffix"
         elif [[ -n "${suffix:-}" ]]; then
             printf 'ptychodus: no ptychodus:*-%s image found in rootless podman storage.\n' "$suffix"
             printf '  Build it from the repository root with:\n'

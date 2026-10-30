@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import math
 import os
 import signal
 import sys
@@ -31,27 +32,46 @@ import threading
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from types import FrameType
-from typing import Any, Final
+from typing import Any, cast, Final, Literal
 
 import numpy
 import yaml
-from ptychi.api import LSQMLOptions
+from ptychi.api import BHOptions, LSQMLOptions
 from ptychi.api.options.task import PtychographyTaskOptions
 
-from ptychodus.api.assemble import AssembledDiffractionData, summarize_dataset
+from ptychodus.api.accumulate import (
+    IncidentBeamEstimate,
+    compute_diffraction_moments,
+    estimate_incident_beam,
+)
+from ptychodus.api.assemble import (
+    AssembledDiffractionData,
+    DetectorCorrections,
+    DiffractionSummary,
+    suggest_crop_region,
+    summarize_dataset,
+)
 from ptychodus.api.diffraction import (
     BadPixels,
     BeamCenter,
     CropRegion,
     DiffractionDataset,
+    DiffractionPattern,
+    DiffractionPatternDType,
 )
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.io import StandardFileLayout, save_diffraction_data, save_product
 from ptychodus.api.preprocess.diffraction import FilterValuesStep, estimate_beam_center
+from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product
-from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
-from ptychodus.model.ptychi.algorithms import task_options_classes
-from ptychodus.model.ptychi.task import (
+from ptychodus.api.reconstruct import (
+    PositionIndexFilter,
+    ReconstructInput,
+    ReconstructOutput,
+    prepare_reconstruct_input,
+)
+from ptychodus.plugins.ptychi.algorithms import task_options_classes
+from ptychodus.plugins.ptychi.task import (
     align_task_options_with_product,
     dump_task_options_yaml,
     load_task_options,
@@ -61,6 +81,7 @@ from ptychodus.model.ptychi.task import (
 
 __all__ = [
     'CancellationToken',
+    'estimate_incident_beam_from_assembled_data',
     'add_print_ptychi_options_argument',
     'add_ptychi_options_argument',
     'format_ptychi_options_defaults',
@@ -68,12 +89,17 @@ __all__ = [
     'invalid_count_threshold',
     'is_main_process',
     'load_ptychi_options',
+    'pair_patterns_with_positions',
     'process_rank',
     'resolve_crop_region',
+    'resolve_ptychi_options_file',
     'resolve_quantity',
     'run_reconstruction',
     'save_assembled_diffraction',
+    'save_ptychi_options',
 ]
+
+logger = logging.getLogger(__name__)
 
 # The conventional "read it from stdin instead" filename, as argparse hands it over once a
 # bare ``-`` has been through ``type=Path``.
@@ -270,15 +296,159 @@ def resolve_quantity(
     raise ValueError(f'{quantity} is not in the file and has no default; pass {flag}.')
 
 
+def resolve_flag(
+    logger: logging.Logger,
+    quantity: str,
+    override: bool | None,
+    from_file: bool | None,
+    fallback: bool,
+    flag: str,
+    *,
+    level: int = logging.INFO,
+) -> bool:
+    """Pick a boolean from the command line, the file, or a fallback, and say which.
+
+    The boolean sibling of :func:`resolve_quantity`, with the same precedence and the
+    same reason for reporting it: a run that guessed the propagation regime must stay
+    distinguishable from one that read it off the instrument. Unlike a geometry
+    quantity there is always a fallback, so this never raises.
+    """
+    if override is not None:
+        logger.log(level, '%s: %s (from %s)', quantity, override, flag)
+        return override
+
+    if from_file is not None:
+        logger.log(level, '%s: %s (from the diffraction file)', quantity, from_file)
+        return from_file
+
+    logger.log(
+        level,
+        '%s: %s (built-in default for this instrument; the file recorded none). '
+        'Pass %s if this scan differs.',
+        quantity,
+        fallback,
+        flag,
+    )
+    return fallback
+
+
+def resolve_focus_object_distance_m(
+    logger: logging.Logger,
+    override: float | None,
+    from_file: float | None,
+    defocus_distance_m: float,
+    *,
+    rel_tol: float = 1.0e-6,
+    level: int = logging.INFO,
+) -> float:
+    """The signed focus position, which a focusing probe states in the opposite frame.
+
+    A probe built from a focusing optic is sampled `defocus_distance_m` past its
+    focus, so the focus sits that far upstream of the object: the same displacement,
+    negated. Deriving one from the other is what lets a user who already enters the
+    defocus -- which every zone-plate instrument does -- declare near field without
+    entering the distance twice in two sign conventions.
+
+    Precedence is the command line, then the file, then the derivation. An explicit
+    value disagreeing with the defocus beyond `rel_tol` is honored and reported: a
+    caller may be modelling a probe that deliberately does not match the geometry.
+
+    Call this only for a near-field run. In far field the focus position does not
+    enter the sampling, and deriving one would put a nonzero focus on every
+    far-field product built from a focusing optic for no reason.
+    """
+    derived_m = -defocus_distance_m
+
+    if override is not None:
+        if defocus_distance_m != 0.0 and not math.isclose(override, derived_m, rel_tol=rel_tol):
+            logger.warning(
+                'Focus-object distance (m): %g from --focus-object-distance-m, but the '
+                'probe defocus %g implies %g. Using the value given.',
+                override,
+                defocus_distance_m,
+                derived_m,
+            )
+        else:
+            logger.log(
+                level,
+                'Focus-object distance (m): %g (from --focus-object-distance-m)',
+                override,
+            )
+
+        return override
+
+    if from_file is not None:
+        logger.log(
+            level,
+            'Focus-object distance (m): %g (from the diffraction file)',
+            from_file,
+        )
+        return from_file
+
+    logger.log(
+        level,
+        'Focus-object distance (m): %g (from the probe defocus %g). Pass '
+        '--focus-object-distance-m to set it directly.',
+        derived_m,
+        defocus_distance_m,
+    )
+    return derived_m
+
+
+def _estimate_crop_region(
+    logger: logging.Logger,
+    mean_pattern: DiffractionPattern,
+    beam_center: BeamCenter,
+    detector_extent: ImageExtent,
+    bad_pixels: BadPixels,
+    value_filter: FilterValuesStep | None,
+    corrections: DetectorCorrections | None,
+) -> CropRegion:
+    """The power-of-two square about `beam_center` holding the signal in `mean_pattern`."""
+    try:
+        suggestion = suggest_crop_region(
+            mean_pattern,
+            beam_center,
+            detector_extent,
+            bad_pixels=bad_pixels,
+            value_filter=value_filter,
+            corrections=corrections,
+        )
+    except ValueError as exc:
+        raise ValueError(f'{exc} Give --crop-extent-px explicitly.') from exc
+
+    signal = suggestion.signal
+    region = suggestion.region
+    logger.info(
+        'Signal radius: %d px (ring mean above background %g by more than %g)',
+        signal.radius_px,
+        signal.noise_floor.median,
+        signal.threshold,
+    )
+
+    if suggestion.is_capped:
+        logger.warning(
+            'The signal reaches %d px from the beam center, past the largest power-of-two '
+            'square that fits on the detector; cropping to %d px',
+            signal.radius_px,
+            region.width_px,
+        )
+    else:
+        logger.info('Crop extent: %d px from the signal radius', region.width_px)
+
+    return region
+
+
 def resolve_crop_region(
     logger: logging.Logger,
     raw_dataset: DiffractionDataset,
     *,
-    crop_extent_px: int | None,
+    crop_extent_px: int | Literal['auto'] | None,
     beam_center_x_px: int | None,
     beam_center_y_px: int | None,
     bad_pixels: BadPixels | None,
     value_filter: FilterValuesStep | None,
+    corrections: DetectorCorrections | None = None,
     subject: str = 'dataset',
 ) -> CropRegion | None:
     """The detector region to read, or None to read the whole frame.
@@ -286,11 +456,25 @@ def resolve_crop_region(
     `subject` names what the beam center is estimated over, for the two log lines that say
     so: a caller that settles one region for a whole run of scans is not summarizing the
     same thing as a caller handling a single dataset.
+
+    An `auto` extent is the smallest power-of-two square about the beam center that holds
+    the signal above the noise floor of the mean pattern, capped at the largest that fits.
+    The mean pattern is cut by `value_filter` and corrected by `corrections` first, as the
+    assembled patterns are; one summary serves both that and any beam-center estimate.
     """
     if crop_extent_px is None:
         return None
 
     metadata = raw_dataset.get_metadata()
+    summary: DiffractionSummary | None = None
+
+    def get_summary() -> DiffractionSummary:
+        nonlocal summary
+
+        if summary is None:
+            summary = summarize_dataset(raw_dataset, bad_pixels=bad_pixels)
+
+        return summary
 
     # Beam center precedence: command line, then the file, then an estimate from the data.
     # The estimate is logged as such -- a wrong center crops the wrong part of the
@@ -306,16 +490,28 @@ def resolve_crop_region(
         # file. summarize_dataset inpaints the bad pixels that estimate_beam_center requires
         # the caller to have handled.
         logger.info('Summarizing the %s to estimate the beam center', subject)
-        summary = summarize_dataset(raw_dataset, bad_pixels=bad_pixels)
-        mean_pattern = (
-            summary.mean_pattern
-            if value_filter is None
-            else value_filter.apply(summary.mean_pattern)
+        mean_pattern = get_summary().mean_pattern
+        beam_center = estimate_beam_center(
+            mean_pattern if value_filter is None else value_filter.apply(mean_pattern)
         )
-        beam_center = estimate_beam_center(mean_pattern)
         center_source = f'an estimate over the whole {subject}'
 
     logger.info('Beam center: (%d, %d) from %s', beam_center.x_px, beam_center.y_px, center_source)
+
+    if crop_extent_px == 'auto':
+        if summary is None:
+            logger.info('Summarizing the %s to estimate the crop extent', subject)
+
+        region = _estimate_crop_region(
+            logger,
+            get_summary().mean_pattern,
+            beam_center,
+            metadata.detector_extent,
+            raw_dataset.get_bad_pixels() if bad_pixels is None else bad_pixels,
+            value_filter,
+            corrections,
+        )
+        crop_extent_px = region.width_px
 
     extent = ImageExtent(width_px=crop_extent_px, height_px=crop_extent_px)
 
@@ -339,7 +535,7 @@ def resolve_crop_region(
     return region
 
 
-def invalid_count_threshold(dtype: numpy.dtype) -> int | None:
+def invalid_count_threshold(dtype: DiffractionPatternDType) -> int | None:
     """Count at and above which a pixel is invalid rather than merely bright.
 
     Dectris detectors flag dead, masked and saturated pixels with the maximum value the
@@ -348,7 +544,8 @@ def invalid_count_threshold(dtype: numpy.dtype) -> int | None:
     the real beam as noise and silently returns the detector midpoint instead.
     """
     if numpy.issubdtype(dtype, numpy.integer):
-        return int(numpy.iinfo(dtype).max)
+        # issubdtype does not narrow the pattern dtype union for the checker.
+        return int(numpy.iinfo(cast(numpy.dtype[numpy.integer], dtype)).max)
 
     return None
 
@@ -362,7 +559,9 @@ _PTYCHI_OPTIONS_HELP = (
 
 
 def add_ptychi_options_argument(
-    parser: argparse.ArgumentParser, *, default_note: str = 'Defaults to stock LSQML.'
+    parser: argparse.ArgumentParser,
+    *,
+    default_note: str = 'Defaults to stock LSQML, or BH for a near-field reconstruction.',
 ) -> None:
     """Add ``--ptychi-options``, so its help text is written once rather than ten times.
 
@@ -384,6 +583,7 @@ def add_ptychi_options_argument(
 _DATA_DERIVED_OPTION_FIELDS: Final = (
     'data_options.wavelength_m',
     'data_options.free_space_propagation_distance_m',
+    'data_options.fft_shift',
     'object_options.pixel_size_m',
     'object_options.pixel_size_aspect_ratio',
     'object_options.slice_spacings_m',
@@ -480,8 +680,9 @@ def add_print_ptychi_options_argument(parser: argparse.ArgumentParser) -> None:
         metavar='ALGORITHM',
         help=(
             "Print this algorithm's default pty-chi options as YAML, then exit. "
-            f'Defaults to {_DEFAULT_PRINTED_ALGORITHM}. Redirect to a file, edit it, and '
-            'pass it back with --ptychi-options.'
+            f'Defaults to {_DEFAULT_PRINTED_ALGORITHM}; pass BH for the algorithm a '
+            'near-field run falls back to. Redirect to a file, edit it, and pass it '
+            'back with --ptychi-options.'
         ),
     )
 
@@ -507,15 +708,55 @@ def _decode_ptychi_options(text: str, options_file: Path) -> PtychographyTaskOpt
     return load_task_options(text)
 
 
-def load_ptychi_options(options_file: Path | None) -> PtychographyTaskOptions:
-    """Build a fresh options object, so per-scan edits never leak into the next scan."""
+def load_ptychi_options(
+    options_file: Path | None, *, far_field: bool = True
+) -> PtychographyTaskOptions:
+    """Build a fresh options object, so per-scan edits never leak into the next scan.
+
+    With no file the algorithm follows the propagation regime: BH for near field,
+    which reconstructs a hologram better than stock LSQML does, and LSQML otherwise.
+    This is a fallback, never an override -- an options file names its own algorithm
+    and always wins, because which algorithm to run is the user's choice.
+    """
     if options_file is None:
-        return LSQMLOptions()
+        if far_field:
+            return LSQMLOptions()
+
+        logger.info('No pty-chi options given; using BH for a near-field reconstruction.')
+        return BHOptions()
 
     if options_file == _STDIN_ARGUMENT:
         return _decode_ptychi_options(sys.stdin.read(), options_file)
 
     return _decode_ptychi_options(options_file.read_text(), options_file)
+
+
+def resolve_ptychi_options_file(
+    logger: logging.Logger, options_file: Path | None, input_directory: Path
+) -> Path | None:
+    """Pick the options file for a prepared directory, or `None` to fall back to stock options.
+
+    An explicit argument always wins, including the ``-`` that means stdin. Otherwise the
+    options staged in `input_directory` are used when they are there. A directory staged
+    by hand, or by a tool that chooses no algorithm, carries none, so their absence is
+    warned about rather than treated as an error.
+    """
+    if options_file is not None:
+        return options_file
+
+    staged_file = StandardFileLayout.PTYCHI_OPTIONS.path(input_directory)
+
+    if staged_file.is_file():
+        logger.info('Using the pty-chi options staged in %s', staged_file)
+        return staged_file
+
+    logger.warning(
+        'No %s in %s; reconstructing with stock options. '
+        'Pass --ptychi-options to choose another algorithm.',
+        StandardFileLayout.PTYCHI_OPTIONS.value,
+        input_directory,
+    )
+    return None
 
 
 def save_assembled_diffraction(
@@ -543,6 +784,93 @@ def save_assembled_diffraction(
     elif is_main_process():
         logger.info('Writing %s', diffraction_file)
         save_diffraction_data(diffraction_file, assembled_data)
+
+
+def estimate_incident_beam_from_assembled_data(
+    assembled_data: AssembledDiffractionData,
+    positions: ProbePositionSequence,
+    *,
+    i0_photons_per_count: float = 0.0,
+) -> IncidentBeamEstimate:
+    """The incident photon count and mean transmission the assembled patterns imply.
+
+    One pass accumulates their moments, and :func:`estimate_incident_beam` judges them
+    with the I0 the positions carry, calibrated by *i0_photons_per_count* when positive.
+
+    Raises:
+        ValueError: if no patterns were assembled.
+    """
+    moments = compute_diffraction_moments(
+        assembled_data.get_indexes(),
+        assembled_data.get_patterns(),
+        bad_pixels=assembled_data.get_bad_pixels(),
+        background=assembled_data.get_background(),
+        flat_field=assembled_data.get_flat_field(),
+    )
+
+    if moments is None:
+        raise ValueError('No diffraction patterns were assembled to estimate the beam from.')
+
+    return estimate_incident_beam(
+        moments,
+        positions.get_probe_photon_counts_by_index(),
+        i0_photons_per_count=i0_photons_per_count,
+    )
+
+
+def pair_patterns_with_positions(
+    logger: logging.Logger,
+    assembled_data: AssembledDiffractionData,
+    product: Product,
+    *,
+    index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
+) -> ReconstructInput:
+    """Pair the assembled patterns with the product's positions, and say if any went unpaired.
+
+    A shortfall is ordinary on a scan that was stopped mid-raster: the detector keeps the
+    line it was on, the position record truncates at its last completed line, and the
+    patterns past that end have no position to pair with. It is reported as a warning
+    rather than raised, because the patterns that did pair are still a valid scan. Patterns
+    an `index_filter` excludes on purpose are not counted as unpaired.
+    """
+    reconstruct_input = prepare_reconstruct_input(assembled_data, product, index_filter)
+    num_paired = reconstruct_input.diffraction_patterns.shape[0]
+    num_patterns = assembled_data.get_num_patterns()
+
+    if index_filter is PositionIndexFilter.ALL and num_paired < num_patterns:
+        logger.warning(
+            'Paired %d of %d assembled patterns; %d had no probe position, which is'
+            ' expected when the detector recorded more scan lines than the position file.',
+            num_paired,
+            num_patterns,
+            num_patterns - num_paired,
+        )
+
+    return reconstruct_input
+
+
+def save_ptychi_options(
+    logger: logging.Logger,
+    options: PtychographyTaskOptions,
+    product: Product,
+    output_directory: Path,
+) -> PtychographyTaskOptions:
+    """Align `options` against `product`, check them, and write them to ``ptychi_options.yaml``.
+
+    Returns the aligned options. Those are the ones a reconstruction runs: they carry the
+    object pixel size, the wavelength and the slice spacings the product supplied, which
+    the unaligned object does not. The write is confined to the main process; every rank
+    aligns, since every rank runs with the result.
+    """
+    task_options = align_task_options_with_product(options, product)
+    task_options.check()
+
+    if is_main_process():
+        options_file = StandardFileLayout.PTYCHI_OPTIONS.path(output_directory)
+        logger.info('Writing %s', options_file)
+        options_file.write_text(dump_task_options_yaml(task_options))
+
+    return task_options
 
 
 def run_reconstruction(
@@ -580,19 +908,8 @@ def run_reconstruction(
     reports progress without reimplementing this loop.
     """
     main_process = is_main_process()
-
-    options_file = StandardFileLayout.PTYCHI_OPTIONS.path(output_directory)
     product_file = StandardFileLayout.PRODUCT.path(output_directory)
-
-    task_options = align_task_options_with_product(options, reconstruct_input.product)
-    task_options.check()
-
-    if main_process:
-        # The aligned options are the ones that ran: they carry the object pixel size, the
-        # wavelength and the slice spacings the product supplied, which the unaligned object
-        # does not.
-        logger.info('Writing %s', options_file)
-        options_file.write_text(dump_task_options_yaml(task_options))
+    task_options = save_ptychi_options(logger, options, reconstruct_input.product, output_directory)
 
     num_epochs = int(task_options.reconstructor_options.num_epochs)
     logger.info(

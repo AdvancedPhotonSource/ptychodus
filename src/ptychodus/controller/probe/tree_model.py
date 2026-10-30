@@ -1,4 +1,5 @@
 from __future__ import annotations
+from enum import Enum
 from typing import Any, overload
 
 import numpy
@@ -57,6 +58,49 @@ def try_get_probe(item: ProbeRepositoryItem) -> Probe | None:
         return None
 
 
+class Column(Enum):
+    """Every column of ProbeTreeModel: its order, its header and whether it edits.
+
+    The member value pairs the header with editability, and the position comes
+    from declaration order rather than being written out, so a column cannot be added
+    to the ordering and forgotten in the labels or the editable set. Nothing could pin
+    that alignment: CLAUDE.md puts this file outside the tested surface.
+
+    Public because the controller installs item delegates on some of them.
+
+    ``editable`` is the item row's sense; a child row is governed by its own arm.
+    """
+
+    NAME = ('Name', True)
+    RELATIVE_POWER = ('Relative Power', False)
+    BUILDER = ('Builder', True)
+    DATA_TYPE = ('Data Type', False)
+    WIDTH_PX = ('Width [px]', False)
+    HEIGHT_PX = ('Height [px]', False)
+    PIXEL_WIDTH_NM = ('Pixel Width\n[nm]', False)
+    PIXEL_HEIGHT_NM = ('Pixel Height\n[nm]', False)
+    SIZE = ('Size', False)
+
+    def __init__(self, header: str, editable: bool) -> None:
+        self.header = header
+        self.editable = editable
+        # Members already defined when this one is constructed, which is its position.
+        self.index = len(self.__class__.__members__)
+
+    @classmethod
+    def from_index(cls, index: int) -> Column:
+        """The column at `index`.
+
+        Raises:
+            IndexError: for a column outside the table, which the model's own
+                ``columnCount`` makes impossible and so would be a bug rather than input.
+        """
+        if index < 0:
+            raise IndexError(f'Column index {index} is negative.')
+
+        return list(cls)[index]
+
+
 class ProbeTreeModel(QAbstractItemModel):
     def __init__(
         self,
@@ -70,17 +114,6 @@ class ProbeTreeModel(QAbstractItemModel):
         self._api = api
         self._editable_item_brush = editable_item_brush
         self._tree_root = ProbeTreeNode()
-        self._header = [
-            'Name',
-            'Relative Power',
-            'Builder',
-            'Data Type',
-            'Width [px]',
-            'Height [px]',
-            'Pixel Width\n[nm]',
-            'Pixel Height\n[nm]',
-            'Size',
-        ]
 
         for index, item in enumerate(repository):
             self.insert_item(index, item)
@@ -98,8 +131,13 @@ class ProbeTreeModel(QAbstractItemModel):
         self.endInsertRows()
 
     def update_item(self, index: int, item: ProbeRepositoryItem) -> None:
+        # Qt row/column bounds are inclusive, so the last valid column is
+        # len(Column) - 1. Asking index() for one past the end fails
+        # hasIndex and yields an invalid QModelIndex, which makes the
+        # dataChanged range malformed and the signal a no-op.
+        last_column = len(Column) - 1
         top_left = self.index(index, 0)
-        bottom_right = self.index(index, len(self._header))
+        bottom_right = self.index(index, last_column)
         self.dataChanged.emit(top_left, bottom_right)
 
         node = self._tree_root.children[index]
@@ -121,9 +159,11 @@ class ProbeTreeModel(QAbstractItemModel):
 
             self.endRemoveRows()
 
-        child_top_left = self.index(0, 0, top_left)
-        child_bottom_right = self.index(num_modes_new, len(self._header), top_left)
-        self.dataChanged.emit(child_top_left, child_bottom_right)
+        # Both corners were one past the end here, in row as well as column.
+        if num_modes_new > 0:
+            child_top_left = self.index(0, 0, top_left)
+            child_bottom_right = self.index(num_modes_new - 1, last_column, top_left)
+            self.dataChanged.emit(child_top_left, child_bottom_right)
 
     def remove_item(self, index: int, item: ProbeRepositoryItem) -> None:
         self.beginRemoveRows(QModelIndex(), index, index)
@@ -137,7 +177,7 @@ class ProbeTreeModel(QAbstractItemModel):
         role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            return self._header[section]
+            return Column.from_index(section).header
 
     @overload
     def parent(self, child: QModelIndex) -> QModelIndex: ...
@@ -181,10 +221,10 @@ class ProbeTreeModel(QAbstractItemModel):
             item = self._repository[parent.row()]
 
             if role == Qt.ItemDataRole.DisplayRole:
-                match index.column():
-                    case 0:
+                match Column.from_index(index.column()):
+                    case Column.NAME:
                         return f'Mode {index.row() + 1}'
-                    case 1:
+                    case Column.RELATIVE_POWER:
                         probe = try_get_probe(item)
                         if probe is None:
                             return None
@@ -193,7 +233,10 @@ class ProbeTreeModel(QAbstractItemModel):
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
                     return self._editable_item_brush
-            elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
+            elif (
+                role == Qt.ItemDataRole.UserRole
+                and Column.from_index(index.column()) is Column.RELATIVE_POWER
+            ):
                 probe = try_get_probe(item)
                 if probe is None:
                     return None
@@ -207,40 +250,43 @@ class ProbeTreeModel(QAbstractItemModel):
             pixel_geometry = probe.get_pixel_geometry() if probe is not None else None
 
             if role == Qt.ItemDataRole.DisplayRole:
-                match index.column():
-                    case 0:
+                match Column.from_index(index.column()):
+                    case Column.NAME:
                         return self._repository.get_name(index.row())
-                    case 1:
+                    case Column.RELATIVE_POWER:
                         if probe is None:
                             return None
                         coherent_percent = calc_coherent_percent(probe)
                         return f'{coherent_percent}%'
-                    case 2:
+                    case Column.BUILDER:
                         return item.get_builder().get_name()
-                    case 3:
+                    case Column.DATA_TYPE:
                         return str(probe.dtype) if probe is not None else None
-                    case 4:
+                    case Column.WIDTH_PX:
                         return probe.width_px if probe is not None else None
-                    case 5:
+                    case Column.HEIGHT_PX:
                         return probe.height_px if probe is not None else None
-                    case 6:
+                    case Column.PIXEL_WIDTH_NM:
                         return (
                             f'{LengthUnit.NANOMETER.convert(pixel_geometry.width_m):.4g}'
                             if pixel_geometry
                             else None
                         )
-                    case 7:
+                    case Column.PIXEL_HEIGHT_NM:
                         return (
                             f'{LengthUnit.NANOMETER.convert(pixel_geometry.height_m):.4g}'
                             if pixel_geometry
                             else None
                         )
-                    case 8:
+                    case Column.SIZE:
                         return format_bytes(probes.nbytes)
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
                     return self._editable_item_brush
-            elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
+            elif (
+                role == Qt.ItemDataRole.UserRole
+                and Column.from_index(index.column()) is Column.RELATIVE_POWER
+            ):
                 probe = try_get_probe(item)
                 if probe is None:
                     return None
@@ -252,7 +298,8 @@ class ProbeTreeModel(QAbstractItemModel):
         if index.isValid():
             parent = index.parent()
 
-            if not parent.isValid() and index.column() in (0, 2):
+            # Only item rows edit; a mode row has no editable column of its own.
+            if not parent.isValid() and Column.from_index(index.column()).editable:
                 value |= Qt.ItemFlag.ItemIsEditable
 
         return value
@@ -262,10 +309,12 @@ class ProbeTreeModel(QAbstractItemModel):
             parent = index.parent()
 
             if not parent.isValid():
-                if index.column() == 0:
+                column = Column.from_index(index.column())
+
+                if column is Column.NAME:
                     self._repository.set_name(index.row(), str(value))
                     return True
-                elif index.column() == 2:
+                elif column is Column.BUILDER:
                     self._api.build_probe(index.row(), str(value))
                     return True
 
@@ -279,4 +328,4 @@ class ProbeTreeModel(QAbstractItemModel):
         return len(node.children)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
-        return len(self._header)
+        return len(Column)

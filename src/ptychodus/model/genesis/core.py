@@ -3,11 +3,12 @@ import logging
 import queue
 import threading
 
-from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.api.plugins import PluginList
 
+from ..plugins import PluginChooser, PluginChooserParameter
 from ..processing import ProcessingAPI
 from ..product import ProductAPI
+from ..settings import SettingsRegistry
 from ..task_manager import TaskManager
 from .executor import GenesisExecutor
 from .facility_adapters import (
@@ -181,14 +182,17 @@ class GenesisCore:
         self._stop_event = threading.Event()
         self.settings = GenesisSettings(settings_registry)
 
-        self._facility_chooser = PluginChooser[IRIFacilityAdapter]()
-        self._transfer_client_chooser = PluginChooser[AmSCGlobusTransferClient]()
+        facilities = PluginList[IRIFacilityAdapter]()
+        transfer_clients = PluginList[AmSCGlobusTransferClient]()
 
         for name, adapter in create_facility_adapters(self.settings).items():
-            self._facility_chooser.register_plugin(adapter, display_name=name)
+            facilities.register_plugin(adapter, display_name=name)
 
         for name, provider in create_globus_transfer_providers().items():
-            self._transfer_client_chooser.register_plugin(provider, display_name=name)
+            transfer_clients.register_plugin(provider, display_name=name)
+
+        self._facility_chooser = PluginChooser(facilities)
+        self._transfer_client_chooser = PluginChooser(transfer_clients)
 
         # Both choosers are empty when the IRI tokens file is absent. Binding an empty
         # chooser is harmless but would log a spurious "invalid plugin name" warning,

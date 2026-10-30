@@ -662,3 +662,36 @@ class TestVisualizeComplexValues:
             amplitude_transform=ScalarTransformation.IDENTITY,
         )
         numpy.testing.assert_array_equal(vp.get_values(), arr)
+
+
+# ---------------------------------------------------------------------------
+# Display names
+# ---------------------------------------------------------------------------
+
+
+def test_transformation_names_are_those_the_desktop_registered() -> None:
+    """Simple names round-trip through settings, so they must not change."""
+    assert [t.simple_name for t in ScalarTransformation] == [
+        'identity',
+        'sqrt',
+        'log2',
+        'ln',
+        'log10',
+    ]
+    assert [t.display_name for t in ScalarTransformation] == [
+        'Identity',
+        'Square Root',
+        'Logarithm (Base 2)',
+        'Natural Logarithm',
+        'Logarithm (Base 10)',
+    ]
+
+
+def test_component_display_names() -> None:
+    assert [c.display_name for c in ComplexComponent] == [
+        'Real',
+        'Imaginary',
+        'Amplitude',
+        'Phase',
+        'Phase (Unwrapped)',
+    ]

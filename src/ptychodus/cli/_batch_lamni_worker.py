@@ -19,7 +19,7 @@ import os
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from multiprocessing import Queue
+    from multiprocessing.queues import SimpleQueue
 
 __all__ = ['reconstruct_scan']
 
@@ -52,15 +52,13 @@ def _redirect_console(output_directory: Any) -> None:
     sys.stderr = os.fdopen(os.dup(2), 'w', buffering=1)
 
 
-def reconstruct_scan(payload: dict[str, Any], queue: Queue[Any]) -> None:
+def reconstruct_scan(payload: dict[str, Any], queue: SimpleQueue[Any]) -> None:
     """Reconstruct the one scan this child was spawned for.
 
     Raising is how a failure is reported: the subprocess protocol marshals the exception
     back to the parent, which counts the scan as failed and, under
     ``misc.continue_on_error``, carries on with the rest.
     """
-    os.environ['CUDA_VISIBLE_DEVICES'] = payload['cuda_visible_devices']
-
     for name in _RANK_ENVIRONMENT_VARIABLES:
         os.environ.pop(name, None)
 
@@ -71,7 +69,10 @@ def reconstruct_scan(payload: dict[str, Any], queue: Queue[Any]) -> None:
     from ptychodus.api.diffraction import CropRegion
     from ptychodus.api.plugins import PluginRegistry
     from ptychodus.cli._batch_lamni_scan import ScanRequest, reconstruct_one_scan
-    from ptychodus.cli._batch_lamni_settings import load_batch_settings_from_text
+    from ptychodus.cli._batch_lamni_settings import (
+        WorkerMessage,
+        load_batch_settings_from_text,
+    )
     from ptychodus.cli._reconstruct_common import install_signal_handlers, load_ptychi_options
 
     settings = load_batch_settings_from_text(payload['settings_text'])
@@ -112,10 +113,14 @@ def reconstruct_scan(payload: dict[str, Any], queue: Queue[Any]) -> None:
         )
         bad_pixels = reader.read(Path(bad_pixels_file))
 
-    options = load_ptychi_options(None)
+    # `far_field` is three-valued in the settings; only an explicit False selects the
+    # near-field fallback, so a batch that says nothing stays on LSQML.
+    options = load_ptychi_options(
+        None, far_field=settings.metadata_overrides.far_field is not False
+    )
 
     if payload['ptychi_options_json'] is not None:
-        from ptychodus.model.ptychi.task import load_task_options
+        from ptychodus.plugins.ptychi.task import load_task_options
 
         options = load_task_options(payload['ptychi_options_json'])
 
@@ -135,4 +140,4 @@ def reconstruct_scan(payload: dict[str, Any], queue: Queue[Any]) -> None:
         cancellation=cancellation,
     )
 
-    queue.put(('output', {'scan_no': scan['scan_no'], 'completed': completed}))
+    queue.put((WorkerMessage.SCAN_RESULT, {'scan_no': scan['scan_no'], 'completed': completed}))

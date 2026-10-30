@@ -1,5 +1,14 @@
 # API Reference
 
+## Accumulate
+
+```{eval-rst}
+.. automodule:: ptychodus.api.accumulate
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Affine
 
 ```{eval-rst}
@@ -27,6 +36,15 @@
    :show-inheritance:
 ```
 
+## Devices
+
+```{eval-rst}
+.. automodule:: ptychodus.api.devices
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Diffraction
 
 ```{eval-rst}
@@ -40,6 +58,15 @@
 
 ```{eval-rst}
 .. automodule:: ptychodus.api.exit_codes
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+## Files
+
+```{eval-rst}
+.. automodule:: ptychodus.api.files
    :members:
    :undoc-members:
    :show-inheritance:
@@ -108,6 +135,15 @@
    :show-inheritance:
 ```
 
+## Moments
+
+```{eval-rst}
+.. automodule:: ptychodus.api.moments
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Object
 
 ```{eval-rst}
@@ -117,19 +153,19 @@
    :show-inheritance:
 ```
 
-## Observer
+## Parallax
 
 ```{eval-rst}
-.. automodule:: ptychodus.api.observer
+.. automodule:: ptychodus.api.parallax
    :members:
    :undoc-members:
    :show-inheritance:
 ```
 
-## Parameters
+## Patch
 
 ```{eval-rst}
-.. automodule:: ptychodus.api.parameters
+.. automodule:: ptychodus.api.patch
    :members:
    :undoc-members:
    :show-inheritance:
@@ -209,10 +245,10 @@
    :show-inheritance:
 ```
 
-## Settings
+## Spawn
 
 ```{eval-rst}
-.. automodule:: ptychodus.api.settings
+.. automodule:: ptychodus.api.spawn
    :members:
    :undoc-members:
    :show-inheritance:

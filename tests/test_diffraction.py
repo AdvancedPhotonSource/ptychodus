@@ -13,6 +13,7 @@ Behaviors verified for Fresnel-zone-plate (with central stop) patterns:
 """
 
 import numpy
+import pytest
 
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.diffraction import (
@@ -155,6 +156,42 @@ class TestNbytes:
 
         assert metadata.nbytes > 0
 
+    def test_metadata_nbytes_accounts_for_the_propagation_regime(self) -> None:
+        # Every optional field has to be summed, or nbytes drifts from the object it
+        # is reporting on as fields are added.
+        null = DiffractionMetadata.create_null()
+        declared = DiffractionMetadata(
+            num_patterns_per_array=null.num_patterns_per_array,
+            pattern_dtype=null.pattern_dtype,
+            detector_extent=null.detector_extent,
+            focus_object_distance_m=-1.0e-3,
+            far_field=False,
+        )
+
+        assert declared.nbytes > null.nbytes
+
+
+class TestPropagationRegimeDeclaration:
+    def test_defaults_to_undeclared(self) -> None:
+        # None means the file recorded nothing, which is what lets a caller tell a
+        # silent file apart from one that declares far field.
+        metadata = DiffractionMetadata.create_null()
+
+        assert metadata.focus_object_distance_m is None
+        assert metadata.far_field is None
+
+    def test_round_trips_a_near_field_declaration(self) -> None:
+        metadata = DiffractionMetadata(
+            num_patterns_per_array=[1],
+            pattern_dtype=numpy.dtype(numpy.uint16),
+            detector_extent=ImageExtent(width_px=4, height_px=4),
+            focus_object_distance_m=-0.021873,
+            far_field=False,
+        )
+
+        assert metadata.focus_object_distance_m == -0.021873
+        assert metadata.far_field is False
+
 
 class TestCropRegionFromCenterExtent:
     def test_combines_fields(self) -> None:
@@ -207,6 +244,30 @@ class TestCropRegionFromLargestPow2:
             BeamCenter(x_px=32, y_px=32), ImageExtent(width_px=128, height_px=40)
         )
         assert (region.width_px, region.height_px) == (16, 16)
+
+
+class TestCropRegionFromSmallestPow2:
+    _DETECTOR = ImageExtent(width_px=512, height_px=512)
+    _CENTER = BeamCenter(x_px=256, y_px=256)
+
+    @pytest.mark.parametrize(
+        ('radius_px', 'size_px'), [(0, 1), (1, 2), (2, 4), (32, 64), (33, 128), (256, 512)]
+    )
+    def test_rounds_the_diameter_up_to_a_power_of_two(self, radius_px: int, size_px: int) -> None:
+        region = CropRegion.from_smallest_pow2(self._CENTER, radius_px, self._DETECTOR)
+        assert (region.width_px, region.height_px) == (size_px, size_px)
+        assert (region.center_x_px, region.center_y_px) == (256, 256)
+
+    def test_caps_at_the_largest_square_that_fits(self) -> None:
+        # center (100, 256): from_largest_pow2 allows 2 * 100 = 200 -> 128.
+        center = BeamCenter(x_px=100, y_px=256)
+        region = CropRegion.from_smallest_pow2(center, 300, self._DETECTOR)
+        assert region == CropRegion.from_largest_pow2(center, self._DETECTOR)
+        assert region.width_px == 128
+
+    def test_center_on_boundary_returns_zero_size(self) -> None:
+        region = CropRegion.from_smallest_pow2(BeamCenter(x_px=0, y_px=32), 8, self._DETECTOR)
+        assert (region.width_px, region.height_px) == (0, 0)
 
 
 class TestCropRegionClampToDetectorExtent:

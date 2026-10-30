@@ -5,7 +5,7 @@ import logging
 import numpy
 
 from matplotlib.axes import Axes
-from matplotlib.backend_bases import DrawEvent
+from matplotlib.backend_bases import Event
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.lines import Line2D
 
@@ -20,11 +20,12 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ptychodus.api.probe import OPRModeSeries, ProbeSequence
+from ptychodus.api.files import FileFormat
+from ptychodus.api.probe import OPRModeSeries, ProbeEnsemble
 from ptychodus.api.typing import ComplexArrayType, IntegerArrayType, RealArrayType
 
 from ...model.analysis import OPRModeAnalyzer
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
 from ...view.probe import OPRModeDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
@@ -32,7 +33,7 @@ from ..image import ImageController
 
 logger = logging.getLogger(__name__)
 
-_SAVE_FILE_FILTER = 'NumPy Zipped Archive (*.npz)'
+_SAVE_FILE_FILTER = FileFormat.NPZ.file_filter
 
 # Positions sampled when fixing the color scale. A locked scale is what keeps playback
 # from flickering, and sampling is what keeps locking it cheap on a long scan; a position
@@ -85,7 +86,7 @@ class _BlittedMarker:
         self._artist = artist
         self._background = None
 
-    def _handle_draw(self, event: DrawEvent) -> None:
+    def _handle_draw(self, event: Event) -> None:
         # Any full draw invalidates the cache: a resize, a toolbar zoom, or a rebuild of
         # the figure. Recapture it, then put the animated artist back on top.
         self._background = self._canvas.copy_from_bbox(self._canvas.figure.bbox)
@@ -112,7 +113,6 @@ class OPRModeViewController:
     def __init__(
         self,
         analyzer: OPRModeAnalyzer,
-        engine: VisualizationEngine,
         file_dialog_factory: FileDialogFactory,
         parent: QWidget,
     ) -> None:
@@ -122,7 +122,7 @@ class OPRModeViewController:
 
         self._product_index = -1
         self._series: OPRModeSeries | None = None
-        self._probes: ProbeSequence | None = None
+        self._probes: ProbeEnsemble | None = None
         self._measured_photon_count: RealArrayType | None = None
         self._num_positions = 0
         self._was_playing_before_drag = False
@@ -178,13 +178,16 @@ class OPRModeViewController:
             self._frame_rate_spin_box,
             parent,
         )
+        # Complex so the dialog can render the composed mode and the deviation from its
+        # across-scan mean as wavefields: OPR moves amplitude and phase together, and the
+        # default 'Complex' renderer shows both at once.
+        self._engine = VisualizationEngine(is_complex=True)
         self._image_controller = ImageController(
-            engine,
+            self._engine,
             self._dialog.probe_view,
             self._dialog.status_bar,
             file_dialog_factory,
         )
-        self._engine = engine
         self._series_marker = _BlittedMarker(self._dialog.series_plot_view.figure_canvas)
         self._grid_marker = _BlittedMarker(self._dialog.scan_grid_plot_view.figure_canvas)
 
@@ -271,31 +274,25 @@ class OPRModeViewController:
 
     # ------------------------------------------------------------------ probe fields
 
-    def _get_basis(self) -> ComplexArrayType:
-        if self._probes is None:
-            raise ValueError('No probe ensemble!')
-
-        return self._probes.get_array()[:, 0, :, :]
-
     def _get_field(self, index: int) -> ComplexArrayType:
         """Complex field the image pane shows for probe position ``index``."""
         series = self._series
+        probes = self._probes
 
-        if series is None:
+        if series is None or probes is None:
             raise ValueError('No OPR mode series!')
 
-        basis = self._get_basis()
         display_view = self._dialog.display_view
 
         if display_view.basis_button.isChecked():
-            return basis[self._mode_spin_box.value() - 1]
+            return probes.get_opr_basis()[self._mode_spin_box.value() - 1]
 
         weight = series.opr_weight[index, :]
 
         if display_view.deviation_button.isChecked():
-            weight = weight - series.opr_weight.mean(axis=0)
+            weight = weight - series.get_mean_weight()
 
-        return numpy.tensordot(weight, basis, axes=1)
+        return probes.compose_opr_field(weight)
 
     def _lock_display_range(self) -> None:
         """Fix the color axis over the whole scan so playback does not flicker.

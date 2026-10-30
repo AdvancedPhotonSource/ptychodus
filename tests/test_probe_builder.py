@@ -7,7 +7,7 @@ ptychodus.api.simulate.probe are not safe to re-apply: generate_incoherent_probe
 re-orthogonalizes and renormalizes every mode to the decay profile, and
 generate_coherent_probe_modes fills its output with fresh Gaussian noise, keeps
 only coherent mode zero of its input, and regenerates the OPR weights from
-scratch. The guards in ProbeSequenceBuilder._condition_probe are what stop a
+scratch. The guards in ProbeEnsembleBuilder._condition_probe are what stop a
 converged OPR basis being replaced with noise.
 
 Second, FromMemoryProbeBuilder must never condition. It holds a probe that is
@@ -24,29 +24,48 @@ was reconstructed at.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
+import logging
+import math
 
 import numpy
 import pytest
 
-from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.accumulate import DiffractionMoments, compute_diffraction_moments
+from ptychodus.api.assemble import AssembledDiffractionData
+from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry
 from ptychodus.api.probe import (
     OPRWeightPolicy,
+    Probe,
     ProbeFileReader,
     ProbeGeometry,
     ProbeGeometryProvider,
-    ProbeSequence,
+    ProbeEnsemble,
 )
-from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.parameters import Parameter
+from ptychodus.api.plugins import PluginList, PluginRegistry
+from ptychodus.model.plugins import PluginChooser
+from ptychodus.model.settings import SettingsRegistry
+from ptychodus.model.declared import describe
 from ptychodus.model.product.probe.builder import (
     FromFileProbeBuilder,
     FromMemoryProbeBuilder,
-    ProbeSequenceBuilder,
+    ProbeEnsembleBuilder,
 )
 from ptychodus.model.product.probe import INCOHERENT_MODE_STRATEGY_NAMES
-from ptychodus.model.product.probe.disk import DiskProbeBuilder
-from ptychodus.model.product.probe.kb_mirror import KBMirrorProbeBuilder
+from ptychodus.api.simulate.probe import (
+    generate_average_pattern_probe,
+    generate_disk_probe,
+    generate_rectangular_probe,
+    generate_super_gaussian_probe,
+    propagate_probe,
+    rescale_probe_intensity,
+    resolve_defocus_distance_m,
+)
+from ptychodus.model.product.probe.builder_factory import ProbeBuilderFactory
+from ptychodus.model.product.probe.plugin import PluginProbeBuilder
 from ptychodus.model.product.probe.settings import ProbeSettings
+from ptychodus.plugins import probe as probe_plugins
 
 NUM_SCAN_POINTS = 7
 PROBE_PHOTON_COUNT = 1.0e6
@@ -67,6 +86,48 @@ def _make_rng() -> numpy.random.Generator:
     return numpy.random.default_rng(42)
 
 
+def _registry() -> PluginRegistry:
+    """Every probe generator, and empty preset choosers."""
+    registry = PluginRegistry()
+    probe_plugins.register_plugins(registry)
+    return registry
+
+
+def _make_factory(settings: ProbeSettings) -> ProbeBuilderFactory:
+    registry = _registry()
+    return ProbeBuilderFactory(
+        _make_rng(),
+        settings,
+        registry.probe_generators,
+        registry.fresnel_zone_plates,
+        registry.kb_mirrors,
+        PluginChooser(PluginList()),
+        PluginChooser(PluginList()),
+    )
+
+
+def _make_builder(name: str, settings: ProbeSettings) -> PluginProbeBuilder:
+    """The builder the factory offers as *name*, reading *settings*."""
+    builder = _make_factory(settings).create(name, has_diffraction_data=True)
+    assert isinstance(builder, PluginProbeBuilder)
+    return builder
+
+
+def _settings_parameters(settings: ProbeSettings) -> dict[str, Parameter[Any]]:
+    """Every generator's settings parameters by key, the ones the factory declares.
+
+    Declaring is idempotent, so these are the same objects a factory built on *settings*
+    copies its builders' parameters from.
+    """
+    parameters: dict[str, Parameter[Any]] = {}
+
+    for plugin in _registry().probe_generators:
+        described = describe(plugin.strategy.get_default_options(), expand_num=True)
+        parameters.update(settings.declare(described))
+
+    return parameters
+
+
 class _StubProbeGeometryProvider(ProbeGeometryProvider):
     """A ready geometry provider, so the builders never hit the not-yet-bound guard."""
 
@@ -75,9 +136,30 @@ class _StubProbeGeometryProvider(ProbeGeometryProvider):
         *,
         probe_photon_count: float = PROBE_PHOTON_COUNT,
         pixel_size_m: float = PIXEL_SIZE_M,
+        focus_object_distance_m: float = 0.0,
+        assembled_data: AssembledDiffractionData | None = None,
     ) -> None:
         self._probe_photon_count = probe_photon_count
         self._pixel_size_m = pixel_size_m
+        self._focus_object_distance_m = focus_object_distance_m
+        self._assembled_data = assembled_data
+
+    def get_assembled_data(self) -> AssembledDiffractionData | None:
+        return self._assembled_data
+
+    def get_diffraction_moments(self) -> DiffractionMoments | None:
+        data = self._assembled_data
+
+        if data is None:
+            return None
+
+        return compute_diffraction_moments(
+            data.get_indexes(),
+            data.get_patterns(),
+            bad_pixels=data.get_bad_pixels(),
+            background=data.get_background(),
+            flat_field=data.get_flat_field(),
+        )
 
     @property
     def detector_distance_m(self) -> float:
@@ -86,6 +168,10 @@ class _StubProbeGeometryProvider(ProbeGeometryProvider):
     @property
     def far_field(self) -> bool:
         return True
+
+    @property
+    def focus_object_distance_m(self) -> float:
+        return self._focus_object_distance_m
 
     @property
     def probe_photon_count(self) -> float:
@@ -121,7 +207,7 @@ def _make_probe_seq(
     *,
     with_opr_weights: bool = False,
     num_positions: int = NUM_SCAN_POINTS,
-) -> ProbeSequence:
+) -> ProbeEnsemble:
     """A deterministic, non-degenerate probe of the requested mode structure.
 
     ``num_positions`` sizes the OPR weights, so passing something other than
@@ -137,7 +223,7 @@ def _make_probe_seq(
         opr_weights = rng.normal(size=(num_positions, num_cmodes))
         opr_weights[:, 0] = 1.0
 
-    return ProbeSequence(
+    return ProbeEnsemble(
         array=array,
         opr_weights=opr_weights,
         pixel_geometry=PixelGeometry(width_m=PIXEL_SIZE_M, height_m=PIXEL_SIZE_M),
@@ -145,16 +231,22 @@ def _make_probe_seq(
 
 
 class _StubProbeFileReader(ProbeFileReader):
-    def __init__(self, probe_seq: ProbeSequence) -> None:
+    def __init__(self, probe_seq: ProbeEnsemble) -> None:
         self._probe_seq = probe_seq
 
-    def read(self, file_path: Path) -> ProbeSequence:
+    def get_file_description(self) -> str:
+        return 'Stub Probe Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.npy'}
+
+    def read(self, file_path: Path) -> ProbeEnsemble:
         return self._probe_seq
 
 
 def _make_from_file_builder(
     settings: ProbeSettings,
-    probe_seq: ProbeSequence,
+    probe_seq: ProbeEnsemble,
     *,
     opr_weight_policy: OPRWeightPolicy | None = None,
 ) -> FromFileProbeBuilder:
@@ -166,7 +258,7 @@ def _make_from_file_builder(
     )
 
 
-def _total_intensity(probe_seq: ProbeSequence) -> float:
+def _total_intensity(probe_seq: ProbeEnsemble) -> float:
     return float(numpy.sum(numpy.abs(probe_seq.get_array()) ** 2))
 
 
@@ -174,7 +266,7 @@ def test_generator_expands_incoherent_modes() -> None:
     """The refactor moved mode generation out of each generator's tail and into
     the base pipeline; generators must still come back multimodal."""
     settings = _make_settings()
-    builder = DiskProbeBuilder(_make_rng(), settings)
+    builder = _make_builder('disk', settings)
     builder.num_incoherent_modes.set_value(4)
 
     probe_seq = builder.build(_StubProbeGeometryProvider())
@@ -185,7 +277,7 @@ def test_generator_expands_incoherent_modes() -> None:
 
 def test_generator_expands_coherent_modes() -> None:
     settings = _make_settings()
-    builder = DiskProbeBuilder(_make_rng(), settings)
+    builder = _make_builder('disk', settings)
     builder.num_coherent_modes.set_value(3)
 
     probe_seq = builder.build(_StubProbeGeometryProvider())
@@ -201,7 +293,7 @@ def test_generator_rescales_to_photon_count() -> None:
     """rescale_probe_intensity was duplicated in all seven generator tails and is
     now a single base helper; the generative path must still be normalized."""
     settings = _make_settings()
-    builder = DiskProbeBuilder(_make_rng(), settings)
+    builder = _make_builder('disk', settings)
 
     probe_seq = builder.build(_StubProbeGeometryProvider())
 
@@ -316,6 +408,56 @@ def test_from_memory_builder_ignores_conditioning() -> None:
     assert numpy.array_equal(probe_seq.get_opr_weights(), raw.get_opr_weights())
 
 
+def test_making_a_from_memory_probe_editable_changes_nothing_until_a_count_is_raised() -> None:
+    settings = _make_settings()
+    settings.num_incoherent_modes.set_value(6)
+    raw = _make_probe_seq(1, 2)
+    builder = FromMemoryProbeBuilder(_make_rng(), settings, raw)
+
+    builder.make_editable()
+
+    assert builder.is_editable
+    assert builder.num_incoherent_modes.get_value() == 2
+    assert builder.num_coherent_modes.get_value() == 1
+    probe_seq = builder.build(_StubProbeGeometryProvider())
+    assert numpy.array_equal(probe_seq.get_array(), raw.get_array())
+
+
+def test_an_editable_from_memory_probe_takes_on_more_modes_and_keeps_its_own() -> None:
+    raw = _make_probe_seq(1, 2)
+    builder = FromMemoryProbeBuilder(_make_rng(), _make_settings(), raw)
+    builder.make_editable()
+    builder.num_incoherent_modes.set_value(4)
+    # The fixture's random modes are not mutually orthogonal, and orthogonalizing them
+    # would change the second; a solved probe's modes already are.
+    builder.orthogonalize_incoherent_modes.set_value(False)
+
+    probe_seq = builder.build(_StubProbeGeometryProvider())
+
+    # The modes it had are kept in shape and order, and the beam's total power is not
+    # changed by how many modes represent it.
+    assert probe_seq.num_incoherent_modes == 4
+    expected = raw.get_array()[0]
+    actual = probe_seq.get_array()[0]
+
+    for kept, original in zip(actual[:2], expected, strict=True):
+        overlap = abs(numpy.vdot(kept, original)) / (
+            numpy.linalg.norm(kept) * numpy.linalg.norm(original)
+        )
+        assert overlap == pytest.approx(1.0, abs=1e-9)
+
+    assert numpy.sum(numpy.abs(actual) ** 2) == pytest.approx(numpy.sum(numpy.abs(expected) ** 2))
+
+
+def test_a_copy_of_an_editable_builder_is_editable() -> None:
+    builder = FromMemoryProbeBuilder(_make_rng(), _make_settings(), _make_probe_seq(1, 1))
+    assert not builder.copy().is_editable
+
+    builder.make_editable()
+
+    assert builder.copy().is_editable
+
+
 def test_repeated_from_memory_builds_are_idempotent() -> None:
     """The reconstruct loop rebuilds the output item's probe once per iteration;
     conditioning must not accumulate across those rebuilds."""
@@ -340,12 +482,12 @@ def test_copy_preserves_mode_parameters(builder_name: str) -> None:
     """copy() iterates parameters() generically and now also has to carry the rng
     hoisted into the base, so the copy must still build."""
     settings = _make_settings()
-    builder: ProbeSequenceBuilder
+    builder: ProbeEnsembleBuilder
 
     if builder_name == 'disk':
-        builder = DiskProbeBuilder(_make_rng(), settings)
+        builder = _make_builder('disk', settings)
     elif builder_name == 'kb_mirror':
-        builder = KBMirrorProbeBuilder(_make_rng(), settings, PluginChooser())
+        builder = _make_builder('kb_mirror', settings)
     else:
         builder = _make_from_file_builder(settings, _make_probe_seq(1, 1))
 
@@ -367,7 +509,7 @@ def test_from_file_builder_resamples_a_probe_sampled_at_another_pixel_size() -> 
     physical size; this is the regrid the builder's TODO used to defer."""
     settings = _make_settings()
     source = _make_probe_seq(1, 1)
-    coarse = ProbeSequence(
+    coarse = ProbeEnsemble(
         array=source.get_array(),
         opr_weights=None,
         pixel_geometry=PixelGeometry(width_m=2.0 * PIXEL_SIZE_M, height_m=2.0 * PIXEL_SIZE_M),
@@ -389,7 +531,7 @@ def test_from_file_builder_leaves_a_probe_without_a_pixel_size_alone() -> None:
     returning the array verbatim."""
     settings = _make_settings()
     source = _make_probe_seq(1, 1)
-    bare = ProbeSequence(array=source.get_array(), opr_weights=None, pixel_geometry=None)
+    bare = ProbeEnsemble(array=source.get_array(), opr_weights=None, pixel_geometry=None)
     builder = _make_from_file_builder(settings, bare)
 
     probe_seq = builder.build(_StubProbeGeometryProvider())
@@ -413,7 +555,7 @@ class TestIncoherentModeDecaySettings:
         settings.incoherent_mode_decay_type.set_value(decay_type)
         settings.incoherent_mode_decay_ratio.set_value(decay_ratio)
 
-        probe_seq = DiskProbeBuilder(_make_rng(), settings).build(_StubProbeGeometryProvider())
+        probe_seq = _make_builder('disk', settings).build(_StubProbeGeometryProvider())
         array = probe_seq.get_probe_no_opr().get_array()
         powers = numpy.array([numpy.square(numpy.abs(mode)).sum() for mode in array])
         return powers / powers.sum()
@@ -450,15 +592,15 @@ class TestIncoherentModeDecaySettings:
             settings.incoherent_mode_decay_type.set_value(decay_type)
             settings.incoherent_mode_decay_ratio.set_value(decay_ratio)
 
-            probe_seq = DiskProbeBuilder(_make_rng(), settings).build(_StubProbeGeometryProvider())
+            probe_seq = _make_builder('disk', settings).build(_StubProbeGeometryProvider())
             total = numpy.square(numpy.abs(probe_seq.get_array())).sum()
 
             assert total == pytest.approx(PROBE_PHOTON_COUNT, rel=1e-9)
 
 
 class TestKBMirrorProbeBuilder:
-    def _build(self, settings: ProbeSettings) -> ProbeSequence:
-        builder = KBMirrorProbeBuilder(_make_rng(), settings, PluginChooser())
+    def _build(self, settings: ProbeSettings) -> ProbeEnsemble:
+        builder = _make_builder('kb_mirror', settings)
         return builder.build(_StubProbeGeometryProvider(pixel_size_m=KB_PIXEL_SIZE_M))
 
     def test_builds_a_probe_at_the_requested_photon_count(self) -> None:
@@ -480,8 +622,12 @@ class TestKBMirrorProbeBuilder:
 
         def fwhm_px(acceptance_length_m: float) -> int:
             settings = _make_settings()
-            settings.kb_horizontal_acceptance_length_m.set_value(acceptance_length_m)
-            settings.kb_vertical_acceptance_length_m.set_value(acceptance_length_m)
+            _settings_parameters(settings)['HorizontalAcceptanceLengthInMeters'].set_value(
+                acceptance_length_m
+            )
+            _settings_parameters(settings)['VerticalAcceptanceLengthInMeters'].set_value(
+                acceptance_length_m
+            )
             array = self._build(settings).get_probe_no_opr().get_array()
             cut = numpy.square(numpy.abs(array[0]))[PROBE_EXTENT_PX // 2, :]
             return int(numpy.count_nonzero(cut >= 0.5 * cut.max()))
@@ -491,13 +637,13 @@ class TestKBMirrorProbeBuilder:
     def test_an_aperture_too_large_for_the_grid_is_refused(self) -> None:
         """The pupil window is lambda*z/dx_probe, so a coarse probe grid cannot hold a
         high-aperture optic; clipping it silently would quietly change the optic."""
-        builder = KBMirrorProbeBuilder(_make_rng(), _make_settings(), PluginChooser())
+        builder = _make_builder('kb_mirror', _make_settings())
 
         with pytest.raises(ValueError, match='does not fit the pupil window'):
             builder.build(_StubProbeGeometryProvider())
 
     def test_presets_are_empty_until_optics_are_registered(self) -> None:
-        builder = KBMirrorProbeBuilder(_make_rng(), _make_settings(), PluginChooser())
+        builder = _make_builder('kb_mirror', _make_settings())
 
         assert list(builder.labels_for_presets()) == []
 
@@ -510,7 +656,7 @@ class TestIncoherentModeStrategySettings:
         settings.incoherent_mode_decay_type.set_value('Exponential')
         settings.incoherent_mode_decay_ratio.set_value(0.5)
 
-        probe_seq = DiskProbeBuilder(_make_rng(), settings).build(_StubProbeGeometryProvider())
+        probe_seq = _make_builder('disk', settings).build(_StubProbeGeometryProvider())
         array = probe_seq.get_probe_no_opr().get_array()
         powers = numpy.array([numpy.square(numpy.abs(mode)).sum() for mode in array])
         return powers / powers.sum()
@@ -526,7 +672,7 @@ class TestIncoherentModeStrategySettings:
 
         for name in INCOHERENT_MODE_STRATEGY_NAMES:
             settings.incoherent_mode_strategy.set_value(name)
-            builder = DiskProbeBuilder(_make_rng(), settings)
+            builder = _make_builder('disk', settings)
             resolved.append(type(builder._create_imode_strategy()))
 
         assert len(set(resolved)) == len(INCOHERENT_MODE_STRATEGY_NAMES)
@@ -539,11 +685,12 @@ class TestIncoherentModeStrategySettings:
         assert numpy.all(numpy.isfinite(powers))
 
     def test_the_decay_driven_strategies_follow_the_decay_settings(self) -> None:
-        """Both read the decay profile, so both land on the same weights."""
+        """Each reads the decay profile, so all land on the same weights."""
         expected = [4 / 7, 2 / 7, 1 / 7]
 
         numpy.testing.assert_allclose(self._mode_powers('MomentPolynomial'), expected, rtol=1e-9)
         numpy.testing.assert_allclose(self._mode_powers('RandomPhaseRamp'), expected, rtol=1e-9)
+        numpy.testing.assert_allclose(self._mode_powers('Derivative'), expected, rtol=1e-9)
 
     def test_gaussian_schell_predicts_its_own_spectrum(self) -> None:
         """It ignores the decay profile, so its weights must differ from the others."""
@@ -567,7 +714,7 @@ class TestIncoherentModeStrategySettings:
         settings.incoherent_mode_strategy.set_value('GaussianSchell')
         settings.gaussian_schell_beam_width_m.set_value(0.0)
 
-        probe_seq = DiskProbeBuilder(_make_rng(), settings).build(_StubProbeGeometryProvider())
+        probe_seq = _make_builder('disk', settings).build(_StubProbeGeometryProvider())
 
         assert probe_seq.num_incoherent_modes == 3
         assert _total_intensity(probe_seq) == pytest.approx(PROBE_PHOTON_COUNT)
@@ -577,7 +724,7 @@ OTHER_SCAN_POSITIONS = NUM_SCAN_POINTS + 4
 """A probe-position count that is deliberately not this run's."""
 
 
-def _opr_from_another_scan(num_cmodes: int = 3, num_imodes: int = 2) -> ProbeSequence:
+def _opr_from_another_scan(num_cmodes: int = 3, num_imodes: int = 2) -> ProbeEnsemble:
     return _make_probe_seq(
         num_cmodes, num_imodes, with_opr_weights=True, num_positions=OTHER_SCAN_POSITIONS
     )
@@ -601,7 +748,7 @@ def test_from_file_builder_conforms_opr_weights_from_another_scan(
 
     weights = probe_seq.get_opr_weights()
     assert weights.shape == (NUM_SCAN_POINTS, 3)
-    assert len(probe_seq) == NUM_SCAN_POINTS
+    assert probe_seq.num_opr_positions == NUM_SCAN_POINTS
     # The default is AVERAGE, so every position starts from the same row.
     numpy.testing.assert_allclose(
         weights,
@@ -722,3 +869,452 @@ def test_from_memory_builder_is_untouched_when_the_counts_agree() -> None:
         probe_seq = builder.build(provider)
         numpy.testing.assert_array_equal(probe_seq.get_opr_weights(), in_memory.get_opr_weights())
         numpy.testing.assert_array_equal(probe_seq.get_array(), in_memory.get_array())
+
+
+class TestFocusDistanceResolution:
+    """Which of the two frames the focus is stated in wins, and when.
+
+    A focusing builder's defocus and the product's focus-object distance are the
+    same displacement with opposite signs. The product owns the geometry the
+    reconstruction runs on, so it owns this too -- except where it declares no
+    focusing optic, which cannot describe a focused probe.
+    """
+
+    def test_a_silent_product_leaves_the_builder_value_alone(self) -> None:
+        # Zero means no focusing optic, which is every far-field configuration
+        # written before the product carried this at all.
+        assert resolve_defocus_distance_m(_StubProbeGeometryProvider(), 8.0e-4) == 8.0e-4
+
+    def test_the_product_wins_when_it_declares_a_focus(self) -> None:
+        provider = _StubProbeGeometryProvider(focus_object_distance_m=-8.0e-4)
+
+        assert resolve_defocus_distance_m(provider, 0.0) == pytest.approx(8.0e-4)
+
+    def test_the_sign_flips_between_the_two_frames(self) -> None:
+        """A focus upstream of the object is a probe sampled downstream of the focus."""
+        upstream = _StubProbeGeometryProvider(focus_object_distance_m=-8.0e-4)
+        downstream = _StubProbeGeometryProvider(focus_object_distance_m=+8.0e-4)
+
+        assert resolve_defocus_distance_m(upstream, 0.0) > 0.0
+        assert resolve_defocus_distance_m(downstream, 0.0) < 0.0
+
+    def test_agreement_is_quiet(self, caplog: pytest.LogCaptureFixture) -> None:
+        provider = _StubProbeGeometryProvider(focus_object_distance_m=-8.0e-4)
+
+        with caplog.at_level(logging.WARNING, logger='ptychodus.model.product.probe.builder'):
+            resolve_defocus_distance_m(provider, 8.0e-4)
+
+        assert not caplog.records
+
+    def test_disagreement_warns_and_the_product_still_wins(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        provider = _StubProbeGeometryProvider(focus_object_distance_m=-8.0e-4)
+
+        with caplog.at_level(logging.WARNING, logger='ptychodus.model.product.probe.builder'):
+            resolved = resolve_defocus_distance_m(provider, 9.0e-4)
+
+        assert resolved == pytest.approx(8.0e-4)
+        assert len(caplog.records) == 1
+
+
+def _every_builder(settings: ProbeSettings) -> list[ProbeEnsembleBuilder]:
+    """One of each builder the factory offers, all reading the same settings."""
+    factory = _make_factory(settings)
+    return [factory.create(name, has_diffraction_data=True) for name in factory]
+
+
+class TestPropagationDistanceIsSeparateFromDefocus:
+    """Defocus and propagation are two settings that never stand in for each other.
+
+    Defocus is the curvature of the beam a builder models; propagation moves the
+    plane of a field already formed. Sharing one key once let editing a disk probe's
+    propagation move a zone-plate probe's focus, so every builder reads each key on
+    its own, whichever of the two it offers.
+    """
+
+    def test_every_builder_offers_at_least_one_of_the_two(self) -> None:
+        builders = _every_builder(_make_settings())
+
+        assert any('defocus_distance_m' in builder.parameters() for builder in builders)
+        assert any('propagation_distance_m' in builder.parameters() for builder in builders)
+
+    def test_setting_the_propagation_never_moves_a_defocus(self) -> None:
+        settings = _make_settings()
+        _settings_parameters(settings)['PropagationDistanceInMeters'].set_value(5.0e-5)
+
+        for builder in _every_builder(settings):
+            parameters = builder.parameters()
+
+            if 'defocus_distance_m' in parameters:
+                assert parameters['defocus_distance_m'].get_value() == 0.0, builder.get_name()
+
+            if 'propagation_distance_m' in parameters:
+                assert parameters['propagation_distance_m'].get_value() == pytest.approx(5.0e-5), (
+                    builder.get_name()
+                )
+
+    def test_setting_the_defocus_never_moves_a_propagation(self) -> None:
+        settings = _make_settings()
+        _settings_parameters(settings)['DefocusDistanceInMeters'].set_value(5.0e-5)
+
+        for builder in _every_builder(settings):
+            parameters = builder.parameters()
+
+            if 'propagation_distance_m' in parameters:
+                assert parameters['propagation_distance_m'].get_value() == 0.0, builder.get_name()
+
+            if 'defocus_distance_m' in parameters:
+                assert parameters['defocus_distance_m'].get_value() == pytest.approx(5.0e-5), (
+                    builder.get_name()
+                )
+
+    def test_the_focusing_builders_ignore_the_propagation_key(self) -> None:
+        settings = _make_settings()
+        _settings_parameters(settings)['PropagationDistanceInMeters'].set_value(5.0e-5)
+
+        builder = _make_builder('kb_mirror', settings)
+
+        assert builder.parameters()['defocus_distance_m'].get_value() == 0.0
+        assert 'propagation_distance_m' not in builder.parameters()
+
+
+# Past the 1 mm the disk needs to stay unaliased on the stub's 100 nm grid, and short
+# of the 2.5 mm where its Fresnel number drops below one.
+_PARAMETRIC_DEFOCUS_M = 2.0e-3
+
+
+def _make_parametric_builder(name: str, settings: ProbeSettings) -> PluginProbeBuilder:
+    builder: PluginProbeBuilder
+
+    match name:
+        case 'disk':
+            builder = _make_builder('disk', settings)
+        case 'rectangular':
+            builder = _make_builder('rectangular', settings)
+        case 'super_gaussian':
+            builder = _make_builder('super_gaussian', settings)
+            # The 400 um default would fill the grid edge to edge; at 0.6 um the 1 %
+            # tail still stays unaliased at the test defocus.
+            builder.parameters()['full_width_at_half_maximum_m'].set_value(0.6e-6)
+        case _:
+            raise ValueError(name)
+
+    return builder
+
+
+def _flat_amplitude(builder: PluginProbeBuilder) -> Probe:
+    """The builder's amplitude as its generator alone produces it."""
+    geometry = _StubProbeGeometryProvider().get_probe_geometry()
+
+    if builder.get_name() == 'disk':
+        return generate_disk_probe(
+            geometry, radius_m=builder.parameters()['diameter_m'].get_value() / 2.0
+        )
+    elif builder.get_name() == 'rectangular':
+        return generate_rectangular_probe(
+            geometry,
+            width_m=builder.parameters()['width_m'].get_value(),
+            height_m=builder.parameters()['height_m'].get_value(),
+        )
+    else:
+        return generate_super_gaussian_probe(
+            geometry,
+            annular_radius_m=builder.parameters()['annular_radius_m'].get_value(),
+            fwhm_m=builder.parameters()['full_width_at_half_maximum_m'].get_value(),
+            order_parameter=builder.parameters()['order_parameter'].get_value(),
+        )
+
+
+_PARAMETRIC_BUILDER_NAMES = ['disk', 'rectangular', 'super_gaussian']
+
+
+class TestParametricProbeDefocus:
+    """Disk, rectangle and super-Gaussian take a defocus phase, then propagate."""
+
+    @pytest.mark.parametrize('name', _PARAMETRIC_BUILDER_NAMES)
+    def test_zero_defocus_and_propagation_is_the_bare_amplitude(self, name: str) -> None:
+        builder = _make_parametric_builder(name, _make_settings())
+        expected = rescale_probe_intensity(_flat_amplitude(builder), PROBE_PHOTON_COUNT)
+
+        probe = builder.build(_StubProbeGeometryProvider())
+
+        numpy.testing.assert_array_equal(probe.get_array()[0], expected.get_array())
+
+    @pytest.mark.parametrize('name', ['disk', 'rectangular'])
+    def test_skipping_the_zero_propagation_changes_only_round_off(self, name: str) -> None:
+        """Disk and rectangle once ran a zero-distance FFT round trip; now they skip it."""
+        builder = _make_parametric_builder(name, _make_settings())
+        round_tripped = propagate_probe(
+            _flat_amplitude(builder),
+            photon_wavelength_m=_StubProbeGeometryProvider().photon_wavelength_m,
+            propagation_distance_m=0.0,
+        )
+        expected = rescale_probe_intensity(round_tripped, PROBE_PHOTON_COUNT)
+
+        probe = builder.build(_StubProbeGeometryProvider())
+
+        numpy.testing.assert_allclose(
+            probe.get_array()[0], expected.get_array(), rtol=0.0, atol=1.0e-9
+        )
+
+    def test_the_super_gaussian_propagates(self) -> None:
+        settings = _make_settings()
+        _settings_parameters(settings)['PropagationDistanceInMeters'].set_value(5.0e-5)
+        builder = _make_parametric_builder('super_gaussian', settings)
+        provider = _StubProbeGeometryProvider()
+        propagated = propagate_probe(
+            _flat_amplitude(builder),
+            photon_wavelength_m=provider.photon_wavelength_m,
+            propagation_distance_m=5.0e-5,
+        )
+        expected = rescale_probe_intensity(propagated, PROBE_PHOTON_COUNT)
+
+        probe = builder.build(provider)
+
+        numpy.testing.assert_allclose(probe.get_array()[0], expected.get_array(), atol=1e-9)
+
+    @pytest.mark.parametrize('name', _PARAMETRIC_BUILDER_NAMES)
+    def test_the_builder_defocus_curves_the_probe(self, name: str) -> None:
+        flat = _make_parametric_builder(name, _make_settings()).build(_StubProbeGeometryProvider())
+        builder = _make_parametric_builder(name, _make_settings())
+        builder.parameters()['defocus_distance_m'].set_value(_PARAMETRIC_DEFOCUS_M)
+
+        curved = builder.build(_StubProbeGeometryProvider())
+
+        assert not numpy.allclose(curved.get_array(), flat.get_array())
+        numpy.testing.assert_allclose(numpy.abs(curved.get_array()), numpy.abs(flat.get_array()))
+
+    @pytest.mark.parametrize('name', _PARAMETRIC_BUILDER_NAMES)
+    def test_a_declared_focus_stands_in_for_the_builder_defocus(self, name: str) -> None:
+        builder = _make_parametric_builder(name, _make_settings())
+        builder.parameters()['defocus_distance_m'].set_value(_PARAMETRIC_DEFOCUS_M)
+        from_builder = builder.build(_StubProbeGeometryProvider())
+
+        builder.parameters()['defocus_distance_m'].set_value(0.0)
+        from_product = builder.build(
+            _StubProbeGeometryProvider(focus_object_distance_m=-_PARAMETRIC_DEFOCUS_M)
+        )
+
+        numpy.testing.assert_allclose(from_product.get_array(), from_builder.get_array())
+
+    @pytest.mark.parametrize('name', _PARAMETRIC_BUILDER_NAMES)
+    def test_the_declared_focus_wins_a_disagreement(
+        self, name: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        expected_builder = _make_parametric_builder(name, _make_settings())
+        expected_builder.parameters()['defocus_distance_m'].set_value(_PARAMETRIC_DEFOCUS_M)
+        expected = expected_builder.build(_StubProbeGeometryProvider())
+        builder = _make_parametric_builder(name, _make_settings())
+        builder.parameters()['defocus_distance_m'].set_value(1.5e-3)
+
+        with caplog.at_level(logging.WARNING, logger='ptychodus.model.product.probe.builder'):
+            probe = builder.build(
+                _StubProbeGeometryProvider(focus_object_distance_m=-_PARAMETRIC_DEFOCUS_M)
+            )
+
+        numpy.testing.assert_allclose(probe.get_array(), expected.get_array())
+        assert 'disagrees' in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# Size estimates and the average-pattern options
+# ---------------------------------------------------------------------------
+
+_DQ = 1.0 / (PROBE_EXTENT_PX * PIXEL_SIZE_M)
+_ESTIMATE_DEFOCUS_M = 2.0e-3
+
+
+def _stub_data(mean_pattern: numpy.ndarray) -> AssembledDiffractionData:
+    """Assembled data whose mean is exactly *mean_pattern*."""
+    return AssembledDiffractionData(
+        indexes=numpy.arange(2),
+        patterns=numpy.stack([mean_pattern, mean_pattern]),
+        # The detector pitch the stub geometry implies: dx = lambda z / (N p).
+        pixel_geometry=PixelGeometry(
+            width_m=1.0e-10 * 1.0 / (PROBE_EXTENT_PX * PIXEL_SIZE_M),
+            height_m=1.0e-10 * 1.0 / (PROBE_EXTENT_PX * PIXEL_SIZE_M),
+        ),
+        bad_pixels=numpy.zeros(mean_pattern.shape, dtype=bool),
+    )
+
+
+def _provider_with(mean_pattern: numpy.ndarray, **kwargs: Any) -> _StubProbeGeometryProvider:
+    return _StubProbeGeometryProvider(assembled_data=_stub_data(mean_pattern), **kwargs)
+
+
+def _frequency_grid() -> tuple[numpy.ndarray, numpy.ndarray]:
+    q = (numpy.arange(PROBE_EXTENT_PX) - PROBE_EXTENT_PX // 2) * _DQ
+    return q.reshape(1, -1), q.reshape(-1, 1)
+
+
+def _make_estimating_builder(name: str) -> PluginProbeBuilder:
+    builder: PluginProbeBuilder
+
+    match name:
+        case 'disk':
+            builder = _make_builder('disk', _make_settings())
+        case 'rectangular':
+            builder = _make_builder('rectangular', _make_settings())
+        case 'super_gaussian':
+            builder = _make_builder('super_gaussian', _make_settings())
+        case _:
+            raise ValueError(name)
+
+    builder.parameters()['defocus_distance_m'].set_value(_ESTIMATE_DEFOCUS_M)
+    return builder
+
+
+class TestSizeEstimateFromDiffraction:
+    """The parametric builders set their size from the measured bright field, once."""
+
+    def test_a_disk_takes_the_diameter_of_its_shadow(self) -> None:
+        qx, qy = _frequency_grid()
+        mean_pattern = 100.0 * (numpy.hypot(qx, qy) <= 8.0 * _DQ)
+        builder = _make_estimating_builder('disk')
+
+        assert builder.estimate_size_from_diffraction(_provider_with(mean_pattern))
+
+        expected_m = 2.0 * 1.0e-10 * _ESTIMATE_DEFOCUS_M * 8.0 * _DQ
+        assert builder.parameters()['diameter_m'].get_value() == pytest.approx(expected_m, rel=0.05)
+
+    def test_a_rectangle_takes_both_sides_of_its_shadow(self) -> None:
+        qx, qy = _frequency_grid()
+        mean_pattern = 100.0 * ((numpy.abs(qx) <= 8.0 * _DQ) & (numpy.abs(qy) <= 4.0 * _DQ))
+        builder = _make_estimating_builder('rectangular')
+
+        assert builder.estimate_size_from_diffraction(_provider_with(mean_pattern))
+
+        # The aperture spans 2 * half + 1 pixels of the frequency grid.
+        scale_m = 1.0e-10 * _ESTIMATE_DEFOCUS_M * _DQ
+        assert builder.parameters()['width_m'].get_value() == pytest.approx(
+            17.0 * scale_m, rel=0.03
+        )
+        assert builder.parameters()['height_m'].get_value() == pytest.approx(
+            9.0 * scale_m, rel=0.03
+        )
+
+    def test_a_super_gaussian_takes_the_fwhm_of_a_gaussian_beam(self) -> None:
+        qx, qy = _frequency_grid()
+        sigma_q = 3.0 * _DQ
+        mean_pattern = 100.0 * numpy.exp(-(qx**2 + qy**2) / (2.0 * sigma_q**2))
+        builder = _make_estimating_builder('super_gaussian')
+
+        assert builder.estimate_size_from_diffraction(_provider_with(mean_pattern))
+
+        sigma_m = math.hypot(
+            1.0 / (4.0 * math.pi * sigma_q), 1.0e-10 * _ESTIMATE_DEFOCUS_M * sigma_q
+        )
+        assert builder.parameters()['full_width_at_half_maximum_m'].get_value() == pytest.approx(
+            2.0 * math.sqrt(2.0 * math.log(2.0)) * sigma_m, rel=0.03
+        )
+
+    @pytest.mark.parametrize('name', _PARAMETRIC_BUILDER_NAMES)
+    def test_without_data_nothing_is_estimated(self, name: str) -> None:
+        builder = _make_estimating_builder(name)
+        provider = _StubProbeGeometryProvider()
+        before = {key: value.get_value() for key, value in builder.parameters().items()}
+
+        assert not builder.can_estimate_size_from_diffraction(provider)
+        assert not builder.estimate_size_from_diffraction(provider)
+        assert {key: value.get_value() for key, value in builder.parameters().items()} == before
+
+    @pytest.mark.parametrize('name', _PARAMETRIC_BUILDER_NAMES)
+    def test_a_copy_reads_the_data_of_the_product_it_is_in(self, name: str) -> None:
+        """Nothing is cached: a copy estimates from whatever provider it is handed."""
+        qx, qy = _frequency_grid()
+        narrow = 100.0 * numpy.exp(-(qx**2 + qy**2) / (2.0 * (2.0 * _DQ) ** 2))
+        wide = 100.0 * numpy.exp(-(qx**2 + qy**2) / (2.0 * (4.0 * _DQ) ** 2))
+        original = _make_estimating_builder(name)
+        original.estimate_size_from_diffraction(_provider_with(narrow))
+        copy = original.copy()
+
+        assert copy.estimate_size_from_diffraction(_provider_with(wide))
+        assert any(
+            copy.parameters()[key].get_value() != value.get_value()
+            for key, value in original.parameters().items()
+        )
+
+    def test_the_factory_guards_only_the_builders_that_need_data(self) -> None:
+        factory = _make_factory(_make_settings())
+
+        for name in _PARAMETRIC_BUILDER_NAMES:
+            assert factory.create(name).get_name() == name
+
+        with pytest.raises(RuntimeError, match='requires an associated diffraction dataset'):
+            factory.create('average_pattern')
+
+        assert factory.create('average_pattern', has_diffraction_data=True).reads_diffraction_data
+        assert factory.create_default().get_name() == 'disk'
+
+
+class TestAveragePatternOptions:
+    """The average-pattern builder's defocus, propagation and bright-field threshold."""
+
+    def _mean_pattern(self) -> numpy.ndarray:
+        qx, qy = _frequency_grid()
+        return 100.0 * (numpy.hypot(qx, qy) <= 8.0 * _DQ) + 2.0
+
+    def _expected(self, **kwargs: Any) -> numpy.ndarray:
+        provider = _StubProbeGeometryProvider()
+        data = _stub_data(self._mean_pattern())
+        probe = generate_average_pattern_probe(
+            provider.get_probe_geometry(),
+            data.get_mean_pattern(),
+            detector_pixel_geometry=data.get_pixel_geometry(),
+            bad_pixels=data.get_bad_pixels(),
+            photon_wavelength_m=provider.photon_wavelength_m,
+            detector_distance_m=provider.detector_distance_m,
+            **kwargs,
+        )
+        return rescale_probe_intensity(probe, PROBE_PHOTON_COUNT).get_array()
+
+    def _builder(self) -> PluginProbeBuilder:
+        return _make_builder('average_pattern', _make_settings())
+
+    def test_defocus_and_propagation_add(self) -> None:
+        builder = self._builder()
+        builder.parameters()['defocus_distance_m'].set_value(2.0e-6)
+        builder.parameters()['propagation_distance_m'].set_value(1.0e-6)
+
+        built = builder.build(_provider_with(self._mean_pattern())).get_probe_no_opr().get_array()
+
+        numpy.testing.assert_allclose(built, self._expected(defocus_distance_m=3.0e-6), atol=1e-9)
+
+    def test_a_declared_focus_stands_in_for_the_builder_defocus(self) -> None:
+        builder = self._builder()
+        provider = _provider_with(self._mean_pattern(), focus_object_distance_m=-2.0e-6)
+
+        built = builder.build(provider).get_probe_no_opr().get_array()
+
+        numpy.testing.assert_allclose(built, self._expected(defocus_distance_m=2.0e-6), atol=1e-9)
+
+    def test_the_bright_field_threshold_is_off_by_default_and_passes_through(self) -> None:
+        builder = self._builder()
+        provider = _provider_with(self._mean_pattern())
+
+        numpy.testing.assert_allclose(
+            builder.build(provider).get_probe_no_opr().get_array(), self._expected(), atol=1e-9
+        )
+
+        builder.parameters()['bright_field_threshold'].set_value(True)
+
+        numpy.testing.assert_allclose(
+            builder.build(provider).get_probe_no_opr().get_array(),
+            self._expected(bright_field_mad_threshold=4.5),
+            atol=1e-9,
+        )
+
+    def test_without_data_the_build_waits_rather_than_fails(self) -> None:
+        with pytest.raises(GeometryNotDefinedError):
+            self._builder().build(_StubProbeGeometryProvider())
+
+    def test_a_copy_builds_from_the_data_of_the_product_it_is_in(self) -> None:
+        original = self._builder()
+        copy = original.copy()
+        other_pattern = 2.0 * self._mean_pattern()
+
+        built = copy.build(_provider_with(other_pattern)).get_probe_no_opr().get_array()
+        expected = original.build(_provider_with(other_pattern)).get_probe_no_opr().get_array()
+
+        numpy.testing.assert_allclose(built, expected, atol=1e-9)

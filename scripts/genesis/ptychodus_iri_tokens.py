@@ -11,7 +11,7 @@ import httpx
 import sys
 
 from ptychodus.api.exit_codes import ExitCode
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.genesis.core import create_facility_adapters
 from ptychodus.model.genesis.iri import get_iri_tokens_file
 from ptychodus.model.genesis.settings import GenesisSettings

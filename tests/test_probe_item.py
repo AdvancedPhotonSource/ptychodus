@@ -14,11 +14,13 @@ from unittest.mock import MagicMock
 import numpy
 import pytest
 
+from ptychodus.api.accumulate import DiffractionMoments
+from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry
-from ptychodus.api.observer import Observable
-from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider, ProbeSequence
-from ptychodus.api.settings import SettingsRegistry
-from ptychodus.model.product.probe.builder import ProbeSequenceBuilder
+from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider, ProbeEnsemble
+from ptychodus.model.observer import Observable
+from ptychodus.model.settings import SettingsRegistry
+from ptychodus.model.product.probe.builder import FromMemoryProbeBuilder, ProbeEnsembleBuilder
 from ptychodus.model.product.probe.item import ProbeRepositoryItem
 from ptychodus.model.product.probe.settings import ProbeSettings
 
@@ -27,10 +29,10 @@ def _make_rng() -> numpy.random.Generator:
     return numpy.random.default_rng(42)
 
 
-class _RecordingBuilder(ProbeSequenceBuilder):
+class _RecordingBuilder(ProbeEnsembleBuilder):
     """Minimal builder that records build() invocations without touching numpy math."""
 
-    def __init__(self, settings: ProbeSettings, probe_seq: ProbeSequence) -> None:
+    def __init__(self, settings: ProbeSettings, probe_seq: ProbeEnsemble) -> None:
         super().__init__(_make_rng(), settings, 'recording')
         self._settings = settings
         self._probe_seq = probe_seq
@@ -39,7 +41,7 @@ class _RecordingBuilder(ProbeSequenceBuilder):
     def copy(self) -> _RecordingBuilder:
         return _RecordingBuilder(self._settings, self._probe_seq)
 
-    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
         # Every real probe builder reads the geometry first, so an undetermined one
         # raises out of here before anything is recorded -- which is what the item's
         # except arm relies on now that it has no pre-flight guard.
@@ -47,7 +49,7 @@ class _RecordingBuilder(ProbeSequenceBuilder):
         self.build_calls.append(geometry_provider)
         return self._probe_seq
 
-    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
         # These tests exercise _rebuild's geometry guard, not the conditioning
         # pipeline, so bypass it and hand back the canned sequence by identity.
         return self._build_raw(geometry_provider)
@@ -80,9 +82,9 @@ def _set_provider_geometry(
     )
 
 
-def _make_probe_seq(pixel_size_m: float) -> ProbeSequence:
+def _make_probe_seq(pixel_size_m: float) -> ProbeEnsemble:
     array = numpy.zeros((1, 4, 4), dtype=numpy.complex64)
-    return ProbeSequence(
+    return ProbeEnsemble(
         array=array,
         opr_weights=None,
         pixel_geometry=PixelGeometry(width_m=pixel_size_m, height_m=pixel_size_m),
@@ -91,7 +93,7 @@ def _make_probe_seq(pixel_size_m: float) -> ProbeSequence:
 
 def test_rebuild_skips_when_geometry_not_ready() -> None:
     """Pre-dataset startup: pixel dimensions are zero. Builder must NOT be called;
-    the initial null ProbeSequence stays in place; no exception escapes."""
+    the initial null ProbeEnsemble stays in place; no exception escapes."""
     registry = SettingsRegistry()
     settings = ProbeSettings(registry)
     provider = _make_provider(pixel_width_m=0.0, pixel_height_m=0.0)
@@ -127,7 +129,7 @@ def test_unready_geometry_is_not_logged_as_a_failure(
 def test_rebuild_fires_when_geometry_becomes_ready() -> None:
     """Once the provider reports a valid pixel geometry and the item is nudged
     (e.g. via set_builder from a settings change), the builder runs and its
-    ProbeSequence replaces the null sentinel."""
+    ProbeEnsemble replaces the null sentinel."""
     registry = SettingsRegistry()
     settings = ProbeSettings(registry)
     provider = _make_provider(pixel_width_m=0.0, pixel_height_m=0.0)
@@ -188,6 +190,10 @@ class _ObservableProbeProvider(ProbeGeometryProvider, Observable):
         return True
 
     @property
+    def focus_object_distance_m(self) -> float:
+        return 0.0
+
+    @property
     def probe_photon_count(self) -> float:
         return 1.0
 
@@ -205,6 +211,12 @@ class _ObservableProbeProvider(ProbeGeometryProvider, Observable):
 
     def get_detector_pixel_geometry(self) -> PixelGeometry:
         return PixelGeometry(width_m=1e-6, height_m=1e-6)
+
+    def get_assembled_data(self) -> AssembledDiffractionData | None:
+        return None
+
+    def get_diffraction_moments(self) -> DiffractionMoments | None:
+        return None
 
     def get_probe_geometry(self) -> ProbeGeometry:
         if self._geometry.pixel_width_m <= 0.0 or self._geometry.pixel_height_m <= 0.0:
@@ -235,3 +247,52 @@ def test_rebuild_fires_on_geometry_observer_notification() -> None:
 
     assert len(builder.build_calls) == 1
     assert item.get_probes().get_array() is canned.get_array()
+
+
+class _DataRecordingBuilder(_RecordingBuilder):
+    """A recording builder that, like the average-pattern builder, reads the patterns."""
+
+    @property
+    def reads_diffraction_data(self) -> bool:
+        return True
+
+
+def test_a_data_change_rebuilds_only_a_builder_that_reads_the_data() -> None:
+    settings = ProbeSettings(SettingsRegistry())
+    canned = _make_probe_seq(pixel_size_m=1e-6)
+    provider = _make_provider(pixel_width_m=1e-6, pixel_height_m=1e-6)
+
+    parametric = _RecordingBuilder(settings, canned)
+    parametric_item = ProbeRepositoryItem(_make_rng(), provider, settings, parametric)
+    reading = _DataRecordingBuilder(settings, canned)
+    reading_item = ProbeRepositoryItem(_make_rng(), provider, settings, reading)
+
+    parametric_item.handle_diffraction_data_changed()
+    reading_item.handle_diffraction_data_changed()
+
+    assert len(parametric.build_calls) == 1
+    assert len(reading.build_calls) == 2
+
+
+def test_a_result_made_editable_reverts_when_reassigned() -> None:
+    """Reconstruction reassigns the output item every iteration, so an editable
+    builder can never be conditioned by a solve that is still running."""
+    settings = ProbeSettings(SettingsRegistry())
+    provider = _ObservableProbeProvider(
+        ProbeGeometry(width_px=64, height_px=64, pixel_width_m=1e-6, pixel_height_m=1e-6),
+    )
+    result = _make_probe_seq(pixel_size_m=1e-6)
+    item = ProbeRepositoryItem(
+        _make_rng(), provider, settings, FromMemoryProbeBuilder(_make_rng(), settings, result)
+    )
+    assert item.can_make_editable()
+
+    item.make_editable()
+    assert not item.can_make_editable()
+
+    item.assign(result)
+
+    builder = item.get_builder()
+    assert isinstance(builder, FromMemoryProbeBuilder)
+    assert not builder.is_editable
+    assert item.can_make_editable()

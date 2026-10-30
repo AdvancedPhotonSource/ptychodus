@@ -4,7 +4,7 @@ import re
 
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.workflow import FileBasedWorkflow, WorkflowAPI
-from ptychodus.plugins.aps31id_lamni._scan_table import read_aps31ide_scan_table
+from ptychodus.plugins.aps31id_lamni.scan_table import read_aps31ide_scan_table
 
 logger = logging.getLogger(__name__)
 

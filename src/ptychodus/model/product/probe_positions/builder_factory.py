@@ -1,29 +1,37 @@
-from collections.abc import Callable, Iterable, Iterator
-from functools import partial
+from collections.abc import Iterable, Iterator, Mapping
 from pathlib import Path
+from typing import Any, Final
 import logging
 
 import numpy
 
-from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.plugins import PluginCatalog
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
     ProbePositionFileReader,
     ProbePositionFileWriter,
 )
+from ptychodus.api.simulate.probe_positions import ProbePositionsGenerator
 
+from ...declared import describe
+from ...file_types import FileTypeChooser
+from ...parameters import Parameter
+from ...plugins import PluginChooser
 from .builder import (
     FromFileProbePositionsBuilder,
     FromMemoryProbePositionsBuilder,
     ProbePositionsBuilder,
 )
-from .cartesian import CartesianProbePositionsBuilder, CartesianProbePositionsVariant
-from .concentric import ConcentricProbePositionsBuilder
-from .lissajous import LissajousProbePositionsBuilder
+from .plugin import PluginProbePositionsBuilder
 from .settings import ProbePositionsSettings
-from .spiral import SpiralProbePositionsBuilder
 
 logger = logging.getLogger(__name__)
+
+# The pattern a fresh install starts on, and the fallback when a settings file
+# names one no registered generator answers to. Named rather than taken as the
+# first the chooser holds: the chooser sorts by name, so that would silently
+# make it whichever pattern sorts first.
+_DEFAULT_GENERATOR: Final = 'rectangular_raster'
 
 
 class ProbePositionsBuilderFactory(Iterable[str]):
@@ -31,38 +39,47 @@ class ProbePositionsBuilderFactory(Iterable[str]):
         self,
         rng: numpy.random.Generator,
         settings: ProbePositionsSettings,
+        generator_chooser: PluginCatalog[ProbePositionsGenerator],
         file_reader_chooser: PluginChooser[ProbePositionFileReader],
         file_writer_chooser: PluginChooser[ProbePositionFileWriter],
     ) -> None:
         self._rng = rng
         self._settings = settings
-        self._file_reader_chooser = file_reader_chooser
-        self._file_writer_chooser = file_writer_chooser
-        self._builders: dict[str, Callable[[], ProbePositionsBuilder]] = {
-            variant.name.lower(): partial(self._create_cartesian_builder, variant)
-            for variant in CartesianProbePositionsVariant
+        self._generators = generator_chooser
+        self.file_readers = FileTypeChooser(file_reader_chooser)
+        self.file_writers = FileTypeChooser(file_writer_chooser)
+
+        # Every registered generator, not only the one selected: the settings
+        # file holds one section for scan positions and it must hold the same
+        # keys however the application was driven, so a pattern never chosen
+        # still contributes the keys it would be configured by.
+        self._parameters: dict[str, Mapping[str, Parameter[Any]]] = {
+            plugin.simple_name: settings.declare(
+                describe(plugin.strategy.get_default_options(), expand_num=True)
+            )
+            for plugin in generator_chooser
         }
-        self._builders.update(
-            {
-                'concentric': lambda: ConcentricProbePositionsBuilder(rng, settings),
-                'spiral': lambda: SpiralProbePositionsBuilder(rng, settings),
-                'lissajous': lambda: LissajousProbePositionsBuilder(rng, settings),
-            }
-        )
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self._builders)
+        for plugin in self._generators:
+            yield plugin.simple_name
 
     def create(self, name: str) -> ProbePositionsBuilder:
-        try:
-            factory = self._builders[name]
-        except KeyError as exc:
-            raise KeyError(f'Unknown scan builder "{name}"!') from exc
+        plugin = self._generators.find_plugin(name)
 
-        return factory()
+        if plugin is None:
+            raise KeyError(f'Unknown scan builder "{name}"!')
+
+        return PluginProbePositionsBuilder(
+            self._rng,
+            self._settings,
+            plugin.simple_name,
+            plugin.strategy,
+            self._parameters[plugin.simple_name],
+        )
 
     def create_default(self) -> ProbePositionsBuilder:
-        return next(iter(self._builders.values()))()
+        return self.create(_DEFAULT_GENERATOR)
 
     def create_from_settings(self) -> ProbePositionsBuilder:
         name = self._settings.builder.get_value()
@@ -76,42 +93,20 @@ class ProbePositionsBuilderFactory(Iterable[str]):
 
         return self.create(name_repaired)
 
-    def _create_cartesian_builder(
-        self, variant: CartesianProbePositionsVariant
-    ) -> CartesianProbePositionsBuilder:
-        return CartesianProbePositionsBuilder(variant, self._rng, self._settings)
-
-    def get_open_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_reader_chooser:
-            yield plugin.display_name
-
-    def get_open_file_filter(self) -> str:
-        return self._file_reader_chooser.get_current_plugin().display_name
-
     def create_scan_from_memory(self, position_seq: ProbePositionSequence) -> ProbePositionsBuilder:
         return FromMemoryProbePositionsBuilder(self._rng, self._settings, position_seq)
 
     def create_scan_from_file(self, file_path: Path, file_type: str) -> ProbePositionsBuilder:
-        self._file_reader_chooser.set_current_plugin(file_type)
-        file_reader = self._file_reader_chooser.get_current_plugin().strategy
+        plugin = self.file_readers.select(file_type)
 
-        builder = FromFileProbePositionsBuilder(self._rng, self._settings, file_reader)
+        builder = FromFileProbePositionsBuilder(self._rng, self._settings, plugin.strategy)
         builder.file_path.set_value(file_path)
-        builder.file_type.set_value(self._file_reader_chooser.get_current_plugin().simple_name)
+        builder.file_type.set_value(plugin.simple_name)
         return builder
-
-    def get_save_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_writer_chooser:
-            yield plugin.display_name
-
-    def get_save_file_filter(self) -> str:
-        return self._file_writer_chooser.get_current_plugin().display_name
 
     def save_scan(
         self, file_path: Path, file_type: str, position_seq: ProbePositionSequence
     ) -> None:
-        self._file_writer_chooser.set_current_plugin(file_type)
-        file_type = self._file_writer_chooser.get_current_plugin().simple_name
-        logger.debug(f'Writing "{file_path}" as "{file_type}"')
-        file_writer = self._file_writer_chooser.get_current_plugin().strategy
-        file_writer.write(file_path, position_seq)
+        plugin = self.file_writers.select(file_type)
+        logger.debug(f'Writing "{file_path}" as "{plugin.simple_name}"')
+        plugin.strategy.write(file_path, position_seq)

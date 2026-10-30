@@ -8,6 +8,9 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
+
+from ptychodus.api.devices import enumerate_devices
 
 
 def read_driver_cuda_version() -> str | None:
@@ -35,7 +38,7 @@ def read_driver_cuda_version() -> str | None:
     return None if match is None else match.group(1)
 
 
-def check_nvrtc_builtins(torch_module) -> None:
+def check_nvrtc_builtins(torch_module: ModuleType) -> None:
     cuda_ver = torch_module.version.cuda
     if not cuda_ver:
         return
@@ -51,7 +54,15 @@ def check_nvrtc_builtins(torch_module) -> None:
 
     print(f'NVRTC Builtins ({soname}): NOT LOADABLE by dynamic linker')
 
-    site_packages = Path(torch_module.__file__).parent.parent
+    module_file = torch_module.__file__
+
+    if module_file is None:
+        # A module need not come from a file, so the bundled-copy search has
+        # nowhere to start. The diagnosis above still stands.
+        print('  Cannot locate torch on disk, so no bundled copy was looked for.')
+        return
+
+    site_packages = Path(module_file).parent.parent
     bundled = sorted(site_packages.glob(f'nvidia/*/lib/{soname}'))
 
     if bundled:
@@ -66,7 +77,7 @@ def check_nvrtc_builtins(torch_module) -> None:
         print(f'  No bundled copy found under {site_packages}/nvidia/')
         print('  Fix: install a CUDA runtime matching the version above, or reinstall torch.')
 
-    print('  Symptom if unfixed: ptychopinn_torch DDP (ddp_spawn) training fails with')
+    print('  Symptom if unfixed: ptychopinn training fails on the first CUDA kernel with')
     print(f'    nvrtc: error: failed to open {soname}')
 
 
@@ -105,6 +116,12 @@ def main() -> int:
         print(f'CUDA Available: {is_cuda_available}')
         print(f'CUDA Version: {torch.version.cuda}')
 
+        # Enumerated the way ptychodus itself does, so a device missing from a
+        # reconstruction is missing from this report for the same reason. Safe
+        # in process here: this command is about to exit.
+        for device in enumerate_devices():
+            print(f'Device: {device.identifier} ({device.name})')
+
         if is_cuda_available:
             check_nvrtc_builtins(torch)
         elif driver_cuda_version is not None and torch.version.cuda:
@@ -114,7 +131,7 @@ def main() -> int:
             )
             print('  A CUDA major version bump is not covered by minor version compatibility.')
             print('  Fix: install the torch build matching the driver, e.g.')
-            print('    uv sync --extra ptychi-cuda128')
+            print('    uv sync --extra ptychi-cuda126')
 
     if args.require_cuda and driver_cuda_version is not None and not is_cuda_available:
         print(

@@ -19,7 +19,7 @@ from ptychodus.api.diffraction import (
 )
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.assemble import AssembledDiffractionData
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.diffraction.dataset import (
     DiffractionDatasetState,
     AssembledDiffractionArray,
@@ -141,7 +141,7 @@ def test_set_bad_pixels_rejects_shape_mismatch_after_reload() -> None:
     _reload_with_extent(a, ImageExtent(width_px=16, height_px=16))
 
     wrong_shape = numpy.zeros((8, 8), dtype=numpy.bool_)
-    with pytest.raises(ValueError, match='does not match loaded detector extent'):
+    with pytest.raises(ValueError, match='Bad pixels shape'):
         a.set_bad_pixels(wrong_shape)
 
     # The original default mask is untouched.
@@ -155,7 +155,7 @@ def test_set_bad_pixels_rejects_shape_mismatch_before_reload() -> None:
     repo.insert_dataset(a)
 
     mask = numpy.zeros((32, 64), dtype=numpy.bool_)
-    with pytest.raises(ValueError, match='does not match loaded detector extent'):
+    with pytest.raises(ValueError, match='Bad pixels shape'):
         a.set_bad_pixels(mask)
 
 
@@ -168,7 +168,7 @@ def test_simple_diffraction_dataset_rejects_bad_pixels_shape_mismatch() -> None:
     contents_tree = DiffractionDatasetLayoutNode.create_root()
     wrong_shape = numpy.zeros((8, 8), dtype=numpy.bool_)
 
-    with pytest.raises(ValueError, match='does not match detector extent'):
+    with pytest.raises(ValueError, match='Bad pixels shape'):
         SimpleDiffractionDataset(metadata, contents_tree, [], wrong_shape)
 
 

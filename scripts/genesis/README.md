@@ -85,7 +85,7 @@ Use passcode only.
 
 ### Containers
 
-Polaris has NVIDIA A100 GPUs, so the matching image is [containers/Dockerfile.cuda](../../containers/Dockerfile.cuda); see [docs/source/getting_started.md](../../docs/source/getting_started.md) for how to build it. Every ptychodus Dockerfile copies the build context (`COPY . /src`), so building on Polaris needs a ptychodus checkout on that filesystem — otherwise build the image elsewhere and bring it over.
+Polaris has NVIDIA A100 GPUs, so the matching image is [containers/Dockerfile.cuda](../../containers/Dockerfile.cuda); see [docs/source/getting_started.md](../../docs/source/getting_started.md) for how to build it. The release images install ptychodus from PyPI and need only the `containers/` directory as build context, so building on Polaris needs a copy of that directory rather than a full checkout. The PtychoPINN and PtychoFM backends are included only when their wheels are staged in `containers/wheels/`, which `scripts/podman/build` does from sibling checkouts; otherwise build the image elsewhere and bring it over.
 
 Stock podman — the podman that ships with the Linux distribution — is supported on Polaris and runs containers directly, with no conversion step. ALCF has no page covering that route, which is why the reference below describes only Apptainer.
 
@@ -151,7 +151,7 @@ Perlmutter has NVIDIA A100 GPUs, so the matching image is [containers/Dockerfile
 - Do not set `PYTHONPATH`; the wrapper is itself a Python program.
 
 ```sh
-podman-hpc build -f containers/Dockerfile.cuda -t ptychodus:cuda .
+podman-hpc build -f containers/Dockerfile.cuda -t ptychodus:cuda containers/
 podman-hpc migrate ptychodus:cuda
 srun -n 1 -G 1 podman-hpc run --rm --gpu ptychodus:cuda python3 -m ptychodus --version
 ```

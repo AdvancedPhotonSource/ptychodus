@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ptychodus.api.observer import Observable, Observer
+from ptychodus.model.observer import Observable, Observer
 
 from ..model.task_monitor import TaskProgressMonitor
 from ..view.widgets import TaskStatusView

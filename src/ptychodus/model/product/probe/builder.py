@@ -5,33 +5,37 @@ import logging
 
 import numpy
 
-from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.simulate.probe import (
     GaussianSchellStrategy,
     IncoherentModeStrategy,
+    ProbeDerivativeStrategy,
     ProbeMomentPolynomialStrategy,
     ProbeModeDecayType,
     RandomPhaseRampStrategy,
     generate_coherent_probe_modes,
     generate_incoherent_probe_modes,
     rescale_probe_intensity,
+    resolve_defocus_distance_m,
 )
 from ptychodus.api.probe import (
     OPRWeightPolicy,
     Probe,
-    ProbeSequence,
+    ProbeEnsemble,
     ProbeFileReader,
+    ProbeExtent,
     ProbeGeometryProvider,
     conform_opr_weights,
-    resample_probe_sequence,
+    estimate_probe_extent,
+    resample_probe_ensemble,
 )
 
+from ...parameters import ParameterGroup
 from .settings import ProbeSettings
 
 logger = logging.getLogger(__name__)
 
 
-class ProbeSequenceBuilder(ParameterGroup):
+class ProbeEnsembleBuilder(ParameterGroup):
     def __init__(self, rng: numpy.random.Generator, settings: ProbeSettings, name: str) -> None:
         super().__init__()
         self._rng = rng
@@ -93,22 +97,22 @@ class ProbeSequenceBuilder(ParameterGroup):
             parameter.sync_value_to_parent()
 
     @abstractmethod
-    def copy(self) -> ProbeSequenceBuilder:
+    def copy(self) -> ProbeEnsembleBuilder:
         pass
 
     @abstractmethod
-    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
         """Return the raw, unconditioned probe.
 
         Implementations must NOT expand the incoherent or coherent (OPR) modes;
         `build` owns the conditioning pipeline. Generative implementations should
         return `self._rescale_to_photon_count(probe, geometry_provider)`, which
         normalizes the intensity and widens the 3-D `Probe` they generated to the
-        4-D `ProbeSequence` this method returns.
+        4-D `ProbeEnsemble` this method returns.
         """
         pass
 
-    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
         """Return the conditioned probe: incoherent modes, then coherent (OPR) modes.
 
         Overriding this method is reserved for builders whose probe is already
@@ -118,11 +122,70 @@ class ProbeSequenceBuilder(ParameterGroup):
         """
         return self._condition_probe(self._build_raw(geometry_provider), geometry_provider)
 
+    @property
+    def reads_diffraction_data(self) -> bool:
+        """Whether the probe this builds depends on the diffraction data.
+
+        Such a probe is rebuilt when the data changes under an unchanged detector
+        geometry -- another dataset, or a reload -- which the geometry alone does not
+        announce.
+        """
+        return False
+
+    def can_estimate_size_from_diffraction(self, geometry_provider: ProbeGeometryProvider) -> bool:
+        """Whether `estimate_size_from_diffraction` has a size to set and data to set it from."""
+        return False
+
+    def estimate_size_from_diffraction(self, geometry_provider: ProbeGeometryProvider) -> bool:
+        """Set this builder's size parameters from the moments of the measured patterns.
+
+        A one-off: the parameters take the estimate and keep it, so the settings stay
+        explicit and a later rebuild does not move them. Returns whether anything was
+        set; builders without a size, or a product without data, leave everything alone.
+        """
+        return False
+
+    def _estimate_extent(
+        self, geometry_provider: ProbeGeometryProvider, defocus_distance_m: float
+    ) -> ProbeExtent | None:
+        """The probe extent the product's mean pattern implies, or None where it cannot say.
+
+        The defocus is resolved against the product's focus, as the build resolves it.
+        """
+        moments = geometry_provider.get_diffraction_moments()
+
+        if moments is None:
+            logger.warning('No diffraction moments to estimate the probe size from.')
+            return None
+
+        if not geometry_provider.far_field:
+            logger.warning(
+                'The probe size is estimated from the far-field bright field; a near-field '
+                'pattern is a hologram and does not hold it.'
+            )
+            return None
+
+        try:
+            # The moments' mean frame is already corrected for the background and flat
+            # field, and their mask includes the pixels those maps leave unusable.
+            return estimate_probe_extent(
+                moments.mean_frame,
+                geometry_provider.get_probe_geometry(),
+                photon_wavelength_m=geometry_provider.photon_wavelength_m,
+                defocus_distance_m=resolve_defocus_distance_m(
+                    geometry_provider, defocus_distance_m
+                ),
+                bad_pixels=moments.bad_pixels,
+            )
+        except ValueError as exc:
+            logger.warning(f'Could not estimate the probe size: {exc}')
+            return None
+
     def _rescale_to_photon_count(
         self, probe: Probe, geometry_provider: ProbeGeometryProvider
-    ) -> ProbeSequence:
+    ) -> ProbeEnsemble:
         """Normalize a freshly generated probe to the expected photon count and
-        widen it to the `ProbeSequence` that `_build_raw` returns.
+        widen it to the `ProbeEnsemble` that `_build_raw` returns.
 
         Only generative builders call this. A probe read from file already carries
         the intensity it was reconstructed at; rescaling it would silently decouple
@@ -130,7 +193,7 @@ class ProbeSequenceBuilder(ParameterGroup):
         product of probe and object, not either one alone.
         """
         rescaled = rescale_probe_intensity(probe, geometry_provider.probe_photon_count)
-        return ProbeSequence.from_probe(rescaled)
+        return ProbeEnsemble.from_probe(rescaled)
 
     def _get_imode_decay(self) -> tuple[ProbeModeDecayType, float]:
         """Resolve the incoherent-mode decay settings, tolerating values the api rejects.
@@ -158,6 +221,10 @@ class ProbeSequenceBuilder(ParameterGroup):
             decay_ratio=decay_ratio,
             damping_width=self.moment_polynomial_damping_width.get_value(),
         )
+
+    def _create_derivative_strategy(self) -> IncoherentModeStrategy:
+        decay_type, decay_ratio = self._get_imode_decay()
+        return ProbeDerivativeStrategy(decay_type=decay_type, decay_ratio=decay_ratio)
 
     def _create_random_phase_ramp_strategy(self) -> IncoherentModeStrategy:
         decay_type, decay_ratio = self._get_imode_decay()
@@ -216,8 +283,8 @@ class ProbeSequenceBuilder(ParameterGroup):
             return OPRWeightPolicy.AVERAGE
 
     def _conform_opr_weights(
-        self, probe_seq: ProbeSequence, geometry_provider: ProbeGeometryProvider
-    ) -> ProbeSequence:
+        self, probe_seq: ProbeEnsemble, geometry_provider: ProbeGeometryProvider
+    ) -> ProbeEnsemble:
         """Reconcile an ingested probe's OPR weights with this run's probe positions.
 
         The weights carry one row per probe position, so a probe solved on another scan
@@ -255,8 +322,8 @@ class ProbeSequenceBuilder(ParameterGroup):
         return conform_opr_weights(self._rng, probe_seq, num_positions, policy)
 
     def _condition_probe(
-        self, probe_seq: ProbeSequence, geometry_provider: ProbeGeometryProvider
-    ) -> ProbeSequence:
+        self, probe_seq: ProbeEnsemble, geometry_provider: ProbeGeometryProvider
+    ) -> ProbeEnsemble:
         """Expand the probe to the requested mode structure, never shrinking it.
 
         Every step is expand-only, so the pipeline is idempotent: conditioning an
@@ -319,10 +386,10 @@ class ProbeSequenceBuilder(ParameterGroup):
                 self._rng,
                 probe,
                 num_cmodes=num_cmodes_requested,
-                num_diffraction_patterns=geometry_provider.num_scan_points,
+                num_positions=geometry_provider.num_scan_points,
             )
         else:
-            probe_seq = ProbeSequence.from_probe(probe)
+            probe_seq = ProbeEnsemble.from_probe(probe)
 
         logger.debug(f'Conditioned probe {probe_seq.get_array().shape=}')
         return probe_seq
@@ -332,11 +399,12 @@ class ProbeSequenceBuilder(ParameterGroup):
 # and the builder resolves against this same mapping, so a name can never be offered
 # without a way to build it, nor a strategy be buildable but never offered.
 _IMODE_STRATEGY_FACTORIES: Mapping[
-    str, Callable[[ProbeSequenceBuilder], IncoherentModeStrategy]
+    str, Callable[[ProbeEnsembleBuilder], IncoherentModeStrategy]
 ] = {
-    'MomentPolynomial': ProbeSequenceBuilder._create_moment_polynomial_strategy,
-    'RandomPhaseRamp': ProbeSequenceBuilder._create_random_phase_ramp_strategy,
-    'GaussianSchell': ProbeSequenceBuilder._create_gaussian_schell_strategy,
+    'MomentPolynomial': ProbeEnsembleBuilder._create_moment_polynomial_strategy,
+    'Derivative': ProbeEnsembleBuilder._create_derivative_strategy,
+    'RandomPhaseRamp': ProbeEnsembleBuilder._create_random_phase_ramp_strategy,
+    'GaussianSchell': ProbeEnsembleBuilder._create_gaussian_schell_strategy,
 }
 
 INCOHERENT_MODE_STRATEGY_NAMES = tuple(_IMODE_STRATEGY_FACTORIES)
@@ -346,7 +414,7 @@ The first entry is what an unrecognized stored name falls back to.
 """
 
 
-class FromMemoryProbeBuilder(ProbeSequenceBuilder):
+class FromMemoryProbeBuilder(ProbeEnsembleBuilder):
     """A probe that has already been conditioned.
 
     Two things produce these. Reconstruction output, which `ProcessingTaskMonitor`
@@ -369,27 +437,51 @@ class FromMemoryProbeBuilder(ProbeSequenceBuilder):
     copied onto a scan of a different size is unusable until its weight rows are
     resolved. It runs no generator and is a strict no-op whenever the row count
     already matches, which it always does for reconstruction output.
+
+    An *editable* builder runs the expand-only conditioning after all, so modes can be
+    added to a result. Only :meth:`make_editable` makes one, starting the mode counts at
+    the probe's own so that nothing changes until they are raised; the item a
+    reconstruction writes into is reassigned a non-editable builder every iteration.
     """
 
     def __init__(
         self,
         rng: numpy.random.Generator,
         settings: ProbeSettings,
-        probe: ProbeSequence,
+        probe: ProbeEnsemble,
+        *,
+        editable: bool = False,
     ) -> None:
         super().__init__(rng, settings, 'from_memory')
         self._settings = settings
         self._probe = probe.copy()
+        self._editable = editable
+
+    @property
+    def is_editable(self) -> bool:
+        return self._editable
+
+    def make_editable(self) -> None:
+        """Condition the probe on later builds, starting from the modes it already has."""
+        if self._editable:
+            return
+
+        self.num_incoherent_modes.set_value(self._probe.num_incoherent_modes, notify=False)
+        self.num_coherent_modes.set_value(self._probe.num_coherent_modes, notify=False)
+        self._editable = True
+        self.notify_observers()
 
     def copy(self) -> FromMemoryProbeBuilder:
-        builder = FromMemoryProbeBuilder(self._rng, self._settings, self._probe)
+        builder = FromMemoryProbeBuilder(
+            self._rng, self._settings, self._probe, editable=self._editable
+        )
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
 
         return builder
 
-    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
         probe_geometry = geometry_provider.get_probe_geometry()
 
         try:
@@ -399,7 +491,7 @@ class FromMemoryProbeBuilder(ProbeSequenceBuilder):
 
         # TODO regrid probe as needed based on probe geometry from file/provider
         return self._conform_opr_weights(
-            ProbeSequence(
+            ProbeEnsemble(
                 self._probe.get_array(),
                 self._probe.get_opr_weights_or_none(),
                 pixel_geometry,
@@ -407,11 +499,14 @@ class FromMemoryProbeBuilder(ProbeSequenceBuilder):
             geometry_provider,
         )
 
-    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
+        if self._editable:
+            return super().build(geometry_provider)
+
         return self._build_raw(geometry_provider)
 
 
-class FromFileProbeBuilder(ProbeSequenceBuilder):
+class FromFileProbeBuilder(ProbeEnsembleBuilder):
     """A probe read from file, conditioned on the way in.
 
     Unlike `FromMemoryProbeBuilder` this is an ingest path, so the mode settings
@@ -431,7 +526,7 @@ class FromFileProbeBuilder(ProbeSequenceBuilder):
     a single ingest.
 
     The photon-count rescale is deliberately not applied; see
-    `ProbeSequenceBuilder._rescale_to_photon_count`.
+    `ProbeEnsembleBuilder._rescale_to_photon_count`.
     """
 
     def __init__(
@@ -469,7 +564,7 @@ class FromFileProbeBuilder(ProbeSequenceBuilder):
 
         return builder
 
-    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
         file_path = self.file_path.get_value()
         file_type = self.file_type.get_value()
         logger.debug(f'Reading "{file_path}" as "{file_type}"')
@@ -488,8 +583,8 @@ class FromFileProbeBuilder(ProbeSequenceBuilder):
             # array is taken to be sampled the way this run is.
             pixel_geometry = probe_geometry.get_pixel_geometry()
 
-        return resample_probe_sequence(
-            ProbeSequence(
+        return resample_probe_ensemble(
+            ProbeEnsemble(
                 probe_from_file.get_array(),
                 probe_from_file.get_opr_weights_or_none(),
                 pixel_geometry,

@@ -23,11 +23,43 @@ class DisplayMode(Enum):
     ENHANCED = 'enhanced'
 
 
-_COL_NAME = 0
-# Public: the controller installs the product combo delegate on this column.
-COL_PRODUCT = 1
-_COL_COUNTS = 3
-_COL_SIZE = 4
+class Column(Enum):
+    """Every column of FluorescenceRepositoryTreeModel: its order, its header and whether it edits.
+
+    The member value pairs the header with editability, and the position comes
+    from declaration order rather than being written out, so a column cannot be added
+    to the ordering and forgotten in the labels or the editable set. Nothing could pin
+    that alignment: CLAUDE.md puts this file outside the tested surface.
+
+    Public because the controller installs the product combo delegate on one of them.
+
+    ``editable`` is the item row's sense; element rows edit nothing.
+    """
+
+    NAME = ('Name', True)
+    PRODUCT = ('Product', True)
+    ELEMENTS = ('Elements', False)
+    COUNTS = ('Counts', False)
+    SIZE = ('Size', False)
+
+    def __init__(self, header: str, editable: bool) -> None:
+        self.header = header
+        self.editable = editable
+        # Members already defined when this one is constructed, which is its position.
+        self.index = len(self.__class__.__members__)
+
+    @classmethod
+    def from_index(cls, index: int) -> Column:
+        """The column at `index`.
+
+        Raises:
+            IndexError: for a column outside the table, which the model's own
+                ``columnCount`` makes impossible and so would be a bug rather than input.
+        """
+        if index < 0:
+            raise IndexError(f'Column index {index} is negative.')
+
+        return list(cls)[index]
 
 
 def _select_display_quantity(
@@ -175,8 +207,6 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
     would clash with sip's wrappertype metaclass on QAbstractItemModel.
     """
 
-    _HEADER = ('Name', 'Product', 'Elements', 'Counts', 'Size')
-
     def __init__(
         self,
         repository: FluorescenceRepository,
@@ -237,8 +267,8 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
         if num_rows == 0:
             return
         # Top-level rows: Counts follows the display.
-        top_left = self.index(0, _COL_COUNTS)
-        bottom_right = self.index(num_rows - 1, _COL_COUNTS)
+        top_left = self.index(0, Column.COUNTS.index)
+        bottom_right = self.index(num_rows - 1, Column.COUNTS.index)
         self.dataChanged.emit(top_left, bottom_right)
         # Element leaves: Counts likewise.
         for item_row in range(num_rows):
@@ -246,8 +276,8 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
             num_children = self.rowCount(parent_index)
             if num_children == 0:
                 continue
-            leaf_top = self.index(0, _COL_COUNTS, parent_index)
-            leaf_bottom = self.index(num_children - 1, _COL_COUNTS, parent_index)
+            leaf_top = self.index(0, Column.COUNTS.index, parent_index)
+            leaf_bottom = self.index(num_children - 1, Column.COUNTS.index, parent_index)
             self.dataChanged.emit(leaf_top, leaf_bottom)
 
     # ------------------------------------------------------------------
@@ -276,8 +306,8 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
         num_children = self.rowCount(parent_idx)
         if num_children > 0:
             # Spans Counts..Size: an enhance run adds element maps, so both move.
-            top_left = self.index(0, _COL_COUNTS, parent_idx)
-            bottom_right = self.index(num_children - 1, _COL_SIZE, parent_idx)
+            top_left = self.index(0, Column.COUNTS.index, parent_idx)
+            bottom_right = self.index(num_children - 1, Column.SIZE.index, parent_idx)
             self.dataChanged.emit(top_left, bottom_right)
 
     def handle_state_changed(self, index: int, item: FluorescenceRepositoryItem) -> None:
@@ -309,7 +339,7 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
         role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            return self._HEADER[section]
+            return Column.from_index(section).header
 
     @overload
     def parent(self, child: QModelIndex) -> QModelIndex: ...
@@ -345,7 +375,7 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
         return len(parent_node.children)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
-        return len(self._HEADER)
+        return len(Column)
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
@@ -355,7 +385,7 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
         node = index.internalPointer()
         if not isinstance(node, _ItemNode):
             return value
-        if index.column() not in (_COL_NAME, COL_PRODUCT):
+        if not Column.from_index(index.column()).editable:
             return value
 
         try:
@@ -388,13 +418,13 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
 
         if isinstance(node, _ElementNode):
             if role == Qt.ItemDataRole.DisplayRole:
-                match index.column():
-                    case 0:
+                match Column.from_index(index.column()):
+                    case Column.NAME:
                         return node.element_name(item)
-                    case 3:
+                    case Column.COUNTS:
                         counts = node.get_counts(item, self._display)
                         return _format_counts(counts)
-                    case 4:
+                    case Column.SIZE:
                         return format_bytes(node.get_nbytes(item))
                     case _:
                         return None
@@ -412,17 +442,17 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
 
         # Item row.
         if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
-            match index.column():
-                case 0:
+            match Column.from_index(index.column()):
+                case Column.NAME:
                     return item.get_name()
-                case 1:
+                case Column.PRODUCT:
                     return item.get_product().get_name()
-                case 2:
+                case Column.ELEMENTS:
                     return len(item.get_measured())
-                case 3:
+                case Column.COUNTS:
                     counts = node.get_counts(item, self._display)
                     return _format_counts(counts)
-                case 4:
+                case Column.SIZE:
                     return format_bytes(node.get_nbytes(item))
         elif role == Qt.ItemDataRole.FontRole:
             return _state_font(state)
@@ -442,14 +472,16 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
         node = index.internalPointer()
         if not isinstance(node, _ItemNode):
             return False
-        if index.column() not in (_COL_NAME, COL_PRODUCT):
+        column = Column.from_index(index.column())
+
+        if not column.editable:
             return False
         try:
             item = self._repository[index.row()]
         except IndexError:
             return False
 
-        if index.column() == _COL_NAME:
+        if column is Column.NAME:
             item.set_name(str(value))
             return True
 

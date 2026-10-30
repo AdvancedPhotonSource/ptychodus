@@ -6,22 +6,47 @@ import h5py
 import numpy
 
 from ptychodus.api.diffraction import BadPixels, BadPixelsFileReader
+from ptychodus.api.files import FileFormat
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.plugins import PluginRegistry
 
 
 class NPYBadPixelsFileReader(BadPixelsFileReader):
+    def get_file_description(self) -> str:
+        return 'NumPy Bad Pixel Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return FileFormat.NPY.extensions
+
     def read(self, file_path: Path) -> BadPixels:
         return numpy.load(file_path)
 
 
 class NPYGoodPixelsFileReader(BadPixelsFileReader):
+    def get_file_description(self) -> str:
+        return 'NumPy Good Pixel Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return FileFormat.NPY.extensions
+
     def read(self, file_path: Path) -> BadPixels:
         return numpy.logical_not(numpy.load(file_path))
 
 
 class APS12IDValidPixelMaskFileReader(BadPixelsFileReader):
+    """Read a 12-ID Pilatus mask whose ``valid_pixel_mask`` is nonzero at usable pixels.
+
+    The beamline stores the mask both as a boolean enum and as ``uint8``; either reads the
+    same way.
+    """
+
     DATA_PATH: Final[str] = 'valid_pixel_mask'
+
+    def get_file_description(self) -> str:
+        return 'APS 12-ID-E Valid Pixel Mask Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
 
     def read(self, file_path: Path) -> BadPixels:
         with h5py.File(file_path, 'r') as h5_file:
@@ -46,6 +71,12 @@ class APS34IDEBadPixelsFileReader(BadPixelsFileReader):
     DETECTOR_EXTENT: Final[ImageExtent] = ImageExtent(width_px=1028, height_px=1062)
     BAD_PIXELS_KEY: Final[str] = 'Bad pixels'
     PIXEL_KEY: Final[str] = 'Pixel'
+
+    def get_file_description(self) -> str:
+        return 'APS 34-ID-E Microdiffraction Bad Pixel Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.json'}
 
     def read(self, file_path: Path) -> BadPixels:
         with file_path.open(mode='r') as fp:
@@ -88,20 +119,16 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.bad_pixels_file_readers.register_plugin(
         NPYBadPixelsFileReader(),
         simple_name='NPY_Bad_Pixels',
-        display_name='NumPy Bad Pixel Files (*.npy)',
     )
     registry.bad_pixels_file_readers.register_plugin(
         NPYGoodPixelsFileReader(),
         simple_name='NPY_Good_Pixels',
-        display_name='NumPy Good Pixel Files (*.npy)',
     )
     registry.bad_pixels_file_readers.register_plugin(
         APS12IDValidPixelMaskFileReader(),
         simple_name='APS_12ID_Valid_Pixel_Mask',
-        display_name='APS 12-ID-E Valid Pixel Mask Files (*.h5 *.hdf5)',
     )
     registry.bad_pixels_file_readers.register_plugin(
         APS34IDEBadPixelsFileReader(),
         simple_name='APS_34IDE_Bad_Pixels',
-        display_name='APS 34-ID-E Microdiffraction Bad Pixel Files (*.json)',
     )

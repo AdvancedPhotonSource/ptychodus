@@ -18,7 +18,7 @@ import tifffile
 from ptychodus.api.diffraction import CropRegion
 from ptychodus.plugins.aps02id_diffraction_file import APS2IDDiffractionFileReader
 from ptychodus.plugins.mda.mda_position_file import RASTER_LINE_INDEX_STRIDE
-from ptychodus.plugins.aps12id_diffraction_file import APS12IDDiffractionFileReader
+from ptychodus.plugins.aps12id_file import APS12IDDiffractionFileReader
 from ptychodus.plugins.aps19id_isn_diffraction_file import ISNDiffractionFileReader
 from ptychodus.plugins.h5_diffraction_file import H5DiffractionFileReader
 from ptychodus.plugins.tiff_diffraction_file import TiffDiffractionFileReader
@@ -26,6 +26,27 @@ from ptychodus.plugins.tiff_diffraction_file import TiffDiffractionFileReader
 _DETECTOR_H = 4
 _DETECTOR_W = 6
 _DATA_PATH = '/entry/data/data'
+
+
+# The description only supplies the name a registration would show in a file dialog.
+# These tests exercise how a reader finds the members of a series, so it is a stub.
+_TEST_DESCRIPTION = 'Test Files'
+
+
+def _aps2id_reader(*, line_index_stride: int | None = None) -> APS2IDDiffractionFileReader:
+    return APS2IDDiffractionFileReader(
+        description=_TEST_DESCRIPTION, line_index_stride=line_index_stride
+    )
+
+
+def _tiff_reader() -> TiffDiffractionFileReader:
+    return TiffDiffractionFileReader(_TEST_DESCRIPTION)
+
+
+def _h5_reader(
+    *, data_path: str, detector_pixel_size_m: float | None = None
+) -> H5DiffractionFileReader:
+    return H5DiffractionFileReader(data_path, detector_pixel_size_m, description=_TEST_DESCRIPTION)
 
 
 def _write_h5(path: Path, num_frames: int, *, data_path: str = _DATA_PATH) -> Path:
@@ -57,9 +78,7 @@ def test_2id_series_is_scoped_to_one_scan(tmp_path: Path) -> None:
         for frame in (1, 2, 3):
             _write_h5(tmp_path / f'fly{scan:03d}_data_{frame:03d}.h5', 2)
 
-    num_arrays, counts, labels = _totals(
-        APS2IDDiffractionFileReader(), tmp_path / 'fly054_data_001.h5'
-    )
+    num_arrays, counts, labels = _totals(_aps2id_reader(), tmp_path / 'fly054_data_001.h5')
 
     assert num_arrays == 3
     assert counts == [2, 2, 2]
@@ -72,9 +91,7 @@ def test_2id_series_handles_a_six_digit_frame_field(tmp_path: Path) -> None:
         for frame in range(3):
             _write_h5(tmp_path / f'bnp_fly{scan:04d}_{frame:06d}.h5', 2)
 
-    num_arrays, _, labels = _totals(
-        APS2IDDiffractionFileReader(), tmp_path / 'bnp_fly0675_000000.h5'
-    )
+    num_arrays, _, labels = _totals(_aps2id_reader(), tmp_path / 'bnp_fly0675_000000.h5')
 
     assert num_arrays == 3
     assert all(label.startswith('bnp_fly0675_') for label in labels)
@@ -89,7 +106,7 @@ def test_2id_reader_reads_each_files_own_frame_count(tmp_path: Path) -> None:
     for frame, num_frames in enumerate((3, 5, 2), start=1):
         _write_h5(tmp_path / f'fly054_data_{frame:03d}.h5', num_frames)
 
-    dataset = APS2IDDiffractionFileReader().read(tmp_path / 'fly054_data_001.h5')
+    dataset = _aps2id_reader().read(tmp_path / 'fly054_data_001.h5')
 
     assert list(dataset.get_metadata().num_patterns_per_array) == [3, 5, 2]
 
@@ -101,7 +118,7 @@ def test_2id_reader_reads_each_files_own_frame_count(tmp_path: Path) -> None:
 
 def test_2id_reader_supplies_the_eiger_pitch(tmp_path: Path) -> None:
     _write_h5(tmp_path / 'fly054_data_001.h5', 2)
-    metadata = APS2IDDiffractionFileReader().read(tmp_path / 'fly054_data_001.h5').get_metadata()
+    metadata = _aps2id_reader().read(tmp_path / 'fly054_data_001.h5').get_metadata()
 
     assert metadata.detector_pixel_geometry is not None
     assert metadata.detector_pixel_geometry.width_m == pytest.approx(75e-6)
@@ -128,33 +145,6 @@ def test_isn_reader_supplies_a_detector_pitch(tmp_path: Path) -> None:
     assert metadata.detector_pixel_geometry.width_m == pytest.approx(75e-6)
 
 
-def test_12id_series_collects_every_line_and_point(tmp_path: Path) -> None:
-    """12-ID writes one file per point, so the series is keyed by (line, point).
-
-    Matching a single digit field picks the line and pins the point, collecting one point
-    from each line and discarding the rest.
-    """
-    shape = (_DETECTOR_H, _DETECTOR_W)
-
-    for line in (1, 2):
-        for point in (0, 1, 2):
-            path = tmp_path / f'007_{line:05d}_{point:d}.h5'
-            with h5py.File(path, 'w') as h5_file:
-                h5_file.create_dataset(_DATA_PATH, data=numpy.zeros(shape, dtype=numpy.uint32))
-
-    dataset = APS12IDDiffractionFileReader().read(tmp_path / '007_00001_0.h5')
-    labels = [array.get_label() for array in dataset]
-
-    assert labels == [
-        '007_00001_0',
-        '007_00001_1',
-        '007_00001_2',
-        '007_00002_0',
-        '007_00002_1',
-        '007_00002_2',
-    ]
-
-
 def test_12id_single_frame_files_assemble(tmp_path: Path) -> None:
     """A one-frame-per-file layout stores a 2-D dataset, but an array must yield a stack.
 
@@ -163,13 +153,14 @@ def test_12id_single_frame_files_assemble(tmp_path: Path) -> None:
     nothing. Cropping is worse: the region slice indexes an axis that is not there.
     """
     shape = (_DETECTOR_H, _DETECTOR_W)
+    h5py.File(tmp_path / 'sample_0007_master.h5', 'w').close()
 
-    for point in (0, 1):
-        path = tmp_path / f'007_00001_{point:d}.h5'
+    for point in (1, 2):
+        path = tmp_path / f'sample_0007_{point:05d}.h5'
         with h5py.File(path, 'w') as h5_file:
             h5_file.create_dataset(_DATA_PATH, data=numpy.ones(shape, dtype=numpy.uint32))
 
-    dataset = APS12IDDiffractionFileReader().read(tmp_path / '007_00001_0.h5')
+    dataset = APS12IDDiffractionFileReader().read(tmp_path / 'sample_0007_master.h5')
 
     for array in dataset:
         patterns = array.get_patterns()
@@ -190,7 +181,7 @@ def test_tiff_series_is_scoped_and_counts_its_own_pages(tmp_path: Path) -> None:
                 tmp_path / f'fly{scan:03d}_data_{frame:03d}.tif', data, photometric='minisblack'
             )
 
-    dataset = TiffDiffractionFileReader().read(tmp_path / 'fly054_data_001.tif')
+    dataset = _tiff_reader().read(tmp_path / 'fly054_data_001.tif')
     labels = [array.get_label() for array in dataset]
 
     assert labels == ['fly054_data_001', 'fly054_data_002', 'fly054_data_003']
@@ -218,7 +209,7 @@ def test_tiff_series_spans_an_unpadded_counter_rollover(tmp_path: Path) -> None:
                 tmp_path / f'Star_scan{scan}_9p5keV_{frame:03d}.tif', data, photometric='minisblack'
             )
 
-    reader = TiffDiffractionFileReader()
+    reader = _tiff_reader()
 
     # The entry point must not matter: three- and four-digit members name one series.
     for member in ('Star_scan15_9p5keV_001.tif', 'Star_scan15_9p5keV_1005.tif'):
@@ -244,14 +235,10 @@ def test_h5_reader_supplies_a_pitch_only_when_given_one(tmp_path: Path) -> None:
     """The fold_slice registration passes a pitch; the bare reader still reports none."""
     path = _write_h5(tmp_path / 'data_roi0_Ndp4_dp.hdf5', 3, data_path='/dp')
 
-    without = H5DiffractionFileReader(data_path='/dp').read(path).get_metadata()
+    without = _h5_reader(data_path='/dp').read(path).get_metadata()
     assert without.detector_pixel_geometry is None
 
-    with_pitch = (
-        H5DiffractionFileReader(data_path='/dp', detector_pixel_size_m=75e-6)
-        .read(path)
-        .get_metadata()
-    )
+    with_pitch = _h5_reader(data_path='/dp', detector_pixel_size_m=75e-6).read(path).get_metadata()
     assert with_pitch.detector_pixel_geometry is not None
     assert with_pitch.detector_pixel_geometry.height_m == pytest.approx(75e-6)
 
@@ -271,7 +258,7 @@ def test_2id_reader_numbers_by_running_count_by_default(tmp_path: Path) -> None:
     for frame in (1, 2, 3):
         _write_h5(tmp_path / f'fly007_data_{frame:03d}.h5', 2)
 
-    reader = APS2IDDiffractionFileReader()
+    reader = _aps2id_reader()
 
     assert _indexes(reader, tmp_path / 'fly007_data_001.h5') == [0, 1, 2, 3, 4, 5]
 
@@ -281,7 +268,7 @@ def test_2id_reader_numbers_line_major_when_given_a_stride(tmp_path: Path) -> No
     for frame in (1, 2, 3):
         _write_h5(tmp_path / f'fly007_data_{frame:03d}.h5', 2)
 
-    reader = APS2IDDiffractionFileReader(line_index_stride=RASTER_LINE_INDEX_STRIDE)
+    reader = _aps2id_reader(line_index_stride=RASTER_LINE_INDEX_STRIDE)
 
     assert _indexes(reader, tmp_path / 'fly007_data_001.h5') == [
         0,
@@ -298,7 +285,7 @@ def test_2id_reader_keeps_line_numbers_across_a_missing_member(tmp_path: Path) -
     for frame in (1, 3):
         _write_h5(tmp_path / f'fly007_data_{frame:03d}.h5', 2)
 
-    reader = APS2IDDiffractionFileReader(line_index_stride=RASTER_LINE_INDEX_STRIDE)
+    reader = _aps2id_reader(line_index_stride=RASTER_LINE_INDEX_STRIDE)
 
     assert _indexes(reader, tmp_path / 'fly007_data_001.h5') == [
         0,
@@ -312,7 +299,7 @@ def test_2id_reader_rejects_a_line_that_reaches_the_stride(tmp_path: Path) -> No
     """A longer line would run into the next line's numbers, so it is refused."""
     _write_h5(tmp_path / 'fly007_data_001.h5', 4)
 
-    reader = APS2IDDiffractionFileReader(line_index_stride=3)
+    reader = _aps2id_reader(line_index_stride=3)
 
     with pytest.raises(ValueError, match='reaches the line-major'):
         reader.read(tmp_path / 'fly007_data_001.h5')
@@ -323,7 +310,7 @@ def test_2id_reader_rejects_a_series_numbered_from_zero(tmp_path: Path) -> None:
     for frame in (0, 1):
         _write_h5(tmp_path / f'fly007_data_{frame:03d}.h5', 2)
 
-    reader = APS2IDDiffractionFileReader(line_index_stride=RASTER_LINE_INDEX_STRIDE)
+    reader = _aps2id_reader(line_index_stride=RASTER_LINE_INDEX_STRIDE)
 
     with pytest.raises(ValueError, match='one-based counter'):
         reader.read(tmp_path / 'fly007_data_000.h5')
@@ -338,7 +325,7 @@ def test_2id_reader_skips_an_unreadable_member(
 
     (tmp_path / 'fly007_data_002.h5').write_bytes(b'')
 
-    reader = APS2IDDiffractionFileReader(line_index_stride=RASTER_LINE_INDEX_STRIDE)
+    reader = _aps2id_reader(line_index_stride=RASTER_LINE_INDEX_STRIDE)
 
     with caplog.at_level('WARNING'):
         indexes = _indexes(reader, tmp_path / 'fly007_data_001.h5')
@@ -351,7 +338,7 @@ def test_2id_reader_skips_an_unreadable_member(
 def test_2id_reader_rejects_a_series_with_nothing_readable(tmp_path: Path) -> None:
     (tmp_path / 'fly007_data_001.h5').write_bytes(b'')
 
-    reader = APS2IDDiffractionFileReader()
+    reader = _aps2id_reader()
 
     with pytest.raises(ValueError, match='No readable diffraction files'):
         reader.read(tmp_path / 'fly007_data_001.h5')
@@ -367,7 +354,7 @@ def test_2id_reader_widens_the_dtype_across_the_series(tmp_path: Path) -> None:
                 _DATA_PATH, data=numpy.zeros((2, _DETECTOR_H, _DETECTOR_W), dtype=dtype)
             )
 
-    metadata = APS2IDDiffractionFileReader().read(tmp_path / 'fly007_data_001.h5').get_metadata()
+    metadata = _aps2id_reader().read(tmp_path / 'fly007_data_001.h5').get_metadata()
 
     assert metadata.pattern_dtype == numpy.dtype(numpy.uint32)
 
@@ -379,7 +366,7 @@ def test_2id_reader_rejects_a_member_of_a_different_size(tmp_path: Path) -> None
         h5_file.create_dataset(_DATA_PATH, data=numpy.zeros((2, _DETECTOR_H + 1, _DETECTOR_W)))
 
     with pytest.raises(ValueError, match='but the series is'):
-        APS2IDDiffractionFileReader().read(tmp_path / 'fly007_data_001.h5')
+        _aps2id_reader().read(tmp_path / 'fly007_data_001.h5')
 
 
 def test_2id_reader_warns_when_the_detector_dropped_frames(
@@ -394,7 +381,7 @@ def test_2id_reader_warns_when_the_detector_dropped_frames(
             data=numpy.array([10, 11, 13, 14], dtype=numpy.int32),
         )
 
-    reader = APS2IDDiffractionFileReader(line_index_stride=RASTER_LINE_INDEX_STRIDE)
+    reader = _aps2id_reader(line_index_stride=RASTER_LINE_INDEX_STRIDE)
 
     with caplog.at_level('WARNING'):
         reader.read(path)
@@ -413,7 +400,7 @@ def test_2id_reader_is_quiet_when_the_frame_counter_is_consecutive(
             data=numpy.array([10, 11, 12, 13], dtype=numpy.int32),
         )
 
-    reader = APS2IDDiffractionFileReader(line_index_stride=RASTER_LINE_INDEX_STRIDE)
+    reader = _aps2id_reader(line_index_stride=RASTER_LINE_INDEX_STRIDE)
 
     with caplog.at_level('WARNING'):
         reader.read(path)

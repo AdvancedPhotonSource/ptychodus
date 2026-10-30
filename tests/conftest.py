@@ -16,10 +16,10 @@ import pytest
 # developers with a real display can pre-set the env var to override.
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
-# tests/ptychodus_store/ needs the "store" extra plus pytest-asyncio. Its own conftest
+# tests/webapp/ needs the "webapp" extra plus pytest-asyncio. Its own conftest
 # imports sqlalchemy eagerly, so the directory has to be dropped before pytest descends
 # into it -- pytest.importorskip in a conftest is reported as an error, not a skip.
-_STORE_TEST_DEPS = (
+_WEBAPP_TEST_DEPS = (
     'aiosqlite',
     'fastapi',
     'pydantic_settings',
@@ -35,7 +35,7 @@ def _has_fastmcp_server() -> bool:
     ``find_spec('fastmcp')`` succeeds on an install that carries only the client
     half; even ``fastmcp.server`` imports there. The absence shows up solely as an
     ImportError raised from the ``FastMCP`` symbol, which is what
-    ``ptychodus_store.mcp_server`` imports -- so the symbol is the only gate that
+    ``ptychodus.webapp.mcp_server`` imports -- so the symbol is the only gate that
     turns that install into a skip rather than a collection error.
     """
     try:
@@ -48,8 +48,8 @@ def _has_fastmcp_server() -> bool:
 
 collect_ignore = []
 
-if any(find_spec(name) is None for name in _STORE_TEST_DEPS) or not _has_fastmcp_server():
-    collect_ignore.append('ptychodus_store')
+if any(find_spec(name) is None for name in _WEBAPP_TEST_DEPS) or not _has_fastmcp_server():
+    collect_ignore.append('webapp')
 
 if find_spec('PyQt5') is None:
     collect_ignore.append('view')

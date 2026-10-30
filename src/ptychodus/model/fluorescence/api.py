@@ -1,14 +1,19 @@
-from collections.abc import Iterator
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 import logging
+
+from pydantic import BaseModel, ValidationError
 
 from ptychodus.api.fluorescence import (
     FluorescenceEnhancer,
     FluorescenceFileReader,
     FluorescenceFileWriter,
 )
-from ptychodus.api.plugins import PluginChooser
 
+from ..file_types import FileTypeChooser
+from ..plugins import PluginChooser
+from ..processing.parameter_store import ProcessingParameterStore
 from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .monitor import EnhanceFluorescenceBackgroundTask, FluorescenceTaskMonitor
@@ -17,7 +22,7 @@ from .repository import (
     FluorescenceRepository,
     FluorescenceRepositoryItem,
 )
-from .settings import FluorescenceSettings
+from .settings import ENHANCER_LIBRARY, FluorescenceSettings
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +35,7 @@ class FluorescenceAPI:
         product_api: ProductAPI,
         repository: FluorescenceRepository,
         enhancer_chooser: PluginChooser[FluorescenceEnhancer],
+        parameter_store: ProcessingParameterStore,
         task_monitor: FluorescenceTaskMonitor,
         file_reader_chooser: PluginChooser[FluorescenceFileReader],
         file_writer_chooser: PluginChooser[FluorescenceFileWriter],
@@ -39,29 +45,16 @@ class FluorescenceAPI:
         self._product_api = product_api
         self._repository = repository
         self._enhancer_chooser = enhancer_chooser
+        self._parameter_store = parameter_store
         self._task_monitor = task_monitor
-        self._file_reader_chooser = file_reader_chooser
-        self._file_writer_chooser = file_writer_chooser
+        self.file_readers = FileTypeChooser(file_reader_chooser)
+        self.file_writers = FileTypeChooser(file_writer_chooser)
 
     def get_task_monitor(self) -> FluorescenceTaskMonitor:
         return self._task_monitor
 
     def get_item(self, item_index: int) -> FluorescenceRepositoryItem:
         return self._repository[item_index]
-
-    def get_open_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_reader_chooser:
-            yield plugin.display_name
-
-    def get_open_file_filter(self) -> str:
-        return self._file_reader_chooser.get_current_plugin().display_name
-
-    def get_save_file_filters(self) -> Iterator[str]:
-        for plugin in self._file_writer_chooser:
-            yield plugin.display_name
-
-    def get_save_file_filter(self) -> str:
-        return self._file_writer_chooser.get_current_plugin().display_name
 
     def open_measured_dataset(
         self, file_path: Path, product_index: int, *, file_type: str | None = None
@@ -75,15 +68,11 @@ class FluorescenceAPI:
         # touch the file, so an orphaned item is never inserted.
         product_item = self._product_api.get_item(product_index)
 
-        if file_type is not None:
-            self._file_reader_chooser.set_current_plugin(file_type)
-
-        resolved_type = self._file_reader_chooser.get_current_plugin().simple_name
-        logger.debug(f'Reading "{file_path}" as "{resolved_type}"')
-        file_reader = self._file_reader_chooser.get_current_plugin().strategy
+        plugin = self.file_readers.select(file_type)
+        logger.debug(f'Reading "{file_path}" as "{plugin.simple_name}"')
 
         try:
-            dataset = file_reader.read(file_path)
+            dataset = plugin.strategy.read(file_path)
         except Exception as exc:
             raise RuntimeError(f'Failed to read "{file_path}"') from exc
 
@@ -96,7 +85,7 @@ class FluorescenceAPI:
             product=product_item,
             measured=dataset,
             source_path=file_path,
-            source_file_type=resolved_type,
+            source_file_type=plugin.simple_name,
         )
         return self._repository.insert_item(item)
 
@@ -135,19 +124,45 @@ class FluorescenceAPI:
         if dataset is None:
             raise ValueError(f'Item "{item.get_name()}" has no enhanced dataset to save')
 
-        if file_type is not None:
-            self._file_writer_chooser.set_current_plugin(file_type)
+        plugin = self.file_writers.select(file_type)
+        logger.debug(f'Writing "{file_path}" as "{plugin.simple_name}"')
+        plugin.strategy.write(file_path, dataset)
 
-        resolved_type = self._file_writer_chooser.get_current_plugin().simple_name
-        logger.debug(f'Writing "{file_path}" as "{resolved_type}"')
-        writer = self._file_writer_chooser.get_current_plugin().strategy
-        writer.write(file_path, dataset)
+    def _get_options(self, enhancer_name: str, overrides: Mapping[str, Any] | None) -> BaseModel:
+        """The options *enhancer_name* runs with: what settings hold, then *overrides*.
+
+        Overrides are keyed by declared field name and land on a copy, so they apply
+        to one run and are never written back to settings. A name the enhancer does
+        not declare is reported and skipped.
+
+        Raises:
+            ValueError: if an override is a value the declaration rejects.
+        """
+        options: BaseModel = self._parameter_store.get_options(ENHANCER_LIBRARY, enhancer_name)
+
+        if not overrides:
+            return options
+
+        declared = type(options).model_fields
+        known: dict[str, Any] = {}
+
+        for name, value in overrides.items():
+            if name in declared:
+                known[name] = value
+            else:
+                logger.warning(f'Enhancer "{enhancer_name}" does not have parameter "{name}"!')
+
+        try:
+            return type(options).model_validate({**options.model_dump(), **known})
+        except ValidationError as exc:
+            raise ValueError(f'Invalid parameters for enhancer "{enhancer_name}": {exc}') from exc
 
     def enhance(
         self,
         item_index: int,
         *,
         algorithm: str | None = None,
+        algorithm_parameters: Mapping[str, Any] | None = None,
         output_file_path: Path | None = None,
         output_file_type: str | None = None,
         block: bool = False,
@@ -168,20 +183,23 @@ class FluorescenceAPI:
         if algorithm is not None:
             self._enhancer_chooser.set_current_plugin(algorithm)
 
+        plugin = self._enhancer_chooser.get_current_plugin()
+        # Before anything is queued, so an override the declaration rejects fails here
+        # rather than in the background task.
+        options = self._get_options(plugin.simple_name, algorithm_parameters)
+
         output_file_writer: FluorescenceFileWriter | None = None
 
         if output_file_path is not None:
-            if output_file_type is not None:
-                self._file_writer_chooser.set_current_plugin(output_file_type)
-
-            output_file_writer = self._file_writer_chooser.get_current_plugin().strategy
+            output_file_writer = self.file_writers.select(output_file_type).strategy
 
         product = item.get_product().get_product()
         item.set_state(FluorescenceItemState.ENHANCING)
 
         background_task = EnhanceFluorescenceBackgroundTask(
             self._task_monitor,
-            self._enhancer_chooser.get_current_plugin().strategy,
+            plugin.strategy,
+            options,
             item.get_measured(),
             product,
             item,

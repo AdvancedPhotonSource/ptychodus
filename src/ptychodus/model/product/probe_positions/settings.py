@@ -1,7 +1,11 @@
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.settings import SettingsRegistry
+from ...declared import ParameterDescription, declare_in
+from ...observer import Observable, Observer
+from ...parameters import Parameter
+from ...settings import SettingsRegistry
 
 
 class ProbePositionsSettings(Observable, Observer):
@@ -44,36 +48,15 @@ class ProbePositionsSettings(Observable, Observer):
             'ExpandedBoundingBoxMaximumYInMeters', +5e-7
         )
 
-        self.num_points_x = self._group.create_integer_parameter('NumberOfPointsX', 10, minimum=0)
-        self.num_points_y = self._group.create_integer_parameter('NumberOfPointsY', 10, minimum=0)
-        self.step_size_x_m = self._group.create_real_parameter(
-            'StepSizeXInMeters', 1e-6, minimum=0.0
-        )
-        self.step_size_y_m = self._group.create_real_parameter(
-            'StepSizeYInMeters', 1e-6, minimum=0.0
-        )
+    def declare(self, described: Sequence[ParameterDescription]) -> Mapping[str, Parameter[Any]]:
+        """Create the parameters a scan pattern declares, and return them by key.
 
-        self.radial_step_size_m = self._group.create_real_parameter(
-            'RadialStepSizeInMeters', 1e-6, minimum=0.0
-        )
-        self.num_shells = self._group.create_integer_parameter('NumberOfShells', 5, minimum=0)
-        self.num_points_in_first_shell = self._group.create_integer_parameter(
-            'NumberOfPointsInFirstShell', 10, minimum=0
-        )
-
-        self.amplitude_x_m = self._group.create_real_parameter(
-            'AmplitudeXInMeters', 4.5e-6, minimum=0.0
-        )
-        self.amplitude_y_m = self._group.create_real_parameter(
-            'AmplitudeYInMeters', 4.5e-6, minimum=0.0
-        )
-        self.angular_step_x_turns = self._group.create_real_parameter('AngularStepXInTurns', 0.03)
-        self.angular_step_y_turns = self._group.create_real_parameter('AngularStepYInTurns', 0.04)
-        self.angular_shift_turns = self._group.create_real_parameter('AngularShiftInTurns', 0.25)
-
-        self.radius_scalar_m = self._group.create_real_parameter(
-            'RadiusScalarInMeters', 0.5e-6, minimum=0.0
-        )
+        The pattern-specific keys of this section are not written out above,
+        because which of them exist is settled by which generators registered.
+        They land in the same group all the same, so one section still holds
+        everything a scan is configured by.
+        """
+        return declare_in(self._group, described)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:

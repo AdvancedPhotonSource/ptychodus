@@ -3,10 +3,11 @@ import logging
 
 from PyQt5.QtWidgets import QButtonGroup
 
+from ptychodus.api.files import FileFormat
 from ptychodus.api.typing import RealArrayType
 
 from ...model.analysis import IlluminationMap, IlluminationMapper
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
 from ...view.probe import IlluminationDialog, IlluminationParametersView, IlluminationQuantityView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
@@ -17,7 +18,7 @@ from ..visualization import (
 
 logger = logging.getLogger(__name__)
 
-_SAVE_FILE_FILTER = 'NumPy Zipped Archive (*.npz)'
+_SAVE_FILE_FILTER = FileFormat.NPZ.file_filter
 
 
 class IlluminationParametersController:
@@ -109,7 +110,6 @@ class IlluminationViewController:
     def __init__(
         self,
         mapper: IlluminationMapper,
-        engine: VisualizationEngine,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
@@ -119,6 +119,7 @@ class IlluminationViewController:
         self._dialog = IlluminationDialog()
 
         self._parameters_controller = IlluminationParametersController(self._dialog.parameters_view)
+        engine = VisualizationEngine(is_complex=False)
         self._visualization_widget_controller = VisualizationWidgetController(
             engine,
             self._dialog.visualization_widget,

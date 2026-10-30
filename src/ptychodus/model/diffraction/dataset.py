@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from bisect import bisect
 from collections.abc import Iterator, Sequence
 from enum import Enum
+from functools import partial
 from pathlib import Path
 from typing import IO, overload
 import logging
@@ -11,10 +12,12 @@ import threading
 
 import numpy
 
+from ptychodus.api.accumulate import DiffractionMoments, compute_diffraction_moments
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     BadPixels,
     CropRegion,
+    DetectorBackground,
     DiffractionArray,
     DiffractionDataset,
     DiffractionDatasetLayoutNode,
@@ -22,12 +25,16 @@ from ptychodus.api.diffraction import (
     DiffractionMetadata,
     DiffractionPattern,
     DiffractionPatterns,
+    FlatField,
     SimpleDiffractionDataset,
+    validate_pixel_map,
 )
 from ptychodus.api.assemble import (
     AssembledDiffractionData,
+    DetectorCorrections,
     allocate_assembled_data,
     compute_array_offsets,
+    compute_assembled_dtype,
     compute_assembled_patterns_shape,
     preprocess_array,
 )
@@ -67,6 +74,10 @@ class DiffractionDatasetObserver(ABC):
 
     @abstractmethod
     def handle_dataset_reloaded(self) -> None:
+        pass
+
+    def handle_moments_changed(self) -> None:
+        """React to the diffraction moments of a finished load becoming available."""
         pass
 
 
@@ -175,10 +186,17 @@ class AssembledDiffractionDataset(DiffractionDataset):
         # and is always overwritten by reload() or by load_all_arrays() before any
         # array is processed, so the shape here only matters when nothing is loaded.
         self._bad_pixels = self._create_default_bad_pixels()
+        # Raw measured detector maps, absent unless the source or a file supplies them.
+        self._background: DetectorBackground | None = None
+        self._flat_field: FlatField | None = None
+        # Moments of self._data: set by the loader thread when a load finishes, or
+        # computed on first request otherwise; None whenever self._data changes.
+        self._moments_lock = threading.Lock()
+        self._moments: DiffractionMoments | None = None
 
     def _create_default_bad_pixels(self) -> BadPixels:
         extent = self._dataset.get_metadata().detector_extent
-        return numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool_)
+        return numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool)
 
     def get_name(self) -> str:
         return self._name
@@ -190,21 +208,38 @@ class AssembledDiffractionDataset(DiffractionDataset):
         self._name = name
 
     def set_bad_pixels(self, bad_pixels: BadPixels) -> None:
-        if bad_pixels.ndim != 2:
-            raise ValueError(f'Bad pixels array must be 2D, got {bad_pixels.ndim}D.')
-
         extent = self._dataset.get_metadata().detector_extent
-
-        if bad_pixels.shape != extent.get_shape():
-            raise ValueError(
-                f'Bad pixels shape {bad_pixels.shape} does not match '
-                f'loaded detector extent {extent.get_shape()}.'
-            )
-
+        validate_pixel_map(bad_pixels, extent.get_shape(), name='Bad pixels')
         self._bad_pixels = bad_pixels
 
     def reset_bad_pixels(self) -> None:
         self._bad_pixels = self._create_default_bad_pixels()
+
+    def set_background(self, background: DetectorBackground) -> None:
+        extent = self._dataset.get_metadata().detector_extent
+        validate_pixel_map(background, extent.get_shape(), name='Background')
+        self._background = background
+
+    def reset_background(self) -> None:
+        self._background = None
+
+    def set_flat_field(self, flat_field: FlatField) -> None:
+        extent = self._dataset.get_metadata().detector_extent
+        validate_pixel_map(flat_field, extent.get_shape(), name='Flat field')
+        self._flat_field = flat_field
+
+    def reset_flat_field(self) -> None:
+        self._flat_field = None
+
+    def _create_corrections(self) -> DetectorCorrections:
+        """The raw maps, applied or carried as the detector settings say."""
+        return DetectorCorrections(
+            background=self._background,
+            flat_field=self._flat_field,
+            subtract_background=self._detector_settings.subtract_background.get_value(),
+            divide_flat_field=self._detector_settings.divide_flat_field.get_value(),
+            flat_field_floor=self._detector_settings.flat_field_floor.get_value(),
+        )
 
     def add_observer(self, observer: DiffractionDatasetObserver) -> None:
         if observer not in self._observer_list:
@@ -262,8 +297,61 @@ class AssembledDiffractionDataset(DiffractionDataset):
     def get_bad_pixels(self) -> BadPixels:
         return self._bad_pixels
 
+    def get_background(self) -> DetectorBackground | None:
+        return self._background
+
+    def get_flat_field(self) -> FlatField | None:
+        return self._flat_field
+
     def get_assembled_data(self) -> AssembledDiffractionData:
         return self._data
+
+    def get_diffraction_moments(self) -> DiffractionMoments | None:
+        """The moments of the assembled patterns, or None while loading or with none loaded.
+
+        A load computes them as it finishes; patterns set or streamed in any other way
+        have them computed here, once, on first request.
+        """
+        with self._moments_lock:
+            moments = self._moments
+
+        if moments is not None or not self._array_list or self.is_load_in_progress():
+            return moments
+
+        data = self._data
+        moments = compute_diffraction_moments(
+            data.get_indexes(),
+            data.get_patterns(),
+            bad_pixels=data.get_bad_pixels(),
+            background=data.get_background(),
+            flat_field=data.get_flat_field(),
+        )
+
+        with self._moments_lock:
+            if data is self._data and self._moments is None:
+                self._moments = moments
+
+        return moments
+
+    def _invalidate_moments(self) -> None:
+        with self._moments_lock:
+            self._moments = None
+
+    def _on_moments_computed(
+        self, data: AssembledDiffractionData, moments: DiffractionMoments | None
+    ) -> None:
+        """Keep moments computed by the loader thread, unless the buffer was replaced since."""
+        with self._moments_lock:
+            if data is not self._data:
+                return
+
+            self._moments = moments
+
+        self._task_manager.put_foreground_task(self._notify_moments_changed)
+
+    def _notify_moments_changed(self) -> None:
+        for observer in self._observer_list:
+            observer.handle_moments_changed()
 
     def get_source(self) -> DiffractionDataset:
         """Return the raw source dataset queued for load, or the currently-loaded one.
@@ -429,7 +517,8 @@ class AssembledDiffractionDataset(DiffractionDataset):
         plan = self._resolve_prep_plan(metadata.detector_extent, process_patterns=process_patterns)
         read_region = plan.read_region if plan is not None else None
         pipeline = plan.pipeline if plan is not None else None
-        raw_bad_pixels = (
+        raw_corrections = self._create_corrections().crop(read_region)
+        raw_bad_pixels = raw_corrections.apply_to_bad_pixels(
             self._bad_pixels if read_region is None else read_region.apply_to(self._bad_pixels)
         )
         processed_bad_pixels = (
@@ -437,6 +526,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
         )
         lower, upper = self._get_total_counts_bounds()
         label = array.get_label()
+        nonfinite_pixels: list[BadPixels] = []
 
         try:
             data = preprocess_array(
@@ -448,13 +538,31 @@ class AssembledDiffractionDataset(DiffractionDataset):
                 total_counts_lower_bound=lower,
                 total_counts_upper_bound=upper,
                 read_region=read_region,
+                corrections=raw_corrections.through_pipeline(pipeline),
+                on_nonfinite_pixels=nonfinite_pixels.append,
             )
         except FileNotFoundError:
             logger.warning(f'File not found for "{label}"!')
             return
 
+        if nonfinite_pixels:
+            # The block's mask already includes them; widen the whole buffer's and the
+            # raw detector mask so every later frame treats them as bad too.
+            self._data.add_bad_pixels(data.get_bad_pixels())
+            detector_pixels = numpy.zeros_like(self._bad_pixels)
+            region_pixels = (
+                detector_pixels if read_region is None else read_region.apply_to(detector_pixels)
+            )
+            region_pixels[...] = nonfinite_pixels[0]
+            self._mask_nonfinite_pixels(detector_pixels)
+
         offset = compute_array_offsets(metadata)[array_index]
         self._on_array_assembled(array_index, label, self._data.assemble(data, offset))
+        self._invalidate_moments()
+
+    def _mask_nonfinite_pixels(self, nonfinite_pixels: BadPixels) -> None:
+        """Mark detector pixels that held NaN or infinite values bad for later loads."""
+        self._bad_pixels = numpy.logical_or(self._bad_pixels, nonfinite_pixels)
 
     def append_array(self, array: DiffractionArray, *, process_patterns: bool = True) -> None:
         self._task_manager.put_background_task(
@@ -496,11 +604,14 @@ class AssembledDiffractionDataset(DiffractionDataset):
     def clear(self) -> None:
         self._dataset = SimpleDiffractionDataset.create_null()
         self._data = AssembledDiffractionData.create_null()
+        self._invalidate_moments()
         self._array_list.clear()
         self._array_counter = 0
         self._source = None
         self._last_array_loader = None
         self._bad_pixels = self._create_default_bad_pixels()
+        self._background = None
+        self._flat_field = None
 
         if self._scratch_tempfile is not None:
             self._scratch_tempfile.close()
@@ -514,6 +625,8 @@ class AssembledDiffractionDataset(DiffractionDataset):
         metadata = dataset.get_metadata()
         self._dataset = SimpleDiffractionDataset(metadata, dataset.get_layout(), [])
         self._bad_pixels = dataset.get_bad_pixels()
+        self._background = dataset.get_background()
+        self._flat_field = dataset.get_flat_field()
         # self._dataset drops the array list, so the source is the only handle on the
         # lazy arrays that load_all_arrays will read.
         self._source = dataset
@@ -538,6 +651,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
         pipeline = plan.pipeline if plan is not None else None
         raw_pixel_geometry = self.get_raw_pixel_geometry()
         lower, upper = self._get_total_counts_bounds()
+        corrections = self._create_corrections()
 
         patterns_shape = compute_assembled_patterns_shape(
             source, pipeline, bad_pixels=self._bad_pixels, read_region=read_region
@@ -551,8 +665,12 @@ class AssembledDiffractionDataset(DiffractionDataset):
             # released in clear().
             self._scratch_tempfile = tempfile.NamedTemporaryFile(dir=scratch_dir, suffix='.npy')
             logger.info(f'Scratch data file {self._scratch_tempfile.name} is {patterns_shape}')
+            # Sized for every promotion the corrections and the pipeline make, so the
+            # scratch file can hold what is assembled into it.
             patterns = numpy.memmap(
-                self._scratch_tempfile, dtype=metadata.pattern_dtype, shape=patterns_shape
+                self._scratch_tempfile,
+                dtype=compute_assembled_dtype(source, pipeline, corrections=corrections),
+                shape=patterns_shape,
             )
             patterns[:] = 0
         else:
@@ -565,7 +683,9 @@ class AssembledDiffractionDataset(DiffractionDataset):
             raw_pixel_geometry=raw_pixel_geometry,
             patterns=patterns,
             read_region=read_region,
+            corrections=corrections,
         )
+        self._invalidate_moments()
         self._array_counter = len(source)
 
         for observer in self._observer_list:
@@ -581,7 +701,10 @@ class AssembledDiffractionDataset(DiffractionDataset):
             total_counts_lower_bound=lower,
             total_counts_upper_bound=upper,
             read_region=read_region,
+            corrections=corrections,
             on_array_assembled=self._on_array_assembled,
+            on_nonfinite_pixels=self._mask_nonfinite_pixels,
+            on_moments_computed=partial(self._on_moments_computed, self._data),
             task_monitor=self._task_monitor,
         )
         finished_event = loader.get_finished_event()
@@ -615,7 +738,16 @@ class AssembledDiffractionDataset(DiffractionDataset):
             data=self._data,
         )
         self._bad_pixels = self._data.get_bad_pixels()
-        self._dataset = SimpleDiffractionDataset(metadata, contents_tree, [], self._bad_pixels)
+        self._background = self._data.get_background()
+        self._flat_field = self._data.get_flat_field()
+        self._dataset = SimpleDiffractionDataset(
+            metadata,
+            contents_tree,
+            [],
+            self._bad_pixels,
+            background=self._background,
+            flat_field=self._flat_field,
+        )
         self._array_list = [array]
         self._array_counter = 1
 

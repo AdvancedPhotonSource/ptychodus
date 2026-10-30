@@ -14,6 +14,8 @@
 
 getting_started
 initial_guesses
+fluorescence
+near_field
 readers
 reconstruction_drivers
 api

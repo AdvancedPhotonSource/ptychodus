@@ -1,17 +1,60 @@
 """Product data structure bundling the probe positions, probe sequence, object and metadata."""
 
-from abc import ABC, abstractmethod
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from sys import getsizeof
+import logging
+import math
 
 from .constants import energy_eV_to_J, energy_eV_to_wavelength_m
 from .diffraction import Polarization
+from .files import FileReader, FileWriter
 from .object import Object
-from .probe import Probe, ProbeSequence
+from .probe import Probe, ProbeEnsemble
 from .probe_positions import ProbePosition, ProbePositionSequence
 from .propagate import compute_magnification
+
+logger = logging.getLogger(__name__)
+
+
+def reconcile_defocus_distance_m(
+    focus_object_distance_m: float,
+    defocus_distance_m: float,
+    *,
+    rel_tol: float = 1.0e-6,
+) -> float:
+    """How far past its focus a probe is sampled, given the two frames that state it.
+
+    The same displacement is stated twice, in opposite frames: as a product's signed
+    focus position *focus_object_distance_m*, and as a probe's own defocus
+    *defocus_distance_m*. The defocus is the negated focus position, so a focus upstream
+    of the object is a probe sampled downstream of it. The product wins wherever it
+    names a focus, because the product is what the reconstruction geometry is computed
+    from -- a probe built against a different focus than the geometry would disagree
+    with the object pixel size it is reconstructed on.
+
+    A focus position of zero means no focusing optic, which cannot describe a focused
+    probe, so *defocus_distance_m* is returned unchanged. A disagreement beyond
+    *rel_tol* is reported rather than silently resolved; widen it only where the two are
+    expected to differ in their last digits.
+    """
+    if focus_object_distance_m == 0.0:
+        return defocus_distance_m
+
+    from_product_m = -focus_object_distance_m
+
+    if defocus_distance_m != 0.0 and not math.isclose(
+        defocus_distance_m, from_product_m, rel_tol=rel_tol
+    ):
+        logger.warning(
+            'Probe defocus %g m disagrees with the focus-object distance %g m the product '
+            'declares, which implies %g m; using the product.',
+            defocus_distance_m,
+            focus_object_distance_m,
+            from_product_m,
+        )
+
+    return from_product_m
 
 
 @dataclass(frozen=True)
@@ -36,11 +79,27 @@ class ProductMetadata:
     sits, not which propagation regime the detector samples. Far field with an optic
     and near field without one are both expressible, and both occur.
     """
+    i0_photons_per_count: float = 0.0
+    """Incident photons per unit of the I0 reading the probe positions carry.
+
+    I0 -- an upstream ion chamber, diode or scaler -- is recorded in whatever units the
+    instrument uses; this converts it to incident photons. Zero means uncalibrated, so
+    I0 then only corrects the detector totals for beam decay.
+    """
 
     @property
     def magnification(self) -> float:
         """See :func:`ptychodus.api.propagate.compute_magnification`."""
         return compute_magnification(self.detector_distance_m, self.focus_object_distance_m)
+
+    @property
+    def defocus_distance_m(self) -> float:
+        """How far past the focus the object sits, the negated `focus_object_distance_m`.
+
+        Zero when the product declares no focusing optic. See
+        :func:`reconcile_defocus_distance_m` for combining it with a probe's own defocus.
+        """
+        return -self.focus_object_distance_m
 
     @property
     def photon_energy_J(self) -> float:  # noqa: N802
@@ -57,6 +116,7 @@ class ProductMetadata:
         sz += getsizeof(self.detector_distance_m)
         sz += getsizeof(self.photon_energy_eV)
         sz += getsizeof(self.probe_photon_count)
+        sz += getsizeof(self.i0_photons_per_count)
         sz += getsizeof(self.exposure_time_s)
         sz += getsizeof(self.mass_attenuation_m2_per_kg)
         sz += getsizeof(self.tomography_angle_deg)
@@ -81,7 +141,7 @@ class Product:
 
     metadata: ProductMetadata
     probe_positions: ProbePositionSequence
-    probes: ProbeSequence
+    probes: ProbeEnsemble
     object_: Object
     losses: Sequence[LossValue]
 
@@ -94,24 +154,16 @@ class Product:
         return sz
 
     def iter_position_probes(self) -> Iterator[tuple[ProbePosition, Probe]]:
-        """Yield ``(scan_position, probe)`` pairs for every scan position."""
-        for index, position in enumerate(self.probe_positions):
-            yield position, self.probes[index]
+        """Yield ``(scan_position, probe)`` pairs for every scan position.
+
+        See :meth:`ptychodus.api.probe.ProbeEnsemble.iter_position_probes`.
+        """
+        return self.probes.iter_position_probes(self.probe_positions)
 
 
-class ProductFileReader(ABC):
+class ProductFileReader(FileReader[Product]):
     """Plugin interface for reading data products."""
 
-    @abstractmethod
-    def read(self, file_path: Path) -> Product:
-        """Read a data product from file."""
-        pass
 
-
-class ProductFileWriter(ABC):
+class ProductFileWriter(FileWriter[Product]):
     """Plugin interface for writing data products."""
-
-    @abstractmethod
-    def write(self, file_path: Path, product: Product) -> None:
-        """Write a data product to file."""
-        pass

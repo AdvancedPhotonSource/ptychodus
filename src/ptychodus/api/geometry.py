@@ -3,6 +3,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
+import math
 from typing import Generic, TypeVar
 
 import numpy
@@ -158,6 +159,23 @@ class ZernikeMode:
     radial_degree: int  # n
     angular_frequency: int  # m
 
+    @classmethod
+    def from_osa_index(cls, index: int, coefficient: complex) -> ZernikeMode:
+        """The mode at OSA/ANSI single index *index*, weighted by *coefficient*.
+
+        Modes are ordered by radial degree, then by angular frequency from ``-n`` to
+        ``n`` in steps of two: ``(0, 0), (1, -1), (1, 1), (2, -2), (2, 0), (2, 2), ...``.
+
+        Raises:
+            ValueError: if *index* is negative.
+        """
+        if index < 0:
+            raise ValueError(f'OSA index must be non-negative (got {index}).')
+
+        radial_degree = (math.isqrt(8 * index + 1) - 1) // 2
+        angular_frequency = 2 * index - radial_degree * (radial_degree + 2)
+        return cls(coefficient, radial_degree, angular_frequency)
+
     def _radial_polynomial(self, distance: RealArrayType) -> RealArrayType:
         n_minus_m = self.radial_degree - abs(self.angular_frequency)
         half_n_minus_m = n_minus_m // 2
@@ -214,6 +232,23 @@ class HermiteMode:
     coefficient: complex
     order_x: int  # m
     order_y: int  # n
+
+    @classmethod
+    def from_index(cls, index: int, coefficient: complex) -> HermiteMode:
+        """The mode at single index *index* in total-degree order, weighted by *coefficient*.
+
+        Modes are ordered by total degree ``m + n``, then by falling ``m``:
+        ``(0, 0), (1, 0), (0, 1), (2, 0), (1, 1), (0, 2), ...``.
+
+        Raises:
+            ValueError: if *index* is negative.
+        """
+        if index < 0:
+            raise ValueError(f'Hermite mode index must be non-negative (got {index}).')
+
+        degree = (math.isqrt(8 * index + 1) - 1) // 2
+        position = index - degree * (degree + 1) // 2
+        return cls(coefficient, degree - position, position)
 
     def __call__(self, x: RealArrayType, y: RealArrayType) -> ComplexArrayType:
         hx = scipy.special.eval_hermite(self.order_x, x)

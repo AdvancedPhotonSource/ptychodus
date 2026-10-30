@@ -23,6 +23,12 @@ class NSLS2Style1DiffractionFileReader(DiffractionFileReader):
     def __init__(self) -> None:
         self._tree_builder = H5DiffractionFileTreeBuilder()
 
+    def get_file_description(self) -> str:
+        return 'NSLS-II 3-ID HXN Style 1 Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
+
     def read(self, file_path: Path) -> DiffractionDataset:
         with h5py.File(file_path, 'r') as h5_file:
             try:
@@ -57,6 +63,12 @@ class NSLS2Style1DiffractionFileReader(DiffractionFileReader):
 class NSLS2Style2DiffractionFileReader(DiffractionFileReader):
     def __init__(self) -> None:
         self._tree_builder = H5DiffractionFileTreeBuilder()
+
+    def get_file_description(self) -> str:
+        return 'NSLS-II 3-ID HXN Style 2 Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
 
     def read(self, file_path: Path) -> DiffractionDataset:
         with h5py.File(file_path, 'r') as h5_file:
@@ -96,6 +108,12 @@ class NSLS2MATLABDiffractionFileReader(DiffractionFileReader):
     def __init__(self) -> None:
         self._tree_builder = H5DiffractionFileTreeBuilder()
 
+    def get_file_description(self) -> str:
+        return 'NSLS-II 3-ID HXN MATLAB Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.mat'}
+
     def read(self, file_path: Path) -> DiffractionDataset:
         with h5py.File(file_path, 'r') as h5_file:
             data = h5_file['det_data']
@@ -130,15 +148,12 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         NSLS2Style1DiffractionFileReader(),
         simple_name='NSLS_II_1',
-        display_name='NSLS-II 3-ID HXN Style 1 Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_readers.register_plugin(
         NSLS2Style2DiffractionFileReader(),
         simple_name='NSLS_II_2',
-        display_name='NSLS-II 3-ID HXN Style 2 Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_readers.register_plugin(
         NSLS2MATLABDiffractionFileReader(),
         simple_name='NSLS_II_MATLAB',
-        display_name='NSLS-II 3-ID HXN MATLAB Files (*.mat)',
     )

@@ -1,3 +1,5 @@
+from __future__ import annotations
+from enum import Enum
 from typing import Any
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QUrl
@@ -6,18 +8,44 @@ from PyQt5.QtGui import QColor, QFont
 from ...model.globus import GlobusStatusRepository
 
 
+class Column(Enum):
+    """Every column of GlobusStatusTableModel: its order and its header.
+
+    The member value is the header and the position comes from declaration order,
+    so a column cannot be added to the ordering and forgotten in the headers.
+    Public because the controller's click handler opens the run URL from one of them.
+    """
+
+    LABEL = 'Label'
+    START_TIME = 'Start Time'
+    COMPLETION_TIME = 'Completion Time'
+    STATUS = 'Status'
+    ACTION = 'Action'
+    RUN_ID = 'Run ID'
+
+    def __init__(self, header: str) -> None:
+        self.header = header
+        # Members already defined when this one is constructed, which is its position.
+        self.index = len(self.__class__.__members__)
+
+    @classmethod
+    def from_index(cls, index: int) -> Column:
+        """The column at `index`.
+
+        Raises:
+            IndexError: for a column outside the table, which the model's own
+                ``columnCount`` makes impossible and so would be a bug rather than input.
+        """
+        if index < 0:
+            raise IndexError(f'Column index {index} is negative.')
+
+        return list(cls)[index]
+
+
 class GlobusStatusTableModel(QAbstractTableModel):
     def __init__(self, presenter: GlobusStatusRepository, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
-        self._section_headers = [
-            'Label',
-            'Start Time',
-            'Completion Time',
-            'Status',
-            'Action',
-            'Run ID',
-        ]
         self._dt_format = '%Y-%m-%d %H:%M:%S'
 
     def headerData(  # noqa: N802
@@ -29,30 +57,31 @@ class GlobusStatusTableModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.DisplayRole:
             match orientation:
                 case Qt.Orientation.Horizontal:
-                    return self._section_headers[section]
+                    return Column.from_index(section).header
                 case Qt.Orientation.Vertical:
                     return section
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid():
             flow_run = self._presenter[index.row()]
+            column = Column.from_index(index.column())
 
             if role == Qt.ItemDataRole.DisplayRole:
-                match index.column():
-                    case 0:
+                match column:
+                    case Column.LABEL:
                         return flow_run.label
-                    case 1:
+                    case Column.START_TIME:
                         return flow_run.start_time.strftime(self._dt_format)
-                    case 2:
+                    case Column.COMPLETION_TIME:
                         if flow_run.completion_time is not None:
                             return flow_run.completion_time.strftime(self._dt_format)
-                    case 3:
+                    case Column.STATUS:
                         return flow_run.status
-                    case 4:
+                    case Column.ACTION:
                         return flow_run.action
-                    case 5:
+                    case Column.RUN_ID:
                         return flow_run.run_id
-            elif index.column() == 5:
+            elif column is Column.RUN_ID:
                 match role:
                     case Qt.ItemDataRole.ToolTipRole:
                         return flow_run.run_url
@@ -70,4 +99,4 @@ class GlobusStatusTableModel(QAbstractTableModel):
         return len(self._presenter)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
-        return len(self._section_headers)
+        return len(Column)

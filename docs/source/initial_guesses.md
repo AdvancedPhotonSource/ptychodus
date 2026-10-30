@@ -29,7 +29,7 @@ with ModelCore(Path('settings.ini')) as model:
         'disk',
         {
             'diameter_m': 1.0e-6,
-            'defocus_distance_m': 0.0,
+            'propagation_distance_m': 0.0,
             'num_incoherent_modes': 1,
             'num_coherent_modes': 1,
         },
@@ -40,7 +40,7 @@ with ModelCore(Path('settings.ini')) as model:
         {
             'amplitude_mean': 1.0,
             'amplitude_deviation': 0.0,
-            'phase_deviation_turns': 0.1,
+            'phase_deviation_tr': 0.1,
             'blur_deviation_px': 0.0,
         },
     )
@@ -53,7 +53,7 @@ The product contains four main pieces of initial data:
 
 - metadata: detector distance, probe energy, photon count, exposure time, etc.;
 - probe positions: a {py:class}`ptychodus.api.probe_positions.ProbePositionSequence`;
-- probe: a {py:class}`ptychodus.api.probe.ProbeSequence`;
+- probe: a {py:class}`ptychodus.api.probe.ProbeEnsemble`;
 - object: a {py:class}`ptychodus.api.object.Object`.
 
 The workflow methods select generator builders by name. Passing no name uses the current settings. Passing a name plus a parameter mapping creates a builder for that product and immediately rebuilds the corresponding data.
@@ -66,10 +66,10 @@ Probe
 : A single {py:class}`ptychodus.api.probe.Probe` stores its array as `(n_incoherent_modes, height, width)`. A two-dimensional complex input is promoted to `(1, height, width)`.
 
 Probe sequence
-: {py:class}`ptychodus.api.probe.ProbeSequence` stores its array as `(n_coherent_modes, n_incoherent_modes, height, width)`. The first dimension is the OPR/coherent-mode dimension. The second dimension is the mutually incoherent probe-mode dimension. A two-dimensional complex input is promoted to `(1, 1, height, width)`; a three-dimensional input is promoted to `(1, n_incoherent_modes, height, width)`.
+: {py:class}`ptychodus.api.probe.ProbeEnsemble` stores its array as `(n_coherent_modes, n_incoherent_modes, height, width)`. The first dimension is the OPR/coherent-mode dimension. The second dimension is the mutually incoherent probe-mode dimension. A two-dimensional complex input is promoted to `(1, 1, height, width)`; a three-dimensional input is promoted to `(1, n_incoherent_modes, height, width)`.
 
 OPR weights
-: If OPR/coherent modes are active, `ProbeSequence` may also carry `opr_weights` with shape `(n_scan_points, n_coherent_modes)`. When a scan point is indexed from a `ProbeSequence`, Ptychodus forms the position-specific dominant incoherent mode as the weighted sum of the coherent/OPR modes and then returns a regular `Probe`.
+: If OPR/coherent modes are active, `ProbeEnsemble` may also carry `opr_weights` with shape `(n_scan_points, n_coherent_modes)`. Asking a `ProbeEnsemble` for the probe at a scan position forms the position-specific dominant incoherent mode as the weighted sum of the coherent/OPR modes and returns a regular `Probe`. Without `opr_weights` one probe describes every position, which is why a `ProbeEnsemble` is addressed by position rather than being a sequence with a length.
 
 Object
 : {py:class}`ptychodus.api.object.Object` stores its complex transmission array as `(n_layers, height, width)`. A two-dimensional complex input is promoted to `(1, height, width)`. For multislice objects, the `layer_spacing_m` sequence must contain `n_layers - 1` spacings.
@@ -81,7 +81,7 @@ Probe positions
 
 An object or probe is sampled at the pixel size its own run implied, which the photon energy and the detector distance fix. Reusing one as an initial guess for a run that samples differently means starting from a guess of the wrong physical scale, and nothing downstream reveals it: the reconstruction simply converges to the wrong answer.
 
-Ptychodus therefore reconciles a file-supplied guess to the run's sampling. {py:func}`ptychodus.api.object.resample_object_to_pixel_size` re-expresses an object at the run's pixel size, preserving its physical extent and center and letting the pixel count absorb the difference; {py:func}`ptychodus.api.probe.resample_probe_sequence` re-expresses every probe mode on the run's probe grid, scaling amplitudes so the photon count survives. Both interpolate with a monotone cubic, so no resampled amplitude or phase overshoots the source, and both return the input untouched when the two samplings already agree.
+Ptychodus therefore reconciles a file-supplied guess to the run's sampling. {py:func}`ptychodus.api.object.resample_object_to_pixel_size` re-expresses an object at the run's pixel size, preserving its physical extent and center and letting the pixel count absorb the difference; {py:func}`ptychodus.api.probe.resample_probe_ensemble` re-expresses every probe mode on the run's probe grid, scaling amplitudes so the photon count survives. Both interpolate with a monotone cubic, so no resampled amplitude or phase overshoots the source, and both return the input untouched when the two samplings already agree.
 
 ```{note}
 This reconciliation only ever fires for a file format that records its pixel size. None of the registered object or probe formats do — NPY and CSV store a bare array — so a guess loaded from one of those is taken to be sampled the way the current run is, exactly as before.
@@ -92,6 +92,8 @@ A product opened from HDF5 or NPZ does carry its pixel size, and that path behav
 ## Probe Position Generators
 
 Use `WorkflowProductAPI.generate_probe_positions(name, parameters)`.
+
+Each pattern is a plugin that states the parameters it accepts, so the names below are what it registered under and the parameter names are the ones it declares. A pattern added to `ptychodus.plugins` appears here, in the settings file and in the editor dialog without any of them being told about it.
 
 Supported generator names are:
 
@@ -133,40 +135,63 @@ The Cartesian builders use:
 : Number of grid points along each axis.
 
 `step_size_x_m`, `step_size_y_m`
-: Physical step size in meters. Equilateral variants derive the effective `y` step from `step_size_x_m`.
+: Physical step size in meters. The equilateral variants derive their `y` step from `step_size_x_m` and do not accept a `step_size_y_m` at all.
+
+The other patterns use:
+
+`num_points`
+: Total number of points, for `spiral` and `lissajous`. Persisted as `NumberOfPoints`, which the two share; it was previously read from the Cartesian `NumberOfPointsX`, so a settings file written before that split starts both at the default rather than at whatever the Cartesian count happened to be.
+
+`radial_step_size_m`, `num_shells`, `num_points_in_first_shell`
+: Shell spacing and population, for `concentric`. Each shell holds a multiple of the first shell's count.
+
+`radius_scalar_m`
+: Spiral radius at unit index, for `spiral`.
+
+`amplitude_x_m`, `amplitude_y_m`, `angular_step_x_tr`, `angular_step_y_tr`, `angular_shift_tr`
+: Figure extent, the two angular rates whose ratio sets the figure, and the phase offset between them, for `lissajous`. The angular values are in turns and may be negative.
 
 ## Probe Generators
 
 Use `WorkflowProductAPI.generate_probe(name, parameters)`. All generated probe builders first create a base complex probe, rescale its total intensity to the product metadata field `probe_photon_count`, then expand it into incoherent and OPR/coherent modes according to the mode settings described below.
 
+Each probe model is a plugin that states the parameters it accepts, so the names below are what it registered under and the parameter names are the ones it declares. A model added to `ptychodus.plugins` appears here, in the settings file and in the editor dialog without any of them being told about it. A plugin knows nothing about where its values come from: the settings file, a workflow call, a preset and a size measured from the data are all just sources of the same declared parameters. Parameters with the same name share one settings key and one value across models — `defocus_distance_m`, `propagation_distance_m`, and the `diameter_m` that `disk` and `zernike` both take as the diameter of a circular pupil — so switching models keeps them.
+
 `disk`
-: Generates a binary circular aperture with parameter `diameter_m`. The aperture is optionally propagated by `defocus_distance_m` with the angular-spectrum propagator. This is the default probe builder.
+: Generates a binary circular aperture with parameter `diameter_m`. `defocus_distance_m` first gives it the quadratic phase of a beam sampled that far past its focus (positive downstream, diverging; negative upstream, converging), deferring to the product's `focus_object_distance_m` the same way the zone plate does. The aperture is then optionally propagated by `propagation_distance_m` with the angular-spectrum propagator. This is the default probe builder. With far-field diffraction data loaded, **Estimate from Diffraction** sets `diameter_m` from the second moments of the mean pattern: the bright field's angular spread times the defocus is the geometric shadow the aperture casts, so set the defocus first. It sets the parameter once and leaves it there. A zone plate's annular bright field reads about 5% larger than its outer diameter at a central stop of a third, and at zero defocus the estimate falls back to the transform-limited waist with a warning.
 
 `rectangular`
-: Generates a binary rectangular aperture with `width_m` and `height_m`. It is also optionally propagated by `defocus_distance_m` with the angular-spectrum propagator.
+: Generates a binary rectangular aperture with `width_m` and `height_m`. It takes `defocus_distance_m` and `propagation_distance_m` exactly as `disk` does, and its **Estimate from Diffraction** sets both sides from the spread of the bright field along x and y.
 
 `super_gaussian`
-: Generates a super-Gaussian amplitude profile. Parameters are `annular_radius_m`, `full_width_at_half_maximum_m` (or the builder parameter name `fwhm_m` in the low-level function), and `order_parameter`. `annular_radius_m = 0` gives a Gaussian-like spot; a positive `annular_radius_m` gives a ring or donut-like profile. This is not a propagated zone-plate simulation; it is an analytic amplitude profile.
+: Generates a super-Gaussian amplitude profile. Parameters are `annular_radius_m`, `full_width_at_half_maximum_m` (`fwhm_m` in the low-level function), and `order_parameter`. `annular_radius_m = 0` gives a Gaussian-like spot; a positive `annular_radius_m` gives a ring or donut-like profile. This is not a zone-plate simulation: the profile is analytic and flat-phased, and takes `defocus_distance_m` and `propagation_distance_m` exactly as `disk` does. Its **Estimate from Diffraction** sets `full_width_at_half_maximum_m` to that of a Gaussian beam with the measured angular spread, at its waist plus the spread of the cone over the defocus; the annular radius and order are left as chosen.
 
 `fresnel_zone_plate`
-: Simulates a Fresnel zone plate optic and propagates it to the sample plane with the Fresnel-transform propagator. Parameters are `zone_plate_diameter_m`, `outermost_zone_width_m`, `central_beamstop_diameter_m`, and `defocus_distance_m`. The central beamstop creates the donut-like zone-plate aperture. The focal length is computed as `zone_plate_diameter_m * outermost_zone_width_m / photon_wavelength_m` and the propagation distance is `focal_length_m + defocus_distance_m`.
+: Simulates a Fresnel zone plate optic and propagates it to the sample plane with the Fresnel-transform propagator. Parameters are `zone_plate_diameter_m`, `outermost_zone_width_m`, `central_beamstop_diameter_m`, and `defocus_distance_m`. The central beamstop creates the donut-like zone-plate aperture. The focal length is computed as `zone_plate_diameter_m * outermost_zone_width_m / photon_wavelength_m` and the propagation distance is `focal_length_m + defocus_distance_m`. `defocus_distance_m` is the object plane's position relative to the focus, which is the negated product metadata field `focus_object_distance_m`; when the product declares a nonzero focus the product's value is used and a disagreeing builder value is reported.
 
 `kb_mirror`
-: Simulates a Kirkpatrick-Baez mirror pair and propagates it to the sample plane. Each mirror takes an `acceptance_length_m`, a `grazing_angle_rad` and a `focus_distance_m`, from which the projected aperture `L sin(theta)` and the numerical aperture follow; `astigmatism_m` separates the two axis foci along the beam and `defocus_distance_m` moves the sample off the focal plane. Grazing angles are stored in radians rather than the turns the GUI uses elsewhere, because that is the number an optics log records. The pupil window is `photon_wavelength_m * z / probe_pixel_size_m`, so a high-aperture optic needs a fine probe pixel size; an aperture that does not fit is refused rather than silently clipped, since clipping would quietly change the optic.
+: Simulates a Kirkpatrick-Baez mirror pair and propagates it to the sample plane. Each mirror takes an `acceptance_length_m`, a `grazing_angle_rad` and a `focus_distance_m`, from which the projected aperture `L sin(theta)` and the numerical aperture follow; `astigmatism_m` separates the two axis foci along the beam and `defocus_distance_m` moves the sample off the focal plane, deferring to the product's `focus_object_distance_m` the same way the zone plate does. Grazing angles are stored in radians rather than the turns the GUI uses elsewhere, because that is the number an optics log records. The pupil window is `photon_wavelength_m * z / probe_pixel_size_m`, so a high-aperture optic needs a fine probe pixel size; an aperture that does not fit is refused rather than silently clipped, since clipping would quietly change the optic.
 
 `average_pattern`
-: Estimates a probe from diffraction data by taking the square root of the mean assembled diffraction pattern and back-propagating it by `detector_distance_m` with the Fresnel-transform propagator. This requires assembled diffraction data to already be available in the model.
+: Estimates a probe from diffraction data by taking the square root of the mean assembled diffraction pattern and back-propagating it to the object plane. Far field takes the square root as the probe's flat-phase angular spectrum and inverse-transforms it onto the probe grid, giving the beam at its waist; the phase the Fresnel transform adds across the detector is not the probe's and is not undone, and no detector pitch is needed. Near field uses the angular spectrum over the demagnified distance, which preserves pitch. Because the far-field estimate is the waist, so `defocus_distance_m` carries it to an object sampled that far past the focus, deferring to the product's `focus_object_distance_m` as the zone plate does. `propagation_distance_m` refines where the probe plane sits without altering the geometry the object pixel size comes from; the two act on the same field and add. Bad pixels are inpainted rather than zeroed, since a hole in the bright field rings through the probe. `bright_field_threshold` (off by default) keeps only the bright field of a far-field mean pattern: the background pedestal is subtracted and the noise around the bright field zeroed, while the bright field keeps its measured values. This requires assembled diffraction data to already be available in the model.
+
+`hermite_gauss`
+: Generates a probe as a superposition of Hermite–Gauss modes. `beam_waist_x_m` and `beam_waist_y_m` are the radii at which the intensity of mode `(0, 0)` falls to `1/e²` of its peak; the Gaussian envelope gives every mode a finite extent, about `sqrt(2m + 1)` waists along its axis, so the scale of the polynomials and the size of the probe are one width. `hermite_gauss_coefficients` is a list of complex amplitudes in total-degree order, `(0, 0), (1, 0), (0, 1), (2, 0), (1, 1), (0, 2), ...`, whose length is the number of modes. Each mode is normalized to unit power, so a coefficient is that mode's amplitude relative to the others.
 
 `zernike`
-: Generates a probe as a superposition of Zernike polynomial modes inside a disk with parameter `diameter_m`. Through the builder object, callers can set the Zernike order and individual coefficients before rebuilding. The workflow parameter mapping covers the common builder parameters, but coefficient-level editing is done on the `ZernikeProbeBuilder` object.
+: Generates a probe as a superposition of Zernike polynomial modes inside a disk with parameter `diameter_m`. `zernike_coefficients` is a list of complex amplitudes in OSA/ANSI order, `(0, 0), (1, -1), (1, 1), (2, -2), (2, 0), (2, 2), ...`, whose length is the number of modes. A coefficient list is a parameter like any other, so a workflow call sets it directly, as complex values or as strings such as `"0.5-0.25j"`; the settings file stores it the same way, as a JSON array of those strings.
+
+**Estimate from Diffraction** fills the parameters a model declares as sizes, measured at its `defocus_distance_m`; today that is `disk`, `rectangular` and `super_gaussian`. A size written into a shared parameter is the value every model sharing it starts from, so estimating a disk's diameter also sets the diameter `zernike` uses.
 
 ### Mirror Presets
 
-Kirkpatrick-Baez mirror pairs register the same way zone plates do, through `registry.kb_mirrors`. None ship yet: a preset states an instrument's measured optics, and those numbers reach a reconstruction, so the presets menu stays empty until real measurements are available and the builder works from its own settings in the meantime.
+Kirkpatrick-Baez mirror pairs register the same way zone plates do, as a {py:class}`ptychodus.api.simulate.probe.KirkpatrickBaezMirrorPreset` through `registry.kb_mirrors`. Its six fields carry the `kb_mirror` parameter names, which is what lets a registered pair fill them. None ship yet: a preset states an instrument's measured optics, and those numbers reach a reconstruction, so the presets menu stays empty until real measurements are available and the builder works from its own settings in the meantime.
+
+A preset is offered to whichever model declares every field the preset names, and applying one writes those fields and leaves the rest — a defocus, an astigmatism — as they were.
 
 ### Zone Plate Presets
 
-Ptychodus registers Fresnel zone plate presets as plugins. The current presets are:
+Ptychodus registers Fresnel zone plate presets as plugins, each under the one name below, which is also what the reconstruction drivers' `--fzp-preset` takes. The current presets are:
 
 - `APS 2-ID-D`: `160e-6` m diameter, `70e-9` m outermost zone width, `60e-6` m central beamstop.
 - `CNM/APS 26-ID-C Hard X-ray Nanoprobe`: `160e-6` m diameter, `30e-9` m outermost zone width, `80e-6` m central beamstop.
@@ -176,21 +201,33 @@ Ptychodus registers Fresnel zone plate presets as plugins. The current presets a
 
 The GUI builder exposes these as presets. Programmatic workflow use can pass the physical values directly.
 
+### Measuring the Defocus
+
+Every probe builder that carries a defocus defers to the product's `focus_object_distance_m` (see the zone plate above), and the parallax between bright-field images measures it from the data. **Estimate Defocus** in the product editor runs the measurement on the bound diffraction data; setting `EstimateDefocusFromParallax` runs it on every product created with data bound, which is how a batch or workflow run reaches it. Far-field data only.
+
+A defocused probe lights each point of its bright field through a different point of the sample, so the image one bright-field detector pixel records as the probe scans is the sample shifted by `-lambda * z * q`. The measurement bins every pattern into bins of `ParallaxBinSizeInPixels` detector pixels a side, maps each bright-field bin's values onto the object grid, registers the images against their mean, and fits the shifts to that line, which gives the defocus with its sign ({py:func}`ptychodus.api.parallax.estimate_defocus_from_parallax`). Larger bins cost less memory but leave fewer bins inside the bright field; at least four must remain away from its edge.
+
+A parallax defocus is **resolved** when it reaches `ParallaxMinSignificance` standard errors and `ParallaxMinDefocusDof` depths of focus, and only then is the focus position set. The depth of focus is `lambda / NA**2`, from the second moments of the mean pattern. Within about that distance of the focus the bright-field images are differently weighted phase-contrast images rather than shifted copies of one image, and registering them still finds a slope that its scatter cannot reveal, so a probe at focus would otherwise report a defocus of about half a depth of focus. The same threshold read the other way is a Fresnel number: the defocus in depths of focus equals `R**2 / (lambda |z|)` for the radius `R` of the probe's shadow, the geometric-optics measure the parametric probe builders warn on below one. Both appear in the log.
+
+Pressing the button on a product that already states a focus replaces it, reporting a disagreement in sign or beyond `ParallaxRtol` of the stated value -- the check that catches a flipped detector or a mistyped focus. The settings-driven run never reaches that case, since it measures only while the focus is still unset.
+
+Fitting a full matrix to the same shifts instead of one slope also measures the detector's orientation relative to the scan, since a flipped or transposed detector maps `q` onto the shifts through that flip; a half-turn of the detector looks exactly like a defocus of the opposite sign, so a reflection is unambiguous but a half-turn needs the defocus sign. `python scripts/check_detector_orientation.py` runs that check on any instrument's files and reports the `hflip`, `vflip` and `transpose` steps for both readings ({py:func}`ptychodus.api.parallax.estimate_parallax_transform`).
+
 ## Probe Mode Generation
 
-Every generated probe type uses the shared `ProbeSequenceBuilder._build_probe_modes` path:
+Every generated probe type goes through the same `ProbeEnsembleBuilder.build` path:
 
-1. Generate one base {py:class}`ptychodus.api.probe.Probe`.
+1. Generate one base {py:class}`ptychodus.api.probe.Probe` and rescale its total intensity to `probe_photon_count`.
 2. Expand to `num_incoherent_modes` with {py:func}`ptychodus.api.simulate.probe.generate_incoherent_probe_modes`.
 3. Expand to `num_coherent_modes` OPR modes with {py:func}`ptychodus.api.simulate.probe.generate_coherent_probe_modes`.
-4. Store the final result as a `ProbeSequence` with array shape `(num_coherent_modes, num_incoherent_modes, height, width)`.
+4. Store the final result as a `ProbeEnsemble` with array shape `(num_coherent_modes, num_incoherent_modes, height, width)`.
 
 ### Incoherent Modes
 
 The incoherent-mode controls are:
 
 `num_incoherent_modes`
-: Number of mutually incoherent modes to store in axis 1 of the final `ProbeSequence`.
+: Number of mutually incoherent modes to store in axis 1 of the final `ProbeEnsemble`.
 
 `orthogonalize_incoherent_modes`
 : If true and more than one incoherent mode is requested, the generated modes are orthogonalized with `scipy.linalg.orth`.
@@ -211,9 +248,11 @@ What the routine guarantees, whatever strategy is in play:
 - **Total power is unchanged**, expanding or truncating, and a mode dropped as linearly dependent passes its share to the modes that survive rather than leaving the probe dimmer. The number of modes used to represent a beam is a modeling choice; the illumination is not, and a probe read from file is never rescaled afterward.
 - Orthogonalization is modified Gram-Schmidt in mode order, which is what keeps mode `n` paired with mode `n`. `mode_dependence_floor` sets how much of its own length a mode's orthogonal part must retain to be kept.
 
-Which strategy runs is the `IncoherentModeStrategy` setting, one of `MomentPolynomial`, `RandomPhaseRamp` or `GaussianSchell`; an unrecognized value falls back to the first. In the GUI it is a combo box, and the parameters below it change with the selection so that only the ones the chosen strategy reads are shown — the decay profile for the first two, the source size and coherence length for Gaussian-Schell, which predicts its own spectrum and never consults a decay profile.
+Which strategy runs is the `IncoherentModeStrategy` setting, one of `MomentPolynomial`, `Derivative`, `RandomPhaseRamp` or `GaussianSchell`; an unrecognized value falls back to the first. In the GUI it is a combo box, and the parameters below it change with the selection so that only the ones the chosen strategy reads are shown — the decay profile for the first three, the source size and coherence length for Gaussian-Schell, which predicts its own spectrum and never consults a decay profile.
 
 `ProbeMomentPolynomialStrategy` is the default, and needs no physical parameters at all. It measures the intensity-weighted centroid and variance of the probe it is given — from the incoherent sum of its modes, which is the footprint the illumination actually covers — and uses that width as its own length scale, so one call suits any illumination without being told how the probe was formed. A new mode is the dominant mode times `u**m * v**n`, with `u` and `v` the transverse coordinates centered on the probe and measured in units of its rms width, damped by a Gaussian of that same width so the polynomial does not push the higher orders into the tails. Orders are graded by total degree and skip the constant term. Weights come from `ProbeModeDecayType` and depend on a mode's index rather than its order.
+
+`ProbeDerivativeStrategy` fills with spatial derivatives of the dominant mode, `∂^(m+n) P / ∂x^m ∂y^n`, taken exactly by multiplying its spectrum by `kx^m ky^n`. A probe jittered by a small offset `d` is `P(r − d) ≈ P − d · ∇P`, so these are the modes positional vibration during an exposure produces; the first two are the x and y gradients. It is the Fourier counterpart of the moment polynomials, whose real-space factors correspond to derivatives in angle — source size and angular jitter rather than positional jitter. Orders are graded by total degree and weights come from `ProbeModeDecayType`.
 
 `RandomPhaseRampStrategy` creates each new mode by duplicating the dominant mode and applying random separable phase wraps along the horizontal and vertical axes, so the added modes share the dominant mode's amplitude structure and differ only by a random linear phase ramp in `x` and `y`. It is the only strategy that consumes randomness, and so the only one that takes an `rng`.
 
@@ -234,16 +273,16 @@ Because the weights are normalized before intensity rescaling, only their relati
 
 ### OPR / Coherent Modes
 
-Ptychodus uses the term `coherent modes` for the leading `ProbeSequence` dimension. In the reconstruction context this is the OPR mode dimension. The control is:
+Ptychodus uses the term `coherent modes` for the leading `ProbeEnsemble` dimension. In the reconstruction context this is the OPR mode dimension. The control is:
 
 `num_coherent_modes`
-: Number of OPR/coherent modes to store in axis 0 of the final `ProbeSequence`.
+: Number of OPR/coherent modes to store in axis 0 of the final `ProbeEnsemble`.
 
 For `num_coherent_modes == 1`, no OPR weights are stored and the probe sequence length is one.
 
 For `num_coherent_modes > 1`:
 
-- `opr_weights` is initialized with shape `(num_diffraction_patterns, num_coherent_modes)`.
+- `opr_weights` is initialized with shape `(num_positions, num_coherent_modes)`: one row per probe position, which the index matcher later conditions to one row per diffraction pattern.
 - The first OPR weight is set to `1.0` for every scan point.
 - Other weights are initialized as small random normal values with default scale `1.0e-6`.
 - OPR mode 0 copies the full incoherent-mode probe.
@@ -267,7 +306,7 @@ The setting is `OPRWeightPolicy` in the `Probe` group, defaulting to `Average`. 
 Opening a probe file that carries OPR weights in the GUI prompts for the policy, stating both counts, and that choice applies to that one load whether or not the counts agree. `Use as is` is offered only when they do.
 
 ```{note}
-`COLLAPSE` applies the mean weight row across every incoherent mode. Indexing a position out of a {py:class}`ptychodus.api.probe.ProbeSequence` instead rewrites only incoherent mode 0 from the coherent basis.
+`COLLAPSE` applies the mean weight row across every incoherent mode. Asking a {py:class}`ptychodus.api.probe.ProbeEnsemble` for the probe at a position instead rewrites only incoherent mode 0 from the coherent basis.
 ```
 
 ### Inspecting an OPR Probe
@@ -324,7 +363,7 @@ The same mode parameters work with other generated probe types such as `disk`, `
 
 #### Add incoherent and OPR modes to an existing single-mode probe
 
-The workflow API can load an existing probe with `load_probe()`, but the current high-level `generate_probe()` call replaces the probe with a named generator rather than augmenting the loaded probe in place. To augment an already loaded single-mode probe, use the low-level mode-expansion routines on the loaded `ProbeSequence` and then register the updated product back with the workflow API.
+The workflow API can load an existing probe with `load_probe()`, but the current high-level `generate_probe()` call replaces the probe with a named generator rather than augmenting the loaded probe in place. To augment an already loaded single-mode probe, use the low-level mode-expansion routines on the loaded `ProbeEnsemble` and then register the updated product back with the workflow API.
 
 ```python
 from pathlib import Path
@@ -348,7 +387,7 @@ with ModelCore(Path('settings.ini')) as model:
 
     product = product_api.get_product()
 
-    # Collapse any OPR handling in the loaded ProbeSequence and start from
+    # Collapse any OPR handling in the loaded ProbeEnsemble and start from
     # the first coherent/OPR mode as a regular Probe.
     base_probe = product.probes.get_probe_no_opr()
 
@@ -358,17 +397,17 @@ with ModelCore(Path('settings.ini')) as model:
         orthogonalize=True,
     )
 
-    expanded_probe_sequence = generate_coherent_probe_modes(
+    expanded_probe_ensemble = generate_coherent_probe_modes(
         model.rng,
         probe_with_incoherent_modes,
         num_cmodes=2,
-        num_diffraction_patterns=len(product.probe_positions),
+        num_positions=len(product.probe_positions),
     )
 
     expanded_product = Product(
         metadata=product.metadata,
         probe_positions=product.probe_positions,
-        probes=expanded_probe_sequence,
+        probes=expanded_probe_ensemble,
         object_=product.object_,
         losses=product.losses,
     )
@@ -381,26 +420,53 @@ with ModelCore(Path('settings.ini')) as model:
     )
 ```
 
-This replaces the probe with a new `ProbeSequence` whose shape is `(2, 3, height, width)` and whose OPR weights have shape `(n_scan_points, 2)`.
+This replaces the probe with a new `ProbeEnsemble` whose shape is `(2, 3, height, width)` and whose OPR weights have shape `(n_scan_points, 2)`.
 
 ## Object Generators
 
-Use `WorkflowProductAPI.generate_object(name, parameters)`. Object geometry is derived from the current probe geometry and scan bounding box, then optional extra padding is applied by `extra_padding_x` and `extra_padding_y`.
+Use `WorkflowProductAPI.generate_object(name, parameters)`. Each object model is a plugin, registered under the name passed here, and its parameters are the fields it declares; the settings file holds each under the same name in PascalCase with its unit in words (`phase_deviation_tr` is `PhaseDeviationInTurns` in `[Object]`). Phases are in turns throughout, as the `_tr` suffix says, so an object is `amplitude * exp(2j * pi * phase_tr)`.
+
+Object geometry is derived from the current probe geometry and scan bounding box. The generated object is then widened by `extra_padding_x` and `extra_padding_y` and scaled to the sample's measured mean transmission (see below); both apply to every generated object and to no file-supplied one.
 
 `random`
-: Generates a complex object from Gaussian amplitude and phase fields. Parameters are `amplitude_mean`, `amplitude_deviation`, `phase_deviation_turns`, and `blur_deviation_px`. The generated field is `amplitude * exp(2j * pi * phase_turns)`.
+: Generates a complex object from independent Gaussian amplitude and phase fields. Parameters are `amplitude_mean`, `amplitude_deviation`, `phase_deviation_tr`, and `blur_deviation_px`, the width of a Gaussian blur applied to both fields.
 
-`grf`
+`gaussian_random_field`
 : Generates a complex Gaussian random field by spectral synthesis. Parameter: `correlation_length_px`.
 
 `fractal_noise`
-: Generates a complex fractal-noise object by summing multiple octaves of simplex noise. Parameters are `grid_scale_px`, `num_octaves`, `gain`, and `lacunarity`.
+: Generates a complex fractal-noise object by summing multiple octaves of simplex noise. Parameters are `grid_scale_px`, the grid scale of the first octave, `num_octaves`, `gain`, the amplitude ratio of each octave to the one before, and `lacunarity`, the factor each octave divides the grid scale by.
 
 `dead_leaves`
-: Generates a layered random disk texture. Parameters include `leaf_radius_lower_px`, `leaf_radius_upper_px`, `leaf_radius_power_law_exponent`, `leaf_amplitude_lower`, `leaf_amplitude_upper`, `leaf_phase_lower_tr`, and `leaf_phase_upper_tr`.
+: Generates a layered random disk texture. Parameters are `leaf_radius_lower_px`, `leaf_radius_upper_px`, `leaf_radius_power_law_exponent`, `leaf_amplitude_lower`, `leaf_amplitude_upper`, `leaf_phase_lower_tr`, and `leaf_phase_upper_tr`.
 
-`stxm`
-: Generates an STXM-like object from assembled diffraction data by interpolating per-position diffraction counts onto the object grid. This requires assembled diffraction data and probe positions.
+`siemens_star`
+: Generates a Siemens star resolution target: `2 * num_spokes` wedges alternate between the spoke and background values inside a disk whose radius is `outer_radius_fraction` of the canvas's smaller half-extent, and pixels outside it take the background values. Parameters are `num_spokes`, `outer_radius_fraction`, `spoke_amplitude`, `background_amplitude`, `spoke_phase_tr`, and `background_phase_tr`.
+
+The four random textures draw from the application's random number generator, so each rebuild draws a fresh texture.
+
+`stxm_dpc`
+: Generates a coarse complex object from far-field diffraction data by STXM differential phase contrast. It requires assembled diffraction data, probe positions and far-field metadata; near-field data is rejected, because the center-of-mass theorem it rests on relates a *far-field* centroid to the phase gradient of the exit wave. Parameters are `shadow_correction` and `regularization_fov_fraction`, described below.
+
+- **Amplitude.** The per-position totals, mapped linearly between the positions and divided by their mean over the supported region, as STXM gives them. Totals have any detector background or flat field the data still carries applied and their bad pixels inpainted, and are corrected for beam decay by the I0 the probe positions carry, each scaled by `mean(I0) / I0_j`, so a drifting beam does not read as absorption. The builder reads them from the diffraction moments the dataset accumulates once per load, so rebuilding it does not pass over the patterns again.
+- **Support.** Without a probe, the supported region is the convex hull of the positions. With the product's probe on the object's pixels, it is where the probe's illumination reaches 5% of its peak, which follows the footprint past the outermost positions. The phase is integrated and referenced over it. The values themselves are always interpolated linearly: each is already the probe-averaged field at its position, so weighting the map by the probe again would blur it twice.
+- **Phase.** Each pattern's intensity centroid, taken over the whole frame with its bad pixels inpainted, is the intensity-weighted mean phase gradient under the probe. The crop bounds both what is lost off the detector and how much high-angle shot noise enters, so data from an integrating detector with read noise should be cropped tightly. The mean centroid is subtracted, which removes the beam-center offset and any net phase wedge across the sample. The gradient is integrated by a least-squares FFT Poisson solve and referenced to zero over the most transparent 5% of the scan — the empty beam, when the scan includes one. Resolution is set by the probe size and the scan step.
+- **Orientation.** The centroids are taken to lie in the frame the forward model simulates, with the detector's x and y along the scan's. A detector rotated or flipped relative to the scan should be oriented with the probe-position affine transform or the diffraction `hflip`, `vflip` and `transpose` steps, which the reconstruction needs in any case. With a defocused probe and a textured sample, `python scripts/check_detector_orientation.py`, a checkout tool that is not installed with the package, names those steps from the raw files (see [Measuring the Defocus](#measuring-the-defocus) above).
+- **Probe shadow.** A centroid also measures the probe's own phase gradient, weighted by the sample's transmission. For a single material under a probe of RMS width σ defocused by Δz, ignoring that term rescales the phase by roughly `1 ± 4π(β/δ)σ²/(λ|Δz|)`, which is of order one for micron-scale defocused hard X-ray probes at moderate β/δ and nothing for a pure phase object. `shadow_correction` subtracts a first-order estimate using the product's current probe. The probe sets the support and the shadow correction when the object is built, and the object does not rebuild when the probe changes, so rebuild it after changing the probe.
+- **Regularization.** Integrating noisy gradients leaves its error as drift across the field of view. `regularization_fov_fraction` adds a Tikhonov term that damps phase variations longer than that fraction of the object canvas's larger dimension, halving them at exactly that length. 0 disables it, and values beyond about 2 have little effect.
+
+`paganin`
+: Generates a complex object by Paganin single-material phase retrieval on the STXM intensity of the diffraction data, corrected for beam decay by I0 as `stxm_dpc`'s amplitude is. It requires assembled diffraction data. The wavelength and propagation distance are the product's; the one parameter is the specimen's `delta_over_beta`. With the product's probe on the object's pixels, the mean intensity is taken over the probe's illumination rather than the convex hull of the positions. The object does not rebuild when the probe changes, so rebuild it after changing the probe.
+
+### Incident Photon Count and Transmission
+
+The product's `probe_photon_count` and the mean transmission that generated objects are scaled to are estimated together from the diffraction moments the dataset accumulates once per load ({py:func}`ptychodus.api.accumulate.estimate_incident_beam`). Each pattern's total sums its whole frame with the bad pixels inpainted. **I0** is the incident-beam reading -- an upstream ion chamber, diode or scaler -- that a position reader may record for each exposure, in whatever units the instrument uses. When I0 is recorded, every total is first corrected for beam decay, scaled by `mean(I0) / I0_j`. Then one of three rules applies, and the log names it:
+
+- **I0 with a calibration.** `I0PhotonsPerCount` (the product's **I0 Calibration [photons/count]**, or `--i0-photons-per-count` on the standard drivers) converts I0 to incident photons. The incident photon count is `factor * mean(I0)`, and the intensity transmission is `mean(total_j / (factor * I0_j))`. A transmission above about one or a vanishing fraction of it is reported, since it usually means a wrong calibration, but the calibration is kept.
+- **I0 without a calibration.** The brightest corrected totals stand in for the empty beam: the incident photon count is their 0.99 quantile.
+- **No I0.** The same, over the uncorrected totals.
+
+Without a calibration the intensity transmission is the mean total over the incident photon count. Either way the mean amplitude transmission is its square root, clipped to `[0, 1]`. The photon count is only filled while it is zero, so a value from the user or a file is kept; **Estimate Probe Photon Count** in the product editor replaces it.
 
 ### Multislice Objects
 
@@ -411,6 +477,20 @@ Reslicing is non-destructive. {py:func}`ptychodus.api.object.resample_object_lay
 Expanding a single slice into several is the degenerate case, since there is no depth axis to resample along. It falls back to {py:func}`ptychodus.api.object.homogenize_object_layers`, which spreads the whole transmission evenly so that each of the `n_slices` layers is the `n_slices`-th root of the original.
 
 The layers are phase screens at depths `0` through the total thickness, so `n_slices` layers leave `n_slices - 1` gaps and `Object.get_total_thickness_m()` -- the sum of those gaps -- is the full thickness. {py:func}`ptychodus.api.object.compute_uniform_layer_spacing_m` builds an even grid on that convention.
+
+## Editing a Reconstruction Result
+
+A reconstruction result's probe and object are kept exactly as solved, so their editors offer no mode or layer controls at first. **Make Editable** in either editor lets the result be conditioned like a generated one: the mode counts and the layer spacing start at what the result already has, so nothing changes until they are raised, and existing modes are kept when more are added. To keep the original, **Duplicate** the product first and make the copy editable. A product that is reconstructed into again reverts to the result as solved.
+
+## Starting cdtools
+
+The **cdtools** reconstructor library (the `cdtools` extra) offers **FancyPtycho**, cdtools' far-field model. Unlike cdtools' own `from_dataset`, it builds no starting guess of its own: the probe, object and positions all come from the product, so any generator above applies. The `average_pattern` probe is the same estimate cdtools calls a SHARP-style probe, and the `stxm_dpc` object is a good start to pair with it.
+
+- **Probe.** Every incoherent mode is used. cdtools models no orthogonal probe relaxation, so a probe with OPR coherent modes is reconstructed from its primary coherent mode alone, with a warning, and the result has none.
+- **Object.** A single layer, on the probe's pixel grid. A multislice object is refused.
+- **Canvas.** Every probe window must lie inside the object array. With `RefinePositions` on, a position can move only within the canvas, so leave room with `ExtraPaddingX` / `ExtraPaddingY` when generating the object.
+- **Detector maps.** A background the data carries starts cdtools' additive background term (`UseBackground`), refined unless `RefineBackground` is off. A flat field multiplies the model (`UseFlatField`) and is never refined.
+- **Scale.** The probe is measured against cdtools' forward model before the run and carried back after it, so the product it returns is in ptychodus's conventions and can warm-start another backend.
 
 ## Low-Level Generator API
 
@@ -469,11 +549,11 @@ probe_with_imodes = generate_incoherent_probe_modes(
     3,
     orthogonalize=True,
 )
-probe_sequence = generate_coherent_probe_modes(
+probe_ensemble = generate_coherent_probe_modes(
     rng,
     probe_with_imodes,
     num_cmodes=2,
-    num_diffraction_patterns=len(positions),
+    num_positions=len(positions),
 )
 
 object_geometry = ObjectGeometry(
@@ -497,7 +577,7 @@ object_guess = generate_random_object(
 
 ## Using Generated Guesses With Pty-Chi
 
-Ptychodus has a Pty-Chi adapter in `ptychodus.model.ptychi`. When using the normal Ptychodus reconstruction path, the adapter receives a {py:class}`ptychodus.api.reconstruct.ReconstructInput`, builds Pty-Chi task options from the settings, and passes the following data from the product to `PtychographyTask` as keyword arguments:
+Ptychodus has a Pty-Chi adapter in `ptychodus.plugins.ptychi`. When using the normal Ptychodus reconstruction path, the adapter receives a {py:class}`ptychodus.api.reconstruct.ReconstructInput` together with the Pty-Chi options the settings hold, reconciles those options with the product, and passes the following data from the product to `PtychographyTask` as keyword arguments:
 
 - object initial guess: `product.object_.get_array()`;
 - probe initial guess: `product.probes.get_array()`;
@@ -506,7 +586,7 @@ Ptychodus has a Pty-Chi adapter in `ptychodus.model.ptychi`. When using the norm
 
 ### Probe And Object Sampling
 
-Pty-Chi 2.1.0 and later allow the probe to be sampled differently from the object: `probe_options.pixel_size_m` and `probe_options.pixel_size_aspect_ratio` each fall back to the matching `object_options` value when left at `None`, and Pty-Chi Fourier-rescales the object onto the probe grid whenever the two disagree.
+Pty-Chi allows the probe to be sampled differently from the object: `probe_options.pixel_size_m` and `probe_options.pixel_size_aspect_ratio` each fall back to the matching `object_options` value when left at `None`, and Pty-Chi Fourier-rescales the object onto the probe grid whenever the two disagree.
 
 The adapter derives both fields from `product.probes.get_pixel_geometry()`, alongside the object fields it derives from `product.object_.get_pixel_geometry()`. When a probe value matches the object's it is left at `None` — stating the inheritance explicitly and keeping Pty-Chi's no-resampling path — and width and aspect ratio are decided independently, matching how Pty-Chi inherits them. A product whose probe carries no pixel geometry leaves both fields unset.
 
@@ -517,7 +597,7 @@ Pty-Chi's documented probe convention is `(n_opr_modes, n_modes, height, width)`
 - `n_opr_modes` is the OPR/eigenmode dimension;
 - `n_modes` is the mutually incoherent probe-mode dimension.
 
-This matches Ptychodus `ProbeSequence.get_array()`:
+This matches Ptychodus `ProbeEnsemble.get_array()`:
 
 - Ptychodus `num_coherent_modes` maps to Pty-Chi `n_opr_modes`;
 - Ptychodus `num_incoherent_modes` maps to Pty-Chi `n_modes`.
@@ -535,7 +615,7 @@ Pty-Chi accepts OPR weights as either:
 
 Ptychodus generated OPR weights use `(n_scan_points, n_coherent_modes)` when `num_coherent_modes > 1`. This is directly compatible with Pty-Chi.
 
-If the probe has more than one OPR mode, Pty-Chi requires initial OPR weights. Ptychodus satisfies this when the OPR modes were generated by `generate_coherent_probe_modes`. If a custom `ProbeSequence` is created manually with multiple leading modes, provide matching `opr_weights`.
+If the probe has more than one OPR mode, Pty-Chi requires initial OPR weights. Ptychodus satisfies this when the OPR modes were generated by `generate_coherent_probe_modes`. If a custom `ProbeEnsemble` is created manually with multiple leading modes, provide matching `opr_weights`.
 
 ### Positions and Object Origin
 
@@ -595,6 +675,6 @@ Pty-Chi still accepts this data through the corresponding `*_options` fields —
 ## Practical Notes
 
 - The generated probe pixel size is derived from detector geometry, detector distance, and probe energy through the product geometry. For physically meaningful generated probes, create or load the diffraction metadata before generating the product.
-- `average_pattern` and `stxm` depend on assembled diffraction data. Analytic generators such as `disk`, `super_gaussian`, `fresnel_zone_plate`, `random`, `grf`, `fractal_noise`, and `dead_leaves` do not require measured patterns.
+- `average_pattern`, `stxm_dpc` and `paganin` depend on assembled diffraction data. Analytic generators such as `disk`, `super_gaussian`, `fresnel_zone_plate`, `random`, `gaussian_random_field`, `fractal_noise`, `dead_leaves`, and `siemens_star` do not require measured patterns.
 - `super_gaussian` is the closest built-in Gaussian-like probe. Ptychodus does not currently register a separate builder literally named `gaussian`.
-- In workflow parameter mappings, use the builder parameter names, not the settings-file names. For example use `diameter_m` rather than `DiskDiameterInMeters`.
+- In workflow parameter mappings, use the builder parameter names, not the settings-file names. For example use `full_width_at_half_maximum_m` rather than `FullWidthAtHalfMaximumInMeters`.

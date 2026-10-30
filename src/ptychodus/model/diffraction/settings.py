@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.settings import SettingsRegistry, get_ptychodus_dir
+from ..observer import Observable, Observer
+from ..settings import SettingsRegistry, get_ptychodus_dir
 
 
 class DetectorSettings(Observable, Observer):
@@ -23,6 +23,23 @@ class DetectorSettings(Observable, Observer):
         )
         self.bad_pixels_file_path = self._group.create_path_parameter(
             'BadPixelsFilePath', Path('/path/to/bad_pixels.npy')
+        )
+
+        self.background_enabled = self._group.create_boolean_parameter('BackgroundEnabled', False)
+        self.background_file_type = self._group.create_string_parameter('BackgroundFileType', 'NPY')
+        self.background_file_path = self._group.create_path_parameter(
+            'BackgroundFilePath', Path('/path/to/background.npy')
+        )
+        self.subtract_background = self._group.create_boolean_parameter('SubtractBackground', False)
+
+        self.flat_field_enabled = self._group.create_boolean_parameter('FlatFieldEnabled', False)
+        self.flat_field_file_type = self._group.create_string_parameter('FlatFieldFileType', 'NPY')
+        self.flat_field_file_path = self._group.create_path_parameter(
+            'FlatFieldFilePath', Path('/path/to/flat_field.npy')
+        )
+        self.divide_flat_field = self._group.create_boolean_parameter('DivideFlatField', False)
+        self.flat_field_floor = self._group.create_real_parameter(
+            'FlatFieldFloor', 1.0e-3, minimum=0.0
         )
 
     def _update(self, observable: Observable) -> None:
@@ -60,9 +77,6 @@ class DiffractionSettings(Observable, Observer):
         self.binning_enabled = self._group.create_boolean_parameter('BinningEnabled', False)
         self.bin_size_x = self._group.create_integer_parameter('BinSizeX', 1, minimum=1)
         self.bin_size_y = self._group.create_integer_parameter('BinSizeY', 1, minimum=1)
-
-        self.upsample_enabled = self._group.create_boolean_parameter('UpsampleEnabled', False)
-        self.upsample_factor = self._group.create_integer_parameter('UpsampleFactor', 1, minimum=1)
 
         self.padding_enabled = self._group.create_boolean_parameter('PaddingEnabled', False)
         self.pad_x = self._group.create_integer_parameter('PadX', 0, minimum=0)

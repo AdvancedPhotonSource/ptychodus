@@ -3,6 +3,9 @@ from pathlib import Path
 import logging
 import time
 
+from pydantic import BaseModel
+
+from ptychodus.api.plugins import PluginCatalog
 from ptychodus.api.reconstruct import (
     NullReconstructor,
     PositionIndexFilter,
@@ -10,15 +13,17 @@ from ptychodus.api.reconstruct import (
     Reconstructor,
     ReconstructorLibrary,
     TrainableReconstructor,
+    TrainingDataFileWriter,
     prepare_reconstruct_input,
 )
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parameters import Parameter, StringParameter
-
 from ..naming import split_name_counter
+from ..observer import Observable, Observer
+from ..parameters import Parameter, StringParameter
+from ..plugins import PluginChooserParameter
 from ..product import ProductAPI
 from ..task_manager import TaskManager
+from .parameter_store import ProcessingParameterStore
 from .monitor import (
     ProcessingTaskMonitor,
     ReconstructBackgroundTask,
@@ -26,6 +31,17 @@ from .monitor import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _algorithm_tag(library: str, algorithm: str) -> str:
+    """Label a run by what produced it.
+
+    One token, because the de-duplication below recognizes the tag a product
+    already carries by matching the end of its name. Both halves, because two
+    backends may offer an algorithm of the same name. An empty half is
+    dropped, so an unresolved selection cannot leave a trailing separator.
+    """
+    return '_'.join(part.casefold() for part in (library, algorithm) if part)
 
 
 def _build_output_product_name(input_name: str, algorithm: str, suffix: str) -> str:
@@ -48,55 +64,123 @@ def _build_output_product_name(input_name: str, algorithm: str, suffix: str) -> 
 
 
 class ProcessingAlgorithmParameter(Parameter[str], Observer):
-    @staticmethod
-    def generate_key(library: str, reconstructor: str) -> str:
-        return f'{library.casefold()}_{reconstructor.casefold()}'
+    """Which reconstructor of the selected library a run uses.
 
-    @staticmethod
-    def split_key(key: str) -> tuple[str, str]:
-        library, reconstructor = key.split('_', maxsplit=1)
-        return library, reconstructor
+    Scoped to the library beside it: the values this accepts are whatever
+    that library offers, so changing the library changes what this means.
+    Spelled as the backend spells it, resolved case-insensitively, and
+    written back canonicalized.
+    """
 
     def __init__(
-        self, parameter: StringParameter, libraries: Sequence[ReconstructorLibrary]
+        self,
+        parameter: StringParameter,
+        library: PluginChooserParameter[ReconstructorLibrary],
+        *,
+        default: str = '',
     ) -> None:
         super().__init__()
         self._parameter = parameter
-        self._libraries = libraries
-        self._reconstructor_map: Mapping[str, Reconstructor] = {
-            self.generate_key(library.name, reconstructor.name): reconstructor
-            for library in libraries
-            for reconstructor in library
-        }
-        self._current_value = 'none_none'
+        self._library = library
+        self._default = default
+        self._current = ''
         self._current_reconstructor: Reconstructor = NullReconstructor('None')
+        # The last algorithm chosen for each library this session, so that
+        # looking at another backend and coming back does not quietly land
+        # somewhere else. Not persisted: a key per library is more than a
+        # settings file should carry for a convenience.
+        self._remembered: dict[str, str] = {}
 
         parameter.add_observer(self)
-        self.set_value(parameter.get_value())
+        library.add_observer(self)
+        self._settle(parameter.get_value(), persist=False)
+
+    def _library_name(self) -> str:
+        try:
+            return self._library.get_value()
+        except LookupError:
+            # No backend registered at all, which only a test arranges.
+            return ''
+
+    def _available(self) -> Sequence[Reconstructor]:
+        """What the selected library offers, or nothing when it offers nothing."""
+        try:
+            return list(self._library.get_strategy())
+        except LookupError:
+            return []
+
+    def choices(self) -> Iterator[str]:
+        """Yield every value this parameter accepts, as the backend spells it."""
+        for reconstructor in self._available():
+            yield reconstructor.name
+
+    def _settle(self, wanted: str, *, persist: bool, warn: bool = True) -> None:
+        """Resolve *wanted* against the selected library and select the result.
+
+        An unresolvable name is stood in for, so the application is usable --
+        but it is not written back unless *persist*. A settings file naming a
+        backend or an algorithm this install lacks is an ordinary thing to
+        carry between machines, and rewriting the key would lose the choice
+        the first time it was opened somewhere that could not resolve it.
+
+        *warn* distinguishes a name that was asked for from one merely
+        carried over: changing library to one that does not offer the
+        previous algorithm is an ordinary thing to do, not a complaint.
+        """
+        available = self._available()
+        sanitized = wanted.strip().casefold()
+        resolved = next((r for r in available if r.name.casefold() == sanitized), None)
+
+        if resolved is None:
+            if warn and sanitized and available:
+                logger.warning(
+                    f'Invalid algorithm "{wanted}" for {self._library_name()}. '
+                    f'Available: {[r.name for r in available]}.'
+                )
+
+            selected = self._stand_in(available)
+        else:
+            selected = resolved
+            persist = True
+
+        if selected is None:
+            self._current = ''
+            self._current_reconstructor = NullReconstructor('None')
+        else:
+            self._current = selected.name
+            self._current_reconstructor = selected
+            self._remembered[self._library_name()] = selected.name
+
+            if persist:
+                self._parameter.set_value(selected.name)
+
+    def _stand_in(self, available: Sequence[Reconstructor]) -> Reconstructor | None:
+        """What to select when the name asked for resolves to nothing.
+
+        The declared default where this library offers it, since that is the
+        algorithm ptychodus chose and the one a settings file saying nothing
+        would land on. Otherwise the first on offer, which is an accident of
+        registration order but is at least an algorithm.
+        """
+        wanted = self._default.strip().casefold()
+        preferred = next((r for r in available if r.name.casefold() == wanted), None)
+
+        if preferred is not None:
+            return preferred
+
+        return available[0] if available else None
 
     def get_value(self) -> str:
-        return self._current_value
+        return self._current
 
     def set_value(self, value: str, *, notify: bool = True) -> None:
-        sanitized_value = value.strip().casefold()
+        if value.strip().casefold() == self._current.casefold():
+            return
 
-        if sanitized_value != self._current_value:
-            try:
-                reconstructor = self._reconstructor_map[sanitized_value]
-            except KeyError:
-                logger.debug(
-                    f'Invalid plugin name "{value}". '
-                    f'Registered plugins: {self._reconstructor_map.keys()}.'
-                )
-                self._parameter.set_value(self._current_value)
-            else:
-                logger.debug(f'{self._current_value} -> {sanitized_value}')
-                self._current_value = sanitized_value
-                self._current_reconstructor = reconstructor
-                self._parameter.set_value(self._current_value)
+        self._settle(value, persist=True)
 
-                if notify:
-                    self.notify_observers()
+        if notify:
+            self.notify_observers()
 
     def get_value_as_string(self) -> str:
         return self.get_value()
@@ -104,19 +188,45 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
     def set_value_from_string(self, value: str) -> None:
         self.set_value(value)
 
-    def available_reconstructors(self) -> Iterator[str]:
-        for key in self._reconstructor_map.keys():
-            yield key
-
     def get_current_reconstructor(self) -> Reconstructor:
         return self._current_reconstructor
 
+    def get_current_parts(self) -> tuple[str, str]:
+        """The selected library and algorithm, as each is spelled."""
+        return self._library_name(), self._current
+
     def copy(self) -> Parameter[str]:
-        return ProcessingAlgorithmParameter(self._parameter, self._libraries)
+        return ProcessingAlgorithmParameter(self._parameter, self._library, default=self._default)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
-            self.set_value(self._parameter.get_value())
+            self._settle(self._parameter.get_value(), persist=False)
+            self.notify_observers()
+        elif observable is self._library:
+            # Re-resolved from what is persisted rather than from what is
+            # selected, because the two keys are applied in an order this
+            # cannot control: a settings file is read after everything is
+            # built, and the algorithm may land while the previous library is
+            # still selected. Whatever settles is recorded, since changing
+            # library is a choice rather than a load.
+            wanted = self._remembered.get(self._library_name(), self._parameter.get_value())
+            self._settle(wanted, persist=True, warn=False)
+            self.notify_observers()
+
+
+def validate_options(reconstructor: Reconstructor, options: BaseModel) -> None:
+    """Reject options that are not of the type *reconstructor* declared.
+
+    ``options`` is typed as the base model, so nothing but this check ties a
+    reconstructor to the options it asked for.
+    """
+    declared = type(reconstructor.get_default_options())
+
+    if not isinstance(options, declared):
+        raise TypeError(
+            f'{reconstructor.name} declares {declared.__name__} '
+            f'but received {type(options).__name__}.'
+        )
 
 
 class ProcessingAPI:
@@ -124,13 +234,34 @@ class ProcessingAPI:
         self,
         task_manager: TaskManager,
         product_api: ProductAPI,
+        library: PluginChooserParameter[ReconstructorLibrary],
         algorithm: ProcessingAlgorithmParameter,
+        algorithms_by_library: Mapping[str, Sequence[str]],
         task_monitor: ProcessingTaskMonitor,
+        parameter_store: ProcessingParameterStore,
+        training_data_file_writers: PluginCatalog[TrainingDataFileWriter],
     ) -> None:
         self._task_manager = task_manager
         self._product_api = product_api
+        self._library_parameter = library
         self._algorithm_parameter = algorithm
+        self._algorithms_by_library = {
+            name.casefold(): tuple(algorithms) for name, algorithms in algorithms_by_library.items()
+        }
         self._task_monitor = task_monitor
+        self._parameter_store = parameter_store
+        self._training_data_file_writers = training_data_file_writers
+
+    def _options_for(self, reconstructor: Reconstructor) -> BaseModel:
+        """Return the options to run *reconstructor* with, as currently edited.
+
+        The store is keyed the same way the algorithm selection is, so the values
+        served are the ones behind the panel the user was just looking at.
+        """
+        library, algorithm = self._algorithm_parameter.get_current_parts()
+        options = self._parameter_store.get_options(library, algorithm)
+        validate_options(reconstructor, options)
+        return options
 
     @property
     def task_monitor(self) -> ProcessingTaskMonitor:
@@ -159,23 +290,40 @@ class ProcessingAPI:
         )
         toc = time.perf_counter()
         logger.info(f'Data preparation time {toc - tic:.4f} seconds.')
+
+        carried: list[str] = []
+
+        if reconstruct_input.background is not None:
+            carried.append('background')
+
+        if reconstruct_input.flat_field is not None:
+            carried.append('flat field')
+
+        if carried:
+            logger.info(
+                f'The patterns carry an unapplied {" and ".join(carried)}; a reconstructor'
+                ' that does not model it ignores it. Enable the detector correction to'
+                ' apply it to the patterns instead.'
+            )
+
         return reconstruct_input
 
     def reconstruct(
         self,
         *,
         product_index: int,
+        library: str | None = None,
         algorithm: str | None = None,
         index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
         output_product_suffix: str = '',
         output_product_file: Path | None = None,
         block: bool = False,
     ) -> int:
-        self.set_reconstructor_if_provided(algorithm)
+        self.set_reconstructor_if_provided(library=library, algorithm=algorithm)
         input_product_item = self._product_api.get_item(product_index)
         output_product_name = _build_output_product_name(
             input_product_item.get_name(),
-            self._algorithm_parameter.get_value(),
+            _algorithm_tag(*self.current_selection()),
             output_product_suffix,
         )
         output_product_index = self._product_api.insert_product(
@@ -188,12 +336,15 @@ class ProcessingAPI:
             product_index=output_product_index,
             index_filter=index_filter,
         )
+        reconstructor = self._algorithm_parameter.get_current_reconstructor()
+        options = self._options_for(reconstructor)
         background_task = ReconstructBackgroundTask(
             self._task_monitor,
-            self._algorithm_parameter.get_current_reconstructor(),
+            reconstructor,
             reconstruct_input,
             output_product_item,
             output_product_file,
+            options,
         )
         snapshot = self._task_monitor.get_completed_runs()
         self._task_manager.put_background_task(background_task)
@@ -210,16 +361,22 @@ class ProcessingAPI:
         return output_product_index
 
     def reconstruct_split(
-        self, *, product_index: int, algorithm: str | None = None
+        self,
+        *,
+        product_index: int,
+        library: str | None = None,
+        algorithm: str | None = None,
     ) -> tuple[int, int]:
         output_product_index_odd = self.reconstruct(
             product_index=product_index,
+            library=library,
             algorithm=algorithm,
             index_filter=PositionIndexFilter.ODD,
             output_product_suffix='odd',
         )
         output_product_index_even = self.reconstruct(
             product_index=product_index,
+            library=library,
             algorithm=algorithm,
             index_filter=PositionIndexFilter.EVEN,
             output_product_suffix='even',
@@ -227,21 +384,25 @@ class ProcessingAPI:
 
         return output_product_index_odd, output_product_index_even
 
-    def load_model_from_file(self, file_path: Path, algorithm: str | None = None) -> None:
-        self.set_reconstructor_if_provided(algorithm)
+    def load_model(
+        self, file_path: Path, *, library: str | None = None, algorithm: str | None = None
+    ) -> None:
+        self.set_reconstructor_if_provided(library=library, algorithm=algorithm)
         reconstructor = self._algorithm_parameter.get_current_reconstructor()
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Opening model...')
             tic = time.perf_counter()
-            reconstructor.load_model_from_file(file_path)
+            reconstructor.load_model(file_path)
             toc = time.perf_counter()
             logger.info(f'Open time {toc - tic:.4f} seconds.')
         else:
             logger.warning('Algorithm is not trainable!')
 
-    def save_model_to_file(self, file_path: Path, algorithm: str | None = None) -> None:
-        self.set_reconstructor_if_provided(algorithm)
+    def save_model(
+        self, file_path: Path, *, library: str | None = None, algorithm: str | None = None
+    ) -> None:
+        self.set_reconstructor_if_provided(library=library, algorithm=algorithm)
         reconstructor = self._algorithm_parameter.get_current_reconstructor()
 
         if isinstance(reconstructor, TrainableReconstructor):
@@ -258,46 +419,55 @@ class ProcessingAPI:
         file_path: Path,
         *,
         product_index: int,
-        algorithm: str | None = None,
         index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
+        file_type: str | None = None,
     ) -> None:
-        self.set_reconstructor_if_provided(algorithm)
-        trainer = self._algorithm_parameter.get_current_reconstructor()
+        """Export what a trainable reconstructor would train on, in any registered format.
 
-        if isinstance(trainer, TrainableReconstructor):
-            reconstruct_input = self.get_reconstruct_input(
-                product_index=product_index,
-                index_filter=index_filter,
-            )
+        `file_type` names a training-data writer by its simple or display name; None
+        writes the format `get_default_training_data_file_type` answers. The selected
+        reconstructor plays no part beyond that default, so every format is on offer
+        whether or not its backend is installed.
 
-            logger.info('Exporting...')
-            tic = time.perf_counter()
-            trainer.export_training_data(file_path, reconstruct_input)
-            toc = time.perf_counter()
-            logger.info(f'Export time {toc - tic:.4f} seconds.')
-        else:
-            logger.warning('Algorithm is not trainable!')
+        Raises:
+            LookupError: when `file_type` names no registered writer.
+        """
+        name = self.get_default_training_data_file_type() if file_type is None else file_type
+        writer = self._training_data_file_writers.get_strategy_by_name(name)
+        reconstruct_input = self.get_reconstruct_input(
+            product_index=product_index,
+            index_filter=index_filter,
+        )
+
+        logger.info('Exporting...')
+        tic = time.perf_counter()
+        writer.write(file_path, reconstruct_input)
+        toc = time.perf_counter()
+        logger.info(f'Export time {toc - tic:.4f} seconds.')
 
     def train(
         self,
-        input_path: Path,
-        output_path: Path,
+        input_directory: Path,
+        output_directory: Path,
         *,
         product_index: int,
+        library: str | None = None,
         algorithm: str | None = None,
         block: bool = False,
     ) -> None:
-        self.set_reconstructor_if_provided(algorithm)
+        self.set_reconstructor_if_provided(library=library, algorithm=algorithm)
         trainer = self._algorithm_parameter.get_current_reconstructor()
 
         if isinstance(trainer, TrainableReconstructor):
             reconstruct_input = self.get_reconstruct_input(product_index=product_index)
+            options = self._options_for(trainer)
             background_task = TrainBackgroundTask(
                 self._task_monitor,
                 trainer,
                 reconstruct_input,
-                input_path,
-                output_path,
+                input_directory,
+                output_directory,
+                options,
             )
             snapshot = self._task_monitor.get_completed_runs()
             self._task_manager.put_background_task(background_task)
@@ -313,19 +483,27 @@ class ProcessingAPI:
         else:
             logger.warning('Algorithm is not trainable!')
 
-    def get_training_data_file_filter(self, *, algorithm: str | None = None) -> str:
-        self.set_reconstructor_if_provided(algorithm)
-        trainer = self._algorithm_parameter.get_current_reconstructor()
+    def get_training_data_file_filters(self) -> dict[str, str]:
+        """Map each training-data file-dialog name filter to the `file_type` that writes it."""
+        return {
+            plugin.display_name: plugin.simple_name for plugin in self._training_data_file_writers
+        }
 
-        if isinstance(trainer, TrainableReconstructor):
-            return trainer.get_training_data_file_filter()
-        else:
-            logger.warning('Algorithm is not trainable!')
+    def get_default_training_data_file_type(self) -> str:
+        """Name the format to export in when none is chosen: the selected backend's own.
 
-        return ''
+        A backend's format is the writer registered under the same simple name as the
+        backend's library; that shared name is the whole of the association. A backend
+        without one, or a selection that resolves to none, falls back to CXI.
+        """
+        library, _ = self.current_selection()
+        plugin = self._training_data_file_writers.find_plugin(library) if library else None
+        return 'CXI' if plugin is None else plugin.simple_name
 
-    def get_model_file_filter(self, *, algorithm: str | None = None) -> str:
-        self.set_reconstructor_if_provided(algorithm)
+    def get_model_file_filter(
+        self, *, library: str | None = None, algorithm: str | None = None
+    ) -> str:
+        self.set_reconstructor_if_provided(library=library, algorithm=algorithm)
         trainer = self._algorithm_parameter.get_current_reconstructor()
 
         if isinstance(trainer, TrainableReconstructor):
@@ -335,8 +513,10 @@ class ProcessingAPI:
 
         return ''
 
-    def get_model_file_extension(self, *, algorithm: str | None = None) -> str:
-        self.set_reconstructor_if_provided(algorithm)
+    def get_model_file_extension(
+        self, *, library: str | None = None, algorithm: str | None = None
+    ) -> str:
+        self.set_reconstructor_if_provided(library=library, algorithm=algorithm)
         trainer = self._algorithm_parameter.get_current_reconstructor()
 
         if isinstance(trainer, TrainableReconstructor):
@@ -346,14 +526,37 @@ class ProcessingAPI:
 
         return ''
 
-    def available_reconstructors(self) -> Iterator[str]:
-        return self._algorithm_parameter.available_reconstructors()
+    def available_libraries(self) -> Iterator[str]:
+        """Yield every reconstructor backend in play, as each is named."""
+        return self._library_parameter.choices()
 
-    def available_reconstructors_parts(self) -> Iterator[tuple[str, str]]:
-        for key in self._algorithm_parameter.available_reconstructors():
-            yield self._algorithm_parameter.split_key(key)
+    def available_algorithms(self, library: str | None = None) -> Iterator[str]:
+        """Yield the algorithms *library* offers, or the selected one's when None.
 
-    def set_reconstructor_if_provided(self, algorithm: str | None) -> None:
+        Asking about a library does not select it. Enumerating what is on
+        offer is exactly what a panel does at startup, and a listing that
+        selected as it went would walk the selection through every backend
+        and leave it on the last.
+        """
+        name = self._library_parameter.get_value() if library is None else library
+        return iter(self._algorithms_by_library.get(name.casefold(), ()))
+
+    def current_selection(self) -> tuple[str, str]:
+        """The selected library and algorithm, as each is named."""
+        return self._algorithm_parameter.get_current_parts()
+
+    def set_reconstructor_if_provided(
+        self, *, library: str | None = None, algorithm: str | None = None
+    ) -> None:
+        """Select what was named, leaving alone whatever was not.
+
+        The library goes first: the algorithm is resolved against whichever
+        library is selected, so setting them the other way round would
+        resolve the algorithm against the one being replaced.
+        """
+        if library is not None:
+            self._library_parameter.set_value(library)
+
         if algorithm is not None:
             self._algorithm_parameter.set_value(algorithm)
 

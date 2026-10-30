@@ -11,8 +11,8 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.product import LossValue
+from ptychodus.model.observer import Observable, Observer
 
 from ...model.processing import ProcessingTaskMonitor
 from ...model.product import ProductRepository, ProductRepositoryItem, ProductRepositoryObserver

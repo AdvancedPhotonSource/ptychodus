@@ -9,7 +9,6 @@ from ptychodus.api.diffraction import CropRegion, Polarization
 from ptychodus.api.affine import AffineTransform
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import ReconstructInput
-from ptychodus.api.settings import PathPrefixChange, SettingsRegistry
 from ptychodus.api.workflow import (
     DiffractionWorkflowAPI,
     ProductWorkflowAPI,
@@ -23,6 +22,7 @@ from .genesis import GenesisExecutor
 from .globus import GlobusExecutor
 from .processing import ProcessingAPI
 from .product import ObjectAPI, ProbeAPI, ProductAPI, ProbePositionsAPI
+from .settings import SettingsRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +99,9 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
         builder = item.get_probe_positions_item().get_builder()
         builder.set_transform(transform)
 
+    def estimate_defocus(self) -> None:
+        self._product_api.estimate_defocus_from_parallax(self._product_index, block=True)
+
     def load_probe(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._probe_api.open_probe(self._product_index, file_path, file_type=file_type)
 
@@ -131,12 +134,14 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
     def reconstruct_local(
         self,
         *,
+        library: str | None = None,
         algorithm: str | None = None,
         output_product_file: Path | None = None,
         block: bool = False,
     ) -> ProductWorkflowAPI:
         output_product_index = self._processing_api.reconstruct(
             product_index=self._product_index,
+            library=library,
             algorithm=algorithm,
             output_product_file=output_product_file,
             block=block,
@@ -156,14 +161,19 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
     def reconstruct_remote(
         self,
         *,
+        library: str | None = None,
         algorithm: str | None = None,
         provider: RemoteComputeProvider = RemoteComputeProvider.GLOBUS,
     ) -> None:
         match provider:
             case RemoteComputeProvider.GLOBUS:
-                self._globus_executor.reconstruct(self._product_index, algorithm=algorithm)
+                self._globus_executor.reconstruct(
+                    self._product_index, library=library, algorithm=algorithm
+                )
             case RemoteComputeProvider.GENESIS:
-                self._genesis_executor.reconstruct(self._product_index, algorithm=algorithm)
+                self._genesis_executor.reconstruct(
+                    self._product_index, library=library, algorithm=algorithm
+                )
             case _:
                 raise ValueError(f'Unsupported remote compute provider: {provider}')
 
@@ -172,6 +182,7 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
         input_path: Path,
         output_path: Path,
         *,
+        library: str | None = None,
         algorithm: str | None = None,
         block: bool = False,
     ) -> None:
@@ -180,6 +191,7 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
             input_path,
             output_path,
             product_index=self._product_index,
+            library=library,
             algorithm=algorithm,
             block=block,
         )
@@ -187,23 +199,26 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
     def train_reconstructor_remote(
         self,
         *,
+        library: str | None = None,
         algorithm: str | None = None,
         provider: RemoteComputeProvider = RemoteComputeProvider.GLOBUS,
     ) -> None:
         # TODO mlflow
         match provider:
             case RemoteComputeProvider.GLOBUS:
-                self._globus_executor.train(self._product_index, algorithm=algorithm)
+                self._globus_executor.train(
+                    self._product_index, library=library, algorithm=algorithm
+                )
             case RemoteComputeProvider.GENESIS:
-                self._genesis_executor.train(self._product_index, algorithm=algorithm)
+                self._genesis_executor.train(
+                    self._product_index, library=library, algorithm=algorithm
+                )
             case _:
                 raise ValueError(f'Unsupported remote compute provider: {provider}')
 
-    def export_training_data(self, file_path: Path, *, algorithm: str | None = None) -> None:
+    def export_training_data(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._processing_api.export_training_data(
-            file_path,
-            product_index=self._product_index,
-            algorithm=algorithm,
+            file_path, product_index=self._product_index, file_type=file_type
         )
 
     def save_product(self, file_path: Path, *, file_type: str | None = None) -> None:
@@ -217,6 +232,7 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
         input_file_type: str | None = None,
         output_file_type: str | None = None,
         algorithm: str | None = None,
+        algorithm_parameters: Mapping[str, Any] | None = None,
         block: bool = False,
     ) -> None:
         item_index = self._fluorescence_api.open_measured_dataset(
@@ -225,6 +241,7 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
         self._fluorescence_api.enhance(
             item_index,
             algorithm=algorithm,
+            algorithm_parameters=algorithm_parameters,
             output_file_path=output_path,
             output_file_type=output_file_type,
             block=block,
@@ -278,6 +295,10 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         crop_region: CropRegion | None = None,
         bad_pixels_file_path: Path | None = None,
         bad_pixels_file_type: str | None = None,
+        background_file_path: Path | None = None,
+        background_file_type: str | None = None,
+        flat_field_file_path: Path | None = None,
+        flat_field_file_type: str | None = None,
         process_patterns: bool = True,
         block: bool = False,
     ) -> DiffractionWorkflowAPI:
@@ -287,13 +308,20 @@ class ConcreteWorkflowAPI(WorkflowAPI):
             crop_region=crop_region,
             bad_pixels_file_path=bad_pixels_file_path,
             bad_pixels_file_type=bad_pixels_file_type,
+            background_file_path=background_file_path,
+            background_file_type=background_file_type,
+            flat_field_file_path=flat_field_file_path,
+            flat_field_file_type=flat_field_file_type,
             process_patterns=process_patterns,
             block=block,
         )
         return ConcreteDiffractionWorkflowAPI(self._diffraction_api, dataset_index)
 
-    def available_reconstructors(self) -> Iterator[str]:
-        return self._processing_api.available_reconstructors()
+    def available_libraries(self) -> Iterator[str]:
+        return self._processing_api.available_libraries()
+
+    def available_algorithms(self, library: str | None = None) -> Iterator[str]:
+        return self._processing_api.available_algorithms(library)
 
     def load_assembled_diffraction_data(self, file_path: Path) -> DiffractionWorkflowAPI:
         dataset_index = self._diffraction_api.import_assembled_patterns(file_path)
@@ -354,6 +382,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
         far_field: bool | None = None,
+        i0_photons_per_count: float | None = None,
         diffraction: DiffractionWorkflowAPI | None = None,
     ) -> ProductWorkflowAPI:
         product_index = self._product_api.insert_new_product(
@@ -369,11 +398,10 @@ class ConcreteWorkflowAPI(WorkflowAPI):
             tilt_angle_deg=tilt_angle_deg,
             polarization=polarization,
             far_field=far_field,
+            i0_photons_per_count=i0_photons_per_count,
             dataset=self._fetch_dataset(diffraction),
         )
         return self.get_product(product_index)
 
-    def save_settings(
-        self, file_path: Path, change_path_prefix: PathPrefixChange | None = None
-    ) -> None:
-        self._settings_registry.save_settings(file_path, change_path_prefix)
+    def save_settings(self, file_path: Path) -> None:
+        self._settings_registry.save_settings(file_path)

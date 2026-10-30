@@ -9,27 +9,23 @@ from ..view import ViewCore
 from .agent import AgentChatController, AgentController
 from .automation import AutomationController
 from .data import FileDialogFactory
-from .diffraction import DiffractionController
+from .diffraction.core import DiffractionController
 from .fluorescence import FluorescenceController
 from .fluorescence.enhance_dialog import FluorescenceEnhanceDialogController
 from .genesis import GenesisController
 from .globus import GlobusController
-from .image import ImageController
 from .memory import MemoryController
 from .object import ObjectController
 from .probe import ProbeController
 from .probe_positions import ProbePositionsController
 from .helpers import create_brush_for_editable_cell
 from .processing import ProcessingController
+from .processing.core import ReconstructorViewControllerFactory
+from .processing.generated import GeneratedViewControllerFactory
 from .product import ProductController
 from .product.core import ProductRepositoryTableModel
 from .product.visualization import ProductVisualizationController
 from .task_status import TaskStatusController
-from .ptycho_fm import PtychoFMViewControllerFactory
-from .ptychi import PtyChiViewControllerFactory
-from .ptychonn import PtychoNNViewControllerFactory
-from .ptychopinn import PtychoPINNViewControllerFactory
-from .ptychopinn_torch import PtychoPINNTorchViewControllerFactory
 from .settings import SettingsController
 
 
@@ -48,23 +44,12 @@ class ControllerCore:
 
         self._memory_controller = MemoryController(model.memory_presenter, view.memory_widget)
         self._file_dialog_factory = FileDialogFactory()
-        self._ptychi_view_controller_factory = PtyChiViewControllerFactory(
-            model.ptychi_reconstructor_library
-        )
-        self._ptychonn_view_controller_factory = PtychoNNViewControllerFactory(
-            model.ptychonn_reconstructor_library
-        )
-        self._ptychopinn_view_controller_factory = PtychoPINNViewControllerFactory(
-            model.ptychopinn_reconstructor_library, self._file_dialog_factory
-        )
-        self._ptychopinn_torch_view_controller_factory = PtychoPINNTorchViewControllerFactory(
-            model.ptychopinn_torch_reconstructor_library,
-            self._file_dialog_factory,
-        )
-        self._ptycho_fm_view_controller_factory = PtychoFMViewControllerFactory(
-            model.ptycho_fm_reconstructor_library,
-            self._file_dialog_factory,
-        )
+        # Every backend's panel is rendered from what it declares, so adding
+        # one needs no wiring here.
+        self._view_controller_factories: list[ReconstructorViewControllerFactory] = [
+            GeneratedViewControllerFactory(name, model.processing_core.parameter_store)
+            for name in model.processing_core.library_names()
+        ]
         # Shared product-repository table model. Constructing it here (before
         # any consumer) lets SettingsController, DiffractionController,
         # ProductController, and ProcessingController all bind to the same
@@ -83,12 +68,6 @@ class ControllerCore:
             view.settings_table_view,
             self._file_dialog_factory,
         )
-        self._diffraction_image_controller = ImageController(
-            model.pattern_visualization_engine,
-            view.diffraction_image_view.image_view,
-            self._status_bar,
-            self._file_dialog_factory,
-        )
         self._diffraction_controller = DiffractionController(
             model.diffraction_core.detector_settings,
             model.diffraction_core.diffraction_settings,
@@ -101,10 +80,8 @@ class ControllerCore:
             model.analysis_core.diffraction_simulator,
             model.analysis_core.diffraction_simulator_settings,
             view.diffraction_view,
-            view.diffraction_image_view.status_view,
-            self._diffraction_image_controller,
+            view.diffraction_image_view,
             model.diffraction_core.summary_service,
-            model.summary_visualization_engine,
             self._status_bar,
             self._file_dialog_factory,
         )
@@ -123,8 +100,6 @@ class ControllerCore:
         if is_developer_mode_enabled:
             self._product_visualization_controller = ProductVisualizationController(
                 model.analysis_core.residual_analyzer,
-                model.analysis_core.residual_real_space_visualization_engine,
-                model.analysis_core.residual_reciprocal_space_visualization_engine,
                 self._product_controller,
                 view.product_visualization_view,
                 self._status_bar,
@@ -138,43 +113,21 @@ class ControllerCore:
             self._file_dialog_factory,
             is_developer_mode_enabled=is_developer_mode_enabled,
         )
-        self._probe_image_controller = ImageController(
-            model.probe_visualization_engine,
-            view.probe_image_view,
-            self._status_bar,
-            self._file_dialog_factory,
-        )
         self._probe_controller = ProbeController(
             model.product_core.probe_repository,
             model.product_core.probe_api,
-            self._probe_image_controller,
+            view.probe_image_view,
             model.analysis_core.probe_propagator,
             model.analysis_core.probe_propagator_settings,
-            model.analysis_core.probe_propagator_visualization_engine,
             model.analysis_core.illumination_mapper,
-            model.analysis_core.illumination_visualization_engine,
             model.analysis_core.probe_overlap_analyzer,
-            model.analysis_core.probe_overlap_visualization_engine,
             model.analysis_core.opr_mode_analyzer,
-            model.analysis_core.opr_mode_visualization_engine,
             view.probe_view,
-            self._file_dialog_factory,
-        )
-        self._object_image_controller = ImageController(
-            model.object_visualization_engine,
-            view.object_image_view,
-            self._status_bar,
-            self._file_dialog_factory,
-        )
-        self._fluorescence_image_controller = ImageController(
-            model.fluorescence_core.visualization_engine,
-            view.fluorescence_image_view,
             self._status_bar,
             self._file_dialog_factory,
         )
         self._fluorescence_enhance_dialog_controller = FluorescenceEnhanceDialogController(
-            model.fluorescence_core,
-            has_ptychozoon=model.fluorescence_core.ptychozoon_enhancer is not None,
+            model.fluorescence_core
         )
         self._fluorescence_controller = FluorescenceController(
             model.fluorescence_core.repository,
@@ -182,25 +135,24 @@ class ControllerCore:
             model.product_core.product_repository,
             self._product_table_model,
             view.fluorescence_view,
-            self._fluorescence_image_controller,
+            view.fluorescence_image_view,
             self._fluorescence_enhance_dialog_controller,
+            self._status_bar,
             self._file_dialog_factory,
         )
         self._object_controller = ObjectController(
             model.product_core.object_repository,
             model.product_core.object_api,
-            self._object_image_controller,
+            view.object_image_view,
             model.analysis_core.fourier_ring_correlator,
             model.analysis_core.fourier_analyzer,
-            model.analysis_core.fourier_real_space_visualization_engine,
-            model.analysis_core.fourier_reciprocal_space_visualization_engine,
             model.analysis_core.xmcd_analyzer,
-            model.analysis_core.xmcd_structural_visualization_engine,
-            model.analysis_core.xmcd_magnetic_visualization_engine,
             view.object_view,
+            self._status_bar,
             self._file_dialog_factory,
         )
         self._processing_controller = ProcessingController(
+            model.processing_core.library_parameter,
             model.processing_core.algorithm_parameter,
             model.processing_core.processing_api,
             model.product_core.product_repository,
@@ -210,13 +162,7 @@ class ControllerCore:
             view.processing_view,
             view.processing_status_view,
             self._file_dialog_factory,
-            [
-                self._ptychi_view_controller_factory,
-                self._ptychopinn_torch_view_controller_factory,
-                self._ptychopinn_view_controller_factory,
-                self._ptychonn_view_controller_factory,
-                self._ptycho_fm_view_controller_factory,
-            ],
+            self._view_controller_factories,
         )
         self._globus_controller = GlobusController(
             model.globus_core.settings,

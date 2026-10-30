@@ -1,13 +1,14 @@
 from __future__ import annotations
 from collections.abc import Sequence
+from enum import Enum
 from typing import Any
 import logging
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QStringListModel
 from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QTableView
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.observer import Observable, Observer
+from ptychodus.model.settings import SettingsRegistry
 
 from ..model.product import ProductRepository
 from ..view.settings import SettingsView, SyncProductToSettingsDialog
@@ -15,6 +16,36 @@ from .data import FileDialogFactory
 from .product.core import ProductRepositoryComboProxyModel, ProductRepositoryTableModel
 
 logger = logging.getLogger(__name__)
+
+
+class _Column(Enum):
+    """Every column of SettingsTableModel: its order and its header.
+
+    The member value is the header and the position comes from declaration order,
+    so a column cannot be added to the ordering and forgotten in the headers.
+    Bare names in a ``match`` arm are capture patterns, not value patterns.
+    """
+
+    NAME = 'Name'
+    VALUE = 'Value'
+
+    def __init__(self, header: str) -> None:
+        self.header = header
+        # Members already defined when this one is constructed, which is its position.
+        self.index = len(self.__class__.__members__)
+
+    @classmethod
+    def from_index(cls, index: int) -> _Column:
+        """The column at `index`.
+
+        Raises:
+            IndexError: for a column outside the table, which the model's own
+                ``columnCount`` makes impossible and so would be a bug rather than input.
+        """
+        if index < 0:
+            raise IndexError(f'Column index {index} is negative.')
+
+        return list(cls)[index]
 
 
 class SettingsTableModel(QAbstractTableModel):
@@ -36,23 +67,22 @@ class SettingsTableModel(QAbstractTableModel):
         role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
         if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
-            if section == 0:
-                return 'Name'
-            elif section == 1:
-                return 'Value'
+            return _Column.from_index(section).header
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
-            if index.column() == 0:
+            column = _Column.from_index(index.column())
+
+            if column is _Column.NAME:
                 return self._names[index.row()]
-            elif index.column() == 1:
+            elif column is _Column.VALUE:
                 return str(self._values[index.row()])
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._names)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
-        return 2
+        return len(_Column)
 
 
 class SettingsController(Observer):

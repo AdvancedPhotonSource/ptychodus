@@ -16,7 +16,10 @@ dependencies = [
     "httpx",
     "matplotlib",
     "mlflow-skinny",
-    "numpy",
+    # 2.2 gives the scalar precision type parameters PEP 696 defaults, so the annotations
+    # here write `numpy.floating` rather than `numpy.floating[Any]`, and makes the
+    # shape-typed `ndarray[tuple[int, int], ...]` aliases in api/ check what they claim.
+    "numpy>=2.2",
     "psutil",
     "pydantic",
     "pydantic-ai>=1.0,<3",
@@ -30,9 +33,10 @@ dependencies = [
 dynamic = ["version"]
 
 [project.scripts]
-convert-to-ptychodus = "ptychodus.cli.convert_to_ptychodus:main"
 ptychodus = "ptychodus.__main__:main"
 ptychodus-bdp = "ptychodus.cli.bdp:main"
+ptychodus-enhance = "ptychodus.cli.enhance:main"
+ptychodus-reconstruct = "ptychodus.cli.reconstruct_prepared:main"
 ptychodus-reconstruct-12ide = "ptychodus.cli.reconstruct_12ide:main"
 ptychodus-reconstruct-2ide = "ptychodus.cli.reconstruct_2ide:main"
 ptychodus-reconstruct-34ide = "ptychodus.cli.reconstruct_34ide:main"
@@ -46,27 +50,30 @@ ptychodus-reconstruct-polar = "ptychodus.cli.reconstruct_polar:main"
 ptychodus-reconstruct-subprocess = "ptychodus.cli.reconstruct_subprocess:main"
 ptychodus-reconstruct-velociprobe = "ptychodus.cli.reconstruct_velociprobe:main"
 ptychodus-system-check = "ptychodus.cli.system_check:main"
-ptychodus-store = "ptychodus_store.cli:main"
+ptychodus-webapp = "ptychodus.webapp.cli:main"
 
-# PtychoPINN, PtychoFM and PtychoNN are published on no index, so they cannot
+# PtychoPINN and PtychoFM are published on no index, so they cannot
 # be named here the way ptychi is -- this table ships as the wheel's
 # Requires-Dist. Install them from a checkout, after any sync:
 #
 #     uv pip install --no-deps -e ../PtychoPINN
 #     uv pip install --no-deps -e ../ptycho-fm
-#     uv pip install --no-deps -e ../PtychoNN
 [project.optional-dependencies]
+# cdtools-py requires torch itself. Listing it here as well would give torch a second
+# source whenever a ptychi extra is also selected; left to cdtools, it resolves from
+# that extra's pinned index, or from PyPI when cdtools is installed alone.
+cdtools = ["cdtools-py>=0.3.2"]
 docs = ["myst-parser", "sphinx", "sphinx-copybutton", "sphinx-rtd-theme"]
 globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]
 gui = ["PyQt5"]
 # pty-chi pins torch to a CUDA-matched index in its own pyproject, but uv does not
 # inherit `tool.uv.sources` from a dependency, so ptychodus has to pin it again below.
-ptychi = ["ptychi==2.1.*", "torch>=2.4", "torchvision"]
-ptychi-cuda128 = ["ptychi==2.1.*", "torch>=2.4", "torchvision"]
-ptychi-cuda130 = ["ptychi==2.1.*", "torch>=2.4", "torchvision"]
-ptychi-cuda132 = ["ptychi==2.1.*", "torch>=2.4", "torchvision"]
+ptychi = ["ptychi==2.3.*", "torch>=2.4", "torchvision"]
+ptychi-cuda126 = ["ptychi==2.3.*", "torch>=2.4", "torchvision"]
+ptychi-cuda130 = ["ptychi==2.3.*", "torch>=2.4", "torchvision"]
+ptychi-cuda132 = ["ptychi==2.3.*", "torch>=2.4", "torchvision"]
 ptychozoon = ["ptychozoon"]
-store = [
+webapp = [
     "fastapi>=0.115",
     "fastmcp>=3",
     "uvicorn[standard]>=0.30",
@@ -75,13 +82,13 @@ store = [
     "pillow>=10.3",
     "pydantic-settings>=2.5",
     "python-multipart>=0.0.18",
+    "xraydb>=4.5",
 ]
-xraydb = ["xraydb>=4.5"]
 
 [tool.setuptools.package-data]
 "ptychodus" = ["py.typed"]
 "ptychodus.plugins.mda" = ["xdrlib-PSF-LICENSE.txt"]
-"ptychodus_store" = [
+"ptychodus.webapp" = [
     "ui/index.html",
     "ui/styles.css",
     "ui/dist/**/*.js",
@@ -101,7 +108,7 @@ where = ["src"]
 conflicts = [
     [
         { extra = "ptychi" },
-        { extra = "ptychi-cuda128" },
+        { extra = "ptychi-cuda126" },
         { extra = "ptychi-cuda130" },
         { extra = "ptychi-cuda132" },
     ],
@@ -112,13 +119,13 @@ conflicts = [
 [tool.uv.sources]
 torch = [
     { index = "pytorch-cpu", extra = "ptychi" },
-    { index = "pytorch-cu128", extra = "ptychi-cuda128", marker = "sys_platform == 'linux'" },
+    { index = "pytorch-cu126", extra = "ptychi-cuda126", marker = "sys_platform == 'linux'" },
     { index = "pytorch-cu130", extra = "ptychi-cuda130", marker = "sys_platform == 'linux'" },
     { index = "pytorch-cu132", extra = "ptychi-cuda132", marker = "sys_platform == 'linux'" },
 ]
 torchvision = [
     { index = "pytorch-cpu", extra = "ptychi" },
-    { index = "pytorch-cu128", extra = "ptychi-cuda128", marker = "sys_platform == 'linux'" },
+    { index = "pytorch-cu126", extra = "ptychi-cuda126", marker = "sys_platform == 'linux'" },
     { index = "pytorch-cu130", extra = "ptychi-cuda130", marker = "sys_platform == 'linux'" },
     { index = "pytorch-cu132", extra = "ptychi-cuda132", marker = "sys_platform == 'linux'" },
 ]
@@ -129,8 +136,8 @@ url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
 explicit = true
 
 [[tool.uv.index]]
@@ -144,6 +151,9 @@ url = "https://download.pytorch.org/whl/cu132"
 explicit = true
 
 [tool.mypy]
+# Teaches mypy that Field(default, ...) supplies a default; without it every
+# field declared that way reads as required and every bare construction errors.
+plugins = ["pydantic.mypy"]
 # The unpackaged scripts/ tree has same-named modules in sibling directories
 # (three genesis submit_job.py), as does tests/ (two conftest.py). Deriving module
 # names from the repo root keeps them distinct without adding __init__.py to trees
@@ -153,6 +163,14 @@ explicit_package_bases = true
 mypy_path = ["src", "tests"]
 
 [[tool.mypy.overrides]]
+# The domain layer states what it takes and returns, so an omitted type parameter is a
+# gap rather than a shorthand. This does not reach the numpy types -- their stubs default
+# every parameter, so nothing reads as missing; tests/test_api_array_annotations.py covers
+# those. What it does cover is the bare `list`, `dict` and `Callable`.
+module = "ptychodus.api.*"
+disallow_any_generics = true
+
+[[tool.mypy.overrides]]
 # Half of this module's xdrlib import pair is always unused -- [import-not-found] on
 # <=3.12, [no-redef] on 3.13 -- and neither half may be removed.
 module = "ptychodus.plugins.mda.mda_position_file"
@@ -160,18 +178,16 @@ warn_unused_ignores = false
 
 [[tool.mypy.overrides]]
 module = [
+    "cdtools.*",
     "colorcet",
     "fastmcp.*",
     "globus_compute_sdk.*",
     "globus_sdk.*",
     "h5py",
     "hdf5plugin",
-    "lightning.*",
     "ptychi.*",
-    "ptycho.*",
     "ptycho_torch.*",
     "ptycho_fm.*",
-    "ptychonn.*",
     "ptychozoon.*",
     "pvaccess",
     "pvapy.*",

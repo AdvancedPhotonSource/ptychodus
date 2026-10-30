@@ -4,23 +4,29 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from pathlib import Path
 
 import numpy
 import numpy.testing
 import pytest
 
 from ptychodus.api.geometry import PixelGeometry
+from typing import cast
+
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.metrics import estimate_reconstruction_ambiguities
 from ptychodus.api.reconstruct import (
+    NoOptions,
     NullReconstructor,
     PositionIndexFilter,
+    ReconstructInput,
     ReconstructionAmbiguities,
+    Reconstructor,
+    ReconstructorLibrary,
+    TrainableReconstructor,
     prepare_reconstruct_input,
     warn_if_propagation_regime_disagrees,
 )
@@ -61,13 +67,13 @@ def _make_object(num_layers: int = 1, *, seed: int = 0) -> Object:
 
 def _make_probes(
     *, num_coherent_modes: int = 1, num_incoherent_modes: int = 1, seed: int = 1
-) -> ProbeSequence:
+) -> ProbeEnsemble:
     rng = numpy.random.default_rng(seed)
     shape = (num_coherent_modes, num_incoherent_modes, PROBE_HEIGHT_PX, PROBE_WIDTH_PX)
     real = rng.standard_normal(shape)
     imag = rng.standard_normal(shape)
     array = (real + 1j * imag).astype(numpy.complex128)
-    return ProbeSequence(
+    return ProbeEnsemble(
         array=array,
         opr_weights=None,
         pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=PIXEL_M),
@@ -335,7 +341,7 @@ class TestStandardizeProductOPRPassthrough:
             + 1j * rng.standard_normal((2, 1, PROBE_HEIGHT_PX, PROBE_WIDTH_PX))
         ).astype(numpy.complex128)
         weights = rng.standard_normal((5, 2)).astype(numpy.float64)
-        probes = ProbeSequence(
+        probes = ProbeEnsemble(
             array=array,
             opr_weights=weights,
             pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=PIXEL_M),
@@ -1115,20 +1121,111 @@ class TestPrepareReconstructInputMerge:
         assert result.bad_pixels is data.get_bad_pixels()
 
 
+def _product_with_tagged_opr_weights(position_indexes: list[int]) -> Product:
+    """Positions at x = row number, with OPR weight rows (1, row number) tagging each row."""
+    points = [
+        ProbePosition(index=i, x_m=float(row), y_m=0.0) for row, i in enumerate(position_indexes)
+    ]
+    rows = numpy.arange(len(position_indexes), dtype=float)
+    weights = numpy.stack([numpy.ones_like(rows), rows], axis=1)
+    probes = _make_probes(num_coherent_modes=2)
+    return Product(
+        metadata=_metadata(),
+        probe_positions=ProbePositionSequence(points),
+        probes=ProbeEnsemble(
+            array=probes.get_array(),
+            opr_weights=weights,
+            pixel_geometry=probes.get_pixel_geometry(),
+        ),
+        object_=_make_object(),
+        losses=[],
+    )
+
+
+class TestPrepareReconstructInputOPRWeights:
+    """OPR rows belong to probe positions and are conditioned exactly like the coordinates."""
+
+    @staticmethod
+    def _row_tags(result: ReconstructInput) -> list[float]:
+        return result.product.probes.get_opr_weights()[:, 1].tolist()
+
+    def test_oversampled_positions_give_one_averaged_row_per_pattern(self) -> None:
+        """Two positioner records per pattern and a surplus point past the last pattern."""
+        data = _make_assembled_data([0, 1, 2, 3, 4])
+        product = _product_with_tagged_opr_weights([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5])
+
+        result = prepare_reconstruct_input(data, product)
+
+        assert len(result.diffraction_patterns) == 5
+        assert self._row_tags(result) == [0.5, 2.5, 4.5, 6.5, 8.5]
+        # Weight rows and coordinates were averaged together, so they still agree.
+        assert self._row_tags(result) == [p.x_m for p in result.product.probe_positions]
+
+    @pytest.mark.parametrize(
+        ('index_filter', 'expected'),
+        [(PositionIndexFilter.ODD, [2.5, 6.5]), (PositionIndexFilter.EVEN, [0.5, 4.5, 8.5])],
+    )
+    def test_a_split_keeps_the_rows_of_its_own_indexes(
+        self, index_filter: PositionIndexFilter, expected: list[float]
+    ) -> None:
+        data = _make_assembled_data([0, 1, 2, 3, 4])
+        product = _product_with_tagged_opr_weights([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5])
+
+        result = prepare_reconstruct_input(data, product, index_filter)
+
+        assert self._row_tags(result) == expected
+
+    def test_a_pattern_without_a_position_gets_interpolated_weights(self) -> None:
+        data = _make_assembled_data([0, 1, 2])
+        product = _product_with_tagged_opr_weights([0, 2])
+
+        result = prepare_reconstruct_input(data, product)
+
+        assert self._row_tags(result) == [0.0, 0.5, 1.0]
+
+    def test_the_row_count_must_match_the_position_count(self) -> None:
+        data = _make_assembled_data([0, 1, 2])
+        product = _product_with_tagged_opr_weights([0, 1, 2])
+        probes = product.probes
+        short = dataclasses.replace(
+            product,
+            probes=ProbeEnsemble(
+                array=probes.get_array(),
+                opr_weights=probes.get_opr_weights()[:2],
+                pixel_geometry=probes.get_pixel_geometry(),
+            ),
+        )
+
+        with pytest.raises(ValueError, match='one probe position'):
+            prepare_reconstruct_input(data, short)
+
+    def test_the_output_feeds_back_in_unchanged(self) -> None:
+        """A reconstructor's own output has one row per position, so it conditions to itself."""
+        data = _make_assembled_data([0, 1, 2, 3, 4])
+        product = _product_with_tagged_opr_weights([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5])
+        first = prepare_reconstruct_input(data, product)
+
+        second = prepare_reconstruct_input(data, first.product)
+
+        numpy.testing.assert_array_equal(
+            second.product.probes.get_opr_weights(), first.product.probes.get_opr_weights()
+        )
+
+
 class TestNullReconstructor:
     """NullReconstructor must remain instantiable as new abstract methods are added."""
 
     def test_instantiable(self) -> None:
-        # Will raise TypeError if any abstract method on TrainableReconstructor lacks a stub.
+        # Will raise TypeError if any abstract method on Reconstructor lacks a stub.
         NullReconstructor('null')
 
-    def test_get_model_file_extension_returns_empty(self) -> None:
-        assert NullReconstructor('null').get_model_file_extension() == ''
+    def test_it_reconstructs_nothing(self) -> None:
+        null = NullReconstructor('null')
+        assert list(null.reconstruct(cast(ReconstructInput, None), options=NoOptions())) == []
 
-    def test_save_model_is_noop(self, tmp_path: Path) -> None:
-        target = tmp_path / 'model.bin'
-        NullReconstructor('null').save_model(target)
-        assert not target.exists()
+    def test_it_is_not_trainable(self) -> None:
+        """What a bare install selects, so a Train button must not appear for it."""
+        assert not isinstance(NullReconstructor('null'), TrainableReconstructor)
 
 
 # ---------------------------------------------------------------------------
@@ -1148,7 +1245,7 @@ def _product_with_regime(
     at 10 um it reads Fr ~ 52, deeply near field.
     """
     product = _make_product()
-    probes = ProbeSequence(
+    probes = ProbeEnsemble(
         array=product.probes.get_array(),
         opr_weights=None,
         pixel_geometry=PixelGeometry(width_m=pixel_m, height_m=pixel_m),
@@ -1217,6 +1314,27 @@ class TestWarnIfPropagationRegimeDisagrees:
 
         assert caplog.records == []
 
+    def test_a_focus_does_not_question_a_far_field_declaration(self, caplog) -> None:
+        """Far-field sampling ignores the magnification and the probe carries the focus's
+        curvature, so a far-field declaration is judged at the detector distance."""
+        product = _product_with_regime(far_field=True, focus_object_distance_m=-1.0e-7)
+
+        with caplog.at_level(logging.WARNING, logger=_WARN_LOGGER):
+            warn_if_propagation_regime_disagrees(product)
+
+        assert product.metadata.magnification > 1.0e6
+        assert caplog.records == []
+
+    def test_a_near_field_declaration_is_judged_at_the_demagnified_distance(self, caplog) -> None:
+        """The same focus brings a near-field product's Fresnel number up by the
+        magnification, which is what makes this geometry near field after all."""
+        product = _product_with_regime(far_field=False, focus_object_distance_m=-1.0e-7)
+
+        with caplog.at_level(logging.WARNING, logger=_WARN_LOGGER):
+            warn_if_propagation_regime_disagrees(product)
+
+        assert caplog.records == []
+
     def test_a_detector_at_the_focus_is_silent_rather_than_raising(self, caplog) -> None:
         """Degenerate geometry is reported by nothing, so it warns about nothing."""
         product = _product_with_regime(far_field=False, focus_object_distance_m=1.0)
@@ -1226,3 +1344,101 @@ class TestWarnIfPropagationRegimeDisagrees:
 
         assert product.metadata.magnification == 0.0
         assert caplog.records == []
+
+
+def _library(
+    requires: tuple[str, ...] = (), build: BaseException | None = None
+) -> ReconstructorLibrary:
+    """A library that either offers one reconstructor or fails to build."""
+
+    class _Library(ReconstructorLibrary):
+        def _build(self) -> list[Reconstructor]:
+            if build is not None:
+                raise build
+
+            return [NullReconstructor('algo')]
+
+    return _Library('backend_under_test', 'backend-under-test', requires=requires)
+
+
+class TestWhatALibrarySaysAboutItself:
+    """A backend's absence is a choice; a backend that cannot import is a fault.
+
+    Locating a module does not execute it, so the two outcomes are discovered at
+    different moments and only the second carries a traceback. They used to be
+    reported with the same sentence at the same level, which made an install
+    broken by a missing transitive dependency indistinguishable from one nobody
+    asked for -- and invisible wherever the threshold is above INFO.
+    """
+
+    def test_an_absent_backend_is_reported_once_at_info(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        library = _library(('a_module_that_does_not_exist',))
+
+        with caplog.at_level(logging.INFO, logger='backend_under_test'):
+            assert list(library) == []
+
+        (record,) = caplog.records
+        assert record.levelname == 'INFO'
+        assert record.getMessage() == 'backend-under-test not found.'
+        assert record.exc_info is None
+
+    def test_a_backend_that_cannot_import_warns_and_says_so(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        library = _library((), build=ImportError('no module named thing'))
+
+        with caplog.at_level(logging.INFO, logger='backend_under_test'):
+            assert list(library) == []
+
+        (record,) = caplog.records
+        assert record.levelname == 'WARNING'
+        assert 'installed but failed to import' in record.getMessage()
+        assert 'backend-under-test' in record.getMessage()
+
+    def test_and_carries_the_traceback_naming_what_broke(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        library = _library((), build=ImportError('no module named thing'))
+
+        with caplog.at_level(logging.INFO, logger='backend_under_test'):
+            list(library)
+
+        (record,) = caplog.records
+        assert record.exc_info is not None
+        assert 'no module named thing' in str(record.exc_info[1])
+
+    def test_the_two_outcomes_do_not_share_a_sentence(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Whichever happened has to be readable from the message alone."""
+        with caplog.at_level(logging.INFO, logger='backend_under_test'):
+            list(_library(('a_module_that_does_not_exist',)))
+            absent = caplog.records[-1].getMessage()
+            list(_library((), build=ImportError('broken')))
+            broken = caplog.records[-1].getMessage()
+
+        assert absent != broken
+
+    def test_a_backend_that_builds_reports_its_version(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        library = _library(())
+
+        with caplog.at_level(logging.INFO, logger='backend_under_test'):
+            assert [r.name for r in library] == ['algo']
+
+        (record,) = caplog.records
+        assert record.levelname == 'INFO'
+        assert record.getMessage().startswith('backend-under-test ')
+
+    def test_the_outcome_is_settled_once(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Iterating is not reprobing; a broken backend must not warn per panel."""
+        library = _library((), build=ImportError('broken'))
+
+        with caplog.at_level(logging.INFO, logger='backend_under_test'):
+            list(library)
+            list(library)
+
+        assert len(caplog.records) == 1

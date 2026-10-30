@@ -24,10 +24,10 @@ from PyQt5.QtWidgets import (
     QWizardPage,
 )
 
+from ptychodus.api.diffraction import BeamCenter
 from ptychodus.api.geometry import Interval
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.preprocess.diffraction import estimate_beam_center
 from ptychodus.api.preprocess.noise import RobustStatistics, compute_robust_statistics
+from ptychodus.model.observer import Observable, Observer
 
 from ....model.diffraction import (
     DetectorSettings,
@@ -35,7 +35,6 @@ from ....model.diffraction import (
     DiffractionSettings,
     DiffractionSummaryService,
 )
-from ....model.visualization import VisualizationEngine
 from ....view.diffraction import OpenDatasetWizardPage
 from ....view.widgets import ExceptionDialog
 
@@ -144,6 +143,17 @@ class CropViewController(CheckableGroupBoxParameterViewController):
         self._estimate_button = QPushButton('Estimate Beam Center')
         self._estimate_button.clicked.connect(self._on_estimate_clicked)
         self._estimate_button.setEnabled(False)
+        self._suggest_extent_button = QPushButton('Suggest Extent')
+        self._suggest_extent_button.setToolTip(
+            'Smallest power-of-two square about the center that holds the signal above the '
+            'noise floor of the summary mean pattern'
+        )
+        self._suggest_extent_button.clicked.connect(self._on_suggest_extent_clicked)
+        self._suggest_extent_button.setEnabled(False)
+
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self._estimate_button)
+        button_layout.addWidget(self._suggest_extent_button)
 
         layout = QGridLayout()
         layout.addWidget(QLabel('Center:'), 0, 0)
@@ -152,7 +162,7 @@ class CropViewController(CheckableGroupBoxParameterViewController):
         layout.addWidget(QLabel('Extent:'), 1, 0)
         layout.addWidget(self._width_spin_box, 1, 1)
         layout.addWidget(self._height_spin_box, 1, 2)
-        layout.addWidget(self._estimate_button, 2, 0, 1, 3)
+        layout.addLayout(button_layout, 2, 0, 1, 3)
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
         self.get_widget().set_contents_layout(layout)
@@ -230,19 +240,41 @@ class CropViewController(CheckableGroupBoxParameterViewController):
         monitor = self._summary_service.task_monitor
         has_summary = self._summary_service.get_last_summary() is not None
         self._estimate_button.setEnabled(has_summary and not monitor.is_processing)
+        self._suggest_extent_button.setEnabled(has_summary and not monitor.is_processing)
 
     def _on_estimate_clicked(self) -> None:
-        summary = self._summary_service.get_last_summary()
-        if summary is None:
-            return
         try:
-            center = estimate_beam_center(summary.mean_pattern)
+            center = self._summary_service.estimate_beam_center()
         except Exception as exc:
             logger.exception(exc)
             ExceptionDialog.show_exception('Estimate Beam Center', exc)
             return
         self._diffraction_settings.beam_center_x_px.set_value(int(center.x_px))
         self._diffraction_settings.beam_center_y_px.set_value(int(center.y_px))
+
+    def _on_suggest_extent_clicked(self) -> None:
+        center = BeamCenter(
+            x_px=self._diffraction_settings.beam_center_x_px.get_value(),
+            y_px=self._diffraction_settings.beam_center_y_px.get_value(),
+        )
+        try:
+            suggestion = self._summary_service.suggest_crop_region(center)
+        except Exception as exc:
+            logger.exception(exc)
+            ExceptionDialog.show_exception('Suggest Extent', exc)
+            return
+        signal = suggestion.signal
+        region = suggestion.region
+        logger.info(
+            'Signal radius %d px (threshold %g above background %g); suggesting a %d px crop%s',
+            signal.radius_px,
+            signal.threshold,
+            signal.noise_floor.median,
+            region.width_px,
+            ', the largest that fits' if suggestion.is_capped else '',
+        )
+        self._diffraction_settings.crop_width_px.set_value(region.width_px)
+        self._diffraction_settings.crop_height_px.set_value(region.height_px)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._summary_service.task_monitor:
@@ -341,22 +373,6 @@ class BinningViewController(CheckableGroupBoxParameterViewController):
             self._sync_model_to_view()
         else:
             super()._update(observable)
-
-
-class UpsampleViewController(CheckableGroupBoxParameterViewController):
-    """UpsampleStep — FFT zero-pad upsampling by an isotropic integer factor."""
-
-    def __init__(self, diffraction_settings: DiffractionSettings) -> None:
-        super().__init__(diffraction_settings.upsample_enabled, 'Upsample')
-        self._factor_view_controller = SpinBoxParameterViewController(
-            diffraction_settings.upsample_factor
-        )
-
-        layout = QGridLayout()
-        layout.addWidget(QLabel('Factor:'), 0, 0)
-        layout.addWidget(self._factor_view_controller.get_widget(), 0, 1)
-        layout.setColumnStretch(1, 1)
-        self.get_widget().set_contents_layout(layout)
 
 
 class PaddingViewController(CheckableGroupBoxParameterViewController):
@@ -663,7 +679,6 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
         extent_source: DetectorExtentSource,
         api: DiffractionAPI,
         summary_service: DiffractionSummaryService,
-        summary_visualization_engine: VisualizationEngine,
         status_bar: QStatusBar,
         file_dialog_factory: FileDialogFactory,
         get_pending_dataset_index: Callable[[], int],
@@ -682,13 +697,11 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
             diffraction_settings, extent_source, summary_service
         )
         self._binning_view_controller = BinningViewController(diffraction_settings, extent_source)
-        self._upsample_view_controller = UpsampleViewController(diffraction_settings)
         self._padding_view_controller = PaddingViewController(diffraction_settings)
         self._transform_view_controller = TransformViewController(diffraction_settings)
         self._summary_view_controller = SummaryPanelViewController(
             diffraction_settings,
             summary_service,
-            summary_visualization_engine,
             extent_source,
             status_bar,
             file_dialog_factory,
@@ -709,7 +722,6 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
         left_layout.addWidget(self._total_counts_filter_view_controller.get_widget())
         left_layout.addWidget(self._crop_view_controller.get_widget())
         left_layout.addWidget(self._binning_view_controller.get_widget())
-        left_layout.addWidget(self._upsample_view_controller.get_widget())
         left_layout.addWidget(self._padding_view_controller.get_widget())
         left_layout.addWidget(self._transform_view_controller.get_widget())
 

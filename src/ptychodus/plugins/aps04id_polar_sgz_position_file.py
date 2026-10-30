@@ -133,6 +133,12 @@ class PolarSoftGlueZynqPositionFileReader(ProbePositionFileReader):
     calls when a master advertises a ``pos_stream`` external link.
     """
 
+    def get_file_description(self) -> str:
+        return 'APS 4-ID-B,G,H POLAR softGlueZynq Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5'}
+
     def read(self, file_path: Path) -> ProbePositionSequence:
         return read_position_stream(file_path)
 
@@ -141,5 +147,4 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         PolarSoftGlueZynqPositionFileReader(),
         simple_name='APS_Polar_SGZ',
-        display_name='APS 4-ID-B,G,H POLAR softGlueZynq Files (*.h5)',
     )

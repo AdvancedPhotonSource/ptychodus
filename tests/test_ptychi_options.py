@@ -2,10 +2,9 @@
 
 pty-chi's ``Options`` classes are Pydantic dataclasses that enforce every
 ``ge``/``gt``/``le`` constraint at construction time. These tests build the full
-per-reconstructor task-options object from ptychodus settings and let pty-chi's
-validators run, so any default or bound in ``ptychodus.model.ptychi.settings``
-that pty-chi would reject surfaces here rather than as a reconstruction-time
-crash. No GPU or real dataset is required — per-field validation runs at
+per-reconstructor task-options object from the live settings and let pty-chi's
+validators run, so a default or a bound that pty-chi would reject surfaces
+here rather than as a reconstruction-time crash. No GPU or real dataset is required — per-field validation runs at
 construction; the task-level ``.check()`` and ``check_task_data()`` cross
 validation only runs inside ``PtychographyTask``.
 
@@ -16,7 +15,6 @@ these tests also pin down that separation.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 import dataclasses
 import json
 import logging
@@ -33,12 +31,12 @@ pytest.importorskip('ptychi')
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.parameters import IntegerParameter, RealParameter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructInput
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.parameters import IntegerParameter, RealParameter
+from ptychodus.model.settings import SettingsRegistry
 from ptychi.api import (
     RECONSTRUCTOR_OPTIONS_MAP,
     LSQMLOptions,
@@ -47,36 +45,36 @@ from ptychi.api import (
     Reconstructors,
 )
 from ptychi.api.options.data import PtychographyDataOptions
+from ptychi.api.options.task import PtychographyTaskOptions
 import torch
 
-from ptychodus.model.ptychi.core import PtyChiReconstructorLibrary
-from ptychodus.model.ptychi.task import _recover_layer_spacing_m
+from ptychodus.model.processing import ProcessingParameterStore
+from ptychodus.model.processing._ptychi_sections import sections_for
+from ptychodus.plugins.ptychi.task import _recover_layer_spacing_m
 
 # Deliberately imported at module scope: this file already does
 # ``pytest.importorskip('ptychi')`` above.
-from ptychodus.model.ptychi.algorithms import (  # noqa: E402
-    AutodiffAlgorithm,
-    BHAlgorithm,
-    DMAlgorithm,
-    EPIEAlgorithm,
-    LSQMLAlgorithm,
-    PIEAlgorithm,
-    PtyChiAlgorithm,
-    PtyChiCommon,
-    RAARAlgorithm,
-    RPIEAlgorithm,
-    build_algorithms,
+from ptychodus.plugins.ptychi.algorithms import (  # noqa: E402
+    _ALGORITHM_CLASSES,
+    build_reconstructors,
 )
+from ptychodus.plugins.ptychi.options import apply_to_task  # noqa: E402
+
+# The name pty-chi registers itself under, which is how the store files it.
+_LIBRARY = 'pty-chi'
 from ptychodus.cli._reconstruct_common import (  # noqa: E402
     _DATA_DERIVED_OPTION_FIELDS,
     add_print_ptychi_options_argument,
     format_ptychi_options_defaults,
     load_ptychi_options,
 )
-from ptychodus.model.ptychi.algorithms import task_options_classes  # noqa: E402
-from ptychodus.model.ptychi.task import (  # noqa: E402
+from ptychodus.plugins.ptychi.algorithms import task_options_classes  # noqa: E402
+from ptychodus.plugins.ptychi.task import (  # noqa: E402
+    _build_ptychi_propagator,
     _initial_opr_mode_weights,
+    align_probe_gauge_with_ptychi,
     align_task_options_with_product,
+    apply_probe_gauge_to_options,
     dump_task_options,
     dump_task_options_yaml,
     load_task_options,
@@ -108,7 +106,7 @@ def _make_reconstruct_input() -> ReconstructInput:
         center=ObjectCenter(x_m=0.0, y_m=0.0),
         layer_spacing_m=[],
     )
-    probes = ProbeSequence(
+    probes = ProbeEnsemble(
         array=(
             rng.standard_normal((1, 1, PROBE_HEIGHT_PX, PROBE_WIDTH_PX))
             + 1j * rng.standard_normal((1, 1, PROBE_HEIGHT_PX, PROBE_WIDTH_PX))
@@ -144,93 +142,63 @@ def _make_reconstruct_input() -> ReconstructInput:
     )
 
 
-@pytest.fixture(scope='module', autouse=True)
-def _stub_the_device_probe() -> Iterator[None]:
-    """Skip the spawned GPU enumeration; nothing here reads the device list.
+class _Harness:
+    """Every pty-chi algorithm, with the live settings generated behind it.
 
-    PtyChiDeviceRepository probes devices in a child process that imports
-    torch -- about 17 seconds, once per library construction, and this module
-    builds sixteen. The repository resolves the probe on its module at call
-    time, so patching the module attribute takes effect.
+    The same arrangement a run uses: each reconstructor's declaration is
+    registered with a parameter store, and options are read back out of it.
+    Exercising that path is the point -- a test that built options straight
+    from the declaration would skip the flattening and the restoration that
+    stand between a settings file and pty-chi.
 
-    Module-scoped, and therefore not the function-scoped ``monkeypatch``
-    fixture: ``built_options_by_algorithm`` below is itself module-scoped and
-    would build its library before any function-scoped patch was in place.
+    DM is first, because two assertions below take the first algorithm.
     """
-    from ptychodus.model.ptychi import device
 
-    with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(device, 'probe_devices_via_subprocess', lambda: ['cpu'])
-        yield
+    def __init__(self) -> None:
+        self.registry = SettingsRegistry()
+        self.store = ProcessingParameterStore(self.registry)
+        self._names: list[str] = []
 
+        for reconstructor in build_reconstructors():
+            self.store.register(
+                _LIBRARY,
+                reconstructor,
+                sections_for(reconstructor.name, reconstructor.get_default_options()),
+            )
+            self._names.append(reconstructor.name)
 
-def _make_library() -> PtyChiReconstructorLibrary:
-    return PtyChiReconstructorLibrary(
-        SettingsRegistry(),
-        is_developer_mode_enabled=False,
-    )
+    @property
+    def names(self) -> list[str]:
+        return list(self._names)
 
+    def parameter(self, group: str, key: str):
+        return self.registry[group].parameters()[key]
 
-def _make_common(library: PtyChiReconstructorLibrary) -> PtyChiCommon:
-    return PtyChiCommon(
-        library.settings,
-        library.object_settings,
-        library.probe_settings,
-        library.probe_position_settings,
-        library.opr_settings,
-    )
+    def declared_task_options(self, name: str):
+        """What the settings alone produce, before the product has a say."""
+        return apply_to_task(self.store.get_options(_LIBRARY, name))
 
+    def task_options(self, name: str, product: Product):
+        # Building each task-options tree runs pty-chi's Pydantic validators
+        # over every sub-option object.
+        return align_task_options_with_product(self.declared_task_options(name), product)
 
-def _make_algorithms(library: PtyChiReconstructorLibrary) -> list[PtyChiAlgorithm]:
-    """Instantiate the algorithm wrappers directly against ``library``'s settings.
+    def all_task_options(self, product: Product) -> list:
+        return [self.task_options(name, product) for name in self._names]
 
-    DM is first because the two ``[0]`` assertions below rely on it —
-    ``build_algorithms`` guarantees that ordering.
-    """
-    algorithms = build_algorithms(
-        _make_common(library),
-        dm_settings=library.dm_settings,
-        raar_settings=library.raar_settings,
-        pie_settings=library.pie_settings,
-        lsqml_settings=library.lsqml_settings,
-        autodiff_settings=library.autodiff_settings,
-        bh_settings=library.bh_settings,
-    )
-    return list(algorithms.values())
+    def numeric_parameters(self):
+        for group_name in sorted(self.registry):
+            if not group_name.startswith('PtyChi'):
+                continue
 
-
-def _build_all_task_options(library: PtyChiReconstructorLibrary, parameters: ReconstructInput):
-    # Building each task-options tree runs pty-chi's Pydantic validators over
-    # every sub-option object.
-    return [
-        algorithm.build_task_options(parameters.product) for algorithm in _make_algorithms(library)
-    ]
-
-
-def _numeric_parameters(library: PtyChiReconstructorLibrary):
-    settings_groups = [
-        library.settings,
-        library.object_settings,
-        library.probe_settings,
-        library.probe_position_settings,
-        library.opr_settings,
-        library.autodiff_settings,
-        library.bh_settings,
-        library.dm_settings,
-        library.lsqml_settings,
-        library.pie_settings,
-        library.raar_settings,
-    ]
-    for group in settings_groups:
-        for name, attr in vars(group).items():
-            if isinstance(attr, (RealParameter, IntegerParameter)):
-                yield f'{type(group).__name__}.{name}', attr
+            for key, parameter in self.registry[group_name].parameters().items():
+                if isinstance(parameter, (RealParameter, IntegerParameter)):
+                    yield f'{group_name}.{key}', parameter
 
 
 def test_default_settings_build_valid_options() -> None:
     """Every reconstructor's default options must satisfy pty-chi's validators."""
-    library = _make_library()
-    _build_all_task_options(library, _make_reconstruct_input())
+    _Harness().all_task_options(_make_reconstruct_input().product)
 
 
 def test_boundary_values_build_valid_options() -> None:
@@ -239,17 +207,17 @@ def test_boundary_values_build_valid_options() -> None:
     This catches ptychodus bounds that are looser than pty-chi's enforced
     constraints (e.g. an inclusive minimum of 0 where pty-chi requires ``gt=0``).
     """
-    library = _make_library()
-    parameters = _make_reconstruct_input()
+    harness = _Harness()
+    product = _make_reconstruct_input().product
 
-    for label, parameter in _numeric_parameters(library):
+    for label, parameter in harness.numeric_parameters():
         original = parameter.get_value()
         for bound in (parameter.get_minimum(), parameter.get_maximum()):
             if bound is None:
                 continue
             parameter.set_value(bound)
             try:
-                _build_all_task_options(library, parameters)
+                harness.all_task_options(product)
             except Exception as exc:  # noqa: BLE001 - surface the offending parameter
                 pytest.fail(f'{label} = {bound!r} produced invalid pty-chi options: {exc}')
         parameter.set_value(original)
@@ -257,13 +225,16 @@ def test_boundary_values_build_valid_options() -> None:
 
 def test_hard_limits_are_serialized_as_lists() -> None:
     """Enabled magnitude/phase hard limits must be plain lists (pty-chi rejects ndarrays)."""
-    library = _make_library()
-    obj = library.object_settings
-    obj.constrain_hard_limits.set_value(True)
-    obj.constrain_hard_limits_enable_abs.set_value(True)
-    obj.constrain_hard_limits_enable_phase.set_value(True)
+    harness = _Harness()
 
-    options = _make_algorithms(library)[0].build_task_options(_make_reconstruct_input().product)
+    for key in (
+        'ConstrainHardLimits',
+        'ConstrainHardLimitsEnableAbs',
+        'ConstrainHardLimitsEnablePhase',
+    ):
+        harness.parameter('PtyChiObject', key).set_value(True)
+
+    options = harness.task_options('DM', _make_reconstruct_input().product)
     hard_limits = options.object_options.hard_limits_magnitude_phase
     assert isinstance(hard_limits.abs_lim, list)
     assert isinstance(hard_limits.phase_lim, list)
@@ -281,9 +252,8 @@ def test_hard_limits_are_serialized_as_lists() -> None:
 
 def test_compact_mode_clustering_stride_is_at_least_one() -> None:
     """Disabled compact-mode clustering must still yield a stride >= 1 for pty-chi."""
-    library = _make_library()
     # Default (disabled) value is 0; pty-chi's stride field is now ge=1.
-    options = _make_algorithms(library)[0].build_task_options(_make_reconstruct_input().product)
+    options = _Harness().task_options('DM', _make_reconstruct_input().product)
     assert options.reconstructor_options.compact_mode_update_clustering_stride >= 1
     assert options.reconstructor_options.compact_mode_update_clustering is False
 
@@ -296,11 +266,9 @@ def test_built_options_carry_no_task_data() -> None:
     reach the parent, so these ``is None`` assertions are the guard that keeps
     ptychodus off the deprecated path.
     """
-    library = _make_library()
     parameters = _make_reconstruct_input()
 
-    for algorithm in _make_algorithms(library):
-        options = algorithm.build_task_options(parameters.product)
+    for options in _Harness().all_task_options(parameters.product):
         assert options.data_options.data is None
         assert options.data_options.valid_pixel_mask is None
         assert options.object_options.initial_guess is None
@@ -310,10 +278,10 @@ def test_built_options_carry_no_task_data() -> None:
         assert options.opr_mode_weight_options.initial_weights is None
 
 
-def _make_probes(num_coherent_modes: int, opr_weights: numpy.ndarray | None) -> ProbeSequence:
+def _make_probes(num_coherent_modes: int, opr_weights: numpy.ndarray | None) -> ProbeEnsemble:
     rng = numpy.random.default_rng(1)
     shape = (num_coherent_modes, 1, PROBE_HEIGHT_PX, PROBE_WIDTH_PX)
-    return ProbeSequence(
+    return ProbeEnsemble(
         array=(rng.standard_normal(shape) + 1j * rng.standard_normal(shape)).astype(
             numpy.complex128
         ),
@@ -356,28 +324,27 @@ def test_no_setting_selects_the_propagation_mode() -> None:
     default; the product supplies the value during alignment. See
     ``test_near_field_distance_comes_from_the_product``.
     """
-    library = _make_library()
-    common = _make_common(library)
+    harness = _Harness()
 
-    assert not hasattr(library.settings, 'use_far_field_propagation')
+    assert 'UseFarFieldPropagation' not in harness.registry['PtyChi'].parameters()
     assert (
-        common.data_options().free_space_propagation_distance_m
+        harness.declared_task_options('DM').data_options.free_space_propagation_distance_m
         == PtychographyDataOptions().free_space_propagation_distance_m
     )
 
 
 def test_near_field_distance_comes_from_the_product() -> None:
     """A product declaring near field supplies the distance; far field stays infinite."""
-    library = _make_library()
+    harness = _Harness()
     parameters = _make_reconstruct_input()
 
     near_field = _with_far_field(parameters.product, False)
-    options = _make_algorithms(library)[0].build_task_options(near_field)
+    options = harness.task_options('DM', near_field)
     assert options.data_options.free_space_propagation_distance_m == pytest.approx(
         near_field.metadata.detector_distance_m
     )
 
-    options = _make_algorithms(library)[0].build_task_options(parameters.product)
+    options = harness.task_options('DM', parameters.product)
     assert options.data_options.free_space_propagation_distance_m == numpy.inf
 
 
@@ -390,9 +357,7 @@ def test_options_round_trip_through_the_wire_format() -> None:
     every algorithm-specific field. The subclass check below is what catches
     that.
     """
-    library = _make_library()
-
-    for task_options in _build_all_task_options(library, _make_reconstruct_input()):
+    for task_options in _Harness().all_task_options(_make_reconstruct_input().product):
         loaded = load_task_options(dump_task_options(task_options))
 
         assert type(loaded) is type(task_options)
@@ -404,11 +369,10 @@ def test_options_round_trip_through_the_wire_format() -> None:
 
 def test_lsqml_algorithm_specific_field_survives_round_trip() -> None:
     """A field that exists only on the subclass must come back with its value."""
-    library = _make_library()
-    library.lsqml_settings.momentum_acceleration_gain.set_value(0.75)
+    harness = _Harness()
+    harness.parameter('PtyChiLSQML', 'MomentumAccelerationGain').set_value(0.75)
 
-    algorithm = LSQMLAlgorithm(_make_common(library), library.lsqml_settings)
-    task_options = algorithm.build_task_options(_make_reconstruct_input().product)
+    task_options = harness.task_options('LSQML', _make_reconstruct_input().product)
 
     loaded = load_task_options(dump_task_options(task_options))
 
@@ -425,27 +389,28 @@ def test_algorithm_task_options_class_matches_built_options() -> None:
     ``get_reconstructor_type()`` disagrees with the expected reconstructor, and
     when two subclasses map to the same reconstructor type.
     """
-    library = _make_library()
+    harness = _Harness()
     parameters = _make_reconstruct_input()
-    common = _make_common(library)
 
-    cases: list[tuple[PtyChiAlgorithm, Reconstructors]] = [
-        (DMAlgorithm(common, library.dm_settings), Reconstructors.DM),
-        (RAARAlgorithm(common, library.raar_settings), Reconstructors.RAAR),
-        (PIEAlgorithm(common, library.pie_settings), Reconstructors.PIE),
-        (EPIEAlgorithm(common, library.pie_settings), Reconstructors.EPIE),
-        (RPIEAlgorithm(common, library.pie_settings), Reconstructors.RPIE),
-        (LSQMLAlgorithm(common, library.lsqml_settings), Reconstructors.LSQML),
-        (AutodiffAlgorithm(common, library.autodiff_settings), Reconstructors.AD_PTYCHO),
-        (BHAlgorithm(common, library.bh_settings), Reconstructors.BH),
-    ]
+    expected_by_name = {
+        'DM': Reconstructors.DM,
+        'RAAR': Reconstructors.RAAR,
+        'PIE': Reconstructors.PIE,
+        'ePIE': Reconstructors.EPIE,
+        'rPIE': Reconstructors.RPIE,
+        'LSQML': Reconstructors.LSQML,
+        'Autodiff': Reconstructors.AD_PTYCHO,
+        'BH': Reconstructors.BH,
+    }
+    specs = {cls.spec.display_name: cls.spec for cls in _ALGORITHM_CLASSES}
+    assert set(expected_by_name) == set(specs)
 
     reconstructors_seen: set[Reconstructors] = set()
 
-    for algorithm, expected_reconstructor in cases:
-        options = algorithm.build_task_options(parameters.product)
+    for name, expected_reconstructor in expected_by_name.items():
+        options = harness.task_options(name, parameters.product)
 
-        assert type(options) is type(algorithm).spec.task_options_cls
+        assert type(options) is specs[name].task_options_cls
         assert options.reconstructor_options.get_reconstructor_type() == expected_reconstructor
         assert expected_reconstructor not in reconstructors_seen
         reconstructors_seen.add(expected_reconstructor)
@@ -463,10 +428,8 @@ def test_spec_option_classes_match_the_upstream_reconstructor_map() -> None:
     the display name stay ptychodus's own, which is why this guards the spec
     rather than replacing it.
     """
-    library = _make_library()
-
-    for algorithm in _make_algorithms(library):
-        spec = type(algorithm).spec
+    for cls in _ALGORITHM_CLASSES:
+        spec = cls.spec
         reconstructor = spec.reconstructor_options_cls().get_reconstructor_type()
         expected = RECONSTRUCTOR_OPTIONS_MAP[reconstructor]
 
@@ -488,9 +451,7 @@ def test_wire_format_carries_the_options_class_name() -> None:
     (which would let PIE/ePIE/rPIE alias each other, since their dicts are
     otherwise identical).
     """
-    library = _make_library()
-    algorithm = LSQMLAlgorithm(_make_common(library), library.lsqml_settings)
-    task_options = algorithm.build_task_options(_make_reconstruct_input().product)
+    task_options = _Harness().task_options('LSQML', _make_reconstruct_input().product)
 
     options_dict = json.loads(dump_task_options(task_options))
 
@@ -508,19 +469,12 @@ def test_wire_format_distinguishes_pie_variants() -> None:
     keeping a dumped ePIE from reloading as PIE and running a different
     algorithm. This is what the hand-rolled envelope used to guarantee.
     """
-    library = _make_library()
-    common = _make_common(library)
+    harness = _Harness()
     product = _make_reconstruct_input().product
-
-    algorithms = [
-        PIEAlgorithm(common, library.pie_settings),
-        EPIEAlgorithm(common, library.pie_settings),
-        RPIEAlgorithm(common, library.pie_settings),
-    ]
     stamps = set()
 
-    for algorithm in algorithms:
-        task_options = algorithm.build_task_options(product)
+    for name in ('PIE', 'ePIE', 'rPIE'):
+        task_options = harness.task_options(name, product)
         loaded = load_task_options(dump_task_options(task_options))
 
         assert type(loaded) is type(task_options)
@@ -539,11 +493,9 @@ def test_yaml_round_trips_every_algorithm_to_the_same_payload_as_json() -> None:
     field of some further unrepresentable type would otherwise fail at the end of a
     reconstruction, after the expensive part, rather than here.
     """
-    library = _make_library()
     product = _make_reconstruct_input().product
 
-    for algorithm in _make_algorithms(library):
-        task_options = algorithm.build_task_options(product)
+    for task_options in _Harness().all_task_options(product):
         text = dump_task_options_yaml(task_options)
         loaded = load_task_options_from_mapping(yaml.safe_load(text))
 
@@ -737,6 +689,8 @@ _PRODUCT_DERIVED_FIELDS = [
     ('object_options.position_origin_coords', [0.0, 0.0]),
     ('data_options.wavelength_m', _make_reconstruct_input().product.metadata.photon_wavelength_m),
     ('data_options.free_space_propagation_distance_m', numpy.inf),
+    # True for this far-field product; a near-field one clears it.
+    ('data_options.fft_shift', True),
     ('probe_options.power_constraint.probe_power', PROBE_PHOTON_COUNT),
     # None means "inherit the object value": the test product's probe and object
     # sampling agree, and writing None is what keeps pty-chi's no-resampling
@@ -761,16 +715,13 @@ def _assert_field_equals(options, path: str, expected) -> None:
 def built_options_by_algorithm() -> list[tuple[str, object]]:
     """Options for all eight algorithms, built once.
 
-    Module-scoped because ``_make_library`` spawns a device-probe subprocess
-    that dominates this file's runtime; the parametrized test below reads these
+    Module-scoped because registering eight declarations and restoring each
+    one dominates this file's runtime; the parametrized test below reads these
     options without mutating settings, so one build serves every case.
     """
-    library = _make_library()
+    harness = _Harness()
     product = _make_reconstruct_input().product
-    return [
-        (type(algorithm).__name__, algorithm.build_task_options(product))
-        for algorithm in _make_algorithms(library)
-    ]
+    return [(name, harness.task_options(name, product)) for name in harness.names]
 
 
 @pytest.mark.parametrize(('path', 'expected'), _PRODUCT_DERIVED_FIELDS, ids=lambda v: str(v)[:48])
@@ -834,7 +785,7 @@ def test_align_is_idempotent(caplog) -> None:
     parameters = _make_reconstruct_input()
     once = align_task_options_with_product(LSQMLOptions(), parameters.product)
 
-    with caplog.at_level(logging.WARNING, logger='ptychodus.model.ptychi.task'):
+    with caplog.at_level(logging.WARNING, logger='ptychodus.plugins.ptychi.task'):
         twice = align_task_options_with_product(once, parameters.product)
 
     assert dump_task_options(twice) == dump_task_options(once)
@@ -848,7 +799,7 @@ def test_align_warns_only_when_it_overrides_a_caller_value(caplog) -> None:
     options = LSQMLOptions()
     options.object_options.pixel_size_m = 5.0e-9
 
-    with caplog.at_level(logging.WARNING, logger='ptychodus.model.ptychi.task'):
+    with caplog.at_level(logging.WARNING, logger='ptychodus.plugins.ptychi.task'):
         aligned = align_task_options_with_product(options, parameters.product)
 
     assert aligned.object_options.pixel_size_m == pytest.approx(PIXEL_M)
@@ -857,7 +808,7 @@ def test_align_warns_only_when_it_overrides_a_caller_value(caplog) -> None:
 
     # The same field left at pty-chi's default is overwritten silently.
     caplog.clear()
-    with caplog.at_level(logging.WARNING, logger='ptychodus.model.ptychi.task'):
+    with caplog.at_level(logging.WARNING, logger='ptychodus.plugins.ptychi.task'):
         align_task_options_with_product(LSQMLOptions(), parameters.product)
 
     assert caplog.records == []
@@ -891,7 +842,7 @@ def test_align_overwrites_a_contradicting_caller_distance_and_warns(caplog) -> N
     options = LSQMLOptions()
     options.data_options.free_space_propagation_distance_m = 0.5
 
-    with caplog.at_level(logging.WARNING, logger='ptychodus.model.ptychi.task'):
+    with caplog.at_level(logging.WARNING, logger='ptychodus.plugins.ptychi.task'):
         aligned = align_task_options_with_product(options, parameters.product)
 
     assert aligned.data_options.free_space_propagation_distance_m == numpy.inf
@@ -939,6 +890,68 @@ def test_align_demagnifies_the_near_field_distance_for_a_cone_beam() -> None:
     assert aligned.data_options.free_space_propagation_distance_m == pytest.approx(
         DETECTOR_DISTANCE_M / magnification
     )
+
+
+def test_align_clears_fft_shift_for_near_field() -> None:
+    """A near-field measurement is real-space intensity; rolling it is always wrong."""
+    product = _with_far_field(_make_reconstruct_input().product, False)
+    options = LSQMLOptions()
+    assert options.data_options.fft_shift
+
+    aligned = align_task_options_with_product(options, product)
+
+    assert aligned.data_options.fft_shift is False
+
+
+def test_align_sets_fft_shift_for_far_field() -> None:
+    """ptychodus stores patterns DC-centered, so far field must roll them to the corner
+    the plain FFT compares against -- not a choice a caller gets to make differently."""
+    product = _make_reconstruct_input().product
+
+    for requested in (True, False):
+        options = LSQMLOptions()
+        options.data_options.fft_shift = requested
+
+        aligned = align_task_options_with_product(options, product)
+
+        assert aligned.data_options.fft_shift is True
+
+
+def test_align_raises_pad_for_shift_from_its_default_for_near_field() -> None:
+    product = _with_far_field(_make_reconstruct_input().product, False)
+    options = LSQMLOptions()
+    assert options.reconstructor_options.forward_model_options.pad_for_shift == 0
+
+    aligned = align_task_options_with_product(options, product)
+
+    assert aligned.reconstructor_options.forward_model_options.pad_for_shift == 50
+
+
+def test_align_keeps_a_chosen_pad_for_shift() -> None:
+    """It is a tunable with no formula behind it, so a caller's value is never clobbered."""
+    product = _with_far_field(_make_reconstruct_input().product, False)
+    options = LSQMLOptions()
+    options.reconstructor_options.forward_model_options.pad_for_shift = 12
+
+    aligned = align_task_options_with_product(options, product)
+
+    assert aligned.reconstructor_options.forward_model_options.pad_for_shift == 12
+
+
+def test_align_honors_the_near_field_pad_for_shift_keyword() -> None:
+    product = _with_far_field(_make_reconstruct_input().product, False)
+
+    aligned = align_task_options_with_product(LSQMLOptions(), product, near_field_pad_for_shift=80)
+
+    assert aligned.reconstructor_options.forward_model_options.pad_for_shift == 80
+
+
+def test_align_never_touches_pad_for_shift_in_far_field() -> None:
+    product = _make_reconstruct_input().product
+
+    aligned = align_task_options_with_product(LSQMLOptions(), product)
+
+    assert aligned.reconstructor_options.forward_model_options.pad_for_shift == 0
 
 
 def test_align_distinguishes_converging_from_diverging_illumination() -> None:
@@ -995,7 +1008,7 @@ def test_align_reads_a_differing_probe_pixel_geometry() -> None:
     """
     parameters = _make_reconstruct_input()
     probes = parameters.product.probes
-    resampled = ProbeSequence(
+    resampled = ProbeEnsemble(
         array=probes.get_array(),
         opr_weights=None,
         pixel_geometry=PixelGeometry(width_m=2.0 * PIXEL_M, height_m=4.0 * PIXEL_M),
@@ -1015,7 +1028,7 @@ def test_align_inherits_probe_pixel_width_when_only_the_aspect_ratio_differs() -
     """pty-chi inherits each omitted probe field independently, so we write them so."""
     parameters = _make_reconstruct_input()
     probes = parameters.product.probes
-    tall = ProbeSequence(
+    tall = ProbeEnsemble(
         array=probes.get_array(),
         opr_weights=None,
         pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=2.0 * PIXEL_M),
@@ -1031,12 +1044,12 @@ def test_align_inherits_probe_pixel_width_when_only_the_aspect_ratio_differs() -
 def test_align_tolerates_a_probe_without_pixel_geometry() -> None:
     """A probe that cannot report its sampling must not make alignment raise.
 
-    ``ProbeSequence.get_pixel_geometry`` raises when unset, and such a product
+    ``ProbeEnsemble.get_pixel_geometry`` raises when unset, and such a product
     reconstructed fine before the probe fields existed; it must still align.
     """
     parameters = _make_reconstruct_input()
     probes = parameters.product.probes
-    ungeometried = ProbeSequence(
+    ungeometried = ProbeEnsemble(
         array=probes.get_array(),
         opr_weights=None,
         pixel_geometry=None,
@@ -1071,29 +1084,26 @@ def test_slice_spacings_from_an_ndarray_product_are_lists() -> None:
     assert aligned.object_options.slice_spacings_m == pytest.approx([3.0e-8])
 
 
-def test_common_kwargs_carry_no_product_derived_fields() -> None:
-    """PtyChiCommon must not re-acquire an owner for anything the helper writes.
+def test_the_settings_write_nothing_the_product_owns() -> None:
+    """Alignment must be the only writer of every field it owns.
 
     A second writer would make the helper's override warning fire on every
-    reconstruction.
+    reconstruction. Checked against a pristine options object rather than
+    against a list of expected values: whatever pty-chi declares as the
+    starting point is what an unwritten field still holds.
     """
-    library = _make_library()
-    common = _make_common(library)
+    harness = _Harness()
+    specs = {cls.spec.display_name: cls.spec for cls in _ALGORITHM_CLASSES}
 
-    object_keys = set(common.object_kwargs())
-    probe_keys = set(common.probe_kwargs())
-    data_options = common.data_options()
+    for name in harness.names:
+        declared = harness.declared_task_options(name)
+        pristine = specs[name].task_options_cls()
 
-    assert not object_keys & {
-        'pixel_size_m',
-        'pixel_size_aspect_ratio',
-        'slice_spacings_m',
-        'determine_position_origin_coords_by',
-        'position_origin_coords',
-    }
-    assert not probe_keys & {'probe_power', 'pixel_size_m', 'pixel_size_aspect_ratio'}
-    assert data_options.wavelength_m == PtychographyDataOptions().wavelength_m
-    assert not math.isfinite(data_options.free_space_propagation_distance_m)
+        for path, _expected in _PRODUCT_DERIVED_FIELDS:
+            read = operator.attrgetter(path)
+            assert read(declared) == read(pristine), f'{name}/{path}'
+
+    assert not math.isfinite(PtychographyDataOptions().free_space_propagation_distance_m)
 
 
 # ---------------------------------------------------------------------------
@@ -1169,3 +1179,340 @@ def test_recover_layer_spacing_single_layer_needs_no_readback() -> None:
     object_in = _make_layered_object(1, 0.0)
 
     assert _recover_layer_spacing_m(_StubTask(_StubTaskObject([0.0])), object_in) == []
+
+
+# ---------------------------------------------------------------------------
+# Probe gauge
+# ---------------------------------------------------------------------------
+
+_GAUGE_PHOTONS = 1.0e6
+_GAUGE_N = PROBE_HEIGHT_PX * PROBE_WIDTH_PX
+# A genuinely near-field sampling. The far-field constants above put the Fresnel number
+# nine orders below pty-chi's angular-spectrum threshold, so declaring near field there
+# would still select the Fresnel transform and never exercise the conserving branch.
+_NEAR_FIELD_PIXEL_M = 1.0e-6
+_NEAR_FIELD_DISTANCE_M = 1.0e-3
+
+
+def _gauge_input(
+    *,
+    probe_factor: float = 1.0,
+    object_amplitude: float = 1.0,
+    far_field: bool = True,
+    pixel_m: float = PIXEL_M,
+    distance_m: float = DETECTOR_DISTANCE_M,
+) -> ReconstructInput:
+    """A product whose probe, object and patterns already agree with each other.
+
+    The probe carries `_GAUGE_PHOTONS` photons, the object is uniform, and every pattern
+    totals what an energy-conserving forward model would put on the detector. The gauge
+    measured from it is therefore the propagator's own convention and nothing else, so
+    `anomaly` is exactly one and any departure is the thing under test.
+
+    `probe_factor` scales the probe away from that agreement, standing in for a probe
+    that arrived in some other gauge.
+    """
+    probe_array = numpy.zeros((1, 1, PROBE_HEIGHT_PX, PROBE_WIDTH_PX), dtype=numpy.complex128)
+    probe_array[...] = 1.0
+    probe_array *= numpy.sqrt(_GAUGE_PHOTONS / numpy.sum(numpy.abs(probe_array) ** 2))
+    probe_array *= probe_factor
+
+    obj = Object(
+        array=numpy.full((1, OBJ_HEIGHT_PX, OBJ_WIDTH_PX), object_amplitude, dtype=complex),
+        pixel_geometry=PixelGeometry(width_m=pixel_m, height_m=pixel_m),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
+        layer_spacing_m=[],
+    )
+    probes = ProbeEnsemble(
+        array=probe_array,
+        opr_weights=None,
+        pixel_geometry=PixelGeometry(width_m=pixel_m, height_m=pixel_m),
+    )
+    positions = ProbePositionSequence(
+        [ProbePosition(index=i, x_m=0.0, y_m=0.0) for i in range(NUM_PATTERNS)]
+    )
+    product = Product(
+        metadata=ProductMetadata(
+            name='gauge',
+            comments='',
+            detector_distance_m=distance_m,
+            photon_energy_eV=PHOTON_ENERGY_EV,
+            probe_photon_count=_GAUGE_PHOTONS,
+            exposure_time_s=1.0,
+            mass_attenuation_m2_per_kg=0.0,
+            tomography_angle_deg=0.0,
+            far_field=far_field,
+        ),
+        probe_positions=positions,
+        probes=probes,
+        object_=obj,
+        losses=[],
+    )
+    # What an energy-conserving model would record: the photons the exit wave carries.
+    per_pattern_total = _GAUGE_PHOTONS * object_amplitude**2
+    patterns = numpy.full(
+        (NUM_PATTERNS, PROBE_HEIGHT_PX, PROBE_WIDTH_PX),
+        per_pattern_total / _GAUGE_N,
+        dtype=numpy.float64,
+    )
+    return ReconstructInput(
+        diffraction_patterns=patterns,
+        bad_pixels=numpy.zeros((PROBE_HEIGHT_PX, PROBE_WIDTH_PX), dtype=numpy.bool_),
+        product=product,
+    )
+
+
+def _aligned_for(parameters: ReconstructInput) -> PtychographyTaskOptions:
+    return align_task_options_with_product(LSQMLOptions(), parameters.product)
+
+
+@pytest.mark.parametrize(
+    'kwargs',
+    [
+        pytest.param({}, id='far-field-fft'),
+        pytest.param(
+            {
+                'far_field': False,
+                'pixel_m': _NEAR_FIELD_PIXEL_M,
+                'distance_m': _NEAR_FIELD_DISTANCE_M,
+            },
+            id='near-field-angular-spectrum',
+        ),
+        pytest.param({'far_field': False}, id='near-field-fresnel-transform'),
+    ],
+)
+def test_probe_gauge_of_a_matched_product_is_the_propagator_convention(
+    kwargs: dict[str, object],
+) -> None:
+    """With probe, object and data already in agreement, the only thing left to correct
+    is pty-chi's own propagator normalization -- whichever of the three it builds."""
+    parameters = _gauge_input(**kwargs)  # type: ignore[arg-type]
+    gauge = align_probe_gauge_with_ptychi(_aligned_for(parameters), parameters)
+
+    # Single precision throughout: pty-chi propagates in complex64 unless told not to.
+    assert gauge.anomaly == pytest.approx(1.0, rel=1e-6)
+    assert gauge.sampled_positions == NUM_PATTERNS
+
+
+def _gauge_input_matched_per_pixel(
+    *,
+    far_field: bool = True,
+    pixel_m: float = PIXEL_M,
+    distance_m: float = DETECTOR_DISTANCE_M,
+) -> ReconstructInput:
+    """A matched product whose patterns agree with the forward model pixel by pixel.
+
+    `_gauge_input` matches only the per-pattern total, which is all the unmasked gauge
+    reads. Masking makes the comparison spatial, so this builds the patterns by actually
+    propagating the exit wave and rolling the result into the detector frame, then scales
+    them to the photons an energy-conserving model would record. Every pixel then carries
+    the same predicted-to-measured ratio, so the gauge is the same over any subset of
+    them -- which is the invariant a masked test is there to pin.
+
+    The probe is a centered Gaussian rather than the uniform one `_gauge_input` uses: a
+    uniform probe transforms to a single bright pixel, leaving a mask nothing to bite on.
+    """
+    y, x = numpy.mgrid[0:PROBE_HEIGHT_PX, 0:PROBE_WIDTH_PX]
+    envelope = numpy.exp(-(((x - PROBE_WIDTH_PX / 2) ** 2 + (y - PROBE_HEIGHT_PX / 2) ** 2) / 4.0))
+    probe_array = numpy.zeros((1, 1, PROBE_HEIGHT_PX, PROBE_WIDTH_PX), dtype=numpy.complex128)
+    probe_array[0, 0] = envelope
+    probe_array *= numpy.sqrt(_GAUGE_PHOTONS / numpy.sum(numpy.abs(probe_array) ** 2))
+
+    parameters = _gauge_input(far_field=far_field, pixel_m=pixel_m, distance_m=distance_m)
+    product = parameters.product
+    probes = ProbeEnsemble(
+        array=probe_array,
+        opr_weights=None,
+        pixel_geometry=product.probes.get_pixel_geometry(),
+    )
+    product = dataclasses.replace(product, probes=probes)
+
+    propagator, corner_ordered = _build_ptychi_propagator(
+        align_task_options_with_product(LSQMLOptions(), product), probes
+    )
+    import torch
+
+    with torch.no_grad():
+        propagated = propagator.propagate_forward(torch.as_tensor(probe_array[0]))
+        intensity = numpy.sum(numpy.abs(propagated.numpy()) ** 2, axis=0)
+
+    if corner_ordered:
+        intensity = numpy.fft.fftshift(intensity, axes=(-2, -1))
+
+    pattern = intensity * (_GAUGE_PHOTONS / numpy.sum(intensity))
+    patterns = numpy.repeat(pattern[numpy.newaxis], NUM_PATTERNS, axis=0)
+
+    return ReconstructInput(
+        diffraction_patterns=patterns,
+        bad_pixels=numpy.zeros((PROBE_HEIGHT_PX, PROBE_WIDTH_PX), dtype=numpy.bool_),
+        product=product,
+    )
+
+
+@pytest.mark.parametrize(
+    'kwargs',
+    [
+        pytest.param({}, id='far-field-fft'),
+        pytest.param(
+            {
+                'far_field': False,
+                'pixel_m': _NEAR_FIELD_PIXEL_M,
+                'distance_m': _NEAR_FIELD_DISTANCE_M,
+            },
+            id='near-field-angular-spectrum',
+        ),
+    ],
+)
+def test_probe_gauge_is_unchanged_by_which_pixels_are_masked(
+    kwargs: dict[str, object],
+) -> None:
+    """Bad pixels drop the same content from both sides of the gauge, whatever the
+    propagator's output ordering.
+
+    The predicted plane is summed over a mask written in detector coordinates, so a
+    propagator that returns DC at a corner -- the plain FFT far field does -- has to be
+    rolled before it is indexed. Left unrolled, the two sides exclude different pixels
+    and a perfectly matched product reports a probe that needs rescaling.
+    """
+    clean = _gauge_input_matched_per_pixel(**kwargs)  # type: ignore[arg-type]
+    bad_pixels = numpy.zeros((PROBE_HEIGHT_PX, PROBE_WIDTH_PX), dtype=numpy.bool_)
+    # Off-center and asymmetric, so it covers different content under either ordering.
+    bad_pixels[1:4, 2:6] = True
+    masked = dataclasses.replace(clean, bad_pixels=bad_pixels)
+
+    gauge = align_probe_gauge_with_ptychi(_aligned_for(masked), masked)
+
+    assert gauge.anomaly == pytest.approx(1.0, rel=1e-5)
+    # Guard the degrade path, which also reports an anomaly of exactly one.
+    assert gauge.sampled_positions == NUM_PATTERNS
+    assert gauge.to_ptychi == pytest.approx(
+        align_probe_gauge_with_ptychi(_aligned_for(clean), clean).to_ptychi, rel=1e-5
+    )
+
+
+def test_probe_gauge_in_far_field_undoes_the_unnormalized_fft() -> None:
+    """Far field propagates with a plain FFT, which multiplies intensity by the pixel
+    count; the probe is scaled by the square root of that."""
+    parameters = _gauge_input(far_field=True)
+    gauge = align_probe_gauge_with_ptychi(_aligned_for(parameters), parameters)
+
+    assert gauge.expected_factor == pytest.approx(1.0 / math.sqrt(_GAUGE_N), rel=1e-6)
+
+
+def test_probe_gauge_in_near_field_leaves_an_energy_conserving_probe_alone() -> None:
+    """The angular spectrum conserves energy, which is ptychodus's own convention, so
+    there is nothing to convert -- the case a hardcoded far-field factor would break."""
+    parameters = _gauge_input(
+        far_field=False, pixel_m=_NEAR_FIELD_PIXEL_M, distance_m=_NEAR_FIELD_DISTANCE_M
+    )
+    gauge = align_probe_gauge_with_ptychi(_aligned_for(parameters), parameters)
+
+    assert gauge.expected_factor == pytest.approx(1.0, rel=1e-6)
+    assert gauge.to_ptychi == pytest.approx(1.0, rel=1e-6)
+
+
+def test_probe_gauge_absorbs_the_objects_transmission() -> None:
+    """An object carrying the sample's mean transmission leaves the probe meaning the
+    incident illumination, so the gauge stays at the propagator convention."""
+    parameters = _gauge_input(object_amplitude=0.5)
+    gauge = align_probe_gauge_with_ptychi(_aligned_for(parameters), parameters)
+
+    assert gauge.anomaly == pytest.approx(1.0, rel=1e-6)
+
+
+def test_probe_gauge_corrects_a_probe_already_in_ptychi_gauge() -> None:
+    """A product written before ptychodus converted here holds pty-chi's own probe,
+    smaller by the square root of the pixel count. Such a probe needs no conversion, and
+    the measurement says so by departing from the convention by exactly that factor."""
+    parameters = _gauge_input(probe_factor=1.0 / math.sqrt(_GAUGE_N))
+
+    gauge = align_probe_gauge_with_ptychi(_aligned_for(parameters), parameters)
+
+    assert gauge.anomaly == pytest.approx(math.sqrt(_GAUGE_N), rel=1e-6)
+    assert gauge.to_ptychi == pytest.approx(1.0, rel=1e-6)
+
+
+def test_probe_gauge_warns_when_the_probe_is_in_a_foreign_gauge(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Far enough from the convention and the probe did not come from here at all --
+    another tool, or a mis-scaled file. Reported, and corrected anyway."""
+    parameters = _gauge_input(probe_factor=1.0e-3)
+
+    with caplog.at_level(logging.WARNING, logger='ptychodus.plugins.ptychi.task'):
+        gauge = align_probe_gauge_with_ptychi(_aligned_for(parameters), parameters)
+
+    assert gauge.anomaly == pytest.approx(1.0e3, rel=1e-6)
+    assert 'may already be in' in caplog.text
+
+
+def test_probe_gauge_round_trips_a_probe_exactly() -> None:
+    """In and out are the same scalar, so a reconstruction that changed nothing returns
+    the probe it was given."""
+    parameters = _gauge_input()
+    gauge = align_probe_gauge_with_ptychi(_aligned_for(parameters), parameters)
+    array = parameters.product.probes.get_array()
+
+    numpy.testing.assert_allclose(array * gauge.to_ptychi / gauge.to_ptychi, array, rtol=1e-12)
+
+
+def test_probe_gauge_ignores_a_carried_background() -> None:
+    """The patterns have not been corrected for it, so left in it would inflate the
+    measurement and shrink the probe."""
+    plain = _gauge_input()
+    background = numpy.full((PROBE_HEIGHT_PX, PROBE_WIDTH_PX), 7.0)
+    with_background = dataclasses.replace(
+        plain,
+        diffraction_patterns=plain.diffraction_patterns + background,
+        background=background,
+    )
+
+    expected = align_probe_gauge_with_ptychi(_aligned_for(plain), plain)
+    actual = align_probe_gauge_with_ptychi(_aligned_for(with_background), with_background)
+
+    assert actual.to_ptychi == pytest.approx(expected.to_ptychi, rel=1e-6)
+
+
+def test_probe_gauge_of_unusable_data_falls_back_to_the_convention(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A scan that recorded nothing gives no ratio to measure; the propagator convention
+    is still right whenever probe and object already agree with the data."""
+    plain = _gauge_input()
+    parameters = dataclasses.replace(
+        plain, diffraction_patterns=numpy.zeros_like(plain.diffraction_patterns)
+    )
+
+    with caplog.at_level(logging.WARNING, logger='ptychodus.plugins.ptychi.task'):
+        gauge = align_probe_gauge_with_ptychi(_aligned_for(parameters), parameters)
+
+    assert gauge.to_ptychi == gauge.expected_factor
+    assert gauge.sampled_positions == 0
+    assert 'unusable' in caplog.text
+
+
+def test_power_constraint_target_follows_the_probe_into_ptychi_gauge() -> None:
+    """The constraint measures the probe's power on pty-chi's arrays, so its target has
+    to be stated there too -- otherwise ticking it would pull the probe to a power it
+    never had. Agreement here is what keeps the two mechanisms from fighting."""
+    parameters = _gauge_input()
+    aligned = _aligned_for(parameters)
+    gauge = align_probe_gauge_with_ptychi(aligned, parameters)
+
+    applied = apply_probe_gauge_to_options(aligned, gauge)
+    handed_over = parameters.product.probes.get_array() * gauge.to_ptychi
+
+    assert applied.probe_options.power_constraint.probe_power == pytest.approx(
+        float(numpy.sum(numpy.abs(handed_over) ** 2)), rel=1e-6
+    )
+
+
+def test_applying_the_gauge_leaves_the_original_options_alone() -> None:
+    """The options a run writes out keep the photon count a reader can interpret."""
+    parameters = _gauge_input()
+    aligned = _aligned_for(parameters)
+    gauge = align_probe_gauge_with_ptychi(aligned, parameters)
+
+    apply_probe_gauge_to_options(aligned, gauge)
+
+    assert aligned.probe_options.power_constraint.probe_power == _GAUGE_PHOTONS

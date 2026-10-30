@@ -1,0 +1,265 @@
+const API = '/api/v1';
+
+/** Mirrors IngestState in db/base.py. */
+export type IngestState = 'DISCOVERED' | 'VALID' | 'INVALID' | 'MISSING_FILES' | 'ORPHANED';
+
+export type Polarization = 'left_circular' | 'right_circular';
+
+export interface DerivedFromEdge {
+  kind: 'diffraction' | 'product' | 'fluorescence';
+  uuid: string;
+  /** The target's display name; empty when the target is not indexed. */
+  label: string;
+}
+
+export interface Page<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/**
+ * Valid choices for the render parameters; enumerated live by the service, each list
+ * in the order the desktop presents it. The label maps give the desktop's names.
+ */
+export interface VisualizationOptions {
+  colormaps_linear: string[];
+  colormaps_cyclic: string[];
+  transforms: string[];
+  components: string[];
+  color_models: string[];
+  transform_labels: Record<string, string>;
+  component_labels: Record<string, string>;
+  color_model_labels: Record<string, string>;
+}
+
+/** What the viewer ribbon currently asks for. */
+export interface RenderParams {
+  colormap: string;
+  transform: string;
+  component: string | null;
+  color_model: string | null;
+  value_min: number | null;
+  value_max: number | null;
+  clip: boolean;
+}
+
+export function renderQuery(params: Partial<RenderParams>): string {
+  const parts: string[] = [];
+  for (const [key, value] of Object.entries(params)) {
+    if (value === null || value === undefined || value === '') continue;
+    parts.push(`${key}=${encodeURIComponent(String(value))}`);
+  }
+  return parts.join('&');
+}
+
+/** Bookkeeping every indexed row carries; see _RowBase in routers/schemas.py. */
+export interface RowBase {
+  uuid: string;
+  folder_path: string;
+  manifest_mtime: string | null;
+  created_from_manifest_at: string | null;
+  ingest_state: IngestState;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiffractionRead extends RowBase {
+  label: string;
+  comments: string;
+  campaign_uuid: string | null;
+  derived_from: DerivedFromEdge[];
+
+  detector_distance_m: number | null;
+  photon_energy_eV: number | null;
+  probe_photon_count: number | null;
+  exposure_time_s: number | null;
+  tomography_angle_deg: number | null;
+  tilt_angle_deg: number | null;
+  polarization: Polarization | null;
+  crop_center_x_px: number | null;
+  crop_center_y_px: number | null;
+
+  // The assembled patterns, so the extent and pixel pitch are the processed ones.
+  pattern_dtype: string | null;
+  pattern_height_px: number | null;
+  pattern_width_px: number | null;
+  num_patterns_total: number | null;
+  detector_pixel_width_m: number | null;
+  detector_pixel_height_m: number | null;
+  num_bad_pixels: number | null;
+  nbytes: number | null;
+}
+
+export interface ProductRead extends RowBase {
+  derived_from: DerivedFromEdge[];
+
+  name: string | null;
+  comments: string | null;
+  detector_distance_m: number | null;
+  focus_object_distance_m: number | null;
+  far_field: boolean | null;
+  photon_energy_eV: number | null;
+  probe_photon_count: number | null;
+  exposure_time_s: number | null;
+  i0_photons_per_count: number | null;
+  mass_attenuation_m2_per_kg: number | null;
+  tomography_angle_deg: number | null;
+  tilt_angle_deg: number | null;
+  polarization: Polarization | null;
+
+  object_layers: number | null;
+  object_height_px: number | null;
+  object_width_px: number | null;
+  object_pixel_width_m: number | null;
+  object_pixel_height_m: number | null;
+  object_dtype: string | null;
+  object_nbytes: number | null;
+  object_layer_spacing_m: number[];
+  object_total_thickness_m: number | null;
+
+  probe_modes: number | null;
+  probe_height_px: number | null;
+  probe_width_px: number | null;
+  probe_pixel_width_m: number | null;
+  probe_pixel_height_m: number | null;
+  probe_coherence: number | null;
+  probe_dtype: string | null;
+  probe_nbytes: number | null;
+  probe_mode_relative_power: number[];
+
+  num_scan_points: number | null;
+  num_loss_epochs: number | null;
+  scan_length_m: number | null;
+  scan_nbytes: number | null;
+
+  // Derived on read by compute_product_geometry. The last five additionally need
+  // the detector, so they are null unless derived_from names an indexed diffraction
+  // dataset. Non-finite results also arrive as null -- JSON has no infinity.
+  photon_wavelength_m: number | null;
+  probe_wavenumber_per_m: number | null;
+  probe_angular_wavenumber_rad_per_m: number | null;
+  probe_photon_flux_per_s: number | null;
+  probe_power_W: number | null;
+  object_plane_propagation_distance_m: number | null;
+  magnification: number | null;
+  object_plane_pixel_width_m: number | null;
+  object_plane_pixel_height_m: number | null;
+  fresnel_number: number | null;
+  detector_numerical_aperture: number | null;
+  depth_of_field_m: number | null;
+}
+
+
+export interface FluorescenceRead extends RowBase {
+  label: string;
+  comments: string;
+  derived_from: DerivedFromEdge[];
+
+  element_names: string[];
+  element_counts: number[];
+  element_nbytes: number[];
+  map_height_px: number | null;
+  map_width_px: number | null;
+  nbytes: number | null;
+}
+
+export interface PlotImage {
+  png_base64: string;
+  mime_type: string;
+  shape_h_px: number;
+  shape_w_px: number;
+}
+
+export interface RenderedImage {
+  png_base64: string;
+  mime_type: 'image/png';
+  value_label: string;
+  color_value_min: number;
+  color_value_max: number;
+  pixel_width_m: number;
+  pixel_height_m: number;
+  shape_h_px: number;
+  shape_w_px: number;
+  /** RGBA stops in [0, 1] from color_value_min to color_value_max, or around the wheel. */
+  legend_rgba: [number, number, number, number][];
+  legend_cyclic: boolean;
+}
+
+async function get<T>(path: string): Promise<T> {
+  const res = await fetch(`${API}${path}`, { headers: { accept: 'application/json' } });
+  if (!res.ok) {
+    let body = '';
+    try {
+      body = await res.text();
+    } catch {
+      // ignore
+    }
+    throw new Error(`GET ${path} → ${res.status} ${res.statusText}: ${body}`);
+  }
+  return (await res.json()) as T;
+}
+
+export const api = {
+  listDiffraction: (limit = 200, offset = 0) =>
+    get<Page<DiffractionRead>>(`/diffraction?limit=${limit}&offset=${offset}`),
+  getDiffraction: (uuid: string) => get<DiffractionRead>(`/diffraction/${uuid}`),
+  diffractionAggregateImage: (uuid: string, params: Partial<RenderParams> = {}) =>
+    get<RenderedImage>(`/diffraction/${uuid}/patterns/aggregate/image?${renderQuery(params)}`),
+  diffractionPatternImage: (uuid: string, index: number, params: Partial<RenderParams> = {}) =>
+    get<RenderedImage>(`/diffraction/${uuid}/patterns/${index}/image?${renderQuery(params)}`),
+  diffractionFileUrl: (uuid: string) => `${API}/diffraction/${uuid}/files/diffraction`,
+
+  listProduct: (limit = 200, offset = 0) =>
+    get<Page<ProductRead>>(`/product?limit=${limit}&offset=${offset}`),
+  getProduct: (uuid: string) => get<ProductRead>(`/product/${uuid}`),
+  // The product of every layer, which the desktop shows for the object itself.
+  productObjectFlattenedImage: (uuid: string, params: Partial<RenderParams> = {}) =>
+    get<RenderedImage>(`/product/${uuid}/object/image?${renderQuery(params)}`),
+  productObjectImage: (uuid: string, layer: number, params: Partial<RenderParams> = {}) =>
+    get<RenderedImage>(`/product/${uuid}/object/${layer}/image?${renderQuery(params)}`),
+  // The per-mode render: a route the service has always had and the UI never called.
+  productProbeImage: (uuid: string, incoherent: number, params: Partial<RenderParams> = {}) =>
+    get<RenderedImage>(
+      `/product/${uuid}/probe/image?incoherent=${incoherent}&${renderQuery(params)}`
+    ),
+  productProbeModesImage: (uuid: string, params: Partial<RenderParams> = {}) =>
+    get<RenderedImage>(`/product/${uuid}/probe/modes/image?${renderQuery(params)}`),
+  // Takes a list so the Positions page can overlay checked scans on shared axes.
+  productPositionsImage: (uuids: string[], connectPath = true) =>
+    get<PlotImage>(
+      `/product/positions/image?${uuids
+        .map((u) => `uuid=${encodeURIComponent(u)}`)
+        .join('&')}&connect_path=${connectPath}`
+    ),
+  productFileUrl: (uuid: string) => `${API}/product/${uuid}/files/product`,
+
+  visualizationOptions: () => get<VisualizationOptions>('/visualization/options'),
+  listFluorescence: (limit = 200, offset = 0) =>
+    get<Page<FluorescenceRead>>(`/fluorescence?limit=${limit}&offset=${offset}`),
+  getFluorescence: (uuid: string) => get<FluorescenceRead>(`/fluorescence/${uuid}`),
+  // product_uuid supplies the pixel geometry; without it the service falls back to a
+  // 1 um placeholder and the caption's physical size is wrong.
+  fluorescenceSummaryImage: (
+    uuid: string,
+    productUuid?: string,
+    params: Partial<RenderParams> = {}
+  ) =>
+    get<RenderedImage>(
+      `/fluorescence/${uuid}/image?` +
+        renderQuery({ ...params, ...(productUuid ? { product_uuid: productUuid } : {}) })
+    ),
+  fluorescenceElementImage: (
+    uuid: string,
+    name: string,
+    productUuid?: string,
+    params: Partial<RenderParams> = {}
+  ) =>
+    get<RenderedImage>(
+      `/fluorescence/${uuid}/elements/${encodeURIComponent(name)}/image?` +
+        renderQuery({ ...params, ...(productUuid ? { product_uuid: productUuid } : {}) })
+    ),
+  fluorescenceFileUrl: (uuid: string) => `${API}/fluorescence/${uuid}/files/fluorescence`,
+};

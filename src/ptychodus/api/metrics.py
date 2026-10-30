@@ -3,9 +3,12 @@
 from __future__ import annotations
 from dataclasses import dataclass, replace
 from enum import Enum, auto
+from typing import TypeVar
 import logging
+import math
 
 import numpy
+import numpy.typing
 import scipy.fft
 from scipy.ndimage import binary_erosion, gaussian_filter
 from scipy.signal.windows import tukey
@@ -14,11 +17,18 @@ from skimage.metrics import (
     peak_signal_noise_ratio,
     structural_similarity,
 )
+from skimage.registration import phase_cross_correlation
 
-from .typing import ComplexArrayType, IntegerArrayType, RealArrayType
+from .typing import (
+    BooleanArrayType,
+    ComplexArrayType,
+    InexactArrayType,
+    IntegerArrayType,
+    RealArrayType,
+)
 from .diffraction import BadPixels, DiffractionPatterns
-from .fourier import fourier_shift_2d
 from .illumination import IlluminationMap
+from .patch import accumulate_probe_intensity
 from .simulate.diffraction import generate_diffraction_data
 from .geometry import PixelGeometry
 from .object import (
@@ -28,10 +38,13 @@ from .object import (
     estimate_object_alignment_shift,
     shift_object,
 )
+from .probe import Probe, ProbeEnsemble, shift_probe
 from .product import Product
 from .reconstruct import ReconstructionAmbiguities
 
 logger = logging.getLogger(__name__)
+
+_InexactT = TypeVar('_InexactT', bound=numpy.inexact)
 
 
 def _validate_weights(
@@ -54,7 +67,7 @@ def _validate_weights(
 
 def _estimate_phase_offset_and_ramp(
     *,
-    signal: numpy.ndarray,
+    signal: ComplexArrayType,
     weights: RealArrayType | None,
     pixel_width_m: float,
     pixel_height_m: float,
@@ -233,6 +246,10 @@ class ObjectComparison:
     pixel_geometry: PixelGeometry
     ambiguities: ReconstructionAmbiguities
     """The ambiguities removed from the test side."""
+    shift_x_px: float = 0.0
+    """Horizontal translation applied to the test object to register it, in pixels."""
+    shift_y_px: float = 0.0
+    """Vertical translation applied to the test object to register it, in pixels."""
 
     @property
     def reference_amplitude(self) -> RealArrayType:
@@ -384,6 +401,145 @@ def compute_object_comparison(
         test_complex=test_array.astype(common_dtype, copy=False),
         pixel_geometry=cropped_reference_object.get_pixel_geometry().copy(),
         ambiguities=ambiguities,
+        shift_x_px=float(shift_x_px),
+        shift_y_px=float(shift_y_px),
+    )
+
+
+@dataclass(frozen=True)
+class ProbeComparison:
+    """Two reconstructed probes compared as mixed states, after removing the ambiguities.
+
+    Both metrics depend only on the density matrix the incoherent modes describe, so
+    they are unchanged by reordering the modes, rotating them into another orthogonal
+    basis, giving each its own global phase, or describing the same state with a
+    different number of modes.
+    """
+
+    normalized_fidelity: float
+    """``(sum of singular values of P1 P2^H)^2 / (tr1 tr2)``, in ``[0, 1]``; one for equal states."""
+    normalized_rms_error: float
+    """``sqrt((tr1 + tr2 - 2 sqrt(fidelity)) / tr1)``, the mixed-state generalization of the
+    phase-aligned RMS error, normalized by the reference probe's power."""
+    probe_shift_x_px: float
+    """Horizontal translation applied to the test probe to register it, in pixels."""
+    probe_shift_y_px: float
+    """Vertical translation applied to the test probe to register it, in pixels."""
+    object_shift_x_px: float
+    """Horizontal translation that registered the objects, in pixels.
+
+    When the reconstructions share their scan positions, a shared translation of object
+    and probe is itself an ambiguity, and the two shifts agree. A large difference means
+    the reconstructions disagree about the positions rather than about the probe.
+    """
+    object_shift_y_px: float
+    """Vertical translation that registered the objects, in pixels."""
+    test_probe: Probe
+    """The test probe, standardized and registered onto the reference."""
+
+
+def _representative_probe(probes: ProbeEnsemble) -> Probe:
+    """Return one probe standing for the ensemble: the OPR mean, or the probe itself."""
+    opr_weights = probes.get_opr_weights_or_none()
+    probe = probes.get_probe_no_opr()
+
+    if opr_weights is None:
+        return probe
+
+    array = probe.get_array().copy()
+    array[0, :, :] = probes.compose_opr_field(opr_weights.mean(axis=0))
+    return Probe(array, probes.get_pixel_geometry())
+
+
+def compute_probe_comparison(
+    reference: Product,
+    test: Product,
+    *,
+    weights: RealArrayType | None = None,
+    upsample_factor: int = 100,
+) -> ProbeComparison:
+    """Compare the probes of two reconstructions as mixed states.
+
+    The coupled scale, phase and phase-ramp ambiguities are estimated from the objects,
+    which have the longer lever arm, via :func:`compute_object_comparison`, and their
+    complement is removed from the test probe. The probes are then registered on their
+    own, through the incoherent sum of their modes, which does not depend on how the
+    state is split into modes and stays correct when either reconstruction refined its
+    positions. A product with OPR weights is represented by its mean-weight probe.
+
+    Args:
+        reference: The reconstruction treated as ground truth.
+        test: The reconstruction being evaluated against ``reference``.
+        weights: Optional per-pixel weights for the ambiguity estimate, passed to
+            :func:`compute_object_comparison`; an illumination-derived region keeps
+            the unscanned border from biasing it.
+        upsample_factor: Sub-pixel precision of both registrations.
+
+    Raises:
+        ValueError: If the probes differ in shape or pixel geometry, or either carries
+            no power.
+    """
+    reference_probe = _representative_probe(reference.probes)
+    test_raw = _representative_probe(test.probes)
+
+    if reference_probe.get_array().shape[-2:] != test_raw.get_array().shape[-2:]:
+        raise ValueError(
+            f'Probe shape mismatch: reference {reference_probe.get_array().shape[-2:]}'
+            f' vs test {test_raw.get_array().shape[-2:]}!'
+        )
+
+    if reference_probe.get_pixel_geometry() != test_raw.get_pixel_geometry():
+        raise ValueError(
+            f'Probe pixel geometry mismatch: reference {reference_probe.get_pixel_geometry()}'
+            f' vs test {test_raw.get_pixel_geometry()}!'
+        )
+
+    object_comparison = compute_object_comparison(
+        reference, test, upsample_factor=upsample_factor, weights=weights
+    )
+    standardized_test = object_comparison.ambiguities.standardize_product(test)
+    test_probe = _representative_probe(standardized_test.probes)
+
+    # Plain rather than phase-normalized cross-correlation: a probe's intensity is smooth
+    # and sits well inside its frame, so whitening its spectrum only amplifies the weak
+    # high frequencies, biasing the sub-pixel peak by up to a tenth of a pixel.
+    shift_yx, _, _ = phase_cross_correlation(
+        reference_probe.get_intensity(),
+        test_probe.get_intensity(),
+        upsample_factor=upsample_factor,
+        normalization=None,
+    )
+    probe_shift_y_px = float(shift_yx[0])
+    probe_shift_x_px = float(shift_yx[1])
+    test_probe = shift_probe(test_probe, shift_y_px=probe_shift_y_px, shift_x_px=probe_shift_x_px)
+
+    reference_modes = reference_probe.get_array().reshape(reference_probe.num_incoherent_modes, -1)
+    test_modes = test_probe.get_array().reshape(test_probe.num_incoherent_modes, -1)
+    reference_modes = reference_modes.astype(numpy.complex128)
+    test_modes = test_modes.astype(numpy.complex128)
+
+    reference_power = float(numpy.sum(numpy.square(numpy.abs(reference_modes))))
+    test_power = float(numpy.sum(numpy.square(numpy.abs(test_modes))))
+
+    if reference_power <= 0.0 or test_power <= 0.0:
+        raise ValueError('Cannot compare probes: a probe carries no power.')
+
+    # The nuclear norm of the cross-Gram matrix is the square root of the fidelity of the
+    # two density matrices, computed without ever forming them.
+    root_fidelity = float(
+        numpy.sum(numpy.linalg.svd(reference_modes @ test_modes.conj().T, compute_uv=False))
+    )
+    normalized_fidelity = min(root_fidelity**2 / (reference_power * test_power), 1.0)
+    squared_error = max(reference_power + test_power - 2.0 * root_fidelity, 0.0)
+
+    return ProbeComparison(
+        normalized_fidelity=normalized_fidelity,
+        normalized_rms_error=math.sqrt(squared_error / reference_power),
+        probe_shift_x_px=probe_shift_x_px,
+        probe_shift_y_px=probe_shift_y_px,
+        object_shift_x_px=object_comparison.shift_x_px,
+        object_shift_y_px=object_comparison.shift_y_px,
+        test_probe=test_probe,
     )
 
 
@@ -534,7 +690,7 @@ def _prepare_spectral_image(
     window: RealArrayType | None,
     *,
     subtract_mean: bool,
-) -> numpy.ndarray:
+) -> InexactArrayType:
     """Remove the DC term and apodize an image ahead of its FFT.
 
     The mean is *window-weighted* so that the zeroth Fourier coefficient of the
@@ -553,13 +709,37 @@ def _prepare_spectral_image(
     return values if window is None else values * window
 
 
+class SpectralSNRConvention(Enum):
+    """How the two correlated images relate to the image whose spectral SNR is reported.
+
+    The FRC measures the agreement of two independent images. What that implies about
+    signal to noise depends on which image the SNR describes, which only the caller knows.
+    """
+
+    HALF_SPLIT = auto()
+    """Two reconstructions from complementary halves of one dataset, reporting the SNR of
+    the full-dataset reconstruction, which averages both halves: ``2 F / (1 - F)``."""
+    REPEAT = auto()
+    """Two independent repeat scans, reporting the SNR of either one: ``F / (1 - F)``."""
+
+    @property
+    def snr_factor(self) -> float:
+        """Multiplier on ``F / (1 - F)``: the number of independent images averaged."""
+        return 2.0 if self is SpectralSNRConvention.HALF_SPLIT else 1.0
+
+
 @dataclass(frozen=True)
 class FourierRingCorrelation:
-    """Per-ring Fourier ring correlation between two complex images, with resolution estimators."""
+    """Per-ring Fourier ring correlation between two complex images, with resolution estimators.
+
+    `convention` says how the two images relate to the one whose spectral SNR is reported,
+    and every SNR-based estimator below follows it.
+    """
 
     spatial_frequency_per_m: RealArrayType
     correlation: RealArrayType
     pixels_per_ring: IntegerArrayType
+    convention: SpectralSNRConvention = SpectralSNRConvention.HALF_SPLIT
 
     def get_resolution_m(self, threshold: float) -> float:
         threshold_curve = numpy.full(self.correlation.shape, threshold, dtype=float)
@@ -595,19 +775,22 @@ class FourierRingCorrelation:
         return threshold_curve
 
     def get_spectral_signal_to_noise_ratio(self) -> RealArrayType:
-        """Spectral SNR per ring under the full-image van Heel/Schatz convention.
+        """Spectral SNR per ring under the van Heel/Schatz relation for `convention`.
 
-        ``SSNR(f) = 2 * FRC(f) / (1 - FRC(f))``. Negative FRC values (anti-
-        correlation from noise, not physical signal) are clipped to 0 so SSNR=0.
-        FRC values of exactly 1 yield +inf. NaN inputs propagate as NaN.
+        ``SSNR(f) = c * FRC(f) / (1 - FRC(f))``, where ``c`` is 2 for
+        :attr:`SpectralSNRConvention.HALF_SPLIT` and 1 for
+        :attr:`SpectralSNRConvention.REPEAT`. Negative FRC values (anti-correlation
+        from noise, not physical signal) are clipped to 0 so SSNR=0. FRC values of
+        exactly 1 yield +inf. NaN inputs propagate as NaN.
         """
         frc = numpy.asarray(self.correlation, dtype=float)
         nan_mask = numpy.isnan(frc)
         safe_frc = numpy.clip(frc, 0.0, None)
         denominator = 1.0 - safe_frc
+        factor = self.convention.snr_factor
 
         with numpy.errstate(divide='ignore', invalid='ignore'):
-            ssnr = numpy.where(denominator > 0.0, 2.0 * safe_frc / denominator, numpy.inf)
+            ssnr = numpy.where(denominator > 0.0, factor * safe_frc / denominator, numpy.inf)
 
         return numpy.where(nan_mask, numpy.nan, ssnr)
 
@@ -657,13 +840,14 @@ class FourierRingCorrelation:
     def get_resolution_m_at_signal_to_noise_threshold(self, snr: float) -> float:
         """Resolution where the FRC-derived SSNR drops below ``snr``.
 
-        Inverts ``SSNR = 2 * FRC / (1 - FRC)`` to get the equivalent FRC
-        threshold ``F = snr / (snr + 2)`` and defers to
-        :meth:`get_resolution_m`. Raises ``ValueError`` for negative ``snr``.
+        Inverts ``SSNR = c * FRC / (1 - FRC)`` (see
+        :meth:`get_spectral_signal_to_noise_ratio`) to get the equivalent FRC
+        threshold ``F = snr / (snr + c)`` and defers to :meth:`get_resolution_m`.
+        Raises ``ValueError`` for negative ``snr``.
         """
         if snr < 0.0:
             raise ValueError('SNR threshold must be non-negative')
-        frc_threshold = snr / (snr + 2.0)
+        frc_threshold = snr / (snr + self.convention.snr_factor)
         return self.get_resolution_m(frc_threshold)
 
     def _resolution_at_threshold_curve(self, threshold_curve: RealArrayType) -> float:
@@ -704,6 +888,7 @@ def compute_fourier_ring_correlation(
     subtract_mean: bool = True,
     num_bins: int | None = None,
     workers: int = -1,
+    convention: SpectralSNRConvention = SpectralSNRConvention.HALF_SPLIT,
 ) -> FourierRingCorrelation:
     """Compute the Fourier ring correlation between two complex images.
 
@@ -741,6 +926,9 @@ def compute_fourier_ring_correlation(
         num_bins: Number of rings tiling ``[0, f_nyquist]``. ``None`` (default)
             keeps the natural FFT bin width ``max(1 / (W dx), 1 / (H dy))``.
         workers: Passed to ``scipy.fft.fft2``.
+        convention: How the two images relate to the image whose spectral SNR the
+            result reports; see :class:`SpectralSNRConvention`. It changes only the
+            SNR-based estimators, never the correlation itself.
 
     Returns:
         A :class:`FourierRingCorrelation` whose ``spatial_frequency_per_m``
@@ -784,6 +972,7 @@ def compute_fourier_ring_correlation(
         spatial_frequency_per_m=numpy.arange(resolved_num_bins) * bin_size_per_m,
         correlation=numpy.clip(correlation, -1.0, 1.0),
         pixels_per_ring=pixels_per_ring,
+        convention=convention,
     )
 
 
@@ -885,7 +1074,19 @@ class ScoringRegion:
     def width_px(self) -> int:
         return self.column_end - self.column_begin
 
-    def crop(self, array: ComplexArrayType | RealArrayType) -> numpy.ndarray:
+    def get_array_weights(self) -> RealArrayType:
+        """Return ``weights`` placed in a zero array of shape ``array_shape``.
+
+        This is the full-array form a per-pixel weighting of the uncropped array takes,
+        such as the ambiguity estimate in :func:`compute_object_comparison`.
+        """
+        array_weights = numpy.zeros(self.array_shape, dtype=numpy.float64)
+        array_weights[self.row_begin : self.row_end, self.column_begin : self.column_end] = (
+            self.weights
+        )
+        return array_weights
+
+    def crop(self, array: numpy.typing.NDArray[_InexactT]) -> numpy.typing.NDArray[_InexactT]:
         """Cut the trailing two axes of ``array`` down to this region's rectangle."""
         values = numpy.asarray(array)
 
@@ -897,7 +1098,7 @@ class ScoringRegion:
         return values[..., self.row_begin : self.row_end, self.column_begin : self.column_end]
 
 
-def _largest_true_rectangle(mask: numpy.ndarray) -> tuple[int, int, int, int]:
+def _largest_true_rectangle(mask: BooleanArrayType) -> tuple[int, int, int, int]:
     """Find the largest axis-aligned all-true rectangle in a 2D boolean mask.
 
     Returns ``(row_begin, row_end, column_begin, column_end)``; an all-false
@@ -1296,23 +1497,13 @@ def compute_reconstruction_residuals(
     per_frame_denominator = numpy.einsum('nhw,hw->n', meas_amp, valid_f)  # (N,)
 
     object_geometry = product.object_.get_geometry()
-    probe_geometry = product.probes.get_geometry()
-    numerator_splat = numpy.zeros((object_geometry.height_px, object_geometry.width_px))
-    denominator_splat = numpy.zeros_like(numerator_splat)
-
-    for num_i, den_i, (scan_point, probe) in zip(
-        per_frame_numerator, per_frame_denominator, product.iter_position_probes()
-    ):
-        object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        bounds = probe_geometry.resolve_patch_bounds(object_point.x_px, object_point.y_px)
-
-        shifted_modes = fourier_shift_2d(probe.get_array(), dx=bounds.dx, dy=bounds.dy)
-        intensity = numpy.sum(numpy.abs(shifted_modes) ** 2, axis=0)
-        total = intensity.sum()
-        patch = intensity / total if total > 0.0 else intensity
-
-        numerator_splat[bounds.y_slice, bounds.x_slice] += num_i * patch
-        denominator_splat[bounds.y_slice, bounds.x_slice] += den_i * patch
+    # Both splats spread the same normalized probe intensity and differ only in the
+    # per-frame scale, so they accumulate together in one pass.
+    numerator_splat, denominator_splat = accumulate_probe_intensity(
+        product,
+        weights=numpy.stack([per_frame_numerator, per_frame_denominator]),
+        normalize=True,
+    )
 
     real_space_error_map = numpy.full_like(numerator_splat, numpy.nan)
     numpy.divide(

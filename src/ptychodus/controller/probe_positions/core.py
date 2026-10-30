@@ -4,7 +4,7 @@ import logging
 from PyQt5.QtCore import QModelIndex, QStringListModel
 from PyQt5.QtWidgets import QAbstractItemView, QDialog, QMessageBox
 
-from ptychodus.api.observer import SequenceObserver
+from ptychodus.model.observer import SequenceObserver
 
 from ...model.product import ProbePositionsAPI, ProbePositionsRepository
 from ...model.product.probe_positions import ProbePositionsRepositoryItem
@@ -19,7 +19,7 @@ from ..helpers import (
     create_brush_for_editable_cell,
 )
 from .editor_factory import ProbePositionsEditorViewControllerFactory
-from .table_model import ProbePositionsTableModel
+from .table_model import Column, ProbePositionsTableModel
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
         view.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         header = view.table_view.horizontalHeader()
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
-        view.table_view.setItemDelegateForColumn(2, builder_item_delegate)
+        view.table_view.setItemDelegateForColumn(Column.BUILDER.index, builder_item_delegate)
         connect_current_changed_signal(view.table_view, self._update_view)
         self._update_view(QModelIndex(), QModelIndex())
 
@@ -113,8 +113,8 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
         file_path, name_filter = self._file_dialog_factory.get_open_file_path(
             self._view,
             'Open Scan',
-            name_filters=[nf for nf in self._api.get_open_file_filters()],
-            selected_name_filter=self._api.get_open_file_filter(),
+            name_filters=self._api.file_readers.get_filters(),
+            selected_name_filter=self._api.file_readers.get_filter(),
         )
 
         if file_path:
@@ -157,8 +157,8 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
         file_path, name_filter = self._file_dialog_factory.get_save_file_path(
             self._view,
             'Save Scan',
-            name_filters=[nameFilter for nameFilter in self._api.get_save_file_filters()],
-            selected_name_filter=self._api.get_save_file_filter(),
+            name_filters=self._api.file_writers.get_filters(),
+            selected_name_filter=self._api.file_writers.get_filter(),
         )
 
         if file_path:

@@ -2,10 +2,9 @@ from importlib.metadata import version
 import logging
 import queue
 
-from ptychodus.api.settings import SettingsRegistry
-
 from ..processing import ProcessingAPI
 from ..product import ProductAPI
+from ..settings import SettingsRegistry
 from .authorizer import GlobusAuthorizer
 from .client import FakeGlobusClient, GlobusClient, GlobusStatus
 from .executor import GlobusExecutor

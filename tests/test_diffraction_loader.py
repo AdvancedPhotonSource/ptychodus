@@ -10,21 +10,27 @@ live in tests/test_assemble.py.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import cast
 
 import numpy
 
 from ptychodus.model.task_manager import BackgroundTask, ForegroundTask, TaskManager
+from ptychodus.api.accumulate import compute_diffraction_moments
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.diffraction import (
     DiffractionArray,
     DiffractionDatasetLayoutNode,
     DiffractionMetadata,
+    DiffractionPatternDType,
     SimpleDiffractionArray,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.settings import SettingsRegistry
-from ptychodus.model.diffraction.dataset import AssembledDiffractionDataset
+from ptychodus.model.settings import SettingsRegistry
+from ptychodus.model.diffraction.dataset import (
+    AssembledDiffractionDataset,
+    DiffractionDatasetObserver,
+)
 from ptychodus.model.diffraction.monitor import DiffractionTaskMonitor
 from ptychodus.model.diffraction.settings import DetectorSettings, DiffractionSettings
 
@@ -57,6 +63,7 @@ def make_dataset(
     crop_width: int = 16,
     arrays: Sequence[DiffractionArray] = (),
     num_patterns_per_array: Sequence[int] | None = None,
+    pattern_dtype: numpy.typing.DTypeLike = numpy.uint16,
 ) -> AssembledDiffractionDataset:
     registry = SettingsRegistry()
     detector_settings = DetectorSettings(registry)
@@ -81,7 +88,7 @@ def make_dataset(
             if num_patterns_per_array is None
             else list(num_patterns_per_array)
         ),
-        pattern_dtype=numpy.dtype(numpy.uint16),
+        pattern_dtype=cast(DiffractionPatternDType, numpy.dtype(pattern_dtype)),
         detector_extent=ImageExtent(width_px=detector_width, height_px=detector_height),
     )
     source = SimpleDiffractionDataset(metadata, DiffractionDatasetLayoutNode.create_root(), arrays)
@@ -260,3 +267,123 @@ def test_processed_geometry_survives_reimport_without_double_binning() -> None:
 
     assert reimported.get_processed_pixel_geometry() == PixelGeometry(2e-4, 4e-4)
     assert reimported.get_processed_image_extent() == ImageExtent(width_px=8, height_px=6)
+
+
+def test_load_masks_non_finite_pixels_in_the_raw_and_processed_masks() -> None:
+    """A NaN pixel is masked in the assembled buffer and in the dataset's raw mask.
+
+    The raw mask carries it into later loads and summaries; the assembled mask is in
+    cropped coordinates.
+    """
+    patterns = numpy.ones((2, 40, 60), dtype=numpy.float32)
+    patterns[1, 18, 30] = numpy.nan  # crop [y=14..26, x=22..38] puts this at (4, 8)
+    array = SimpleDiffractionArray('nan', numpy.arange(2, dtype=numpy.intp), patterns)
+    dataset = make_dataset(arrays=[array], pattern_dtype=numpy.float32)
+
+    dataset.load_all_arrays(process_patterns=True, block=True)
+
+    assembled = dataset.get_assembled_data()
+    assert assembled.get_bad_pixels()[4, 8]
+    assert numpy.isfinite(assembled.get_patterns()).all()
+    raw_bad = dataset.get_bad_pixels()
+    assert raw_bad.shape == (40, 60)
+    assert raw_bad[18, 30]
+    assert raw_bad.sum() == 1
+
+
+def test_appended_array_masks_its_non_finite_pixels_for_the_whole_buffer() -> None:
+    """The streaming path widens the buffer's mask and the raw mask, as a full load does."""
+    clean = numpy.ones((2, 40, 60), dtype=numpy.float32)
+    dirty = numpy.ones((2, 40, 60), dtype=numpy.float32)
+    dirty[0, 18, 30] = numpy.inf
+    dataset = make_dataset(
+        arrays=[SimpleDiffractionArray('a', numpy.arange(2, dtype=numpy.intp), clean)],
+        num_patterns_per_array=[2, 2],
+        pattern_dtype=numpy.float32,
+    )
+    dataset.load_all_arrays(process_patterns=True, block=True)
+
+    dataset.append_array(
+        SimpleDiffractionArray('b', numpy.arange(2, 4, dtype=numpy.intp), dirty),
+        process_patterns=True,
+    )
+
+    assert dataset.get_assembled_data().get_bad_pixels()[4, 8]
+    assert dataset.get_bad_pixels()[18, 30]
+    assert numpy.isfinite(dataset.get_assembled_data().get_patterns()).all()
+
+
+class _MomentsObserver(DiffractionDatasetObserver):
+    def __init__(self) -> None:
+        super().__init__()
+        self.num_moments_changed = 0
+
+    def handle_array_inserted(self, index: int) -> None:
+        pass
+
+    def handle_array_changed(self, index: int) -> None:
+        pass
+
+    def handle_dataset_reloaded(self) -> None:
+        pass
+
+    def handle_moments_changed(self) -> None:
+        self.num_moments_changed += 1
+
+
+def _assert_moments_of(dataset: AssembledDiffractionDataset) -> None:
+    data = dataset.get_assembled_data()
+    expected = compute_diffraction_moments(
+        data.get_indexes(), data.get_patterns(), bad_pixels=data.get_bad_pixels()
+    )
+    moments = dataset.get_diffraction_moments()
+
+    assert expected is not None and moments is not None
+    numpy.testing.assert_array_equal(moments.indexes, expected.indexes)
+    numpy.testing.assert_allclose(moments.total_counts, expected.total_counts)
+    numpy.testing.assert_allclose(moments.mean_frame, expected.mean_frame)
+
+
+def test_a_load_accumulates_the_moments_of_what_it_assembled() -> None:
+    dataset = make_dataset(arrays=[_saturated_array('a', 3), _saturated_array('b', 2, 3)])
+    observer = _MomentsObserver()
+    dataset.add_observer(observer)
+
+    dataset.load_all_arrays(process_patterns=True, block=True)
+
+    assert dataset._moments is not None
+    assert observer.num_moments_changed == 1
+    _assert_moments_of(dataset)
+
+
+def test_a_reload_discards_the_moments() -> None:
+    arrays = [_saturated_array('a', 3)]
+    dataset = make_dataset(arrays=arrays)
+    dataset.load_all_arrays(process_patterns=True, block=True)
+    assert dataset.get_diffraction_moments() is not None
+
+    dataset.reload(
+        SimpleDiffractionDataset(
+            dataset.get_metadata(), DiffractionDatasetLayoutNode.create_root(), arrays
+        )
+    )
+
+    assert dataset._moments is None
+    assert dataset.get_diffraction_moments() is None
+
+
+def test_patterns_set_directly_get_their_moments_on_first_request() -> None:
+    dataset = make_dataset()
+    patterns = numpy.arange(4 * 6 * 6, dtype=numpy.uint16).reshape(4, 6, 6)
+    dataset.set_assembled_patterns(
+        AssembledDiffractionData(
+            numpy.arange(4, dtype=numpy.intp),
+            patterns,
+            PixelGeometry(width_m=1e-6, height_m=1e-6),
+            numpy.zeros((6, 6), dtype=bool),
+        )
+    )
+
+    assert dataset._moments is None
+    _assert_moments_of(dataset)
+    assert dataset._moments is not None

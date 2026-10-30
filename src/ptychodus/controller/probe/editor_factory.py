@@ -5,252 +5,42 @@ from PyQt5.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QPushButton,
     QRadioButton,
-    QSpinBox,
     QStackedWidget,
     QTableView,
     QVBoxLayout,
     QWidget,
 )
 
-from ptychodus.api.constants import LengthUnit
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.probe import OPRWeightPolicy
-from ptychodus.api.parameters import StringParameter
+from ptychodus.model.observer import Observable, Observer
+from ptychodus.model.parameters import BooleanParameter, StringParameter
 
 from ...model.product.probe import (
     INCOHERENT_MODE_STRATEGY_NAMES,
-    AveragePatternProbeBuilder,
-    DiskProbeBuilder,
-    FresnelZonePlateProbeBuilder,
     FromFileProbeBuilder,
-    HermiteProbeBuilder,
-    KBMirrorProbeBuilder,
+    FromMemoryProbeBuilder,
+    PluginProbeBuilder,
     ProbeModeDecayType,
     ProbeRepositoryItem,
-    ProbeSequenceBuilder,
-    RectangularProbeBuilder,
-    SuperGaussianProbeBuilder,
-    ZernikeProbeBuilder,
+    ProbeEnsembleBuilder,
 )
 from ...view.widgets import GroupBoxWithPresets
+from ..make_editable import MakeEditableViewController
 from ..parameters import (
     DecimalLineEditParameterViewController,
     DecimalSliderParameterViewController,
     LengthParameterViewController,
     ParameterViewBuilder,
     ParameterViewController,
+    create_parameter_view_controller,
 )
-from .hermite import HermiteTableModel
 from .metrics import ProbeMetricsTableModel
-from .zernike import ZernikeTableModel
 
 __all__ = [
     'ProbeEditorViewControllerFactory',
 ]
-
-
-class FresnelZonePlateViewController(ParameterViewController):
-    def __init__(self, title: str, probe_builder: FresnelZonePlateProbeBuilder) -> None:
-        super().__init__()
-        self._widget = GroupBoxWithPresets(title)
-
-        for label in probe_builder.labels_for_presets():
-            action = self._widget.presets_menu.addAction(label)
-
-            if action is None:
-                raise ValueError('action is None!')
-            else:
-                action.triggered.connect(lambda _, label=label: probe_builder.apply_presets(label))
-
-        self._zone_plate_diameter_view_controller = LengthParameterViewController(
-            probe_builder.zone_plate_diameter_m
-        )
-        self._outermost_zone_width_view_controller = LengthParameterViewController(
-            probe_builder.outermost_zone_width_m
-        )
-        self._central_beamstop_diameter_view_controller = LengthParameterViewController(
-            probe_builder.central_beamstop_diameter_m
-        )
-        self._defocus_distance_view_controller = LengthParameterViewController(
-            probe_builder.defocus_distance_m, default_unit=LengthUnit.MICROMETER
-        )
-
-        layout = QFormLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addRow(
-            'Zone Plate Diameter:', self._zone_plate_diameter_view_controller.get_widget()
-        )
-        layout.addRow(
-            'Outermost Zone Width:',
-            self._outermost_zone_width_view_controller.get_widget(),
-        )
-        layout.addRow(
-            'Central Beamstop Diameter:',
-            self._central_beamstop_diameter_view_controller.get_widget(),
-        )
-        layout.addRow('Defocus Distance:', self._defocus_distance_view_controller.get_widget())
-        self._widget.contents.setLayout(layout)
-
-    def get_widget(self) -> QWidget:
-        return self._widget
-
-
-class KBMirrorViewController(ParameterViewController):
-    def __init__(self, title: str, probe_builder: KBMirrorProbeBuilder) -> None:
-        super().__init__()
-        self._widget = GroupBoxWithPresets(title)
-
-        for label in probe_builder.labels_for_presets():
-            action = self._widget.presets_menu.addAction(label)
-
-            if action is None:
-                raise ValueError('action is None!')
-            else:
-                action.triggered.connect(lambda _, label=label: probe_builder.apply_presets(label))
-
-        self._horizontal_acceptance_length_view_controller = LengthParameterViewController(
-            probe_builder.horizontal_acceptance_length_m, default_unit=LengthUnit.MILLIMETER
-        )
-        self._horizontal_grazing_angle_view_controller = DecimalLineEditParameterViewController(
-            probe_builder.horizontal_grazing_angle_rad
-        )
-        self._horizontal_focus_distance_view_controller = LengthParameterViewController(
-            probe_builder.horizontal_focus_distance_m, default_unit=LengthUnit.MILLIMETER
-        )
-        self._vertical_acceptance_length_view_controller = LengthParameterViewController(
-            probe_builder.vertical_acceptance_length_m, default_unit=LengthUnit.MILLIMETER
-        )
-        self._vertical_grazing_angle_view_controller = DecimalLineEditParameterViewController(
-            probe_builder.vertical_grazing_angle_rad
-        )
-        self._vertical_focus_distance_view_controller = LengthParameterViewController(
-            probe_builder.vertical_focus_distance_m, default_unit=LengthUnit.MILLIMETER
-        )
-        self._astigmatism_view_controller = LengthParameterViewController(
-            probe_builder.astigmatism_m, is_signed=True, default_unit=LengthUnit.MICROMETER
-        )
-        self._defocus_distance_view_controller = LengthParameterViewController(
-            probe_builder.defocus_distance_m, default_unit=LengthUnit.MICROMETER
-        )
-
-        layout = QFormLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addRow(
-            'Horizontal Acceptance Length:',
-            self._horizontal_acceptance_length_view_controller.get_widget(),
-        )
-        layout.addRow(
-            'Horizontal Grazing Angle [rad]:',
-            self._horizontal_grazing_angle_view_controller.get_widget(),
-        )
-        layout.addRow(
-            'Horizontal Focus Distance:',
-            self._horizontal_focus_distance_view_controller.get_widget(),
-        )
-        layout.addRow(
-            'Vertical Acceptance Length:',
-            self._vertical_acceptance_length_view_controller.get_widget(),
-        )
-        layout.addRow(
-            'Vertical Grazing Angle [rad]:',
-            self._vertical_grazing_angle_view_controller.get_widget(),
-        )
-        layout.addRow(
-            'Vertical Focus Distance:',
-            self._vertical_focus_distance_view_controller.get_widget(),
-        )
-        layout.addRow('Astigmatism:', self._astigmatism_view_controller.get_widget())
-        layout.addRow('Defocus Distance:', self._defocus_distance_view_controller.get_widget())
-        self._widget.contents.setLayout(layout)
-
-    def get_widget(self) -> QWidget:
-        return self._widget
-
-
-class ZernikeViewController(ParameterViewController, Observer):
-    def __init__(self, title: str, probe_builder: ZernikeProbeBuilder) -> None:
-        super().__init__()
-        self._widget = QGroupBox(title)
-        self._probe_builder = probe_builder
-        self._order_spin_box = QSpinBox()
-        self._coefficients_table_model = ZernikeTableModel(probe_builder)
-        self._coefficients_table_view = QTableView()
-        self._diameter_view_controller = LengthParameterViewController(probe_builder.diameter_m)
-
-        self._coefficients_table_view.setModel(self._coefficients_table_model)
-        header = self._coefficients_table_view.horizontalHeader()
-        header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
-
-        layout = QFormLayout()
-        layout.addRow('Diameter:', self._diameter_view_controller.get_widget())
-        layout.addRow('Order:', self._order_spin_box)
-        layout.addRow(self._coefficients_table_view)
-        self._widget.setLayout(layout)
-
-        self._sync_model_to_view()
-        self._order_spin_box.valueChanged.connect(probe_builder.set_order)
-        probe_builder.add_observer(self)
-
-    def get_widget(self) -> QWidget:
-        return self._widget
-
-    def _sync_model_to_view(self) -> None:
-        self._order_spin_box.setRange(1, 100)
-        self._order_spin_box.setValue(self._probe_builder.get_order())
-
-        self._coefficients_table_model.beginResetModel()  # TODO clean up
-        self._coefficients_table_model.endResetModel()
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._probe_builder:
-            self._sync_model_to_view()
-
-
-class HermiteViewController(ParameterViewController, Observer):
-    def __init__(self, title: str, probe_builder: HermiteProbeBuilder) -> None:
-        super().__init__()
-        self._widget = QGroupBox(title)
-        self._probe_builder = probe_builder
-        self._order_x_spin_box = QSpinBox()
-        self._order_y_spin_box = QSpinBox()
-        self._coefficients_table_model = HermiteTableModel(probe_builder)
-        self._coefficients_table_view = QTableView()
-        self._width_view_controller = LengthParameterViewController(probe_builder.width_m)
-        self._height_view_controller = LengthParameterViewController(probe_builder.height_m)
-
-        self._coefficients_table_view.setModel(self._coefficients_table_model)
-        header = self._coefficients_table_view.horizontalHeader()
-        header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
-
-        layout = QFormLayout()
-        layout.addRow('Width:', self._width_view_controller.get_widget())
-        layout.addRow('Height:', self._height_view_controller.get_widget())
-        layout.addRow('Order X:', self._order_x_spin_box)
-        layout.addRow('Order Y:', self._order_y_spin_box)
-        layout.addRow(self._coefficients_table_view)
-        self._widget.setLayout(layout)
-
-        self._sync_model_to_view()
-        self._order_x_spin_box.valueChanged.connect(probe_builder.set_order_x)
-        self._order_y_spin_box.valueChanged.connect(probe_builder.set_order_y)
-        probe_builder.add_observer(self)
-
-    def get_widget(self) -> QWidget:
-        return self._widget
-
-    def _sync_model_to_view(self) -> None:
-        self._order_x_spin_box.setRange(1, 100)
-        self._order_x_spin_box.setValue(self._probe_builder.get_order_x())
-        self._order_y_spin_box.setRange(1, 100)
-        self._order_y_spin_box.setValue(self._probe_builder.get_order_y())
-
-        self._coefficients_table_model.beginResetModel()  # TODO clean up
-        self._coefficients_table_model.endResetModel()
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._probe_builder:
-            self._sync_model_to_view()
 
 
 class DecayTypeParameterViewController(ParameterViewController, Observer):
@@ -316,7 +106,7 @@ class IncoherentModeStrategyViewController(ParameterViewController, Observer):
     knob that does nothing.
     """
 
-    def __init__(self, probe_builder: ProbeSequenceBuilder) -> None:
+    def __init__(self, probe_builder: ProbeEnsembleBuilder) -> None:
         super().__init__()
         self._strategy = probe_builder.incoherent_mode_strategy
         self._widget = QStackedWidget()
@@ -346,6 +136,17 @@ class IncoherentModeStrategyViewController(ParameterViewController, Observer):
             ),
         ]
 
+        derivative_decay_rows: list[tuple[str, ParameterViewController]] = [
+            (
+                'Decay Type:',
+                DecayTypeParameterViewController(probe_builder.incoherent_mode_decay_type),
+            ),
+            (
+                'Decay Ratio:',
+                DecimalSliderParameterViewController(probe_builder.incoherent_mode_decay_ratio),
+            ),
+        ]
+
         self._pages: dict[str, QWidget] = {
             'MomentPolynomial': self._build_page(
                 [
@@ -358,6 +159,7 @@ class IncoherentModeStrategyViewController(ParameterViewController, Observer):
                     ),
                 ]
             ),
+            'Derivative': self._build_page(derivative_decay_rows),
             'RandomPhaseRamp': self._build_page(more_decay_rows),
             'GaussianSchell': self._build_page(
                 [
@@ -470,83 +272,100 @@ class ProbeMetricsViewController(ParameterViewController, Observer):
             self._refresh_metrics()
 
 
+class EstimateSizeViewController(ParameterViewController):
+    """A button that sets a parametric probe's size from the measured patterns."""
+
+    def __init__(self, item: ProbeRepositoryItem) -> None:
+        super().__init__()
+        self._item = item
+        self._widget = QPushButton('Estimate from Diffraction')
+        self._widget.setToolTip(
+            'Set the size from the second moments of the mean diffraction pattern, at the '
+            'defocus distance above. Needs far-field data.'
+        )
+        self._widget.setEnabled(item.can_estimate_size_from_diffraction())
+        self._widget.clicked.connect(self._estimate)
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+    def _estimate(self) -> None:
+        self._item.estimate_size_from_diffraction()
+
+
+class DeclaredParametersViewController(ParameterViewController):
+    """The rows a generator declares, in a group offering whichever presets fit it."""
+
+    def __init__(self, title: str, item: ProbeRepositoryItem, builder: PluginProbeBuilder) -> None:
+        super().__init__()
+        self._view_controllers: list[ParameterViewController] = []
+        layout = QFormLayout()
+
+        for description in builder.describe_parameters():
+            parameter = builder.parameters()[description.name]
+            view_controller = create_parameter_view_controller(
+                parameter,
+                name=description.name,
+                label=description.label,
+                tool_tip=description.tool_tip,
+                choices=description.choices,
+                unit=description.unit,
+                display_unit=description.display_unit,
+            )
+
+            if view_controller is not None:
+                self._view_controllers.append(view_controller)
+                # A check box carries its own text, so its row needs no label beside it.
+                row_label = '' if isinstance(parameter, BooleanParameter) else description.label
+                layout.addRow(row_label, view_controller.get_widget())
+
+        if builder.estimates_size:
+            estimate_view_controller = EstimateSizeViewController(item)
+            self._view_controllers.append(estimate_view_controller)
+            layout.addRow('', estimate_view_controller.get_widget())
+
+        preset_labels = list(builder.labels_for_presets())
+
+        if preset_labels:
+            group_box = GroupBoxWithPresets(title)
+
+            for label in preset_labels:
+                action = group_box.presets_menu.addAction(label)
+
+                if action is None:
+                    raise ValueError('action is None!')
+
+                action.triggered.connect(lambda _, label=label: builder.apply_presets(label))
+
+            layout.setContentsMargins(0, 0, 0, 0)
+            group_box.contents.setLayout(layout)
+            self._widget: QWidget = group_box
+        else:
+            plain_group_box = QGroupBox(title)
+            plain_group_box.setLayout(layout)
+            self._widget = plain_group_box
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+
 class ProbeEditorViewControllerFactory:
     def _append_primary_mode(
         self,
-        probe_builder: ProbeSequenceBuilder,
+        item: ProbeRepositoryItem,
         dialog_builder: ParameterViewBuilder,
     ) -> bool:
-        primary_mode_group = 'Primary Mode'
+        """Add the rows the item's generator declares, returning whether it has any.
 
-        if isinstance(probe_builder, AveragePatternProbeBuilder):
-            return True
-        elif isinstance(probe_builder, DiskProbeBuilder):
-            dialog_builder.add_length_widget(
-                probe_builder.diameter_m,
-                'Diameter:',
-                group=primary_mode_group,
-            )
-            dialog_builder.add_length_widget(
-                probe_builder.defocus_distance_m,
-                'Defocus Distance:',
-                default_unit=LengthUnit.MICROMETER,
-                group=primary_mode_group,
-            )
-            return True
-        elif isinstance(probe_builder, FresnelZonePlateProbeBuilder):
+        One branch for every probe model, because a generator describes its own
+        parameters: a model added later needs no branch of its own. The from-file and
+        from-memory builders describe nothing.
+        """
+        probe_builder = item.get_builder()
+
+        if isinstance(probe_builder, PluginProbeBuilder):
             dialog_builder.add_view_controller_to_top(
-                FresnelZonePlateViewController(primary_mode_group, probe_builder)
-            )
-            return True
-        elif isinstance(probe_builder, KBMirrorProbeBuilder):
-            dialog_builder.add_view_controller_to_top(
-                KBMirrorViewController(primary_mode_group, probe_builder)
-            )
-            return True
-        elif isinstance(probe_builder, HermiteProbeBuilder):
-            dialog_builder.add_view_controller_to_top(
-                HermiteViewController(primary_mode_group, probe_builder)
-            )
-            return True
-        elif isinstance(probe_builder, RectangularProbeBuilder):
-            dialog_builder.add_length_widget(
-                probe_builder.width_m,
-                'Width:',
-                group=primary_mode_group,
-            )
-            dialog_builder.add_length_widget(
-                probe_builder.height_m,
-                'Height:',
-                group=primary_mode_group,
-            )
-            dialog_builder.add_length_widget(
-                probe_builder.defocus_distance_m,
-                'Defocus Distance:',
-                default_unit=LengthUnit.MICROMETER,
-                group=primary_mode_group,
-            )
-            return True
-        elif isinstance(probe_builder, SuperGaussianProbeBuilder):
-            dialog_builder.add_length_widget(
-                probe_builder.annular_radius_m,
-                'Annular Radius:',
-                default_unit=LengthUnit.MICROMETER,
-                group=primary_mode_group,
-            )
-            dialog_builder.add_length_widget(
-                probe_builder.fwhm_m,
-                'Full Width at Half Maximum:',
-                group=primary_mode_group,
-            )
-            dialog_builder.add_decimal_line_edit(
-                probe_builder.order_parameter,
-                'Order Parameter:',
-                group=primary_mode_group,
-            )
-            return True
-        elif isinstance(probe_builder, ZernikeProbeBuilder):
-            dialog_builder.add_view_controller_to_top(
-                ZernikeViewController(primary_mode_group, probe_builder)
+                DeclaredParametersViewController('Primary Mode', item, probe_builder)
             )
             return True
 
@@ -554,7 +373,7 @@ class ProbeEditorViewControllerFactory:
 
     def _append_additional_modes(
         self,
-        probe_builder: ProbeSequenceBuilder,
+        probe_builder: ProbeEnsembleBuilder,
         dialog_builder: ParameterViewBuilder,
     ) -> None:
         expand_only_tool_tip = (
@@ -617,12 +436,30 @@ class ProbeEditorViewControllerFactory:
         # A from-file probe is conditioned on the way in, so the mode parameters
         # do something and belong in the dialog. A from-memory probe holds an
         # already-conditioned probe -- reconstruction output, or a product loaded
-        # from file -- whose mode parameters are deliberately inert, so offering
-        # controls that would silently do nothing is worse than offering none.
-        has_primary_mode = self._append_primary_mode(probe_builder, dialog_builder)
+        # from file -- whose mode parameters are deliberately inert until it is made
+        # editable, so offering controls that would silently do nothing is worse than
+        # offering the button that makes them apply.
+        has_primary_mode = self._append_primary_mode(item, dialog_builder)
+        is_editable_result = (
+            isinstance(probe_builder, FromMemoryProbeBuilder) and probe_builder.is_editable
+        )
 
-        if has_primary_mode or isinstance(probe_builder, FromFileProbeBuilder):
+        if (
+            has_primary_mode
+            or is_editable_result
+            or isinstance(probe_builder, FromFileProbeBuilder)
+        ):
             self._append_additional_modes(probe_builder, dialog_builder)
+        elif item.can_make_editable():
+            dialog_builder.add_view_controller_to_bottom(
+                MakeEditableViewController(
+                    item.make_editable,
+                    lambda: self.create_editor_dialog(item_name, item, parent).open(),
+                    'Let this result take on more incoherent or coherent modes. The '
+                    'counts start at the modes it has, so nothing changes until they are '
+                    'raised.',
+                )
+            )
         else:
             dialog_builder.add_view_controller_to_bottom(
                 LabelViewController(f'"{builder_name}" has no editable parameters.')

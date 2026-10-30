@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""Micro-benchmark for BarycentricArrayInterpolator / BarycentricArrayStitcher.
+"""Micro-benchmark for BarycentricArrayInterpolator.
 
-Times the per-call cost of the gather (``get_patch``), scatter (``add_patch``),
-and stitcher scatter at sizes representative of the VSPI fluorescence enhancer
-and PtychoNN training-data export inner loops.
+Times the per-call cost of the gather (``get_patch``) and scatter (``add_patch``)
+at sizes representative of the VSPI fluorescence enhancer and complex-object
+patch extraction inner loops.
 
 Run this on both ``main`` and the optimization branch to quantify the speedup:
 
@@ -18,10 +18,7 @@ import time
 
 import numpy
 
-from ptychodus.api.interpolate import (
-    BarycentricArrayInterpolator,
-    BarycentricArrayStitcher,
-)
+from ptychodus.api.interpolate import BarycentricArrayInterpolator
 
 
 def _time(label: str, n_calls: int, fn):
@@ -40,7 +37,7 @@ def _bench_case(
     array_shape: tuple[int, ...],
     patch_shape: tuple[int, int],
     n_calls: int,
-    dtype: numpy.dtype,
+    dtype: numpy.dtype[numpy.inexact],
     label: str,
 ) -> None:
     rng = numpy.random.default_rng(2026)
@@ -80,21 +77,6 @@ def _bench_case(
 
     _time('add_patch', n_calls, do_add_patch)
 
-    if not numpy.issubdtype(dtype, numpy.complexfloating):
-        return  # Stitcher-with-weights case exercised via complex path below
-
-    upper = numpy.zeros(array_shape, dtype=dtype)
-    lower = numpy.zeros(array_shape, dtype=numpy.float64)
-    stitcher = BarycentricArrayStitcher(upper=upper, lower=lower)
-    weight = rng.standard_normal(patch_full_shape).astype(numpy.float64, copy=False) ** 2
-
-    def do_stitcher_add() -> None:
-        i = counter[0] % n_calls
-        counter[0] += 1
-        stitcher.add_patch(centers_x[i], centers_y[i], patches_real, weight=weight)
-
-    _time('Stitcher.add_patch (weighted)', n_calls, do_stitcher_add)
-
 
 def main() -> None:
     print('=== VSPI-representative: 2048x2048 float64 object, 256x256 patches ===')
@@ -107,13 +89,13 @@ def main() -> None:
     )
 
     print()
-    print('=== PtychoNN-representative: 2048x2048 complex128 object, 128x128 patches ===')
+    print('=== Complex object: 2048x2048 complex128, 128x128 patches ===')
     _bench_case(
         array_shape=(2048, 2048),
         patch_shape=(128, 128),
         n_calls=500,
         dtype=numpy.dtype(numpy.complex128),
-        label='PtychoNN complex',
+        label='complex object',
     )
 
     print()

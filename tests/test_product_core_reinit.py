@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from ptychodus.api.observer import Observable
+from ptychodus.model.observer import Observable
 from ptychodus.model.product.core import ProductCore
 
 

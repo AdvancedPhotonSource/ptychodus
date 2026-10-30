@@ -1,28 +1,36 @@
+from collections.abc import Mapping, Sequence
 import logging
 
 from ptychodus.api.fluorescence import (
-    DeconvolutionStrategy,
     FluorescenceEnhancer,
     FluorescenceFileReader,
     FluorescenceFileWriter,
-    UpscalingStrategy,
+    SubprocessFluorescenceEnhancer,
 )
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
-from ptychodus.api.settings import SettingsRegistry
 
+from ..devices import DeviceSelection
+from ..observer import Observable, Observer
+from ..plugins import PluginChooser, PluginChooserParameter
+from ..processing.parameter_store import OptionsBranch, ProcessingParameterStore
 from ..product import ProductAPI, ProductRepository
+from ..settings import SettingsRegistry
 from ..task_manager import TaskManager
-from ..visualization import VisualizationEngine
 from .api import FluorescenceAPI
 from .monitor import FluorescenceTaskMonitor
-from .ptychozoon import PtychozoonFluorescenceEnhancer
 from .repository import FluorescenceRepository
-from .settings import FluorescenceSettings
-from .two_step import TwoStepFluorescenceEnhancer
-from .vspi import VSPIFluorescenceEnhancer
+from .settings import ENHANCER_LIBRARY, FluorescenceSettings
 
 logger = logging.getLogger(__name__)
+
+# Which group backs each enhancer, keyed by the name it registered under. The same
+# table the reconstructor backends have: the fields carry their own bounds and
+# display text, the field name is the key, and this says only where each enhancer's
+# options persist. One group each, so no two enhancers share a key.
+_BRANCHES_BY_ENHANCER: Mapping[str, Sequence[OptionsBranch]] = {
+    'two_step': (OptionsBranch(f'{ENHANCER_LIBRARY}TwoStep'),),
+    'vspi': (OptionsBranch(f'{ENHANCER_LIBRARY}VSPI'),),
+    'ptychozoon': (OptionsBranch(f'{ENHANCER_LIBRARY}Ptychozoon'),),
+}
 
 
 class FluorescenceCore(Observer):
@@ -32,8 +40,8 @@ class FluorescenceCore(Observer):
         settings_registry: SettingsRegistry,
         product_api: ProductAPI,
         product_repository: ProductRepository,
-        upscaling_strategy_chooser: PluginChooser[UpscalingStrategy],
-        deconvolution_strategy_chooser: PluginChooser[DeconvolutionStrategy],
+        enhancer_chooser: PluginChooser[FluorescenceEnhancer],
+        device_selection: DeviceSelection,
         file_reader_chooser: PluginChooser[FluorescenceFileReader],
         file_writer_chooser: PluginChooser[FluorescenceFileWriter],
         reinit_observable: Observable,
@@ -41,54 +49,45 @@ class FluorescenceCore(Observer):
         super().__init__()
         self._product_repository = product_repository
         self.settings = FluorescenceSettings(settings_registry)
-        self.upscaling_strategy_chooser = upscaling_strategy_chooser
-        self.deconvolution_strategy_chooser = deconvolution_strategy_chooser
-        self.two_step_enhancer = TwoStepFluorescenceEnhancer(
-            upscaling_strategy_chooser, deconvolution_strategy_chooser
-        )
-        self.vspi_enhancer = VSPIFluorescenceEnhancer(self.settings)
+        self.enhancer_parameter_store = ProcessingParameterStore(settings_registry)
+        self.task_monitor = FluorescenceTaskMonitor(task_manager)
+        log_handler = self.task_monitor.get_log_handler()
+        package_loggers = {'ptychodus.model.fluorescence'}
 
-        self.enhancer_chooser = PluginChooser[FluorescenceEnhancer]()
-        self.enhancer_chooser.register_plugin(
-            self.two_step_enhancer,
-            simple_name=TwoStepFluorescenceEnhancer.SIMPLE_NAME,
-            display_name=TwoStepFluorescenceEnhancer.DISPLAY_NAME,
-        )
-        self.enhancer_chooser.register_plugin(
-            self.vspi_enhancer,
-            simple_name=VSPIFluorescenceEnhancer.SIMPLE_NAME,
-            display_name=VSPIFluorescenceEnhancer.DISPLAY_NAME,
-        )
+        # Every enhancer, not only the selected one: the settings file must hold the
+        # same groups however the application was driven.
+        for plugin in enhancer_chooser:
+            enhancer = plugin.strategy
+            branches = _BRANCHES_BY_ENHANCER.get(plugin.simple_name)
 
-        # The GPU VSPI enhancer is optional: register it only when ptychozoon is
-        # installed so it silently disappears otherwise. Importing the top-level
-        # package is cheap and does not pull in CuPy (that happens only inside the
-        # spawned subprocess), so probing it here is safe.
-        self.ptychozoon_enhancer: PtychozoonFluorescenceEnhancer | None = None
+            if branches is None:
+                logger.warning(
+                    f'No settings group was named for enhancer "{plugin.simple_name}"; its '
+                    'options will not be editable and every run will use their defaults.'
+                )
 
-        try:
-            import ptychozoon  # noqa: F401
-        except ModuleNotFoundError:
-            logger.info('ptychozoon not found.')
-        else:
-            self.ptychozoon_enhancer = PtychozoonFluorescenceEnhancer(self.settings)
-            self.enhancer_chooser.register_plugin(
-                self.ptychozoon_enhancer,
-                simple_name=PtychozoonFluorescenceEnhancer.SIMPLE_NAME,
-                display_name=PtychozoonFluorescenceEnhancer.DISPLAY_NAME,
+            self.enhancer_parameter_store.register_declared(
+                ENHANCER_LIBRARY,
+                plugin.simple_name,
+                enhancer.get_default_options(),
+                branches or (),
             )
+
+            # Placement is ptychodus's to decide, so it is attached here rather than
+            # declared by the backend or passed through every call.
+            if isinstance(enhancer, SubprocessFluorescenceEnhancer):
+                enhancer.device_environment = device_selection.environment
+
+            # The package rather than the module, so a backend's forwarded child logs
+            # reach the monitor too.
+            package_loggers.add(type(enhancer).__module__.rpartition('.')[0])
+
+        for name in sorted(package_loggers):
+            logging.getLogger(name).addHandler(log_handler)
 
         # Display-name views of each chooser, bound to the settings parameter that
         # persists the selection. These are what the GUI binds combo boxes to.
-        self.enhancer_parameter = PluginChooserParameter(
-            self.enhancer_chooser, self.settings.algorithm
-        )
-        self.upscaling_strategy_parameter = PluginChooserParameter(
-            upscaling_strategy_chooser, self.settings.upscaling_strategy
-        )
-        self.deconvolution_strategy_parameter = PluginChooserParameter(
-            deconvolution_strategy_chooser, self.settings.deconvolution_strategy
-        )
+        self.enhancer_parameter = PluginChooserParameter(enhancer_chooser, self.settings.algorithm)
         self.file_reader_parameter = PluginChooserParameter(
             file_reader_chooser, self.settings.file_type
         )
@@ -97,22 +96,17 @@ class FluorescenceCore(Observer):
         # binding both would make them fight over the same parameter.
         file_writer_chooser.set_current_plugin(self.settings.file_type.get_value())
 
-        self.visualization_engine = VisualizationEngine(is_complex=False)
-        self.task_monitor = FluorescenceTaskMonitor(task_manager)
         self.repository = FluorescenceRepository(product_repository)
         self.fluorescence_api = FluorescenceAPI(
             task_manager,
             self.settings,
             product_api,
             self.repository,
-            self.enhancer_chooser,
+            enhancer_chooser,
+            self.enhancer_parameter_store,
             self.task_monitor,
             file_reader_chooser,
             file_writer_chooser,
-        )
-
-        logging.getLogger('ptychodus.model.fluorescence').addHandler(
-            self.task_monitor.get_log_handler()
         )
 
         self._reinit_observable = reinit_observable

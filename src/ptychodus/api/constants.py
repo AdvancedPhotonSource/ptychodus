@@ -26,8 +26,45 @@ PLANCK_CONSTANT_J_PER_HZ: Final[float] = 6.62607015e-34
 # the numerator omitted when it is dimensionless: m2_per_kg, J_per_m2, rad_per_m, per_s,
 # per_s_m2. A bare _ never means division, and a rate is never spelled _Hz -- so that one
 # quantity carries one name wherever it is derived, mapped or measured. The enums below
-# convert to and from those base units at the boundaries -- file readers on the way in,
-# the GUI on the way out.
+# convert to and from those base units at the edges, where a value arrives in whatever
+# unit it was written in and leaves in whatever unit it is to be read in.
+
+
+class Unit(Enum):
+    """A unit a field names itself after, and how a settings key spells it out.
+
+    The suffix convention above, read back: a name ending in ``_m`` is held in
+    meters, and a key derived from that name says so in words.
+
+    Declared in descending suffix length, which is the order :meth:`of` matches
+    in: ``m`` is a suffix of ``m2_per_kg`` as a string, so a shorter member
+    reached first would claim a field belonging to a longer one.
+    """
+
+    SQUARE_METERS_PER_KILOGRAM = ('m2_per_kg', 'SquareMetersPerKilogram')
+    DEGREE = ('deg', 'InDegrees')
+    RADIAN = ('rad', 'InRadians')
+    ELECTRON_VOLT = ('eV', 'InElectronVolts')
+    PIXEL = ('px', 'InPixels')
+    TURN = ('tr', 'InTurns')
+    METER = ('m', 'InMeters')
+    SECOND = ('s', 'InSeconds')
+
+    def __init__(self, suffix: str, words: str) -> None:
+        self.suffix = suffix
+        self.words = words
+
+    @classmethod
+    def of(cls, field_name: str) -> Unit | None:
+        """The unit *field_name* ends in, or None where it names none."""
+        return next(
+            (unit for unit in cls if field_name.endswith(f'_{unit.suffix}')),
+            None,
+        )
+
+    def strip_from(self, field_name: str) -> str:
+        """*field_name* without the trailing suffix that named this unit."""
+        return field_name[: -len(self.suffix) - 1]
 
 
 class LengthUnit(Enum):
@@ -35,8 +72,9 @@ class LengthUnit(Enum):
 
     The member value pairs the unit's power of ten relative to the meter with its display
     label. The exponent, not a float, is the source of truth: both scale factors --
-    ``meters_per_unit`` for ordinary float arithmetic and ``decimal_meters_per_unit`` for the
-    exact decimal arithmetic the GUI needs -- are derived from it, so neither can drift.
+    ``meters_per_unit`` for ordinary float arithmetic and ``decimal_meters_per_unit`` for
+    arithmetic that must not accumulate binary rounding error -- are derived from it, so
+    neither can drift.
     """
 
     PICOMETER = (-12, 'pm')

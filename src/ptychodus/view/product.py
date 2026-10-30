@@ -34,9 +34,11 @@ class ProductEditorActionsView(QGroupBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Actions')
         self.estimate_probe_photon_count_button = QPushButton('Estimate Probe Photon Count')
+        self.estimate_defocus_button = QPushButton('Estimate Defocus')
 
         layout = QVBoxLayout()
         layout.addWidget(self.estimate_probe_photon_count_button)
+        layout.addWidget(self.estimate_defocus_button)
         layout.addStretch()
         self.setLayout(layout)
 

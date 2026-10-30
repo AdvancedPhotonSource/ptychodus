@@ -4,6 +4,8 @@ from pathlib import Path
 import logging
 import time
 
+from pydantic import BaseModel
+
 from ptychodus.api.io import save_product
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import (
@@ -52,14 +54,19 @@ class ReconstructBackgroundTask:
     reconstruct_input: ReconstructInput
     product_item: ProductRepositoryItem
     output_product_file: Path | None
+    options: BaseModel
 
     def __call__(self) -> None:
         with self.task_monitor as monitor:
-            monitor.update_progress(0, self.reconstructor.get_progress_goal())
+            # Zero until the run says otherwise, which a progress bar reads
+            # as indeterminate: only the run knows how many steps it will take.
+            monitor.update_progress(0, 0)
             tic = time.perf_counter()
 
-            for result in self.reconstructor.reconstruct(self.reconstruct_input):
-                monitor.update_progress(result.progress, self.reconstructor.get_progress_goal())
+            for result in self.reconstructor.reconstruct(
+                self.reconstruct_input, options=self.options
+            ):
+                monitor.update_progress(result.progress, result.progress_goal)
                 monitor.update_product(self.product_item, result)
                 of = self.output_product_file
 
@@ -79,16 +86,19 @@ class TrainBackgroundTask:
     task_monitor: ProcessingTaskMonitor
     trainer: TrainableReconstructor
     reconstruct_input: ReconstructInput
-    input_path: Path
-    output_path: Path
+    input_directory: Path
+    output_directory: Path
+    options: BaseModel
 
     def __call__(self) -> None:
         with self.task_monitor as monitor:
-            monitor.update_progress(0, self.trainer.get_progress_goal())
+            monitor.update_progress(0, 0)
             tic = time.perf_counter()
 
-            for result in self.trainer.train(self.input_path, self.output_path):
-                monitor.update_progress(result.progress, self.trainer.get_progress_goal())
+            for result in self.trainer.train(
+                self.input_directory, self.output_directory, options=self.options
+            ):
+                monitor.update_progress(result.progress, result.progress_goal)
 
                 if monitor.is_stopping:
                     break

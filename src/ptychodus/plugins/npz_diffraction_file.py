@@ -14,6 +14,7 @@ from ptychodus.api.diffraction import (
     SimpleDiffractionArray,
     SimpleDiffractionDataset,
 )
+from ptychodus.api.files import FileFormat
 from ptychodus.api.plugins import PluginRegistry
 
 logger = logging.getLogger(__name__)
@@ -21,11 +22,16 @@ logger = logging.getLogger(__name__)
 
 class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
     SIMPLE_NAME: Final[str] = 'NPZ'
-    DISPLAY_NAME: Final[str] = 'Ptychodus NumPy Zipped Archive (*.npz)'
 
     INDEXES: Final[str] = 'indexes'
     PATTERNS: Final[str] = 'patterns'
     BAD_PIXELS: Final[str] = 'bad_pixels'
+
+    def get_file_description(self) -> str:
+        return 'Ptychodus NumPy Zipped Archive'
+
+    def get_file_extensions(self) -> set[str]:
+        return FileFormat.NPZ.extensions
 
     def read(self, file_path: Path) -> DiffractionDataset:
         contents = numpy.load(file_path)
@@ -87,10 +93,8 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         npz_diffraction_file_io,
         simple_name=NPZDiffractionFileIO.SIMPLE_NAME,
-        display_name=NPZDiffractionFileIO.DISPLAY_NAME,
     )
     registry.diffraction_file_writers.register_plugin(
         npz_diffraction_file_io,
         simple_name=NPZDiffractionFileIO.SIMPLE_NAME,
-        display_name=NPZDiffractionFileIO.DISPLAY_NAME,
     )

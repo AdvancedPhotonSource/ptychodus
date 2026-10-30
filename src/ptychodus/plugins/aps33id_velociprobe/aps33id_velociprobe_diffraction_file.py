@@ -218,7 +218,7 @@ class VelociprobeDiffractionDataset(DiffractionDataset):
 
     def get_bad_pixels(self) -> BadPixels:
         extent = self._metadata.detector_extent
-        return numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool_)
+        return numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool)
 
     @overload
     def __getitem__(self, index: int) -> DiffractionArray: ...
@@ -238,6 +238,12 @@ class VelociprobeDiffractionFileReader(DiffractionFileReader):
         super().__init__()
         self._tree_builder = H5DiffractionFileTreeBuilder()
         self.stage_rotation_deg = 0.0  # TODO This is a hack; remove when able!
+
+    def get_file_description(self) -> str:
+        return 'APS 33-ID-C VelociProbe Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
 
     def read(self, file_path: Path) -> DiffractionDataset:
         with h5py.File(file_path, 'r') as h5_file:

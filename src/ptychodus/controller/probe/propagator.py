@@ -5,12 +5,13 @@ import numpy
 from PyQt5.QtWidgets import QSpinBox
 
 from ptychodus.api.constants import LengthUnit, format_length
+from ptychodus.api.files import FileFormat
 from ptychodus.api.probe import ProbeSizeMetrics
 from ptychodus.api.propagate import PropagatedWavefield, intensity
 from ptychodus.api.typing import NumberArrayType, RealArrayType
 
 from ...model.analysis import ProbePropagatorSettings, ProbePropagator
-from ...model.visualization import VisualizationEngine
+from ..rendering import VisualizationEngine
 from ...view.probe import ProbePropagationDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
@@ -25,7 +26,7 @@ from .metrics import compute_xy_metrics
 
 logger = logging.getLogger(__name__)
 
-_SAVE_FILE_FILTER = 'NumPy Zipped Archive (*.npz)'
+_SAVE_FILE_FILTER = FileFormat.NPZ.file_filter
 
 
 class ProbePropagationViewController:
@@ -33,7 +34,6 @@ class ProbePropagationViewController:
         self,
         propagator: ProbePropagator,
         settings: ProbePropagatorSettings,
-        engine: VisualizationEngine,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
@@ -83,6 +83,12 @@ class ProbePropagationViewController:
         probe_view.intensity_button.setChecked(True)
         probe_view.intensity_button.toggled.connect(self._handle_visualization_mode_toggled)
         self._mode_spin_box.valueChanged.connect(self._refresh_views)
+
+        # Complex so a single incoherent mode's wavefield can be rendered; Real up front
+        # because the dialog opens on the mode-summed intensity, for which the is_complex
+        # default of 'Complex' paints a flat hue.
+        engine = VisualizationEngine(is_complex=True)
+        engine.set_renderer('Real')
 
         # All three views share one engine, so the XY ribbon's colorize and data-range
         # controls drive the color axis for the Z planes too.

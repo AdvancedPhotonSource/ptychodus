@@ -13,7 +13,7 @@ child that dies at end-of-call.
 pulls torch in for its type annotations so the parent can build the picklable
 ``PtychographyTaskOptions`` the child needs, and no CUDA runtime is
 initialised by that. See the invariant note at the top of
-``ptychodus.model.processing._subprocess_protocol`` for the canonical
+``ptychodus.api.spawn`` for the canonical
 statement.
 
 So this module checks two things, in one spawned probe process that imports
@@ -53,41 +53,49 @@ CONTEXT_CAPABLE_MODULES = (
 # context, or they are child-side backend packages the composition roots have
 # no reason to touch.
 #
-# ``ptycho`` and ``ptycho_torch`` are a softer case than ``cupy``. Their config
-# subpackages -- ``ptycho.config.config`` and ``ptycho_torch.config_params`` --
-# are deliberately reachable from the parent AT CALL TIME, because the parent
-# builds the backend config objects it ships to the child (see
-# ``ptychopinn/_payload.py`` and ``ptychopinn_torch/_payload.py``). Neither
-# acquires a GPU context: the former pulls no heavy modules at all, the latter
-# pulls torch, which is allowed above. Both imports live inside the payload
-# builders, so they do not run until the first reconstruct/train call and this
-# import-time probe never sees them. Keep it that way -- hoisting either to
-# module scope in a ``reconstructor.py`` is what this list is here to catch.
+# These used to be a softer case than ``cupy``: the parent reached a backend's
+# config subpackage AT CALL TIME to build the config objects it shipped to the
+# child, so the ban held only at import time. It no longer does. Every backend
+# is now configured from a mapping of plain scalars assembled from settings, so
+# no parent-side code path imports a backend at all and the ban is absolute.
+# ``tests/test_parent_config_builders.py`` pins the call-time half of that,
+# asserting the settings builders import no backend even when one is installed;
+# this probe pins the import-time half. Hoisting a backend import to module
+# scope in a ``reconstructor.py`` is what this list is here to catch.
 CHILD_ONLY_MODULES = (
     'cupy',  # links and initialises the CUDA runtime at import; no non-invasive probe
+    'cdtools',  # cdtools backend; child-side entry point only
     'ptycho',  # ptychopinn TensorFlow package; raw_data/probe/tf_helper pull TensorFlow
-    'ptycho_torch',  # ptychopinn_torch backend; child-side entry point only
+    'ptycho_torch',  # ptychopinn backend; child-side entry point only
     'ptycho_fm',  # ptycho_fm backend; child-side entry point only
+    'ptychozoon',  # fluorescence backend; vspi_enhance pulls CuPy
 )
 
-# ``ptychozoon.data_structures`` and ``ptychozoon.settings`` are CPU-only --
-# they pull in only numpy, dataclasses, enum, and typing. The parent-side
-# fluorescence factory imports them so it can construct the ptychozoon
-# payload directly instead of duplicating its fields. Any *other*
-# ``ptychozoon.*`` module (notably ``vspi_enhance``) pulls in CuPy and is a
-# regression if it lands in the parent's ``sys.modules``.
-ALLOWED_PTYCHOZOON_MODULES = frozenset(
+# The exceptions, named in full. Each is a configuration submodule the parent
+# reaches so it can build the payload it ships to the child, rather than
+# duplicating the fields:
+#
+# - ``ptycho_fm.config`` is pydantic schema and nothing else, which is what
+#   lets ptychodus declare PtychoFM's parameters from upstream's own model
+#   instead of restating them. ``tests/test_ptycho_fm_sections.py`` measures
+#   that cost; this list permits it.
+#
+# ptychozoon has no exception: its child builds every ptychozoon object from
+# ptychodus types, so the parent never imports the package at all. Any other
+# submodule of either package is a regression if it lands in the parent's
+# ``sys.modules``.
+ALLOWED_CHILD_SUBMODULES = frozenset(
     {
-        'ptychozoon',
-        'ptychozoon.data_structures',
-        'ptychozoon.settings',
+        'ptycho_fm',
+        'ptycho_fm.config',
     }
 )
 
 
 def _is_child_only(module_name: str) -> bool:
-    if module_name == 'ptychozoon' or module_name.startswith('ptychozoon.'):
-        return module_name not in ALLOWED_PTYCHOZOON_MODULES
+    if module_name in ALLOWED_CHILD_SUBMODULES:
+        return False
+
     return any(module_name == m or module_name.startswith(m + '.') for m in CHILD_ONLY_MODULES)
 
 
@@ -134,8 +142,14 @@ def _check_in_subprocess(result_queue: multiprocessing.Queue[dict[str, list[str]
         # Import the top-level package plus the main composition roots.
         import ptychodus  # noqa: F401
         import ptychodus.model.core  # noqa: F401
-        import ptychodus.model.processing.subprocess_reconstructor  # noqa: F401
-        import ptychodus.model.processing._subprocess_protocol  # noqa: F401
+        import ptychodus.api.spawn  # noqa: F401
+        from ptychodus.api.plugins import PluginRegistry
+
+        # Registering is what reaches every backend now that no composition
+        # root names one. It must still not import a GPU framework: a library
+        # resolves its modules without loading them and builds its
+        # reconstructors only when something asks for them.
+        PluginRegistry.load_plugins()
 
         context_offenders, notes = _gpu_context_offenders()
         result_queue.put(
@@ -199,6 +213,6 @@ def test_parent_holds_no_gpu_context(probe_result: dict[str, list[str]]) -> None
         constructed a PtychographyTask/Trainer, or otherwise initialised the
         runtime. Move that work into a child entry point dispatched through
         SubprocessReconstructor (see
-        ptychodus.model.processing._subprocess_protocol).
+        ptychodus.api.spawn).
         """
     )

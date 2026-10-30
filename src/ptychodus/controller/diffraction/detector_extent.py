@@ -1,5 +1,5 @@
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.observer import Observable
+from ptychodus.model.observer import Observable
 
 
 class DetectorExtentSource(Observable):

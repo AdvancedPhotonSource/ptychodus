@@ -17,7 +17,7 @@ Scope is [CLAUDE.md](../../CLAUDE.md) and [.claude/skills/](../../.claude/skills
 - **Prefer claims whose truth survives the most likely change.** "nine of them" dies the next time a beamline is added; "all but `reconstruct_pear.py` and `reconstruct_batch_lamni.py`" does not.
 - **Make rules grep-auditable and embed the audit command in the rule.** A rule carrying its own one-line check can be verified forever; one that cannot is unenforceable. This is the single highest-value habit in the file.
 - **Name roles, not instances.** When a rule needs an exemplar, expect the exemplar to be renamed before the rule changes.
-- **Never surface deliberately undocumented on-disk artifacts** — `tike`, `ptychonn`, `ptycho_fm`, repo-root `.ini` files, `install.sh`, `TODO`.
+- **Never surface deliberately undocumented on-disk artifacts** — `tike`, `ptycho_fm`, repo-root `.ini` files, `install.sh`, `TODO`.
 
 ## Steps
 
@@ -138,7 +138,7 @@ Every referenced repo path must be tracked. This one check subsumes the standing
 grep -o '\]([^)]*)' CLAUDE.md | sed 's/^](//; s/)$//' | sort -u | while read -r p; do
   git ls-files "$p" | grep -q . || echo "UNTRACKED  $p"
 done
-grep -nEi '\b(tike|ptychonn|ptycho_fm|install\.sh)\b' CLAUDE.md
+grep -nEi '\b(tike|ptycho_fm|install\.sh)\b' CLAUDE.md
 ```
 
 `settings.ini` as a `StandardFileLayout` member is an I/O contract, not a repo-root file — not a finding.
@@ -155,11 +155,11 @@ Judgment, not grep. Check three directions:
 
 ```sh
 awk '/^## Conventions/,/^## Repository/' CLAUDE.md \
-  | awk '/^- /{n = split($0, a, " "); if (n > 80) printf "%4d words  %.70s...\n", n, $0}'
+  | awk '/^- /{n = split($0, a, " "); if (n > 110) printf "%4d words  %.70s...\n", n, $0}'
 wc -w CLAUDE.md
 ```
 
-Soft caps: ~80 words per bullet, ~2400 words total. Over either, **compress rationale — never delete a rule.** Each convention was added because Claude violated it, so dropping one regresses behavior. Cut instead: prose restating what a linter or `pyproject.toml` already enforces, narrative explaining how the code came to be this way, and any procedure a skill already owns. Keep the rule, its audit command, and one exemplar.
+Soft caps: ~110 words per bullet, ~3400 words total — set where a rules-only compression pass landed, so growth past them means rationale is creeping back in. Over either, **compress rationale — never delete a rule.** Each convention was added because Claude violated it, so dropping one regresses behavior. Cut instead: prose restating what a linter or `pyproject.toml` already enforces, narrative explaining how the code came to be this way, and any procedure a skill already owns. Keep the rule, its audit command, and one exemplar.
 
 ## Admitting a new rule
 

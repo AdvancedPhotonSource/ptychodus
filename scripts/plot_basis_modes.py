@@ -31,6 +31,7 @@ import matplotlib.pyplot as plt
 import numpy
 
 from ptychodus.api.geometry import HermiteMode, LegendreMode, ZernikeMode
+from ptychodus.api.typing import RealArrayType
 
 # Panels are sized in inches and the figure is grown to fit them, rather than a
 # fixed-size figure being subdivided until the titles collide.
@@ -53,7 +54,7 @@ def _grid_figsize(num_rows: int, num_columns: int) -> tuple[float, float]:
     return width_in, height_in
 
 
-def _normalized_grid(num_pixels: int) -> tuple[numpy.ndarray, numpy.ndarray]:
+def _normalized_grid(num_pixels: int) -> tuple[RealArrayType, RealArrayType]:
     """Return (y, x) over the square [-1, 1] x [-1, 1], pixel centers included."""
     y, x = numpy.mgrid[:num_pixels, :num_pixels]
     half = num_pixels / 2

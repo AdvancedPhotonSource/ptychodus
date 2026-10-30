@@ -24,6 +24,12 @@ class CSAXSDiffractionFileReader(DiffractionFileReader):
         self._data_path = '/entry/data/data'
         self._tree_builder = H5DiffractionFileTreeBuilder()
 
+    def get_file_description(self) -> str:
+        return 'SLS X12SA cSAXS Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
+
     def read(self, file_path: Path) -> DiffractionDataset:
         with h5py.File(file_path, 'r') as h5_file:
             data = h5_file[self._data_path]
@@ -68,5 +74,4 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         CSAXSDiffractionFileReader(),
         simple_name='SLS_cSAXS',
-        display_name='SLS X12SA cSAXS Files (*.h5 *.hdf5)',
     )

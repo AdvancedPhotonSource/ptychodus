@@ -33,7 +33,7 @@ from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePositionParseError, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import prepare_reconstruct_input
@@ -49,6 +49,29 @@ from ptychodus.plugins.mda.mda_position_file import (
 )
 
 MICROMETER_M = 1e-6
+
+
+# The description only supplies the name a registration would show in a file dialog.
+# These tests exercise how positions are read and numbered, so it is a stub.
+_TEST_DESCRIPTION = 'Test Files'
+
+
+def _mda_reader(
+    *, scale_to_meters: float, line_index_stride: int | None = None
+) -> MDAPositionFileReader:
+    return MDAPositionFileReader(
+        scale_to_meters,
+        description=_TEST_DESCRIPTION,
+        line_index_stride=line_index_stride,
+    )
+
+
+def _aps2id_reader(*, line_index_stride: int | None = None) -> APS2IDDiffractionFileReader:
+    return APS2IDDiffractionFileReader(
+        description=_TEST_DESCRIPTION, line_index_stride=line_index_stride
+    )
+
+
 MILLIMETER_M = 1e-3
 
 MDA_READER_NAMES = frozenset(
@@ -337,7 +360,7 @@ def test_flat_scan_reader_scales_both_axes(flat_mda: Path) -> None:
 
 def test_nested_reader_walks_lower_scans(nested_mda: Path) -> None:
     """Rank-2 files pair each outer y with a whole lower scan of x values."""
-    positions = MDAPositionFileReader(scale_to_meters=MICROMETER_M).read(nested_mda)
+    positions = _mda_reader(scale_to_meters=MICROMETER_M).read(nested_mda)
 
     assert len(positions) == 6
     assert [point.index for point in positions] == list(range(6))
@@ -367,7 +390,7 @@ def test_nested_reader_rejects_a_deeper_rank(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ProbePositionParseError, match='rank-3'):
-        MDAPositionFileReader(scale_to_meters=MICROMETER_M).read(mda)
+        _mda_reader(scale_to_meters=MICROMETER_M).read(mda)
 
 
 # --- aborted scans: current_point is the count of rows actually written
@@ -400,7 +423,7 @@ def test_nested_reader_stops_at_the_last_written_row(tmp_path: Path) -> None:
         current_point=2,
     )
 
-    positions = MDAPositionFileReader(scale_to_meters=MICROMETER_M).read(mda)
+    positions = _mda_reader(scale_to_meters=MICROMETER_M).read(mda)
 
     assert len(positions) == 4
     assert [point.index for point in positions] == [0, 1, 2, 3]
@@ -423,7 +446,7 @@ def test_nested_reader_halts_at_a_hole_rather_than_skipping_it(tmp_path: Path) -
         hole_at=1,
     )
 
-    positions = MDAPositionFileReader(scale_to_meters=MICROMETER_M).read(mda)
+    positions = _mda_reader(scale_to_meters=MICROMETER_M).read(mda)
 
     assert len(positions) == 2
     assert [point.x_m for point in positions] == pytest.approx(
@@ -450,7 +473,7 @@ def test_nested_reader_rejects_a_scan_with_no_points(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ProbePositionParseError):
-        MDAPositionFileReader(scale_to_meters=MICROMETER_M).read(mda)
+        _mda_reader(scale_to_meters=MICROMETER_M).read(mda)
 
 
 def test_flat_reader_rejects_a_single_positioner_file(tmp_path: Path) -> None:
@@ -493,7 +516,7 @@ def test_vendored_xdrlib_parses_identically(
     redirects every unpacker in the file without touching sys.modules.
     """
     reader = MDAFlatScanPositionFileReader(scale_to_meters=MILLIMETER_M)
-    nested_reader = MDAPositionFileReader(scale_to_meters=MICROMETER_M)
+    nested_reader = _mda_reader(scale_to_meters=MICROMETER_M)
 
     def coordinates() -> list[tuple[int, float, float]]:
         return [
@@ -734,14 +757,14 @@ def test_flat_reader_cannot_read_a_single_positioner_fly_scan(isn_mda: Path) -> 
 
 def test_nested_reader_numbers_by_running_count_by_default(nested_mda: Path) -> None:
     """Every other instrument keeps the contiguous numbering, so the stride is opt-in."""
-    positions = MDAPositionFileReader(scale_to_meters=MICROMETER_M).read(nested_mda)
+    positions = _mda_reader(scale_to_meters=MICROMETER_M).read(nested_mda)
 
     assert [point.index for point in positions] == [0, 1, 2, 3, 4, 5]
 
 
 def test_nested_reader_numbers_line_major_when_given_a_stride(nested_mda: Path) -> None:
     """A point is named by its line and column, not by how many points preceded it."""
-    positions = MDAPositionFileReader(
+    positions = _mda_reader(
         scale_to_meters=MICROMETER_M,
         line_index_stride=RASTER_LINE_INDEX_STRIDE,
     ).read(nested_mda)
@@ -762,7 +785,7 @@ def test_nested_reader_numbers_line_major_when_given_a_stride(nested_mda: Path) 
 
 def test_nested_reader_rejects_a_line_that_reaches_the_stride(nested_mda: Path) -> None:
     """A longer line would run into the next line's numbers, so it is refused."""
-    reader = MDAPositionFileReader(scale_to_meters=MICROMETER_M, line_index_stride=3)
+    reader = _mda_reader(scale_to_meters=MICROMETER_M, line_index_stride=3)
 
     with pytest.raises(ProbePositionParseError, match='reaches the line-major index stride'):
         reader.read(nested_mda)
@@ -799,9 +822,7 @@ def _write_line_series(directory: Path, frames_per_line: list[int]) -> Path:
 
 def _pair(mda_path: Path, series_path: Path) -> list[tuple[float, float]]:
     """Read both sides the way 2-ID-E is registered and pair them by scan index."""
-    dataset = APS2IDDiffractionFileReader(line_index_stride=RASTER_LINE_INDEX_STRIDE).read(
-        series_path
-    )
+    dataset = _aps2id_reader(line_index_stride=RASTER_LINE_INDEX_STRIDE).read(series_path)
     indexes = numpy.concatenate([array.get_indexes() for array in dataset])
     pixel_geometry = PixelGeometry(width_m=1e-6, height_m=1e-6)
 
@@ -810,9 +831,8 @@ def _pair(mda_path: Path, series_path: Path) -> list[tuple[float, float]]:
         patterns=numpy.zeros((indexes.size, 2, 2), dtype=numpy.uint16),
         pixel_geometry=pixel_geometry,
         bad_pixels=numpy.zeros((2, 2), dtype=numpy.bool_),
-        probe_photon_counts=None,
     )
-    positions = MDAPositionFileReader(
+    positions = _mda_reader(
         scale_to_meters=MICROMETER_M,
         line_index_stride=RASTER_LINE_INDEX_STRIDE,
     ).read(mda_path)
@@ -828,7 +848,7 @@ def _pair(mda_path: Path, series_path: Path) -> list[tuple[float, float]]:
             tomography_angle_deg=0.0,
         ),
         probe_positions=ProbePositionSequence(list(positions)),
-        probes=ProbeSequence(
+        probes=ProbeEnsemble(
             array=numpy.zeros((1, 1, 2, 2), dtype=numpy.complex128),
             opr_weights=None,
             pixel_geometry=pixel_geometry,

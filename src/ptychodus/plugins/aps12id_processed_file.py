@@ -3,14 +3,11 @@
 A processed scan is a master file plus one file per scan line, the lines named
 ``<sample>_<scan>_<line>.h5`` beside it. Each line file carries its own patterns at
 ``/dp`` and its own positions at ``/positions``; the master carries the beam center as
-a ``beam_center_YX`` attribute. This differs from the raw layout handled by
-:mod:`ptychodus.plugins.aps12id_diffraction_file`, which is one file per scan point.
+a ``beam_center_YX`` attribute.
 
 Positions come from column 1 (y) and column 2 (x) of ``/positions``, in nanometers,
-with x negated -- the same convention as the raw ``.dat`` reader in
-:mod:`ptychodus.plugins.aps12id_position_file`. Unlike the raw ``.dat`` files, which
-hold several oversampled rows per scan point, ``/positions`` holds one row per point,
-so rows and indexes correspond one to one.
+with x negated. ``/positions`` holds one row per scan point, so rows and indexes
+correspond one to one.
 """
 
 from __future__ import annotations
@@ -47,7 +44,6 @@ from .h5_diffraction_file import H5DiffractionPatternArray
 logger = logging.getLogger(__name__)
 
 _SIMPLE_NAME: Final[str] = 'APS_PtychoSAXS_Processed'
-_DISPLAY_NAME: Final[str] = 'APS 12-ID-E Ptycho-SAXS Processed Files (*.h5 *.hdf5)'
 
 _DATA_PATH: Final[str] = '/dp'
 _POSITIONS_PATH: Final[str] = '/positions'
@@ -110,6 +106,12 @@ def _read_beam_center(file_path: Path) -> tuple[int, int] | None:
 
 
 class APS12IDProcessedDiffractionFileReader(DiffractionFileReader):
+    def get_file_description(self) -> str:
+        return 'APS 12-ID-E Ptycho-SAXS Processed Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
+
     def read(self, file_path: Path) -> DiffractionDataset:
         line_files = _line_files(file_path)
         num_patterns_per_array: list[int] = []
@@ -163,6 +165,12 @@ class APS12IDProcessedDiffractionFileReader(DiffractionFileReader):
 
 
 class APS12IDProcessedPositionFileReader(ProbePositionFileReader):
+    def get_file_description(self) -> str:
+        return 'APS 12-ID-E Ptycho-SAXS Processed Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.h5', '.hdf5'}
+
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = []
         scale = LengthUnit.NANOMETER.meters_per_unit
@@ -200,10 +208,8 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         APS12IDProcessedDiffractionFileReader(),
         simple_name=_SIMPLE_NAME,
-        display_name=_DISPLAY_NAME,
     )
     registry.probe_position_file_readers.register_plugin(
         APS12IDProcessedPositionFileReader(),
         simple_name=_SIMPLE_NAME,
-        display_name=_DISPLAY_NAME,
     )

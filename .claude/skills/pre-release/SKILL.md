@@ -1,11 +1,11 @@
 ---
 name: pre-release
-description: Run a comprehensive pre-release verification of the ptychodus repository — API docs coverage, minimal docstring presence, reader-plugin docs, README/CLAUDE.md/pyproject.toml consistency, install-instruction freshness, Markdown hygiene, zero-warning Sphinx build, full CI gate, entry-point smoke tests, and distribution-artifact contents. Report every finding and offer per-issue fixes. Use when the user says "pre-release check", "release audit", "before we cut a release", or "verify the repo is release-ready".
+description: Run a comprehensive pre-release verification of the ptychodus repository — API docs coverage, minimal docstring presence, reader-plugin docs, README/CLAUDE.md/pyproject.toml consistency, install-instruction freshness, Markdown hygiene, zero-warning Sphinx build, full CI gate, entry-point smoke tests, distribution-artifact contents, and the test suite against a bare install of the built wheel. Report every finding and offer per-issue fixes. Use when the user says "pre-release check", "release audit", "before we cut a release", or "verify the repo is release-ready".
 ---
 
 # pre-release
 
-Comprehensive gate for cutting a release. Runs nine verification sections in order, reports pass/fail for each, and — for every failure — proposes a specific fix and asks the user before applying it. **Never fixes silently. Never commits.**
+Comprehensive gate for cutting a release. Runs ten verification sections in order, reports pass/fail for each, and — for every failure — proposes a specific fix and asks the user before applying it. **Never fixes silently. Never commits.**
 
 ## How to run the check
 
@@ -28,7 +28,7 @@ Launch each section's command with `run <section-name> <command>`, then `wait`, 
 
 ```sh
 uv lock --check || uv lock --upgrade
-uv sync --extra docs --extra gui --extra globus --extra ptychi --extra store --dry-run
+uv sync --extra docs --extra gui --extra globus --extra ptychi --extra webapp --dry-run
 ```
 
 `--check` answers "is this lock consistent with the manifest", not "is this lock current" — the two come apart. Plain `uv lock` is conservative and keeps any pin that still satisfies the manifest, so a lock can pass `--check` while carrying resolutions inherited from a manifest that no longer exists. Only `--upgrade` re-resolves. Measured here: after the `ptychopinn`/`ptycho-fm` path sources were dropped, a plain `uv lock` still pinned `torch 2.6.0` from the PtychoPINN era; `--upgrade` moved it to `2.14.1`.
@@ -36,20 +36,20 @@ uv sync --extra docs --extra gui --extra globus --extra ptychi --extra store --d
 Then read the dry-run diff. Sync for real only when it is empty or confined to the extras being added. A torch or CUDA version moving, an editable install reverting to a registry release, or packages being removed all mean the lock is stale — fix that first, because the gate would otherwise report `PASS` for an environment nobody has.
 
 ```sh
-uv sync --extra docs --extra gui --extra globus --extra ptychi --extra store
+uv sync --extra docs --extra gui --extra globus --extra ptychi --extra webapp
 ```
 
-`ptychi` is the CPU torch extra, which is what this audit wants: no release check needs a GPU, and the CUDA variants (`ptychi-cuda128` and friends) are mutually exclusive with it. Section 5c below validates the extras README names against `pyproject.toml`, so both lists have to move together.
+`ptychi` is the CPU torch extra, which is what this audit wants: no release check needs a GPU, and the CUDA variants (`ptychi-cuda126` and friends) are mutually exclusive with it. Section 5c below validates the extras README names against `pyproject.toml`, so both lists have to move together.
 
 If the developer deliberately runs an editable sibling checkout (pty-chi is the usual one), skip the sync entirely and pass `--no-sync` to every `uv run` below, as the `pre-push` skill does — an exact sync silently swaps that checkout for the published release.
 
-Then run Sections 6, 7, and 9 in order. They must not overlap — with each other or with Phase A. See "Why the phases" below.
+Then run Sections 6, 7, 9 and 10 in order. They must not overlap — with each other or with Phase A. See "Why the phases" below.
 
 ---
 
 ### Section 1 — API modules present in `docs/source/api.md`
 
-For every `src/ptychodus/api/**/*.py` file, confirm `docs/source/api.md` contains a matching `.. automodule:: ptychodus.api.<dotted.name>` directive. The scan is recursive, so subpackage modules (`preprocess/`, `simulate/`) are covered under their dotted names. A path component starting with `_` is skipped at any depth — that covers `__init__.py`, `simulate/_phase_unwrap.py`, and any future private subpackage.
+For every `src/ptychodus/api/**/*.py` file, confirm `docs/source/api.md` contains a matching `.. automodule:: ptychodus.api.<dotted.name>` directive. The scan is recursive, so subpackage modules (`preprocess/`, `simulate/`) are covered under their dotted names. A path component starting with `_` is skipped at any depth — that covers `__init__.py`, any `_`-prefixed helper module, and any future private subpackage.
 
 Do not enumerate with a flat `ls src/ptychodus/api/*.py`, and do not match the directive with a `[a-z_]+` character class: the former misses every subpackage module, and the latter has no `.` so `preprocess.diffraction` truncates to `preprocess`. The two errors cancel out and the section reports `PASS` while blind to an undocumented subpackage module.
 
@@ -97,7 +97,7 @@ Ask the user to confirm the heading text before writing.
 
 ### Section 2 — Minimal docstring coverage in `src/ptychodus/api/`
 
-For each non-private module in `src/ptychodus/api/`, verify:
+For each non-private module in `src/ptychodus/api/`, subpackages included and `_`-prefixed path components skipped at any depth as in Section 1, verify:
 
 - Module has a top-of-file docstring.
 - Every top-level `class` has a docstring on its first statement.
@@ -108,9 +108,10 @@ Run this AST scan:
 ```sh
 uv run python -c "
 import ast, pathlib
+root = pathlib.Path('src/ptychodus/api')
 missing = []
-for p in sorted(pathlib.Path('src/ptychodus/api').glob('*.py')):
-    if p.name.startswith('_'):
+for p in sorted(root.rglob('*.py')):
+    if any(part.startswith('_') for part in p.relative_to(root).parts):
         continue
     tree = ast.parse(p.read_text())
     if not (tree.body and isinstance(tree.body[0], ast.Expr) and isinstance(tree.body[0].value, ast.Constant) and isinstance(tree.body[0].value.value, str)):
@@ -136,7 +137,7 @@ print(f'--- {len(missing)} missing ---')
 
 ### Section 3 — Reader plugins represented in `docs/source/readers.md`
 
-`docs/source/readers.md` is a curated bullet list of user-facing names, not a 1:1 file mapping. Cross-check it against the plugin registry rather than against filenames: every plugin already declares a user-facing `display_name` in its `register_plugins` hook, and those strings are the authoritative source.
+`docs/source/readers.md` is a curated bullet list of user-facing names, not a 1:1 file mapping. Cross-check it against the plugin registry rather than against filenames: every file reader already declares a user-facing description and extension set, from which registration derives its `display_name`, and those strings are the authoritative source.
 
 Drive the check from `PluginRegistry.load_plugins()` so it reuses the exact discovery path the application uses. This matters because `pkgutil.iter_modules` is non-recursive: it yields `aps33id_velociprobe` as a *package* and calls the `register_plugins` in its `__init__.py`. A flat `ls src/ptychodus/plugins/*.py` misses that package entirely, and a hand-maintained keyword table drifts silently as new plugins land — do not reintroduce either.
 
@@ -166,7 +167,7 @@ names = {p.display_name
          for p in getattr(registry, a)}
 doc = pathlib.Path('docs/source/readers.md').read_text()
 
-FACILITIES = ['APS', 'CNM', 'LCLS', 'MAX IV', 'NSLS-II', 'SLAC', 'SLS']
+FACILITIES = ['APS', 'CNM', 'ESRF', 'LCLS', 'MAX IV', 'NSLS-II', 'SLAC', 'SLS']
 BEAMLINE = re.compile(r'\b\d+-ID\b')
 
 def tokens(text):
@@ -203,21 +204,26 @@ Two details in that script are load-bearing:
 **4a. Extras named in `README.md` all exist in `pyproject.toml`.**
 
 ```sh
-# Extract extras from README.md install commands.
+# Extras named in install commands, both `ptychodus[a,b]` and `uv sync --extra a`.
 # Anchor on `ptychodus[...]` so Markdown link labels ([Ptychodus], [uv]) don't match:
-grep -oE 'ptychodus\[[a-z,]+\]' README.md | sed 's/.*\[//; s/\]//' | tr ',' '\n' | sort -u
+extras() { grep -hoE 'ptychodus\[[a-z0-9,-]+\]|--extra [a-z0-9-]+' "$@" \
+  | sed -E 's/^ptychodus\[//; s/\]$//; s/^--extra //' | tr ',' '\n' | sort -u; }
 
 # Extras declared in pyproject.toml:
-uv run python -c "
+declared() { uv run python -c "
 import tomllib
 with open('pyproject.toml','rb') as f:
     p = tomllib.load(f)
 for k in sorted(p['project']['optional-dependencies']):
     print(k)
-"
+"; }
+
+comm -23 <(extras README.md) <(declared)   # prints each undeclared extra
 ```
 
-`PASS` if the README extras are a subset of the pyproject extras. `FAIL` with the missing extras.
+The character class admits digits and hyphens on purpose: with `[a-z,]+`, `ptychodus[ptychi-cuda126]` fails to match at all and the extra slips past unchecked.
+
+`PASS` if `comm` prints nothing. `FAIL` with the extras it prints.
 
 **Suggested fix**: either add the extra to `pyproject.toml` (rare — usually intentional) or remove/rename the extra reference in `README.md`.
 
@@ -249,11 +255,17 @@ done
 
 **5b. Extras named in `docs/source/getting_started.md` install commands exist in pyproject.**
 
-Same technique as 4a but against getting_started.md.
+With the helpers from 4a:
 
-**5c. The `uv sync` command in README.md uses currently-supported extras.**
+```sh
+comm -23 <(extras docs/source/getting_started.md) <(declared)
+```
 
-Parse the `uv sync --extra <x> --extra <y> ...` line in README.md and confirm each extra is in `pyproject.toml`.
+`PASS` if it prints nothing.
+
+**5c. The `uv sync` commands in README.md use currently-supported extras.**
+
+Covered by 4a: `extras` also reads `--extra <name>`, so README's `uv sync` lines are already in the set it checks. Report 5c with 4a's result rather than running it twice.
 
 ---
 
@@ -285,11 +297,11 @@ make -C docs clean
 make -C docs html SPHINXOPTS="-W --keep-going"
 ```
 
-The sync happens once at the top of Phase B, not here. A bare `uv sync --extra docs` at this point would uninstall `gui`, `globus`, `ptychi`, and `store` before Section 7 runs — see "Why the phases".
+The sync happens once at the top of Phase B, not here. A bare `uv sync --extra docs` at this point would uninstall `gui`, `globus`, `ptychi`, and `webapp` before Section 7 runs — see "Why the phases".
 
 `PASS` if exit code 0. `FAIL` on any warning or error.
 
-**Suggested fix**: hand the first warning to the user. Common causes: undocumented cross-references, autodoc import failures (usually a missing extra — retry with `uv sync --extra docs --extra ptychi --extra globus --extra gui --extra store` if autodoc can't import a module), duplicate labels. Not auto-fixable.
+**Suggested fix**: hand the first warning to the user. Common causes: undocumented cross-references, autodoc import failures (usually a missing extra — retry with `uv sync --extra docs --extra ptychi --extra globus --extra gui --extra webapp` if autodoc can't import a module), duplicate labels. Not auto-fixable.
 
 *Note*: `-W` is strict, and the prose sources are expected to build clean — treat any warning originating in `docs/source/*.md` as a regression introduced by the change under review. Warnings raised from `src/ptychodus/api/*.py` docstrings (reStructuredText syntax errors surfaced by autodoc) are a known pre-existing backlog; report the count and the first offender, but do not fold fixing them into the release gate.
 
@@ -328,7 +340,7 @@ with open('pyproject.toml','rb') as f:
 
 ### Section 9 — Distribution artifacts
 
-The release artifacts are what PyPI users actually get, and nothing else in this audit inspects them. In particular the `ptychodus-store` web UI is compiled TypeScript that is gitignored, so it can silently go missing from a build.
+The release artifacts are what PyPI users actually get, and nothing else in this audit inspects them. In particular the `ptychodus-webapp` web UI is compiled TypeScript that is gitignored, so it can silently go missing from a build.
 
 First, fail if a stale `build/` tree is present — `setuptools` reuses `build/lib/`, so a leftover from an earlier build can ship outdated modules:
 
@@ -340,8 +352,8 @@ Then build both artifacts into a temp directory with the UI requirement enforced
 
 ```sh
 out=$(mktemp -d)
-PTYCHODUS_STORE_REQUIRE_UI_BUILD=1 uv build --no-sources --out-dir "$out" || echo "FAIL: uv build"
-ts=$(find src/ptychodus_store/ui/src -name '*.ts' | wc -l)
+PTYCHODUS_WEBAPP_REQUIRE_UI_BUILD=1 uv build --no-sources --out-dir "$out" || echo "FAIL: uv build"
+ts=$(find src/ptychodus/webapp/ui/src -name '*.ts' | wc -l)
 sdist=$(tar -tzf "$out"/ptychodus-*.tar.gz | grep -c 'ui/dist/.*\.js$')
 wheel=$(unzip -Z1 "$out"/ptychodus-*.whl | grep -c 'ui/dist/.*\.js$')
 echo "ts=$ts sdist=$sdist wheel=$wheel"
@@ -350,6 +362,50 @@ uvx twine check "$out"/* || echo "FAIL: twine check"
 ```
 
 `FAIL` on a count mismatch means the `sdist`/`build_py` hooks in `setup.py` did not compile the UI — check that `tsc` is on `PATH`. Report the temp directory path so the user can inspect the artifacts, and do not copy them into `./dist/`.
+
+### Section 10 — Bare install
+
+CI's test job runs `pip install . pytest` and then `pytest tests/` with **no extras**, but every developer environment, this audit's included, carries the full extras, so Section 7 cannot see a regression that only a bare install hits. The typical one is an optional dependency imported at module scope anywhere reachable from `ptychodus.model`. Measured here: `model/processing/_ptychi_sections.py` built an overlay table at import that named `ptychi.api.ForwardModels`. On a bare install, `import ptychodus.model` then raised `ModuleNotFoundError`, ten test modules failed to collect, and `ptychodus --version` crashed, while `pre-push` stayed green in every full environment.
+
+Install the wheel Section 9 built, not the checkout: it is what PyPI users get, so this also catches a module or data file missing from the wheel, which `pip install .` from a source tree would hide. Cover CI's whole Python matrix. The three environments are independent, so run them concurrently:
+
+```sh
+wheel=$(ls "$out"/ptychodus-*.whl)
+# Beside uv's cache, not in /tmp: uv then hardlinks packages instead of copying them.
+bare=$(mktemp -d -p "$(dirname "$(uv cache dir)")" ptychodus-bare.XXXXXX)
+for py in 3.11 3.12 3.13; do
+    (
+        (
+            uv venv -q "$bare/$py" --python "$py" \
+            && uv pip install -q --python "$bare/$py/bin/python" "$wheel" pytest pytest-xdist \
+            && "$bare/$py/bin/ptychodus" --version \
+            && "$bare/$py/bin/python" -m pytest tests/ -q -p no:cacheprovider -n auto --dist loadfile
+        ) >"$bare/$py.log" 2>&1
+        echo $? >"$bare/$py.rc"
+    ) &
+done
+wait
+for py in 3.11 3.12 3.13; do printf '%s %s\n' "$(cat "$bare/$py.rc")" "py$py"; done
+```
+
+The environments go on the filesystem holding uv's cache. There uv hardlinks the scientific stack instead of copying it, so three environments cost little disk and install in seconds. In `/tmp` each is a full copy, about half a gigabyte, and on a small tmpfs the three together fill it mid-run, losing the logs.
+
+Run it from the checkout root, as CI does. The `src/` layout keeps the checkout's package off `sys.path`, so `import ptychodus` resolves to the installed wheel while the tests come from the working tree. `pytest-xdist` is not in CI's install and changes only speed; `-p no:cacheprovider` keeps the run from writing `.pytest_cache`.
+
+The extras must actually be absent, or the check proves nothing. Confirm it against the 3.11 environment:
+
+```sh
+"$bare/3.11/bin/python" -c "
+import importlib.util
+present = [m for m in ('ptychi', 'torch', 'PyQt5', 'globus_compute_sdk', 'xraydb')
+           if importlib.util.find_spec(m)]
+print('FAIL: extras present: ' + ', '.join(present) if present else 'PASS: no extras')
+"
+```
+
+`PASS` if every Python exits 0 and no extra is present. `FAIL` lists each failing Python with the first error in its log. A `ModuleNotFoundError` naming an optional package is the regression this section exists for. Report the temp directory so the user can read the logs; delete it once the run is clean.
+
+**Suggested fix**: move the offending import inside the function that needs it, or behind the deferred-import pattern CLAUDE.md's Testing section describes for optional subsystems. Never install the extra into the bare environment to make the section pass.
 
 ---
 
@@ -368,6 +424,7 @@ Print a summary in this exact format after all sections have run:
 7. Full CI gate                PASS|FAIL
 8. Entry-point smoke tests     PASS|FAIL   (<pass>/<total>)
 9. Distribution artifacts      PASS|FAIL   (ui .js sdist/wheel vs .ts count)
+10. Bare install               PASS|FAIL   (<passing Pythons>/3; first error if any)
 ```
 
 Then, and only then, walk through each `FAIL` with the user: state the finding, propose the fix, ask "apply it?" per item, and Edit/Write only after they confirm.
@@ -416,11 +473,12 @@ The `--oneline` view gives you the merge granularity (usually one bullet per mer
 
 ## Why the phases
 
-Three constraints force Phase B to be serial. Do not re-flatten the phases without addressing them:
+These constraints force Phase B to be serial. Do not re-flatten the phases without addressing them:
 
-- **`uv sync` is exact by default.** It uninstalls anything outside the extras named on that one invocation (`--inexact` opts out). A narrow `uv sync --extra docs` therefore strips `gui`, `globus`, `ptychi`, and `store` — which silently narrows Section 7's pytest collection and inflates Section 3's "modules skipped at load" count. That is why the sync is hoisted to the top of Phase B and names every extra at once.
+- **`uv sync` is exact by default.** It uninstalls anything outside the extras named on that one invocation (`--inexact` opts out). A narrow `uv sync --extra docs` therefore strips `gui`, `globus`, `ptychi`, and `webapp` — which silently narrows Section 7's pytest collection and inflates Section 3's "modules skipped at load" count. That is why the sync is hoisted to the top of Phase B and names every extra at once.
 - **`uv build` and `uv sync` contend on the same project lock.** Section 9 must not overlap Section 6 or the hoisted sync.
 - **Section 9's stale-`build/` guard only means something if nothing else is building.** A concurrent build would create the very directory the guard is checking for.
+- **Section 10 installs the wheel Section 9 builds**, so it runs after it. Its environments live in a temp directory and never touch the project's lock or `.venv`, which is why its three Pythons may run concurrently with each other, though not with Phase A.
 - **The lock guard is not ceremony.** `uv.lock` is untracked, so it drifts per machine with nothing to refresh it, and `uv sync` is exact. A stale lock silently narrows or rewrites what Sections 6, 7 and 9 test, and every one of them still reports `PASS` — against an environment the developer does not have. Keep the `uv lock --check` and the `--dry-run` read ahead of the real sync.
 
 Phase A is safe to fan out because every section in it only reads: filesystem scans, an AST walk, a plugin-registry load, and `--version`/`--help` invocations of the entry points.

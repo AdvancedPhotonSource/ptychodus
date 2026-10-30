@@ -1,14 +1,15 @@
 from __future__ import annotations
+from collections.abc import Callable
 import logging
 import math
-
 
 from ptychodus.api.constants import format_length
 from ptychodus.api.geometry import GeometryNotDefinedError
 from ptychodus.api.object import Object, ObjectGeometryProvider
-from ptychodus.api.observer import Observable
-from ptychodus.api.parameters import ParameterGroup
+from ptychodus.api.probe import ProbeEnsemble
 
+from ...observer import Observable
+from ...parameters import ParameterGroup
 from .builder import FromMemoryObjectBuilder, ObjectBuilder
 from .settings import ObjectSettings
 
@@ -21,11 +22,15 @@ class ObjectRepositoryItem(ParameterGroup):
         geometry_provider: ObjectGeometryProvider,
         settings: ObjectSettings,
         builder: ObjectBuilder,
+        *,
+        probe_supplier: Callable[[], ProbeEnsemble] | None = None,
     ) -> None:
         super().__init__()
         self._geometry_provider = geometry_provider
         self._settings = settings
+        self._probe_supplier = probe_supplier
         self._builder = builder
+        self._builder.bind_probe_supplier(probe_supplier)
         self._object = Object(array=None, pixel_geometry=None, center=None)
 
         self.layer_spacing_m = settings.object_layer_spacing_m.copy()
@@ -78,13 +83,28 @@ class ObjectRepositoryItem(ParameterGroup):
     def get_builder(self) -> ObjectBuilder:
         return self._builder
 
+    def can_make_editable(self) -> bool:
+        """Whether the object is a result whose layers cannot yet be changed."""
+        return isinstance(self._builder, FromMemoryObjectBuilder) and not self._builder.is_editable
+
+    def make_editable(self) -> None:
+        """Let a result be resliced; see :meth:`FromMemoryObjectBuilder.make_editable`."""
+        if isinstance(self._builder, FromMemoryObjectBuilder):
+            self._builder.make_editable()
+
     def set_builder(self, builder: ObjectBuilder) -> None:
         self._remove_group('builder')
         self._builder.remove_observer(self)
         self._builder = builder
+        self._builder.bind_probe_supplier(self._probe_supplier)
         self._builder.add_observer(self)
         self._add_group('builder', self._builder, observe=True)
         self.rebuild()
+
+    def handle_diffraction_data_changed(self) -> None:
+        """Rebuild if the builder reads the diffraction data, which has just changed."""
+        if self._builder.reads_diffraction_data:
+            self.rebuild()
 
     def rebuild(self, *, recenter: bool = False) -> None:
         try:

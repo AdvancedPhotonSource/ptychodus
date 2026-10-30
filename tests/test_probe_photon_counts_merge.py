@@ -1,9 +1,8 @@
-"""Tests for compute_probe_photon_counts_by_index (assemble.py) and its downstream propagation.
+"""Tests for the I0 the probe positions carry, keyed by scan index, and its propagation.
 
 Covers:
-- Diffraction-side wins when both sides supply per-pattern counts.
-- Position-side counts key by scan index when the diffraction side lacks measurements.
-- Per-pattern total-counts fallback for pattern indexes with no measured counts on either side.
+- ProbePositionSequence.get_probe_photon_counts_by_index keys I0 by scan index, averages
+  duplicate indexes, and is empty when the positions carry none.
 - prepare_reconstruct_input averages duplicate-index position counts arithmetically and linearly
   interpolates counts for pattern indexes that lie between anchor positions -- symmetric with the
   existing (x, y) handling.
@@ -14,13 +13,10 @@ from __future__ import annotations
 import numpy
 import pytest
 
-from ptychodus.api.assemble import (
-    AssembledDiffractionData,
-    compute_probe_photon_counts_by_index,
-)
+from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import prepare_reconstruct_input
@@ -46,7 +42,6 @@ def _metadata() -> ProductMetadata:
 def _make_assembled_data(
     indexes: list[int],
     *,
-    probe_photon_counts: numpy.ndarray | None = None,
     pattern_hw: int = 4,
 ) -> AssembledDiffractionData:
     indexes_arr = numpy.asarray(indexes, dtype=numpy.intp)
@@ -62,7 +57,6 @@ def _make_assembled_data(
         patterns=patterns,
         pixel_geometry=_pixel(),
         bad_pixels=bad_pixels,
-        probe_photon_counts=probe_photon_counts,
     )
 
 
@@ -75,7 +69,7 @@ def _make_product(specs: list[tuple[int, float, float, float | None]]) -> Produc
     positions = ProbePositionSequence(points)
 
     probe_array = numpy.zeros((1, 1, 4, 4), dtype=numpy.complex128)
-    probes = ProbeSequence(array=probe_array, opr_weights=None, pixel_geometry=_pixel())
+    probes = ProbeEnsemble(array=probe_array, opr_weights=None, pixel_geometry=_pixel())
 
     obj_array = numpy.zeros((1, 16, 16), dtype=numpy.complex128)
     object_ = Object(
@@ -93,50 +87,21 @@ def _make_product(specs: list[tuple[int, float, float, float | None]]) -> Produc
     )
 
 
-class TestComputeProbePhotonCountsByIndex:
-    def test_diffraction_side_wins_when_both_supply_counts(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        # Diffraction side carries measured counts for every valid pattern.
-        diff_counts = numpy.array([10.0, 20.0, 30.0], dtype=numpy.float64)
-        data = _make_assembled_data([0, 1, 2], probe_photon_counts=diff_counts)
-        # Position side supplies different counts at the same indexes -- must be ignored.
+class TestProbePhotonCountsByIndex:
+    def test_i0_is_keyed_by_scan_index(self) -> None:
         product = _make_product([(0, 0.0, 0.0, 111.0), (1, 1.0, 0.0, 222.0), (2, 2.0, 0.0, 333.0)])
-
-        with caplog.at_level('DEBUG', logger='ptychodus.api.assemble'):
-            result = compute_probe_photon_counts_by_index(data, product.probe_positions)
-
-        assert result == {0: 10.0, 1: 20.0, 2: 30.0}
-        assert 'overridden' in caplog.text
-
-    def test_position_side_used_when_diffraction_side_absent(self) -> None:
-        data = _make_assembled_data([0, 1, 2])
-        product = _make_product([(0, 0.0, 0.0, 111.0), (1, 1.0, 0.0, 222.0), (2, 2.0, 0.0, 333.0)])
-        result = compute_probe_photon_counts_by_index(data, product.probe_positions)
+        result = product.probe_positions.get_probe_photon_counts_by_index()
         assert result == {0: 111.0, 1: 222.0, 2: 333.0}
 
-    def test_total_counts_fallback_for_pattern_indexes_outside_position_coverage(self) -> None:
-        # Positions cover indexes {1, 2} with counts on every one (all-or-nothing).
-        # The assembled data adds pattern index 5, which no position covers -- that
-        # pattern should fall through to per-pattern total counts. Pattern rows are
-        # tagged with their index, so total_counts per pattern = index * (H*W) = index * 16.
-        data = _make_assembled_data([1, 2, 5])
-        product = _make_product([(1, 1.0, 0.0, 100.0), (2, 2.0, 0.0, 200.0)])
-        result = compute_probe_photon_counts_by_index(data, product.probe_positions)
-        assert result[1] == pytest.approx(100.0)
-        assert result[2] == pytest.approx(200.0)
-        assert result[5] == pytest.approx(5 * 16)
+    def test_duplicate_indexes_average_into_one_reading(self) -> None:
+        product = _make_product([(1, 1.0, 0.0, 12.0), (1, 3.0, 0.0, 20.0), (4, 0.0, 0.0, 7.0)])
+        result = product.probe_positions.get_probe_photon_counts_by_index()
+        assert result == {1: pytest.approx(16.0), 4: pytest.approx(7.0)}
 
-    def test_returns_total_counts_when_neither_side_supplies_measurements(self) -> None:
-        # No measured counts anywhere: every index falls through to total_counts,
-        # preserving the pre-refactor illumination-map weighting behavior.
-        data = _make_assembled_data([0, 1, 2])
-        product = _make_product([(0, 0.0, 0.0, None), (1, 1.0, 0.0, None), (2, 2.0, 0.0, None)])
-        result = compute_probe_photon_counts_by_index(data, product.probe_positions)
-        assert set(result.keys()) == {0, 1, 2}
-        assert result[0] == pytest.approx(0.0)
-        assert result[1] == pytest.approx(1 * 16)
-        assert result[2] == pytest.approx(2 * 16)
+    def test_positions_without_i0_give_an_empty_mapping(self) -> None:
+        product = _make_product([(0, 0.0, 0.0, None), (1, 1.0, 0.0, None)])
+        assert product.probe_positions.get_probe_photon_counts_by_index() == {}
+        assert ProbePositionSequence().get_probe_photon_counts_by_index() == {}
 
 
 class TestPrepareReconstructInputPhotonCountPropagation:
@@ -168,8 +133,7 @@ class TestPrepareReconstructInputPhotonCountPropagation:
         assert by_index[4] == pytest.approx(200.0)
 
     def test_no_position_counts_yields_none_photon_counts_on_output(self) -> None:
-        # If neither the diffraction nor the position side carries measurements,
-        # the reconstruct-input positions should have probe_photon_count == None so
+        # If the positions carry no I0, the reconstruct-input positions should have probe_photon_count == None so
         # downstream code that inspects them explicitly can distinguish that case.
         data = _make_assembled_data([0, 1, 2])
         product = _make_product([(0, 0.0, 0.0, None), (1, 1.0, 0.0, None), (2, 2.0, 0.0, None)])

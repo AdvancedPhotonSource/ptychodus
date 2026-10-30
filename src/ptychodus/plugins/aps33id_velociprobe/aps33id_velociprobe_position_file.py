@@ -27,21 +27,41 @@ class VelociprobePositionFileColumn(IntEnum):
 
 
 class VelociprobePositionFileReader(ProbePositionFileReader):
-    def __init__(self, diffraction_reader: VelociprobeDiffractionFileReader, y_column: int) -> None:
+    def __init__(
+        self,
+        diffraction_reader: VelociprobeDiffractionFileReader,
+        y_column: int,
+        description: str,
+    ) -> None:
         self._diffraction_reader = diffraction_reader
         self._y_column = y_column
+        self._description = description
 
     @classmethod
     def create_laser_interferometer_instance(
         cls, diffraction_reader: VelociprobeDiffractionFileReader
     ) -> VelociprobePositionFileReader:
-        return cls(diffraction_reader, VelociprobePositionFileColumn.LASER_INTERFEROMETER_Y)
+        return cls(
+            diffraction_reader,
+            VelociprobePositionFileColumn.LASER_INTERFEROMETER_Y,
+            'APS 33-ID-C VelociProbe Files - Laser Interferometer',
+        )
 
     @classmethod
     def create_position_encoder_instance(
         cls, diffraction_reader: VelociprobeDiffractionFileReader
     ) -> VelociprobePositionFileReader:
-        return cls(diffraction_reader, VelociprobePositionFileColumn.POSITION_ENCODER_Y)
+        return cls(
+            diffraction_reader,
+            VelociprobePositionFileColumn.POSITION_ENCODER_Y,
+            'APS 33-ID-C VelociProbe Files - Position Encoder',
+        )
+
+    def get_file_description(self) -> str:
+        return self._description
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.txt'}
 
     def _apply_transform(self, positions: ProbePositionSequence) -> ProbePositionSequence:
         stage_rotation_rad = numpy.deg2rad(self._diffraction_reader.stage_rotation_deg)

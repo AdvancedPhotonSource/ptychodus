@@ -146,9 +146,50 @@ def test_indexing() -> None:
             idx += 1
 
 
+def test_osa_index_follows_the_degree_then_frequency_loop() -> None:
+    """from_osa_index inverts the order a loop over n, then m in steps of two, produces."""
+    index = 0
+
+    for n in range(10):
+        for m in range(-n, n + 1, 2):
+            mode = ZernikeMode.from_osa_index(index, 0.5j)
+            assert (mode.radial_degree, mode.angular_frequency) == (n, m)
+            assert mode.coefficient == 0.5j
+            index += 1
+
+
+def test_a_negative_osa_index_is_refused() -> None:
+    with pytest.raises(ValueError, match='non-negative'):
+        ZernikeMode.from_osa_index(-1, 1.0)
+
+
 # ---------------------------------------------------------------------------
 # HermiteMode
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ('index', 'orders'),
+    [(0, (0, 0)), (1, (1, 0)), (2, (0, 1)), (3, (2, 0)), (4, (1, 1)), (5, (0, 2)), (6, (3, 0))],
+)
+def test_hermite_index_is_in_total_degree_order(index: int, orders: tuple[int, int]) -> None:
+    mode = HermiteMode.from_index(index, 2.0 - 1j)
+
+    assert (mode.order_x, mode.order_y) == orders
+    assert mode.coefficient == 2.0 - 1j
+
+
+def test_hermite_index_visits_every_order_pair_once_per_degree() -> None:
+    seen = [HermiteMode.from_index(index, 1.0) for index in range(55)]  # degrees 0 to 9
+
+    assert {(mode.order_x, mode.order_y) for mode in seen} == {
+        (m, d - m) for d in range(10) for m in range(d + 1)
+    }
+
+
+def test_a_negative_hermite_index_is_refused() -> None:
+    with pytest.raises(ValueError, match='non-negative'):
+        HermiteMode.from_index(-1, 1.0)
 
 
 def test_hermite_str() -> None:

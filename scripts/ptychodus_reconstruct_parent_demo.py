@@ -29,13 +29,20 @@ import time
 from pathlib import Path
 
 from ptychodus.api.io import StandardFileLayout, load_product
-from ptychodus.api.settings import SettingsRegistry
-from ptychodus.model.processing.api import ProcessingAlgorithmParameter
+from ptychodus.model.settings import SettingsRegistry
+from ptychodus.model.processing import ProcessingParameterStore
+from ptychodus.model.processing._ptychi_sections import sections_for
 from ptychodus.model.processing.settings import ProcessingSettings
-from ptychodus.model.ptychi.core import PtyChiReconstructorLibrary
-from ptychodus.model.ptychi.task import dump_task_options
+from ptychodus.plugins.ptychi.core import PtyChiReconstructorLibrary
+from ptychodus.plugins.ptychi.options import apply_to_task
+from ptychodus.plugins.ptychi.task import align_task_options_with_product, dump_task_options
 
 COMMAND_NAME = 'ptychodus-reconstruct-subprocess'
+
+# What pty-chi registers itself as. Spelled here because this script builds
+# the library directly rather than taking it from the plugin registry, and a
+# library is named by whatever registers it.
+LIBRARY_NAME = 'pty-chi'
 
 
 def _child_command() -> list[str]:
@@ -89,21 +96,43 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    # Build the options the way ptychodus itself does, from a settings INI.
+    # Build the options the way ptychodus itself does: register what each
+    # reconstructor declares with a parameter store, let the settings file
+    # fill it, and read back the algorithm that was selected.
     registry = SettingsRegistry()
     registry.open_settings(args.settings)
-    library = PtyChiReconstructorLibrary(registry, is_developer_mode_enabled=False)
+    library = PtyChiReconstructorLibrary()
+    store = ProcessingParameterStore(registry)
+    names = {}
 
-    # The chosen algorithm lives in the settings as '<library>_<reconstructor>'
-    # (e.g. 'pty-chi_lsqml'); split off the library half and hand the
-    # reconstructor name to library.build_task_options, which case-folds it.
+    for reconstructor in library:
+        store.register(
+            LIBRARY_NAME,
+            reconstructor,
+            sections_for(reconstructor.name, reconstructor.get_default_options()),
+        )
+        names[reconstructor.name.casefold()] = reconstructor.name
+
+    # The settings name the backend and the algorithm separately. Case-folded
+    # on the way in, so that 'rPIE' and 'rpie' both resolve.
     processing_settings = ProcessingSettings(registry)
-    _library, algorithm = ProcessingAlgorithmParameter.split_key(
-        processing_settings.algorithm.get_value()
-    )
+    selected_library = processing_settings.library.get_value()
+    selected = processing_settings.algorithm.get_value()
+
+    if selected_library.casefold() != LIBRARY_NAME.casefold():
+        raise SystemExit(
+            f'Settings select "{selected_library}", and this demo runs {LIBRARY_NAME}.'
+        )
+
+    try:
+        algorithm = names[selected.casefold()]
+    except KeyError:
+        raise SystemExit(f'Unknown {LIBRARY_NAME} algorithm "{selected}".') from None
 
     product_file = StandardFileLayout.PRODUCT.path(args.input_directory)
-    task_options = library.build_task_options(algorithm, load_product(product_file))
+    task_options = align_task_options_with_product(
+        apply_to_task(store.get_options(LIBRARY_NAME, algorithm)), load_product(product_file)
+    )
 
     if args.num_epochs is not None:
         task_options.reconstructor_options.num_epochs = args.num_epochs

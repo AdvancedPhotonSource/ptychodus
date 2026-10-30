@@ -22,12 +22,16 @@ to whatever the item's layer spacing happens to say.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from functools import cache
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import numpy
 import numpy.testing
 import pytest
 
+from ptychodus.api.accumulate import DiffractionMoments, compute_diffraction_moments
+from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import (
     Object,
@@ -36,15 +40,17 @@ from ptychodus.api.object import (
     ObjectGeometry,
     ObjectGeometryProvider,
 )
+from ptychodus.api.plugins import PluginCatalog, PluginRegistry
 from ptychodus.api.probe_positions import ProbePosition
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.api.simulate.object import ObjectGenerator
+from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.product.object.builder import (
     FromFileObjectBuilder,
     FromMemoryObjectBuilder,
     ObjectBuilder,
 )
+from ptychodus.model.product.object.builder_factory import ObjectBuilderFactory
 from ptychodus.model.product.object.item import ObjectRepositoryItem
-from ptychodus.model.product.object.random import RandomObjectBuilder
 from ptychodus.model.product.object.settings import ObjectSettings
 
 EXTENT_PX = 8
@@ -60,17 +66,64 @@ def _make_rng() -> numpy.random.Generator:
     return numpy.random.default_rng(42)
 
 
+@cache
+def _object_generators() -> PluginCatalog[ObjectGenerator]:
+    return PluginRegistry.load_plugins().object_generators
+
+
+def _make_builder(
+    name: str, settings: ObjectSettings, *, has_diffraction_data: bool = False
+) -> ObjectBuilder:
+    """The builder the factory makes for *name*, drawing from a freshly seeded rng."""
+    factory = ObjectBuilderFactory(
+        _make_rng(), settings, _object_generators(), MagicMock(), MagicMock()
+    )
+    return factory.create(name, has_diffraction_data=has_diffraction_data)
+
+
 class _StubObjectGeometryProvider(ObjectGeometryProvider):
-    def __init__(self, photon_wavelength_m: float = 1.0e-10) -> None:
+    def __init__(
+        self,
+        photon_wavelength_m: float = 1.0e-10,
+        mean_amplitude_transmission: float = 1.0,
+        assembled_data: AssembledDiffractionData | None = None,
+    ) -> None:
         self._photon_wavelength_m = photon_wavelength_m
+        self._mean_amplitude_transmission = mean_amplitude_transmission
+        self._assembled_data = assembled_data
+
+    def get_assembled_data(self) -> AssembledDiffractionData | None:
+        return self._assembled_data
+
+    def get_diffraction_moments(self) -> DiffractionMoments | None:
+        data = self._assembled_data
+
+        if data is None:
+            return None
+
+        return compute_diffraction_moments(
+            data.get_indexes(),
+            data.get_patterns(),
+            bad_pixels=data.get_bad_pixels(),
+            background=data.get_background(),
+            flat_field=data.get_flat_field(),
+        )
 
     @property
     def photon_wavelength_m(self) -> float:
         return self._photon_wavelength_m
 
     @property
+    def mean_amplitude_transmission(self) -> float:
+        return self._mean_amplitude_transmission
+
+    @property
     def object_plane_propagation_distance_m(self) -> float:
         return 1.0
+
+    @property
+    def far_field(self) -> bool:
+        return True
 
     def get_probe_positions(self) -> Sequence[ProbePosition]:
         return ()
@@ -105,6 +158,12 @@ class _StubObjectFileReader(ObjectFileReader):
     def __init__(self, object_: Object) -> None:
         self._object = object_
 
+    def get_file_description(self) -> str:
+        return 'Stub Object Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return {'.npy'}
+
     def read(self, file_path: Path) -> Object:
         return self._object
 
@@ -117,7 +176,7 @@ def test_generator_pads_canvas() -> None:
     """The padding moved from the shared pipeline into _build_raw; the generative
     path must still honor it."""
     settings = _make_settings()
-    builder = RandomObjectBuilder(_make_rng(), settings)
+    builder = _make_builder('random', settings)
     builder.extra_padding_x.set_value(3)
     builder.extra_padding_y.set_value(2)
 
@@ -129,7 +188,7 @@ def test_generator_pads_canvas() -> None:
 
 def test_generator_generates_layers() -> None:
     settings = _make_settings()
-    builder = RandomObjectBuilder(_make_rng(), settings)
+    builder = _make_builder('random', settings)
 
     object_ = builder.build(_StubObjectGeometryProvider(), [LAYER_SPACING_M] * 2)
 
@@ -230,6 +289,34 @@ def test_from_memory_builder_ignores_conditioning() -> None:
     assert list(object_.layer_spacing_m) == list(raw.layer_spacing_m)
 
 
+def test_an_editable_from_memory_object_is_resliced_but_not_padded() -> None:
+    settings = _make_settings()
+    raw = _make_object(1)
+    builder = FromMemoryObjectBuilder(settings, raw)
+    builder.extra_padding_x.set_value(5)
+    builder.make_editable()
+
+    unchanged = builder.build(_StubObjectGeometryProvider(), list(raw.layer_spacing_m))
+    resliced = builder.build(_StubObjectGeometryProvider(), [LAYER_SPACING_M, LAYER_SPACING_M])
+
+    assert builder.is_editable
+    assert numpy.array_equal(unchanged.get_array(), raw.get_array())
+    assert resliced.num_layers == 3
+    assert resliced.get_array().shape[-2:] == raw.get_array().shape[-2:]
+    numpy.testing.assert_allclose(
+        resliced.get_layers_flattened(), raw.get_layers_flattened(), rtol=1e-9, atol=1e-12
+    )
+
+
+def test_a_copy_of_an_editable_object_builder_is_editable() -> None:
+    builder = FromMemoryObjectBuilder(_make_settings(), _make_object(2))
+    assert not builder.copy().is_editable
+
+    builder.make_editable()
+
+    assert builder.copy().is_editable
+
+
 def test_repeated_from_memory_builds_are_idempotent() -> None:
     """The reconstruct loop rebuilds the output item's object once per iteration.
     pad_object is strictly additive, so conditioning here would grow the array
@@ -272,7 +359,7 @@ def test_copy_preserves_padding_parameters(builder_name: str) -> None:
     builder: ObjectBuilder
 
     if builder_name == 'random':
-        builder = RandomObjectBuilder(_make_rng(), settings)
+        builder = _make_builder('random', settings)
     else:
         builder = _make_from_file_builder(settings, _make_object(1))
 
@@ -330,11 +417,6 @@ class TestPaganinReadsTheExperiment:
     """
 
     def _build(self, photon_wavelength_m: float) -> numpy.ndarray:
-        from unittest.mock import MagicMock
-
-        from ptychodus.api.assemble import AssembledDiffractionData
-        from ptychodus.model.product.object.paganin import PaganinObjectBuilder
-
         num_positions = 25
         patterns = numpy.full((num_positions, 4, 4), 100.0, dtype=numpy.float64)
         patterns[:, 2, 2] += numpy.arange(num_positions, dtype=numpy.float64)
@@ -344,11 +426,10 @@ class TestPaganinReadsTheExperiment:
             PixelGeometry(width_m=1e-6, height_m=1e-6),
             numpy.zeros((4, 4), dtype=numpy.bool_),
         )
-        dataset = MagicMock()
-        dataset.get_assembled_data.return_value = assembled
-
-        builder = PaganinObjectBuilder(_make_settings(), dataset)
-        provider = _StubObjectGeometryProvider(photon_wavelength_m=photon_wavelength_m)
+        builder = _make_builder('paganin', _make_settings(), has_diffraction_data=True)
+        provider = _StubObjectGeometryProvider(
+            photon_wavelength_m=photon_wavelength_m, assembled_data=assembled
+        )
         # A real 5x5 grid: the STXM step triangulates the positions, so coincident
         # points degenerate the hull.
         span_m = EXTENT_PX * PIXEL_SIZE_M / 3.0
@@ -370,3 +451,66 @@ class TestPaganinReadsTheExperiment:
         at_20_keV = self._build(6.1992e-11)  # noqa: N806
 
         assert not numpy.allclose(at_6_keV, at_20_keV)
+
+
+# ---------------------------------------------------------------------------
+# Mean amplitude transmission
+# ---------------------------------------------------------------------------
+
+
+def test_generated_object_carries_the_measured_mean_transmission() -> None:
+    """A generated object is scaled to the opacity the data implies.
+
+    A unit-modulus guess asserts a transparent sample and so predicts more signal than
+    the detector recorded. Putting the difference here keeps it out of the probe, which
+    has to go on meaning the incident illumination.
+    """
+    settings = _make_settings()
+    transmission = 0.6
+
+    opaque = _make_builder('random', settings).build(
+        _StubObjectGeometryProvider(mean_amplitude_transmission=transmission), []
+    )
+    transparent = _make_builder('random', settings).build(_StubObjectGeometryProvider(), [])
+
+    numpy.testing.assert_allclose(
+        opaque.get_array(), transparent.get_array() * transmission, atol=1e-12
+    )
+
+
+def test_from_file_object_keeps_its_own_transmission() -> None:
+    """Diffraction data constrains the product of probe and object, not either alone,
+    so rescaling a warm-start object would decouple it from the probe it was solved
+    with."""
+    settings = _make_settings()
+    from_file = _make_object(1)
+    builder = _make_from_file_builder(settings, from_file)
+
+    object_ = builder.build(_StubObjectGeometryProvider(mean_amplitude_transmission=0.6), [])
+
+    numpy.testing.assert_allclose(object_.get_array(), from_file.get_array(), atol=1e-12)
+
+
+def test_from_memory_object_keeps_its_own_transmission() -> None:
+    """Reconstruction output flows through this builder once per iteration, so a
+    rescale here would compound on every one."""
+    settings = _make_settings()
+    raw = _make_object(1)
+    builder = FromMemoryObjectBuilder(settings, raw)
+
+    object_ = builder.build(_StubObjectGeometryProvider(mean_amplitude_transmission=0.6), [])
+
+    numpy.testing.assert_allclose(object_.get_array(), raw.get_array(), atol=1e-12)
+
+
+@pytest.mark.parametrize('transmission', [0.0, -0.5, 1.5, float('nan')])
+def test_an_unusable_transmission_leaves_a_generated_object_alone(transmission: float) -> None:
+    """An initial guess degrades rather than stopping a reconstruction."""
+    settings = _make_settings()
+
+    scaled = _make_builder('random', settings).build(
+        _StubObjectGeometryProvider(mean_amplitude_transmission=transmission), []
+    )
+    unscaled = _make_builder('random', settings).build(_StubObjectGeometryProvider(), [])
+
+    numpy.testing.assert_allclose(scaled.get_array(), unscaled.get_array(), atol=1e-12)

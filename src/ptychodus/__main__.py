@@ -5,8 +5,8 @@ import argparse
 import logging
 import sys
 
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.exit_codes import ExitCode
+from ptychodus.model.observer import Observable, Observer
 from ptychodus.cli import DirectoryType, verify_all_arguments_parsed
 from ptychodus.model import ModelCore
 from ptychodus.model.diffraction import DiffractionTaskMonitor
@@ -104,7 +104,7 @@ def main() -> int:
 
         view = ViewCore(is_developer_mode_enabled=model.is_developer_mode_enabled)
 
-        from ptychodus.controller import ControllerCore
+        from ptychodus.controller.core import ControllerCore
 
         controller = ControllerCore(
             model, view, is_developer_mode_enabled=model.is_developer_mode_enabled

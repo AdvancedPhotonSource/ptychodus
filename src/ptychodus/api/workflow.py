@@ -12,7 +12,6 @@ from ptychodus.api.diffraction import CropRegion, Polarization
 from ptychodus.api.affine import AffineTransform
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import ReconstructInput
-from ptychodus.api.settings import PathPrefixChange
 
 
 class RemoteComputeProvider(Enum):
@@ -79,6 +78,17 @@ class ProductWorkflowAPI(ABC):
         pass
 
     @abstractmethod
+    def estimate_defocus(self) -> None:
+        """Measure the defocus from the parallax and set the product's focus position.
+
+        Blocks until the measurement is applied, so a probe generated next is sampled at
+        the measured defocus. A focus the product already states is replaced, and a
+        disagreement reported; an estimate the thresholds do not resolve leaves it alone.
+        Far-field data only.
+        """
+        pass
+
+    @abstractmethod
     def load_probe(self, file_path: Path, *, file_type: str | None = None) -> None:
         """Load a probe sequence from file, uses format from settings when file_type is None."""
         pass
@@ -115,6 +125,7 @@ class ProductWorkflowAPI(ABC):
     def reconstruct_local(
         self,
         *,
+        library: str | None = None,
         algorithm: str | None = None,
         output_product_file: Path | None = None,
         block: bool = False,
@@ -129,6 +140,7 @@ class ProductWorkflowAPI(ABC):
     def reconstruct_remote(
         self,
         *,
+        library: str | None = None,
         algorithm: str | None = None,
         provider: RemoteComputeProvider = RemoteComputeProvider.GLOBUS,
     ) -> None:
@@ -141,6 +153,7 @@ class ProductWorkflowAPI(ABC):
         input_path: Path,
         output_path: Path,
         *,
+        library: str | None = None,
         algorithm: str | None = None,
         block: bool = False,
     ) -> None:
@@ -154,6 +167,7 @@ class ProductWorkflowAPI(ABC):
     def train_reconstructor_remote(
         self,
         *,
+        library: str | None = None,
         algorithm: str | None = None,
         provider: RemoteComputeProvider = RemoteComputeProvider.GLOBUS,
     ) -> None:
@@ -161,8 +175,12 @@ class ProductWorkflowAPI(ABC):
         pass
 
     @abstractmethod
-    def export_training_data(self, file_path: Path, *, algorithm: str | None = None) -> None:
-        """Export training data for the current reconstructor to file."""
+    def export_training_data(self, file_path: Path, *, file_type: str | None = None) -> None:
+        """Export training data to file in a registered training-data format.
+
+        `file_type` names the format by its simple name; None writes the selected
+        reconstructor's own format, or CXI when it has none.
+        """
         pass
 
     @abstractmethod
@@ -179,9 +197,15 @@ class ProductWorkflowAPI(ABC):
         input_file_type: str | None = None,
         output_file_type: str | None = None,
         algorithm: str | None = None,
+        algorithm_parameters: Mapping[str, Any] | None = None,
         block: bool = False,
     ) -> None:
         """Run fluorescence enhancement locally and write the result to output_path.
+
+        ``algorithm`` names an enhancer, not a reconstructor, so it has no
+        library beside it; None runs the one settings select.
+        ``algorithm_parameters`` overrides the selected enhancer's options by
+        declared field name, for this run only: settings are left as they were.
 
         Blocks until completion when block is True, otherwise returns immediately.
         """
@@ -200,13 +224,20 @@ class WorkflowAPI(ABC):
         crop_region: CropRegion | None = None,
         bad_pixels_file_path: Path | None = None,
         bad_pixels_file_type: str | None = None,
+        background_file_path: Path | None = None,
+        background_file_type: str | None = None,
+        flat_field_file_path: Path | None = None,
+        flat_field_file_type: str | None = None,
         process_patterns: bool = True,
         block: bool = False,
     ) -> DiffractionWorkflowAPI:
         """Load and assemble a diffraction dataset from file.
 
         When bad_pixels_file_path is provided, its mask is applied to the loaded
-        dataset. Blocks until complete when block is True, otherwise returns immediately.
+        dataset; a background or flat-field file likewise replaces the map the data
+        file carries. Whether those maps are applied or carried follows the detector
+        settings. Blocks until complete when block is True, otherwise returns
+        immediately.
         """
         pass
 
@@ -255,6 +286,7 @@ class WorkflowAPI(ABC):
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
         far_field: bool | None = None,
+        i0_photons_per_count: float | None = None,
         diffraction: DiffractionWorkflowAPI | None = None,
     ) -> ProductWorkflowAPI:
         """Create a new product with optional metadata overrides and return a handle to it.
@@ -269,14 +301,21 @@ class WorkflowAPI(ABC):
         pass
 
     @abstractmethod
-    def available_reconstructors(self) -> Iterator[str]:
-        """Yield the names of all registered reconstructors."""
+    def available_libraries(self) -> Iterator[str]:
+        """Yield the names of all registered reconstructor backends."""
         pass
 
     @abstractmethod
-    def save_settings(
-        self, file_path: Path, change_path_prefix: PathPrefixChange | None = None
-    ) -> None:
+    def available_algorithms(self, library: str | None = None) -> Iterator[str]:
+        """Yield the algorithms a backend offers, or the selected one's when None.
+
+        Asking about another backend selects it, because what a backend
+        offers is only knowable by looking at it.
+        """
+        pass
+
+    @abstractmethod
+    def save_settings(self, file_path: Path) -> None:
         """Save the current settings to file, optionally remapping path prefixes."""
         pass
 

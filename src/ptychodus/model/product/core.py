@@ -1,19 +1,26 @@
 import numpy
 
 from ptychodus.api.object import ObjectFileReader, ObjectFileWriter
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
+from ptychodus.api.plugins import PluginCatalog
 from ptychodus.api.probe import ProbeFileReader, ProbeFileWriter
-from ptychodus.api.simulate.probe import FresnelZonePlate, KirkpatrickBaezMirrorPair
+from ptychodus.api.simulate.object import ObjectGenerator
+from ptychodus.api.simulate.probe import (
+    FresnelZonePlate,
+    KirkpatrickBaezMirrorPreset,
+    ProbeGenerator,
+)
 from ptychodus.api.probe_positions import ProbePositionFileReader, ProbePositionFileWriter
+from ptychodus.api.simulate.probe_positions import ProbePositionsGenerator
 from ptychodus.api.product import ProductFileReader, ProductFileWriter
-from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import (
     AssembledDiffractionDataset,
     DiffractionAPI,
     DiffractionDatasetRepositoryObserver,
 )
+from ..observer import Observable, Observer
+from ..plugins import PluginChooser, PluginChooserParameter
+from ..settings import SettingsRegistry
 from ..task_manager import TaskManager
 from .api import ObjectAPI, ProbeAPI, ProductAPI, ProbePositionsAPI
 from .item_factory import ProductRepositoryItemFactory
@@ -59,12 +66,15 @@ class ProductCore(Observer):
         rng: numpy.random.Generator,
         settings_registry: SettingsRegistry,
         diffraction_api: DiffractionAPI,
+        scan_generator_chooser: PluginCatalog[ProbePositionsGenerator],
         scan_file_reader_chooser: PluginChooser[ProbePositionFileReader],
         scan_file_writer_chooser: PluginChooser[ProbePositionFileWriter],
-        fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
-        kb_mirror_chooser: PluginChooser[KirkpatrickBaezMirrorPair],
+        probe_generator_chooser: PluginCatalog[ProbeGenerator],
+        fresnel_zone_plate_chooser: PluginCatalog[FresnelZonePlate],
+        kb_mirror_chooser: PluginCatalog[KirkpatrickBaezMirrorPreset],
         probe_file_reader_chooser: PluginChooser[ProbeFileReader],
         probe_file_writer_chooser: PluginChooser[ProbeFileWriter],
+        object_generator_chooser: PluginCatalog[ObjectGenerator],
         object_file_reader_chooser: PluginChooser[ObjectFileReader],
         object_file_writer_chooser: PluginChooser[ObjectFileWriter],
         product_file_reader_chooser: PluginChooser[ProductFileReader],
@@ -77,7 +87,11 @@ class ProductCore(Observer):
 
         self._scan_settings = ProbePositionsSettings(settings_registry)
         self._scan_builder_factory = ProbePositionsBuilderFactory(
-            rng, self._scan_settings, scan_file_reader_chooser, scan_file_writer_chooser
+            rng,
+            self._scan_settings,
+            scan_generator_chooser,
+            scan_file_reader_chooser,
+            scan_file_writer_chooser,
         )
         self._scan_repository_item_factory = ProbePositionsRepositoryItemFactory(
             rng, self._scan_settings, self._scan_builder_factory
@@ -87,6 +101,7 @@ class ProductCore(Observer):
         self._probe_builder_factory = ProbeBuilderFactory(
             rng,
             self._probe_settings,
+            probe_generator_chooser,
             fresnel_zone_plate_chooser,
             kb_mirror_chooser,
             probe_file_reader_chooser,
@@ -100,6 +115,7 @@ class ProductCore(Observer):
         self._object_builder_factory = ObjectBuilderFactory(
             rng,
             self._object_settings,
+            object_generator_chooser,
             object_file_reader_chooser,
             object_file_writer_chooser,
         )
