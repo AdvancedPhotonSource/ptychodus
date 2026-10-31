@@ -1,4 +1,4 @@
-"""``ptychodus-enhance``: options round trip, path guards, and an end-to-end run."""
+"""``ptychodus-enhance-xrf``: options round trip, path guards, and an end-to-end run."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.cli import enhance
+from ptychodus.cli import enhance_xrf
 
 _PIXEL_SIZE_M = 1.0e-7
 _CANVAS_PX = 24
@@ -41,8 +41,8 @@ _CHANNELS = ('Fe', 'Zn')
 @pytest.fixture(autouse=True)
 def _no_process_side_effects(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep ``main()`` from claiming the test process's signals and root logger."""
-    monkeypatch.setattr(enhance.signal, 'signal', lambda signalnum, handler: None)
-    monkeypatch.setattr(enhance, 'configure_logging', lambda args: None)
+    monkeypatch.setattr(enhance_xrf.signal, 'signal', lambda signalnum, handler: None)
+    monkeypatch.setattr(enhance_xrf, 'configure_logging', lambda args: None)
 
 
 def _product() -> Product:
@@ -100,8 +100,8 @@ def _write_inputs(directory: Path) -> tuple[Path, Path]:
 
 
 def _main(monkeypatch: pytest.MonkeyPatch, *argv: str | Path) -> ExitCode:
-    monkeypatch.setattr('sys.argv', ['ptychodus-enhance', *map(str, argv)])
-    return enhance.main()
+    monkeypatch.setattr('sys.argv', ['ptychodus-enhance-xrf', *map(str, argv)])
+    return enhance_xrf.main()
 
 
 @pytest.mark.parametrize('algorithm', ['two_step', 'vspi'])
@@ -109,10 +109,10 @@ def test_printed_options_load_back_to_the_defaults(algorithm: str) -> None:
     plugin = PluginRegistry.load_plugins().fluorescence_enhancers.find_plugin(algorithm)
     assert plugin is not None
 
-    document = yaml.safe_load(enhance.format_enhancer_options(plugin))
+    document = yaml.safe_load(enhance_xrf.format_enhancer_options(plugin))
 
     assert document['algorithm'] == algorithm
-    options = enhance._validate_options(plugin, document['options'])
+    options = enhance_xrf._validate_options(plugin, document['options'])
     assert options == plugin.strategy.get_default_options()
 
 
@@ -280,7 +280,7 @@ def test_cancelled_enhancement_writes_nothing(
             yield output
 
     monkeypatch.setattr(plugin.strategy, 'enhance', interrupted_enhance)
-    monkeypatch.setattr(enhance.PluginRegistry, 'load_plugins', lambda: registry)
+    monkeypatch.setattr(enhance_xrf.PluginRegistry, 'load_plugins', lambda: registry)
 
     exit_code = _main(
         monkeypatch,

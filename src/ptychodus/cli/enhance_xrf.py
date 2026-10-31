@@ -39,7 +39,7 @@ from ptychodus.api.io import load_product
 from ptychodus.api.plugins import Plugin, PluginCatalog, PluginRegistry
 from ptychodus.cli import add_log_level_argument, configure_logging
 
-logger = logging.getLogger('enhance')
+logger = logging.getLogger('enhance_xrf')
 
 # The enhancer a run without --algorithm or --options uses, and the one --print-options
 # describes when given no name. The same default the application's settings start from.

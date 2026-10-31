@@ -255,7 +255,7 @@ class ModelCore:
 
             logger.warning(
                 'Batch-mode fluorescence enhancement is deprecated and will be removed. '
-                'Reconstruct with ptychodus-reconstruct, then enhance with ptychodus-enhance.'
+                'Reconstruct with ptychodus-reconstruct, then enhance with ptychodus-enhance-xrf.'
             )
             logger.info('Enhancing fluorescence...')
 

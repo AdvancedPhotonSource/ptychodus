@@ -4,10 +4,10 @@ Ptychodus can sharpen an X-ray fluorescence dataset measured alongside a ptychog
 
 ## Running an enhancement
 
-`ptychodus-enhance` enhances a fluorescence dataset against a product file, such as the `product.h5` that `ptychodus-reconstruct` writes:
+`ptychodus-enhance-xrf` enhances a fluorescence dataset against a product file, such as the `product.h5` that `ptychodus-reconstruct` writes:
 
 ```sh
-$ ptychodus-enhance --product out/product.h5 --fluorescence 2xfm_0123.mda.h5 \
+$ ptychodus-enhance-xrf --product out/product.h5 --fluorescence 2xfm_0123.mda.h5 \
     --algorithm vspi -o out/fluorescence.h5
 ```
 
@@ -16,8 +16,8 @@ The enhanced dataset is written in the format the measured one was read in (`--f
 An enhancer runs at its default options unless an options file is given. `--print-options` writes one, naming the enhancer and its fields by their declared names:
 
 ```sh
-$ ptychodus-enhance --print-options vspi > vspi.yaml
-$ ptychodus-enhance --product out/product.h5 --fluorescence 2xfm_0123.mda.h5 \
+$ ptychodus-enhance-xrf --print-options vspi > vspi.yaml
+$ ptychodus-enhance-xrf --product out/product.h5 --fluorescence 2xfm_0123.mda.h5 \
     --options vspi.yaml -o out/fluorescence.h5
 ```
 

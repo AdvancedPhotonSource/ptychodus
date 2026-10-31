@@ -101,7 +101,7 @@ fly054/
 
 `product.h5` is the result: it carries the object, the probe, the refined probe positions, and
 the metadata the reconstruction used. It opens in the GUI and reads back through the Python
-API. `ptychodus-enhance` takes it with a fluorescence dataset from the same scan, as
+API. `ptychodus-enhance-xrf` takes it with a fluorescence dataset from the same scan, as
 {doc}`fluorescence` describes.
 
 `ptychi_options.yaml` records the options *after* the product's own values were folded in, so
