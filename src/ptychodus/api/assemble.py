@@ -345,11 +345,6 @@ class DetectorCorrections:
     divide_flat_field: bool = False
     flat_field_floor: float = 1.0e-3
 
-    @classmethod
-    def create_null(cls) -> DetectorCorrections:
-        """No maps, so nothing is applied or carried."""
-        return cls()
-
     @property
     def applies_background(self) -> bool:
         return self.subtract_background and self.background is not None

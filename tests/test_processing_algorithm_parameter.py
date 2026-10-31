@@ -15,12 +15,10 @@ from pydantic import BaseModel
 import pytest
 
 from ptychodus.api.reconstruct import (
-    NullReconstructor,
     ReconstructInput,
     ReconstructOutput,
     Reconstructor,
     ReconstructorLibrary,
-    TrainableReconstructor,
 )
 from ptychodus.api.plugins import PluginList
 from ptychodus.model.parameters import StringParameter
@@ -79,8 +77,10 @@ def _selection(
 def test_a_registered_algorithm_is_selected() -> None:
     algorithm, _, _ = _selection('algo', ('lib', _Library('lib', _Reconstructor('algo'))))
 
+    reconstructor = algorithm.get_current_reconstructor()
     assert algorithm.get_value() == 'algo'
-    assert algorithm.get_current_reconstructor().name == 'algo'
+    assert reconstructor is not None
+    assert reconstructor.name == 'algo'
     assert algorithm.get_current_parts() == ('lib', 'algo')
 
 
@@ -122,17 +122,16 @@ def test_an_unresolvable_name_still_leaves_something_usable() -> None:
     assert setting.get_value() == 'nope'
 
 
-def test_a_library_offering_nothing_resolves_to_a_reconstructor_that_cannot_train() -> None:
-    """A bare install must not offer to train a no-op.
+def test_a_library_offering_nothing_resolves_to_no_reconstructor() -> None:
+    """A bare install selects nothing, so there is nothing to reconstruct or train with.
 
     A backend registers whether or not its packages are installed, so the
     empty case is a library that offers nothing rather than no library.
     """
     algorithm, _, _ = _selection('nope', ('lib', _Library('lib')))
 
-    reconstructor = algorithm.get_current_reconstructor()
-    assert isinstance(reconstructor, NullReconstructor)
-    assert not isinstance(reconstructor, TrainableReconstructor)
+    assert algorithm.get_value() == ''
+    assert algorithm.get_current_reconstructor() is None
 
 
 def test_no_backend_at_all_is_survivable() -> None:
@@ -141,7 +140,7 @@ def test_no_backend_at_all_is_survivable() -> None:
 
     assert algorithm.get_value() == ''
     assert list(algorithm.choices()) == []
-    assert isinstance(algorithm.get_current_reconstructor(), NullReconstructor)
+    assert algorithm.get_current_reconstructor() is None
 
 
 def test_the_choices_are_the_selected_library_s_algorithms() -> None:

@@ -9,7 +9,6 @@ import pytest
 
 from ptychodus.api.plugins import PluginCatalog, PluginList
 from ptychodus.api.reconstruct import (
-    NullReconstructor,
     ReconstructInput,
     TrainingDataFileWriter,
 )
@@ -50,8 +49,8 @@ def _processing_api(
     writers: PluginCatalog[TrainingDataFileWriter], *, library: str = 'Native'
 ) -> ProcessingAPI:
     algorithm_parameter = MagicMock()
-    # Not trainable: export must not depend on what is selected being able to train.
-    algorithm_parameter.get_current_reconstructor.return_value = NullReconstructor('None')
+    # Nothing selected: export must not depend on what is selected being able to train.
+    algorithm_parameter.get_current_reconstructor.return_value = None
     algorithm_parameter.get_current_parts.return_value = (library, 'Algorithm')
     return ProcessingAPI(
         MagicMock(),

@@ -9,8 +9,11 @@ import numpy
 import numpy.testing
 import pytest
 
+from collections.abc import Iterator
+
+from pydantic import BaseModel
+
 from ptychodus.api.geometry import PixelGeometry
-from typing import cast
 
 from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeEnsemble
@@ -19,14 +22,12 @@ from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.metrics import estimate_reconstruction_ambiguities
 from ptychodus.api.reconstruct import (
-    NoOptions,
-    NullReconstructor,
     PositionIndexFilter,
     ReconstructInput,
+    ReconstructOutput,
     ReconstructionAmbiguities,
     Reconstructor,
     ReconstructorLibrary,
-    TrainableReconstructor,
     prepare_reconstruct_input,
     warn_if_propagation_regime_disagrees,
 )
@@ -1212,22 +1213,6 @@ class TestPrepareReconstructInputOPRWeights:
         )
 
 
-class TestNullReconstructor:
-    """NullReconstructor must remain instantiable as new abstract methods are added."""
-
-    def test_instantiable(self) -> None:
-        # Will raise TypeError if any abstract method on Reconstructor lacks a stub.
-        NullReconstructor('null')
-
-    def test_it_reconstructs_nothing(self) -> None:
-        null = NullReconstructor('null')
-        assert list(null.reconstruct(cast(ReconstructInput, None), options=NoOptions())) == []
-
-    def test_it_is_not_trainable(self) -> None:
-        """What a bare install selects, so a Train button must not appear for it."""
-        assert not isinstance(NullReconstructor('null'), TrainableReconstructor)
-
-
 # ---------------------------------------------------------------------------
 # warn_if_propagation_regime_disagrees
 # ---------------------------------------------------------------------------
@@ -1351,12 +1336,22 @@ def _library(
 ) -> ReconstructorLibrary:
     """A library that either offers one reconstructor or fails to build."""
 
+    class _Plain(Reconstructor):
+        @property
+        def name(self) -> str:
+            return 'algo'
+
+        def reconstruct(
+            self, input_: ReconstructInput, *, options: BaseModel
+        ) -> Iterator[ReconstructOutput]:
+            yield from ()
+
     class _Library(ReconstructorLibrary):
         def _build(self) -> list[Reconstructor]:
             if build is not None:
                 raise build
 
-            return [NullReconstructor('algo')]
+            return [_Plain()]
 
     return _Library('backend_under_test', 'backend-under-test', requires=requires)
 

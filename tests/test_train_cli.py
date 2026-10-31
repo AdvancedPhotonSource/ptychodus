@@ -20,7 +20,6 @@ from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.product import LossValue
 from ptychodus.api.reconstruct import (
-    NullReconstructor,
     ReconstructInput,
     ReconstructOutput,
     Reconstructor,
@@ -47,6 +46,19 @@ class _Training(BaseModel):
 class _Options(BaseModel):
     learning_rate: float = Field(1.0e-3, gt=0.0)
     training: _Training = Field(default_factory=_Training)
+
+
+class _Solver(Reconstructor):
+    """An algorithm the library offers that cannot train."""
+
+    @property
+    def name(self) -> str:
+        return 'Solve'
+
+    def reconstruct(
+        self, input_: ReconstructInput, *, options: BaseModel
+    ) -> Iterator[ReconstructOutput]:
+        yield from ()
 
 
 class _FakeTrainer(TrainableReconstructor):
@@ -131,7 +143,7 @@ def _registry(monkeypatch: pytest.MonkeyPatch, ddp: _FakeTrainer, single: _FakeT
     """Offer only the fake library, and keep ``main()`` off the test process's globals."""
     registry = PluginRegistry()
     registry.reconstructor_libraries.register_plugin(
-        _FakeLibrary([ddp, single, NullReconstructor('Solve')]),
+        _FakeLibrary([ddp, single, _Solver()]),
         simple_name='fake',
         display_name='Fake',
     )

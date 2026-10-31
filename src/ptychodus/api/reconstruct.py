@@ -48,7 +48,6 @@ __all__ = [
     'DumpReconstructOptions',
     'DumpTrainOptions',
     'NoOptions',
-    'NullReconstructor',
     'PositionIndexFilter',
     'ReconstructInput',
     'ReconstructionAmbiguities',
@@ -206,27 +205,6 @@ class TrainableReconstructor(Reconstructor):
         Override when the backend makes that promise.
         """
         return False
-
-
-class NullReconstructor(Reconstructor):
-    """Stands in for a selection that resolves to no reconstructor at all.
-
-    A plain :class:`Reconstructor` rather than a trainable one, deliberately:
-    there is nothing here to train, so a test for trainability should say so
-    rather than find a stub. Reconstructing yields nothing.
-    """
-
-    def __init__(self, name: str) -> None:
-        self._name = name
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    def reconstruct(
-        self, input_: ReconstructInput, *, options: BaseModel
-    ) -> Iterator[ReconstructOutput]:
-        yield from ()
 
 
 class ReconstructorMessage(StrEnum):

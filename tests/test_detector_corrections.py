@@ -62,9 +62,9 @@ def _uint16_array(values: numpy.ndarray, num_patterns: int = 2) -> SimpleDiffrac
 # ---------- DetectorCorrections ----------
 
 
-def test_null_corrections_change_nothing() -> None:
+def test_default_corrections_change_nothing() -> None:
     patterns = numpy.ones((1, 2, 2), dtype=numpy.uint16)
-    corrections = DetectorCorrections.create_null()
+    corrections = DetectorCorrections()
 
     assert corrections.apply(patterns) is patterns
     assert corrections.apply_to_dtype(numpy.dtype(numpy.uint16)) == numpy.uint16

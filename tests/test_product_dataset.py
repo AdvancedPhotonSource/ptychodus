@@ -166,6 +166,29 @@ def test_get_reconstruct_input_raises_without_dataset() -> None:
         api.get_reconstruct_input(product_index=0)
 
 
+def test_reconstruct_without_a_reconstructor_raises_before_inserting_a_product() -> None:
+    """A library offering no algorithm must not leave a stray output product behind."""
+    product_api = MagicMock()
+    algorithm = MagicMock()
+    algorithm.get_current_reconstructor.return_value = None
+    algorithm.get_current_parts.return_value = ('lib', '')
+    api = ProcessingAPI(
+        MagicMock(),
+        product_api,
+        MagicMock(),
+        algorithm,
+        {},
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
+    )
+
+    with pytest.raises(RuntimeError, match='lib offers no reconstructor'):
+        api.reconstruct(product_index=0)
+
+    product_api.insert_product.assert_not_called()
+
+
 def test_get_reconstruct_input_uses_product_dataset() -> None:
     dataset = MagicMock()
     product = MagicMock()

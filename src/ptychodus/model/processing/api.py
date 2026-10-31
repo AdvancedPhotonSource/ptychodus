@@ -7,7 +7,6 @@ from pydantic import BaseModel
 
 from ptychodus.api.plugins import PluginCatalog
 from ptychodus.api.reconstruct import (
-    NullReconstructor,
     PositionIndexFilter,
     ReconstructInput,
     Reconstructor,
@@ -84,7 +83,7 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
         self._library = library
         self._default = default
         self._current = ''
-        self._current_reconstructor: Reconstructor = NullReconstructor('None')
+        self._current_reconstructor: Reconstructor | None = None
         # The last algorithm chosen for each library this session, so that
         # looking at another backend and coming back does not quietly land
         # somewhere else. Not persisted: a key per library is more than a
@@ -145,7 +144,7 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
 
         if selected is None:
             self._current = ''
-            self._current_reconstructor = NullReconstructor('None')
+            self._current_reconstructor = None
         else:
             self._current = selected.name
             self._current_reconstructor = selected
@@ -188,7 +187,8 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
     def set_value_from_string(self, value: str) -> None:
         self.set_value(value)
 
-    def get_current_reconstructor(self) -> Reconstructor:
+    def get_current_reconstructor(self) -> Reconstructor | None:
+        """The selected reconstructor, or None when the library offers no algorithm."""
         return self._current_reconstructor
 
     def get_current_parts(self) -> tuple[str, str]:
@@ -320,6 +320,14 @@ class ProcessingAPI:
         block: bool = False,
     ) -> int:
         self.set_reconstructor_if_provided(library=library, algorithm=algorithm)
+        reconstructor = self._algorithm_parameter.get_current_reconstructor()
+
+        if reconstructor is None:
+            selected_library, _ = self.current_selection()
+            raise RuntimeError(
+                f'{selected_library} offers no reconstructor; is its backend installed?'
+            )
+
         input_product_item = self._product_api.get_item(product_index)
         output_product_name = _build_output_product_name(
             input_product_item.get_name(),
@@ -336,7 +344,6 @@ class ProcessingAPI:
             product_index=output_product_index,
             index_filter=index_filter,
         )
-        reconstructor = self._algorithm_parameter.get_current_reconstructor()
         options = self._options_for(reconstructor)
         background_task = ReconstructBackgroundTask(
             self._task_monitor,
