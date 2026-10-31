@@ -12,17 +12,22 @@ from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers.polling import PollingObserver
 
 from ptychodus.webapp.ingest.pipeline import delete_manifest, ingest_manifest
-from ptychodus.webapp.storage.layout import StoreLayout
-from ptychodus.webapp.storage.manifest import MANIFEST_FILENAME
+from ptychodus.api.storage import MANIFEST_FILENAME, StorageLayout
 
 logger = logging.getLogger(__name__)
 
 
 class _ManifestEventHandler(FileSystemEventHandler):
-    """Collapses bursts of manifest events into a single debounced ingest per path."""
+    """Collapses bursts of manifest events into a single debounced ingest per path.
 
-    def __init__(self, on_upsert, on_delete, debounce_window_s: float) -> None:
+    Paths with a hidden component below the storage root -- the savers' ``.staging/``
+    among them -- are not resources and are ignored. A resource renamed in from staging
+    arrives as its manifest moving to a watched path.
+    """
+
+    def __init__(self, root: Path, on_upsert, on_delete, debounce_window_s: float) -> None:
         super().__init__()
+        self._root = root
         self._on_upsert = on_upsert
         self._on_delete = on_delete
         self._debounce_window_s = debounce_window_s
@@ -31,7 +36,17 @@ class _ManifestEventHandler(FileSystemEventHandler):
         self._lock = Lock()
 
     def _is_manifest(self, src_path: str) -> bool:
-        return Path(src_path).name == MANIFEST_FILENAME
+        path = Path(src_path)
+
+        if path.name != MANIFEST_FILENAME:
+            return False
+
+        try:
+            parts = path.relative_to(self._root).parts
+        except ValueError:
+            return False
+
+        return not any(part.startswith('.') for part in parts)
 
     def _schedule_upsert(self, path: Path) -> None:
         with self._lock:
@@ -76,7 +91,7 @@ class ManifestWatcher:
 
     def __init__(
         self,
-        layout: StoreLayout,
+        layout: StorageLayout,
         session_factory: async_sessionmaker,
         loop: asyncio.AbstractEventLoop,
         *,
@@ -90,7 +105,7 @@ class ManifestWatcher:
         self._debounce_window_s = debounce_window_s
         self._observer = PollingObserver(timeout=polling_interval_s)
         self._handler = _ManifestEventHandler(
-            self._schedule_upsert, self._schedule_delete, debounce_window_s
+            layout.root, self._schedule_upsert, self._schedule_delete, debounce_window_s
         )
         self._pending_upsert_handles: dict[Path, asyncio.TimerHandle] = {}
         self._pending_delete_handles: dict[Path, asyncio.TimerHandle] = {}

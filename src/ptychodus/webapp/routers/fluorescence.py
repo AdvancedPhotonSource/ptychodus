@@ -19,7 +19,7 @@ from ptychodus.webapp.rendering.params import RenderParamsDep
 from ptychodus.webapp.routers._convert import fluorescence_to_read
 from ptychodus.webapp.routers.deps import LayoutDep, SessionDep
 from ptychodus.webapp.routers.schemas import FluorescenceRead, Page
-from ptychodus.webapp.storage.manifest import ResourceKind
+from ptychodus.api.storage import ResourceKind
 
 _DEFAULT_FLUORESCENCE_PIXEL_GEOMETRY = PixelGeometry(
     width_m=LengthUnit.MICROMETER.meters_per_unit,

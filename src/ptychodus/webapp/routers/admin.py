@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ptychodus.webapp.db.session import SessionProvider
-from ptychodus.webapp.storage.layout import StoreLayout
+from ptychodus.api.storage import StorageLayout
 
 import asyncio
 import logging
@@ -17,7 +17,7 @@ from ptychodus.webapp.routers.schemas import ReindexResponse, StoreStats
 from ptychodus.webapp.db.base import IngestState
 from ptychodus.webapp.db.models import Campaign, Diffraction, Fluorescence, Product
 from ptychodus.webapp.routers.deps import SessionDep
-from ptychodus.webapp.storage.layout import LayoutError
+from ptychodus.api.storage import LayoutError
 from sqlalchemy import func, or_, select
 from fastapi import Request
 
@@ -31,7 +31,7 @@ router = APIRouter(prefix='/admin', tags=['admin'])
 _rescan_lock = asyncio.Lock()
 
 
-async def _do_rescan(session_provider: SessionProvider, layout: StoreLayout) -> None:
+async def _do_rescan(session_provider: SessionProvider, layout: StorageLayout) -> None:
     try:
         async with _rescan_lock:
             async with session_provider.session_factory() as session:

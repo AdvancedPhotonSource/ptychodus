@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from httpx import AsyncClient
 from pathlib import Path
-from ptychodus.webapp.storage.layout import StoreLayout
+from ptychodus.api.storage import StorageLayout
 from sqlalchemy.ext.asyncio import AsyncEngine
 from uuid import UUID, uuid4
 
@@ -18,7 +18,7 @@ from ptychodus.webapp.ingest.pipeline import ingest_manifest
 pytestmark = pytest.mark.asyncio
 
 
-async def _ingest(db_engine: AsyncEngine, layout: StoreLayout, manifest_path: Path) -> None:
+async def _ingest(db_engine: AsyncEngine, layout: StorageLayout, manifest_path: Path) -> None:
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
     factory = async_sessionmaker(db_engine, expire_on_commit=False)
@@ -66,7 +66,7 @@ async def test_visualization_options_follow_the_desktop(app_client: AsyncClient)
 async def test_diffraction_pattern_image(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
@@ -85,7 +85,7 @@ async def test_diffraction_pattern_image(
 async def test_diffraction_pattern_out_of_range(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
@@ -98,7 +98,7 @@ async def test_diffraction_pattern_out_of_range(
 async def test_diffraction_aggregate_image(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
@@ -112,7 +112,7 @@ async def test_diffraction_aggregate_image(
 async def test_probe_image(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
@@ -129,7 +129,7 @@ async def test_probe_image(
 async def test_probe_image_cylindrical(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
@@ -144,7 +144,7 @@ async def test_probe_image_cylindrical(
 async def test_probe_image_component_and_color_model_rejected(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
@@ -160,7 +160,7 @@ async def test_probe_image_component_and_color_model_rejected(
 async def test_probe_incoherent_out_of_range(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
@@ -173,7 +173,7 @@ async def test_probe_incoherent_out_of_range(
 async def test_probe_modes_image(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
@@ -188,7 +188,7 @@ async def test_probe_modes_image(
 async def test_object_layer_image(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
@@ -204,7 +204,7 @@ async def test_object_layer_image(
 async def test_object_layer_out_of_range(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
@@ -217,7 +217,7 @@ async def test_object_layer_out_of_range(
 async def test_fluorescence_element_image(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_fluorescence: Callable[..., UUID],
 ) -> None:
     f = seed_fluorescence(elements=['Fe', 'Cu'])
@@ -231,7 +231,7 @@ async def test_fluorescence_element_image(
 async def test_fluorescence_element_missing(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_fluorescence: Callable[..., UUID],
 ) -> None:
     f = seed_fluorescence(elements=['Fe', 'Cu'])
@@ -246,7 +246,7 @@ async def test_fluorescence_element_missing(
 async def test_fluorescence_with_product_pixel_geometry(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
     seed_fluorescence: Callable[..., UUID],
 ) -> None:
@@ -270,7 +270,7 @@ async def test_fluorescence_with_product_pixel_geometry(
 async def test_bad_colormap_returns_400(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
@@ -288,7 +288,7 @@ async def test_bad_colormap_returns_400(
 async def test_bad_transform_returns_400(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
@@ -303,7 +303,7 @@ async def test_bad_transform_returns_400(
 async def test_component_on_real_endpoint_rejected(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
@@ -318,7 +318,7 @@ async def test_component_on_real_endpoint_rejected(
 async def test_positions_plot_overlays_several_products(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ):
     """The scan plot takes repeated uuid params and draws them on shared axes.
@@ -369,7 +369,7 @@ async def test_positions_plot_404s_on_an_unknown_product(
 async def test_legend_matches_the_renderer(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
     params: dict[str, str],
     cyclic: bool,
@@ -390,7 +390,7 @@ async def test_legend_matches_the_renderer(
 async def test_real_valued_legend_follows_the_colormap(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
@@ -411,7 +411,7 @@ async def test_real_valued_legend_follows_the_colormap(
 async def test_object_flattened_image(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ) -> None:
     """The object's own row shows the product of its layers, as the desktop's does."""
@@ -426,7 +426,7 @@ async def test_object_flattened_image(
 async def test_fluorescence_summary_image(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_fluorescence: Callable[..., UUID],
 ) -> None:
     """The dataset's own row shows every element map summed, as the desktop's does."""

@@ -29,7 +29,7 @@ from ptychodus.webapp.routers import (
     visualization,
 )
 from ptychodus.webapp.routers import product as product_router
-from ptychodus.webapp.storage.layout import StoreLayout
+from ptychodus.api.storage import StorageLayout
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     _configure_logging(settings.log_level)
 
-    layout = StoreLayout(settings.storage_root)
+    layout = StorageLayout(settings.storage_root)
     engine = create_engine(settings.database_url)
     session_provider = SessionProvider(engine)
 

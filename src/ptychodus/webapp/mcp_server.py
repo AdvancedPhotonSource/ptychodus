@@ -54,8 +54,8 @@ from ptychodus.webapp.routers.schemas import (
     ProductRead,
     StoreStats,
 )
-from ptychodus.webapp.storage.layout import StoreLayout
-from ptychodus.webapp.storage.manifest import ResourceKind
+from ptychodus.api.storage import StorageLayout
+from ptychodus.api.storage import ResourceKind
 
 logger = logging.getLogger(__name__)
 
@@ -67,14 +67,14 @@ _DEFAULT_FLUORESCENCE_PIXEL_GEOMETRY = PixelGeometry(
 
 class _Ctx:
     provider: SessionProvider | None = None
-    layout: StoreLayout | None = None
+    layout: StorageLayout | None = None
 
 
 def bind_session_provider(provider: SessionProvider) -> None:
     _Ctx.provider = provider
 
 
-def bind_layout(layout: StoreLayout) -> None:
+def bind_layout(layout: StorageLayout) -> None:
     _Ctx.layout = layout
 
 
@@ -86,9 +86,9 @@ async def _session() -> AsyncIterator[AsyncSession]:
         yield session
 
 
-def _require_layout() -> StoreLayout:
+def _require_layout() -> StorageLayout:
     if _Ctx.layout is None:
-        raise ToolError('StoreLayout not bound; call bind_layout() first')
+        raise ToolError('StorageLayout not bound; call bind_layout() first')
     return _Ctx.layout
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ptychodus.webapp.db.models import Diffraction
 from ptychodus.webapp.db.session import SessionProvider
-from ptychodus.webapp.storage.layout import StoreLayout
+from ptychodus.api.storage import StorageLayout
 
 import asyncio
 import json
@@ -54,7 +54,7 @@ def _write_diffraction_folder(root: Path, uuid_str: str) -> Path:
 
 
 async def test_watcher_picks_up_new_manifest(
-    tmp_storage_root: Path, layout: StoreLayout, session_provider: SessionProvider
+    tmp_storage_root: Path, layout: StorageLayout, session_provider: SessionProvider
 ):
     loop = asyncio.get_running_loop()
     watcher = ManifestWatcher(
@@ -80,7 +80,7 @@ async def test_watcher_picks_up_new_manifest(
 
 
 async def test_watcher_handles_manifest_delete(
-    tmp_storage_root: Path, layout: StoreLayout, session_provider: SessionProvider
+    tmp_storage_root: Path, layout: StorageLayout, session_provider: SessionProvider
 ):
     loop = asyncio.get_running_loop()
     watcher = ManifestWatcher(
@@ -109,5 +109,36 @@ async def test_watcher_handles_manifest_delete(
                 return (await repo.get_row(session, Diffraction, uuid)) is None
 
         assert await _wait_until(gone, timeout=8.0)
+    finally:
+        watcher.stop()
+
+
+async def test_watcher_ingests_a_resource_renamed_in_from_staging(
+    tmp_storage_root: Path, layout: StorageLayout, session_provider: SessionProvider
+):
+    """The savers stage a resource under ``.staging/`` and rename it into place."""
+    loop = asyncio.get_running_loop()
+    watcher = ManifestWatcher(
+        layout,
+        session_provider.session_factory,
+        loop,
+        polling_interval_s=0.3,
+        debounce_window_s=0.2,
+    )
+    watcher.start()
+    try:
+        uuid = uuid4()
+        staged = _write_diffraction_folder(tmp_storage_root / '.staging', str(uuid))
+        await asyncio.sleep(1.0)
+
+        async def check():
+            async with session_provider.session_factory() as session:
+                return await repo.get_row(session, Diffraction, uuid)
+
+        assert await check() is None, 'a staged resource must not be ingested'
+
+        staged.rename(tmp_storage_root / 'diffraction' / str(uuid))
+        row = await _wait_until(check, timeout=8.0)
+        assert row is not None, 'watcher did not ingest the renamed-in resource'
     finally:
         watcher.stop()

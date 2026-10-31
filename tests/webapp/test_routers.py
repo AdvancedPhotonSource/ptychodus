@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from httpx import AsyncClient
 from pathlib import Path
-from ptychodus.webapp.storage.layout import StoreLayout
+from ptychodus.api.storage import StorageLayout
 from sqlalchemy.ext.asyncio import AsyncEngine
 from uuid import UUID
 
@@ -14,7 +14,9 @@ from ptychodus.webapp.ingest.pipeline import ingest_manifest
 pytestmark = pytest.mark.asyncio
 
 
-async def _ingest(client, db_engine: AsyncEngine, layout: StoreLayout, manifest_path: Path) -> None:
+async def _ingest(
+    client, db_engine: AsyncEngine, layout: StorageLayout, manifest_path: Path
+) -> None:
     # Use a fresh session from the same engine the app is wired to.
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
@@ -35,7 +37,7 @@ async def test_health(app_client: AsyncClient) -> None:
 async def test_campaign_list_and_get(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_campaign: Callable[..., UUID],
 ):
     c = seed_campaign(sample_name='alpha', tags=['benchmark'])
@@ -59,7 +61,7 @@ async def test_campaign_list_and_get(
 async def test_diffraction_filter_by_campaign(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_campaign: Callable[..., UUID],
     seed_diffraction: Callable[..., UUID],
 ):
@@ -85,7 +87,7 @@ async def test_diffraction_filter_by_campaign(
 async def test_product_derived_from_filter(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
     seed_product: Callable[..., UUID],
 ):
@@ -109,7 +111,7 @@ async def test_product_derived_from_filter(
 async def test_lineage_dag_walk(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_campaign: Callable[..., UUID],
     seed_diffraction: Callable[..., UUID],
     seed_product: Callable[..., UUID],
@@ -148,7 +150,7 @@ async def test_lineage_dag_walk(
 async def test_file_download(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
 ):
     d = seed_diffraction()
@@ -163,7 +165,7 @@ async def test_file_download(
 async def test_admin_stats(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_campaign: Callable[..., UUID],
     seed_diffraction: Callable[..., UUID],
 ):
@@ -184,7 +186,7 @@ async def test_admin_stats(
 async def test_derived_quantities_need_only_metadata(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ):
     """Five of the nine follow from the product's own columns."""
@@ -202,7 +204,7 @@ async def test_derived_quantities_need_only_metadata(
 async def test_detector_dependent_quantities_need_the_lineage_edge(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
     seed_product: Callable[..., UUID],
 ):
@@ -237,7 +239,7 @@ async def test_detector_dependent_quantities_need_the_lineage_edge(
 async def test_product_reports_every_desktop_property(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
     seed_product: Callable[..., UUID],
 ):
@@ -287,7 +289,7 @@ async def test_product_reports_every_desktop_property(
 async def test_derived_from_edges_carry_the_target_name(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
     seed_fluorescence: Callable[..., UUID],
 ):

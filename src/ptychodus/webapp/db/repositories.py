@@ -16,7 +16,7 @@ from ptychodus.webapp.db.models import (
     Fluorescence,
     Product,
 )
-from ptychodus.webapp.storage.manifest import ResourceKind
+from ptychodus.api.storage import ResourceKind
 
 # Every row model this module reads or writes. Generic helpers below are keyed on the
 # model class rather than the kind string, so a caller that names a concrete table gets

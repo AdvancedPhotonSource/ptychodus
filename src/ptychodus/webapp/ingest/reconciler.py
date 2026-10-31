@@ -11,13 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ptychodus.webapp.db import repositories as repo
 from ptychodus.webapp.db.models import Campaign, DerivationEdge, Diffraction, Fluorescence, Product
 from ptychodus.webapp.ingest.pipeline import ingest_manifest
-from ptychodus.webapp.storage.layout import StoreLayout
-from ptychodus.webapp.storage.manifest import ResourceKind
+from ptychodus.api.storage import StorageLayout
+from ptychodus.api.storage import ResourceKind
 
 logger = logging.getLogger(__name__)
 
 
-async def full_rescan(session: AsyncSession, layout: StoreLayout) -> dict[str, int]:
+async def full_rescan(session: AsyncSession, layout: StorageLayout) -> dict[str, int]:
     """Walk the store, upsert every manifest, then drop rows whose folder no longer exists."""
 
     found_uuids: dict[str, set[UUID]] = {

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 from ptychodus.webapp.db.models import Diffraction, Product
-from ptychodus.webapp.storage.layout import StoreLayout
+from ptychodus.api.storage import StorageLayout
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
@@ -20,7 +20,7 @@ pytestmark = pytest.mark.asyncio
 
 
 async def test_ingest_diffraction_valid(
-    db_session: AsyncSession, layout: StoreLayout, seed_diffraction: Callable[..., UUID]
+    db_session: AsyncSession, layout: StorageLayout, seed_diffraction: Callable[..., UUID]
 ):
     uuid = seed_diffraction()
     manifest_path = layout.manifest_path('diffraction', uuid)
@@ -38,7 +38,7 @@ async def test_ingest_diffraction_valid(
 
 
 async def test_ingest_diffraction_missing_h5(
-    db_session: AsyncSession, layout: StoreLayout, seed_diffraction: Callable[..., UUID]
+    db_session: AsyncSession, layout: StorageLayout, seed_diffraction: Callable[..., UUID]
 ):
     uuid = seed_diffraction(write_h5=False)
     await ingest_manifest(db_session, layout, layout.manifest_path('diffraction', uuid))
@@ -49,7 +49,7 @@ async def test_ingest_diffraction_missing_h5(
 
 
 async def test_ingest_bad_json(
-    db_session: AsyncSession, layout: StoreLayout, tmp_storage_root: Path
+    db_session: AsyncSession, layout: StorageLayout, tmp_storage_root: Path
 ):
     from uuid import uuid4
 
@@ -68,7 +68,7 @@ async def test_ingest_bad_json(
 
 async def test_derived_from_creates_edge(
     db_session: AsyncSession,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
     seed_product: Callable[..., UUID],
 ):
@@ -90,7 +90,7 @@ async def test_derived_from_creates_edge(
 
 async def test_orphan_then_resolves(
     db_session: AsyncSession,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
     seed_product: Callable[..., UUID],
 ):
@@ -118,7 +118,7 @@ async def test_orphan_then_resolves(
 
 async def test_delete_manifest_removes_row_and_propagates(
     db_session: AsyncSession,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
     seed_product: Callable[..., UUID],
 ):
@@ -139,7 +139,7 @@ async def test_delete_manifest_removes_row_and_propagates(
 
 async def test_multi_parent_edges(
     db_session: AsyncSession,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
     seed_product: Callable[..., UUID],
 ):
@@ -163,7 +163,7 @@ async def test_multi_parent_edges(
 
 async def test_rewrite_manifest_shrinks_edges(
     db_session: AsyncSession,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
     seed_product: Callable[..., UUID],
 ):

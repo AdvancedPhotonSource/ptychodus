@@ -26,14 +26,14 @@ def _serve(_args: argparse.Namespace) -> None:
 def _rebuild_index(_args: argparse.Namespace) -> None:
     from ptychodus.webapp.db.session import SessionProvider, create_engine, create_schema
     from ptychodus.webapp.ingest.reconciler import full_rescan
-    from ptychodus.webapp.storage.layout import StoreLayout
+    from ptychodus.api.storage import StorageLayout
 
     settings = get_settings()
     logging.basicConfig(
         level=getattr(logging, settings.log_level.upper(), logging.INFO),
         format='%(asctime)s %(levelname)s %(name)s: %(message)s',
     )
-    layout = StoreLayout(settings.storage_root)
+    layout = StorageLayout(settings.storage_root)
     engine = create_engine(settings.database_url)
     provider = SessionProvider(engine)
 

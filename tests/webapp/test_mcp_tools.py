@@ -8,7 +8,7 @@ from collections.abc import Callable
 from fastmcp import FastMCP
 from pathlib import Path
 from ptychodus.webapp.db.session import SessionProvider
-from ptychodus.webapp.storage.layout import StoreLayout
+from ptychodus.api.storage import StorageLayout
 from uuid import UUID
 
 import base64
@@ -49,7 +49,7 @@ def _decode_image_content(result: ToolResult, expected_h: int, expected_w: int) 
 
 async def test_mcp_tools_registered_and_callable(
     session_provider: SessionProvider,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_campaign: Callable[..., UUID],
     seed_diffraction: Callable[..., UUID],
     seed_product: Callable[..., UUID],
@@ -108,14 +108,14 @@ async def test_mcp_tools_registered_and_callable(
 
 
 @pytest.fixture
-def bound_mcp(session_provider: SessionProvider, layout: StoreLayout):
+def bound_mcp(session_provider: SessionProvider, layout: StorageLayout):
     bind_session_provider(session_provider)
     bind_layout(layout)
     return create_mcp_server()
 
 
 async def _ingest(
-    session_provider: SessionProvider, layout: StoreLayout, manifest_path: Path
+    session_provider: SessionProvider, layout: StorageLayout, manifest_path: Path
 ) -> None:
     async with session_provider.session_factory() as session:
         await ingest_manifest(session, layout, manifest_path)
@@ -133,7 +133,7 @@ async def test_mcp_get_visualization_options(bound_mcp: FastMCP) -> None:
 async def test_mcp_render_diffraction_pattern(
     bound_mcp: FastMCP,
     session_provider: SessionProvider,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
@@ -147,7 +147,7 @@ async def test_mcp_render_diffraction_pattern(
 async def test_mcp_render_diffraction_aggregate(
     bound_mcp: FastMCP,
     session_provider: SessionProvider,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
@@ -159,7 +159,7 @@ async def test_mcp_render_diffraction_aggregate(
 async def test_mcp_render_probe(
     bound_mcp: FastMCP,
     session_provider: SessionProvider,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
@@ -171,7 +171,7 @@ async def test_mcp_render_probe(
 async def test_mcp_render_probe_cylindrical(
     bound_mcp: FastMCP,
     session_provider: SessionProvider,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
@@ -183,7 +183,7 @@ async def test_mcp_render_probe_cylindrical(
 async def test_mcp_render_probe_modes(
     bound_mcp: FastMCP,
     session_provider: SessionProvider,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
@@ -195,7 +195,7 @@ async def test_mcp_render_probe_modes(
 async def test_mcp_render_object_layer(
     bound_mcp: FastMCP,
     session_provider: SessionProvider,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
@@ -209,7 +209,7 @@ async def test_mcp_render_object_layer(
 async def test_mcp_render_fluorescence_element(
     bound_mcp: FastMCP,
     session_provider: SessionProvider,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_fluorescence: Callable[..., UUID],
 ) -> None:
     f = seed_fluorescence(elements=['Fe', 'Cu'])
@@ -223,7 +223,7 @@ async def test_mcp_render_fluorescence_element(
 async def test_mcp_render_object(
     bound_mcp: FastMCP,
     session_provider: SessionProvider,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
@@ -235,7 +235,7 @@ async def test_mcp_render_object(
 async def test_mcp_render_fluorescence_summary(
     bound_mcp: FastMCP,
     session_provider: SessionProvider,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_fluorescence: Callable[..., UUID],
 ) -> None:
     f = seed_fluorescence(elements=['Fe', 'Cu'])
@@ -247,7 +247,7 @@ async def test_mcp_render_fluorescence_summary(
 async def test_mcp_render_object_layer_out_of_range(
     bound_mcp: FastMCP,
     session_provider: SessionProvider,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
@@ -259,7 +259,7 @@ async def test_mcp_render_object_layer_out_of_range(
 async def test_mcp_render_bad_colormap(
     bound_mcp: FastMCP,
     session_provider: SessionProvider,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
 ) -> None:
     d = seed_diffraction()
@@ -274,7 +274,7 @@ async def test_mcp_render_bad_colormap(
 async def test_mcp_render_probe_component_and_color_model_rejected(
     bound_mcp: FastMCP,
     session_provider: SessionProvider,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ) -> None:
     p = seed_product()
@@ -289,7 +289,7 @@ async def test_mcp_render_probe_component_and_color_model_rejected(
 async def test_mcp_render_fluorescence_missing_element(
     bound_mcp: FastMCP,
     session_provider: SessionProvider,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_fluorescence: Callable[..., UUID],
 ) -> None:
     f = seed_fluorescence(elements=['Fe', 'Cu'])

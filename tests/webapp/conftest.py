@@ -19,20 +19,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ptychodus.webapp.config import Settings
 from ptychodus.webapp.db.session import SessionProvider, create_engine, create_schema
-from ptychodus.webapp.storage.layout import StoreLayout
+from ptychodus.api.storage import StorageLayout
 
 
 @pytest.fixture
 def tmp_storage_root(tmp_path: Path) -> Path:
     root = tmp_path / 'store'
-    layout = StoreLayout(root)
+    layout = StorageLayout(root)
     layout.ensure_kind_dirs()
     return root
 
 
 @pytest.fixture
-def layout(tmp_storage_root: Path) -> StoreLayout:
-    return StoreLayout(tmp_storage_root)
+def layout(tmp_storage_root: Path) -> StorageLayout:
+    return StorageLayout(tmp_storage_root)
 
 
 @pytest_asyncio.fixture
@@ -248,7 +248,7 @@ async def app_client(
     )
     from ptychodus.webapp.routers import product as product_router
 
-    layout = StoreLayout(tmp_storage_root)
+    layout = StorageLayout(tmp_storage_root)
     provider = SessionProvider(db_engine)
     bind_session_provider(provider)
     settings = Settings(

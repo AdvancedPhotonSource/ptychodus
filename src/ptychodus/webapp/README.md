@@ -50,7 +50,15 @@ The shipped wheel already contains the compiled frontend. Rebuilding the UI in p
     fluorescence.h5
 ```
 
-Per-kind subdirectories are created on first start via `layout.ensure_kind_dirs()`. The service watches for changes to `manifest.json` files and reconciles them into the SQLite cache. Canonical definitions live in [storage/layout.py](storage/layout.py) and [storage/manifest.py](storage/manifest.py).
+Per-kind subdirectories are created on first start via `layout.ensure_kind_dirs()`. The service watches for changes to `manifest.json` files and reconciles them into the SQLite cache, ignoring hidden paths such as `.staging/`. Canonical definitions live in [api/storage.py](../api/storage.py), shared with the writers.
+
+Resources are added through that module's chainable savers — `save_campaign_resource`, `save_diffraction_resource` and `save_product_resource` — which assemble each resource under `<storage_root>/.staging/` and rename it into place, so the service sees it whole or not at all. Each returns the new uuid, which the next takes in `campaign` or `derived_from`:
+
+```python
+campaign = save_campaign_resource(layout, label='fly001 demo')
+diffraction = save_diffraction_resource(layout, data, label='scan 42', campaign=campaign)
+product = save_product_resource(layout, product, derived_from=[diffraction])
+```
 
 ## Configuration
 

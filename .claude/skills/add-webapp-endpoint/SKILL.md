@@ -94,7 +94,7 @@ Rules:
 If this is a genuinely new resource (not a new query over an existing one), you also need:
 
 - SQLAlchemy model in `src/ptychodus/webapp/db/models.py` (UUID PK, `ingest_state`, metadata fields).
-- New `ResourceKind` enum variant in `src/ptychodus/webapp/storage/manifest.py`.
+- New `ResourceKind` enum variant in `src/ptychodus/api/storage.py`.
 - Ingestion path in `src/ptychodus/webapp/ingest/` (reconciler + watcher will pick it up automatically once the kind is registered).
 
 ## Testing

@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ptychodus.webapp.db import repositories as repo
 from ptychodus.webapp.db.base import IngestState
 from ptychodus.webapp.storage import h5_introspect
-from ptychodus.webapp.storage.layout import LayoutError, StoreLayout
-from ptychodus.webapp.storage.manifest import (
+from ptychodus.api.storage import LayoutError, StorageLayout
+from ptychodus.api.storage import (
     CampaignManifest,
     DiffractionManifest,
     FluorescenceManifest,
@@ -231,7 +231,9 @@ async def _propagate_orphan_to_referrers(session: AsyncSession, uuid: UUID) -> N
         await _reevaluate_orphan(session, edge.source_kind, edge.source_uuid)
 
 
-async def ingest_manifest(session: AsyncSession, layout: StoreLayout, manifest_path: Path) -> None:
+async def ingest_manifest(
+    session: AsyncSession, layout: StorageLayout, manifest_path: Path
+) -> None:
     """Parse a manifest at `manifest_path`, validate, introspect HDF5, upsert the row."""
     try:
         location = layout.parse_manifest_path(manifest_path)
@@ -315,7 +317,9 @@ async def _upsert_minimal(session: AsyncSession, kind: str, bookkeeping: dict[st
     await repo.upsert_row(session, kind, values)
 
 
-async def delete_manifest(session: AsyncSession, layout: StoreLayout, manifest_path: Path) -> None:
+async def delete_manifest(
+    session: AsyncSession, layout: StorageLayout, manifest_path: Path
+) -> None:
     """Handle a manifest delete event: drop the row, clear edges, propagate orphan state."""
     try:
         location = layout.parse_manifest_path(manifest_path)

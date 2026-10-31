@@ -19,7 +19,7 @@ from ptychodus.webapp.rendering.params import RenderParamsDep
 from ptychodus.webapp.routers._convert import diffraction_to_read
 from ptychodus.webapp.routers.deps import LayoutDep, SessionDep
 from ptychodus.webapp.routers.schemas import DiffractionRead, Page
-from ptychodus.webapp.storage.manifest import ResourceKind
+from ptychodus.api.storage import ResourceKind
 
 router = APIRouter(prefix='/diffraction', tags=['diffraction'])
 

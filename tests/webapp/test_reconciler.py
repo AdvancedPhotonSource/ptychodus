@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from ptychodus.webapp.db.models import Diffraction, Product
-from ptychodus.webapp.storage.layout import StoreLayout
+from ptychodus.api.storage import StorageLayout
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
@@ -19,7 +19,7 @@ pytestmark = pytest.mark.asyncio
 
 async def test_full_rescan_counts(
     db_session: AsyncSession,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_campaign: Callable[..., UUID],
     seed_diffraction: Callable[..., UUID],
     seed_product: Callable[..., UUID],
@@ -40,7 +40,7 @@ async def test_full_rescan_counts(
 
 
 async def test_full_rescan_deletes_stale(
-    db_session: AsyncSession, layout: StoreLayout, seed_diffraction: Callable[..., UUID]
+    db_session: AsyncSession, layout: StorageLayout, seed_diffraction: Callable[..., UUID]
 ):
     d1 = seed_diffraction()
     d2 = seed_diffraction()
@@ -57,7 +57,7 @@ async def test_full_rescan_deletes_stale(
 
 async def test_rescan_resolves_forward_refs(
     db_session: AsyncSession,
-    layout: StoreLayout,
+    layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
     seed_product: Callable[..., UUID],
 ):

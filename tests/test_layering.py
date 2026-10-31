@@ -11,6 +11,9 @@ taking the GUI session along. Three subpackages must therefore never import
   layer that builds selection over them;
 - ``ptychodus.webapp``, the read-only web service, which reads ``api`` only.
 
+The stream processor's modules in ``ptychodus.cli`` are held to the same boundary: it
+runs inside a beamline pipeline, and needs no GUI session to do it.
+
 The scan is an AST walk rather than an import so it holds on a bare install, and it
 reads every import in a module, including the deferred ones inside a function body.
 """
@@ -63,14 +66,20 @@ def _imported_modules(path: Path, package: str) -> Iterator[tuple[int, str]]:
                 yield node.lineno, base
 
 
-def _violations(root: Path, package: str) -> list[str]:
+def _module_violations(path: Path, package: str, base: Path) -> list[str]:
     forbidden = ('ptychodus.model', 'ptychodus.view', 'ptychodus.controller')
+    return [
+        f'{path.relative_to(base)}:{line} imports {module}'
+        for line, module in _imported_modules(path, package)
+        if any(module == name or module.startswith(f'{name}.') for name in forbidden)
+    ]
+
+
+def _violations(root: Path, package: str) -> list[str]:
     found: list[str] = []
 
     for path, containing_package in _modules(root, package):
-        for line, module in _imported_modules(path, containing_package):
-            if any(module == name or module.startswith(f'{name}.') for name in forbidden):
-                found.append(f'{path.relative_to(root.parent)}:{line} imports {module}')
+        found.extend(_module_violations(path, containing_package, root.parent))
 
     return found
 
@@ -78,6 +87,12 @@ def _violations(root: Path, package: str) -> list[str]:
 @pytest.mark.parametrize('subpackage', ['api', 'plugins', 'webapp'])
 def test_subpackage_imports_nothing_above_api(subpackage: str) -> None:
     assert _violations(_PTYCHODUS_ROOT / subpackage, f'ptychodus.{subpackage}') == []
+
+
+@pytest.mark.parametrize('module', ['_stream'])
+def test_the_stream_processor_imports_nothing_above_api(module: str) -> None:
+    path = _PTYCHODUS_ROOT / 'cli' / f'{module}.py'
+    assert _module_violations(path, 'ptychodus.cli', _PTYCHODUS_ROOT) == []
 
 
 def test_relative_imports_that_climb_out_of_api_are_caught(tmp_path: Path) -> None:
