@@ -57,6 +57,7 @@ ptychodus-stream = "ptychodus.cli.stream:main"
 ptychodus-system-check = "ptychodus.cli.system_check:main"
 ptychodus-train = "ptychodus.cli.train:main"
 ptychodus-webapp = "ptychodus.webapp.cli:main"
+ptychodus-xmcd = "ptychodus.cli.xmcd:main"
 
 # PtychoPINN and PtychoFM are published on no index, so they cannot
 # be named here the way ptychi is -- this table ships as the wheel's
