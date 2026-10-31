@@ -1,6 +1,5 @@
 import logging
 
-from ptychodus.api.files import FileFormat
 from ptychodus.api.xmcd import XMCDResult
 
 from ...model.analysis import XMCDAnalyzer
@@ -13,8 +12,6 @@ from .tree_model import ObjectTreeModel
 
 logger = logging.getLogger(__name__)
 
-_SAVE_FILE_FILTER = FileFormat.NPZ.file_filter
-
 
 class XMCDViewController:
     def __init__(
@@ -25,7 +22,6 @@ class XMCDViewController:
     ) -> None:
         super().__init__()
         self._analyzer = analyzer
-        self._file_dialog_factory = file_dialog_factory
         self._result: XMCDResult | None = None
 
         self._dialog = XMCDDialog()
@@ -34,7 +30,7 @@ class XMCDViewController:
         self._dialog.parameters_view.lcirc_combo_box.textActivated.connect(self._reanalyze)
         self._dialog.parameters_view.rcirc_combo_box.setModel(tree_model)
         self._dialog.parameters_view.rcirc_combo_box.textActivated.connect(self._reanalyze)
-        self._dialog.parameters_view.save_button.clicked.connect(self._save_data)
+        self._dialog.parameters_view.add_button.clicked.connect(self._add_products)
 
         self._structural_image_controller = ImageController(
             VisualizationEngine(is_complex=True),
@@ -79,31 +75,22 @@ class XMCDViewController:
             self._magnetic_image_controller.clear_array()
             return
 
-        structural_object = self._result.structural_object
+        structural_object = self._result.structural_product.object_
         self._structural_image_controller.set_array(
             structural_object.get_layer(0), structural_object.get_pixel_geometry()
         )
-        magnetic_object = self._result.magnetic_object
+        magnetic_object = self._result.magnetic_product.object_
         self._magnetic_image_controller.set_array(
             magnetic_object.get_layer(0), magnetic_object.get_pixel_geometry()
         )
 
-    def _save_data(self) -> None:
+    def _add_products(self) -> None:
         if self._result is None:
-            logger.warning('No XMCD result to save!')
+            logger.warning('No XMCD result to add!')
             return
 
-        title = 'Save XMCD Data'
-        file_path, _ = self._file_dialog_factory.get_save_file_path(
-            self._dialog,
-            title,
-            name_filters=[_SAVE_FILE_FILTER],
-            selected_name_filter=_SAVE_FILE_FILTER,
-        )
-
-        if file_path:
-            try:
-                self._result.save_npz(file_path)
-            except Exception as err:
-                logger.exception(err)
-                ExceptionDialog.show_exception(title, err)
+        try:
+            self._analyzer.insert_products(self._result)
+        except Exception as err:
+            logger.exception(err)
+            ExceptionDialog.show_exception('Add XMCD Products', err)

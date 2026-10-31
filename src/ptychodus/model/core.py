@@ -122,6 +122,7 @@ class ModelCore:
             self.diffraction_core.repository,
             self.product_core.product_repository,
             self.product_core.probe_positions_repository,
+            self.product_core.product_api,
         )
         self.globus_core = GlobusCore(
             self.settings_registry,

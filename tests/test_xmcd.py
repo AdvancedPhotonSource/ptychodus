@@ -6,10 +6,12 @@ The XMCD decomposition assumes the helicity model
     O_- (LCP) = O_struct / M
 
 so the tests synthesize ground-truth ``O_struct`` and ``M``, build the RCP/LCP
-pair from them, and verify that estimate_xmcd recovers the inputs.
+pair from them, and verify that the object-level decomposition and the
+product-level ``estimate_xmcd`` recover the inputs.
 """
 
 from __future__ import annotations
+from dataclasses import replace
 
 import numpy
 import numpy.testing
@@ -17,7 +19,13 @@ import pytest
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter, align_objects
-from ptychodus.api.xmcd import XMCDResult, estimate_xmcd
+from ptychodus.api.probe import ProbeEnsemble
+from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
+from ptychodus.api.product import LossValue, Product, ProductMetadata
+from ptychodus.api.diffraction import Polarization
+from ptychodus.api.xmcd import _decompose_objects, estimate_xmcd
+
+_EPSILON = 1.0e-12
 
 
 def _make_object(
@@ -58,24 +66,24 @@ def _build_xmcd_pair(
     return rcp, lcp
 
 
-def test_estimate_xmcd_pure_absorption_recovers_structural_and_magnetic_amplitudes() -> None:
+def test_decompose_objects_pure_absorption_recovers_structural_and_magnetic_amplitudes() -> None:
     """Real-positive O_struct and M → recovered amplitudes match, recovered phases ~ 0."""
     rng = numpy.random.default_rng(0)
     o_struct = rng.uniform(0.4, 0.9, size=(16, 16)).astype(numpy.complex128)
     m_factor = rng.uniform(0.8, 1.2, size=(16, 16)).astype(numpy.complex128)
     rcp, lcp = _build_xmcd_pair(o_struct, m_factor)
 
-    result = estimate_xmcd(rcp, lcp)
+    structural_object, magnetic_object = _decompose_objects(rcp, lcp, epsilon=_EPSILON)
 
-    structural = result.structural_object.get_array()[0]
-    magnetic = result.magnetic_object.get_array()[0]
+    structural = structural_object.get_array()[0]
+    magnetic = magnetic_object.get_array()[0]
     numpy.testing.assert_allclose(numpy.abs(structural), numpy.abs(o_struct), atol=1.0e-9)
     numpy.testing.assert_allclose(numpy.abs(magnetic), numpy.abs(m_factor), atol=1.0e-9)
     numpy.testing.assert_allclose(numpy.angle(structural), 0.0, atol=1.0e-9)
     numpy.testing.assert_allclose(numpy.angle(magnetic), 0.0, atol=1.0e-9)
 
 
-def test_estimate_xmcd_pure_phase_recovers_within_principal_branch() -> None:
+def test_decompose_objects_pure_phase_recovers_within_principal_branch() -> None:
     """Unit-modulus O_struct=exp(i*beta) and M=exp(i*alpha) with phases in (-pi/2, pi/2)."""
     rng = numpy.random.default_rng(1)
     beta = rng.uniform(-1.0, 1.0, size=(16, 16))  # safely inside (-pi/2, pi/2)
@@ -84,17 +92,17 @@ def test_estimate_xmcd_pure_phase_recovers_within_principal_branch() -> None:
     m_factor = numpy.exp(1j * alpha)
     rcp, lcp = _build_xmcd_pair(o_struct, m_factor)
 
-    result = estimate_xmcd(rcp, lcp)
+    structural_object, magnetic_object = _decompose_objects(rcp, lcp, epsilon=_EPSILON)
 
-    structural = result.structural_object.get_array()[0]
-    magnetic = result.magnetic_object.get_array()[0]
+    structural = structural_object.get_array()[0]
+    magnetic = magnetic_object.get_array()[0]
     numpy.testing.assert_allclose(numpy.abs(structural), 1.0, atol=1.0e-9)
     numpy.testing.assert_allclose(numpy.abs(magnetic), 1.0, atol=1.0e-9)
     numpy.testing.assert_allclose(numpy.angle(structural), beta, atol=1.0e-9)
     numpy.testing.assert_allclose(numpy.angle(magnetic), alpha, atol=1.0e-9)
 
 
-def test_estimate_xmcd_combined_complex_recovers_both_components() -> None:
+def test_decompose_objects_combined_complex_recovers_both_components() -> None:
     """Combined amplitude + phase: random complex O_struct and M, all inside the principal branch."""
     rng = numpy.random.default_rng(2)
     amp_struct = rng.uniform(0.4, 0.9, size=(32, 32))
@@ -105,36 +113,66 @@ def test_estimate_xmcd_combined_complex_recovers_both_components() -> None:
     m_factor = amp_mag * numpy.exp(1j * phase_mag)
     rcp, lcp = _build_xmcd_pair(o_struct, m_factor)
 
-    result = estimate_xmcd(rcp, lcp)
+    structural_object, magnetic_object = _decompose_objects(rcp, lcp, epsilon=_EPSILON)
 
-    structural = result.structural_object.get_array()[0]
-    magnetic = result.magnetic_object.get_array()[0]
+    structural = structural_object.get_array()[0]
+    magnetic = magnetic_object.get_array()[0]
     numpy.testing.assert_allclose(structural, o_struct, atol=1.0e-9)
     numpy.testing.assert_allclose(magnetic, m_factor, atol=1.0e-9)
 
 
-def test_estimate_xmcd_magnetic_phase_wraps_outside_principal_branch() -> None:
+def test_decompose_objects_magnetic_phase_wraps_outside_principal_branch() -> None:
     """A magnetic phase of +3pi/4 wraps to -pi/4 because of the half-angle branch cut.
 
     The half-angle phase extraction ``0.5 * angle(z)`` gives values in
     ``(-pi/2, pi/2]``. So a magnetic phase ``alpha`` outside that range comes
     back as ``alpha - pi`` (or ``alpha + pi``), which is the principal-branch
-    representative of the same magnetic transmission factor up to sign. This
-    test documents that behavior so it is not later treated as a regression.
+    representative of the same magnetic transmission factor up to sign. The
+    structural object flips sign with it, so the pair still reproduces both
+    measurements. This test documents that behavior so it is not later treated
+    as a regression.
     """
     o_struct = numpy.ones((8, 8), dtype=numpy.complex128) * 0.7
     alpha = 3 * numpy.pi / 4  # outside (-pi/2, pi/2]
     m_factor = numpy.full((8, 8), numpy.exp(1j * alpha), dtype=numpy.complex128)
     rcp, lcp = _build_xmcd_pair(o_struct, m_factor)
 
-    result = estimate_xmcd(rcp, lcp)
-    recovered_alpha = numpy.angle(result.magnetic_object.get_array()[0])
+    structural_object, magnetic_object = _decompose_objects(rcp, lcp, epsilon=_EPSILON)
+    recovered_alpha = numpy.angle(magnetic_object.get_array()[0])
 
     expected_alpha = alpha - numpy.pi  # = -pi/4
     numpy.testing.assert_allclose(recovered_alpha, expected_alpha, atol=1.0e-9)
+    structural = structural_object.get_array()[0]
+    magnetic = magnetic_object.get_array()[0]
+    numpy.testing.assert_allclose(structural, -o_struct, atol=1.0e-9)
+    numpy.testing.assert_allclose(structural * magnetic, rcp.get_array()[0], atol=1.0e-9)
 
 
-def test_estimate_xmcd_epsilon_keeps_magnetic_finite_at_zero_lcp_pixels() -> None:
+def test_decompose_objects_structural_phase_crossing_half_pi_has_no_sign_flips() -> None:
+    """A structural phase ramp across pi/2 is recovered whole, consistent with M.
+
+    The model fixes ``(O_struct, M)`` only up to a joint sign. Halving the
+    structural and magnetic angles on independent branches would flip
+    ``O_struct`` alone wherever its phase crosses ``pi/2``, breaking
+    ``O_struct * M = O_+``.
+    """
+    beta = numpy.tile(numpy.linspace(0.0, 2.5, 64), (8, 1))
+    alpha = numpy.where(numpy.arange(64) < 32, 0.02, -0.02)[numpy.newaxis].repeat(8, axis=0)
+    o_struct = 0.8 * numpy.exp(1j * beta)
+    m_factor = 1.01 * numpy.exp(1j * alpha)
+    rcp, lcp = _build_xmcd_pair(o_struct, m_factor)
+
+    structural_object, magnetic_object = _decompose_objects(rcp, lcp, epsilon=_EPSILON)
+
+    structural = structural_object.get_array()[0]
+    magnetic = magnetic_object.get_array()[0]
+    numpy.testing.assert_allclose(structural, o_struct, atol=1.0e-9)
+    numpy.testing.assert_allclose(magnetic, m_factor, atol=1.0e-9)
+    numpy.testing.assert_allclose(structural * magnetic, rcp.get_array()[0], atol=1.0e-9)
+    numpy.testing.assert_allclose(structural / magnetic, lcp.get_array()[0], atol=1.0e-9)
+
+
+def test_decompose_objects_epsilon_keeps_magnetic_finite_at_zero_lcp_pixels() -> None:
     """A column of exact zeros in the LCP array must not produce NaN/Inf."""
     rng = numpy.random.default_rng(3)
     o_struct = rng.uniform(0.4, 0.9, size=(16, 16)).astype(numpy.complex128)
@@ -145,19 +183,19 @@ def test_estimate_xmcd_epsilon_keeps_magnetic_finite_at_zero_lcp_pixels() -> Non
     lcp_array[0, :, 5] = 0.0 + 0.0j
     lcp_zeroed = _make_object(lcp_array[0])
 
-    result = estimate_xmcd(rcp, lcp_zeroed)
+    structural_object, magnetic_object = _decompose_objects(rcp, lcp_zeroed, epsilon=_EPSILON)
 
-    assert numpy.all(numpy.isfinite(result.structural_object.get_array()))
-    assert numpy.all(numpy.isfinite(result.magnetic_object.get_array()))
+    assert numpy.all(numpy.isfinite(structural_object.get_array()))
+    assert numpy.all(numpy.isfinite(magnetic_object.get_array()))
 
     # Pixels away from the dead column should still recover correctly.
-    structural = result.structural_object.get_array()[0]
+    structural = structural_object.get_array()[0]
     keep = numpy.ones_like(o_struct, dtype=bool)
     keep[:, 5] = False
     numpy.testing.assert_allclose(numpy.abs(structural[keep]), numpy.abs(o_struct[keep]), atol=1e-6)
 
 
-def test_estimate_xmcd_multi_layer_input_flattens() -> None:
+def test_decompose_objects_multi_layer_input_flattens() -> None:
     rng = numpy.random.default_rng(4)
     layer_shape = (8, 8)
     o_struct = rng.uniform(0.4, 0.9, size=layer_shape).astype(numpy.complex128)
@@ -168,13 +206,13 @@ def test_estimate_xmcd_multi_layer_input_flattens() -> None:
     rcp = _make_object(rcp_layers, layer_spacing_m=[1.0e-6])
     lcp = _make_object(lcp_layers, layer_spacing_m=[1.0e-6])
 
-    result = estimate_xmcd(rcp, lcp)
+    structural_object, magnetic_object = _decompose_objects(rcp, lcp, epsilon=_EPSILON)
 
-    assert result.structural_object.num_layers == 1
-    assert result.magnetic_object.num_layers == 1
+    assert structural_object.num_layers == 1
+    assert magnetic_object.num_layers == 1
 
 
-def test_estimate_xmcd_raises_on_pixel_geometry_mismatch() -> None:
+def test_decompose_objects_raises_on_pixel_geometry_mismatch() -> None:
     rng = numpy.random.default_rng(5)
     o_struct = rng.uniform(0.4, 0.9, size=(8, 8)).astype(numpy.complex128)
     m_factor = rng.uniform(0.8, 1.2, size=(8, 8)).astype(numpy.complex128)
@@ -183,18 +221,18 @@ def test_estimate_xmcd_raises_on_pixel_geometry_mismatch() -> None:
     rcp = _make_object(rcp_array, pixel_geometry=PixelGeometry(width_m=1.0e-9, height_m=1.0e-9))
     lcp = _make_object(lcp_array, pixel_geometry=PixelGeometry(width_m=2.0e-9, height_m=1.0e-9))
     with pytest.raises(ValueError, match='pixel geometry mismatch'):
-        estimate_xmcd(rcp, lcp)
+        _decompose_objects(rcp, lcp, epsilon=_EPSILON)
 
 
-def test_estimate_xmcd_raises_on_array_shape_mismatch() -> None:
+def test_decompose_objects_raises_on_array_shape_mismatch() -> None:
     rng = numpy.random.default_rng(6)
     rcp = _make_object(rng.uniform(0.5, 1.0, size=(1, 8, 8)).astype(numpy.complex128))
     lcp = _make_object(rng.uniform(0.5, 1.0, size=(1, 16, 16)).astype(numpy.complex128))
     with pytest.raises(ValueError, match='array shape mismatch'):
-        estimate_xmcd(rcp, lcp)
+        _decompose_objects(rcp, lcp, epsilon=_EPSILON)
 
 
-def test_estimate_xmcd_output_inherits_rcp_pixel_geometry_and_center() -> None:
+def test_decompose_objects_output_inherits_rcp_pixel_geometry_and_center() -> None:
     """Result objects stamp RCP's pixel geometry and center, not LCP's.
 
     This is intentional: after align_objects, the aligned LCP carries an
@@ -216,17 +254,16 @@ def test_estimate_xmcd_output_inherits_rcp_pixel_geometry_and_center() -> None:
         lcp_center=lcp_center,
     )
 
-    result = estimate_xmcd(rcp, lcp)
+    structural_object, magnetic_object = _decompose_objects(rcp, lcp, epsilon=_EPSILON)
 
-    assert result.structural_object.get_pixel_geometry() == pixel_geom
-    assert result.magnetic_object.get_pixel_geometry() == pixel_geom
-    assert result.structural_object.get_center() == rcp_center
-    assert result.magnetic_object.get_center() == rcp_center
-    assert isinstance(result, XMCDResult)
+    assert structural_object.get_pixel_geometry() == pixel_geom
+    assert magnetic_object.get_pixel_geometry() == pixel_geom
+    assert structural_object.get_center() == rcp_center
+    assert magnetic_object.get_center() == rcp_center
 
 
-def test_estimate_xmcd_end_to_end_with_align_objects_recovers_known_signal() -> None:
-    """Integration: known XMCD pair + known shift on LCP → align_objects + estimate_xmcd recovers."""
+def test_decompose_objects_end_to_end_with_align_objects_recovers_known_signal() -> None:
+    """Integration: known XMCD pair + known shift on LCP → align_objects + decomposition recovers."""
     rng = numpy.random.default_rng(8)
     # Use a localized smooth feature so phase_cross_correlation has structure to lock onto.
     y = numpy.arange(48)[:, None]
@@ -242,10 +279,12 @@ def test_estimate_xmcd_end_to_end_with_align_objects_recovers_known_signal() -> 
     lcp_shifted = _make_object(lcp_shifted_array[0])
 
     cropped_rcp, aligned_lcp = align_objects(rcp, lcp_shifted)
-    result = estimate_xmcd(cropped_rcp, aligned_lcp)
+    structural_object, magnetic_object = _decompose_objects(
+        cropped_rcp, aligned_lcp, epsilon=_EPSILON
+    )
 
-    structural = result.structural_object.get_array()[0]
-    magnetic = result.magnetic_object.get_array()[0]
+    structural = structural_object.get_array()[0]
+    magnetic = magnetic_object.get_array()[0]
 
     # Compare only in the support region where amp is significant — outside, the
     # signals are weak and noise dominates.
@@ -258,12 +297,12 @@ def test_estimate_xmcd_end_to_end_with_align_objects_recovers_known_signal() -> 
     )
 
 
-def test_estimate_xmcd_end_to_end_with_mismatched_shapes_recovers_known_signal() -> None:
+def test_decompose_objects_end_to_end_with_mismatched_shapes_recovers_known_signal() -> None:
     """Integration: RCP and LCP with different shapes → align_objects trims and aligns.
 
     Simulates the failure mode this fix targets: rounding/padding leaves the
     two reconstructions with slightly different array shapes. The full
-    align_objects → estimate_xmcd chain must trim to a common shape and still
+    align_objects → decomposition chain must trim to a common shape and still
     recover the known structural + magnetic signal on that shared region.
     """
     rng = numpy.random.default_rng(9)
@@ -296,9 +335,11 @@ def test_estimate_xmcd_end_to_end_with_mismatched_shapes_recovers_known_signal()
     assert cropped_rcp.get_array().shape == (1, 48, 48)
     assert aligned_lcp.get_array().shape == (1, 48, 48)
 
-    result = estimate_xmcd(cropped_rcp, aligned_lcp)
-    structural = result.structural_object.get_array()[0]
-    magnetic = result.magnetic_object.get_array()[0]
+    structural_object, magnetic_object = _decompose_objects(
+        cropped_rcp, aligned_lcp, epsilon=_EPSILON
+    )
+    structural = structural_object.get_array()[0]
+    magnetic = magnetic_object.get_array()[0]
 
     support = amp_rcp > 0.2
     numpy.testing.assert_allclose(
@@ -307,3 +348,98 @@ def test_estimate_xmcd_end_to_end_with_mismatched_shapes_recovers_known_signal()
     numpy.testing.assert_allclose(
         numpy.abs(magnetic)[support], numpy.abs(m_factor_rcp)[support], atol=5e-3
     )
+
+
+def _product(
+    o_struct: numpy.ndarray,
+    m_factor: numpy.ndarray,
+    *,
+    name: str,
+    polarization: Polarization,
+) -> Product:
+    pixel_geometry = PixelGeometry(width_m=1.0e-8, height_m=1.0e-8)
+    array = (
+        o_struct * m_factor if polarization is Polarization.RIGHT_CIRCULAR else o_struct / m_factor
+    )
+    return Product(
+        metadata=ProductMetadata(
+            name=name,
+            comments='measured',
+            detector_distance_m=1.0,
+            photon_energy_eV=700.0,
+            probe_photon_count=1.0e9,
+            exposure_time_s=0.1,
+            mass_attenuation_m2_per_kg=0.0,
+            tomography_angle_deg=0.0,
+            polarization=polarization,
+        ),
+        probe_positions=ProbePositionSequence(
+            [ProbePosition(index=index, x_m=index * 1.0e-8, y_m=0.0) for index in range(4)]
+        ),
+        probes=ProbeEnsemble(
+            array=numpy.ones((1, 1, 4, 4), dtype=numpy.complex128),
+            opr_weights=None,
+            pixel_geometry=pixel_geometry,
+        ),
+        object_=Object(
+            array=array,
+            pixel_geometry=pixel_geometry,
+            center=ObjectCenter(x_m=1.0e-8, y_m=-2.0e-8),
+        ),
+        losses=[LossValue(epoch=0, value=1.0)],
+    )
+
+
+def test_estimate_xmcd_recovers_signal_on_the_rcp_product() -> None:
+    """Products in, products out: RCP's frame, provenance named, polarization cleared."""
+    rng = numpy.random.default_rng(10)
+    y = numpy.arange(48)[:, None]
+    x = numpy.arange(48)[None, :]
+    amp = numpy.exp(-(((y - 24) ** 2 + (x - 24) ** 2) / 60.0))
+    o_struct = (amp * (0.7 + 0.05 * rng.standard_normal(amp.shape))).astype(numpy.complex128)
+    m_factor = (1.0 + 0.05 * amp).astype(numpy.complex128)
+    rcp = _product(o_struct, m_factor, name='scan_rcp', polarization=Polarization.RIGHT_CIRCULAR)
+    lcp = _product(o_struct, m_factor, name='scan_lcp', polarization=Polarization.LEFT_CIRCULAR)
+    lcp_array = numpy.roll(lcp.object_.get_array(), shift=(3, -2), axis=(-2, -1))
+    # A global phase on the LCP reconstruction is an ambiguity the standardization removes.
+    lcp = replace(
+        lcp,
+        object_=Object(
+            array=lcp_array * numpy.exp(0.4j),
+            pixel_geometry=lcp.object_.get_pixel_geometry(),
+            center=lcp.object_.get_center(),
+        ),
+    )
+
+    result = estimate_xmcd(lcp, rcp)
+
+    # The standardization absorbs the weighted mean |M|**2 into the LCP scale, so each
+    # output matches its truth up to one global factor, while the RCP reference is
+    # reproduced exactly by their product.
+    support = amp > 0.2
+    structural = result.structural_product.object_.get_array()[0]
+    magnetic = result.magnetic_product.object_.get_array()[0]
+    numpy.testing.assert_allclose(structural * magnetic, rcp.object_.get_array()[0], atol=1e-9)
+
+    for estimate, truth in ((structural, o_struct), (magnetic, m_factor)):
+        factor = numpy.vdot(estimate[support], truth[support]) / numpy.vdot(
+            estimate[support], estimate[support]
+        )
+        assert abs(factor - 1.0) < 0.05
+        numpy.testing.assert_allclose(factor * estimate[support], truth[support], atol=5e-3)
+
+    for product, component in (
+        (result.structural_product, 'structural'),
+        (result.magnetic_product, 'magnetic'),
+    ):
+        assert product.metadata.name == f'scan_rcp-{component}'
+        assert product.metadata.comments == (
+            f"XMCD {component} component of LCP 'scan_lcp' and RCP 'scan_rcp'"
+        )
+        assert product.metadata.polarization is None
+        assert product.metadata.photon_energy_eV == rcp.metadata.photon_energy_eV
+        assert product.losses == []
+        assert product.probe_positions is rcp.probe_positions
+        assert product.probes is rcp.probes
+        assert product.object_.get_pixel_geometry() == rcp.object_.get_pixel_geometry()
+        assert product.object_.get_center() == rcp.object_.get_center()

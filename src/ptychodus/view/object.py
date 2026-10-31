@@ -100,12 +100,12 @@ class XMCDParametersView(QGroupBox):
 
         self.lcirc_combo_box = QComboBox()
         self.rcirc_combo_box = QComboBox()
-        self.save_button = QPushButton('Save')
+        self.add_button = QPushButton('Add to Products')
 
         layout = QFormLayout()
         layout.addRow('Left Circular:', self.lcirc_combo_box)
         layout.addRow('Right Circular:', self.rcirc_combo_box)
-        layout.addRow(self.save_button)
+        layout.addRow(self.add_button)
         self.setLayout(layout)
 
 

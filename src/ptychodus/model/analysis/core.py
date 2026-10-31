@@ -1,7 +1,7 @@
 import numpy
 
 from ..diffraction import DiffractionDatasetRepository
-from ..product import ProbePositionsRepository, ProductRepository
+from ..product import ProbePositionsRepository, ProductAPI, ProductRepository
 from ..settings import SettingsRegistry
 from .affine import AffineTransformEstimator
 from .diffraction import DiffractionSimulator
@@ -28,6 +28,7 @@ class AnalysisCore:
         diffraction_repository: DiffractionDatasetRepository,
         product_repository: ProductRepository,
         probe_positions_repository: ProbePositionsRepository,
+        product_api: ProductAPI,
     ) -> None:
         self._affine_transform_estimator_settings = AffineTransformEstimatorSettings(
             settings_registry
@@ -56,4 +57,4 @@ class AnalysisCore:
 
         self.residual_analyzer = ResidualAnalyzer(product_repository)
 
-        self.xmcd_analyzer = XMCDAnalyzer(product_repository)
+        self.xmcd_analyzer = XMCDAnalyzer(product_repository, product_api)

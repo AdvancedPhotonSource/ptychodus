@@ -1244,8 +1244,7 @@ def align_objects(
     ``W`` that addressed a particular piece of content in ``moving_object``
     will, after alignment, address that same content at its new array index in
     the returned object. Both returned objects share the common shape and pixel
-    grid so downstream elementwise math (e.g. :func:`ptychodus.api.xmcd.estimate_xmcd`)
-    can be applied directly.
+    grid so downstream elementwise math can be applied directly.
 
     The geometric-center crop assumes the two arrays' array-centers correspond
     to approximately the same physical point (the regime of probe-position
