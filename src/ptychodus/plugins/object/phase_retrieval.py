@@ -11,7 +11,7 @@ import logging
 import numpy
 from pydantic import BaseModel, Field
 
-from ptychodus.api.geometry import GeometryNotDefinedError
+from ptychodus.api.geometry import GeometryNotDefinedError, ImageExtent
 from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.probe import Probe
 from ptychodus.api.probe_positions import ProbePositionSequence
@@ -114,20 +114,21 @@ class STXMDPCObjectGenerator(ObjectGenerator):
                 ' far-field centroid to the exit-wave phase gradient.'
             )
 
-        assembled_data = geometry_provider.get_assembled_data()
+        moments = geometry_provider.get_diffraction_moments()
 
-        if assembled_data is None:
-            # Not yet bound; the build is retried once the product has data.
-            raise GeometryNotDefinedError('No diffraction data to estimate the object from.')
+        if moments is None:
+            # Not yet bound, or the moments are still being computed; the build is retried.
+            raise GeometryNotDefinedError('No diffraction moments to estimate the object from.')
 
         if dpc.shadow_correction and probe is None:
             logger.warning('No probe to correct the STXM-DPC shadow term with; skipping it.')
 
+        height_px, width_px = moments.mean_frame.shape
         return generate_stxm_dpc_object(
             geometry_provider.get_object_geometry(),
             compute_decay_corrected_signals(geometry_provider),
             geometry_provider.get_probe_positions(),
-            detector_extent=assembled_data.get_image_extent(),
+            detector_extent=ImageExtent(width_px=width_px, height_px=height_px),
             probe=probe,
             correct_shadow=dpc.shadow_correction,
             regularization_fov_fraction=dpc.regularization_fov_fraction,
@@ -171,9 +172,9 @@ class PaganinObjectGenerator(ObjectGenerator):
     ) -> Object:
         paganin = expect_options(options, PaganinOptions)
 
-        if geometry_provider.get_assembled_data() is None:
-            # Not yet bound; the build is retried once the product has data.
-            raise GeometryNotDefinedError('No diffraction data to estimate the object from.')
+        if geometry_provider.get_diffraction_moments() is None:
+            # Not yet bound, or the moments are still being computed; the build is retried.
+            raise GeometryNotDefinedError('No diffraction moments to estimate the object from.')
 
         return generate_paganin_object(
             geometry_provider.get_object_geometry(),

@@ -48,8 +48,9 @@ logger = logging.getLogger(__name__)
 class DiffractionMoments:
     """A snapshot of accumulated diffraction statistics; frozen, and picklable.
 
-    The frames are those of the patterns as they were added, before bad pixels were
-    filled; `bad_pixels` is the mask the accumulator inpainted with. Per-pattern rows
+    The frames are those of the patterns as accumulated -- corrected for any background
+    and flat field, before bad pixels were filled; `bad_pixels` is the mask the
+    accumulator inpainted with. Per-pattern rows
     pair with probe positions by `indexes`, never by order. Totals sum the whole frame
     with its bad pixels inpainted. Centroids are in detector pixels about the frame
     midpoint ``(N - 1) / 2``, x along columns and y along rows; a frame with no signal
@@ -149,11 +150,15 @@ class DiffractionMoments:
 class DiffractionMomentAccumulator:
     """Thread-safe online accumulation of the statistics a :class:`DiffractionMoments` holds.
 
-    Patterns are added already corrected for any detector background and flat field,
-    in chunks of any size and from any number of threads. They are buffered into chunks
-    of *chunk_size* so the biharmonic fill of *bad_pixels* is solved once per chunk
-    rather than once per frame; each full chunk is reduced outside the lock and folded
-    in under it.
+    Patterns are added in chunks of any size and from any number of threads. With
+    *corrections*, each is corrected as it is reduced, and *bad_pixels* is widened by
+    the pixels the corrections make unusable; without, patterns are added already
+    corrected. They are buffered into chunks of *chunk_size* so the biharmonic fill of
+    the bad pixels is solved once per chunk rather than once per frame.
+
+    Each full chunk is reduced outside the lock, and its frame statistics and per-pattern
+    rows are folded in together under it, so a snapshot taken at any moment describes
+    exactly the patterns its rows list.
 
     `merge` folds in another accumulator or a snapshot, which is how workers that saw
     different patterns -- separate processes included, since snapshots pickle --
@@ -169,6 +174,7 @@ class DiffractionMomentAccumulator:
         width: int,
         *,
         bad_pixels: BadPixels | None = None,
+        corrections: DetectorCorrections | None = None,
         chunk_size: int = 256,
         binning: BinningStep | None = None,
     ) -> None:
@@ -182,15 +188,22 @@ class DiffractionMomentAccumulator:
                 raise ValueError(f'{binning!r} leaves no whole bin in the frames!')
 
         self._shape = (height, width)
-        self._bad_pixels: BadPixels = (
+        initial_bad_pixels: BadPixels = (
             numpy.zeros(self._shape, dtype=numpy.bool) if bad_pixels is None else bad_pixels
         )
 
-        if self._bad_pixels.shape != self._shape:
+        if initial_bad_pixels.shape != self._shape:
             raise ValueError(
-                f'Bad pixels of shape {self._bad_pixels.shape} do not match the {self._shape} '
-                'frames!'
+                f'Bad pixels of shape {initial_bad_pixels.shape} do not match the '
+                f'{self._shape} frames!'
             )
+
+        self._corrections = corrections
+        self._bad_pixels: BadPixels = (
+            initial_bad_pixels
+            if corrections is None
+            else corrections.apply_to_bad_pixels(initial_bad_pixels)
+        )
 
         self._chunk_size = chunk_size
         self._binning = binning
@@ -239,15 +252,13 @@ class DiffractionMomentAccumulator:
         if moments.binning != self._binning:
             raise ValueError('Only accumulations with the same binning can be merged!')
 
-        self._frame_statistics.merge(
+        self._fold(
             FrameStatistics.from_frames(
                 moments.num_patterns,
                 moments.minimum_frame,
                 moments.mean_frame,
                 moments.maximum_frame,
-            )
-        )
-        self._fold_rows(
+            ),
             moments.indexes,
             moments.total_counts,
             moments.center_of_mass_x_px,
@@ -266,29 +277,34 @@ class DiffractionMomentAccumulator:
         if chunk is not None:
             self._reduce(*chunk)
 
-        frames = self._frame_statistics.get_frames()
+        # The frames and the row lists are read together, so they describe the same
+        # patterns; the rows are never mutated once folded, so they are joined outside.
+        with self._lock:
+            frames = self._frame_statistics.get_frames()
+            num_patterns = self._frame_statistics.num_patterns
+            indexes = list(self._indexes)
+            total_counts = list(self._total_counts)
+            center_of_mass_x_px = list(self._center_of_mass_x_px)
+            center_of_mass_y_px = list(self._center_of_mass_y_px)
+            binned_patterns = list(self._binned_patterns)
 
         if frames is None:
             return None
 
         minimum_frame, mean_frame, maximum_frame = frames
-
-        with self._lock:
-            return DiffractionMoments(
-                num_patterns=self._frame_statistics.num_patterns,
-                minimum_frame=minimum_frame,
-                mean_frame=mean_frame,
-                maximum_frame=maximum_frame,
-                bad_pixels=self._bad_pixels.copy(),
-                indexes=numpy.concatenate(self._indexes),
-                total_counts=numpy.concatenate(self._total_counts),
-                center_of_mass_x_px=numpy.concatenate(self._center_of_mass_x_px),
-                center_of_mass_y_px=numpy.concatenate(self._center_of_mass_y_px),
-                binning=self._binning,
-                binned_patterns=(
-                    None if self._binning is None else numpy.concatenate(self._binned_patterns)
-                ),
-            )
+        return DiffractionMoments(
+            num_patterns=num_patterns,
+            minimum_frame=minimum_frame,
+            mean_frame=mean_frame,
+            maximum_frame=maximum_frame,
+            bad_pixels=self._bad_pixels.copy(),
+            indexes=numpy.concatenate(indexes),
+            total_counts=numpy.concatenate(total_counts),
+            center_of_mass_x_px=numpy.concatenate(center_of_mass_x_px),
+            center_of_mass_y_px=numpy.concatenate(center_of_mass_y_px),
+            binning=self._binning,
+            binned_patterns=None if self._binning is None else numpy.concatenate(binned_patterns),
+        )
 
     def _take_pending(self) -> tuple[IntegerArrayType, DiffractionPatterns]:
         # Called with the lock held.
@@ -300,7 +316,12 @@ class DiffractionMomentAccumulator:
         return indexes, patterns
 
     def _reduce(self, indexes: IntegerArrayType, patterns: DiffractionPatterns) -> None:
-        self._frame_statistics.add(patterns)
+        if self._corrections is not None:
+            patterns = self._corrections.apply(patterns)
+
+        height, width = self._shape
+        chunk_statistics = FrameStatistics(height, width)
+        chunk_statistics.add(patterns)
         repaired = inpaint_bad_pixels(patterns.astype(numpy.float64), self._bad_pixels)
         moments = compute_intensity_moments(repaired)
         binned_patterns: RealArrayType | None = None
@@ -311,7 +332,8 @@ class DiffractionMomentAccumulator:
                 self._binned_bad_pixels, numpy.nan, self._binning.apply(zeroed)
             )
 
-        self._fold_rows(
+        self._fold(
+            chunk_statistics,
             indexes,
             moments.total,
             moments.centroid_x_px,
@@ -319,8 +341,9 @@ class DiffractionMomentAccumulator:
             binned_patterns,
         )
 
-    def _fold_rows(
+    def _fold(
         self,
+        frame_statistics: FrameStatistics,
         indexes: IntegerArrayType,
         total_counts: RealArrayType,
         center_of_mass_x_px: RealArrayType,
@@ -328,6 +351,7 @@ class DiffractionMomentAccumulator:
         binned_patterns: RealArrayType | None,
     ) -> None:
         with self._lock:
+            self._frame_statistics.merge(frame_statistics)
             self._indexes.append(numpy.asarray(indexes).copy())
             self._total_counts.append(numpy.asarray(total_counts, dtype=numpy.float64).copy())
             self._center_of_mass_x_px.append(
@@ -380,7 +404,8 @@ def iterate_diffraction_moments(
     accumulator = DiffractionMomentAccumulator(
         height,
         width,
-        bad_pixels=corrections.apply_to_bad_pixels(bad_pixels),
+        bad_pixels=bad_pixels,
+        corrections=corrections,
         chunk_size=chunk_size,
         binning=binning,
     )
@@ -392,10 +417,7 @@ def iterate_diffraction_moments(
     for stop in stops[stops > 0]:
         for chunk_start in range(start, stop, chunk_size):
             chunk_stop = min(chunk_start + chunk_size, stop)
-            accumulator.add(
-                indexes[chunk_start:chunk_stop],
-                corrections.apply(patterns[chunk_start:chunk_stop]),
-            )
+            accumulator.add(indexes[chunk_start:chunk_stop], patterns[chunk_start:chunk_stop])
 
         start = int(stop)
         moments = accumulator.get_moments()

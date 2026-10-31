@@ -40,10 +40,9 @@ class AveragePatternProbeGenerator(ProbeGenerator):
 
     def generate(self, options: BaseModel, geometry_provider: ProbeGeometryProvider) -> Probe:
         estimate = expect_options(options, AveragePatternOptions)
-        assembled_data = geometry_provider.get_assembled_data()
         moments = geometry_provider.get_diffraction_moments()
 
-        if assembled_data is None or moments is None:
+        if moments is None:
             # Not yet bound, or the moments are still being computed.
             raise GeometryNotDefinedError('No diffraction moments to estimate the probe from.')
 
@@ -61,7 +60,7 @@ class AveragePatternProbeGenerator(ProbeGenerator):
         return generate_average_pattern_probe(
             geometry_provider.get_probe_geometry(),
             moments.mean_frame,
-            detector_pixel_geometry=assembled_data.get_pixel_geometry(),
+            detector_pixel_geometry=geometry_provider.get_detector_pixel_geometry(),
             bad_pixels=moments.bad_pixels,
             photon_wavelength_m=geometry_provider.photon_wavelength_m,
             detector_distance_m=geometry_provider.detector_distance_m,

@@ -17,6 +17,7 @@ import numpy
 import pytest
 
 from ptychodus.api.assemble import (
+    ArrayPreprocessor,
     AssembledDiffractionData,
     allocate_assembled_data,
     assemble_dataset,
@@ -30,6 +31,7 @@ from ptychodus.api.diffraction import (
     BeamCenter,
     CropRegion,
     DiffractionArray,
+    DiffractionDatasetLayoutNode,
     SimpleDiffractionArray,
     SimpleDiffractionDataset,
 )
@@ -560,6 +562,70 @@ class TestGetImageExtent:
         extent = data.get_image_extent()
 
         assert extent == ImageExtent(width_px=7, height_px=5)
+
+
+# ---------- ArrayPreprocessor ----------
+
+
+def _random_dataset_with_maps() -> SimpleDiffractionDataset:
+    """Three arrays of random counts on an 8x8 detector, with bad pixels and both maps."""
+    rng = numpy.random.default_rng(7)
+    arrays = [
+        SimpleDiffractionArray(
+            label,
+            numpy.arange(first, first + count, dtype=numpy.intp),
+            rng.integers(0, 50, size=(count, 8, 8)).astype(numpy.uint16),
+        )
+        for label, first, count in (('a', 0, 3), ('b', 3, 2), ('c', 5, 4))
+    ]
+    bad_pixels = numpy.zeros((8, 8), dtype=bool)
+    bad_pixels[3, 4] = True
+    template = make_dataset(arrays, (8, 8))
+    return SimpleDiffractionDataset(
+        template.get_metadata(),
+        DiffractionDatasetLayoutNode.create_root(),
+        arrays,
+        bad_pixels,
+        background=rng.uniform(0.0, 2.0, size=(8, 8)),
+        flat_field=rng.uniform(0.5, 1.5, size=(8, 8)),
+    )
+
+
+def test_array_preprocessor_equals_assembling_the_whole_dataset() -> None:
+    dataset = _random_dataset_with_maps()
+    pipeline = DiffractionPrepPipeline(steps=(BinningStep(bin_size_x=2, bin_size_y=2),))
+    region = CropRegion(x_range=(2, 6), y_range=(1, 5))
+
+    whole = assemble_dataset(dataset, pipeline, read_region=region, total_counts_lower_bound=10)
+    preprocessor = ArrayPreprocessor.from_dataset(
+        dataset, pipeline, read_region=region, total_counts_lower_bound=10
+    )
+    # Out of order, one array at a time, as a stream delivers them.
+    blocks = [preprocessor(array) for array in reversed(list(dataset))]
+    order = numpy.argsort(numpy.concatenate([block.get_indexes() for block in blocks]))
+
+    numpy.testing.assert_array_equal(
+        numpy.concatenate([block.get_indexes() for block in blocks])[order], whole.get_indexes()
+    )
+    numpy.testing.assert_array_equal(
+        numpy.concatenate([block.get_patterns() for block in blocks])[order], whole.get_patterns()
+    )
+    numpy.testing.assert_array_equal(preprocessor.processed_bad_pixels, whole.get_bad_pixels())
+    assert preprocessor.processed_pixel_geometry == whole.get_pixel_geometry()
+    assert all(block.get_pixel_geometry() == whole.get_pixel_geometry() for block in blocks)
+
+
+def test_array_preprocessor_carries_the_maps_assembly_carries() -> None:
+    dataset = _random_dataset_with_maps()
+    pipeline = DiffractionPrepPipeline(steps=(BinningStep(bin_size_x=2, bin_size_y=2),))
+
+    whole = assemble_dataset(dataset, pipeline)
+    preprocessor = ArrayPreprocessor.from_dataset(dataset, pipeline)
+
+    assert preprocessor.carried_background is not None
+    assert preprocessor.carried_flat_field is not None
+    numpy.testing.assert_array_equal(preprocessor.carried_background, whole.get_background())
+    numpy.testing.assert_array_equal(preprocessor.carried_flat_field, whole.get_flat_field())
 
 
 # ---------- read-only accessors and the pattern count ----------

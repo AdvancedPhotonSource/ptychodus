@@ -793,6 +793,24 @@ def test_the_positions_i0_corrects_the_builders_signals(absorbing_scan: _Scan) -
     assert spread(corrected) < 1e-3
 
 
+class _MomentsOnlyProvider(_StubProvider):
+    """Serves the moments of its data but not the data, as a streamed scan does."""
+
+    def get_assembled_data(self) -> AssembledDiffractionData | None:
+        return None
+
+
+@pytest.mark.parametrize('name', ['stxm_dpc', 'paganin'])
+def test_the_builders_need_only_the_moments(name: str, phase_scan: _Scan) -> None:
+    builder = _builder(name, _settings())
+    with_data = _StubProvider(phase_scan.positions, assembled_data=phase_scan.data)
+    moments_only = _MomentsOnlyProvider(phase_scan.positions, assembled_data=phase_scan.data)
+
+    numpy.testing.assert_array_equal(
+        builder.build(moments_only, []).get_array(), builder.build(with_data, []).get_array()
+    )
+
+
 def test_the_builders_wait_for_the_moments(absorbing_scan: _Scan) -> None:
     with pytest.raises(GeometryNotDefinedError):
         compute_decay_corrected_signals(_StubProvider(absorbing_scan.positions))

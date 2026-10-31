@@ -19,6 +19,7 @@ Behaviors verified:
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import pickle
+import threading
 
 import numpy
 import numpy.testing
@@ -31,7 +32,7 @@ from ptychodus.api.accumulate import (
     estimate_incident_beam,
     iterate_diffraction_moments,
 )
-from ptychodus.api.assemble import estimate_incident_photon_count
+from ptychodus.api.assemble import DetectorCorrections, estimate_incident_photon_count
 from ptychodus.api.diffraction import BadPixels
 from ptychodus.api.moments import FrameStatistics, compute_intensity_moments
 from ptychodus.api.preprocess.diffraction import BinningStep, inpaint_bad_pixels
@@ -264,6 +265,80 @@ def test_a_snapshot_does_not_change_with_later_additions() -> None:
     assert snapshot is not None and later is not None
     assert snapshot.num_patterns == 10 and snapshot.indexes.size == 10
     assert later.num_patterns == 20 and later.indexes.size == 20
+
+
+def test_snapshots_taken_during_accumulation_are_consistent() -> None:
+    """A snapshot's mean frame covers exactly the patterns its rows list, mid-stream too."""
+    patterns = _patterns(600)
+    accumulator = DiffractionMomentAccumulator(*_SHAPE, bad_pixels=_bad_pixels(), chunk_size=4)
+    snapshots: list[DiffractionMoments] = []
+    done = threading.Event()
+
+    def snapshot_until_done() -> None:
+        while not done.is_set():
+            moments = accumulator.get_moments()
+
+            if moments is not None:
+                snapshots.append(moments)
+
+    readers = [threading.Thread(target=snapshot_until_done) for _ in range(2)]
+
+    for reader in readers:
+        reader.start()
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        for start in range(0, len(patterns), 4):
+            executor.submit(
+                accumulator.add, numpy.arange(start, start + 4), patterns[start : start + 4]
+            )
+
+    done.set()
+
+    for reader in readers:
+        reader.join()
+
+    assert snapshots
+
+    for moments in snapshots:
+        assert moments.num_patterns == moments.indexes.size == moments.total_counts.size
+        numpy.testing.assert_allclose(
+            moments.mean_frame, patterns[moments.indexes].mean(axis=0), rtol=1e-12
+        )
+
+
+def test_corrections_are_applied_as_patterns_are_reduced() -> None:
+    patterns = _patterns(30).astype(numpy.float64)
+    background = numpy.full(_SHAPE, 3.0)
+    flat_field = numpy.full(_SHAPE, 2.0)
+    flat_field[0, 0] = 0.0
+    corrections = DetectorCorrections(
+        background=background,
+        flat_field=flat_field,
+        subtract_background=True,
+        divide_flat_field=True,
+    )
+    raw = patterns * flat_field + background
+    accumulator = DiffractionMomentAccumulator(
+        *_SHAPE, bad_pixels=_bad_pixels(), corrections=corrections, chunk_size=7, binning=_BINNING
+    )
+
+    for start in range(0, 30, 4):
+        accumulator.add(numpy.arange(start, min(start + 4, 30)), raw[start : start + 4])
+
+    expected_accumulator = DiffractionMomentAccumulator(
+        *_SHAPE,
+        bad_pixels=corrections.apply_to_bad_pixels(_bad_pixels()),
+        chunk_size=7,
+        binning=_BINNING,
+    )
+    expected_accumulator.add(numpy.arange(30), corrections.apply(raw))
+    moments = accumulator.get_moments()
+    expected = expected_accumulator.get_moments()
+
+    assert moments is not None and expected is not None
+    assert moments.bad_pixels[0, 0]
+    numpy.testing.assert_array_equal(moments.bad_pixels, expected.bad_pixels)
+    _assert_same_moments(moments, expected)
 
 
 def test_an_empty_accumulator_has_no_moments() -> None:

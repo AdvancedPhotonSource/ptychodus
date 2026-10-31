@@ -45,6 +45,7 @@ from .typing import RealArrayType
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    'ArrayPreprocessor',
     'AssembledDiffractionData',
     'CropSuggestion',
     'DetectorCorrections',
@@ -863,6 +864,109 @@ def preprocess_array(
     )
 
 
+@dataclass(frozen=True)
+class ArrayPreprocessor:
+    """The preprocessing of one dataset, resolved once and applied to each of its arrays.
+
+    Calling it is :func:`preprocess_array` with the masks, corrections and geometry
+    :func:`assemble_dataset` resolves, so an array preprocessed here equals the same
+    array assembled from the whole dataset. Arrays may arrive one at a time, from a
+    reader or from a stream, in any order.
+
+    `raw_bad_pixels` is the detector mask cut to `read_region` and widened by the
+    pixels the corrections make unusable; `processed_bad_pixels` is that mask carried
+    through `pipeline`. `corrections` are on the processed grid.
+    """
+
+    pipeline: DiffractionPrepPipeline | None
+    raw_bad_pixels: BadPixels
+    processed_bad_pixels: BadPixels
+    raw_pixel_geometry: PixelGeometry
+    read_region: CropRegion | None
+    corrections: DetectorCorrections
+    total_counts_lower_bound: int | None = None
+    total_counts_upper_bound: int | None = None
+
+    @classmethod
+    def from_dataset(
+        cls,
+        dataset: DiffractionDataset,
+        pipeline: DiffractionPrepPipeline | None = None,
+        *,
+        bad_pixels: BadPixels | None = None,
+        raw_pixel_geometry: PixelGeometry | None = None,
+        read_region: CropRegion | None = None,
+        corrections: DetectorCorrections | None = None,
+        total_counts_lower_bound: int | None = None,
+        total_counts_upper_bound: int | None = None,
+    ) -> ArrayPreprocessor:
+        """Resolve the preprocessing of *dataset*; the arguments mean what they do for
+        :func:`assemble_dataset`.
+
+        The dataset supplies the detector extent, and the bad pixels, background, flat
+        field and pixel geometry wherever an argument leaves them out; its arrays are
+        not read.
+
+        Raises:
+            ValueError: if a map does not match the detector extent, or no raw pixel
+                geometry is given or recorded.
+        """
+        resolved = _resolve_corrections(dataset, pipeline, corrections, read_region)
+        raw_bad_pixels, processed_bad_pixels = _resolve_bad_pixels(
+            dataset, pipeline, bad_pixels, read_region, resolved.raw
+        )
+        return cls(
+            pipeline=pipeline,
+            raw_bad_pixels=raw_bad_pixels,
+            processed_bad_pixels=processed_bad_pixels,
+            raw_pixel_geometry=_resolve_pixel_geometry(
+                dataset.get_metadata(), None, raw_pixel_geometry
+            ),
+            read_region=read_region,
+            corrections=resolved.processed,
+            total_counts_lower_bound=total_counts_lower_bound,
+            total_counts_upper_bound=total_counts_upper_bound,
+        )
+
+    @property
+    def processed_pixel_geometry(self) -> PixelGeometry:
+        """The pixel geometry of the preprocessed patterns."""
+        if self.pipeline is None:
+            return self.raw_pixel_geometry
+
+        return self.pipeline.compute_output_pixel_geometry(self.raw_pixel_geometry)
+
+    @property
+    def carried_background(self) -> DetectorBackground | None:
+        """The processed background the patterns still carry, or None when it is applied."""
+        return None if self.corrections.applies_background else self.corrections.background
+
+    @property
+    def carried_flat_field(self) -> FlatField | None:
+        """The processed flat field the patterns still carry, or None when it is applied."""
+        return None if self.corrections.applies_flat_field else self.corrections.flat_field
+
+    def __call__(
+        self,
+        array: DiffractionArray,
+        *,
+        on_nonfinite_pixels: Callable[[BadPixels], None] | None = None,
+    ) -> AssembledDiffractionData:
+        """Preprocess *array*; see :func:`preprocess_array`."""
+        return preprocess_array(
+            array,
+            self.pipeline,
+            raw_bad_pixels=self.raw_bad_pixels,
+            processed_bad_pixels=self.processed_bad_pixels,
+            raw_pixel_geometry=self.raw_pixel_geometry,
+            total_counts_lower_bound=self.total_counts_lower_bound,
+            total_counts_upper_bound=self.total_counts_upper_bound,
+            read_region=self.read_region,
+            corrections=self.corrections,
+            on_nonfinite_pixels=on_nonfinite_pixels,
+        )
+
+
 def default_max_workers(
     *, max_arrays_in_flight: int = 8, local_world_size: int | None = None
 ) -> int:
@@ -1044,17 +1148,24 @@ def assemble_dataset(
     num_patterns_per_array = metadata.num_patterns_per_array
     num_arrays = len(dataset)
 
-    # Streaming callers legitimately reload with an empty array list and append
-    # later, so an array count *below* the metadata count is fine; above it is not.
+    # A reader may deliver fewer arrays than its metadata reserves, and the empty
+    # slots are elided, so an array count *below* the metadata count is fine; above
+    # it is not.
     if num_arrays > len(num_patterns_per_array):
         raise ValueError(
             'Dataset has more arrays than metadata accounts for! '
             f'(actual={num_arrays} expected at most {len(num_patterns_per_array)})'
         )
 
-    resolved = _resolve_corrections(dataset, pipeline, corrections, read_region)
-    raw_bad_pixels, processed_bad_pixels = _resolve_bad_pixels(
-        dataset, pipeline, bad_pixels, read_region, resolved.raw
+    preprocessor = ArrayPreprocessor.from_dataset(
+        dataset,
+        pipeline,
+        bad_pixels=bad_pixels,
+        raw_pixel_geometry=raw_pixel_geometry,
+        read_region=read_region,
+        corrections=corrections,
+        total_counts_lower_bound=total_counts_lower_bound,
+        total_counts_upper_bound=total_counts_upper_bound,
     )
 
     if out is None:
@@ -1069,26 +1180,13 @@ def assemble_dataset(
     else:
         data = out
 
-    # preprocess_array needs the raw geometry; the value on each returned block
-    # is overwritten when scattered.
-    block_pixel_geometry = _resolve_pixel_geometry(metadata, None, raw_pixel_geometry)
     offsets = compute_array_offsets(metadata)
     nonfinite_union = _NonfinitePixelUnion()
 
     def load_array(array_index: int, array: DiffractionArray) -> None:
         label = array.get_label()
-        block = preprocess_array(
-            array,
-            pipeline,
-            raw_bad_pixels=raw_bad_pixels,
-            processed_bad_pixels=processed_bad_pixels,
-            raw_pixel_geometry=block_pixel_geometry,
-            total_counts_lower_bound=total_counts_lower_bound,
-            total_counts_upper_bound=total_counts_upper_bound,
-            read_region=read_region,
-            corrections=resolved.processed,
-            on_nonfinite_pixels=nonfinite_union.add,
-        )
+        # The block's pixel geometry is overwritten when it is scattered into the buffer.
+        block = preprocessor(array, on_nonfinite_pixels=nonfinite_union.add)
         num_patterns = block.get_patterns_shape()[0]
         capacity = num_patterns_per_array[array_index]
 
@@ -1117,7 +1215,7 @@ def assemble_dataset(
     if nonfinite_pixels is not None:
         _warn_nonfinite_pixels(nonfinite_pixels)
         data.add_bad_pixels(
-            _with_nonfinite_pixels(processed_bad_pixels, pipeline, nonfinite_pixels)
+            _with_nonfinite_pixels(preprocessor.processed_bad_pixels, pipeline, nonfinite_pixels)
         )
 
         if on_nonfinite_pixels is not None:

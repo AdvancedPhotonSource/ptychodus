@@ -190,6 +190,10 @@ class _StubProbeGeometryProvider(ProbeGeometryProvider):
         return NUM_SCAN_POINTS
 
     def get_detector_pixel_geometry(self) -> PixelGeometry:
+        # The model's provider takes the pitch from the bound data, as here.
+        if self._assembled_data is not None:
+            return self._assembled_data.get_pixel_geometry()
+
         return PixelGeometry(width_m=PIXEL_SIZE_M, height_m=PIXEL_SIZE_M)
 
     def get_probe_geometry(self) -> ProbeGeometry:
@@ -1308,6 +1312,17 @@ class TestAveragePatternOptions:
     def test_without_data_the_build_waits_rather_than_fails(self) -> None:
         with pytest.raises(GeometryNotDefinedError):
             self._builder().build(_StubProbeGeometryProvider())
+
+    def test_the_build_needs_only_the_moments(self) -> None:
+        with_data = _provider_with(self._mean_pattern())
+        moments_only = _provider_with(self._mean_pattern())
+        # Serves the moments of its data but not the data, as a streamed scan does.
+        moments_only.get_assembled_data = lambda: None  # type: ignore[method-assign]
+
+        numpy.testing.assert_array_equal(
+            self._builder().build(moments_only).get_probe_no_opr().get_array(),
+            self._builder().build(with_data).get_probe_no_opr().get_array(),
+        )
 
     def test_a_copy_builds_from_the_data_of_the_product_it_is_in(self) -> None:
         original = self._builder()
