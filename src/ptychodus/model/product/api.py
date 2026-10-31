@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
 from typing import Any
 import logging
@@ -39,31 +39,6 @@ from .settings import ProductSettings
 logger = logging.getLogger(__name__)
 
 
-class PositionsStreamingContext:
-    def __init__(self) -> None:
-        self._positions_x_m: list[float] = []
-        self._triggers_x: list[int] = []
-        self._positions_y_m: list[float] = []
-        self._triggers_y: list[int] = []
-
-    def start(self) -> None:
-        self._positions_x_m.clear()
-        self._triggers_x.clear()
-        self._positions_y_m.clear()
-        self._triggers_y.clear()
-
-    def append_positions_x(self, values_m: Sequence[float], trigger_counts: Sequence[int]) -> None:
-        self._positions_x_m.extend(values_m)
-        self._triggers_x.extend(trigger_counts)
-
-    def append_positions_y(self, values_m: Sequence[float], trigger_counts: Sequence[int]) -> None:
-        self._positions_y_m.extend(values_m)
-        self._triggers_y.extend(trigger_counts)
-
-    def stop(self) -> None:
-        pass  # TODO
-
-
 class ProbePositionsAPI:
     def __init__(
         self,
@@ -76,9 +51,6 @@ class ProbePositionsAPI:
         self._builder_factory = builder_factory
         self.file_readers = builder_factory.file_readers
         self.file_writers = builder_factory.file_writers
-
-    def create_streaming_context(self) -> PositionsStreamingContext:
-        return PositionsStreamingContext()
 
     def builder_names(self) -> Iterator[str]:
         return iter(self._builder_factory)

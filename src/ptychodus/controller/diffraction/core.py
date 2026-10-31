@@ -337,8 +337,8 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
             self._refresh_enabled_buttons()
 
     def _handle_dataset_reloaded_for_dataset(self, dataset: AssembledDiffractionDataset) -> None:
-        # Refresh the wizard's crop/bin bounds when a dataset is reloaded (e.g. via a
-        # streaming context or a programmatic re-open with a different file).
+        # Refresh the wizard's crop/bin bounds when a dataset is reloaded (e.g. by a
+        # programmatic re-open with a different file).
         self._detector_extent_source.set_extent(dataset.get_metadata().detector_extent)
 
 

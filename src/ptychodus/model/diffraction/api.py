@@ -7,15 +7,11 @@ from ptychodus.api.diffraction import (
     BadPixelsFileReader,
     DetectorBackground,
     CropRegion,
-    DiffractionArray,
-    DiffractionDatasetLayoutNode,
     DiffractionFileReader,
     DiffractionFileWriter,
-    DiffractionMetadata,
     FlatField,
     PixelMap,
     PixelMapFileReader,
-    SimpleDiffractionDataset,
 )
 
 from ..file_types import FileTypeChooser
@@ -25,24 +21,6 @@ from .repository import DiffractionDatasetRepository
 from .settings import DiffractionSettings
 
 logger = logging.getLogger(__name__)
-
-
-class PatternsStreamingContext:
-    def __init__(self, dataset: AssembledDiffractionDataset, metadata: DiffractionMetadata) -> None:
-        self._dataset = dataset
-        self._metadata = metadata
-
-    def start(self) -> None:
-        contents_tree = DiffractionDatasetLayoutNode.create_root()
-        stream_dataset = SimpleDiffractionDataset(self._metadata, contents_tree, [])
-        self._dataset.reload(stream_dataset)
-        self._dataset.load_all_arrays(process_patterns=True, block=True)
-
-    def append_array(self, array: DiffractionArray) -> None:
-        self._dataset.append_array(array, process_patterns=True)
-
-    def stop(self) -> None:
-        pass
 
 
 class DiffractionAPI:
@@ -72,11 +50,6 @@ class DiffractionAPI:
 
     def get_repository(self) -> DiffractionDatasetRepository:
         return self._repository
-
-    def create_streaming_context(self, metadata: DiffractionMetadata) -> PatternsStreamingContext:
-        dataset = self._repository.create_dataset('stream')
-        self._repository.insert_dataset(dataset)
-        return PatternsStreamingContext(dataset, metadata)
 
     def get_bad_pixels_file_reader_chooser(self) -> PluginChooser[BadPixelsFileReader]:
         return self._bad_pixels_file_reader_chooser

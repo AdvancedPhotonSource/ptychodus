@@ -11,6 +11,10 @@ options, without assembling the data a second time.
 The prepared directory is left untouched. Its ``product.h5`` is the initial product and the
 output's ``product.h5`` is the final one, which is why the two directories must differ.
 
+A scan in a storage root -- as ``ptychodus-stream`` saves them -- is named instead by its
+product uuid, with ``--product``; the storage layout finds its diffraction data through the
+product's lineage.
+
 ``ptychodus-reconstruct-subprocess`` reconstructs the same input for a launching process,
 reporting progress as an event stream; this command logs to the console instead.
 """
@@ -19,13 +23,22 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
+from uuid import UUID
 
 import ptychodus
 from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.io import StandardFileLayout, load_diffraction_data, load_product
 from ptychodus.api.reconstruct import PositionIndexFilter
+from ptychodus.api.storage import (
+    STORAGE_ROOT_ENVIRONMENT_VARIABLE,
+    LayoutError,
+    ManifestLoadError,
+    StorageLayout,
+    resolve_storage_inputs,
+)
 from ptychodus.cli import (
     DirectoryType,
     add_log_level_argument,
@@ -50,14 +63,28 @@ def _build_parser() -> argparse.ArgumentParser:
         description='Reconstruct a directory prepared by a driver run with --prepare-only.',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument(
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument(
         '-i',
         '--input-directory',
         metavar='INPUT_DIR',
-        required=True,
         type=DirectoryType(must_exist=True),
         help='Prepared directory holding diffraction.h5, product.h5 and optionally '
         'ptychi_options.yaml. It is not modified.',
+    )
+    source.add_argument(
+        '--product',
+        metavar='UUID',
+        type=UUID,
+        help='Uuid of a product in the storage root, reconstructed with the diffraction '
+        'data it derives from.',
+    )
+    parser.add_argument(
+        '--storage-root',
+        metavar='STORAGE_ROOT',
+        type=Path,
+        default=os.environ.get(STORAGE_ROOT_ENVIRONMENT_VARIABLE),
+        help=f'Storage root holding --product. Defaults to ${STORAGE_ROOT_ENVIRONMENT_VARIABLE}.',
     )
     parser.add_argument(
         '-o',
@@ -115,23 +142,34 @@ def main() -> ExitCode:
     parser = _build_parser()
     args = parser.parse_args()
 
-    input_directory: Path = args.input_directory
+    input_directory: Path | None = args.input_directory
     output_directory: Path = args.output_directory
 
-    if output_directory.resolve() == input_directory.resolve():
+    if input_directory is None:
+        if args.storage_root is None:
+            parser.error(f'--product needs --storage-root or ${STORAGE_ROOT_ENVIRONMENT_VARIABLE}.')
+
+        try:
+            diffraction_file, input_product_file = resolve_storage_inputs(
+                StorageLayout(Path(args.storage_root)), args.product
+            )
+        except (LayoutError, ManifestLoadError) as exc:
+            parser.error(str(exc))
+    else:
+        diffraction_file = StandardFileLayout.DIFFRACTION.path(input_directory)
+        input_product_file = StandardFileLayout.PRODUCT.path(input_directory)
+
+        for required_file in (diffraction_file, input_product_file):
+            if not required_file.is_file():
+                parser.error(
+                    f'{input_directory} holds no {required_file.name}; is it a prepared directory?'
+                )
+
+    if output_directory.resolve() == input_product_file.parent.resolve():
         parser.error(
-            'OUTPUT_DIR must differ from INPUT_DIR: the final product.h5 would overwrite '
+            'OUTPUT_DIR must differ from the input: the final product.h5 would overwrite '
             'the initial one.'
         )
-
-    diffraction_file = StandardFileLayout.DIFFRACTION.path(input_directory)
-    input_product_file = StandardFileLayout.PRODUCT.path(input_directory)
-
-    for required_file in (diffraction_file, input_product_file):
-        if not required_file.is_file():
-            parser.error(
-                f'{input_directory} holds no {required_file.name}; is it a prepared directory?'
-            )
 
     configure_logging(args)
 
@@ -141,7 +179,11 @@ def main() -> ExitCode:
 
     # A named or staged file is decoded before the data are read, so options that do not
     # parse fail in seconds rather than after loading several gigabytes.
-    options_file = resolve_ptychi_options_file(logger, args.ptychi_options, input_directory)
+    options_file = (
+        args.ptychi_options
+        if input_directory is None
+        else resolve_ptychi_options_file(logger, args.ptychi_options, input_directory)
+    )
     options = None if options_file is None else load_ptychi_options(options_file)
 
     logger.info('Reading %s', diffraction_file)

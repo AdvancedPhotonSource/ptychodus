@@ -33,10 +33,8 @@ from ptychodus.api.assemble import (
     AssembledDiffractionData,
     DetectorCorrections,
     allocate_assembled_data,
-    compute_array_offsets,
     compute_assembled_dtype,
     compute_assembled_patterns_shape,
-    preprocess_array,
 )
 from ptychodus.api.io import load_diffraction_data, save_diffraction_data
 from ptychodus.api.preprocess.diffraction import DiffractionPrepPlan
@@ -172,7 +170,6 @@ class AssembledDiffractionDataset(DiffractionDataset):
         self._dataset = SimpleDiffractionDataset.create_null()
         self._data = AssembledDiffractionData.create_null()
         self._array_list: list[AssembledDiffractionArray] = list()
-        self._array_counter = 0
         # Retained after dispatch so callers can detect \"still loading\" and read
         # any error the loader stored (see is_load_in_progress / get_last_load_error).
         self._last_array_loader: LoadDiffractionDataset | None = None
@@ -367,12 +364,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
         return self._data.nbytes
 
     def is_load_in_progress(self) -> bool:
-        """True while a load task is queued but has not finished.
-
-        Note: this does not track per-array append_array() streams, which are
-        used only by the pvapy streaming path; products are created there only
-        after the stream stops, so the streaming case doesn't rely on this.
-        """
+        """True while a load task is queued but has not finished."""
         if self._source is not None:
             return True
 
@@ -476,15 +468,11 @@ class AssembledDiffractionDataset(DiffractionDataset):
         detector_extent: ImageExtent,
         *,
         process_patterns: bool,
-        log_level: int = logging.DEBUG,
     ) -> DiffractionPrepPlan | None:
         """Resolve the prep plan and report the region patterns will be read from.
 
         A mis-centered or off-detector crop silently starves the reconstruction of
-        signal, so the resolved region is always reported. load_all_arrays raises
-        log_level to INFO because it resolves the plan once per dataset; the
-        streaming path in _append_array resolves it once per incoming array and
-        leaves the DEBUG default, so a live feed does not emit a line per frame.
+        signal, so the resolved region is always reported.
         """
         if not process_patterns:
             return None
@@ -496,78 +484,15 @@ class AssembledDiffractionDataset(DiffractionDataset):
             if read_region is None
             else f'x={read_region.x_range} y={read_region.y_range}'
         )
-        logger.log(
-            log_level,
+        logger.info(
             f'Detector is {detector_extent.width_px}x{detector_extent.height_px};'
             f' reading {region_text}.',
         )
         return plan
 
-    def _append_array(self, array: DiffractionArray, *, process_patterns: bool) -> None:
-        """Preprocess one array and scatter it into the current buffer.
-
-        Unlike load_all_arrays this reads settings at call time, because the
-        streaming path wants each appended frame to reflect the live
-        configuration rather than a snapshot taken when the dataset was opened.
-        """
-        array_index = self._array_counter
-        self._array_counter += 1
-
-        metadata = self._dataset.get_metadata()
-        plan = self._resolve_prep_plan(metadata.detector_extent, process_patterns=process_patterns)
-        read_region = plan.read_region if plan is not None else None
-        pipeline = plan.pipeline if plan is not None else None
-        raw_corrections = self._create_corrections().crop(read_region)
-        raw_bad_pixels = raw_corrections.apply_to_bad_pixels(
-            self._bad_pixels if read_region is None else read_region.apply_to(self._bad_pixels)
-        )
-        processed_bad_pixels = (
-            raw_bad_pixels if pipeline is None else pipeline.apply_to_mask(raw_bad_pixels)
-        )
-        lower, upper = self._get_total_counts_bounds()
-        label = array.get_label()
-        nonfinite_pixels: list[BadPixels] = []
-
-        try:
-            data = preprocess_array(
-                array,
-                pipeline,
-                raw_bad_pixels=raw_bad_pixels,
-                processed_bad_pixels=processed_bad_pixels,
-                raw_pixel_geometry=self.get_raw_pixel_geometry(),
-                total_counts_lower_bound=lower,
-                total_counts_upper_bound=upper,
-                read_region=read_region,
-                corrections=raw_corrections.through_pipeline(pipeline),
-                on_nonfinite_pixels=nonfinite_pixels.append,
-            )
-        except FileNotFoundError:
-            logger.warning(f'File not found for "{label}"!')
-            return
-
-        if nonfinite_pixels:
-            # The block's mask already includes them; widen the whole buffer's and the
-            # raw detector mask so every later frame treats them as bad too.
-            self._data.add_bad_pixels(data.get_bad_pixels())
-            detector_pixels = numpy.zeros_like(self._bad_pixels)
-            region_pixels = (
-                detector_pixels if read_region is None else read_region.apply_to(detector_pixels)
-            )
-            region_pixels[...] = nonfinite_pixels[0]
-            self._mask_nonfinite_pixels(detector_pixels)
-
-        offset = compute_array_offsets(metadata)[array_index]
-        self._on_array_assembled(array_index, label, self._data.assemble(data, offset))
-        self._invalidate_moments()
-
     def _mask_nonfinite_pixels(self, nonfinite_pixels: BadPixels) -> None:
         """Mark detector pixels that held NaN or infinite values bad for later loads."""
         self._bad_pixels = numpy.logical_or(self._bad_pixels, nonfinite_pixels)
-
-    def append_array(self, array: DiffractionArray, *, process_patterns: bool = True) -> None:
-        self._task_manager.put_background_task(
-            lambda: self._append_array(array, process_patterns=process_patterns)
-        )
 
     def _insert_array(self, array: AssembledDiffractionArray) -> None:
         pos = bisect(self._array_list, array.array_index, key=lambda x: x.array_index)
@@ -606,7 +531,6 @@ class AssembledDiffractionDataset(DiffractionDataset):
         self._data = AssembledDiffractionData.create_null()
         self._invalidate_moments()
         self._array_list.clear()
-        self._array_counter = 0
         self._source = None
         self._last_array_loader = None
         self._bad_pixels = self._create_default_bad_pixels()
@@ -645,7 +569,6 @@ class AssembledDiffractionDataset(DiffractionDataset):
         plan = self._resolve_prep_plan(
             metadata.detector_extent,
             process_patterns=process_patterns,
-            log_level=logging.INFO,
         )
         read_region = plan.read_region if plan is not None else None
         pipeline = plan.pipeline if plan is not None else None
@@ -686,7 +609,6 @@ class AssembledDiffractionDataset(DiffractionDataset):
             corrections=corrections,
         )
         self._invalidate_moments()
-        self._array_counter = len(source)
 
         for observer in self._observer_list:
             observer.handle_dataset_reloaded()
@@ -749,7 +671,6 @@ class AssembledDiffractionDataset(DiffractionDataset):
             flat_field=self._flat_field,
         )
         self._array_list = [array]
-        self._array_counter = 1
 
         for observer in self._observer_list:
             observer.handle_dataset_reloaded()

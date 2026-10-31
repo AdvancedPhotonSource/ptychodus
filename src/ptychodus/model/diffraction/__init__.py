@@ -1,4 +1,4 @@
-from .api import DiffractionAPI, PatternsStreamingContext
+from .api import DiffractionAPI
 from .core import DiffractionCore
 from .dataset import (
     AssembledDiffractionArray,
@@ -26,6 +26,5 @@ __all__ = [
     'DiffractionSummaryService',
     'DiffractionSummaryTaskMonitor',
     'DiffractionTaskMonitor',
-    'PatternsStreamingContext',
     'PrepPipelineBuilder',
 ]

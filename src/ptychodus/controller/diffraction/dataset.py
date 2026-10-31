@@ -628,7 +628,7 @@ class DiffractionTreeModel(QAbstractItemModel):
         """Load state of the dataset a node belongs to.
 
         Array and frame rows inherit their dataset's state, so a whole subtree greys
-        out together while its patterns are still streaming in.
+        out together while its patterns are still loading.
         """
         dataset_row = _find_containing_dataset_row(node)
 

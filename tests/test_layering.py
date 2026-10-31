@@ -89,7 +89,7 @@ def test_subpackage_imports_nothing_above_api(subpackage: str) -> None:
     assert _violations(_PTYCHODUS_ROOT / subpackage, f'ptychodus.{subpackage}') == []
 
 
-@pytest.mark.parametrize('module', ['_stream'])
+@pytest.mark.parametrize('module', ['_stream', 'stream'])
 def test_the_stream_processor_imports_nothing_above_api(module: str) -> None:
     path = _PTYCHODUS_ROOT / 'cli' / f'{module}.py'
     assert _module_violations(path, 'ptychodus.cli', _PTYCHODUS_ROOT) == []

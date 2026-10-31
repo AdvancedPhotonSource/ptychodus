@@ -37,6 +37,9 @@ def test_entry_point_imports_and_exposes_its_callable(
     if module.startswith('ptychodus.cli.reconstruct_'):
         pytest.importorskip('ptychi')
 
+    if module == 'ptychodus.cli.stream':
+        pytest.importorskip('pvapy')
+
     imported = importlib.import_module(module)
     assert callable(getattr(imported, function)), f'{command} -> {module}:{function}'
 
@@ -50,6 +53,9 @@ def test_entry_point_prints_help_and_exits_zero(
 
     if module.startswith('ptychodus.cli.reconstruct_'):
         pytest.importorskip('ptychi')
+
+    if module == 'ptychodus.cli.stream':
+        pytest.importorskip('pvapy')
 
     if module == 'ptychodus.__main__':
         pytest.skip('builds a QApplication rather than only a parser')

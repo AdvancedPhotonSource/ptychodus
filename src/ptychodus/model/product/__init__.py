@@ -1,4 +1,4 @@
-from .api import ObjectAPI, ProbeAPI, ProductAPI, ProbePositionsAPI, PositionsStreamingContext
+from .api import ObjectAPI, ProbeAPI, ProductAPI, ProbePositionsAPI
 from .core import ProductCore
 from .item import ProductRepositoryItem, ProductRepositoryObserver
 from .monitor import ProductTaskMonitor
@@ -11,7 +11,6 @@ from .settings import ProductSettings
 __all__ = [
     'ObjectAPI',
     'ObjectRepository',
-    'PositionsStreamingContext',
     'ProbeAPI',
     'ProbeRepository',
     'ProductAPI',

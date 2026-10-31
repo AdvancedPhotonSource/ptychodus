@@ -164,20 +164,6 @@ def test_arrays_land_at_their_metadata_offsets_in_order() -> None:
     numpy.testing.assert_array_equal(dataset.get_assembled_data().get_indexes(), [0, 1, 2, 3, 4])
 
 
-def test_append_array_after_a_load_continues_past_the_loaded_arrays() -> None:
-    """Regression: the appended array must not overwrite array 0 at offset 0."""
-    dataset = make_dataset(
-        arrays=[_saturated_array('a', 2, 0)],
-        num_patterns_per_array=[2, 2],
-    )
-    dataset.load_all_arrays(process_patterns=True, block=True)
-
-    dataset.append_array(_saturated_array('b', 2, 10), process_patterns=True)
-
-    assert [a.get_label() for a in dataset] == ['a', 'b']
-    numpy.testing.assert_array_equal(dataset.get_assembled_data().get_indexes(), [0, 1, 10, 11])
-
-
 def _set_raw_pixel_size(dataset: AssembledDiffractionDataset, geometry: PixelGeometry) -> None:
     """Seed DetectorSettings with a raw pixel geometry; the dataset picks it up
     through get_raw_pixel_geometry's metadata→settings fallback when metadata carries
@@ -289,28 +275,6 @@ def test_load_masks_non_finite_pixels_in_the_raw_and_processed_masks() -> None:
     assert raw_bad.shape == (40, 60)
     assert raw_bad[18, 30]
     assert raw_bad.sum() == 1
-
-
-def test_appended_array_masks_its_non_finite_pixels_for_the_whole_buffer() -> None:
-    """The streaming path widens the buffer's mask and the raw mask, as a full load does."""
-    clean = numpy.ones((2, 40, 60), dtype=numpy.float32)
-    dirty = numpy.ones((2, 40, 60), dtype=numpy.float32)
-    dirty[0, 18, 30] = numpy.inf
-    dataset = make_dataset(
-        arrays=[SimpleDiffractionArray('a', numpy.arange(2, dtype=numpy.intp), clean)],
-        num_patterns_per_array=[2, 2],
-        pattern_dtype=numpy.float32,
-    )
-    dataset.load_all_arrays(process_patterns=True, block=True)
-
-    dataset.append_array(
-        SimpleDiffractionArray('b', numpy.arange(2, 4, dtype=numpy.intp), dirty),
-        process_patterns=True,
-    )
-
-    assert dataset.get_assembled_data().get_bad_pixels()[4, 8]
-    assert dataset.get_bad_pixels()[18, 30]
-    assert numpy.isfinite(dataset.get_assembled_data().get_patterns()).all()
 
 
 class _MomentsObserver(DiffractionDatasetObserver):

@@ -1,5 +1,4 @@
 from __future__ import annotations
-from collections.abc import Sequence
 from importlib.metadata import version
 from pathlib import Path
 from types import TracebackType
@@ -16,7 +15,6 @@ except ModuleNotFoundError:
 import h5py
 import numpy
 
-from ptychodus.api.diffraction import DiffractionMetadata, DiffractionArray
 from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.plugins import PluginRegistry
@@ -25,14 +23,14 @@ from ptychodus.api.workflow import WorkflowAPI
 from .agent import AgentCore
 from .analysis import AnalysisCore
 from .automation import AutomationCore
-from .diffraction import DiffractionCore, PatternsStreamingContext
+from .diffraction import DiffractionCore
 from .fluorescence import FluorescenceCore
 from .genesis import GenesisCore
 from .globus import GlobusCore
 from .memory import MemoryPresenter
 from .plugins import PluginChooser
 from .processing import ProcessingCore
-from .product import PositionsStreamingContext, ProductCore
+from .product import ProductCore
 from .settings import SettingsRegistry
 from .task_manager import TaskManager
 from .workflow import ConcreteWorkflowAPI
@@ -55,36 +53,6 @@ def configure_logger(*, log_level: int) -> None:
     logger.info('HDF5Plugin ' + version('hdf5plugin'))
     logger.info('H5Py ' + version('h5py'))
     logger.info(f'HDF5 {h5py.version.hdf5_version}')
-
-
-class PtychodusStreamingContext:
-    def __init__(
-        self,
-        positions_context: PositionsStreamingContext,
-        patterns_context: PatternsStreamingContext,
-    ) -> None:
-        self._positions_context = positions_context
-        self._patterns_context = patterns_context
-
-    def start(self) -> None:
-        self._positions_context.start()
-        self._patterns_context.start()
-
-    def append_positions_x(self, values_m: Sequence[float], trigger_counts: Sequence[int]) -> None:
-        self._positions_context.append_positions_x(values_m, trigger_counts)
-
-    def append_positions_y(self, values_m: Sequence[float], trigger_counts: Sequence[int]) -> None:
-        self._positions_context.append_positions_y(values_m, trigger_counts)
-
-    def append_array(self, array: DiffractionArray) -> None:
-        self._patterns_context.append_array(array)
-
-    def get_queue_size(self) -> int:
-        return 0  # TODO get_queue_size
-
-    def stop(self) -> None:
-        self._patterns_context.stop()
-        self._positions_context.stop()
 
 
 class ModelCore:
@@ -217,12 +185,6 @@ class ModelCore:
         self.globus_core.stop()
         self.genesis_core.stop()
         self._task_manager.stop(await_finish=False)
-
-    def create_streaming_context(self, metadata: DiffractionMetadata) -> PtychodusStreamingContext:
-        return PtychodusStreamingContext(
-            self.product_core.probe_positions_api.create_streaming_context(),
-            self.diffraction_core.diffraction_api.create_streaming_context(metadata),
-        )
 
     def run_tasks(self) -> None:
         self._task_manager.run_foreground_tasks()

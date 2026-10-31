@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import Any
+from uuid import UUID, uuid4
 
 import numpy
 import pytest
@@ -28,6 +29,12 @@ from ptychodus.api.probe import ProbeEnsemble  # noqa: E402
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence  # noqa: E402
 from ptychodus.api.product import Product, ProductMetadata  # noqa: E402
 from ptychodus.api.reconstruct import ReconstructInput  # noqa: E402
+from ptychodus.api.storage import (  # noqa: E402
+    STORAGE_ROOT_ENVIRONMENT_VARIABLE,
+    StorageLayout,
+    save_diffraction_resource,
+    save_product_resource,
+)
 from ptychodus.cli import _reconstruct_standard, reconstruct_prepared  # noqa: E402
 from ptychodus.cli._reconstruct_common import CancellationToken  # noqa: E402
 
@@ -223,5 +230,65 @@ def test_a_directory_missing_its_product_is_refused(
 
     with pytest.raises(SystemExit) as caught:
         _main(monkeypatch, '-i', str(prepared), '-o', str(tmp_path / 'result'))
+
+    assert caught.value.code == 2
+
+
+def _store(root: Path) -> UUID:
+    """A product in a storage root, derived from its diffraction data; return its uuid."""
+    layout = StorageLayout(root)
+    diffraction = save_diffraction_resource(layout, _assembled_data(), label='scan 1')
+    return save_product_resource(layout, _product(), derived_from=[diffraction])
+
+
+def test_a_stored_product_reconstructs_by_uuid(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    product = _store(tmp_path / 'storage')
+    captured = _capture_run(monkeypatch)
+
+    code = _main(
+        monkeypatch,
+        '--storage-root',
+        str(tmp_path / 'storage'),
+        '--product',
+        str(product),
+        '-o',
+        str(tmp_path / 'result'),
+    )
+
+    assert code is ExitCode.SUCCESS
+    assert captured['reconstruct_input'].diffraction_patterns.shape[0] == NUM_PATTERNS
+    assert type(captured['options']).__name__ == 'LSQMLOptions'
+
+
+def test_the_storage_root_defaults_to_the_environment(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    product = _store(tmp_path / 'storage')
+    captured = _capture_run(monkeypatch)
+    monkeypatch.setenv(STORAGE_ROOT_ENVIRONMENT_VARIABLE, str(tmp_path / 'storage'))
+
+    code = _main(monkeypatch, '--product', str(product), '-o', str(tmp_path / 'result'))
+
+    assert code is ExitCode.SUCCESS
+    assert captured['reconstruct_input'].diffraction_patterns.shape[0] == NUM_PATTERNS
+
+
+@pytest.mark.parametrize('case', ['no root', 'unknown uuid', 'both inputs'])
+def test_a_bad_product_request_is_a_usage_error(
+    case: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    product = _store(tmp_path / 'storage')
+    _prepare(tmp_path / 'prepared')
+    monkeypatch.delenv(STORAGE_ROOT_ENVIRONMENT_VARIABLE, raising=False)
+    argv = {
+        'no root': ['--product', str(product)],
+        'unknown uuid': ['--storage-root', str(tmp_path / 'storage'), '--product', str(uuid4())],
+        'both inputs': ['-i', str(tmp_path / 'prepared'), '--product', str(product)],
+    }[case]
+
+    with pytest.raises(SystemExit) as caught:
+        _main(monkeypatch, *argv, '-o', str(tmp_path / 'result'))
 
     assert caught.value.code == 2

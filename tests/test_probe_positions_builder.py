@@ -40,7 +40,6 @@ from ptychodus.model.product.probe_positions.builder_factory import (
     ProbePositionsBuilderFactory,
 )
 from ptychodus.model.product.probe_positions.settings import ProbePositionsSettings
-from ptychodus.model.product.probe_positions.streaming import StreamingScanBuilder
 from ptychodus.plugins.probe_positions.cartesian import (
     CartesianProbePositionsGenerator,
     CartesianVariant,
@@ -217,16 +216,3 @@ def test_copy_preserves_trim_parameters(builder_name: str) -> None:
 
     assert duplicate.num_discard_at_start.get_value() == 2
     assert duplicate.num_discard_at_end.get_value() == 3
-
-
-def test_streaming_builder_is_instantiable_and_copyable() -> None:
-    """StreamingScanBuilder never implemented the abstract copy(), so it could
-    not be instantiated at all."""
-    settings = _make_settings()
-    builder = StreamingScanBuilder(_make_rng(), settings, _make_line(5))
-    builder.num_discard_at_start.set_value(1)
-
-    duplicate = builder.copy()
-
-    assert duplicate.num_discard_at_start.get_value() == 1
-    assert [p.index for p in builder.build()] == [1, 2, 3, 4]

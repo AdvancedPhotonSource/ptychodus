@@ -7,18 +7,12 @@ except PackageNotFoundError:
     # package is not installed
     __version__ = 'unknown'
 
-try:
-    from .ptychodus_stream_processor import PtychodusAdImageProcessor
-except ModuleNotFoundError:
-    pass
-
 __all__ = [
     'api',
     'cli',
     'model',
     'view',
     'controller',
-    'PtychodusAdImageProcessor',
     'VERSION_STRING',
 ]
 
