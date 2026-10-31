@@ -322,3 +322,39 @@ def test_save_without_load_or_train_raises() -> None:
 
     with pytest.raises(RuntimeError):
         adapter.save_model(Path('/tmp/x'))
+
+
+@pytest.mark.parametrize(
+    ('is_trainable', 'distributed_training', 'expected'),
+    [
+        (True, False, False),
+        (True, True, True),
+        # A promise about training means nothing for a reconstructor that cannot train.
+        (False, True, False),
+    ],
+)
+def test_supports_distributed_training_follows_the_keyword(
+    is_trainable: bool, distributed_training: bool, expected: bool
+) -> None:
+    adapter = SubprocessReconstructor(
+        name='FAKE',
+        child_module=FIXTURES_MODULE,
+        dump_reconstruct_options=lambda p, o: {},
+        is_trainable=is_trainable,
+        dump_train_options=lambda opts: {},
+        distributed_training=distributed_training,
+    )
+
+    assert adapter.supports_distributed_training() is expected
+
+
+def test_supports_distributed_training_defaults_to_false() -> None:
+    adapter = SubprocessReconstructor(
+        name='FAKE',
+        child_module=FIXTURES_MODULE,
+        dump_reconstruct_options=lambda p, o: {},
+        is_trainable=True,
+        dump_train_options=lambda opts: {},
+    )
+
+    assert not adapter.supports_distributed_training()

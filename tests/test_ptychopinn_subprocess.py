@@ -90,13 +90,8 @@ def _captured(excinfo: pytest.ExceptionInfo[ChildError]) -> dict[str, Any]:
 # ----------------------------- spawned child -----------------------------
 
 
-def test_train_hands_the_public_door_a_settings_mapping() -> None:
-    """Training goes through the dataset-to-bundle door, not a config object."""
-    options = {
-        'settings': {'mode': 'Unsupervised', 'epochs': 3},
-        'accelerator': 'cpu',
-        'num_workers': 2,
-    }
+def _capture_train_call(options: dict[str, Any]) -> dict[str, Any]:
+    """What the child hands the stubbed training door, given these dumped options."""
     adapter = SubprocessReconstructor(
         name='PtychoPINN train probe',
         child_module=FIXTURES_MODULE,
@@ -114,7 +109,19 @@ def test_train_hands_the_public_door_a_settings_mapping() -> None:
             )
         )
 
-    captured = _captured(excinfo)
+    return _captured(excinfo)
+
+
+def test_train_hands_the_public_door_a_settings_mapping(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Training goes through the dataset-to-bundle door, not a config object."""
+    monkeypatch.delenv('LOCAL_WORLD_SIZE', raising=False)
+    captured = _capture_train_call(
+        {
+            'settings': {'mode': 'Unsupervised', 'epochs': 3},
+            'accelerator': 'cpu',
+            'num_workers': 2,
+        }
+    )
     assert captured['dataset_name'] == 'train_data.npz'
     assert captured['settings_is_mapping'] is True
     assert captured['mode'] == 'Unsupervised'
@@ -126,6 +133,24 @@ def test_train_hands_the_public_door_a_settings_mapping() -> None:
     # Every supplied runtime value must be declared explicit, or the factory
     # treats it as a default it may discard.
     assert captured['explicit_fields'] == sorted(captured['execution_values'])
+
+
+def test_train_under_a_distributed_launcher_claims_one_device_per_local_rank(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Lightning's TorchElastic environment rejects a device count other than its own."""
+    # Inherited by the spawned child, as a launcher's variables are.
+    monkeypatch.setenv('LOCAL_WORLD_SIZE', '2')
+    captured = _capture_train_call(
+        {
+            'settings': {'mode': 'Unsupervised', 'epochs': 3},
+            'accelerator': 'gpu',
+            'num_workers': 0,
+        }
+    )
+
+    assert captured['execution_values']['devices'] == 2
+    assert 'devices' in captured['explicit_fields']
 
 
 def test_reconstruct_stages_declared_arrays_through_the_embedder_seam() -> None:

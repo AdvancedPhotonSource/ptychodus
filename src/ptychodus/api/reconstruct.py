@@ -195,6 +195,18 @@ class TrainableReconstructor(Reconstructor):
         """Train from a StandardFileLayout in *input_directory*, writing to *output_directory*."""
         pass
 
+    def supports_distributed_training(self) -> bool:
+        """Whether one ``train`` call per rank of a distributed launch trains one model.
+
+        True promises that, started once per rank by a launcher such as ``torchrun``, the
+        backend joins a single process group from the environment it inherits and writes
+        its outputs from global rank zero alone. False, the default, means each rank would
+        train a model of its own into the same output directory.
+
+        Override when the backend makes that promise.
+        """
+        return False
+
 
 class NullReconstructor(Reconstructor):
     """Stands in for a selection that resolves to no reconstructor at all.
@@ -365,7 +377,10 @@ class SubprocessReconstructor(TrainableReconstructor):
 
     Each ``reconstruct()`` / ``train()`` call spawns exactly one child; the
     child dies before the call returns, and the iterator yields the same
-    per-iteration output an in-process backend would.
+    per-iteration output an in-process backend would. The child inherits this
+    process's environment, a distributed launcher's rank variables included,
+    which is what lets a backend passing ``distributed_training`` join one
+    process group from a child per rank.
 
     **Trainable-model lifecycle.** ``load_model`` records the path and nothing
     else -- the fresh inference child does the real load, once per call.
@@ -386,6 +401,7 @@ class SubprocessReconstructor(TrainableReconstructor):
         is_trainable: bool = False,
         train_function: str = '',
         dump_train_options: DumpTrainOptions | None = None,
+        distributed_training: bool = False,
         model_file_filter: str = '',
         model_file_extension: str = '',
         save_model: SaveModel | None = None,
@@ -401,6 +417,7 @@ class SubprocessReconstructor(TrainableReconstructor):
         self._is_trainable = is_trainable
         self._train_function = train_function
         self._dump_train_options = dump_train_options
+        self._distributed_training = distributed_training
 
         # Where this reconstructor's child code lives. Stamped by the library
         # that builds it, which is the thing that knows; set directly only by
@@ -425,6 +442,9 @@ class SubprocessReconstructor(TrainableReconstructor):
     @property
     def is_trainable(self) -> bool:
         return self._is_trainable
+
+    def supports_distributed_training(self) -> bool:
+        return self._is_trainable and self._distributed_training
 
     def get_default_options(self) -> BaseModel:
         # A fresh object per call, so a caller editing what it was handed

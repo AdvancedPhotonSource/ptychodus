@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import csv
 import logging
+import os
 import tempfile
 from collections.abc import Sequence
 from dataclasses import replace
@@ -262,8 +263,8 @@ def _read_epoch_losses(output_path: Path) -> tuple[list[LossValue], list[LossVal
 def run_train(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None:
     """Child entry point for one training session.
 
-    Masks the visible GPUs, then hands the already-translated settings mapping
-    to the backend's public dataset-to-bundle training door.
+    Hands the already-translated settings mapping to the backend's public
+    dataset-to-bundle training door, on the devices this child was started to see.
     """
 
     from ptycho_torch.execution_request import ExecutionRequest
@@ -273,11 +274,14 @@ def run_train(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None:
     options = payload.options
     settings = options['settings']
 
+    # Under a distributed launcher this child is one rank of LOCAL_WORLD_SIZE on
+    # its node, and Lightning's TorchElastic environment insists the device
+    # count say so. Otherwise 'auto' resolves to the number of devices this
+    # child can see, so no manual clamping is needed.
+    local_world_size = os.environ.get('LOCAL_WORLD_SIZE')
     execution_values: dict[str, Any] = {
         'accelerator': options['accelerator'],
-        # Resolves to the number of devices actually visible after the mask
-        # above, so no manual clamping is needed.
-        'devices': 'auto',
+        'devices': 'auto' if local_world_size is None else int(local_world_size),
         'num_workers': options['num_workers'],
         'enable_progress_bar': False,
     }

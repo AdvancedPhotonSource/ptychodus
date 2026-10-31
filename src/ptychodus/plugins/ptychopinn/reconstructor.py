@@ -272,6 +272,9 @@ def build_reconstructor(model_training_mode: str) -> SubprocessReconstructor:
         resolve_model_path=resolve_model_path,
         is_trainable=True,
         dump_train_options=dump_train_options,
+        # Lightning's DDP strategy joins the process group a launcher such as torchrun
+        # describes, and PtychoPINN persists its bundle from global rank zero alone.
+        distributed_training=True,
         model_file_filter='Zipped Archive (*.zip)',
         model_file_extension='.zip',
         save_model=_save_model_bundle,
