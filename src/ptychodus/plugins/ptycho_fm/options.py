@@ -75,8 +75,12 @@ class PtychoFMOptions(PtychoFMConfig):
     A subclass rather than a wrapper, so the object stays a ``PtychoFMConfig``
     and dumps to the same nested shape the child already reads. Upstream allows
     extra keys, so the added branch rides along as a top-level section.
+
+    ``model`` is redeclared only to mark it frozen, pydantic's own statement that
+    the architecture is not a user's to vary; see the module docstring.
     """
 
+    model: ModelConfig = Field(default_factory=ModelConfig, frozen=True)
     inference: InferenceOptions = Field(default_factory=InferenceOptions)
 
 

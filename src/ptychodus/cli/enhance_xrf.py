@@ -25,8 +25,7 @@ import logging
 import signal
 import sys
 
-from pydantic import BaseModel, ValidationError
-import yaml
+from pydantic import BaseModel
 
 import ptychodus
 from ptychodus.api.exit_codes import ExitCode
@@ -38,6 +37,12 @@ from ptychodus.api.fluorescence import (
 from ptychodus.api.io import load_product
 from ptychodus.api.plugins import Plugin, PluginCatalog, PluginRegistry
 from ptychodus.cli import add_log_level_argument, configure_logging
+from ptychodus.cli._options import (
+    OptionsError,
+    apply_options_document,
+    format_options_document,
+    read_options_document,
+)
 
 logger = logging.getLogger('enhance_xrf')
 
@@ -46,103 +51,31 @@ logger = logging.getLogger('enhance_xrf')
 _DEFAULT_ALGORITHM: Final = 'vspi'
 _DEFAULT_FILE_TYPE: Final = 'XRF-Maps'
 
-# The conventional "read it from stdin instead" filename, as argparse hands it over once a
-# bare ``-`` has been through ``type=Path``.
-_STDIN_ARGUMENT: Final = Path('-')
-
-
-class _OptionsError(ValueError):
-    """An options document that cannot be used, reported as a usage error."""
-
 
 def format_enhancer_options(plugin: Plugin[FluorescenceEnhancer]) -> str:
     """One enhancer's default options as a commented YAML document.
 
     The document names the enhancer beside its fields, so it can be saved and passed
-    straight back to ``--options``. Each field's description is written above it as a
-    YAML comment, which :func:`yaml.safe_load` discards.
+    straight back to ``--options``.
     """
-    defaults = plugin.strategy.get_default_options()
-    values = defaults.model_dump(mode='json')
-    lines = [
-        f'# {plugin.simple_name} fluorescence enhancer options, at their defaults. Save this,',
-        '# edit it, and pass it back with --options.',
-        yaml.safe_dump({'algorithm': plugin.simple_name}, sort_keys=False).rstrip(),
-        'options:',
-    ]
-
-    for name, field in type(defaults).model_fields.items():
-        if field.description:
-            lines.append(f'  # {field.description}')
-
-        entry = yaml.safe_dump({name: values[name]}, default_flow_style=False, sort_keys=False)
-        lines.extend(f'  {line}' for line in entry.splitlines())
-
-    return '\n'.join(lines) + '\n'
-
-
-def _read_options_document(options_file: Path) -> tuple[str, Mapping[str, Any]]:
-    """The enhancer an options document names, and the field values it gives.
-
-    Raises:
-        _OptionsError: if the document is not a mapping holding a string ``algorithm``
-            and, optionally, a mapping of ``options``.
-    """
-    text = sys.stdin.read() if options_file == _STDIN_ARGUMENT else options_file.read_text()
-
-    try:
-        document = yaml.safe_load(text)
-    except yaml.YAMLError as exc:
-        raise _OptionsError(f'{options_file} is not YAML: {exc}') from exc
-
-    if not isinstance(document, Mapping):
-        raise _OptionsError(f'{options_file} must hold a mapping with "algorithm" and "options".')
-
-    unknown_keys = sorted(str(key) for key in document if key not in ('algorithm', 'options'))
-
-    if unknown_keys:
-        raise _OptionsError(
-            f'{options_file} has unexpected top-level keys {unknown_keys}; '
-            'only "algorithm" and "options" are read.'
-        )
-
-    algorithm = document.get('algorithm')
-
-    if not isinstance(algorithm, str):
-        raise _OptionsError(f'{options_file} must name its enhancer as a string "algorithm".')
-
-    fields = document.get('options')
-
-    if fields is None:
-        fields = {}
-    elif not isinstance(fields, Mapping):
-        raise _OptionsError(f'"options" in {options_file} must be a mapping of field values.')
-
-    return algorithm, fields
+    return format_options_document(
+        f'{plugin.simple_name} fluorescence enhancer options',
+        {'algorithm': plugin.simple_name},
+        plugin.strategy.get_default_options(),
+    )
 
 
 def _validate_options(plugin: Plugin[FluorescenceEnhancer], fields: Mapping[str, Any]) -> BaseModel:
     """The enhancer's defaults with `fields` applied, validated against its declaration.
 
     Raises:
-        _OptionsError: if a field is not declared, or a value is one the declaration rejects.
+        OptionsError: if a field is not declared, or a value is one the declaration rejects.
     """
-    defaults = plugin.strategy.get_default_options()
-    declared = type(defaults).model_fields
-    # Checked here because pydantic ignores names a model does not declare, which would
-    # let a misspelled field run silently at its default.
-    unknown = sorted(str(name) for name in fields if name not in declared)
-
-    if unknown:
-        raise _OptionsError(
-            f'Enhancer "{plugin.simple_name}" does not declare {unknown}; '
-            f'it declares {sorted(declared)}.'
-        )
-
-    try:
-        return type(defaults).model_validate({**defaults.model_dump(), **fields})
-    except ValidationError as exc:
-        raise _OptionsError(f'Invalid options for enhancer "{plugin.simple_name}": {exc}') from exc
+    return apply_options_document(
+        plugin.strategy.get_default_options(),
+        fields,
+        subject=f'Enhancer "{plugin.simple_name}"',
+    )
 
 
 class _PrintOptionsAction(argparse.Action):
@@ -311,10 +244,11 @@ def main() -> ExitCode:
     # Before the data are read, so options that cannot be used fail in seconds.
     try:
         if args.options is not None:
-            file_algorithm, fields = _read_options_document(args.options)
+            selectors, fields = read_options_document(args.options, ('algorithm',))
+            file_algorithm = selectors['algorithm']
 
             if algorithm is not None and algorithm.casefold() != file_algorithm.casefold():
-                raise _OptionsError(
+                raise OptionsError(
                     f'--algorithm {algorithm} disagrees with {args.options}, which names '
                     f'{file_algorithm}; pass one or the other.'
                 )
@@ -324,13 +258,13 @@ def main() -> ExitCode:
         plugin = registry.fluorescence_enhancers.find_plugin(algorithm or _DEFAULT_ALGORITHM)
 
         if plugin is None:
-            raise _OptionsError(
+            raise OptionsError(
                 f'No enhancer named "{algorithm}"; installed are '
                 f'{registry.fluorescence_enhancers.stringify_plugin_names()}.'
             )
 
         options = _validate_options(plugin, fields)
-    except (_OptionsError, OSError) as exc:
+    except (OptionsError, OSError) as exc:
         parser.error(str(exc))
 
     configure_logging(args)
