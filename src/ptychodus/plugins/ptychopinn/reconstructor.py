@@ -192,23 +192,42 @@ def _extract_bundle_dir(model_bundle_path: Path) -> Path:
 
 
 def _save_model_bundle(loaded_from: Path, dest: Path) -> None:
-    """Archive the loaded bundle directory (or copy the bundle .zip) to ``dest``.
+    """Write the model recorded at ``loaded_from`` to ``dest`` as a zip of its bundle.
 
     The child records either a bundle directory (right after training) or a
-    ``wts.h5.zip`` file (right after inference load). This function normalises
-    to a zip archive at ``dest``.
-    """
-    if loaded_from.is_dir():
-        archive_stem = str(dest.with_suffix(''))
-        logger.debug(f'Archiving bundle {loaded_from!r} -> {dest!r}')
-        shutil.make_archive(archive_stem, 'zip', root_dir=loaded_from)
-        return
+    ``wts.h5.zip`` file (right after inference load). A bundle is that one
+    archive: it carries its own manifest, and PtychoPINN loads nothing else from
+    the directory holding it. So only it is saved, wrapped in the outer zip
+    :func:`_extract_bundle_dir` unpacks, and whatever else training left beside
+    it -- logs, checkpoints, metrics -- stays behind.
 
-    if loaded_from.name == MODEL_FILE_NAME:
-        # wts.h5.zip inside a bundle dir -- archive the parent dir so the
-        # saved artifact is a self-contained bundle.
-        archive_stem = str(dest.with_suffix(''))
-        shutil.make_archive(archive_stem, 'zip', root_dir=loaded_from.parent)
+    The outer zip is assembled beside ``dest`` and renamed onto it, so ``dest``
+    is written exactly as named, a ``dest`` inside the bundle directory is never
+    part of what is archived, and a failed write leaves nothing at ``dest``.
+    """
+    if loaded_from.is_dir() or loaded_from.name == MODEL_FILE_NAME:
+        bundle_dir = loaded_from if loaded_from.is_dir() else loaded_from.parent
+        archive = bundle_dir / MODEL_FILE_NAME
+
+        if not archive.is_file():
+            raise RuntimeError(f'Cannot save PtychoPINN model: {archive} is not a file.')
+
+        logger.debug(f'Archiving bundle {archive!r} -> {dest!r}')
+
+        with tempfile.NamedTemporaryFile(
+            dir=dest.parent, prefix=f'.{dest.name}.', suffix='.tmp', delete=False
+        ) as handle:
+            staging = Path(handle.name)
+
+        try:
+            with zipfile.ZipFile(staging, 'w') as outer:
+                outer.write(archive, arcname=MODEL_FILE_NAME)
+
+            staging.replace(dest)
+        except BaseException:
+            staging.unlink(missing_ok=True)
+            raise
+
         return
 
     if loaded_from.suffix == '.zip':

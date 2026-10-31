@@ -348,3 +348,24 @@ $ ptychodus-reconstruct-pear --params ./scan0054_params.json --dry-run
 
 The output directory is derived from the parameter file, following the same convention PEAR
 uses, so results land where that workflow expects them.
+
+## Training a model
+
+`ptychodus-train` trains a learned reconstructor such as PtychoPINN from training data in the backend's own format, as the GUI's export writes it — `train_data.npz` for PtychoPINN. It reads no raw beamline files and no settings file, and leaves the input directory untouched.
+
+Its options come from a YAML document, as `ptychodus-enhance-xrf`'s do. `--print-options` writes one at the defaults, naming the library and the algorithm beside every field, and `--options` passes an edited copy back. Fields it omits keep their defaults; a misspelled field, or one the backend fixes, is refused rather than ignored.
+
+```sh
+$ ptychodus-train --print-options PtychoPINN/Unsupervised > pinn.yaml
+$ ptychodus-train -i ./training-data -o ./trained --options pinn.yaml
+```
+
+The backend writes what it trains into the output directory, and the command adds the trained model there as `model` with the backend's extension, such as `model.zip` for PtychoPINN. `--dry-run` checks the inputs, options and launch without training.
+
+To train on several GPUs of one node, launch it with `torchrun`:
+
+```sh
+$ torchrun --standalone --nproc-per-node=4 -m ptychodus.cli.train -i ./training-data -o ./trained --options pinn.yaml
+```
+
+Each rank runs the backend in a child process that joins one process group, and only the first rank logs progress and saves the model; add `--local-ranks-filter 0` to see one rank's console. Choose the GPUs with `CUDA_VISIBLE_DEVICES`: every rank must see the same devices, as many as `--nproc-per-node`. PtychoPINN trains this way. A backend that trains on one device only is refused under a launch of more than one process, and any launch across more than one node is refused.
