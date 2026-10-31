@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=80", "setuptools-scm[simple]>=9.2"]
+requires = ["setuptools>=84.1", "setuptools-scm[simple]>=9.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,19 +10,23 @@ requires-python = ">=3.11"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 dependencies = [
+    # Older bundles trust emSign ECC Root CA - G3, whose intermediates' keys are compromised
+    # (GHSA-6q48-6c7w-9gw2). httpx and requests verify TLS against this bundle, and a direct
+    # floor upgrades a stale copy that a container base image already provides.
+    "certifi>=2026.10.19",
     "colorcet",
     "h5py>=3",
     "hdf5plugin",
     "httpx",
     "matplotlib",
-    "mlflow-skinny",
+    "mlflow-skinny>=3.17.2",
     # 2.2 gives the scalar precision type parameters PEP 696 defaults, so the annotations
     # here write `numpy.floating` rather than `numpy.floating[Any]`, and makes the
     # shape-typed `ndarray[tuple[int, int], ...]` aliases in api/ check what they claim.
     "numpy>=2.2",
     "psutil",
     "pydantic",
-    "pydantic-ai>=1.0,<3",
+    "pydantic-ai>=2.53,<3",
     "pyyaml",
     "scikit-image",
     "scikit-learn",
@@ -65,25 +69,28 @@ ptychodus-webapp = "ptychodus.webapp.cli:main"
 # that extra's pinned index, or from PyPI when cdtools is installed alone.
 cdtools = ["cdtools-py>=0.3.2"]
 docs = ["myst-parser", "sphinx", "sphinx-copybutton", "sphinx-rtd-theme"]
-globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]
+globus = ["globus-compute-sdk", "globus-sdk>=4.10.0"]
 gui = ["PyQt5"]
 # pty-chi pins torch to a CUDA-matched index in its own pyproject, but uv does not
 # inherit `tool.uv.sources` from a dependency, so ptychodus has to pin it again below.
-ptychi = ["ptychi==2.3.*", "torch>=2.4", "torchvision"]
-ptychi-cuda126 = ["ptychi==2.3.*", "torch>=2.4", "torchvision"]
-ptychi-cuda130 = ["ptychi==2.3.*", "torch>=2.4", "torchvision"]
-ptychi-cuda132 = ["ptychi==2.3.*", "torch>=2.4", "torchvision"]
+ptychi = ["ptychi==2.3.*", "torch>=2.8", "torchvision"]
+ptychi-cuda126 = ["ptychi==2.3.*", "torch>=2.8", "torchvision"]
+ptychi-cuda130 = ["ptychi==2.3.*", "torch>=2.8", "torchvision"]
+ptychi-cuda132 = ["ptychi==2.3.*", "torch>=2.8", "torchvision"]
 ptychozoon = ["ptychozoon"]
 stream = ["pvapy>=5.6"]
 webapp = [
     "fastapi>=0.115",
-    "fastmcp>=3",
+    "fastmcp>=4.1.2",
+    # Listed directly because neither fastapi nor fastmcp requires a release past its
+    # request.form() and request-path CVEs, fixed through 1.3.1.
+    "starlette>=1.3.1",
     "uvicorn[standard]>=0.30",
     "sqlalchemy[asyncio]>=2.0",
     "aiosqlite>=0.20",
-    "pillow>=10.3",
-    "pydantic-settings>=2.5",
-    "python-multipart>=0.0.18",
+    "pillow>=13.0.0",
+    "pydantic-settings>=2.14.2",
+    "python-multipart>=0.0.31",
     "xraydb>=4.5",
 ]
 
