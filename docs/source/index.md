@@ -20,7 +20,7 @@ readers
 reconstruction_drivers
 api
 globus
-pvapy
+stream
 ```
 
 ## Python API Example

@@ -364,6 +364,31 @@ def pack_batched_axes(
     }
 
 
+def pack_batched_positions(
+    configuration: StreamConfiguration,
+    event_ids: Sequence[int],
+    x_m: Sequence[float],
+    y_m: Sequence[float],
+    i0: Sequence[float] | None = None,
+) -> dict[str, dict[str, Any]]:
+    """One batch of points as the configured batched structure, in stream units."""
+    axes = {
+        configuration.x_axis.name: (
+            event_ids,
+            numpy.asarray(x_m, dtype=numpy.float64) / configuration.x_axis.scale_m,
+        ),
+        configuration.y_axis.name: (
+            event_ids,
+            numpy.asarray(y_m, dtype=numpy.float64) / configuration.y_axis.scale_m,
+        ),
+    }
+
+    if configuration.i0_name is not None and i0 is not None:
+        axes[configuration.i0_name] = (event_ids, numpy.asarray(i0, dtype=numpy.float64))
+
+    return pack_batched_axes(axes)
+
+
 def _configured_axes(configuration: StreamConfiguration) -> dict[Axis, tuple[str, float]]:
     axes = {
         Axis.X: (configuration.x_axis.name, configuration.x_axis.scale_m),

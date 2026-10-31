@@ -48,6 +48,7 @@ from ptychodus.cli._stream import (
     display_images,
     estimate_product,
     pack_batched_axes,
+    pack_batched_positions,
     pack_sgsocket_attributes,
     parse_batched_axes,
     parse_sgsocket_event,
@@ -192,6 +193,19 @@ def test_batched_axes_round_trip_with_scale_and_offset() -> None:
     numpy.testing.assert_allclose(updates[Axis.Y].values, [8e-6, 9e-6])
     numpy.testing.assert_array_equal(updates[Axis.I0].indexes, [2])
     assert value['X']['num_events'] == 3
+
+
+def test_a_packed_batch_of_positions_parses_back_to_metres() -> None:
+    configuration = _configuration(
+        x_axis={'name': 'X', 'scale_m': 1e-6}, y_axis={'name': 'Y', 'scale_m': -1e-6}
+    )
+    value = pack_batched_positions(configuration, [4, 5], [1e-6, 2e-6], [3e-6, 4e-6])
+    updates = {update.axis: update for update in parse_batched_axes(value, configuration)}
+
+    numpy.testing.assert_allclose(value['X']['positions'], [1.0, 2.0])
+    numpy.testing.assert_allclose(updates[Axis.X].values, [1e-6, 2e-6])
+    numpy.testing.assert_allclose(updates[Axis.Y].values, [3e-6, 4e-6])
+    numpy.testing.assert_array_equal(updates[Axis.Y].indexes, [4, 5])
 
 
 def test_an_axis_missing_from_a_batch_is_skipped() -> None:

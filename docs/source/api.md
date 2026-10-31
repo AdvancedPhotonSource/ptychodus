@@ -254,6 +254,15 @@
    :show-inheritance:
 ```
 
+## Storage
+
+```{eval-rst}
+.. automodule:: ptychodus.api.storage
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Simulate
 
 ### Diffraction simulation
