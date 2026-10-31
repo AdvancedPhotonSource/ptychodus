@@ -70,6 +70,7 @@ from ptychodus.api.reconstruct import (
     ReconstructOutput,
     prepare_reconstruct_input,
 )
+from ptychodus.cli._launch import environment_rank
 from ptychodus.plugins.ptychi.algorithms import task_options_classes
 from ptychodus.plugins.ptychi.task import (
     align_task_options_with_product,
@@ -105,27 +106,6 @@ logger = logging.getLogger(__name__)
 # bare ``-`` has been through ``type=Path``.
 _STDIN_ARGUMENT = Path('-')
 
-# Environment variables that report this process's rank, in the order they are consulted.
-# `torchrun` and `torch.distributed.launch` export RANK; plain `srun` exports SLURM_PROCID
-# and none of the torch ones.
-_RANK_ENVIRONMENT_VARIABLES = ('RANK', 'SLURM_PROCID')
-
-
-def _environment_rank() -> int:
-    """Rank as the launcher reported it, or 0 when no launcher did.
-
-    A value that is empty or not an integer is ignored rather than fatal: it means
-    something in the environment claims a rank it cannot state, and declining to write
-    the run's output is the worse of the two readings.
-    """
-    for name in _RANK_ENVIRONMENT_VARIABLES:
-        try:
-            return int(os.environ[name])
-        except (KeyError, ValueError):
-            continue
-
-    return 0
-
 
 def process_rank() -> int:
     """This process's rank, as either the process group or the launcher reports it.
@@ -143,7 +123,7 @@ def process_rank() -> int:
     # by the time this runs the name is already in sys.modules.
     from ptychi.parallel import get_rank
 
-    return get_rank() or _environment_rank()
+    return get_rank() or environment_rank()
 
 
 def is_main_process() -> bool:
