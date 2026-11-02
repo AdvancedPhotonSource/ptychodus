@@ -214,7 +214,7 @@ Sanity check:
 $ ptychodus --version
 ```
 
-stderr will show a one-line notice such as `ptychodus: using image localhost/ptychodus:1.5.1-cuda13.0 (detected: nvidia, driver CUDA 13.0)` — the wrapper reads the driver's CUDA ceiling from `nvidia-smi`, takes the `ptychodus:*-cuda<X.Y>` tags present in local podman storage as the candidates, and launches the newest one that ceiling allows. stdout prints the version reported by the in-container `ptychodus`.
+stderr will show a one-line notice such as `ptychodus: using image localhost/ptychodus:1.5.1-cuda13.0 (detected: nvidia, driver CUDA 13.0)` — the wrapper reads the driver's CUDA ceiling from `nvidia-smi`, takes the `ptychodus:*-cuda<X.Y>` tags present in local podman storage that the ceiling allows as the candidates, and launches the newest ptychodus version among them in the newest CUDA variant built for it. stdout prints the version reported by the in-container `ptychodus`.
 
 ### Usage
 
@@ -241,7 +241,7 @@ File paths passed via `-i`, `-o`, `-s`, or as positional arguments resolve natur
 
 The `BACKEND_FOR` map (which backend suffix pairs with each detected GPU family) and the `BEAMLINE_MOUNTS` list live near the top of `scripts/podman/ptychodus` and can be edited in place to change the default ROCm version per site or to add mount points (for example `/data`, `/nsls2`). The wrapper joins the suffix to the newest matching `ptychodus:*-<suffix>` image at runtime, so a rebuild does not require editing the script. "Newest" is PEP 440 order rather than plain string order: `1.5.10` outranks `1.5.9`, and a pre-release tag sorts *below* the release it precedes, so a stale `1.5.2.dev14_g79157a2b2` image does not shadow `1.5.2`. Set `PTYCHODUS_VERSION` to pin a different one; GPU and CUDA detection still run, and the CUDA candidates are narrowed to the variants that version was built for.
 
-The NVIDIA row is different: it is only the **fallback** used when `nvidia-smi` does not report a CUDA version. Normally the CUDA variant is sensed at launch — the candidate versions are read from the `ptychodus:*-cuda<X.Y>` tags in podman storage, and the newest one that is no newer than the driver's ceiling wins. A CUDA major version bump is not covered by minor version compatibility, so a `cuda13.x` image on a CUDA 12.x driver leaves `torch.cuda.is_available()` `False`; sensing the version is what keeps that from turning into a silently CPU-speed reconstruction. Building a new CUDA variant with `scripts/podman/build` is enough to make it selectable — there is no list in the wrapper to keep in sync.
+The NVIDIA row is different: it is only the **fallback** used when `nvidia-smi` does not report a CUDA version. Normally the CUDA variant is sensed at launch — the candidates are the `ptychodus:*-cuda<X.Y>` tags in podman storage no newer than the driver's ceiling, and the newest ptychodus version among them wins, in the newest CUDA variant built for it. The ptychodus version ranks first, so a release that dropped a CUDA variant is not shadowed by an older one that has it: on a CUDA 12.8 driver, `1.8.0-cuda12.6` wins over `1.7.0-cuda12.8`. A CUDA major version bump is not covered by minor version compatibility, so a `cuda13.x` image on a CUDA 12.x driver leaves `torch.cuda.is_available()` `False`; sensing the version is what keeps that from turning into a silently CPU-speed reconstruction. Building a new CUDA variant with `scripts/podman/build` is enough to make it selectable — there is no list in the wrapper to keep in sync.
 
 ### Troubleshooting
 

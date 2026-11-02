@@ -67,9 +67,10 @@ ROCM_VERSION=7.2.4
 # step with these rows.
 #
 # scripts/podman/ptychodus discovers the CUDA variants from the tags this
-# script leaves in podman storage and launches the newest one the host driver
-# supports, so adding a cuda row here is all that is needed to make it
-# selectable -- there is no matching list to update in the launcher.
+# script leaves in podman storage and launches the newest release built for a
+# variant the host driver supports, in the newest such variant, so adding a
+# cuda row here is all that is needed to make it selectable -- there is no
+# matching list to update in the launcher.
 declare -A VARIANT_ARGS=(
     [cpu]="-f containers/Dockerfile.cpu"
     [cuda12.6]="-f containers/Dockerfile.cuda --build-arg CUDA_VERSION=12.6 --build-arg PYTORCH_VERSION=2.14.1"
