@@ -136,7 +136,7 @@ GPU access requires CDI (Container Device Interface) to be configured on the hos
 ```sh
 $ xhost +local:podman
 $ podman run -it --rm --env DISPLAY --security-opt label=type:container_runtime_t --network host \
-    --device nvidia.com/gpu=all ptychodus:1.5.1-cuda13.0
+    --device nvidia.com/gpu=all ptychodus:1.8.0-cuda13.0
 $ xhost -local:podman
 ```
 
@@ -163,20 +163,34 @@ GPU access requires [nvidia-container-toolkit](https://docs.nvidia.com/datacente
 ```sh
 $ xhost +local:docker
 $ docker run -it --rm  -e "DISPLAY=$DISPLAY" -v "$HOME/.Xauthority:/root/.Xauthority:ro" --network host \
-      --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 ptychodus:1.5.1-cuda13.0
+      --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 ptychodus:1.8.0-cuda13.0
 $ xhost -local:docker
 ```
 
 ## Apptainer / Singularity
 
-The images above are OCI-compliant and can be converted to SIF for HPC sites (NERSC, OLCF, ALCF) that prefer Apptainer. After building an OCI image locally, convert it from the engine's local storage. Match the transport to the engine that built the image:
+The images above are OCI-compliant and can be converted to SIF for HPC sites (NERSC, OLCF, ALCF) that prefer Apptainer. Choose the variant by the driver on the system that will *run* the SIF, not the one that builds it: ALCF Polaris, whose A100s run under a CUDA 13.0 driver since its August 2026 upgrade, takes `cuda13.0`. Its [system updates page](https://docs.alcf.anl.gov/polaris/system-updates/) records driver changes.
+
+Apptainer has no source for podman's storage, so save a podman image to an archive first and build from that. `podman save` stages the image in `/var/tmp` on the way, as a build does, so where `/var` is small set `TMPDIR` to a large filesystem for the save. Docker's daemon can be read directly:
 
 ```sh
-$ apptainer build ptychodus-1.5.1-cuda13.0.sif podman-daemon:ptychodus:1.5.1-cuda13.0  # built with podman
-$ apptainer build ptychodus-1.5.1-cuda13.0.sif docker-daemon:ptychodus:1.5.1-cuda13.0  # built with docker
+$ podman save -o ptychodus-1.8.0-cuda13.0.tar ptychodus:1.8.0-cuda13.0        # built with podman
+$ apptainer build ptychodus-1.8.0-cuda13.0.sif docker-archive:ptychodus-1.8.0-cuda13.0.tar
+$ apptainer build ptychodus-1.8.0-cuda13.0.sif docker-daemon:ptychodus:1.8.0-cuda13.0  # built with docker
 ```
 
 If the image lives in a registry, pull directly with `docker://` instead.
+
+A host without Apptainer can run the same build inside the official Apptainer image. Pin its tag to the Apptainer release of the system that will run the SIF — `1.4.1` on Polaris. `APPTAINER_TMPDIR` must exist before the build starts:
+
+```sh
+$ mkdir -p tmp
+$ podman run --rm -v "$PWD:/work" -e APPTAINER_TMPDIR=/work/tmp -e APPTAINER_CACHEDIR=/work/cache \
+    ghcr.io/apptainer/apptainer:1.4.1 \
+    apptainer build /work/ptychodus-1.8.0-cuda13.0.sif docker-archive:/work/ptychodus-1.8.0-cuda13.0.tar
+```
+
+Converting an existing image needs neither `--fakeroot` nor a privileged container. Running the SIF on Polaris follows ALCF's [container instructions](https://docs.alcf.anl.gov/polaris/containers/containers/) — a compute node, `--fakeroot`, and `--nv` for the GPUs; **`scripts/genesis/README.md`** in the repository collects the Polaris specifics.
 
 ## Wrapper Script (Beamline Workstations)
 
@@ -214,7 +228,7 @@ Sanity check:
 $ ptychodus --version
 ```
 
-stderr will show a one-line notice such as `ptychodus: using image localhost/ptychodus:1.5.1-cuda13.0 (detected: nvidia, driver CUDA 13.0)` — the wrapper reads the driver's CUDA ceiling from `nvidia-smi`, takes the `ptychodus:*-cuda<X.Y>` tags present in local podman storage that the ceiling allows as the candidates, and launches the newest ptychodus version among them in the newest CUDA variant built for it. stdout prints the version reported by the in-container `ptychodus`.
+stderr will show a one-line notice such as `ptychodus: using image localhost/ptychodus:1.8.0-cuda13.0 (detected: nvidia, driver CUDA 13.0)` — the wrapper reads the driver's CUDA ceiling from `nvidia-smi`, takes the `ptychodus:*-cuda<X.Y>` tags present in local podman storage that the ceiling allows as the candidates, and launches the newest ptychodus version among them in the newest CUDA variant built for it. stdout prints the version reported by the in-container `ptychodus`.
 
 ### Usage
 
@@ -222,8 +236,8 @@ stderr will show a one-line notice such as `ptychodus: using image localhost/pty
 $ ptychodus                                          # GUI, auto-detect GPU
 $ ptychodus -s settings.ini                          # GUI with settings
 $ ptychodus -b reconstruct -i ./input -o ./output    # headless batch
-$ PTYCHODUS_VERSION=1.5.1 ptychodus                  # pin the version, keep GPU detection
-$ PTYCHODUS_IMAGE=ptychodus:1.5.1-cpu ptychodus      # force a specific image
+$ PTYCHODUS_VERSION=1.8.0 ptychodus                  # pin the version, keep GPU detection
+$ PTYCHODUS_IMAGE=ptychodus:1.8.0-cpu ptychodus      # force a specific image
 $ PTYCHODUS_QUIET=1 ptychodus -v                     # silent, version only
 ```
 
@@ -249,10 +263,10 @@ The NVIDIA row is different: it is only the **fallback** used when `nvidia-smi` 
 - **"cannot open display"** — confirm `$DISPLAY` is set in the shell, then run `xhost +local:` once per X session. Wayland desktops work via XWayland as long as `$DISPLAY` is set (the default on GNOME and KDE).
 - **"podman: command not found"** — ask facility IT to install rootless podman.
 - **"host NVIDIA driver supports CUDA \<= \<X.Y\>, but every ptychodus CUDA image in podman storage is newer"** — the driver predates every CUDA variant that has been built. Build one no newer than the reported ceiling, choosing it from the matrix at the top of `scripts/podman/build`, or upgrade the driver.
-- **"PyQt5 not found."** — the selected image is headless, as the ROCm and XPU images are. Run a `-b` batch invocation, or use the CPU image for the GUI with `PTYCHODUS_IMAGE=ptychodus:1.5.1-cpu`.
-- **"no kernel image is available for execution on the device"** — the wrapper matches the image to the driver, not to the GPU, so a pre-Turing GPU on a CUDA 13 driver gets an image without kernels for it. Pin `PTYCHODUS_IMAGE=ptychodus:1.5.1-cuda12.6`.
-- **Wrong GPU family or CUDA version detected** — override with `PTYCHODUS_IMAGE=ptychodus:1.5.1-cpu` (or any other versioned tag).
-- **Wrong ptychodus version picked, or you want an older release** — set `PTYCHODUS_VERSION=1.5.1`. Use it rather than `PTYCHODUS_IMAGE` whenever the backend is not the thing you are changing: the pin keeps GPU and CUDA detection, while `PTYCHODUS_IMAGE` skips both and makes you name the backend yourself.
+- **"PyQt5 not found."** — the selected image is headless, as the ROCm and XPU images are. Run a `-b` batch invocation, or use the CPU image for the GUI with `PTYCHODUS_IMAGE=ptychodus:1.8.0-cpu`.
+- **"no kernel image is available for execution on the device"** — the wrapper matches the image to the driver, not to the GPU, so a pre-Turing GPU on a CUDA 13 driver gets an image without kernels for it. Pin `PTYCHODUS_IMAGE=ptychodus:1.8.0-cuda12.6`.
+- **Wrong GPU family or CUDA version detected** — override with `PTYCHODUS_IMAGE=ptychodus:1.8.0-cpu` (or any other versioned tag).
+- **Wrong ptychodus version picked, or you want an older release** — set `PTYCHODUS_VERSION=1.8.0`. Use it rather than `PTYCHODUS_IMAGE` whenever the backend is not the thing you are changing: the pin keeps GPU and CUDA detection, while `PTYCHODUS_IMAGE` skips both and makes you name the backend yourself.
 - **"no ptychodus:\<version\>-\<suffix\> image found"** — that version/backend pairing was never built. The message lists the versions built for that backend and the backends built for that version; build the missing one with `PTYCHODUS_VERSION=<version> scripts/podman/build <backend>`, which installs exactly that release from PyPI, or drop the pin.
 - **Files written by the container are owned by root** — rootless `--userns=keep-id` is not in effect; check `podman info` for `rootless: true`.
 - **"permission denied" on a path argument** — the path is outside the bind-mounted set. Run from under `$HOME` or one of the beamline roots, or add the path to `BEAMLINE_MOUNTS` at the top of the wrapper. A symlinked home (`/home/beams/$USER` → `/home/beams0/$USER`) is mounted under both spellings, so an absolute path in either form resolves.
@@ -337,3 +351,22 @@ $ uv publish
 ```sh
 $ python -m twine upload --verbose dist/*
 ```
+
+### Container images
+
+The release images install ptychodus from PyPI, so build them only after the upload, with the version pinned — unpinned, [scripts/podman/build](../../scripts/podman/build) takes PyPI's latest release, which is the previous one until the upload lands:
+
+```sh
+$ PTYCHODUS_VERSION=1.8.0 scripts/podman/build cuda12.6 cuda13.0 cuda13.2
+```
+
+Each CUDA base image is about 23 GB, and podman stages every committed layer in `/var/tmp`. Where `/var` is small, point `TMPDIR` at a large filesystem for the build, or the install layer fails with `no space left on device`.
+
+Check each image before handing it out. `torch.__version__` must carry a `+cuXXX` suffix; a bare version means a dependency replaced the base image's CUDA torch with PyPI's generic build:
+
+```sh
+$ podman run --rm ptychodus:1.8.0-cuda13.0 ptychodus --version
+$ podman run --rm ptychodus:1.8.0-cuda13.0 python3 -c 'import torch; print(torch.__version__)'
+```
+
+Convert the variant an HPC site needs to SIF as described under [Apptainer / Singularity](#apptainer--singularity).

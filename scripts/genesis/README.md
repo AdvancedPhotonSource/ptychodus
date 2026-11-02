@@ -85,18 +85,18 @@ Use passcode only.
 
 ### Containers
 
-Polaris has NVIDIA A100 GPUs, so the matching image is [containers/Dockerfile.cuda](../../containers/Dockerfile.cuda); see [docs/source/getting_started.md](../../docs/source/getting_started.md) for how to build it. The release images install ptychodus from PyPI and need only the `containers/` directory as build context, so building on Polaris needs a copy of that directory rather than a full checkout. The PtychoPINN and PtychoFM backends are included only when their wheels are staged in `containers/wheels/`, which `scripts/podman/build` does from sibling checkouts; otherwise build the image elsewhere and bring it over.
+Polaris has NVIDIA A100 GPUs, so the matching image is [containers/Dockerfile.cuda](../../containers/Dockerfile.cuda), in the newest CUDA variant the Polaris driver allows — `cuda13.0` under the CUDA 13.0 driver installed in August 2026; the [system updates page](https://docs.alcf.anl.gov/polaris/system-updates/) records driver changes. See [docs/source/getting_started.md](../../docs/source/getting_started.md) for how to build it. The release images install ptychodus from PyPI and need only the `containers/` directory as build context, so building on Polaris needs a copy of that directory rather than a full checkout. The PtychoPINN and PtychoFM backends are included only when their wheels are staged in `containers/wheels/`, which `scripts/podman/build` does from sibling checkouts; otherwise build the image elsewhere and bring it over.
 
 Stock podman — the podman that ships with the Linux distribution — is supported on Polaris and runs containers directly, with no conversion step. ALCF has no page covering that route, which is why the reference below describes only Apptainer.
 
-Apptainer is the route ALCF documents: <https://docs.alcf.anl.gov/polaris/containers/containers/>. The constraints below belong to that route, not to containers on Polaris generally.
+Apptainer is the route ALCF documents: <https://docs.alcf.anl.gov/polaris/containers/containers/>. The constraints below belong to that route, not to containers on Polaris generally. A SIF can also be built off-site, from a locally built image, as [docs/source/getting_started.md](../../docs/source/getting_started.md) describes under Apptainer, and copied to Eagle; then only running it needs a compute node.
 
 - Apptainer builds and runs on compute nodes only; request one with `qsub -I` and `-l singularity_fakeroot=true`, then pass `--fakeroot` to `apptainer build`.
 - Load the modules with `ml use /soft/modulefiles`, `ml spack-pe-base` and `ml apptainer`.
 - Point `APPTAINER_TMPDIR` and `APPTAINER_CACHEDIR` at `/local/scratch/`; the default `~/.apptainer/cache` fills the home quota.
 - Pulling a `docker://` image from a compute node needs `HTTP_PROXY` and `HTTPS_PROXY` set to `http://proxy.alcf.anl.gov:3128`; network virtualization is unavailable.
 - Request the filesystems the job touches with `-l filesystems=home:eagle`, matching what `ALCFFacilityAdapter` already sets.
-- Launch under PBS with `mpiexec … apptainer exec …`, not `srun`.
+- Launch under PBS with `mpiexec … apptainer exec --fakeroot --nv -B /opt …`, not `srun`; `--nv` exposes the GPUs.
 
 ## NERSC
 
@@ -199,7 +199,7 @@ Unlike ALCF and NERSC, OLCF does not support running podman directly: an image h
 
 ```sh
 podman save -o ptychodus.tar localhost/ptychodus:<version>-rocm7.2.4
-apptainer build ptychodus.sif docker-archive://ptychodus.tar
+apptainer build ptychodus.sif docker-archive:ptychodus.tar
 ```
 
 ## AmSC Data Transfer API

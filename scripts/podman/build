@@ -177,10 +177,11 @@ fi
 # committed code only, never whatever is half-edited in the working tree, and
 # with the git metadata setuptools_scm needs. PtychoPINN's clone is patched
 # first: its pyproject lists TensorFlow, which ptychodus's backend
-# (ptycho_torch) never imports, and caps Python below 3.12, which would
-# otherwise refuse every interpreter the images ship. The trap covers the
-# failure and Ctrl-C paths too: a wheel left behind in containers/wheels/
-# would silently be baked into every later image.
+# (ptycho_torch) never imports; OpenCV, which that backend never imports
+# either and whose bundled Qt plugins break the PyQt5 GUI; and caps Python
+# below 3.12, which would otherwise refuse every interpreter the images
+# ship. The trap covers the failure and Ctrl-C paths too: a wheel left
+# behind in containers/wheels/ would silently be baked into every later image.
 PTYCHOPINN_SRC="${PTYCHOPINN_SRC-$repo_root/../PtychoPINN}"
 PTYCHO_FM_SRC="${PTYCHO_FM_SRC-$repo_root/../ptycho-fm}"
 WHEEL_STAGE="$repo_root/containers/wheels"
@@ -198,6 +199,7 @@ trap cleanup EXIT
 patch_ptychopinn() {
     sed -i \
         -e '/^[[:space:]]*"tensorflow/d' \
+        -e '/^[[:space:]]*"opencv/d' \
         -e 's/^requires-python = .*/requires-python = ">=3.10"/' \
         pyproject.toml
 }

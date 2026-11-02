@@ -55,9 +55,14 @@ RUN python3 -m venv "${VIRTUAL_ENV}" \
     && pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # PtychoPINN: clone, strip tensorflow* deps from pyproject.toml (they conflict with
-# the PyTorch stack), install (bypassing its overly strict Python pin), drop the source.
+# the PyTorch stack) and opencv* deps (their bundled Qt plugins break the PyQt5 GUI,
+# and ptychodus's PtychoPINN path never imports cv2), install (bypassing its overly
+# strict Python pin), drop the source.
 RUN git clone --depth 1 https://github.com/hoidn/PtychoPINN /tmp/ptychopinn \
-    && sed -i '/^[[:space:]]*"tensorflow/d' /tmp/ptychopinn/pyproject.toml \
+    && sed -i \
+        -e '/^[[:space:]]*"tensorflow/d' \
+        -e '/^[[:space:]]*"opencv/d' \
+        /tmp/ptychopinn/pyproject.toml \
     && pip install --no-cache-dir --ignore-requires-python /tmp/ptychopinn \
     && rm -rf /tmp/ptychopinn
 
