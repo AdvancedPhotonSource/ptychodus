@@ -3,11 +3,9 @@ import logging
 from datetime import datetime
 
 from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIChatModel
-from pydantic_ai.providers.openai import OpenAIProvider
-from pydantic_ai.settings import ModelSettings
+from pydantic_ai.mcp import MCPToolset
 
-from .endpoint import get_api_key_for_base_url
+from .endpoint import create_chat_model, create_model_settings, get_mcp_server_url
 from .models import ChatMessage, ChatRole
 from .repository import ConversationRepository
 from .settings import AgentSettings
@@ -35,33 +33,18 @@ class ChatTerminal:
             )
         )
 
-        # NOTE: pydantic-ai uses Authorization: Bearer headers via the OpenAI SDK.
-        # The Argo OpenAPI spec instead declares ?authorization= as a query param;
-        # if the live endpoint rejects the Bearer header, pass a custom
-        # httpx.AsyncClient(params={'authorization': key}) to OpenAIProvider.
-        base_url = self._settings.base_url.get_value()
-        provider = OpenAIProvider(
-            base_url=base_url,
-            api_key=get_api_key_for_base_url(base_url),
-        )
-        model = OpenAIChatModel(self._settings.model.get_value(), provider=provider)
-        model_settings = ModelSettings(
-            temperature=self._settings.temperature.get_value(),
-            top_p=self._settings.top_p.get_value(),
-            max_tokens=self._settings.max_tokens.get_value(),
-        )
-        # TODO(mcp-followup): when settings.mcp_server_url is non-empty, pass
-        # toolsets=[MCPServerStreamableHTTP(url=...)] so the agent can call
-        # ptychodus.webapp tools (see src/ptychodus/webapp/mcp_server.py).
-        agent = Agent(
-            model,
-            system_prompt=self._settings.system_prompt.get_value(),
-            model_settings=model_settings,
-        )
-
-        prior = self._repository.load_model_messages()
-
         try:
+            mcp_server_url = get_mcp_server_url(self._settings)
+            agent = Agent(
+                create_chat_model(
+                    self._settings.base_url.get_value(), self._settings.model.get_value()
+                ),
+                instructions=self._settings.instructions.get_value(),
+                model_settings=create_model_settings(self._settings),
+                toolsets=[MCPToolset(mcp_server_url)] if mcp_server_url else [],
+            )
+            prior = self._repository.load_model_messages()
+
             # asyncio.run blocks the Qt event loop for the duration of the call,
             # same as the previous requests.post. Move to a QThread if it stops
             # being acceptable for this developer-mode panel.

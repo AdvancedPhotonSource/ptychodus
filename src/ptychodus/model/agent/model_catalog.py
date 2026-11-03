@@ -2,14 +2,14 @@ import logging
 
 import httpx
 
-from .endpoint import get_api_key_for_base_url
+from .endpoint import get_argo_user, get_gateway_url
 from .settings import AgentSettings
 
 logger = logging.getLogger(__name__)
 
 
 class ModelCatalog:
-    """Fetches and caches the list of chat models advertised by the configured endpoint."""
+    """Fetches and caches the list of chat models advertised by the configured gateway."""
 
     def __init__(self, settings: AgentSettings) -> None:
         self._settings = settings
@@ -21,16 +21,15 @@ class ModelCatalog:
         return self._cached_models
 
     def refresh(self) -> list[str]:
-        base_url = self._settings.base_url.get_value().rstrip('/')
-        api_key = get_api_key_for_base_url(base_url)
-        headers = {'Authorization': f'Bearer {api_key}'} if api_key else {}
+        models_url = f'{get_gateway_url(self._settings.base_url.get_value())}/v1/models'
         try:
-            response = httpx.get(f'{base_url}/models', timeout=10.0, headers=headers)
+            headers = {'Authorization': f'Bearer {get_argo_user(models_url)}'}
+            response = httpx.get(models_url, timeout=10.0, headers=headers)
             response.raise_for_status()
             data = response.json()['data']
             models = [str(item['id']) for item in data]
         except (httpx.HTTPError, KeyError, ValueError, TypeError) as exc:
-            logger.error(f'Failed to fetch chat models from {base_url}/models: {exc}')
+            logger.error(f'Failed to fetch chat models from {models_url}: {exc}')
             models = []
         self._cached_models = models
         return models

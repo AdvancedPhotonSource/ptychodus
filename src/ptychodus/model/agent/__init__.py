@@ -2,7 +2,7 @@ from .core import AgentCore
 from .model_catalog import ModelCatalog
 from .models import ChatMessage, ChatRole
 from .repository import ConversationObserver, ConversationRepository
-from .settings import AgentSettings
+from .settings import AgentSettings, ThinkingLevel
 from .terminal import ChatTerminal
 
 __all__ = [
@@ -14,4 +14,5 @@ __all__ = [
     'ConversationObserver',
     'ConversationRepository',
     'ModelCatalog',
+    'ThinkingLevel',
 ]

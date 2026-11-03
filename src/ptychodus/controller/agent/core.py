@@ -24,10 +24,11 @@ from ...model.agent import (
     ConversationObserver,
     ConversationRepository,
     ModelCatalog,
+    ThinkingLevel,
 )
 from ...view.agent import AgentChatView, AgentInputView, AgentView
 from ..parameters import (
-    DecimalSliderParameterViewController,
+    ComboBoxParameterViewController,
     LineEditParameterViewController,
     ParameterViewController,
     SpinBoxParameterViewController,
@@ -162,49 +163,45 @@ class AgentController(QObject):
         self._base_url_view_controller = LineEditParameterViewController(
             settings.base_url,
             tool_tip=(
-                'OpenAI-compatible base URL. pydantic-ai appends /chat/completions and /models. '
-                'OPENAI_API_KEY env var is sent as a Bearer token; for Argo set this to your '
-                'Argonne username.'
+                'Argo Gateway root URL. Claude models use the Anthropic Messages API, GPT '
+                'models the OpenAI Responses API, and others OpenAI Chat Completions. Your '
+                'ANL domain username is read from ARGO_USER, falling back to the login name.'
             ),
         )
         self._model_view_controller = _RefreshableComboBoxParameterViewController(
             settings.model,
             catalog.refresh,
-            tool_tip='The chat model to use. Click Refresh to re-fetch the list from /models.',
+            tool_tip='The Argo model ID. Click Refresh to re-fetch the list from /v1/models.',
         )
-        self._system_prompt_view_controller = LineEditParameterViewController(
-            settings.system_prompt,
-            tool_tip='System prompt sent at the start of every conversation.',
+        self._instructions_view_controller = LineEditParameterViewController(
+            settings.instructions,
+            tool_tip='Instructions sent to the model with every message.',
         )
-        self._temperature_view_controller = DecimalSliderParameterViewController(
-            settings.temperature,
+        self._thinking_view_controller = ComboBoxParameterViewController(
+            settings.thinking,
+            [level.value for level in ThinkingLevel],
             tool_tip=(
-                'Sampling temperature between 0 and 2. Higher values mean the model takes '
-                'more risks.'
-            ),
-        )
-        self._top_p_view_controller = DecimalSliderParameterViewController(
-            settings.top_p,
-            tool_tip=(
-                'Nucleus sampling: the model considers tokens with top_p probability mass. '
-                'Alternative to temperature.'
+                'Reasoning effort. Default leaves it to the model; models without a matching '
+                'level use the closest one.'
             ),
         )
         self._max_tokens_view_controller = SpinBoxParameterViewController(
             settings.max_tokens,
-            tool_tip='Maximum number of tokens generated in the chat completion.',
+            tool_tip='Maximum number of tokens in each response; 0 leaves it to the model.',
         )
         self._mcp_server_url_view_controller = LineEditParameterViewController(
             settings.mcp_server_url,
-            tool_tip='Optional MCP server URL (e.g. ptychodus-webapp at http://localhost:8000/mcp).',
+            tool_tip=(
+                'Optional MCP server whose tools the agent may call (e.g. ptychodus-webapp at '
+                'http://localhost:8000/mcp). Must be https:// or loopback http://.'
+            ),
         )
 
         group_box_layout = QFormLayout()
         group_box_layout.addRow('Base URL:', self._base_url_view_controller.get_widget())
         group_box_layout.addRow('Model:', self._model_view_controller.get_widget())
-        group_box_layout.addRow('System Prompt:', self._system_prompt_view_controller.get_widget())
-        group_box_layout.addRow('Temperature:', self._temperature_view_controller.get_widget())
-        group_box_layout.addRow('Top P:', self._top_p_view_controller.get_widget())
+        group_box_layout.addRow('Instructions:', self._instructions_view_controller.get_widget())
+        group_box_layout.addRow('Thinking:', self._thinking_view_controller.get_widget())
         group_box_layout.addRow('Max Tokens:', self._max_tokens_view_controller.get_widget())
         group_box_layout.addRow(
             'MCP Server URL:', self._mcp_server_url_view_controller.get_widget()
