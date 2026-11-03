@@ -2,34 +2,38 @@ import logging
 
 import httpx
 
-from .endpoint import get_argo_user, get_gateway_url
-from .settings import AgentSettings
+from ptychodus.api.language_model import LanguageModelProviderError
+
+from .provider import LanguageModelProviderSelection
 
 logger = logging.getLogger(__name__)
 
 
 class ModelCatalog:
-    """Fetches and caches the list of chat models advertised by the configured gateway."""
+    """Fetches and caches the chat models each provider advertises.
 
-    def __init__(self, settings: AgentSettings) -> None:
-        self._settings = settings
-        self._cached_models: list[str] | None = None
+    Cached per provider, so switching providers neither shows another's list nor
+    fetches again; :meth:`refresh` re-fetches the selected provider's.
+    """
+
+    def __init__(self, selection: LanguageModelProviderSelection) -> None:
+        self._selection = selection
+        self._cached_models: dict[str, list[str]] = {}
 
     def get_available_models(self) -> list[str]:
-        if self._cached_models is None:
-            return self.refresh()
-        return self._cached_models
+        name = self._selection.get_current().plugin.simple_name
+        models = self._cached_models.get(name)
+        return self.refresh() if models is None else models
 
     def refresh(self) -> list[str]:
-        models_url = f'{get_gateway_url(self._settings.base_url.get_value())}/v1/models'
+        options = self._selection.get_current()
+        name = options.plugin.simple_name
+
         try:
-            headers = {'Authorization': f'Bearer {get_argo_user(models_url)}'}
-            response = httpx.get(models_url, timeout=10.0, headers=headers)
-            response.raise_for_status()
-            data = response.json()['data']
-            models = [str(item['id']) for item in data]
-        except (httpx.HTTPError, KeyError, ValueError, TypeError) as exc:
-            logger.error(f'Failed to fetch chat models from {models_url}: {exc}')
+            models = list(options.list_models())
+        except (httpx.HTTPError, LanguageModelProviderError) as exc:
+            logger.error(f'Failed to fetch {options.plugin.display_name} models: {exc}')
             models = []
-        self._cached_models = models
+
+        self._cached_models[name] = models
         return models

@@ -18,10 +18,7 @@ class AgentSettings(Observable, Observer):
         self._group = registry.create_group('Agent')
         self._group.add_observer(self)
 
-        self.base_url = self._group.create_string_parameter(
-            'BaseURL', 'https://apps.inside.anl.gov/argoapi'
-        )
-        self.model = self._group.create_string_parameter('Model', 'claudesonnet55')
+        self.provider = self._group.create_string_parameter('Provider', 'Argo')
         self.instructions = self._group.create_string_parameter(
             'Instructions', 'You are a helpful assistant.'
         )

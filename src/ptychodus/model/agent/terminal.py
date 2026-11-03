@@ -7,6 +7,7 @@ from pydantic_ai.mcp import MCPToolset
 
 from .endpoint import create_chat_model, create_model_settings, get_mcp_server_url
 from .models import ChatMessage, ChatRole
+from .provider import LanguageModelProviderSelection
 from .repository import ConversationRepository
 from .settings import AgentSettings
 
@@ -14,8 +15,14 @@ logger = logging.getLogger(__name__)
 
 
 class ChatTerminal:
-    def __init__(self, settings: AgentSettings, repository: ConversationRepository) -> None:
+    def __init__(
+        self,
+        settings: AgentSettings,
+        selection: LanguageModelProviderSelection,
+        repository: ConversationRepository,
+    ) -> None:
         self._settings = settings
+        self._selection = selection
         self._repository = repository
 
     def clear_conversation(self) -> None:
@@ -36,9 +43,7 @@ class ChatTerminal:
         try:
             mcp_server_url = get_mcp_server_url(self._settings)
             agent = Agent(
-                create_chat_model(
-                    self._settings.base_url.get_value(), self._settings.model.get_value()
-                ),
+                create_chat_model(self._selection.resolve_endpoint()),
                 instructions=self._settings.instructions.get_value(),
                 model_settings=create_model_settings(self._settings),
                 toolsets=[MCPToolset(mcp_server_url)] if mcp_server_url else [],

@@ -1,22 +1,22 @@
-"""Argo Gateway access for the settings-controlled chat endpoint.
+"""The agent's one meeting point with pydantic-ai.
 
-Argo serves three native APIs under one gateway root: Anthropic Messages
-(``/v1/messages``), OpenAI Responses (``/v1/responses``) and OpenAI-compatible Chat
-Completions (``/v1/chat/completions``). Each takes the caller's ANL domain username
-as its bearer token in place of an API key.
+A provider hands back a framework-neutral :class:`LanguageModelEndpoint`; this turns it
+into a pydantic-ai model. Replacing the agent framework means replacing this module and
+the terminal that drives it, and no provider.
 """
 
-from urllib.parse import urlparse
-import getpass
 import logging
-import os
 
 from pydantic_ai.models import Model
 from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
+from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.settings import ModelSettings
+
+from ptychodus.api.language_model import LanguageModelEndpoint, WireProtocol, is_confidential_url
 
 from .settings import AgentSettings, ThinkingLevel
 
@@ -25,92 +25,59 @@ logger = logging.getLogger(__name__)
 __all__ = [
     'create_chat_model',
     'create_model_settings',
-    'get_argo_user',
-    'get_gateway_url',
     'get_mcp_server_url',
 ]
-
-
-def _is_confidential_url(url: str) -> bool:
-    parsed = urlparse(url)
-
-    if parsed.scheme == 'https':
-        return True
-
-    return parsed.scheme == 'http' and parsed.hostname in {'localhost', '127.0.0.1', '::1'}
-
-
-def get_gateway_url(base_url: str) -> str:
-    """Return the gateway root, tolerating a trailing ``/`` or ``/v1``."""
-    return base_url.rstrip('/').removesuffix('/v1')
-
-
-def get_argo_user(url: str) -> str:
-    """Return the ANL domain username sent to ``url`` as its bearer token.
-
-    Reads ``ARGO_USER``, falling back to the login name. The value is a username (or an
-    ``svc``-prefixed service account), never an email address. It is not a secret, but
-    it attributes usage and cost, so it is never stored in ``settings.ini``.
-
-    ``Agent/BaseURL`` is a plain string in ``settings.ini``, and batch mode loads that
-    file from its input directory. Refusing cleartext endpoints keeps a settings file
-    that travels with a dataset from sending the user's identity elsewhere.
-
-    Raises:
-        ValueError: if ``url`` is neither ``https`` nor loopback ``http``, or no
-            username can be determined.
-    """
-    if not _is_confidential_url(url):
-        raise ValueError(f'Refusing insecure chat endpoint "{url}"; use an https:// URL.')
-
-    user = os.environ.get('ARGO_USER', '')
-
-    if not user:
-        try:
-            user = getpass.getuser()
-        except OSError as exc:
-            raise ValueError('Set ARGO_USER to your ANL domain username.') from exc
-
-    return user
 
 
 def get_mcp_server_url(settings: AgentSettings) -> str:
     """Return the MCP server URL, or an empty string when unset or insecure."""
     url = settings.mcp_server_url.get_value().strip()
 
-    if url and not _is_confidential_url(url):
+    if url and not is_confidential_url(url):
         logger.warning(f'Ignoring insecure MCP server "{url}"; use an https:// URL.')
         return ''
 
     return url
 
 
-def create_chat_model(base_url: str, model_name: str) -> Model:
-    """Route ``model_name`` to its vendor-native Argo API.
+def create_chat_model(endpoint: LanguageModelEndpoint) -> Model:
+    """Return the pydantic-ai model that speaks *endpoint*'s protocol.
 
-    ``claude*`` models use Anthropic Messages, ``gpt*`` models OpenAI Responses, and
-    every other model OpenAI-compatible Chat Completions.
+    An endpoint without a key gets a placeholder rather than none: given none, each
+    vendor client falls back to its own environment variable, which would send that
+    vendor's key to whatever server the endpoint names.
     """
-    gateway_url = get_gateway_url(base_url)
-    user = get_argo_user(gateway_url)
+    api_key = endpoint.api_key or 'api-key-not-set'
 
-    if model_name.startswith('claude'):
-        return AnthropicModel(
-            model_name, provider=AnthropicProvider(base_url=gateway_url, api_key=user)
-        )
+    match endpoint.protocol:
+        case WireProtocol.ANTHROPIC_MESSAGES:
+            return AnthropicModel(
+                endpoint.model_id,
+                provider=AnthropicProvider(base_url=endpoint.base_url, api_key=api_key),
+            )
+        case WireProtocol.OPENAI_RESPONSES:
+            return OpenAIResponsesModel(
+                endpoint.model_id,
+                provider=OpenAIProvider(base_url=endpoint.base_url, api_key=api_key),
+            )
+        case WireProtocol.OPENAI_CHAT_COMPLETIONS:
+            return OpenAIChatModel(
+                endpoint.model_id,
+                provider=OpenAIProvider(base_url=endpoint.base_url, api_key=api_key),
+            )
+        case WireProtocol.GOOGLE_GEMINI:
+            return GoogleModel(
+                endpoint.model_id,
+                provider=GoogleProvider(base_url=endpoint.base_url, api_key=api_key),
+            )
 
-    provider = OpenAIProvider(base_url=f'{gateway_url}/v1', api_key=user)
-
-    if model_name.startswith('gpt'):
-        return OpenAIResponsesModel(model_name, provider=provider)
-
-    return OpenAIChatModel(model_name, provider=provider)
+    raise ValueError(f'Unsupported wire protocol "{endpoint.protocol}".')
 
 
 def create_model_settings(settings: AgentSettings) -> ModelSettings:
     """Return generation settings, leaving out whatever the model should choose itself.
 
-    No sampling parameters are sent: current Argo models variously drop, reject or pin
+    No sampling parameters are sent: current models variously drop, reject or pin
     ``temperature`` and ``top_p``.
     """
     model_settings = ModelSettings()

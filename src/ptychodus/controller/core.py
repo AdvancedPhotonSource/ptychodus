@@ -188,7 +188,10 @@ class ControllerCore:
             self._file_dialog_factory,
         )
         self._agent_controller = AgentController(
-            model.agent_core.settings, model.agent_core.catalog, view.agent_view
+            model.agent_core.settings,
+            model.agent_core.provider_selection,
+            model.agent_core.catalog,
+            view.agent_view,
         )
         self._agent_chat_controller = AgentChatController(
             model.agent_core.repository, model.agent_core.terminal, view.agent_chat_view

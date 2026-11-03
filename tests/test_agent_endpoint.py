@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 import pytest
+from anthropic import AsyncAnthropic
+from openai import AsyncOpenAI
 from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModel
 
+from ptychodus.api.language_model import LanguageModelEndpoint, WireProtocol
 from ptychodus.model.agent import AgentSettings, ThinkingLevel
 from ptychodus.model.agent.endpoint import (
     create_chat_model,
     create_model_settings,
-    get_argo_user,
-    get_gateway_url,
     get_mcp_server_url,
 )
 from ptychodus.model.settings import SettingsRegistry
-
-GATEWAY_URL = 'https://apps.inside.anl.gov/argoapi'
 
 
 @pytest.fixture
@@ -22,62 +22,60 @@ def settings() -> AgentSettings:
     return AgentSettings(SettingsRegistry())
 
 
-@pytest.fixture(autouse=True)
-def argo_user(monkeypatch: pytest.MonkeyPatch) -> str:
-    monkeypatch.setenv('ARGO_USER', 'mdearing')
-    return 'mdearing'
-
-
 @pytest.mark.parametrize(
-    'base_url',
-    [GATEWAY_URL, f'{GATEWAY_URL}/', f'{GATEWAY_URL}/v1', f'{GATEWAY_URL}/v1/'],
-)
-def test_gateway_url_strips_api_version(base_url: str) -> None:
-    assert get_gateway_url(base_url) == GATEWAY_URL
-
-
-@pytest.mark.parametrize(
-    ('model_name', 'model_type', 'expected_base_url'),
+    ('protocol', 'base_url', 'model_type'),
     [
-        ('claudesonnet55', AnthropicModel, f'{GATEWAY_URL}/'),
-        ('gpt6sol', OpenAIResponsesModel, f'{GATEWAY_URL}/v1/'),
-        ('gemini38flash', OpenAIChatModel, f'{GATEWAY_URL}/v1/'),
+        (WireProtocol.ANTHROPIC_MESSAGES, 'https://api.anthropic.com', AnthropicModel),
+        (WireProtocol.OPENAI_RESPONSES, 'https://api.openai.com/v1', OpenAIResponsesModel),
+        (WireProtocol.OPENAI_CHAT_COMPLETIONS, 'http://localhost:11434/v1', OpenAIChatModel),
+        (WireProtocol.GOOGLE_GEMINI, 'https://generativelanguage.googleapis.com', GoogleModel),
     ],
 )
-def test_chat_model_routes_by_vendor(
-    model_name: str, model_type: type, expected_base_url: str
+def test_chat_model_speaks_endpoint_protocol(
+    protocol: WireProtocol, base_url: str, model_type: type
 ) -> None:
-    model = create_chat_model(f'{GATEWAY_URL}/v1', model_name)
+    model = create_chat_model(LanguageModelEndpoint(protocol, base_url, 'some-model', 'key'))
 
     assert isinstance(model, model_type)
-    assert model.model_name == model_name
-    assert model.base_url == expected_base_url
+    assert model.model_name == 'some-model'
+    # Clients disagree on whether a base URL keeps a trailing slash.
+    assert (model.base_url or '').rstrip('/') == base_url
 
 
-def test_argo_user_prefers_environment(argo_user: str) -> None:
-    assert get_argo_user(GATEWAY_URL) == argo_user
+@pytest.mark.parametrize(
+    ('protocol', 'env_var'),
+    [
+        (WireProtocol.ANTHROPIC_MESSAGES, 'ANTHROPIC_API_KEY'),
+        (WireProtocol.OPENAI_CHAT_COMPLETIONS, 'OPENAI_API_KEY'),
+        (WireProtocol.GOOGLE_GEMINI, 'GOOGLE_API_KEY'),
+    ],
+)
+def test_chat_model_without_key_ignores_vendor_environment(
+    monkeypatch: pytest.MonkeyPatch, protocol: WireProtocol, env_var: str
+) -> None:
+    monkeypatch.setenv(env_var, 'vendor-secret')
+    endpoint = LanguageModelEndpoint(protocol, 'http://localhost:8080/v1', 'some-model')
+
+    model = create_chat_model(endpoint)
+
+    if isinstance(model, GoogleModel):
+        # google-genai keeps the key on its inner API client.
+        api_key = model.client._api_client.api_key
+    else:
+        assert isinstance(model, AnthropicModel | OpenAIChatModel)
+        client = model.client
+        assert isinstance(client, AsyncAnthropic | AsyncOpenAI)
+        api_key = client.api_key
+
+    assert api_key == 'api-key-not-set'
 
 
-def test_argo_user_falls_back_to_login_name(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv('ARGO_USER')
-    monkeypatch.setattr('getpass.getuser', lambda: 'login')
+def test_endpoint_repr_omits_key() -> None:
+    endpoint = LanguageModelEndpoint(
+        WireProtocol.OPENAI_RESPONSES, 'https://api.openai.com/v1', 'm', api_key='secret'
+    )
 
-    assert get_argo_user(GATEWAY_URL) == 'login'
-
-
-def test_argo_user_allows_loopback_http(argo_user: str) -> None:
-    assert get_argo_user('http://localhost:8080/argoapi') == argo_user
-
-
-@pytest.mark.parametrize('url', ['http://example.com/argoapi', 'ftp://example.com/argoapi'])
-def test_argo_user_refuses_insecure_endpoint(url: str) -> None:
-    with pytest.raises(ValueError, match='insecure'):
-        get_argo_user(url)
-
-
-def test_chat_model_refuses_insecure_endpoint() -> None:
-    with pytest.raises(ValueError, match='insecure'):
-        create_chat_model('http://example.com/argoapi', 'claudesonnet55')
+    assert 'secret' not in repr(endpoint)
 
 
 @pytest.mark.parametrize(

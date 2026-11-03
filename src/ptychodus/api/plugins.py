@@ -26,6 +26,7 @@ from .diffraction import (
     PixelMapFileReader,
 )
 from .files import FileHandler
+from .language_model import LanguageModelProvider
 from .fluorescence import (
     FluorescenceEnhancer,
     FluorescenceFileReader,
@@ -265,6 +266,9 @@ class PluginRegistry:
         # instance like every other catalog holds, which a backend can supply
         # because it is configured per call and holds nothing of its own.
         self.reconstructor_libraries = PluginList[ReconstructorLibrary]()
+        # A language-model provider is offered the way a reconstructor backend is,
+        # and like one is constructed whether or not its service can be reached.
+        self.language_model_providers = PluginList[LanguageModelProvider]()
 
     def register_product_file_reader_with_adapters(
         self, strategy: ProductFileReader, *, simple_name: str = ''

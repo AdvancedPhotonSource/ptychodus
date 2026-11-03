@@ -153,7 +153,10 @@ class ModelCore:
             self.workflow_api,
             PluginChooser(self.plugin_registry.file_based_workflows),
         )
-        self.agent_core = AgentCore(self.settings_registry)
+        self.agent_core = AgentCore(
+            self.settings_registry,
+            PluginChooser(self.plugin_registry.language_model_providers),
+        )
 
         if settings_file:
             self.settings_registry.open_settings(settings_file)

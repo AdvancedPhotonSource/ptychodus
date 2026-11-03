@@ -29,6 +29,7 @@ import warnings
 
 from ptychodus.api.plugins import PluginCatalog, PluginRegistry
 from ptychodus.model.settings import SettingsRegistry
+from ptychodus.model.agent import LanguageModelProviderOptions
 from ptychodus.model.declared import declare_in, describe
 from ptychodus.model.fluorescence import ENHANCER_LIBRARY
 from ptychodus.model.fluorescence.core import _BRANCHES_BY_ENHANCER
@@ -60,8 +61,10 @@ def _build_registry() -> SettingsRegistry:
         root = Path(next(iter(package.__path__)))
         _construct_settings_under(root, prefix, registry, constructed)
 
+    plugins = PluginRegistry.load_plugins()
     _register_declared_sections(registry)
-    _register_generator_parameters(registry)
+    _register_generator_parameters(registry, plugins)
+    _register_language_model_providers(registry, plugins)
     return registry
 
 
@@ -77,15 +80,19 @@ _GENERATORS_BY_GROUP: Mapping[str, Callable[[PluginRegistry], PluginCatalog[Any]
 }
 
 
-def _register_generator_parameters(registry: SettingsRegistry) -> None:
+def _register_generator_parameters(registry: SettingsRegistry, plugins: PluginRegistry) -> None:
     """Add the parameters every registered generator declares."""
-    plugins = PluginRegistry.load_plugins()
-
     for group_name, choose in _GENERATORS_BY_GROUP.items():
         group = registry[group_name]
 
         for plugin in choose(plugins):
             declare_in(group, describe(plugin.strategy.get_default_options(), expand_num=True))
+
+
+def _register_language_model_providers(registry: SettingsRegistry, plugins: PluginRegistry) -> None:
+    """Add the group every language-model provider persists its options in."""
+    for plugin in plugins.language_model_providers:
+        LanguageModelProviderOptions(registry, plugin)
 
 
 def absent_backends() -> list[str]:
