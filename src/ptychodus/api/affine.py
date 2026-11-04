@@ -1,6 +1,7 @@
 """Affine transforms of probe positions: the transform primitive, its physical decomposition,
-the estimator that fits one to measured/corrected position pairs, and the product-level correction
-that folds a fitted transform back into the experiment geometry."""
+the frame change an off-axis scattering geometry implies, the estimator that fits one to
+measured/corrected position pairs, and the product-level correction that folds a fitted transform
+back into the experiment geometry."""
 
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ from .object import Object, ObjectGeometry, compute_object_geometry
 from .probe import ProbeGeometry, ProbeEnsemble
 from .probe_positions import ProbePosition, ProbePositionSequence
 from .product import Product
+from .scattering import ScatteringGeometry
 from .typing import BooleanArrayType, ComplexArrayType, IntegerArrayType, RealArrayType
 
 __all__ = [
@@ -105,6 +107,59 @@ class AffineTransform:
         b11 = k2 * cos_rotation
         # Swapping both axes takes it to (x, y).
         return cls(b11, b10, translation_x_m, b01, b00, translation_y_m)
+
+    @classmethod
+    def from_scattering_geometry(
+        cls, geometry: ScatteringGeometry, *, grazing_sine_floor: float = 1.0e-6
+    ) -> AffineTransform:
+        """The map taking scan positions into the frame where the 2D Fourier relation holds.
+
+        Scan positions are measured across the incident beam. The detector records the
+        Fourier transform of the sample projected along the exit beam, onto the plane its
+        own axes span. A point of a thin sample's surface reaches the first plane by
+        projection along the incident beam and the second by projection along the exit
+        beam, so the two planes are related through the surface by a linear map, returned
+        here with zero translation. Positions carried through it make the off-axis problem
+        transmission ptychography on the detector's ordinary far-field grid.
+
+        The map is the identity for a forward exit beam whatever the incidence. Its
+        determinant is negative exactly when the geometry is a reflection, so it cannot be
+        decomposed into :class:`AffineTransformComponents`.
+
+        Args:
+            geometry: Exit-beam and surface directions.
+            grazing_sine_floor: Sine of the angle between a beam and the surface at or
+                below which the projection counts as degenerate. A beam grazing the surface
+                spreads its footprint without bound, so a scan step there has no finite image.
+                Raising it refuses more nearly grazing geometries.
+
+        Raises:
+            ValueError: if the incident or the exit beam grazes the surface.
+        """
+        normal = geometry.get_surface_normal()
+        incident_sine = abs(float(normal[2]))
+        exit_sine = abs(float(normal @ geometry.get_exit_direction()))
+
+        if min(incident_sine, exit_sine) <= grazing_sine_floor:
+            raise ValueError(
+                'A beam grazes the sample surface (incident sine '
+                f'{incident_sine:.3g}, exit sine {exit_sine:.3g}); the projection between '
+                'the scan frame and the detector frame is degenerate.'
+            )
+
+        # A scan point (x, y) lies on the surface at z = slope_x * x + slope_y * y, and
+        # projecting it along the exit beam keeps its components along the detector axes.
+        slope_x = -normal[0] / normal[2]
+        slope_y = -normal[1] / normal[2]
+        column_axis, row_axis = geometry.get_detector_axes()
+        return cls(
+            float(column_axis[0] + column_axis[2] * slope_x),
+            float(column_axis[1] + column_axis[2] * slope_y),
+            0.0,
+            float(row_axis[0] + row_axis[2] * slope_x),
+            float(row_axis[1] + row_axis[2] * slope_y),
+            0.0,
+        )
 
     def decompose(self, *, quadratic_eps: float = 1.0e-12) -> AffineTransformComponents:
         """Factor the linear part into scale, asymmetry, rotation and shear.

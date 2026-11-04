@@ -1,7 +1,9 @@
-"""Forward model for simulating diffraction patterns from a ptychography data product."""
+"""Forward models for simulating diffraction patterns from a ptychography data product."""
 
 import numpy
+from scipy.ndimage import map_coordinates
 
+from ..affine import AffineTransform, transform_probe_positions
 from ..diffraction import (
     BadPixels,
     DetectorBackground,
@@ -11,8 +13,11 @@ from ..diffraction import (
     validate_pixel_map,
 )
 from ..geometry import ImageExtent, PixelGeometry
+from ..object import Object, compute_object_geometry
 from ..patch import iter_probe_patches
 from ..assemble import AssembledDiffractionData
+from ..probe import ProbeEnsemble
+from ..probe_positions import ProbePositionSequence
 from ..product import Product
 from ..propagate import (
     AngularSpectrumPropagator,
@@ -22,6 +27,10 @@ from ..propagate import (
     choose_propagator,
     compute_far_field_pixel_geometry,
 )
+from ..scattering import ScatteringGeometry
+from ..typing import ComplexArrayType, RealArrayType
+
+__all__ = ['generate_diffraction_data', 'generate_scattering_data']
 
 
 def generate_diffraction_data(
@@ -173,3 +182,146 @@ def generate_diffraction_data(
         background=background,
         flat_field=flat_field,
     )
+
+
+def _solve_surface_points(
+    geometry: ScatteringGeometry, u_m: RealArrayType, v_m: RealArrayType
+) -> RealArrayType:
+    """The surface point each exit-frame coordinate is the projection of, as ``(..., 3)``.
+
+    A point ``r`` on the surface projects along the exit beam to ``(e1 · r, e2 · r)`` and
+    satisfies ``n · r = 0``; the three equations are solved for ``r``.
+    """
+    column_axis, row_axis = geometry.get_detector_axes()
+    system = numpy.vstack((column_axis, row_axis, geometry.get_surface_normal()))
+    inverse = numpy.linalg.inv(system)
+    return u_m[..., numpy.newaxis] * inverse[:, 0] + v_m[..., numpy.newaxis] * inverse[:, 1]
+
+
+def _sample_complex(
+    array: ComplexArrayType, row: RealArrayType, column: RealArrayType, *, order: int
+) -> ComplexArrayType:
+    """Interpolate a 2D complex array at fractional indexes, zero beyond its edge."""
+    real = map_coordinates(array.real, (row, column), order=order, mode='grid-constant')
+    imaginary = map_coordinates(array.imag, (row, column), order=order, mode='grid-constant')
+    return real + 1j * imaginary
+
+
+def generate_scattering_data(
+    product: Product,
+    geometry: ScatteringGeometry,
+    rng: numpy.random.Generator | None = None,
+    *,
+    interpolation_order: int = 3,
+) -> tuple[AssembledDiffractionData, Product]:
+    """Simulate a far-field Bragg or Laue scan of a thin sample, kinematically.
+
+    *product* states each part in its physical frame. The object is the sample surface,
+    with its x along :meth:`ScatteringGeometry.get_surface_axes`' in-plane trace and y
+    along y, at any rectangular pitch. The probe and the probe positions are across the
+    incident beam, the probe on the detector's far-field pitch. Off the forward direction
+    the detector sees the sample projected along the exit beam, so each part is carried
+    into that exit frame and the patterns are those :func:`generate_diffraction_data`
+    simulates there:
+
+    * positions through :meth:`AffineTransform.from_scattering_geometry`;
+    * object and probe by solving, for every exit-frame pixel, for the surface point it
+      is the projection of, and sampling the surface object at that point's surface
+      coordinates and the probe at its coordinates across the incident beam. This path
+      does not go through the transform, so the two cross-check.
+
+    Beyond the surface object's edge nothing scatters, as for a finite crystal. The
+    resampled probe is rescaled so the first coherent mode keeps its ``sum(abs(P)**2)``:
+    the incident photon count is conserved, and how efficiently the sample scatters them
+    is the surface object's amplitude.
+
+    Args:
+        product: Surface object, incident probe and scan positions, with far-field
+            metadata.
+        geometry: Exit-beam and surface directions.
+        rng: Adds Poisson noise to the patterns when supplied.
+        interpolation_order: Spline order of the object and probe resampling. Lowering it
+            is faster and blurs fine structure.
+
+    Returns:
+        The patterns, and the exit-frame product they were simulated from: the ground
+        truth a reconstruction of them is compared with.
+
+    Raises:
+        ValueError: for a multislice object, which the thin-sample model excludes, for a
+            near-field product, or for a geometry in which a beam grazes the surface.
+    """
+    if not product.metadata.far_field:
+        raise ValueError('The scattering forward model is defined for far-field geometry only.')
+
+    surface_object = product.object_
+
+    if surface_object.num_layers != 1:
+        raise ValueError(
+            f'The scattering forward model takes a single-layer object; got '
+            f'{surface_object.num_layers} layers.'
+        )
+
+    transform = AffineTransform.from_scattering_geometry(geometry)
+    positions = ProbePositionSequence(
+        list(transform_probe_positions(product.probe_positions, transform))
+    )
+
+    probes = product.probes
+    probe_geometry = probes.get_geometry()
+    probe_coordinates = probe_geometry.get_transverse_coordinates()
+    probe_points = _solve_surface_points(geometry, probe_coordinates.x_m, probe_coordinates.y_m)
+    probe_column = (
+        probe_points[..., 0] / probe_geometry.pixel_width_m + (probe_geometry.width_px - 1) / 2
+    )
+    probe_row = (
+        probe_points[..., 1] / probe_geometry.pixel_height_m + (probe_geometry.height_px - 1) / 2
+    )
+    probe_array = probes.get_array()
+    exit_probe_array = numpy.empty_like(probe_array)
+
+    for index in numpy.ndindex(probe_array.shape[:-2]):
+        exit_probe_array[index] = _sample_complex(
+            probe_array[index], probe_row, probe_column, order=interpolation_order
+        )
+
+    exit_power = numpy.sum(numpy.square(numpy.abs(exit_probe_array[0])))
+
+    if exit_power > 0.0:
+        incident_power = numpy.sum(numpy.square(numpy.abs(probe_array[0])))
+        exit_probe_array *= numpy.sqrt(incident_power / exit_power)
+
+    exit_geometry = compute_object_geometry(positions, probe_geometry)
+    exit_coordinates = exit_geometry.get_transverse_coordinates()
+    object_points = _solve_surface_points(
+        geometry,
+        exit_geometry.center_x_m + exit_coordinates.x_m,
+        exit_geometry.center_y_m + exit_coordinates.y_m,
+    )
+    surface_axis_x, surface_axis_y = geometry.get_surface_axes()
+    surface_geometry = surface_object.get_geometry()
+    object_column = (
+        object_points @ surface_axis_x - surface_geometry.center_x_m
+    ) / surface_geometry.pixel_width_m + (surface_geometry.width_px - 1) / 2
+    object_row = (
+        object_points @ surface_axis_y - surface_geometry.center_y_m
+    ) / surface_geometry.pixel_height_m + (surface_geometry.height_px - 1) / 2
+
+    exit_product = Product(
+        metadata=product.metadata,
+        probe_positions=positions,
+        probes=ProbeEnsemble(
+            array=exit_probe_array,
+            opr_weights=probes.get_opr_weights_or_none(),
+            pixel_geometry=probes.get_pixel_geometry(),
+        ),
+        object_=Object(
+            array=_sample_complex(
+                surface_object.get_layer(0), object_row, object_column, order=interpolation_order
+            ),
+            pixel_geometry=exit_geometry.get_pixel_geometry(),
+            center=exit_geometry.get_center(),
+        ),
+        losses=[],
+    )
+    return generate_diffraction_data(exit_product, rng), exit_product

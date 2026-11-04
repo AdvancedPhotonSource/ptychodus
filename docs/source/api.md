@@ -245,6 +245,15 @@
    :show-inheritance:
 ```
 
+## Scattering
+
+```{eval-rst}
+.. automodule:: ptychodus.api.scattering
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Spawn
 
 ```{eval-rst}
