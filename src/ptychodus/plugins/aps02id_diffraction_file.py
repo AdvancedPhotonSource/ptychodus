@@ -19,7 +19,7 @@ from ptychodus.api.diffraction import (
 )
 from ptychodus.api.plugins import PluginRegistry
 
-from .h5_diffraction_file import H5DiffractionPatternArray
+from .h5_diffraction_file import H5DiffractionPatternArray, warn_on_dropped_frames
 from .mda.mda_position_file import RASTER_LINE_INDEX_STRIDE
 
 logger = logging.getLogger(__name__)
@@ -32,38 +32,6 @@ logger = logging.getLogger(__name__)
 # from each of hundreds of unrelated scans. The extension is excluded from the match
 # because it has digits of its own: ".h5" would otherwise supply the last digit run.
 _SERIES_STEM: Final = re.compile(r'(?P<prefix>.*?)(?P<frame>\d+)(?P<tail>\D*)')
-
-# The areaDetector driver's per-frame counter, written by the HDF5 plugin. It runs across
-# the whole acquisition rather than restarting per file, so a step of one between
-# consecutive frames of a member says the detector recorded that line without dropping a
-# frame in the middle of it.
-_UNIQUE_ID_PATH: Final = '/entry/instrument/NDAttributes/NDArrayUniqueId'
-
-
-def _warn_on_dropped_frames(h5_file: h5py.File, file_path: Path) -> None:
-    """Report a member whose frames are not consecutive in the detector's own counter.
-
-    Under line-major numbering a frame's column is its position within the member, so a
-    frame the detector dropped mid-line shifts every column after it -- placing patterns
-    on positions the beam never visited, without any count disagreeing. The counter is
-    the only record of the drop. Files that do not carry it are left alone.
-    """
-    h5data = h5_file.get(_UNIQUE_ID_PATH)
-
-    if not isinstance(h5data, h5py.Dataset) or h5data.shape[0] < 2:
-        return
-
-    unique_ids = h5data[()]
-    steps = numpy.unique(numpy.diff(unique_ids))
-
-    if steps.size != 1 or steps[0] != 1:
-        logger.warning(
-            'Frames in "%s" are not consecutive in the detector frame counter (steps %s);'
-            ' the detector dropped frames, so columns after the gap name the wrong'
-            ' scan positions.',
-            file_path,
-            steps.tolist(),
-        )
 
 
 class APS2IDDiffractionFileReader(DiffractionFileReader):
@@ -166,7 +134,7 @@ class APS2IDDiffractionFileReader(DiffractionFileReader):
                 member_extent = ImageExtent(detector_width, detector_height)
 
                 if stride is not None:
-                    _warn_on_dropped_frames(h5_file, fp)
+                    warn_on_dropped_frames(h5_file, fp)
 
                 # Widening rather than trusting the first member: these series mix widths
                 # -- a one-frame opening line can be uint32 where the rest are uint16 --

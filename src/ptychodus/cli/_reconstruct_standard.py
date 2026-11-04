@@ -25,7 +25,8 @@ from __future__ import annotations
 import argparse
 import logging
 import math
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy
@@ -137,6 +138,15 @@ class InstrumentProfile:
     # True adds the MAD and end-trim pattern filters. They are instrument-agnostic; this
     # only decides which instruments offer them.
     offers_pattern_filters: bool = False
+    # Diffraction readers by file suffix, for an instrument whose layouts differ by format;
+    # a suffix not listed falls back to diffraction_reader.
+    diffraction_readers_by_suffix: Mapping[str, str] = field(default_factory=dict)
+
+    def get_diffraction_reader(self, file_path: Path) -> str:
+        """The diffraction reader for `file_path`, chosen by its suffix when listed."""
+        return self.diffraction_readers_by_suffix.get(
+            file_path.suffix.casefold(), self.diffraction_reader
+        )
 
 
 def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser:
@@ -801,16 +811,15 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
     cancellation = None if args.prepare_only else install_signal_handlers()
 
     registry = PluginRegistry.load_plugins()
+    diffraction_reader_name = profile.get_diffraction_reader(args.diffraction_file)
     diffraction_reader = registry.diffraction_file_readers.get_strategy_by_name(
-        profile.diffraction_reader
+        diffraction_reader_name
     )
     position_reader = registry.probe_position_file_readers.get_strategy_by_name(
         profile.position_reader
     )
 
-    logger.info(
-        'Reading diffraction from %s as %s', args.diffraction_file, profile.diffraction_reader
-    )
+    logger.info('Reading diffraction from %s as %s', args.diffraction_file, diffraction_reader_name)
     raw_dataset = diffraction_reader.read(args.diffraction_file)
     metadata = raw_dataset.get_metadata()
 

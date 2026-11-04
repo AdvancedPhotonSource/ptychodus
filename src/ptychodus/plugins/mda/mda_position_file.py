@@ -603,64 +603,63 @@ class MDAPositionFileReader(ProbePositionFileReader):
         return _require_points(point_list, mda_file, file_path)
 
 
-class MDAFlatScanPositionFileReader(ProbePositionFileReader):
-    def __init__(self, scale_to_meters: float) -> None:
-        self._scale_to_meters = scale_to_meters
+def _point_scans(mda_file: MDAFile) -> list[MDAScan] | None:
+    """The scans whose detector arrays hold one entry per scan point, in scan order.
 
-    def get_file_description(self) -> str:
-        return 'CNM/APS 26-ID-C Hard X-ray Nanoprobe Files'
+    A rank-1 file records its channels in the scan itself. A rank-2 file records them in
+    each lower scan, one per row, so the rows are returned in the order they were taken.
+    A deeper file nests rasters under each row, and flattening those would pair the
+    wrong points, so it has none: the result is None.
+    """
+    data_rank = mda_file.header.data_rank
 
-    def get_file_extensions(self) -> set[str]:
-        return {'.mda'}
+    if data_rank > 2:
+        return None
 
-    def read(self, file_path: Path) -> ProbePositionSequence:
-        point_list: list[ProbePosition] = list()
-
-        mda_file = MDAFile.read(file_path)
-        readback_array = _require_positioners(mda_file, 2, file_path)
-        xarray = readback_array[0, :]
-        yarray = readback_array[1, :]
-
-        for idx, (x, y) in enumerate(zip(xarray, yarray)):
-            point = ProbePosition(
-                index=idx,
-                x_m=float(x) * self._scale_to_meters,
-                y_m=float(y) * self._scale_to_meters,
-            )
-            point_list.append(point)
-
-        return _require_points(point_list, mda_file, file_path)
+    return mda_file.scan.lower_scans if data_rank == 2 else [mda_file.scan]
 
 
-def _require_detectors(mda_file: MDAFile, count: int, file_path: Path) -> RealArrayType:
-    """Return the detector array, or explain why it cannot supply `count` channels."""
-    detector_array = mda_file.scan.data.detector_array
+def read_detector_channel(mda_file: MDAFile, name: str) -> RealArrayType | None:
+    """The detector channel whose PV is `name`, one value per scan point, or None.
 
-    if detector_array.ndim != 2 or detector_array.shape[0] < count:
-        raise ProbePositionParseError(
-            f'"{file_path}" has {mda_file.scan.info.num_detectors} detector channel(s);'
-            f' this reader needs {count}.'
-        )
+    Rank-1 and rank-2 scans are both read, the second row by row; a deeper scan, an
+    empty one and a file that does not record the channel exactly once all return None.
+    """
+    scans = _point_scans(mda_file)
+    rows: list[RealArrayType] = []
 
-    return detector_array
+    for scan in scans or []:
+        matches = [i for i, d in enumerate(scan.info.detector) if d.name == name]
+
+        if len(matches) != 1 or scan.data.detector_array.ndim != 2:
+            return None
+
+        rows.append(scan.data.detector_array[matches[0]])
+
+    return numpy.concatenate(rows) if rows else None
 
 
 def _select_channel(
-    mda_file: MDAFile,
-    description: str,
-    index_fallback: int,
+    detectors: list[MDAScanDetectorInfo],
+    channel: str,
+    index_fallback: int | None,
     axis: str,
     file_path: Path,
 ) -> int:
-    """Index of the detector channel holding one axis, by description then by position.
+    """Index of the detector channel holding one axis: by PV name, description, position.
 
-    Matching the description survives a channel list that grows or is reordered, which
-    an index cannot. An ambiguous description is an error rather than a guess: picking
-    the first of several matches is how a reconstruction ends up silently built on the
-    wrong axis.
+    An exact PV name is tried first, since it does not drift when a channel is relabeled.
+    A description substring follows, which survives a channel list that grows or is
+    reordered, as an index cannot. An ambiguous description is an error rather than a
+    guess: picking the first of several matches is how a reconstruction ends up silently
+    built on the wrong axis.
     """
-    detectors = mda_file.scan.info.detector
-    wanted = description.casefold()
+    wanted = channel.casefold()
+    named_matches = [i for i, d in enumerate(detectors) if d.name.casefold() == wanted]
+
+    if len(named_matches) == 1:
+        return named_matches[0]
+
     matches = [i for i, d in enumerate(detectors) if wanted in d.description.casefold()]
 
     if len(matches) == 1:
@@ -669,60 +668,78 @@ def _select_channel(
     if len(matches) > 1:
         named = ', '.join(f'd[{i}] {detectors[i].description!r}' for i in matches)
         raise ProbePositionParseError(
-            f'"{file_path}" has {len(matches)} detector channels matching {description!r}'
+            f'"{file_path}" has {len(matches)} detector channels matching {channel!r}'
             f' for the {axis} axis: {named}. Cannot choose between them.'
         )
 
-    if index_fallback < len(detectors):
+    if index_fallback is not None and index_fallback < len(detectors):
         logger.debug(
-            'No detector channel in "%s" describes %r; falling back to d[%d] %r for %s.',
+            'No detector channel in "%s" is named or describes %r; falling back to d[%d] %r'
+            ' for %s.',
             file_path,
-            description,
+            channel,
             index_fallback,
             detectors[index_fallback].description,
             axis,
         )
         return index_fallback
 
-    named = ', '.join(f'd[{i}] {d.description!r}' for i, d in enumerate(detectors))
+    named = ', '.join(f'd[{i}] {d.name} {d.description!r}' for i, d in enumerate(detectors))
+    fallback = '' if index_fallback is None else f', and no d[{index_fallback}] to fall back to'
     raise ProbePositionParseError(
-        f'"{file_path}" has no detector channel describing {description!r} for the {axis}'
-        f' axis, and no d[{index_fallback}] to fall back to. Channels present: {named}.'
+        f'"{file_path}" has no detector channel named or describing {channel!r} for the'
+        f' {axis} axis{fallback}. Channels present: {named}.'
     )
 
 
 class MDADetectorChannelPositionFileReader(ProbePositionFileReader):
     """Read scan positions from MDA detector channels rather than from positioners.
 
-    A fly scan drives a single trajectory positioner and records each axis encoder as a
-    detector channel, so :class:`MDAFlatScanPositionFileReader`, which requires two
-    positioners, cannot read one. APS 19-ID-E In-situ Nanoprobe files have exactly that
-    shape: rank 1, one positioner (``19idAERO:m2.VAL``, the X setpoint) and 28 detector
-    channels, among them ``19idAERO:m2.RBV`` ("X Axis") and ``19idAERO:SM1.RBV``
-    ("Piezo Y (all)") -- the encoder readbacks the reconstruction needs.
+    An encoder readback records where each frame was taken, which a positioner's demanded
+    coordinate does not: a fly scan does not stop on it, and a step scan settles near it.
+    Instruments that record their axis encoders as detector channels are read here.
 
-    The readbacks are preferred over the setpoint: a fly scan does not stop on the
-    demanded coordinate, so the setpoint describes the trajectory rather than where each
-    frame was taken.
+    APS 19-ID-E In-situ Nanoprobe fly scans are rank 1 with a single trajectory
+    positioner (``19idAERO:m2.VAL``, the X setpoint) and 28 detector channels, among
+    them ``19idAERO:m2.RBV`` ("X Axis") and ``19idAERO:SM1.RBV`` ("Piezo Y (all)").
+    CNM/APS 26-ID-C Hard X-ray Nanoprobe scans record the zone-plate piezo encoders
+    ``26idcnpi:m34.RBV`` and ``26idcnpi:m35.RBV`` in every era, as channels of a rank-1
+    spiral or of each row of a rank-2 raster whose outer axis is X in some scans and Y
+    in others; reading the channels sidesteps which axis the scan nested.
+
+    `x_channel` and `y_channel` name each axis's channel by its PV name or by a
+    substring of its description; `x_index_fallback` and `y_index_fallback`, when given,
+    pin a channel index to use when neither matches. `x_scale_to_meters` and
+    `y_scale_to_meters` default to `scale_to_meters`; a negative scale reverses an axis.
+    Points are numbered by running count in scan order.
     """
 
     def __init__(
         self,
         scale_to_meters: float,
         *,
-        x_description: str,
-        y_description: str,
-        x_index_fallback: int,
-        y_index_fallback: int,
+        description: str,
+        x_channel: str,
+        y_channel: str,
+        x_index_fallback: int | None = None,
+        y_index_fallback: int | None = None,
+        x_scale_to_meters: float | None = None,
+        y_scale_to_meters: float | None = None,
     ) -> None:
-        self._scale_to_meters = scale_to_meters
-        self._x_description = x_description
-        self._y_description = y_description
+        self._description = description
+        self._x_channel = x_channel
+        self._y_channel = y_channel
         self._x_index_fallback = x_index_fallback
         self._y_index_fallback = y_index_fallback
+        self._x_scale_to_meters = (
+            scale_to_meters if x_scale_to_meters is None else x_scale_to_meters
+        )
+        self._y_scale_to_meters = (
+            scale_to_meters if y_scale_to_meters is None else y_scale_to_meters
+        )
 
     def get_file_description(self) -> str:
-        return 'APS 19-ID-E In-situ Nanoprobe Files'
+        return self._description
 
     def get_file_extensions(self) -> set[str]:
         return {'.mda'}
@@ -731,21 +748,41 @@ class MDADetectorChannelPositionFileReader(ProbePositionFileReader):
         point_list: list[ProbePosition] = list()
 
         mda_file = MDAFile.read(file_path)
-        x_index = _select_channel(
-            mda_file, self._x_description, self._x_index_fallback, 'x', file_path
-        )
-        y_index = _select_channel(
-            mda_file, self._y_description, self._y_index_fallback, 'y', file_path
-        )
-        detector_array = _require_detectors(mda_file, 1 + max(x_index, y_index), file_path)
+        scans = _point_scans(mda_file)
 
-        for idx, (x, y) in enumerate(zip(detector_array[x_index, :], detector_array[y_index, :])):
-            point = ProbePosition(
-                index=idx,
-                x_m=float(x) * self._scale_to_meters,
-                y_m=float(y) * self._scale_to_meters,
+        if scans is None:
+            raise ProbePositionParseError(
+                f'"{file_path}" is a rank-{mda_file.header.data_rank} scan of'
+                f' {mda_file.header.dimensions}; this reader needs a rank-1 or rank-2 scan.'
             )
-            point_list.append(point)
+
+        if scans:
+            # Every row of a raster is written by the same scan record, so the first one's
+            # channel list stands for all of them.
+            detectors = scans[0].info.detector
+            x_index = _select_channel(
+                detectors, self._x_channel, self._x_index_fallback, 'x', file_path
+            )
+            y_index = _select_channel(
+                detectors, self._y_channel, self._y_index_fallback, 'y', file_path
+            )
+
+            for scan in scans:
+                detector_array = scan.data.detector_array
+
+                if detector_array.ndim != 2 or detector_array.shape[0] <= max(x_index, y_index):
+                    raise ProbePositionParseError(
+                        f'"{file_path}" has a scan with {scan.info.num_detectors} detector'
+                        f' channel(s); this reader needs {1 + max(x_index, y_index)}.'
+                    )
+
+                for x, y in zip(detector_array[x_index, :], detector_array[y_index, :]):
+                    point = ProbePosition(
+                        index=len(point_list),
+                        x_m=float(x) * self._x_scale_to_meters,
+                        y_m=float(y) * self._y_scale_to_meters,
+                    )
+                    point_list.append(point)
 
         return _require_points(point_list, mda_file, file_path)
 

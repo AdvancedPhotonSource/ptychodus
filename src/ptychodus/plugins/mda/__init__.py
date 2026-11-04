@@ -3,7 +3,6 @@ from ptychodus.api.plugins import PluginRegistry
 from .mda_position_file import (
     RASTER_LINE_INDEX_STRIDE,
     MDADetectorChannelPositionFileReader,
-    MDAFlatScanPositionFileReader,
     MDAPositionFileReader,
 )
 
@@ -38,22 +37,38 @@ def register_plugins(registry: PluginRegistry) -> None:
         simple_name='APS_BNP',
     )
     # ISN fly scans expose one positioner -- the X setpoint -- and record both axis
-    # encoders as detector channels, so the flat-scan reader, which needs two
-    # positioners, raises on every one of these files. Descriptions observed on real
-    # 19idAERO files; the index fallbacks match them and are used only if the
-    # descriptions ever change.
+    # encoders as detector channels, so the positions are read from the channels.
+    # Descriptions observed on real 19idAERO files; the index fallbacks match them and are
+    # used only if the descriptions ever change.
     registry.probe_position_file_readers.register_plugin(
         MDADetectorChannelPositionFileReader(
             scale_to_meters=1.0e-3,
-            x_description='X Axis',
-            y_description='Piezo Y',
+            description='APS 19-ID-E In-situ Nanoprobe Files',
+            x_channel='X Axis',
+            y_channel='Piezo Y',
             x_index_fallback=1,
             y_index_fallback=0,
         ),
         simple_name='APS_ISN_MDA',
     )
+    # 26-ID-C records the zone-plate piezo encoders as detector channels in every era --
+    # in the rank-1 spirals and in each row of the rank-2 rasters, whose outer axis is X in
+    # some scans and Y in others -- while the positioners and channel labels changed. The
+    # PV names did not, so the channels are chosen by them.
+    #
+    # The x encoder runs opposite to the Medipix frame's columns. Reconstructing 2019 scan
+    # 29 and 2022 scans 29 and 247 under each of the eight axis flips and swaps, only this
+    # one (or its twin, y reversed with the opposite defocus) resolves the sample; the
+    # others smear it, and the transposed ones fit 1.4 to 3 times worse. Not established
+    # for the 2023 Eiger scan, which did not reconstruct under any of them.
     registry.probe_position_file_readers.register_plugin(
-        MDAFlatScanPositionFileReader(scale_to_meters=1.0e-6),
+        MDADetectorChannelPositionFileReader(
+            scale_to_meters=1.0e-6,
+            description='CNM/APS 26-ID-C Hard X-ray Nanoprobe Files',
+            x_channel='26idcnpi:m34.RBV',
+            y_channel='26idcnpi:m35.RBV',
+            x_scale_to_meters=-1.0e-6,
+        ),
         simple_name='CNM_APS_HXN',
     )
     # 34-ID-E scans the sample stage open loop: both positioners are piezo driver command

@@ -1,6 +1,6 @@
 """The shared standard-reconstruction pipeline and the profiles the drivers declare.
 
-The parser tests matter because nine beamline commands now get their entire command-line
+The parser tests matter because ten beamline commands now get their entire command-line
 surface from one builder: a mistake in a profile field is a silent change to a published
 CLI, and nothing else would catch it. The filter tests cover the only arithmetic in the
 module.
@@ -42,6 +42,7 @@ def _profiles() -> dict[str, InstrumentProfile]:
 
     names = (
         '12ide',
+        '26idc',
         '2ide',
         '34ide',
         'bnp',
@@ -69,7 +70,7 @@ def test_every_profile_builds_a_parser() -> None:
 
 
 def test_every_profile_can_print_ptychi_option_defaults() -> None:
-    """All nine beamline commands must offer the flag, and offer it without any input.
+    """All ten beamline commands must offer the flag, and offer it without any input.
 
     It is how a user obtains the file ``--ptychi-options`` takes, so a driver missing it
     leaves no way to start one but finishing a reconstruction first.
@@ -139,10 +140,28 @@ def test_pattern_filters_are_offered_only_where_the_profile_asks() -> None:
     assert polar.drop_leading_frames == 0
     assert polar.drop_trailing_frames == 0
 
-    for name in ('12ide', '2ide', '34ide', 'bnp', 'isn', 'lamni', 'velociprobe'):
+    for name in ('12ide', '26idc', '2ide', '34ide', 'bnp', 'isn', 'lamni', 'velociprobe'):
         args = _defaults(profiles[name])
         for absent in ('dp_mad_k', 'i0_mad_k', 'drop_leading_frames', 'drop_trailing_frames'):
             assert not hasattr(args, absent), f'{name}.{absent}'
+
+
+def test_diffraction_reader_follows_the_file_suffix() -> None:
+    from pathlib import Path
+
+    profile = _profiles()['26idc']
+
+    assert profile.get_diffraction_reader(Path('scan_29_img_005604.tif')) == 'CNM_APS_HXN_TIFF'
+    assert profile.get_diffraction_reader(Path('scan_126_img_075988.tif.gz')) == 'CNM_APS_HXN_TIFF'
+    assert profile.get_diffraction_reader(Path('scan_43_000099.h5')) == 'CNM_APS_HXN'
+    # A profile without a suffix table always uses its one reader.
+    isn = _profiles()['isn']
+    assert isn.get_diffraction_reader(Path('anything.tif')) == isn.diffraction_reader
+
+
+def test_26idc_starts_from_the_average_pattern_probe() -> None:
+    """No zone-plate preset by default, so the probe is estimated from the mean pattern."""
+    assert _defaults(_profiles()['26idc']).fzp_preset == ''
 
 
 def test_logger_names_stay_per_driver() -> None:

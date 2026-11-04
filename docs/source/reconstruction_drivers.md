@@ -9,13 +9,14 @@ Every driver is installed as a console command by `pip install ptychodus`.
 
 ## Choosing a driver
 
-Nine commands differ only in which instrument they read. The last four differ in shape: they
+Ten commands differ only in which instrument they read. The last four differ in shape: they
 take their configuration from a file, or operate on a directory another driver prepared.
 
 | Command | Instrument | Diffraction input | Position input |
 | --- | --- | --- | --- |
 | `ptychodus-reconstruct-2ide` | APS 2-ID-E XFM | `fly###_data_NNN.h5` series | EPICS MDA, `mda/2xfm_NNNN.mda` |
 | `ptychodus-reconstruct-12ide` | APS 12-ID-E Ptycho-SAXS | `<sample>_<scan>_master.h5` or any frame file (2026_2 layout onward) | The same master; positions are read from it |
+| `ptychodus-reconstruct-26idc` | CNM/APS 26-ID-C Hard X-ray Nanoprobe | Any `scan_N_img_F.tif`/`.tif.gz` frame, or `scan_N_F.h5` member | EPICS MDA, `26idbSOFT_NNNN.mda` |
 | `ptychodus-reconstruct-34ide` | APS 34-ID-E Microdiffraction | One scan's TIFF series | EPICS MDA, `mda_files/34ide_NNNNNN.mda` |
 | `ptychodus-reconstruct-bnp` | APS 2-ID-D Bionanoprobe | `bnp_flyNNNN_NNNNNN.h5` series | EPICS MDA, `mda/bnp_flyNNNN.mda` |
 | `ptychodus-reconstruct-isn` | APS 19-ID-E In-situ Nanoprobe | `PTYCHO/scan_NNNN_FFFFF.h5` series | `Processed/SOCKETSERVER/Scan_NNNN_position.h5` |
@@ -34,7 +35,7 @@ carries its own geometry.
 
 ## Common arguments
 
-The nine instrument commands share one argument set. Three paths are required:
+The ten instrument commands share one argument set. Three paths are required:
 
 ```sh
 $ ptychodus-reconstruct-2ide \
@@ -296,7 +297,7 @@ boundary after the request and leaves the scans already written in place.
 ## Preparing and reconstructing separately
 
 Reading and assembling the raw files and running pty-chi need not happen in one command. Give
-any of the nine instrument commands `--prepare-only` and it stops after building the initial
+any of the ten instrument commands `--prepare-only` and it stops after building the initial
 product: it writes the prepared directory shown above and exits successfully without
 reconstructing. `ptychodus-reconstruct` then runs the reconstruction from that directory:
 

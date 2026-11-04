@@ -64,9 +64,11 @@ class APS26IDFileBasedWorkflow(FileBasedWorkflow):
             digits = int(re.findall(r'\d+', diffraction_file_path.stem)[-1])
 
             if digits == 0:
-                diffraction_api = api.load_diffraction_data(diffraction_file_path)
+                diffraction_api = api.load_diffraction_data(
+                    diffraction_file_path, file_type='CNM_APS_HXN'
+                )
                 product_api = api.create_product(f'scan_{scan_id}', diffraction=diffraction_api)
-                product_api.load_probe_positions(file_path)
+                product_api.load_probe_positions(file_path, file_type='CNM_APS_HXN')
                 product_api.generate_probe()
                 product_api.generate_object()
                 product_api.reconstruct_remote()

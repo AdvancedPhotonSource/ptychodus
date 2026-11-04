@@ -12,7 +12,7 @@ File readers are implemented using a Python namespace plugin system. We would be
   - [9-ID-D Coherent Surface Scattering Imaging (CSSI)](https://www.aps.anl.gov/Beamlines/Beamline-Directory/221)
   - [12-ID-E High Resolution Small Angle X-ray Scattering (Ptycho-SAXS)](https://www.aps.anl.gov/Beamlines/Beamline-Directory/228) (`*.dat`, `*.h5`, `*.hdf5`, `*.tif`, `*.tiff`)
   - [19-ID-E In-situ Nanoprobe (ISN)](https://www.aps.anl.gov/Beamlines/Beamline-Directory/232)
-  - [26-ID-C CNM/APS Hard X-ray Nanoprobe (HXN)](https://www.aps.anl.gov/Beamlines/Beamline-Directory/92)
+  - [26-ID-C CNM/APS Hard X-ray Nanoprobe (HXN)](https://www.aps.anl.gov/Beamlines/Beamline-Directory/92) (`*.tif`, `*.tif.gz`, `*.h5`, `*.mda`)
   - [31-ID-E Ptychography-Laminography (LamNI)](https://www.aps.anl.gov/Beamlines/Beamline-Directory/240) (`*.dat`, `*.h5`, `*.hdf5`)
   - [33-ID-C PtychoProbe, VelociProbe endstation](https://www.aps.anl.gov/Beamlines/Beamline-Directory/241)
   - [34-ID-E Microdiffraction](https://www.aps.anl.gov/Beamlines/Beamline-Directory/204) (`*.json`, `*.mda`, `*.tif`, `*.tiff`)
@@ -24,7 +24,7 @@ File readers are implemented using a Python namespace plugin system. We would be
 - [MAX IV](https://www.maxiv.lu.se/beamlines-accelerators/beamlines/)
   - [NanoMAX](https://www.maxiv.lu.se/beamlines-accelerators/beamlines/nanomax/) (`*.h5`)
 - [National Synchrotron Light Source II (NSLS-II)](https://www.bnl.gov/nsls2/beamlines)
-  - [3-ID Hard X-ray Nanoprobe (HXN)](https://www.bnl.gov/nsls2/beamlines/beamline.php?r=3-ID)
+  - [3-ID Hard X-ray Nanoprobe (HXN)](https://www.bnl.gov/nsls2/beamlines/beamline.php?r=3-ID) (`*.h5`, `*.hdf5`, `*.mat`)
 - [Swiss Light Source (SLS)](https://www.psi.ch/en/sls/beamlines-at-sls)
   - [X12SA cSAXS: Coherent Small-Angle X-ray Scattering](https://www.psi.ch/en/node/508)
 - Common File Formats

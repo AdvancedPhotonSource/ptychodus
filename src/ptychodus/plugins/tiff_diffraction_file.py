@@ -1,5 +1,7 @@
 from collections.abc import Mapping
 from pathlib import Path
+import gzip
+import io
 import logging
 import re
 import sys
@@ -32,6 +34,19 @@ logger = logging.getLogger(__name__)
 _SERIES_STEM: Final = re.compile(r'(?P<prefix>.*?)(?P<frame>\d+)(?P<tail>\D*)')
 
 
+def open_tiff(file_path: Path) -> TiffFile:
+    """Open a TIFF, decompressing a gzipped one (``*.tif.gz``) into memory first.
+
+    tifffile reads gzip only through its own compression tags, not a gzip stream around
+    the whole file, so a ``.gz`` member is inflated and handed over as a buffer.
+    """
+    if file_path.suffix.casefold() == '.gz':
+        with gzip.open(file_path, 'rb') as fp:
+            return TiffFile(io.BytesIO(fp.read()))
+
+    return TiffFile(file_path)
+
+
 class TiffDiffractionPatternArray(DiffractionArray):
     def __init__(self, file_path: Path, indexes: DiffractionIndexes) -> None:
         super().__init__()
@@ -48,7 +63,7 @@ class TiffDiffractionPatternArray(DiffractionArray):
         return self._indexes
 
     def get_patterns(self, *, read_region: CropRegion | None = None) -> DiffractionPatterns:
-        with TiffFile(self._file_path) as tiff:
+        with open_tiff(self._file_path) as tiff:
             data = tiff.asarray()
 
         if data.ndim == 2:
@@ -119,7 +134,7 @@ class TiffDiffractionFileReader(DiffractionFileReader):
         # makes assembly drop it with only a warning. `pages` reports the count without
         # decoding the image data.
         for idx, fp in sorted(file_path_mapping.items()):
-            with TiffFile(fp) as tiff:
+            with open_tiff(fp) as tiff:
                 num_patterns = len(tiff.pages)
 
                 if detector_extent is None:
@@ -154,10 +169,6 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         TiffDiffractionFileReader(FileFormat.TIFF.description),
         simple_name='TIFF',
-    )
-    registry.diffraction_file_readers.register_plugin(
-        TiffDiffractionFileReader('CNM/APS 26-ID-C Hard X-ray Nanoprobe Files'),
-        simple_name='CNM_APS_HXN_TIFF',
     )
     registry.diffraction_file_readers.register_plugin(
         TiffDiffractionFileReader('APS 34-ID-E Microdiffraction Files'),

@@ -33,6 +33,33 @@ from ptychodus.api.plugins import PluginRegistry
 logger = logging.getLogger(__name__)
 
 
+def warn_on_dropped_frames(h5_file: h5py.File, file_path: Path) -> None:
+    """Warn when the frames of an areaDetector HDF5 file skip in the detector's own counter.
+
+    The HDF5 plugin records each frame's ``NDArrayUniqueId``, a count that runs across the
+    whole acquisition, so a step other than one between consecutive frames says the
+    detector dropped (or repeated) frames. Patterns are paired with positions by their
+    order in the file, so a drop shifts every later pattern onto a position the beam
+    never visited, without any count disagreeing; the counter is the only record of it.
+    Files that do not carry the counter are left alone.
+    """
+    h5data = h5_file.get('/entry/instrument/NDAttributes/NDArrayUniqueId')
+
+    if not isinstance(h5data, h5py.Dataset) or h5data.ndim != 1 or h5data.shape[0] < 2:
+        return
+
+    steps = numpy.unique(numpy.diff(h5data[()]))
+
+    if steps.size != 1 or steps[0] != 1:
+        logger.warning(
+            'Frames in "%s" are not consecutive in the detector frame counter (steps %s);'
+            ' the detector dropped frames, so patterns after the gap pair with the wrong'
+            ' scan positions.',
+            file_path,
+            steps.tolist(),
+        )
+
+
 class H5DiffractionPatternArray(DiffractionArray):
     def __init__(
         self, label: str, indexes: DiffractionIndexes, file_path: Path, data_path: str
@@ -297,11 +324,4 @@ def register_plugins(registry: PluginRegistry) -> None:
             description='APS 9-ID-D CSSI Files',
         ),
         simple_name='APS_CSSI',
-    )
-    registry.diffraction_file_readers.register_plugin(
-        H5DiffractionFileReader(
-            data_path='/entry/data/data',
-            description='CNM/APS 26-ID-C Hard X-ray Nanoprobe Files',
-        ),
-        simple_name='CNM_APS_HXN',
     )
