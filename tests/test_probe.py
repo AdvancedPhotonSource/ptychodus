@@ -874,6 +874,48 @@ def test_resample_probe_ensemble_carries_opr_weights_through() -> None:
     numpy.testing.assert_array_equal(resampled_weights, weights)
 
 
+def test_resample_probe_ensemble_commutes_with_a_global_phase() -> None:
+    probes = _make_gaussian_probe_ensemble()
+    phase = numpy.exp(0.9j)
+    rotated = ProbeEnsemble(
+        array=phase * probes.get_array(),
+        opr_weights=None,
+        pixel_geometry=probes.get_pixel_geometry(),
+    )
+    target = ProbeGeometry(width_px=48, height_px=48, pixel_width_m=1.3e-8, pixel_height_m=1.3e-8)
+
+    numpy.testing.assert_allclose(
+        resample_probe_ensemble(rotated, target).get_array(),
+        phase * resample_probe_ensemble(probes, target).get_array(),
+        atol=1e-12,
+    )
+
+
+def test_resample_probe_ensemble_keeps_opr_superposition() -> None:
+    """Resampled modes must still mix by their weights as the originals did."""
+    rng = numpy.random.default_rng(6)
+    basis = rng.standard_normal((3, 1, 32, 32)) + 1j * rng.standard_normal((3, 1, 32, 32))
+    weights = numpy.array([1.0, -0.4, 0.25])
+    pixel_geometry = PixelGeometry(width_m=2.0e-8, height_m=2.0e-8)
+    target = ProbeGeometry(width_px=48, height_px=48, pixel_width_m=1.3e-8, pixel_height_m=1.3e-8)
+
+    resampled_basis = resample_probe_ensemble(
+        ProbeEnsemble(array=basis, opr_weights=None, pixel_geometry=pixel_geometry), target
+    ).get_array()
+    resampled_mix = resample_probe_ensemble(
+        ProbeEnsemble(
+            array=numpy.tensordot(weights, basis, axes=1)[numpy.newaxis],
+            opr_weights=None,
+            pixel_geometry=pixel_geometry,
+        ),
+        target,
+    ).get_array()[0]
+
+    numpy.testing.assert_allclose(
+        resampled_mix, numpy.tensordot(weights, resampled_basis, axes=1), atol=1e-12
+    )
+
+
 def test_resample_probe_ensemble_passes_through_without_a_pixel_geometry() -> None:
     probes = ProbeEnsemble(
         array=_make_gaussian_probe_ensemble().get_array(),

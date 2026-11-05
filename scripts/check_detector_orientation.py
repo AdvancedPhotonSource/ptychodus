@@ -8,6 +8,10 @@ and what is left: a scan rotation no quarter turn expresses, or a miscalibrated 
 axis. A defocus sign error and a half-turn of the detector look the same to the
 parallax, so both readings are reported; knowing the sign of the defocus picks one.
 
+Given ``--two-theta-deg`` (with ``--detector-gamma-deg`` and ``--incidence-angle-deg``), it
+also compares the fit with the Bragg or Laue geometry those angles describe, through any
+orientation already known (``--orientation``), and with the forward assumption.
+
 The probe must be defocused beyond its depth of focus and the sample textured, and the
 patterns are read as the instrument recorded them, before any orientation steps.
 
@@ -39,14 +43,18 @@ from ptychodus.api.diffraction import DiffractionDataset
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.object import ObjectGeometry
 from ptychodus.api.parallax import (
+    DetectorOrientation,
     OrientationCandidate,
     ParallaxTransform,
+    compute_geometry_mismatch,
     estimate_parallax_transform,
 )
 from ptychodus.api.plugins import PluginCatalog, PluginRegistry
 from ptychodus.api.preprocess.diffraction import BinningStep
 from ptychodus.api.probe import ProbeGeometry
 from ptychodus.api.probe_positions import ProbePositionSequence, calculate_scan_geometry
+from ptychodus.api.scattering.frame import compute_exit_frame_transform
+from ptychodus.api.scattering.geometry import ScatteringGeometry
 
 logger = logging.getLogger(Path(__file__).stem)
 
@@ -87,6 +95,20 @@ def _build_parser() -> argparse.ArgumentParser:
         '--image-pixel-m',
         type=float,
         help='Pitch of the bright-field images; default half the median scan step.',
+    )
+    parser.add_argument(
+        '--two-theta-deg',
+        type=float,
+        help='Off-axis detector angle; with the other two angles, compares the fit with the '
+        'Bragg or Laue geometry they describe. See ScatteringGeometry for the conventions.',
+    )
+    parser.add_argument('--detector-gamma-deg', type=float, default=0.0)
+    parser.add_argument('--incidence-angle-deg', type=float, default=90.0)
+    parser.add_argument(
+        '--orientation',
+        default='',
+        help='Flips and transpose already known for the detector, as a subset of '
+        '"hflip,vflip,transpose"; the geometry is compared through them.',
     )
     parser.add_argument('--figure', type=Path, help='Save the diagnostic figure here.')
     parser.add_argument('--show', action='store_true', help='Display the diagnostic figure.')
@@ -249,6 +271,33 @@ def _report(transform: ParallaxTransform) -> None:
         print(f'  {_describe(candidate)}')
 
 
+def _report_geometry(transform: ParallaxTransform, args: argparse.Namespace) -> None:
+    """Compare the fit with the off-axis geometry the angles describe, and with forward."""
+    geometry = ScatteringGeometry(
+        two_theta_deg=args.two_theta_deg,
+        detector_gamma_deg=args.detector_gamma_deg,
+        incidence_angle_deg=args.incidence_angle_deg,
+    )
+    flags = {flag.strip() for flag in args.orientation.split(',') if flag.strip()}
+    orientation = DetectorOrientation(
+        hflip='hflip' in flags, vflip='vflip' in flags, transpose='transpose' in flags
+    )
+    scan_to_exit = compute_exit_frame_transform(geometry)
+    print(f'{geometry.regime.value.capitalize()} geometry {geometry}:')
+    print(
+        f'  positions map to the exit frame by [[{scan_to_exit.a00:+.6f}, '
+        f'{scan_to_exit.a01:+.6f}], [{scan_to_exit.a10:+.6f}, {scan_to_exit.a11:+.6f}]]'
+    )
+    matching = compute_geometry_mismatch(transform, geometry, orientation=orientation)
+    forward = compute_geometry_mismatch(transform, ScatteringGeometry(), orientation=orientation)
+    print(
+        f'  scale-free mismatch with this geometry {matching:.3f}; assuming forward {forward:.3f}'
+    )
+
+    if matching >= forward:
+        print('  WARNING: the forward assumption fits the parallax at least as well.')
+
+
 def _plot(transform: ParallaxTransform, *, figure_path: Path | None, show: bool) -> None:
     import matplotlib
 
@@ -384,6 +433,9 @@ def main() -> int:
         return 1
 
     _report(transform)
+
+    if args.two_theta_deg is not None:
+        _report_geometry(transform, args)
 
     if args.figure is not None or args.show:
         _plot(transform, figure_path=args.figure, show=args.show)

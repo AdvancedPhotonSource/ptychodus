@@ -5,6 +5,8 @@ from ptychodus.api.interpolate import (
     BarycentricArrayInterpolator,
     interpolate_at_indexes,
     lerp,
+    resample_complex_at,
+    resample_complex_on_grid,
 )
 
 
@@ -264,3 +266,92 @@ def test_interpolate_at_indexes_with_empty_source_leaves_every_target_out() -> N
 def test_interpolate_at_indexes_rejects_mismatched_rows() -> None:
     with pytest.raises(ValueError, match='one row of values per source index'):
         interpolate_at_indexes(numpy.array([0, 1]), numpy.array([1.0]), numpy.array([0]))
+
+
+def _complex_field(shape: tuple[int, ...]) -> numpy.ndarray:
+    rng = numpy.random.default_rng(4)
+    return rng.standard_normal(shape) + 1j * rng.standard_normal(shape)
+
+
+@pytest.mark.parametrize('order', [1, 3])
+def test_resample_complex_at_reproduces_the_nodes(order: int) -> None:
+    field = _complex_field((9, 11))
+    row, column = numpy.mgrid[:9, :11].astype(float)
+
+    numpy.testing.assert_allclose(
+        resample_complex_at(field, row, column, order=order), field, atol=1e-12
+    )
+
+
+def test_resample_complex_at_is_zero_outside_the_array_in_constant_mode() -> None:
+    field = _complex_field((9, 11))
+    row = numpy.array([-5.0, 20.0, 4.0])
+    column = numpy.array([5.0, 5.0, -7.0])
+
+    numpy.testing.assert_array_equal(
+        resample_complex_at(field, row, column, order=3, mode='constant'), numpy.zeros(3)
+    )
+
+
+def test_resample_complex_at_fades_to_zero_outside_the_array_in_grid_constant_mode() -> None:
+    """A cubic spline's prefilter reaches past the edge, decaying about 0.27 per pixel."""
+    field = _complex_field((9, 11))
+    row = numpy.array([-5.0, 20.0, 4.0])
+    column = numpy.array([5.0, 5.0, -7.0])
+
+    outside = resample_complex_at(field, row, column, order=3)
+
+    assert numpy.abs(outside).max() < 1e-5 * numpy.abs(field).max()
+
+
+@pytest.mark.parametrize('order', [1, 3])
+def test_resample_complex_at_commutes_with_a_global_phase(order: int) -> None:
+    """Linear in the field, so the arbitrary phase of a reconstruction does not matter."""
+    field = _complex_field((16, 16))
+    rng = numpy.random.default_rng(5)
+    row = rng.uniform(0.0, 15.0, size=50)
+    column = rng.uniform(0.0, 15.0, size=50)
+    phase = numpy.exp(0.7j)
+
+    numpy.testing.assert_allclose(
+        resample_complex_at(phase * field, row, column, order=order),
+        phase * resample_complex_at(field, row, column, order=order),
+        atol=1e-12,
+    )
+
+
+@pytest.mark.parametrize('order', [1, 3])
+def test_resample_complex_on_grid_reproduces_the_nodes(order: int) -> None:
+    field = _complex_field((9, 11))
+
+    numpy.testing.assert_allclose(
+        resample_complex_on_grid(field, numpy.arange(9.0), numpy.arange(11.0), order=order),
+        field,
+        atol=1e-12,
+    )
+
+
+def test_resample_complex_on_grid_fills_exactly_beyond_the_source() -> None:
+    field = _complex_field((2, 9, 11))
+    rows = numpy.arange(-2.0, 11.0)
+    columns = numpy.arange(11.0)
+
+    resampled = resample_complex_on_grid(field, rows, columns, order=3, fill_value=1.0 + 0.5j)
+
+    assert resampled.shape == (2, 13, 11)
+    numpy.testing.assert_array_equal(resampled[:, :2], 1.0 + 0.5j)
+    numpy.testing.assert_array_equal(resampled[:, -2:], 1.0 + 0.5j)
+
+
+def test_resample_complex_on_grid_matches_the_scattered_resampler_inside() -> None:
+    """Order 1 has no prefilter, so the two boundary treatments agree away from the edge."""
+    field = _complex_field((16, 16))
+    rows = 2.0 + 0.7 * numpy.arange(15)
+    columns = 1.5 + 0.8 * numpy.arange(15)
+    row_grid, column_grid = numpy.meshgrid(rows, columns, indexing='ij')
+
+    numpy.testing.assert_allclose(
+        resample_complex_on_grid(field, rows, columns, order=1),
+        resample_complex_at(field, row_grid, column_grid, order=1),
+        atol=1e-12,
+    )

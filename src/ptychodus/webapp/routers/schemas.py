@@ -6,10 +6,14 @@ from datetime import datetime
 from typing import Generic, Literal, TypeVar
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from ptychodus.api.diffraction import Polarization
+from ptychodus.api.scattering.geometry import ScatteringRegime
 from ptychodus.webapp.db.base import IngestState
+
+
+_TILT_ANGLE_DESCRIPTION = 'The sample tilt APS 4-ID POLAR records for an XMCD projection, which sets the magnetization component the contrast is sensitive to. Stored but read by no computation, and unrelated to the scattering geometry.'
 
 
 class _RowBase(BaseModel):
@@ -53,7 +57,7 @@ class DiffractionRead(_RowBase):
     probe_photon_count: int | None
     exposure_time_s: float | None
     tomography_angle_deg: float | None
-    tilt_angle_deg: float | None = None
+    tilt_angle_deg: float | None = Field(default=None, description=_TILT_ANGLE_DESCRIPTION)
     polarization: Polarization | None = None
     crop_center_x_px: int | None
     crop_center_y_px: int | None
@@ -85,8 +89,16 @@ class ProductRead(_RowBase):
     i0_photons_per_count: float | None = None
     mass_attenuation_m2_per_kg: float | None
     tomography_angle_deg: float | None
-    tilt_angle_deg: float | None = None
+    tilt_angle_deg: float | None = Field(default=None, description=_TILT_ANGLE_DESCRIPTION)
     polarization: Polarization | None = None
+    two_theta_deg: float | None = None
+    detector_gamma_deg: float | None = None
+    incidence_angle_deg: float | None = None
+    scattering_regime: ScatteringRegime | None = Field(
+        default=None,
+        description='Transmission, Bragg or Laue, derived from the scattering angles. Off '
+        'axis, the positions, probe and object are in the exit frame of that geometry.',
+    )
 
     object_layers: int | None
     object_height_px: int | None

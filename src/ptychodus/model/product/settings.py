@@ -36,12 +36,25 @@ class ProductSettings(Observable, Observer):
         self.tomography_angle_deg = self._group.create_real_parameter(
             'TomographyAngleInDegrees', 0.0
         )
+        # The APS 4-ID POLAR XMCD sample tilt: stored and persisted, read by no computation,
+        # and unrelated to the scattering geometry below.
         self.tilt_angle_deg = self._group.create_real_parameter('TiltAngleInDegrees', 0.0)
         self.polarization = self._group.create_string_parameter('Polarization', '')
         self.far_field = self._group.create_boolean_parameter('FarField', True)
         # Zero means the I0 the probe positions carry is uncalibrated.
         self.i0_photons_per_count = self._group.create_real_parameter(
             'I0PhotonsPerCount', 0.0, minimum=0.0
+        )
+        # ScatteringGeometry. Forward by default; off axis, positions and model probes are
+        # carried into the exit frame where they enter a product.
+        self.two_theta_deg = self._group.create_real_parameter(
+            'TwoThetaInDegrees', 0.0, minimum=-180.0, maximum=180.0
+        )
+        self.detector_gamma_deg = self._group.create_real_parameter(
+            'DetectorGammaInDegrees', 0.0, minimum=-90.0, maximum=90.0
+        )
+        self.incidence_angle_deg = self._group.create_real_parameter(
+            'IncidenceAngleInDegrees', 90.0, minimum=-180.0, maximum=180.0
         )
 
         # Measure the defocus from the parallax between bright-field images when a

@@ -20,6 +20,13 @@ detector whose frames reach the scan's frame through flips and a transpose with
 coordinate map ``U``, ``M = -lambda * z * U``. Negating ``z`` negates ``U``, which is the
 same as rotating the detector by half a turn, so the parallax alone leaves the two
 apart; a reflection is unambiguous.
+
+Off the forward direction (Bragg or Laue), the probe's curvature is still set across the
+incident beam, so in the exit frame it is stretched by the map ``T`` from the scan to the
+exit frame: the ray reaching frequency ``q`` leaves from ``(A^T A)^-1 lambda z q`` with
+``A = T^-1``, and the scan carries it there through ``T``. The shifts are therefore
+``M = -lambda * z * T^T * U``, which makes the fitted matrix a check on the scattering
+angles that needs no reconstruction (:func:`compute_geometry_mismatch`).
 """
 
 from __future__ import annotations
@@ -43,6 +50,8 @@ from .preprocess.diffraction import (
 )
 from .probe import ProbeGeometry, estimate_probe_extent
 from .probe_positions import ProbePositionSequence
+from .scattering.frame import compute_exit_frame_transform
+from .scattering.geometry import ScatteringGeometry
 from .simulate.object import interpolate_scan_values
 from .typing import BooleanArrayType, RealArrayType
 
@@ -51,6 +60,7 @@ __all__ = [
     'OrientationCandidate',
     'ParallaxEstimate',
     'ParallaxTransform',
+    'compute_geometry_mismatch',
     'estimate_defocus_from_parallax',
     'estimate_parallax_transform',
 ]
@@ -312,15 +322,7 @@ class ParallaxTransform:
         """
         normalized = self._normalized()
         residual = normalized @ _nearest_orientation(normalized).matrix.T
-        inverse = numpy.linalg.inv(residual)
-        components = AffineTransform(
-            float(inverse[0, 0]),
-            float(inverse[0, 1]),
-            0.0,
-            float(inverse[1, 0]),
-            float(inverse[1, 1]),
-            0.0,
-        ).decompose()
+        components = AffineTransform.from_linear_matrix(numpy.linalg.inv(residual)).decompose()
         return AffineTransform.from_components(replace(components, scale=1.0))
 
     def components(self) -> AffineTransformComponents:
@@ -404,6 +406,37 @@ def estimate_parallax_transform(
         depth_of_focus_m=_depth_of_focus_m(
             moments, probe_geometry, photon_wavelength_m, defocus_magnitude_m
         ),
+    )
+
+
+def compute_geometry_mismatch(
+    transform: ParallaxTransform,
+    geometry: ScatteringGeometry,
+    *,
+    orientation: DetectorOrientation = DetectorOrientation(),
+) -> float:
+    """How far a fitted parallax matrix is from the one *geometry* predicts, scale free.
+
+    With the positions as the scan recorded them, *geometry* predicts ``M`` proportional to
+    ``T^T U``: ``T`` takes the scan to the exit frame
+    (:func:`~ptychodus.api.scattering.frame.compute_exit_frame_transform`) and ``U`` is *orientation*'s map.
+    The transpose, not the inverse, because the probe's curvature belongs to the incident
+    beam (see the module docstring); the two agree only for a mirror. Both matrices are
+    divided by the square root of their absolute determinant, which removes the unknown
+    defocus magnitude, and the smaller Frobenius distance over the two signs of the
+    defocus is returned. A matching geometry gives a distance near the fit's own scatter;
+    a forward assumption on Bragg data gives about 2, the distance between a mirror and
+    the identity.
+
+    Raises:
+        ValueError: if a beam grazes the surface, where *geometry* predicts no matrix.
+    """
+    predicted = compute_exit_frame_transform(geometry).get_linear_matrix().T @ orientation.matrix
+    measured = transform.matrix_m2 / math.sqrt(abs(float(numpy.linalg.det(transform.matrix_m2))))
+    predicted /= math.sqrt(abs(float(numpy.linalg.det(predicted))))
+    return min(
+        float(numpy.linalg.norm(measured - predicted)),
+        float(numpy.linalg.norm(measured + predicted)),
     )
 
 

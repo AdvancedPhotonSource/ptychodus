@@ -30,25 +30,36 @@ import pytest
 
 from parallax_scan_fixtures import (
     DEPTH_OF_FOCUS_M,
+    METADATA,
     OBJECT_GEOMETRY,
+    PIXEL_GEOMETRY,
     PIXEL_SIZE_M,
     PROBE_GEOMETRY,
     WAVELENGTH_M,
     accumulate_scan,
     make_positions,
+    make_probe,
+    make_transmission,
     simulate_scan,
 )
 from ptychodus.api.accumulate import DiffractionMoments, compute_diffraction_moments
+from ptychodus.api.affine import AffineTransform
 from ptychodus.api.parallax import (
     DetectorOrientation,
     ParallaxEstimate,
     ParallaxTransform,
+    compute_geometry_mismatch,
     estimate_defocus_from_parallax,
     estimate_parallax_transform,
 )
 from ptychodus.api.preprocess.diffraction import BinningStep, DiffractionPrepPipeline
-from ptychodus.api.probe import ProbeGeometry
+from ptychodus.api.object import Object, ObjectCenter
+from ptychodus.api.probe import ProbeEnsemble, ProbeGeometry
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
+from ptychodus.api.product import Product
+from ptychodus.api.scattering.frame import compute_exit_frame_transform
+from ptychodus.api.scattering.geometry import ScatteringGeometry
+from ptychodus.api.simulate.diffraction import generate_scattering_data
 
 
 def _estimate(
@@ -297,3 +308,72 @@ def test_a_matrix_fit_needs_four_bins() -> None:
             photon_wavelength_m=WAVELENGTH_M,
             minimum_bins=3,
         )
+
+
+# --- scattering geometry -----------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    'geometry',
+    [
+        ScatteringGeometry(two_theta_deg=47.35, incidence_angle_deg=23.675),  # a mirror
+        ScatteringGeometry(two_theta_deg=45.0, incidence_angle_deg=90.0),  # cos 2θ along x
+        ScatteringGeometry(two_theta_deg=30.0, detector_gamma_deg=8.0, incidence_angle_deg=80.0),
+    ],
+)
+def test_the_parallax_of_an_off_axis_scan_matches_its_geometry(
+    geometry: ScatteringGeometry,
+) -> None:
+    probe = make_probe(2.0e-3)
+    product = Product(
+        metadata=METADATA,
+        probe_positions=ProbePositionSequence(make_positions()),
+        probes=ProbeEnsemble(
+            array=probe.get_array(), opr_weights=None, pixel_geometry=PIXEL_GEOMETRY
+        ),
+        object_=Object(
+            array=make_transmission(featureless=False)[numpy.newaxis],
+            pixel_geometry=PIXEL_GEOMETRY,
+            center=ObjectCenter(x_m=0.0, y_m=0.0),
+        ),
+        losses=[],
+    )
+    data, _ = generate_scattering_data(product, geometry, numpy.random.default_rng(0))
+    moments = compute_diffraction_moments(
+        numpy.array(data.get_indexes()),
+        numpy.array(data.get_patterns()),
+        bad_pixels=numpy.array(data.get_bad_pixels()),
+        binning=BinningStep(bin_size_x=2, bin_size_y=2),
+    )
+    assert moments is not None
+    transform = estimate_parallax_transform(
+        moments,
+        ProbePositionSequence(make_positions()),
+        OBJECT_GEOMETRY,
+        PROBE_GEOMETRY,
+        photon_wavelength_m=WAVELENGTH_M,
+    )
+    assert transform is not None
+
+    matching = compute_geometry_mismatch(transform, geometry)
+    forward = compute_geometry_mismatch(transform, ScatteringGeometry())
+
+    assert transform.is_reflection is geometry.is_reflection
+    assert matching < 0.1
+    assert forward > 3.0 * matching
+
+    if geometry.detector_gamma_deg != 0.0:
+        # Sheared, the transpose differs from both the inverse and the map itself; the
+        # parallax follows the transpose.
+        scan_to_exit = compute_exit_frame_transform(geometry)
+        assert compute_geometry_mismatch(transform, geometry) < 0.5 * min(
+            _mismatch_from(transform, scan_to_exit.inverted()),
+            _mismatch_from(transform, scan_to_exit),
+        )
+
+
+def _mismatch_from(transform: ParallaxTransform, predicted: AffineTransform) -> float:
+    matrix = numpy.array([[predicted.a00, predicted.a01], [predicted.a10, predicted.a11]])
+    matrix /= numpy.sqrt(abs(numpy.linalg.det(matrix)))
+    measured = transform.matrix_m2 / numpy.sqrt(abs(numpy.linalg.det(transform.matrix_m2)))
+    return float(min(numpy.linalg.norm(measured - matrix), numpy.linalg.norm(measured + matrix)))

@@ -5,10 +5,11 @@ import math
 
 import numpy.typing
 import numpy
-from scipy.interpolate import PchipInterpolator
+from scipy.ndimage import affine_transform, map_coordinates
 
 from ptychodus.api.typing import (
     BooleanArrayType,
+    ComplexArrayType,
     InexactArrayType,
     IntegerArrayType,
     RealArrayType,
@@ -18,7 +19,8 @@ __all__ = [
     'BarycentricArrayInterpolator',
     'interpolate_at_indexes',
     'lerp',
-    'resample_along_axis',
+    'resample_complex_at',
+    'resample_complex_on_grid',
 ]
 
 
@@ -72,26 +74,99 @@ def lerp(
     return (1.0 - frac) * lower + frac * upper
 
 
-def resample_along_axis(
-    values: RealArrayType, indexes: RealArrayType, *, axis: int, fill_value: float
-) -> RealArrayType:
-    """Interpolate *values* along *axis* at fractional *indexes*, filling outside the source.
+def _grid_scale_and_offset(indexes: RealArrayType) -> tuple[float, float]:
+    """The scale and offset of a uniform 1-D index grid, ``indexes[i] = scale * i + offset``."""
+    scale = float(indexes[1] - indexes[0]) if indexes.size > 1 else 1.0
+    return scale, float(indexes[0])
 
-    The interpolant is monotone cubic (PCHIP): an unconstrained cubic overshoots, and an
-    overshoot is structure the source does not contain. Everything beyond the source ends
-    up as ``fill_value``, substituted here rather than left as the NaN the interpolator
-    produces, since a NaN would spread along the whole line of any later pass.
 
-    Two of these resample a plane onto an axis-aligned target grid, which separates into
-    one pass per axis because such a grid is a tensor product. Scattered target points --
-    a rotation or a shear -- do not separate and need a different interpolator entirely.
-    Real data only: interpolate the real and imaginary parts of a complex array
-    separately.
+def resample_complex_on_grid(
+    array: ComplexArrayType,
+    rows: RealArrayType,
+    columns: RealArrayType,
+    *,
+    order: int,
+    fill_value: complex = 0j,
+) -> ComplexArrayType:
+    """Resample the last two axes of a complex array onto an axis-aligned grid.
+
+    *rows* and *columns* are the fractional source indexes each target row and column
+    samples. Both must be uniform -- a pitch change, a shift, a crop or a pad -- so the
+    target is a tensor product of two 1-D grids and every leading slice (layers, modes) is
+    one diagonal :func:`scipy.ndimage.affine_transform`, with no coordinate arrays built.
+    The axis-aligned counterpart of :func:`resample_complex_at`, which takes scattered
+    points.
+
+    The real and imaginary parts are each a B-spline of *order*, so the result is linear in
+    the field: it commutes with a global phase, and resampled probe modes still mix by
+    their OPR weights as the originals do. A cubic spline overshoots by a few percent at a
+    hard edge, which a band-limited field does not have.
+
+    The spline is fitted with the source mirrored at its edge, and a target point whose
+    source index lies outside ``[0, N - 1]`` on either axis takes *fill_value* exactly. A
+    spline's prefilter is not local, so fitting it through the fill instead would leak the
+    fill several pixels into the field; mirroring keeps the interior from ever seeing it.
+
+    A gather only: it has no adjoint.
     """
-    interpolated = PchipInterpolator(
-        numpy.arange(float(values.shape[axis])), values, axis=axis, extrapolate=False
-    )(indexes)
-    return numpy.where(numpy.isnan(interpolated), fill_value, interpolated)
+    row_scale, row_offset = _grid_scale_and_offset(rows)
+    column_scale, column_offset = _grid_scale_and_offset(columns)
+    output_shape = (rows.size, columns.size)
+    outside = ~numpy.outer(
+        (rows >= 0.0) & (rows <= array.shape[-2] - 1),
+        (columns >= 0.0) & (columns <= array.shape[-1] - 1),
+    )
+    resampled = numpy.empty((*array.shape[:-2], *output_shape), dtype=numpy.result_type(array, 1j))
+
+    for index in numpy.ndindex(array.shape[:-2]):
+        plane = array[index]
+        parts = []
+
+        for values in (plane.real, plane.imag):
+            parts.append(
+                affine_transform(
+                    values,
+                    numpy.array([row_scale, column_scale]),
+                    offset=(row_offset, column_offset),
+                    output_shape=output_shape,
+                    order=order,
+                    mode='mirror',
+                )
+            )
+
+        resampled[index] = numpy.where(outside, fill_value, parts[0] + 1j * parts[1])
+
+    return resampled
+
+
+def resample_complex_at(
+    array: ComplexArrayType,
+    row: RealArrayType,
+    column: RealArrayType,
+    *,
+    order: int,
+    mode: str = 'grid-constant',
+) -> ComplexArrayType:
+    """Sample a 2D complex array at fractional ``(row, column)`` indexes, as zero beyond its edge.
+
+    The real and imaginary parts are each a B-spline of *order* through
+    :func:`scipy.ndimage.map_coordinates`. That makes the result linear in the field: it
+    commutes with a global phase, so it does not depend on the arbitrary phase a
+    reconstruction settles on, and resampled probe modes still mix by their OPR weights as
+    the originals do. *row* and *column* may have any shape; the result takes it.
+
+    *mode* is how the edge is treated. ``'grid-constant'`` interpolates toward the zeros
+    beyond the array, so a field fades out across the edge -- over a pixel at order 1, and
+    over a geometrically decaying tail of the spline's prefilter at higher orders.
+    ``'constant'`` interpolates only within the array and returns exactly zero outside it.
+
+    A gather only: it has no adjoint. Where an operator's transpose must be exact, use
+    :class:`BarycentricArrayInterpolator`.
+    """
+    coordinates = (row, column)
+    real = map_coordinates(array.real, coordinates, order=order, mode=mode, cval=0.0)
+    imaginary = map_coordinates(array.imag, coordinates, order=order, mode=mode, cval=0.0)
+    return real + 1j * imaginary
 
 
 def interpolate_at_indexes(

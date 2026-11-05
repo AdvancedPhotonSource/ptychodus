@@ -2,6 +2,7 @@ import logging
 
 from ptychodus.api.diffraction import Polarization
 from ptychodus.api.product import Product, ProductFileReader
+from ptychodus.api.scattering.geometry import ScatteringGeometry
 
 from ..diffraction import AssembledDiffractionDataset
 from ..plugins import PluginChooser
@@ -83,6 +84,7 @@ class ProductRepositoryItemFactory:
         polarization: Polarization | None = None,
         far_field: bool | None = None,
         i0_photons_per_count: float | None = None,
+        scattering_geometry: ScatteringGeometry | None = None,
         dataset: AssembledDiffractionDataset | None = None,
     ) -> ProductRepositoryItem:
         metadata_item = MetadataRepositoryItem(
@@ -101,9 +103,10 @@ class ProductRepositoryItemFactory:
             polarization=polarization,
             far_field=far_field,
             i0_photons_per_count=i0_photons_per_count,
+            scattering_geometry=scattering_geometry,
         )
 
-        scan_item = self._scan_item_factory.create()
+        scan_item = self._scan_item_factory.create(metadata_item=metadata_item)
         geometry = ProductGeometryProvider(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create(geometry)
@@ -145,9 +148,12 @@ class ProductRepositoryItemFactory:
             polarization=product.metadata.polarization,
             far_field=product.metadata.far_field,
             i0_photons_per_count=product.metadata.i0_photons_per_count,
+            scattering_geometry=product.metadata.scattering_geometry,
         )
 
-        scan_item = self._scan_item_factory.create(product.probe_positions)
+        scan_item = self._scan_item_factory.create(
+            product.probe_positions, metadata_item=metadata_item
+        )
         geometry = ProductGeometryProvider(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create(geometry, product.probes)
@@ -172,7 +178,7 @@ class ProductRepositoryItemFactory:
         ProductRepositoryItem.copy_contents_from once the source dataset finishes
         loading."""
         metadata_item = MetadataRepositoryItem(self._settings, self._repository, name=name)
-        scan_item = self._scan_item_factory.create()
+        scan_item = self._scan_item_factory.create(metadata_item=metadata_item)
         geometry = ProductGeometryProvider(metadata_item, scan_item)
         probe_item = self._probe_item_factory.create(geometry)
         object_item = self._object_item_factory.create(
@@ -210,7 +216,7 @@ class ProductRepositoryItemFactory:
         metadata_item = MetadataRepositoryItem(
             self._settings, self._repository, name=resolve_product_name('', dataset)
         )
-        scan_item = self._scan_item_factory.create_from_settings()
+        scan_item = self._scan_item_factory.create_from_settings(metadata_item=metadata_item)
         geometry = ProductGeometryProvider(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
         has_diffraction_data = dataset is not None

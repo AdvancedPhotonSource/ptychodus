@@ -13,6 +13,7 @@ import numpy
 
 from .files import FileReader, FileWriter
 from .geometry import ImageExtent, PixelGeometry
+from .scattering.geometry import ScatteringGeometry
 
 BadPixels: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.bool]]
 PixelMap: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.floating]]
@@ -243,9 +244,19 @@ class DiffractionMetadata:
     exposure_time_s: float | None = None
     tomography_angle_deg: float | None = None
     tilt_angle_deg: float | None = None
+    """Sample tilt relative to the beam in an XMCD projection, as APS 4-ID POLAR records it.
+
+    It sets which magnetization component the XMCD contrast is sensitive to. ptychodus
+    stores and persists it, but no computation reads it. It belongs to a transmission
+    measurement and is unrelated to `scattering_geometry`: it neither moves the detector
+    nor changes the frame the probe positions are in. A Bragg or Laue sample's orientation
+    is ``scattering_geometry.incidence_angle_deg``.
+    """
     polarization: Polarization | None = None
     sample_name: str | None = None
     file_path: Path | None = None
+    scattering_geometry: ScatteringGeometry | None = None
+    """Exit-beam and surface directions the instrument recorded, or None if it recorded none."""
 
     @property
     def nbytes(self) -> int:
@@ -265,6 +276,7 @@ class DiffractionMetadata:
         sz += getsizeof(self.polarization)
         sz += getsizeof(self.sample_name)
         sz += getsizeof(self.file_path)
+        sz += getsizeof(self.scattering_geometry)
         return sz
 
     @classmethod

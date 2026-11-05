@@ -9,6 +9,7 @@ from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider, compute
 from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider
 from ptychodus.api.propagate import ProductGeometry, compute_product_geometry
 from ptychodus.api.probe_positions import ProbePosition
+from ptychodus.api.scattering.geometry import ScatteringGeometry
 
 from ..diffraction import AssembledDiffractionDataset
 from ..observer import Observable, Observer
@@ -140,6 +141,10 @@ class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Obs
     @property
     def focus_object_distance_m(self) -> float:
         return self._metadata_item.focus_object_distance_m.get_value()
+
+    @property
+    def scattering_geometry(self) -> ScatteringGeometry:
+        return self._metadata_item.get_scattering_geometry()
 
     def _get_detector_extent(self) -> ImageExtent:
         # No dataset bound yet: degrade to a zero-sized extent so downstream

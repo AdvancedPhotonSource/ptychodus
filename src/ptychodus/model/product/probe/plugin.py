@@ -8,6 +8,7 @@ from typing import Any, TypeVar
 import numpy
 from pydantic import BaseModel
 
+from ptychodus.api.scattering.frame import transform_probe_to_exit_frame
 from ptychodus.api.plugins import Plugin, PluginCatalog
 from ptychodus.api.probe import ProbeEnsemble, ProbeExtent, ProbeGeometryProvider
 from ptychodus.api.simulate.probe import (
@@ -221,6 +222,15 @@ class PluginProbeBuilder(ProbeEnsembleBuilder):
             description.key: self.parameters()[description.name] for description in self._described
         }
         options = restore(self._defaults, self._described, held)
-        return self._rescale_to_photon_count(
+        probes = self._rescale_to_photon_count(
             self._generator.generate(options, geometry_provider), geometry_provider
+        )
+
+        if self._generator.reads_diffraction_data:
+            # Estimated from the patterns, so already in the exit frame they define.
+            return probes
+
+        # A model probe describes the beam's cross section; carry it into the exit frame.
+        return transform_probe_to_exit_frame(
+            probes, geometry_provider.scattering_geometry, far_field=geometry_provider.far_field
         )

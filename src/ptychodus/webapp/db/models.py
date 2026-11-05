@@ -137,6 +137,11 @@ class Product(Base):
     tomography_angle_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
     tilt_angle_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
     polarization: Mapped[str | None] = mapped_column(String, nullable=True)
+    two_theta_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    detector_gamma_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    incidence_angle_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Derived from the angles at ingest, so it can be filtered on.
+    scattering_regime: Mapped[str | None] = mapped_column(String, nullable=True)
     object_layers: Mapped[int | None] = mapped_column(Integer, nullable=True)
     object_height_px: Mapped[int | None] = mapped_column(Integer, nullable=True)
     object_width_px: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -178,6 +183,7 @@ class Product(Base):
 
     __table_args__ = (
         Index('ix_product_photon_energy_eV', 'photon_energy_eV'),
+        Index('ix_product_scattering_regime', 'scattering_regime'),
         Index('ix_product_ingest_state', 'ingest_state'),
     )
 

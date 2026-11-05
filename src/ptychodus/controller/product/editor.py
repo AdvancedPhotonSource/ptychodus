@@ -24,6 +24,7 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.constants import LengthUnit
 from ptychodus.api.diffraction import Polarization
 from ptychodus.api.parallax import ParallaxEstimate
+from ptychodus.api.scattering.geometry import ScatteringIssue, find_scattering_issues
 from ptychodus.model.observer import Observable, Observer
 
 from ...model.diffraction import (
@@ -63,7 +64,7 @@ class _Row(Enum):
     I0_PHOTONS_PER_COUNT = ('I0 Calibration [photons/count]', True)
     MASS_ATTENUATION_M2_PER_KG = ('Mass Attenuation [m\u00b2/kg]', True)
     TOMOGRAPHY_ANGLE_DEG = ('Tomography Angle [deg]', True)
-    TILT_ANGLE_DEG = ('Tilt Angle [deg]', True)
+    TILT_ANGLE_DEG = ('XMCD Tilt Angle [deg]', True)
     POLARIZATION = ('Polarization', True)
     FRESNEL_NUMBER = ('Fresnel Number', False)
     DETECTOR_NUMERICAL_APERTURE = ('Detector Numerical Aperture', False)
@@ -73,6 +74,10 @@ class _Row(Enum):
     DIFFRACTION_DATASET = ('Diffraction Dataset', True)
     FOCUS_OBJECT_DISTANCE_MM = ('Focus-Object Distance [mm]', True)
     FAR_FIELD = ('Far Field', True)
+    TWO_THETA_DEG = ('Two Theta [deg]', True)
+    DETECTOR_GAMMA_DEG = ('Detector Gamma [deg]', True)
+    INCIDENCE_ANGLE_DEG = ('Incidence Angle [deg]', True)
+    SCATTERING_GEOMETRY = ('Scattering Geometry', False)
 
     def __init__(self, label: str, editable: bool) -> None:
         self.label = label
@@ -210,9 +215,38 @@ class ProductPropertyTableModel(QAbstractTableModel):
                                 return f'{LengthUnit.MILLIMETER.convert(distance_m):.4g}'
                             case _Row.FAR_FIELD:
                                 return FAR_FIELD_CHOICES[metadata_item.far_field.get_value()]
+                            case _Row.TWO_THETA_DEG:
+                                return f'{metadata_item.two_theta_deg.get_value():.4g}'
+                            case _Row.DETECTOR_GAMMA_DEG:
+                                return f'{metadata_item.detector_gamma_deg.get_value():.4g}'
+                            case _Row.INCIDENCE_ANGLE_DEG:
+                                return f'{metadata_item.incidence_angle_deg.get_value():.4g}'
+                            case _Row.SCATTERING_GEOMETRY:
+                                return self._describe_scattering_geometry()
+            elif role == Qt.ItemDataRole.ToolTipRole:
+                if _Row.from_index(index.row()) == _Row.SCATTERING_GEOMETRY:
+                    issues = self._find_scattering_issues()
+                    return '\n'.join(issue.describe() for issue in issues) or None
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
                     return self._editable_item_brush
+
+    def _find_scattering_issues(self) -> tuple[ScatteringIssue, ...]:
+        metadata_item = self._product_item.get_metadata_item()
+        return find_scattering_issues(
+            metadata_item.get_scattering_geometry(),
+            far_field=metadata_item.far_field.get_value(),
+            num_object_layers=self._product_item.get_object_item().get_num_layers(),
+        )
+
+    def _describe_scattering_geometry(self) -> str:
+        """The regime and propagation, e.g. 'Bragg, far field', flagged when unsupported."""
+        metadata_item = self._product_item.get_metadata_item()
+        regime = metadata_item.get_scattering_geometry().regime
+        propagation = FAR_FIELD_CHOICES[metadata_item.far_field.get_value()].lower()
+        text = f'{regime.value.capitalize()}, {propagation}'
+        issues = self._find_scattering_issues()
+        return f'{text} \u2014 not supported (see tooltip)' if issues else text
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
         if index.isValid() and index.column() == _Col.VALUE and role == Qt.ItemDataRole.EditRole:
@@ -301,6 +335,23 @@ class ProductPropertyTableModel(QAbstractTableModel):
                         return False
 
                     metadata_item.far_field.set_value(text == FAR_FIELD_CHOICES[True])
+                    return True
+                case _Row.TWO_THETA_DEG | _Row.DETECTOR_GAMMA_DEG | _Row.INCIDENCE_ANGLE_DEG:
+                    # Positions follow: the positions item re-carries them into the new
+                    # exit frame as soon as the angle changes.
+                    try:
+                        angle_deg = float(value)
+                    except ValueError:
+                        return False
+
+                    match _Row.from_index(index.row()):
+                        case _Row.TWO_THETA_DEG:
+                            metadata_item.two_theta_deg.set_value(angle_deg)
+                        case _Row.DETECTOR_GAMMA_DEG:
+                            metadata_item.detector_gamma_deg.set_value(angle_deg)
+                        case _:
+                            metadata_item.incidence_angle_deg.set_value(angle_deg)
+
                     return True
 
         return False

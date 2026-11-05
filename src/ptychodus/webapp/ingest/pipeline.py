@@ -10,6 +10,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ptychodus.api.scattering.geometry import ScatteringGeometry
 from ptychodus.webapp.db import repositories as repo
 from ptychodus.webapp.db.base import IngestState
 from ptychodus.webapp.storage import h5_introspect
@@ -25,6 +26,19 @@ from ptychodus.api.storage import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _scattering_regime(h5: dict[str, Any]) -> str:
+    """Transmission, Bragg or Laue, from the angles; a file without them is forward."""
+    two_theta_deg = h5.get('two_theta_deg')
+    detector_gamma_deg = h5.get('detector_gamma_deg')
+    incidence_angle_deg = h5.get('incidence_angle_deg')
+    geometry = ScatteringGeometry(
+        two_theta_deg=0.0 if two_theta_deg is None else two_theta_deg,
+        detector_gamma_deg=0.0 if detector_gamma_deg is None else detector_gamma_deg,
+        incidence_angle_deg=90.0 if incidence_angle_deg is None else incidence_angle_deg,
+    )
+    return geometry.regime.value
 
 
 def _mtime(path: Path) -> datetime | None:
@@ -115,6 +129,10 @@ def _values_for_product(
         'tomography_angle_deg': h5.get('tomography_angle_deg'),
         'tilt_angle_deg': h5.get('tilt_angle_deg'),
         'polarization': h5.get('polarization'),
+        'two_theta_deg': h5.get('two_theta_deg'),
+        'detector_gamma_deg': h5.get('detector_gamma_deg'),
+        'incidence_angle_deg': h5.get('incidence_angle_deg'),
+        'scattering_regime': _scattering_regime(h5),
         'object_layers': obj_shape[0],
         'object_height_px': obj_shape[1],
         'object_width_px': obj_shape[2],

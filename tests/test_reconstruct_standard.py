@@ -8,6 +8,7 @@ module.
 
 from __future__ import annotations
 
+from pathlib import Path
 import argparse
 import logging
 
@@ -425,3 +426,124 @@ class TestNearFieldProbeGeometry:
         downstream = compute_magnification(1.0, +1.0e-3)
 
         assert upstream > downstream
+
+
+# --- scattering geometry ---------------------------------------------------------------
+
+
+class TestScatteringGeometry:
+    """Only the off-axis instruments offer the angles; elsewhere the geometry is forward."""
+
+    def test_only_26idc_and_34ide_offer_the_angles(self) -> None:
+        for name, profile in _profiles().items():
+            args = _defaults(profile)
+            offered = name in ('26idc', '34ide')
+
+            assert profile.offers_scattering_geometry is offered, name
+            assert hasattr(args, 'two_theta_deg') is offered, name
+
+    def test_the_command_line_wins_over_the_file(self) -> None:
+        from ptychodus.api.scattering.geometry import ScatteringGeometry
+
+        args = _defaults(_profiles()['26idc'])
+        args.two_theta_deg = 47.35
+        recorded = ScatteringGeometry(two_theta_deg=10.0, incidence_angle_deg=30.0)
+
+        geometry = rs._resolve_scattering_geometry(logger, args, recorded, _profiles()['26idc'])
+
+        assert geometry == ScatteringGeometry(two_theta_deg=47.35, incidence_angle_deg=30.0)
+
+    def test_nothing_said_is_forward(self) -> None:
+        from ptychodus.api.scattering.geometry import ScatteringGeometry
+
+        args = _defaults(_profiles()['34ide'])
+
+        assert (
+            rs._resolve_scattering_geometry(logger, args, None, _profiles()['34ide'])
+            == ScatteringGeometry()
+        )
+
+    def test_a_profile_without_the_switch_ignores_the_file(self) -> None:
+        from ptychodus.api.scattering.geometry import ScatteringGeometry
+
+        args = _defaults(_profiles()['2ide'])
+        recorded = ScatteringGeometry(two_theta_deg=10.0)
+
+        assert (
+            rs._resolve_scattering_geometry(logger, args, recorded, _profiles()['2ide'])
+            == ScatteringGeometry()
+        )
+
+    def test_prepare_only_writes_exit_frame_positions_and_the_geometry(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        from types import SimpleNamespace
+
+        from ptychodus.api.scattering.frame import compute_exit_frame_transform
+        from ptychodus.api.diffraction import SimpleDiffractionArray
+        from ptychodus.api.io import StandardFileLayout, load_product
+        from ptychodus.api.scattering.geometry import ScatteringGeometry
+
+        rng = numpy.random.default_rng(0)
+        num_patterns = 16
+        indexes = numpy.arange(num_patterns)
+        patterns = rng.poisson(50.0, size=(num_patterns, 64, 64)).astype(numpy.uint16)
+        dataset = make_dataset(
+            [SimpleDiffractionArray('scan', indexes, patterns)],
+            (64, 64),
+            pixel_geometry=PixelGeometry(width_m=DETECTOR_PIXEL_M, height_m=DETECTOR_PIXEL_M),
+        )
+        lab_positions = ProbePositionSequence(
+            [ProbePosition(index=int(i), x_m=(i % 4) * 5e-8, y_m=(i // 4) * 5e-8) for i in indexes]
+        )
+
+        def reader(result: object) -> SimpleNamespace:
+            return SimpleNamespace(read=lambda path: result)
+
+        registry = SimpleNamespace(
+            diffraction_file_readers=SimpleNamespace(
+                get_strategy_by_name=lambda name: reader(dataset)
+            ),
+            probe_position_file_readers=SimpleNamespace(
+                get_strategy_by_name=lambda name: reader(lab_positions)
+            ),
+        )
+        monkeypatch.setattr(rs.PluginRegistry, 'load_plugins', lambda: registry)
+        output = tmp_path / 'prepared'
+        monkeypatch.setattr(
+            'sys.argv',
+            [
+                'ptychodus-reconstruct-26idc',
+                '--diffraction-file',
+                str(tmp_path / 'scan_1_img_000000.tif'),
+                '--position-file',
+                str(tmp_path / '26idbSOFT_0001.mda'),
+                '--output-directory',
+                str(output),
+                '--photon-energy-eV',
+                '11200',
+                '--detector-distance-m',
+                '0.89',
+                '--two-theta-deg',
+                '47.35',
+                '--detector-gamma-deg',
+                '-0.27',
+                '--incidence-angle-deg',
+                '24.15',
+                '--prepare-only',
+            ],
+        )
+
+        assert rs.run_standard_reconstruction(_profiles()['26idc']) == 0
+
+        product = load_product(StandardFileLayout.PRODUCT.path(output))
+        geometry = ScatteringGeometry(47.35, -0.27, 24.15)
+        transform = compute_exit_frame_transform(geometry)
+
+        assert product.metadata.scattering_geometry == geometry
+
+        for stored, lab in zip(product.probe_positions, lab_positions):
+            expected = transform(lab)
+            assert stored.index == lab.index
+            assert stored.x_m == pytest.approx(expected.x_m, abs=1e-15)
+            assert stored.y_m == pytest.approx(expected.y_m, abs=1e-15)

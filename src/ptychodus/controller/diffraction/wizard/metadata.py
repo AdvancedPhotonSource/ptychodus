@@ -160,6 +160,18 @@ def _format_exposure_time(metadata: DiffractionMetadata) -> str:
     return '—' if exposure_time_s is None else f'{exposure_time_s * 1e3:.3f} ms'
 
 
+def _format_scattering_geometry(metadata: DiffractionMetadata) -> str:
+    geometry = metadata.scattering_geometry
+
+    if geometry is None:
+        return '—'
+
+    return (
+        f'2\u03b8 {geometry.two_theta_deg:g}\u00b0, \u03b3 {geometry.detector_gamma_deg:g}\u00b0, '
+        f'incidence {geometry.incidence_angle_deg:g}\u00b0 ({geometry.regime.value.capitalize()})'
+    )
+
+
 class OpenDatasetWizardMetadataViewController:
     def __init__(
         self,
@@ -259,6 +271,12 @@ class OpenDatasetWizardMetadataViewController:
                 is_present=lambda m: m.exposure_time_s is not None,
                 format_value=_format_exposure_time,
                 apply=self._apply_exposure_time,
+            ),
+            _MetadataRow(
+                name='Scattering Geometry',
+                is_present=lambda m: m.scattering_geometry is not None,
+                format_value=_format_scattering_geometry,
+                apply=self._apply_scattering_geometry,
             ),
         )
 
@@ -372,3 +390,12 @@ class OpenDatasetWizardMetadataViewController:
         exposure_time_s = metadata.exposure_time_s
         if exposure_time_s:
             self._product_settings.exposure_time_s.set_value(exposure_time_s)
+
+    # --- Scattering geometry ---
+
+    def _apply_scattering_geometry(self, metadata: DiffractionMetadata) -> None:
+        geometry = metadata.scattering_geometry
+        if geometry is not None:
+            self._product_settings.two_theta_deg.set_value(geometry.two_theta_deg)
+            self._product_settings.detector_gamma_deg.set_value(geometry.detector_gamma_deg)
+            self._product_settings.incidence_angle_deg.set_value(geometry.incidence_angle_deg)

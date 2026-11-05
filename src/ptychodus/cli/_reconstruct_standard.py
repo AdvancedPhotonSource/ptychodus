@@ -32,6 +32,7 @@ from pathlib import Path
 import numpy
 from ptychi.api.options.task import PtychographyTaskOptions
 
+from ptychodus.api.affine import AffineTransform, transform_probe_positions
 from ptychodus.api.assemble import (
     AssembledDiffractionData,
     DetectorCorrections,
@@ -60,6 +61,11 @@ from ptychodus.api.preprocess.noise import compute_robust_statistics
 from ptychodus.api.probe import Probe, ProbeGeometry, ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata, reconcile_defocus_distance_m
+from ptychodus.api.scattering.frame import (
+    resolve_exit_frame_transform,
+    transform_probe_to_exit_frame,
+)
+from ptychodus.api.scattering.geometry import ScatteringGeometry
 from ptychodus.api.simulate.object import generate_uniform_object
 from ptychodus.api.simulate.probe import (
     generate_average_pattern_probe,
@@ -138,6 +144,11 @@ class InstrumentProfile:
     # True adds the MAD and end-trim pattern filters. They are instrument-agnostic; this
     # only decides which instruments offer them.
     offers_pattern_filters: bool = False
+    # True adds --two-theta-deg, --detector-gamma-deg and --incidence-angle-deg, for an
+    # instrument that measures off the forward direction (Bragg or Laue). Positions and a
+    # zone-plate probe are then carried into the exit frame, and the product records the
+    # geometry. Elsewhere the geometry stays forward.
+    offers_scattering_geometry: bool = False
     # Diffraction readers by file suffix, for an instrument whose layouts differ by format;
     # a suffix not listed falls back to diffraction_reader.
     diffraction_readers_by_suffix: Mapping[str, str] = field(default_factory=dict)
@@ -366,6 +377,10 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
         default=None,
         help='Override the tomography angle in degrees.',
     )
+
+    if profile.offers_scattering_geometry:
+        _add_scattering_geometry_arguments(parser)
+
     add_ptychi_options_argument(parser)
     add_print_ptychi_options_argument(parser)
     mode = parser.add_mutually_exclusive_group()
@@ -386,6 +401,101 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
     )
     add_log_level_argument(parser)
     return parser
+
+
+def _add_scattering_geometry_arguments(parser: argparse.ArgumentParser) -> None:
+    group = parser.add_argument_group(
+        'scattering geometry',
+        'Off the forward direction (Bragg or Laue), the positions are carried into the exit '
+        'frame, where the detector records the Fourier transform of the sample projected '
+        'along the exit beam. Each angle defaults to the diffraction file, else forward. '
+        'See ptychodus.api.scattering.geometry.ScatteringGeometry for the conventions.',
+    )
+    group.add_argument(
+        '--two-theta-deg',
+        type=float,
+        default=None,
+        help='Detector arm angle about y, from the incident beam toward +x.',
+    )
+    group.add_argument(
+        '--detector-gamma-deg',
+        type=float,
+        default=None,
+        help='Exit-beam elevation out of the x-z plane, toward +y.',
+    )
+    group.add_argument(
+        '--incidence-angle-deg',
+        type=float,
+        default=None,
+        help='Angle between the incident beam and the sample surface, turning in the sense '
+        'of two-theta; 90 is normal incidence.',
+    )
+
+
+def _resolve_scattering_geometry(
+    logger: logging.Logger,
+    args: argparse.Namespace,
+    recorded: ScatteringGeometry | None,
+    profile: InstrumentProfile,
+) -> ScatteringGeometry:
+    """The geometry from the command line, then the diffraction file, then forward.
+
+    Forward is the ordinary case, not a guess, so falling back to it is not a warning.
+    An instrument that does not offer the flags is always forward.
+    """
+    forward = ScatteringGeometry()
+
+    if not profile.offers_scattering_geometry:
+        return forward
+
+    values: dict[str, float] = {}
+
+    for name, flag in (
+        ('two_theta_deg', '--two-theta-deg'),
+        ('detector_gamma_deg', '--detector-gamma-deg'),
+        ('incidence_angle_deg', '--incidence-angle-deg'),
+    ):
+        override = getattr(args, name)
+
+        if override is not None:
+            logger.info('%s: %g (from %s)', name, override, flag)
+            values[name] = float(override)
+        elif recorded is not None:
+            values[name] = getattr(recorded, name)
+            logger.info('%s: %g (from the diffraction file)', name, values[name])
+        else:
+            values[name] = getattr(forward, name)
+
+    return ScatteringGeometry(**values)
+
+
+def _log_scattering_geometry(
+    logger: logging.Logger,
+    geometry: ScatteringGeometry,
+    transform: AffineTransform,
+    probe_geometry: ProbeGeometry,
+) -> None:
+    """One line saying what the geometry does to the positions and the surface sampling."""
+    if geometry.is_forward:
+        return
+
+    column_axis, _ = geometry.get_detector_axes()
+    trace, _ = geometry.get_surface_axes()
+    foreshortening = abs(float(column_axis @ trace))
+    incidence_sine = abs(geometry.get_incident_sine())
+    logger.info(
+        '%s geometry %s: positions map by [[%+.6f, %+.6f], [%+.6f, %+.6f]]; one exit-frame '
+        'pixel spans %.4g m of surface along its in-plane axis, and the footprint is '
+        'stretched %.3gx along it.',
+        geometry.regime.value.capitalize(),
+        geometry,
+        transform.a00,
+        transform.a01,
+        transform.a10,
+        transform.a11,
+        probe_geometry.pixel_width_m / foreshortening if foreshortening > 0.0 else math.inf,
+        1.0 / incidence_sine if incidence_sine > 0.0 else math.inf,
+    )
 
 
 def _add_pattern_filter_arguments(parser: argparse.ArgumentParser) -> None:
@@ -672,6 +782,7 @@ def _build_initial_probe(
     far_field: bool,
     focus_object_distance_m: float,
     probe_photon_count: float,
+    scattering_geometry: ScatteringGeometry,
 ) -> Probe:
     """The probe the reconstruction starts from: a warm start, a zone plate, or the data.
 
@@ -680,6 +791,9 @@ def _build_initial_probe(
     refined against. A warm start is left at the intensity it was reconstructed at:
     rescaling it would decouple it from a matching object, because the data constrains
     the product of the two and not either alone.
+
+    Off axis, a zone-plate probe describes the beam's cross section and is carried into
+    the exit frame. A warm start and a probe estimated from the patterns are already in it.
     """
     if args.probe_file is not None:
         logger.info('Reading the initial probe from %s', args.probe_file)
@@ -703,7 +817,7 @@ def _build_initial_probe(
         _warn_unused_probe_propagation(logger, args, '--fzp-preset')
         logger.info('Simulating the initial probe from zone plate preset "%s"', args.fzp_preset)
         zone_plate = registry.fresnel_zone_plates.get_strategy_by_name(args.fzp_preset)
-        return rescale_probe_intensity(
+        zone_plate_probe = rescale_probe_intensity(
             generate_fresnel_zone_plate_probe(
                 probe_geometry,
                 zone_plate,
@@ -717,6 +831,9 @@ def _build_initial_probe(
             ),
             probe_photon_count,
         )
+        return transform_probe_to_exit_frame(
+            ProbeEnsemble.from_probe(zone_plate_probe), scattering_geometry, far_field=far_field
+        ).get_probe_no_opr()
 
     # No zone-plate preset applies, so the cold start comes from the data:
     # back-propagating the mean pattern estimates the probe without asserting an
@@ -964,6 +1081,17 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
 
         num_patterns = assembled_data.get_num_patterns()
 
+    # After the filters, which read the positions' I0 in whatever frame they arrive in.
+    scattering_geometry = _resolve_scattering_geometry(
+        logger, args, metadata.scattering_geometry, profile
+    )
+    exit_transform = resolve_exit_frame_transform(scattering_geometry, far_field=far_field)
+
+    if exit_transform != AffineTransform.create_identity():
+        positions = ProbePositionSequence(
+            list(transform_probe_positions(positions, exit_transform))
+        )
+
     photon_wavelength_m = energy_eV_to_wavelength_m(photon_energy_eV)
     # Keyed off the declaration rather than off a magnification of one: a near-field
     # scan with no focusing optic is a parallel beam at M = 1, and sampling that through
@@ -984,6 +1112,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             magnification=magnification,
         )
     logger.info('Probe geometry: %s', probe_geometry)
+    _log_scattering_geometry(logger, scattering_geometry, exit_transform, probe_geometry)
 
     # Resolved before the probe is built, because a generated probe is normalized to it.
     incident_beam = estimate_incident_beam_from_assembled_data(
@@ -1008,6 +1137,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         far_field=far_field,
         focus_object_distance_m=focus_object_distance_m,
         probe_photon_count=probe_photon_count,
+        scattering_geometry=scattering_geometry,
     )
 
     if args.num_probe_modes > 1:
@@ -1049,6 +1179,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
                 0.0 if args.tomography_angle_deg is None else float(args.tomography_angle_deg)
             ),
             i0_photons_per_count=args.i0_photons_per_count,
+            scattering_geometry=scattering_geometry,
         ),
         probe_positions=positions,
         probes=probe_ensemble,

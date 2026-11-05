@@ -140,6 +140,8 @@ def introspect_product(path: Path) -> dict[str, Any]:
         probe_photon_count, exposure_time_s, i0_photons_per_count,
         mass_attenuation_m2_per_kg, tomography_angle_deg, tilt_angle_deg,
         polarization, far_field
+      * two_theta_deg, detector_gamma_deg, incidence_angle_deg: the scattering
+        geometry, None in a file that predates it
       * object_shape:        tuple[int, int, int] | None — (layers, h, w)
       * object_pixel_width_m, object_pixel_height_m: float | None
       * probe_shape:         tuple[int, int, int] | None — (incoherent modes, h, w)
@@ -254,6 +256,9 @@ def introspect_product(path: Path) -> dict[str, Any]:
                 'tomography_angle_deg': _root_attr(ProductFileKeys.TOMOGRAPHY_ANGLE, float),
                 'tilt_angle_deg': _root_attr(ProductFileKeys.TILT_ANGLE, float),
                 'polarization': _root_str_attr(ProductFileKeys.POLARIZATION),
+                'two_theta_deg': _root_attr(ProductFileKeys.TWO_THETA, float),
+                'detector_gamma_deg': _root_attr(ProductFileKeys.DETECTOR_GAMMA, float),
+                'incidence_angle_deg': _root_attr(ProductFileKeys.INCIDENCE_ANGLE, float),
                 'object_shape': object_shape,
                 'object_pixel_width_m': object_pixel_width_m,
                 'object_pixel_height_m': object_pixel_height_m,

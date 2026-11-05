@@ -51,6 +51,9 @@ def test_introspect_product(tmp_path: Path) -> None:
         f.attrs['tomography_angle_deg'] = 30.0
         f.attrs['tilt_angle_deg'] = 12.5
         f.attrs['polarization'] = 'left_circular'
+        f.attrs['two_theta_deg'] = 47.35
+        f.attrs['detector_gamma_deg'] = -0.27
+        f.attrs['incidence_angle_deg'] = 24.15
         obj = f.create_dataset('object', data=np.zeros((2, 32, 48), dtype=np.complex64))
         obj.attrs['pixel_width_m'] = 1e-9
         obj.attrs['pixel_height_m'] = 1e-9
@@ -71,6 +74,22 @@ def test_introspect_product(tmp_path: Path) -> None:
     assert result['tomography_angle_deg'] == 30.0
     assert result['tilt_angle_deg'] == 12.5
     assert result['polarization'] == 'left_circular'
+    assert result['two_theta_deg'] == pytest.approx(47.35)
+    assert result['detector_gamma_deg'] == pytest.approx(-0.27)
+    assert result['incidence_angle_deg'] == pytest.approx(24.15)
+
+
+def test_a_product_without_scattering_angles_ingests_as_transmission() -> None:
+    from ptychodus.webapp.ingest.pipeline import _scattering_regime
+
+    assert _scattering_regime({}) == 'transmission'
+    assert (
+        _scattering_regime(
+            {'two_theta_deg': 47.35, 'detector_gamma_deg': -0.27, 'incidence_angle_deg': 24.15}
+        )
+        == 'bragg'
+    )
+    assert _scattering_regime({'two_theta_deg': 57.42, 'incidence_angle_deg': 90.0}) == 'laue'
 
 
 def test_introspect_fluorescence(tmp_path: Path) -> None:

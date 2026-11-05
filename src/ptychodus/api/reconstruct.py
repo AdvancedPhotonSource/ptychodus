@@ -38,6 +38,7 @@ from .probe import ProbeEnsemble
 from .probe_positions import ProbePositionSequence, ProbePosition
 from .product import LossValue, Product
 from .propagate import compute_full_aperture_fresnel_number
+from .scattering.geometry import find_scattering_issues
 from .spawn import run_subprocess
 from .typing import RealArrayType
 
@@ -65,6 +66,7 @@ __all__ = [
     'TrainingDataFileWriter',
     'prepare_reconstruct_input',
     'warn_if_propagation_regime_disagrees',
+    'warn_if_scattering_geometry_unsupported',
 ]
 
 logger = logging.getLogger(__name__)
@@ -766,6 +768,8 @@ def prepare_reconstruct_input(
     if pattern_indexes.size == 0:
         raise ValueError('Cannot prepare reconstruct input from empty diffraction dataset.')
 
+    warn_if_scattering_geometry_unsupported(product)
+
     pattern_keep = numpy.fromiter(
         (index_filter(int(i)) for i in pattern_indexes),
         dtype=numpy.bool,
@@ -891,6 +895,25 @@ def prepare_reconstruct_input(
         background=assembled_data.get_background(),
         flat_field=assembled_data.get_flat_field(),
     )
+
+
+def warn_if_scattering_geometry_unsupported(product: Product) -> None:
+    """Log a warning for each way the product's geometry falls outside the exit-frame model.
+
+    A transmission reconstructor reconstructs an off-axis product correctly only in the
+    exit frame, which needs far field, a single-slice object and beams crossing the
+    surface at a finite angle (:func:`ptychodus.api.scattering.geometry.find_scattering_issues`).
+    The reconstruction still runs; the warnings say what it will get wrong. A forward
+    geometry logs nothing.
+    """
+    geometry = product.metadata.scattering_geometry
+
+    for issue in find_scattering_issues(
+        geometry,
+        far_field=product.metadata.far_field,
+        num_object_layers=product.object_.num_layers,
+    ):
+        logger.warning('%s geometry %s: %s', geometry.regime, geometry, issue.describe())
 
 
 def warn_if_propagation_regime_disagrees(

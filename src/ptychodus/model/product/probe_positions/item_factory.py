@@ -8,6 +8,7 @@ from .builder import FromMemoryProbePositionsBuilder
 from .builder_factory import ProbePositionsBuilderFactory
 from .item import ProbePositionsRepositoryItem
 from .settings import ProbePositionsSettings
+from ..metadata import MetadataRepositoryItem
 
 logger = logging.getLogger(__name__)
 
@@ -53,21 +54,43 @@ class ProbePositionsRepositoryItemFactory:
             )
 
     def create(
-        self, position_seq: ProbePositionSequence | None = None
+        self,
+        position_seq: ProbePositionSequence | None = None,
+        *,
+        metadata_item: MetadataRepositoryItem | None = None,
     ) -> ProbePositionsRepositoryItem:
+        """An item over the default builder, or over *position_seq* in the exit frame.
+
+        *position_seq* is in the exit frame of *metadata_item*'s geometry, as a product's
+        positions are, and is taken back to the lab frame once.
+        """
         if position_seq is None:
-            builder = self._builder_factory.create_default()
-        else:
-            self._warn_if_conditioning_ignored()
-            builder = FromMemoryProbePositionsBuilder(self._rng, self._settings, position_seq)
+            return ProbePositionsRepositoryItem(
+                self._rng,
+                self._settings,
+                self._builder_factory.create_default(),
+                metadata_item=metadata_item,
+            )
 
-        return ProbePositionsRepositoryItem(self._rng, self._settings, builder)
+        self._warn_if_conditioning_ignored()
+        item = ProbePositionsRepositoryItem(
+            self._rng,
+            self._settings,
+            FromMemoryProbePositionsBuilder(self._rng, self._settings, ProbePositionSequence()),
+            metadata_item=metadata_item,
+        )
+        item.assign(position_seq)
+        return item
 
-    def create_from_settings(self) -> ProbePositionsRepositoryItem:
+    def create_from_settings(
+        self, *, metadata_item: MetadataRepositoryItem | None = None
+    ) -> ProbePositionsRepositoryItem:
         try:
             builder = self._builder_factory.create_from_settings()
         except Exception as exc:
             logger.exception(''.join(exc.args))
             builder = self._builder_factory.create_default()
 
-        return ProbePositionsRepositoryItem(self._rng, self._settings, builder)
+        return ProbePositionsRepositoryItem(
+            self._rng, self._settings, builder, metadata_item=metadata_item
+        )

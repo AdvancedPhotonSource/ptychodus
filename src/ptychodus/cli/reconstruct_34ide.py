@@ -69,6 +69,7 @@ PROFILE = InstrumentProfile(
     default_detector_distance_m=1.04,
     default_detector_pixel_size_m=7.5e-05,
     default_bad_pixels_reader='APS_34IDE_Bad_Pixels',
+    offers_scattering_geometry=True,
 )
 
 

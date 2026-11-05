@@ -9,6 +9,7 @@ from sqlalchemy import exists, select
 
 from ptychodus.api.io import load_product
 from ptychodus.api.product import Product as ProductAggregate
+from ptychodus.api.scattering.geometry import ScatteringRegime
 
 from ptychodus.webapp.db import repositories as repo
 from ptychodus.webapp.db.base import IngestState
@@ -34,8 +35,11 @@ async def list_product(
     ingest_state: IngestState | None = None,
     photon_energy_eV_min: float | None = Query(None, alias='photon_energy_eV_min'),  # noqa: N803
     photon_energy_eV_max: float | None = Query(None, alias='photon_energy_eV_max'),  # noqa: N803
+    scattering_regime: ScatteringRegime | None = None,
 ) -> Page[ProductRead]:
     where = []
+    if scattering_regime is not None:
+        where.append(Product.scattering_regime == scattering_regime.value)
     if ingest_state is not None:
         where.append(Product.ingest_state == ingest_state)
     if photon_energy_eV_min is not None:

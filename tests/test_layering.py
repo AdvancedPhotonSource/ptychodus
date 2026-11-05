@@ -104,3 +104,24 @@ def test_relative_imports_that_climb_out_of_api_are_caught(tmp_path: Path) -> No
     assert _violations(api, 'ptychodus.api') == [
         'api/sub/leaf.py:1 imports ptychodus.model.observer'
     ]
+
+
+@pytest.mark.parametrize(
+    ('module', 'allowed'),
+    [
+        # Math only: the transform, its decomposition and its estimator act on positions.
+        ('api/affine.py', {'ptychodus.api.probe_positions', 'ptychodus.api.typing'}),
+        # A leaf the metadata holds; anything heavier here would cycle back through it.
+        ('api/scattering/geometry.py', {'ptychodus.api.typing'}),
+    ],
+)
+def test_leaf_modules_import_only_what_they_name(module: str, allowed: set[str]) -> None:
+    path = _PTYCHODUS_ROOT / module
+    package = '.'.join(['ptychodus', *Path(module).with_suffix('').parts[:-1]])
+    internal = {
+        name
+        for _, name in _imported_modules(path, package)
+        if name == 'ptychodus' or name.startswith('ptychodus.')
+    }
+
+    assert internal <= allowed, sorted(internal - allowed)

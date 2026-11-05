@@ -681,7 +681,7 @@ def _make_smooth_object(
 def test_resample_to_the_same_pixel_size_returns_the_input_itself() -> None:
     obj = _make_smooth_object()
     same = resample_object_to_pixel_size(obj, PixelGeometry(width_m=2.0e-8, height_m=2.0e-8))
-    # Identity, not equality: PCHIP at its own nodes is exact only to round-off, so the
+    # Identity, not equality: the spline at its own nodes is exact only to round-off, so the
     # tolerance guard is what makes a repeated rebuild non-destructive.
     assert same is obj
 
@@ -712,25 +712,66 @@ def test_resample_round_trip_recovers_smooth_content() -> None:
     back = resample_object_to_pixel_size(fine, PixelGeometry(width_m=2.0e-8, height_m=2.0e-8))
 
     assert back.get_array().shape == obj.get_array().shape
-    # The border samples the vacuum fill beyond the source, so compare the interior.
-    error = numpy.abs(back.get_array() - obj.get_array())[:, 2:-2, 2:-2]
-    assert error.max() < 1.0e-3
+    # The fine grid reaches half a pixel past the source into the vacuum fill, and the cubic
+    # spline spreads that sliver a few pixels inward, decaying about fourfold per pixel, so
+    # compare from four pixels in.
+    error = numpy.abs(back.get_array() - obj.get_array())[:, 4:-4, 4:-4]
+    assert error.max() < 1.0e-4
 
 
-def test_resample_of_a_monotone_ramp_does_not_overshoot() -> None:
-    """The property PCHIP is chosen for; an unconstrained cubic fails this."""
-    ramp = numpy.linspace(0.0, 1.0, 64)[None, :] * numpy.ones((64, 1))
-    obj = Object(
-        array=(ramp + 0j)[numpy.newaxis, ...],
-        pixel_geometry=PixelGeometry(width_m=2.0e-8, height_m=2.0e-8),
-        center=ObjectCenter(x_m=0.0, y_m=0.0),
+def test_resample_commutes_with_a_global_phase() -> None:
+    """A reconstruction's global phase is arbitrary, so resampling must not depend on it."""
+    obj = _make_smooth_object()
+    phase = numpy.exp(0.9j)
+    rotated = Object(
+        array=phase * obj.get_array(),
+        pixel_geometry=obj.get_pixel_geometry(),
+        center=obj.get_center(),
+    )
+    target = ObjectGeometry(
+        width_px=80,
+        height_px=80,
+        pixel_width_m=1.3e-8,
+        pixel_height_m=1.3e-8,
+        center_x_m=1.0e-6,
+        center_y_m=-2.0e-6,
     )
 
-    resampled = resample_object_to_pixel_size(obj, PixelGeometry(width_m=1.3e-8, height_m=1.3e-8))
-    interior = resampled.get_array().real[:, 2:-2, 2:-2]
+    numpy.testing.assert_allclose(
+        resample_object(rotated, target).get_array(),
+        phase * resample_object(obj, target).get_array(),
+        atol=1e-12,
+    )
 
-    assert interior.min() >= 0.0
-    assert interior.max() <= 1.0
+
+def test_resample_keeps_fringes() -> None:
+    """A strain-like phase grating, compared with the field itself at the target pitch."""
+    pixel_m = 2.0e-8
+
+    def grating(x_px: numpy.ndarray, y_px: numpy.ndarray) -> numpy.ndarray:
+        return numpy.exp(1.5j * numpy.sin(2.0 * numpy.pi * (x_px + 0.3 * y_px) / 9.0))
+
+    y, x = numpy.mgrid[:64, :64] - 31.5
+    obj = Object(
+        array=grating(x, y)[numpy.newaxis, ...],
+        pixel_geometry=PixelGeometry(width_m=pixel_m, height_m=pixel_m),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
+    )
+    target = ObjectGeometry(
+        width_px=48,
+        height_px=48,
+        pixel_width_m=0.73 * pixel_m,
+        pixel_height_m=0.73 * pixel_m,
+        center_x_m=0.0,
+        center_y_m=0.0,
+    )
+    target_y, target_x = 0.73 * (numpy.mgrid[:48, :48] - 23.5)
+
+    resampled = resample_object(obj, target).get_array()[0]
+    expected = grating(target_x, target_y)
+    error = numpy.linalg.norm(resampled - expected) / numpy.linalg.norm(expected)
+
+    assert error < 2.0e-2
 
 
 def test_resample_passes_through_an_object_without_a_pixel_geometry() -> None:

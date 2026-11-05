@@ -1,27 +1,23 @@
-"""Affine transforms of probe positions: the transform primitive, its physical decomposition,
-the frame change an off-axis scattering geometry implies, the estimator that fits one to
-measured/corrected position pairs, and the product-level correction that folds a fitted transform
-back into the experiment geometry."""
+"""2D affine maps of probe positions: the transform primitive, its physical decomposition and
+the estimator that fits one to measured/corrected position pairs.
+
+Math only. What a map means physically lives with the physics: the exit frame of an off-axis
+scattering geometry in :mod:`ptychodus.api.scattering.frame`, and the correction that folds a
+fitted map back into a product's geometry in :func:`ptychodus.api.product.transform_product`."""
 
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 import logging
 import math
 
 import numpy
 import skimage.transform
-from scipy.ndimage import map_coordinates
 from skimage.measure import ransac
 
-from .geometry import PixelGeometry
-from .object import Object, ObjectGeometry, compute_object_geometry
-from .probe import ProbeGeometry, ProbeEnsemble
 from .probe_positions import ProbePosition, ProbePositionSequence
-from .product import Product
-from .scattering import ScatteringGeometry
-from .typing import BooleanArrayType, ComplexArrayType, IntegerArrayType, RealArrayType
+from .typing import BooleanArrayType, IntegerArrayType, RealArrayType
 
 __all__ = [
     'AffineFitResult',
@@ -30,7 +26,6 @@ __all__ = [
     'AffineTransformComponents',
     'estimate_affine_transform',
     'transform_probe_positions',
-    'transform_product',
 ]
 
 logger = logging.getLogger(__name__)
@@ -109,56 +104,65 @@ class AffineTransform:
         return cls(b11, b10, translation_x_m, b01, b00, translation_y_m)
 
     @classmethod
-    def from_scattering_geometry(
-        cls, geometry: ScatteringGeometry, *, grazing_sine_floor: float = 1.0e-6
+    def from_linear_matrix(
+        cls,
+        matrix: RealArrayType,
+        *,
+        translation_x_m: float = 0.0,
+        translation_y_m: float = 0.0,
     ) -> AffineTransform:
-        """The map taking scan positions into the frame where the 2D Fourier relation holds.
+        """A transform from its 2x2 linear part, acting on ``(x, y)``, and a translation.
 
-        Scan positions are measured across the incident beam. The detector records the
-        Fourier transform of the sample projected along the exit beam, onto the plane its
-        own axes span. A point of a thin sample's surface reaches the first plane by
-        projection along the incident beam and the second by projection along the exit
-        beam, so the two planes are related through the surface by a linear map, returned
-        here with zero translation. Positions carried through it make the off-axis problem
-        transmission ptychography on the detector's ordinary far-field grid.
-
-        The map is the identity for a forward exit beam whatever the incidence. Its
-        determinant is negative exactly when the geometry is a reflection, so it cannot be
-        decomposed into :class:`AffineTransformComponents`.
-
-        Args:
-            geometry: Exit-beam and surface directions.
-            grazing_sine_floor: Sine of the angle between a beam and the surface at or
-                below which the projection counts as degenerate. A beam grazing the surface
-                spreads its footprint without bound, so a scan step there has no finite image.
-                Raising it refuses more nearly grazing geometries.
+        Inverse of :meth:`get_linear_matrix` up to the translation.
 
         Raises:
-            ValueError: if the incident or the exit beam grazes the surface.
+            ValueError: if *matrix* is not 2x2.
         """
-        normal = geometry.get_surface_normal()
-        incident_sine = abs(float(normal[2]))
-        exit_sine = abs(float(normal @ geometry.get_exit_direction()))
+        if numpy.shape(matrix) != (2, 2):
+            raise ValueError(f'An affine linear part is 2x2; got shape {numpy.shape(matrix)}.')
 
-        if min(incident_sine, exit_sine) <= grazing_sine_floor:
+        return cls(
+            float(matrix[0, 0]),
+            float(matrix[0, 1]),
+            translation_x_m,
+            float(matrix[1, 0]),
+            float(matrix[1, 1]),
+            translation_y_m,
+        )
+
+    def get_linear_matrix(self) -> RealArrayType:
+        """The 2x2 linear part, acting on ``(x, y)`` column vectors; the translation is dropped."""
+        return numpy.array([[self.a00, self.a01], [self.a10, self.a11]])
+
+    @property
+    def determinant(self) -> float:
+        """Determinant of the linear part: negative for a mirror, zero when singular."""
+        return self.a00 * self.a11 - self.a01 * self.a10
+
+    def inverted(self) -> AffineTransform:
+        """The transform that undoes this one.
+
+        Raises:
+            ValueError: if the linear part is singular.
+        """
+        determinant = self.determinant
+
+        if not math.isfinite(determinant) or determinant == 0.0:
             raise ValueError(
-                'A beam grazes the sample surface (incident sine '
-                f'{incident_sine:.3g}, exit sine {exit_sine:.3g}); the projection between '
-                'the scan frame and the detector frame is degenerate.'
+                f'A singular affine transform has no inverse; determinant {determinant}.'
             )
 
-        # A scan point (x, y) lies on the surface at z = slope_x * x + slope_y * y, and
-        # projecting it along the exit beam keeps its components along the detector axes.
-        slope_x = -normal[0] / normal[2]
-        slope_y = -normal[1] / normal[2]
-        column_axis, row_axis = geometry.get_detector_axes()
-        return cls(
-            float(column_axis[0] + column_axis[2] * slope_x),
-            float(column_axis[1] + column_axis[2] * slope_y),
-            0.0,
-            float(row_axis[0] + row_axis[2] * slope_x),
-            float(row_axis[1] + row_axis[2] * slope_y),
-            0.0,
+        b00 = self.a11 / determinant
+        b01 = -self.a01 / determinant
+        b10 = -self.a10 / determinant
+        b11 = self.a00 / determinant
+        return AffineTransform(
+            b00,
+            b01,
+            -(b00 * self.a02 + b01 * self.a12),
+            b10,
+            b11,
+            -(b10 * self.a02 + b11 * self.a12),
         )
 
     def decompose(self, *, quadratic_eps: float = 1.0e-12) -> AffineTransformComponents:
@@ -179,7 +183,7 @@ class AffineTransform:
             ValueError: if the linear part is singular or orientation-reversing. A positive
                 determinant is what makes ``scale`` positive and ``|asymmetry|`` less than 2.
         """
-        determinant = self.a00 * self.a11 - self.a01 * self.a10
+        determinant = self.determinant
 
         if not math.isfinite(determinant) or determinant <= 0.0:
             raise ValueError(
@@ -676,273 +680,4 @@ def estimate_affine_transform(
         linear_transform=linear_transform,
         pairs=pairs,
         rms_residual_m=_rms(pooled),
-    )
-
-
-def _calibrate_detector_distance(
-    detector_distance_m: float,
-    scale: float,
-    *,
-    focus_object_distance_m: float = 0.0,
-    far_field: bool = True,
-) -> float:
-    """Return the detector distance implied by a fitted isotropic position scale.
-
-    In far-field geometry the object pixel is ``wavelength * distance / (width * detector pixel)``,
-    so it is proportional to the detector distance -- this inverts
-    :func:`ptychodus.api.propagate.compute_far_field_pixel_geometry` with respect to the distance.
-    A fit that had to spread the probe positions out by ``scale`` means the assumed object pixel
-    was too large by that same factor, and the distance that reproduces the correct pixel is
-    ``detector_distance_m / scale``.
-
-    Both near-field geometries break that proportionality, for different reasons, so each is
-    refused rather than calibrated. The regime has to be tested as well as the focus position:
-    a parallel beam declares no focusing optic, so testing the focus alone would admit it.
-
-    Args:
-        detector_distance_m: Sample-to-detector distance the positions were reconstructed with.
-        scale: Isotropic scale from :meth:`AffineTransform.decompose`.
-        focus_object_distance_m: Focus-to-object distance of the product. A nonzero value selects
-            cone-beam geometry, where the object pixel is set by
-            :func:`ptychodus.api.propagate.compute_magnification` rather than by the detector
-            distance alone and this relation does not hold.
-        far_field: Declared propagation regime. Near field back-projects the detector pixel
-            onto the object, so the object pixel does not depend on the detector distance at
-            all and no position scale can report one.
-
-    Raises:
-        ValueError: If ``scale`` is not positive and finite, if ``detector_distance_m`` is not
-            finite, if ``focus_object_distance_m`` is nonzero, or if the product declares
-            near-field propagation.
-    """
-    if focus_object_distance_m != 0.0:
-        raise ValueError(
-            'Detector-distance calibration from a position scale is defined for far-field '
-            'geometry only; this product has a nonzero focus-object distance '
-            f'({focus_object_distance_m} m), where the object pixel follows the magnification.'
-        )
-
-    if not far_field:
-        raise ValueError(
-            'Detector-distance calibration from a position scale is defined for far-field '
-            'geometry only; this product declares near-field propagation, where the object '
-            'pixel is the detector pixel back-projected and carries no distance to recover.'
-        )
-
-    if not math.isfinite(detector_distance_m):
-        raise ValueError(f'Detector distance must be finite; got {detector_distance_m}.')
-
-    if not math.isfinite(scale) or scale <= 0.0:
-        raise ValueError(f'Position scale must be positive and finite; got {scale}.')
-
-    return detector_distance_m / scale
-
-
-def _target_object_geometry(
-    source_geometry: ObjectGeometry,
-    positions: ProbePositionSequence,
-    corrected_positions: ProbePositionSequence,
-    probe_geometry: ProbeGeometry,
-    corrected_probe_geometry: ProbeGeometry,
-    scale_free: AffineTransform,
-) -> ObjectGeometry:
-    """Return the grid the corrected object lives on.
-
-    How much the canvas changes is decided by :func:`compute_object_geometry`, not here: it is
-    evaluated once on the uncorrected scan and probe and once on the corrected ones, and the
-    difference between the two is the change. Whatever the source object has beyond that canonical
-    size -- extra padding, or simply the size a warm start read from file happens to be -- rides
-    through as a signed per-axis difference, so an identity transform is an exact no-op and no
-    object is silently cropped to the minimal canvas.
-    """
-    base_source = compute_object_geometry(positions, probe_geometry)
-    base_target = compute_object_geometry(corrected_positions, corrected_probe_geometry)
-    extra_width_px = source_geometry.width_px - base_source.width_px
-    extra_height_px = source_geometry.height_px - base_source.height_px
-    width_px = base_target.width_px + extra_width_px
-    height_px = base_target.height_px + extra_height_px
-
-    if width_px < 1 or height_px < 1:
-        raise ValueError(
-            f'The corrected object canvas is {width_px} x {height_px} px; the source object is '
-            f'{-extra_width_px} x {-extra_height_px} px smaller than the canvas its own scan '
-            'needs, and the correction shrinks it past nothing.'
-        )
-
-    center = scale_free(ProbePosition(0, source_geometry.center_x_m, source_geometry.center_y_m))
-    return ObjectGeometry(
-        width_px=width_px,
-        height_px=height_px,
-        pixel_width_m=base_target.pixel_width_m,
-        pixel_height_m=base_target.pixel_height_m,
-        center_x_m=center.x_m,
-        center_y_m=center.y_m,
-    )
-
-
-def _resample_object(
-    array: ComplexArrayType,
-    source_geometry: ObjectGeometry,
-    target_geometry: ObjectGeometry,
-    transform: AffineTransform,
-    *,
-    interpolation_order: int,
-) -> ComplexArrayType:
-    """Resample every layer of *array* from its own grid onto the target grid.
-
-    Source and target differ in extent, pitch and center all at once, so the source index of each
-    target pixel is built explicitly: take the target pixel's physical coordinate, map it back
-    through the inverse of *transform*, and express the result in the source's fractional pixel
-    indexes under the centered-pixel convention. Target pixels falling outside the source array
-    are filled with zeros, which is what padding an object does elsewhere.
-    """
-    coordinates = target_geometry.get_transverse_coordinates()
-    x_m = target_geometry.center_x_m + coordinates.x_m
-    y_m = target_geometry.center_y_m + coordinates.y_m
-
-    linear = numpy.array([[transform.a00, transform.a01], [transform.a10, transform.a11]])
-    inverse = numpy.linalg.inv(linear)
-    dx_m = x_m - transform.a02
-    dy_m = y_m - transform.a12
-    source_x_m = inverse[0, 0] * dx_m + inverse[0, 1] * dy_m
-    source_y_m = inverse[1, 0] * dx_m + inverse[1, 1] * dy_m
-
-    # Centered-pixel convention: the world center sits at pixel index (N - 1) / 2.
-    column = (source_x_m - source_geometry.center_x_m) / source_geometry.pixel_width_m + (
-        source_geometry.width_px - 1
-    ) / 2
-    row = (source_y_m - source_geometry.center_y_m) / source_geometry.pixel_height_m + (
-        source_geometry.height_px - 1
-    ) / 2
-
-    resampled = numpy.empty(
-        (array.shape[0], target_geometry.height_px, target_geometry.width_px), dtype=array.dtype
-    )
-
-    for index, layer in enumerate(array):
-        real = map_coordinates(
-            layer.real, (row, column), order=interpolation_order, mode='constant', cval=0.0
-        )
-        imaginary = map_coordinates(
-            layer.imag, (row, column), order=interpolation_order, mode='constant', cval=0.0
-        )
-        resampled[index] = real + 1j * imaginary
-
-    return resampled
-
-
-def transform_product(
-    product: Product, transform: AffineTransform, *, interpolation_order: int = 1
-) -> Product:
-    """Apply an affine transform to a product by splitting it between positions and geometry.
-
-    An isotropic scale on the probe positions and the object pixel size are the same degree of
-    freedom expressed two ways, so applying the whole transform to the positions *and* correcting
-    the detector distance would count the scale twice. This decomposes the transform and folds
-    only ``scale`` into ``detector_distance_m``, treating the scan stage as the trustworthy
-    measurement and the detector distance as the miscalibrated one. Because the far-field object
-    pixel is proportional to that distance, the same scale divides both pixel geometries exactly,
-    with no interpolation. The remaining scale-free part -- asymmetry, rotation and shear -- moves
-    the probe positions and warps the object array onto the grid they now imply.
-
-    The object's array therefore changes shape as well as pitch, and the two axes change
-    independently: a finer pixel needs more of them to cover the same scan, and asymmetry and
-    rotation act differently on each axis. The probe array is reinterpreted rather than resampled,
-    since the scale-free part distorts the scan frame and not the illumination optics.
-
-    The correction is translation-free. A translation shifts the positions and the object center
-    by the same amount, so it relabels the product's lab coordinates without changing a single
-    sample; relocating products against each other is a cross-scan registration job.
-
-    Resampling costs accuracy. Measured relative error of one bilinear pass against a band-limited
-    reference, as a function of how far the object's content reaches toward Nyquist: 1.3e-02 at
-    20%, 1.2e-01 at 40%, 4.3e-01 at 70%. Raising ``interpolation_order`` to 3 buys roughly an
-    order of magnitude on smooth content at three times the cost, and buys much less on content
-    that reaches Nyquist. The warp is small in absolute terms -- a corner moves 0.43 px on a 256 px
-    canvas and 1.72 px on a 1024 px one at typical fitted magnitudes -- and the dominant
-    component, the isotropic scale, never reaches the interpolator at all.
-
-    Args:
-        product: Product to correct.
-        transform: Affine map fitted to this product's probe positions.
-        interpolation_order: Spline order passed to :func:`scipy.ndimage.map_coordinates` for the
-            object array. Raising it sharpens the resampled object at superlinear cost.
-
-    Raises:
-        ValueError: If the linear part is singular or orientation-reversing, if the product is not
-            far-field, or if the correction shrinks the object canvas away entirely.
-    """
-    metadata = product.metadata
-    components = transform.decompose()
-    detector_distance_m = _calibrate_detector_distance(
-        metadata.detector_distance_m,
-        components.scale,
-        focus_object_distance_m=metadata.focus_object_distance_m,
-        far_field=metadata.far_field,
-    )
-    scale_free = AffineTransform.from_components(replace(components, scale=1.0))
-
-    probes = product.probes
-    probe_geometry = probes.get_geometry()
-    corrected_probe_pixel_geometry = PixelGeometry(
-        width_m=probe_geometry.pixel_width_m / components.scale,
-        height_m=probe_geometry.pixel_height_m / components.scale,
-    )
-    corrected_probe_geometry = ProbeGeometry(
-        width_px=probe_geometry.width_px,
-        height_px=probe_geometry.height_px,
-        pixel_width_m=corrected_probe_pixel_geometry.width_m,
-        pixel_height_m=corrected_probe_pixel_geometry.height_m,
-    )
-
-    positions = product.probe_positions
-    corrected_positions = ProbePositionSequence(
-        list(transform_probe_positions(positions, scale_free))
-    )
-
-    object_ = product.object_
-    source_geometry = object_.get_geometry()
-    target_geometry = _target_object_geometry(
-        source_geometry,
-        positions,
-        corrected_positions,
-        probe_geometry,
-        corrected_probe_geometry,
-        scale_free,
-    )
-    logger.info(
-        'Scale %.6f moves the detector distance from %.6f m to %.6f m; applying asymmetry '
-        '%+.3e, rotation %+.4f deg and shear %+.4f deg to %d probe positions and resampling the '
-        'object from %s onto %s.',
-        components.scale,
-        metadata.detector_distance_m,
-        detector_distance_m,
-        components.asymmetry,
-        math.degrees(components.rotation_rad),
-        math.degrees(components.shear_rad),
-        len(positions),
-        source_geometry,
-        target_geometry,
-    )
-    return replace(
-        product,
-        metadata=replace(metadata, detector_distance_m=detector_distance_m),
-        probe_positions=corrected_positions,
-        probes=ProbeEnsemble(
-            array=probes.get_array(),
-            opr_weights=probes.get_opr_weights_or_none(),
-            pixel_geometry=corrected_probe_pixel_geometry,
-        ),
-        object_=Object(
-            array=_resample_object(
-                object_.get_array(),
-                source_geometry,
-                target_geometry,
-                scale_free,
-                interpolation_order=interpolation_order,
-            ),
-            pixel_geometry=target_geometry.get_pixel_geometry(),
-            center=target_geometry.get_center(),
-            layer_spacing_m=list(object_.layer_spacing_m),
-        ),
     )

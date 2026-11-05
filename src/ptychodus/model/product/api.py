@@ -10,6 +10,7 @@ from ptychodus.api.diffraction import Polarization
 from ptychodus.api.parallax import ParallaxEstimate, estimate_defocus_from_parallax
 from ptychodus.api.preprocess.diffraction import BinningStep
 from ptychodus.api.probe import OPRWeightPolicy
+from ptychodus.api.scattering.geometry import ScatteringGeometry
 from ptychodus.api.product import (
     Product,
     ProductFileReader,
@@ -529,6 +530,7 @@ class ProductAPI:
         polarization: Polarization | None = None,
         far_field: bool | None = None,
         i0_photons_per_count: float | None = None,
+        scattering_geometry: ScatteringGeometry | None = None,
         dataset: AssembledDiffractionDataset | None = None,
         block: bool = True,
     ) -> int:
@@ -547,6 +549,7 @@ class ProductAPI:
                 polarization=polarization,
                 far_field=far_field,
                 i0_photons_per_count=i0_photons_per_count,
+                scattering_geometry=scattering_geometry,
                 dataset=dataset,
             )
 

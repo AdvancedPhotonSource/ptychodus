@@ -4,6 +4,7 @@ const API = '/api/v1';
 export type IngestState = 'DISCOVERED' | 'VALID' | 'INVALID' | 'MISSING_FILES' | 'ORPHANED';
 
 export type Polarization = 'left_circular' | 'right_circular';
+export type ScatteringRegime = 'transmission' | 'bragg' | 'laue';
 
 export interface DerivedFromEdge {
   kind: 'diffraction' | 'product' | 'fluorescence';
@@ -109,6 +110,10 @@ export interface ProductRead extends RowBase {
   tomography_angle_deg: number | null;
   tilt_angle_deg: number | null;
   polarization: Polarization | null;
+  two_theta_deg: number | null;
+  detector_gamma_deg: number | null;
+  incidence_angle_deg: number | null;
+  scattering_regime: ScatteringRegime | null;
 
   object_layers: number | null;
   object_height_px: number | null;

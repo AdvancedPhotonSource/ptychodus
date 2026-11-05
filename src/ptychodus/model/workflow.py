@@ -9,6 +9,7 @@ from ptychodus.api.diffraction import CropRegion, Polarization
 from ptychodus.api.affine import AffineTransform
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import ReconstructInput
+from ptychodus.api.scattering.geometry import ScatteringGeometry
 from ptychodus.api.workflow import (
     DiffractionWorkflowAPI,
     ProductWorkflowAPI,
@@ -383,6 +384,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         polarization: Polarization | None = None,
         far_field: bool | None = None,
         i0_photons_per_count: float | None = None,
+        scattering_geometry: ScatteringGeometry | None = None,
         diffraction: DiffractionWorkflowAPI | None = None,
     ) -> ProductWorkflowAPI:
         product_index = self._product_api.insert_new_product(
@@ -399,6 +401,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
             polarization=polarization,
             far_field=far_field,
             i0_photons_per_count=i0_photons_per_count,
+            scattering_geometry=scattering_geometry,
             dataset=self._fetch_dataset(diffraction),
         )
         return self.get_product(product_index)

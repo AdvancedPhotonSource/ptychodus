@@ -14,6 +14,7 @@ import h5py
 import numpy
 import pytest
 
+from ptychodus.api.scattering.geometry import ScatteringGeometry
 from ptychodus.api.assemble import assemble_dataset
 from ptychodus.api.constants import energy_eV_to_J, energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import (
@@ -78,6 +79,9 @@ def _diffraction_dataset(
         tomography_angle_deg=12.5,
         tilt_angle_deg=-3.0,
         polarization=Polarization.LEFT_CIRCULAR,
+        scattering_geometry=ScatteringGeometry(
+            two_theta_deg=47.35, detector_gamma_deg=-0.27, incidence_angle_deg=24.15
+        ),
     )
     bad_pixels = numpy.zeros((6, 8), dtype=bool)
     bad_pixels[1, 2] = True
@@ -119,6 +123,7 @@ def test_diffraction_round_trips_every_metadata_field(tmp_path: Path) -> None:
     assert metadata.tomography_angle_deg == pytest.approx(original.tomography_angle_deg)
     assert metadata.tilt_angle_deg == pytest.approx(original.tilt_angle_deg)
     assert metadata.polarization == original.polarization
+    assert metadata.scattering_geometry == original.scattering_geometry
     # The sample name identifies a product, not a detector readout, so the diffraction
     # writer does not record it; only the product writer does.
     assert metadata.sample_name is None

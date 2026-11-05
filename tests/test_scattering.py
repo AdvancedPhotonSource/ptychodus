@@ -8,13 +8,24 @@ import numpy
 import pytest
 
 from ptychodus.api.affine import AffineTransform
+from ptychodus.api.scattering.frame import (
+    compute_exit_frame_transform,
+    resolve_exit_frame_transform,
+    transform_probe_to_exit_frame,
+)
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter, compute_object_geometry
 from ptychodus.api.probe import ProbeEnsemble, ProbeGeometry
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.scattering import ScatteringGeometry
+from ptychodus.api.scattering.geometry import (
+    ScatteringGeometry,
+    ScatteringIssue,
+    ScatteringRegime,
+    compute_displacement_m,
+    find_scattering_issues,
+)
 from ptychodus.api.simulate.diffraction import generate_diffraction_data, generate_scattering_data
 from ptychodus.api.typing import ComplexArrayType, RealArrayType
 
@@ -125,14 +136,14 @@ def _lab_product(object_: Object, probes: ProbeEnsemble | None = None) -> Produc
 
 
 # ---------------------------------------------------------------------------
-# ScatteringGeometry and AffineTransform.from_scattering_geometry
+# ScatteringGeometry and compute_exit_frame_transform
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize('incidence_angle_deg', [90.0, 24.15, -60.0, 135.0])
 def test_forward_exit_is_the_identity_whatever_the_incidence(incidence_angle_deg: float) -> None:
     geometry = ScatteringGeometry(incidence_angle_deg=incidence_angle_deg)
-    transform = AffineTransform.from_scattering_geometry(geometry)
+    transform = compute_exit_frame_transform(geometry)
 
     assert geometry.is_forward
     assert not geometry.is_reflection
@@ -154,7 +165,7 @@ def test_in_plane_geometry_scales_x_only(two_theta_deg: float, incidence_angle_d
     expected = math.sin(incidence_rad - two_theta_rad) / math.sin(incidence_rad)
 
     numpy.testing.assert_allclose(
-        _matrix(AffineTransform.from_scattering_geometry(geometry)),
+        _matrix(compute_exit_frame_transform(geometry)),
         [[expected, 0.0], [0.0, 1.0]],
         atol=1e-12,
     )
@@ -168,7 +179,7 @@ def test_symmetric_bragg_is_a_mirror(two_theta_deg: float) -> None:
 
     assert geometry.is_reflection
     numpy.testing.assert_allclose(
-        _matrix(AffineTransform.from_scattering_geometry(geometry)),
+        _matrix(compute_exit_frame_transform(geometry)),
         [[-1.0, 0.0], [0.0, 1.0]],
         atol=1e-12,
     )
@@ -180,7 +191,7 @@ def test_normal_incidence_laue_foreshortens_by_cos_two_theta(two_theta_deg: floa
 
     assert not geometry.is_reflection
     numpy.testing.assert_allclose(
-        _matrix(AffineTransform.from_scattering_geometry(geometry)),
+        _matrix(compute_exit_frame_transform(geometry)),
         [[math.cos(math.radians(two_theta_deg)), 0.0], [0.0, 1.0]],
         atol=1e-12,
     )
@@ -210,13 +221,13 @@ def test_out_of_plane_angle_adds_a_shear_of_y_by_x(geometry: ScatteringGeometry)
     ]
 
     numpy.testing.assert_allclose(
-        _matrix(AffineTransform.from_scattering_geometry(geometry)), expected, atol=1e-12
+        _matrix(compute_exit_frame_transform(geometry)), expected, atol=1e-12
     )
 
 
 def test_asymmetric_bragg_mirrors_compresses_and_shears() -> None:
     numpy.testing.assert_allclose(
-        _matrix(AffineTransform.from_scattering_geometry(_BRAGG_ASYMMETRIC)),
+        _matrix(compute_exit_frame_transform(_BRAGG_ASYMMETRIC)),
         [[-0.96288, 0.0], [0.01059, 0.99999]],
         atol=1e-5,
     )
@@ -233,7 +244,7 @@ def test_determinant_is_negative_exactly_for_reflections() -> None:
                 )
 
                 try:
-                    transform = AffineTransform.from_scattering_geometry(geometry)
+                    transform = compute_exit_frame_transform(geometry)
                 except ValueError:
                     continue
 
@@ -257,8 +268,8 @@ def test_mirrored_instrument_conjugates_the_transform(geometry: ScatteringGeomet
     flip = numpy.diag([-1.0, 1.0])
 
     numpy.testing.assert_allclose(
-        _matrix(AffineTransform.from_scattering_geometry(mirrored)),
-        flip @ _matrix(AffineTransform.from_scattering_geometry(geometry)) @ flip,
+        _matrix(compute_exit_frame_transform(mirrored)),
+        flip @ _matrix(compute_exit_frame_transform(geometry)) @ flip,
         atol=1e-12,
     )
 
@@ -272,7 +283,7 @@ def test_mirrored_instrument_conjugates_the_transform(geometry: ScatteringGeomet
 )
 def test_a_grazing_beam_is_refused(geometry: ScatteringGeometry) -> None:
     with pytest.raises(ValueError, match='grazes'):
-        AffineTransform.from_scattering_geometry(geometry)
+        compute_exit_frame_transform(geometry)
 
 
 def test_geometry_vectors_are_orthonormal() -> None:
@@ -371,7 +382,7 @@ def test_the_exit_probe_keeps_its_photons_and_takes_the_transformed_shape(
         centered = points - mean[:, numpy.newaxis, numpy.newaxis]
         return numpy.einsum('ihw,jhw,hw->ij', centered, centered, weights) / weights.sum()
 
-    transform = _matrix(AffineTransform.from_scattering_geometry(geometry))
+    transform = _matrix(compute_exit_frame_transform(geometry))
     lab_power = numpy.sum(numpy.square(numpy.abs(lab_product.probes.get_array())))
     exit_power = numpy.sum(numpy.square(numpy.abs(exit_product.probes.get_array())))
 
@@ -384,7 +395,12 @@ def test_the_exit_probe_keeps_its_photons_and_takes_the_transformed_shape(
     )
 
 
-def _kinematic_patterns(product: Product, geometry: ScatteringGeometry) -> RealArrayType:
+def _kinematic_patterns(
+    product: Product,
+    geometry: ScatteringGeometry,
+    *,
+    displacement_m: Callable[[RealArrayType, RealArrayType], RealArrayType] | None = None,
+) -> RealArrayType:
     """Patterns summed directly over the surface, with exact path lengths to each pixel.
 
     No projection, no Fourier transform and no far-field approximation: every surface point
@@ -392,6 +408,10 @@ def _kinematic_patterns(product: Product, geometry: ScatteringGeometry) -> RealA
     rotated detector. The surface object is the envelope of a lattice term ``exp(i G · r)``
     with ``G = k (k_f - z)``, which meets the Bragg condition at the detector center; the
     lattice term is put back here. This is the independent check on the projection model.
+
+    *displacement_m*, given surface coordinates, moves each scatterer that far along ``G``
+    while its lattice term stays that of its undisplaced site: a strained crystal, with the
+    phase the displacement causes left to the path lengths rather than written in.
     """
     wavelength_m = product.metadata.photon_wavelength_m
     wavenumber = 2.0 * numpy.pi / wavelength_m
@@ -415,8 +435,12 @@ def _kinematic_patterns(product: Product, geometry: ScatteringGeometry) -> RealA
     s2_m = (surface_geometry.center_y_m + coordinates.y_m).ravel()
     trace, y_axis = geometry.get_surface_axes()
     points_m = s1_m[:, numpy.newaxis] * trace + s2_m[:, numpy.newaxis] * y_axis
-    lattice_phase = wavenumber * points_m @ (exit_direction - numpy.array([0.0, 0.0, 1.0]))
-    reflectivity = surface.get_layer(0).ravel() * numpy.exp(1j * lattice_phase)
+    scattering_vector = geometry.get_scattering_vector_per_m(wavelength_m)
+    reflectivity = surface.get_layer(0).ravel() * numpy.exp(1j * points_m @ scattering_vector)
+
+    if displacement_m is not None:
+        direction = scattering_vector / numpy.linalg.norm(scattering_vector)
+        points_m = points_m + displacement_m(s1_m, s2_m)[:, numpy.newaxis] * direction
 
     patterns = []
 
@@ -483,3 +507,185 @@ def test_a_grazing_geometry_is_refused_by_the_generator() -> None:
             _lab_product(_surface_object(_surface_reflectivity)),
             ScatteringGeometry(two_theta_deg=30.0, incidence_angle_deg=30.0),
         )
+
+
+# ---------------------------------------------------------------------------
+# Regimes, issues and the exit-frame helpers
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ('geometry', 'regime'),
+    [
+        (ScatteringGeometry(), ScatteringRegime.TRANSMISSION),
+        (ScatteringGeometry(incidence_angle_deg=30.0), ScatteringRegime.TRANSMISSION),
+        (_BRAGG_ASYMMETRIC, ScatteringRegime.BRAGG),
+        (ScatteringGeometry(two_theta_deg=40.0, incidence_angle_deg=20.0), ScatteringRegime.BRAGG),
+        (_LAUE, ScatteringRegime.LAUE),
+        (ScatteringGeometry(two_theta_deg=30.0, incidence_angle_deg=60.0), ScatteringRegime.LAUE),
+    ],
+)
+def test_the_regime_follows_from_the_angles(
+    geometry: ScatteringGeometry, regime: ScatteringRegime
+) -> None:
+    assert geometry.regime is regime
+
+
+def test_a_forward_geometry_has_no_issues_whatever_else_is_true() -> None:
+    assert find_scattering_issues(ScatteringGeometry(), far_field=False, num_object_layers=4) == ()
+
+
+@pytest.mark.parametrize(
+    ('geometry', 'far_field', 'num_object_layers', 'expected'),
+    [
+        (_BRAGG_ASYMMETRIC, True, 1, ()),
+        (_BRAGG_ASYMMETRIC, False, 1, (ScatteringIssue.NEAR_FIELD,)),
+        (_LAUE, True, 3, (ScatteringIssue.MULTISLICE,)),
+        (
+            ScatteringGeometry(two_theta_deg=30.0, incidence_angle_deg=0.0),
+            True,
+            1,
+            (ScatteringIssue.GRAZING_INCIDENCE,),
+        ),
+        (
+            ScatteringGeometry(two_theta_deg=30.0, incidence_angle_deg=30.0),
+            False,
+            2,
+            (ScatteringIssue.NEAR_FIELD, ScatteringIssue.MULTISLICE, ScatteringIssue.GRAZING_EXIT),
+        ),
+    ],
+)
+def test_issues_name_what_the_model_does_not_cover(
+    geometry: ScatteringGeometry,
+    far_field: bool,
+    num_object_layers: int,
+    expected: tuple[ScatteringIssue, ...],
+) -> None:
+    issues = find_scattering_issues(
+        geometry, far_field=far_field, num_object_layers=num_object_layers
+    )
+
+    assert issues == expected
+    assert all(issue.describe() for issue in issues)
+
+
+def test_the_exit_frame_transform_is_the_full_one_where_defined() -> None:
+    assert resolve_exit_frame_transform(
+        _BRAGG_ASYMMETRIC, far_field=True
+    ) == compute_exit_frame_transform(_BRAGG_ASYMMETRIC)
+
+
+@pytest.mark.parametrize(
+    ('geometry', 'far_field'),
+    [
+        (_BRAGG_ASYMMETRIC, False),
+        (ScatteringGeometry(two_theta_deg=30.0, incidence_angle_deg=30.0), True),
+    ],
+)
+def test_the_exit_frame_transform_is_the_identity_where_undefined(
+    geometry: ScatteringGeometry, far_field: bool, caplog: pytest.LogCaptureFixture
+) -> None:
+    transform = resolve_exit_frame_transform(geometry, far_field=far_field)
+
+    assert transform == AffineTransform.create_identity()
+    assert 'untransformed' in caplog.text
+
+
+def test_the_inverse_undoes_the_transform() -> None:
+    transform = replace(compute_exit_frame_transform(_BRAGG_ASYMMETRIC), a02=3e-7, a12=-1e-7)
+    position = ProbePosition(index=5, x_m=2.5e-7, y_m=-4e-7, probe_photon_count=7.0)
+
+    round_trip = transform.inverted()(transform(position))
+
+    assert round_trip.index == 5
+    assert round_trip.x_m == pytest.approx(position.x_m, abs=1e-20)
+    assert round_trip.y_m == pytest.approx(position.y_m, abs=1e-20)
+    assert round_trip.probe_photon_count == 7.0
+
+
+def test_a_singular_transform_has_no_inverse() -> None:
+    with pytest.raises(ValueError, match='singular'):
+        AffineTransform(1.0, 2.0, 0.0, 2.0, 4.0, 0.0).inverted()
+
+
+def test_a_probe_is_not_resampled_where_the_exit_frame_is_undefined() -> None:
+    probes = _probes(_incident_probe)
+
+    assert transform_probe_to_exit_frame(probes, _BRAGG_ASYMMETRIC, far_field=False) is probes
+    assert transform_probe_to_exit_frame(probes, ScatteringGeometry(), far_field=True) is probes
+
+
+def test_the_simulated_truth_carries_its_geometry() -> None:
+    _, truth = generate_scattering_data(_lab_product(_surface_object(_surface_reflectivity)), _LAUE)
+
+    assert truth.metadata.scattering_geometry == _LAUE
+
+
+def test_the_scattering_vector_meets_the_bragg_condition() -> None:
+    wavelength_m = energy_eV_to_wavelength_m(_PHOTON_ENERGY_EV)
+    geometry = ScatteringGeometry(two_theta_deg=47.35, incidence_angle_deg=23.675)
+    magnitude_per_m = float(numpy.linalg.norm(geometry.get_scattering_vector_per_m(wavelength_m)))
+
+    assert magnitude_per_m == pytest.approx(
+        4.0 * math.pi * math.sin(math.radians(47.35 / 2.0)) / wavelength_m, rel=1e-12
+    )
+    # Symmetric reflection: the scattering vector is along the surface normal.
+    normal = geometry.get_surface_normal()
+    assert abs(float(normal @ geometry.get_scattering_vector_per_m(wavelength_m))) == pytest.approx(
+        magnitude_per_m, rel=1e-12
+    )
+
+
+@pytest.mark.parametrize('sign', [-1.0, 1.0])
+def test_the_phase_of_a_strained_crystal_is_minus_g_dot_u(sign: float) -> None:
+    """Displaced scatterers match the envelope exp(-i G u), not exp(+i G u).
+
+    This pins the sign :func:`compute_displacement_m` relies on: the oracle moves each
+    scatterer and lets the exact path lengths make the phase, while the generator is fed
+    the envelope.
+    """
+    geometry = _BRAGG_ASYMMETRIC
+    wavelength_m = energy_eV_to_wavelength_m(_PHOTON_ENERGY_EV)
+    magnitude_per_m = float(numpy.linalg.norm(geometry.get_scattering_vector_per_m(wavelength_m)))
+    pixel_m = _probe_geometry().pixel_width_m
+
+    def displacement_m(s1_m: RealArrayType, s2_m: RealArrayType) -> RealArrayType:
+        # About a third of a lattice-plane spacing, so the phase swings near ±2 rad.
+        return (2.0 / magnitude_per_m) * numpy.sin(2.0 * numpy.pi * s1_m / (40.0 * pixel_m))
+
+    def amplitude(s1_m: RealArrayType, s2_m: RealArrayType) -> ComplexArrayType:
+        return numpy.abs(_surface_reflectivity(s1_m, s2_m)) + 0j
+
+    def envelope(s1_m: RealArrayType, s2_m: RealArrayType) -> ComplexArrayType:
+        phase = sign * magnitude_per_m * displacement_m(s1_m, s2_m)
+        return amplitude(s1_m, s2_m) * numpy.exp(1j * phase)
+
+    expected = _kinematic_patterns(
+        _lab_product(_surface_object(amplitude)), geometry, displacement_m=displacement_m
+    )
+    data, truth = generate_scattering_data(_lab_product(_surface_object(envelope)), geometry)
+    simulated = data.get_patterns()
+    errors = [
+        numpy.linalg.norm(simulated[i] / simulated[i].sum() - expected[i] / expected[i].sum())
+        / numpy.linalg.norm(expected[i] / expected[i].sum())
+        for i in range(simulated.shape[0])
+    ]
+
+    if sign < 0.0:
+        assert max(errors) < 5e-3
+    else:
+        assert min(errors) > 5e-2
+
+    s1_m = numpy.linspace(-5.0, 5.0, 11) * pixel_m
+    s2_m = numpy.zeros_like(s1_m)
+    recovered_m = compute_displacement_m(
+        numpy.angle(envelope(s1_m, s2_m)), geometry, photon_wavelength_m=wavelength_m
+    )
+
+    if sign < 0.0:
+        numpy.testing.assert_allclose(recovered_m, displacement_m(s1_m, s2_m), atol=1e-14)
+
+
+def test_a_forward_geometry_has_no_displacement() -> None:
+    with pytest.raises(ValueError, match='forward'):
+        compute_displacement_m(numpy.zeros(3), ScatteringGeometry(), photon_wavelength_m=1e-10)

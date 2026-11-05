@@ -53,6 +53,7 @@ from .probe_positions import ProbePositionSequence, ProbePosition, calculate_sca
 from .product import LossValue, Product, ProductMetadata
 from .propagate import compute_far_field_pixel_geometry, compute_near_field_pixel_geometry
 from .reconstruct import ReconstructInput
+from .scattering.geometry import ScatteringGeometry
 
 __all__ = [
     'CXIDiffractionContents',
@@ -281,10 +282,15 @@ class ProductFileKeys(StrEnum):
     EXPOSURE_TIME = 'exposure_time_s'
     MASS_ATTENUATION = 'mass_attenuation_m2_per_kg'
     TOMOGRAPHY_ANGLE = 'tomography_angle_deg'
+    # The APS 4-ID POLAR XMCD sample tilt; not part of the scattering geometry below.
     TILT_ANGLE = 'tilt_angle_deg'
     POLARIZATION = 'polarization'
     FAR_FIELD = 'far_field'
     I0_PHOTONS_PER_COUNT = 'i0_photons_per_count'
+    # ScatteringGeometry; absent in files that predate it, which read as forward.
+    TWO_THETA = 'two_theta_deg'
+    DETECTOR_GAMMA = 'detector_gamma_deg'
+    INCIDENCE_ANGLE = 'incidence_angle_deg'
     PROBE_ARRAY = 'probe'
     OPR_WEIGHTS = 'opr_weights'
     PROBE_PIXEL_HEIGHT = 'pixel_height_m'
@@ -348,6 +354,12 @@ def load_product(file: Path) -> Product:
         if ProductFileKeys.POLARIZATION in h5_file.attrs:
             polarization = _parse_polarization(h5_file.attrs[ProductFileKeys.POLARIZATION], file)
 
+        scattering_geometry = ScatteringGeometry(
+            two_theta_deg=float(h5_file.attrs.get(ProductFileKeys.TWO_THETA, 0.0)),
+            detector_gamma_deg=float(h5_file.attrs.get(ProductFileKeys.DETECTOR_GAMMA, 0.0)),
+            incidence_angle_deg=float(h5_file.attrs.get(ProductFileKeys.INCIDENCE_ANGLE, 90.0)),
+        )
+
         metadata = ProductMetadata(
             name=name,
             comments=comments,
@@ -362,6 +374,7 @@ def load_product(file: Path) -> Product:
             polarization=polarization,
             far_field=far_field,
             i0_photons_per_count=i0_photons_per_count,
+            scattering_geometry=scattering_geometry,
         )
 
         h5_object = h5_file[ProductFileKeys.OBJECT_ARRAY]
@@ -512,6 +525,10 @@ def save_product(file: Path, product: Product) -> None:
         h5_file.attrs[ProductFileKeys.TILT_ANGLE] = metadata.tilt_angle_deg
         h5_file.attrs[ProductFileKeys.FAR_FIELD] = metadata.far_field
         h5_file.attrs[ProductFileKeys.I0_PHOTONS_PER_COUNT] = metadata.i0_photons_per_count
+        scattering_geometry = metadata.scattering_geometry
+        h5_file.attrs[ProductFileKeys.TWO_THETA] = scattering_geometry.two_theta_deg
+        h5_file.attrs[ProductFileKeys.DETECTOR_GAMMA] = scattering_geometry.detector_gamma_deg
+        h5_file.attrs[ProductFileKeys.INCIDENCE_ANGLE] = scattering_geometry.incidence_angle_deg
         if metadata.polarization is not None:
             h5_file.attrs[ProductFileKeys.POLARIZATION] = metadata.polarization.value
 
@@ -757,11 +774,15 @@ class CXIFileKeys(StrEnum):
     EXPOSURE_TIME = 'ptychodus/exposure_time_s'
     MASS_ATTENUATION = 'ptychodus/mass_attenuation_m2_per_kg'
     TOMOGRAPHY_ANGLE = 'ptychodus/tomography_angle_deg'
+    # The APS 4-ID POLAR XMCD sample tilt; not part of the scattering geometry below.
     TILT_ANGLE = 'ptychodus/tilt_angle_deg'
     FOCUS_OBJECT_DISTANCE = 'ptychodus/focus_object_distance_m'
     POLARIZATION = 'ptychodus/polarization'
     FAR_FIELD = 'ptychodus/far_field'
     I0_PHOTONS_PER_COUNT = 'ptychodus/i0_photons_per_count'
+    TWO_THETA = 'ptychodus/two_theta_deg'
+    DETECTOR_GAMMA = 'ptychodus/detector_gamma_deg'
+    INCIDENCE_ANGLE = 'ptychodus/incidence_angle_deg'
     BEAM_CENTER_X = 'ptychodus/beam_center_x_px'
     BEAM_CENTER_Y = 'ptychodus/beam_center_y_px'
 
@@ -923,6 +944,33 @@ def _read_cxi_photon_energy_eV(entry: h5py.Group) -> float | None:  # noqa: N802
             return wavelength_m_to_energy_eV(wavelength_m)
 
     return None
+
+
+def _read_cxi_scattering_geometry(entry: h5py.Group) -> ScatteringGeometry | None:
+    """The scattering geometry the extension group records, or None if it records none."""
+    two_theta_deg = _read_cxi_float(entry, CXIFileKeys.TWO_THETA)
+    detector_gamma_deg = _read_cxi_float(entry, CXIFileKeys.DETECTOR_GAMMA)
+    incidence_angle_deg = _read_cxi_float(entry, CXIFileKeys.INCIDENCE_ANGLE)
+
+    if two_theta_deg is None and detector_gamma_deg is None and incidence_angle_deg is None:
+        return None
+
+    return ScatteringGeometry(
+        two_theta_deg=0.0 if two_theta_deg is None else two_theta_deg,
+        detector_gamma_deg=0.0 if detector_gamma_deg is None else detector_gamma_deg,
+        incidence_angle_deg=90.0 if incidence_angle_deg is None else incidence_angle_deg,
+    )
+
+
+def _scattering_geometry_datasets(
+    geometry: ScatteringGeometry,
+) -> tuple[tuple[CXIFileKeys, float], ...]:
+    """The extension datasets that record *geometry*."""
+    return (
+        (CXIFileKeys.TWO_THETA, geometry.two_theta_deg),
+        (CXIFileKeys.DETECTOR_GAMMA, geometry.detector_gamma_deg),
+        (CXIFileKeys.INCIDENCE_ANGLE, geometry.incidence_angle_deg),
+    )
 
 
 def _read_cxi_basis_vectors(
@@ -1135,6 +1183,7 @@ def _read_cxi_diffraction_contents(
         ),
         sample_name=sample_name or None,
         file_path=file_path,
+        scattering_geometry=_read_cxi_scattering_geometry(entry),
     )
 
     if 'instrument_1/detector_1/data_white' in entry:
@@ -1348,6 +1397,7 @@ def _read_cxi_product_metadata(entry: h5py.Group, file_path: Path) -> ProductMet
         ),
         far_field=True if far_field is None else bool(far_field),
         i0_photons_per_count=scalar(CXIFileKeys.I0_PHOTONS_PER_COUNT),
+        scattering_geometry=_read_cxi_scattering_geometry(entry) or ScatteringGeometry(),
     )
 
 
@@ -1702,6 +1752,10 @@ def _write_cxi_diffraction(
         if value is not None:
             _replace_cxi_dataset(entry, key, value)
 
+    if metadata.scattering_geometry is not None:
+        for key, value in _scattering_geometry_datasets(metadata.scattering_geometry):
+            _replace_cxi_dataset(entry, key, value)
+
     if metadata.polarization is not None:
         _replace_cxi_dataset(entry, CXIFileKeys.POLARIZATION, str(metadata.polarization))
 
@@ -1920,6 +1974,7 @@ def _write_cxi_product(
         (CXIFileKeys.FOCUS_OBJECT_DISTANCE, metadata.focus_object_distance_m),
         (CXIFileKeys.FAR_FIELD, metadata.far_field),
         (CXIFileKeys.I0_PHOTONS_PER_COUNT, metadata.i0_photons_per_count),
+        *_scattering_geometry_datasets(metadata.scattering_geometry),
     ):
         _replace_cxi_dataset(entry, key, value)
 

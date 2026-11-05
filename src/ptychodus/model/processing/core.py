@@ -1,11 +1,13 @@
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
+import logging
 
 from ptychodus.api.plugins import PluginCatalog
 from ptychodus.api.reconstruct import (
     ReconstructorLibrary,
     SubprocessReconstructor,
     TrainingDataFileWriter,
+    prepare_reconstruct_input,
 )
 
 from ..plugins import PluginChooser, PluginChooserParameter
@@ -106,6 +108,12 @@ class ProcessingCore:
         # Iterating the chooser is not that: it yields what was registered.
         for _, library in libraries:
             library.get_logger().addHandler(self._task_monitor.get_log_handler())
+
+        # What prepare_reconstruct_input warns about -- an unsupported scattering geometry,
+        # a propagation regime the data disagrees with -- belongs beside the run it is about.
+        logging.getLogger(prepare_reconstruct_input.__module__).addHandler(
+            self._task_monitor.get_log_handler()
+        )
 
         # Two selections, one behind the other: the chooser's own current
         # plugin is the library, and the algorithm is resolved against

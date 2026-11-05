@@ -31,6 +31,7 @@ from ptychodus.api.product import (
     ProductMetadata,
 )
 from ptychodus.api.reconstruct import LossValue
+from ptychodus.api.scattering.geometry import ScatteringGeometry
 from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 
 logger = logging.getLogger(__name__)
@@ -75,10 +76,14 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
     EXPOSURE_TIME: Final[str] = 'exposure_time_s'
     MASS_ATTENUATION: Final[str] = 'mass_attenuation_m2_per_kg'
     TOMOGRAPHY_ANGLE: Final[str] = 'tomography_angle_deg'
+    # The APS 4-ID POLAR XMCD sample tilt; not part of the scattering geometry below.
     TILT_ANGLE: Final[str] = 'tilt_angle_deg'
     POLARIZATION: Final[str] = 'polarization'
     FAR_FIELD: Final[str] = 'far_field'
     I0_PHOTONS_PER_COUNT: Final[str] = 'i0_photons_per_count'
+    TWO_THETA: Final[str] = 'two_theta_deg'
+    DETECTOR_GAMMA: Final[str] = 'detector_gamma_deg'
+    INCIDENCE_ANGLE: Final[str] = 'incidence_angle_deg'
 
     PROBE_ARRAY: Final[str] = 'probe'
     OPR_WEIGHTS: Final[str] = 'opr_weights'
@@ -137,6 +142,11 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
                 polarization=self._read_polarization(npz_file, file_path),
                 far_field=_read_boolean(npz_file, self.FAR_FIELD, True),
                 i0_photons_per_count=_read_real(npz_file, self.I0_PHOTONS_PER_COUNT, 0.0),
+                scattering_geometry=ScatteringGeometry(
+                    two_theta_deg=_read_real(npz_file, self.TWO_THETA, 0.0),
+                    detector_gamma_deg=_read_real(npz_file, self.DETECTOR_GAMMA, 0.0),
+                    incidence_angle_deg=_read_real(npz_file, self.INCIDENCE_ANGLE, 90.0),
+                ),
             )
 
             scan_indexes = npz_file[self.PROBE_POSITION_INDEXES]
@@ -234,6 +244,9 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
         contents[self.TILT_ANGLE] = metadata.tilt_angle_deg
         contents[self.FAR_FIELD] = metadata.far_field
         contents[self.I0_PHOTONS_PER_COUNT] = metadata.i0_photons_per_count
+        contents[self.TWO_THETA] = metadata.scattering_geometry.two_theta_deg
+        contents[self.DETECTOR_GAMMA] = metadata.scattering_geometry.detector_gamma_deg
+        contents[self.INCIDENCE_ANGLE] = metadata.scattering_geometry.incidence_angle_deg
 
         # savez cannot store None, so an absent key is how both formats spell "unpolarized".
         if metadata.polarization is not None:

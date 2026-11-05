@@ -20,6 +20,7 @@ from ptychodus.api.constants import LengthUnit
 from ptychodus.api.diffraction import Polarization
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import load_diffraction_data, load_fluorescence_data, load_product
+from ptychodus.api.scattering.geometry import ScatteringRegime
 
 from ptychodus.webapp.db import repositories as repo
 from ptychodus.webapp.db.base import IngestState
@@ -237,10 +238,13 @@ def create_mcp_server() -> FastMCP:
         ingest_state: str | None = None,
         photon_energy_eV_min: float | None = None,  # noqa: N803
         photon_energy_eV_max: float | None = None,  # noqa: N803
+        scattering_regime: ScatteringRegime | None = None,
     ) -> Page[ProductRead]:
-        """List reconstruction products."""
+        """List reconstruction products, optionally only transmission, Bragg or Laue ones."""
         async with _session() as session:
             where = []
+            if scattering_regime is not None:
+                where.append(Product.scattering_regime == scattering_regime.value)
             if ingest_state is not None:
                 where.append(Product.ingest_state == ingest_state)
             if photon_energy_eV_min is not None:

@@ -118,7 +118,7 @@ function showDetail(host: HTMLElement, p: ProductRead): void {
     ['I0 Calibration [photons/count]', fmt(p.i0_photons_per_count)],
     ['Mass Attenuation [m²/kg]', fmt(p.mass_attenuation_m2_per_kg)],
     ['Tomography Angle [deg]', fmt(p.tomography_angle_deg)],
-    ['Tilt Angle [deg]', fmt(p.tilt_angle_deg)],
+    ['XMCD Tilt Angle [deg]', fmt(p.tilt_angle_deg)],
     ['Polarization', p.polarization ?? '(unset)'],
     ['Fresnel Number', fmt(p.fresnel_number)],
     ['Detector Numerical Aperture', fmt(p.detector_numerical_aperture)],
@@ -131,6 +131,10 @@ function showDetail(host: HTMLElement, p: ProductRead): void {
     ['Diffraction Dataset', datasetName(p)],
     ['Focus-Object Distance [mm]', fmt(scale(p.focus_object_distance_m, 1e3))],
     ['Far Field', farFieldText(p.far_field)],
+    ['Two Theta [deg]', fmt(p.two_theta_deg)],
+    ['Detector Gamma [deg]', fmt(p.detector_gamma_deg)],
+    ['Incidence Angle [deg]', fmt(p.incidence_angle_deg)],
+    ['Scattering Geometry', scatteringText(p)],
   ];
   for (const [k, v] of rows) {
     const dt = document.createElement('dt');
@@ -173,6 +177,13 @@ function datasetName(p: ProductRead): string {
   const edge = p.derived_from.find((e) => e.kind === 'diffraction');
   if (edge === undefined) return MISSING;
   return edge.label || edge.uuid.slice(0, 8);
+}
+
+// As the desktop editor's geometry row reads: the regime, then the propagation.
+function scatteringText(p: ProductRead): string {
+  if (p.scattering_regime === null) return MISSING;
+  const regime = p.scattering_regime.charAt(0).toUpperCase() + p.scattering_regime.slice(1);
+  return `${regime}, ${farFieldText(p.far_field).toLowerCase()}`;
 }
 
 function farFieldText(farField: boolean | null): string {

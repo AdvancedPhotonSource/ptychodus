@@ -33,6 +33,7 @@ import pytest
 
 from ptychodus.api.accumulate import DiffractionMoments, compute_diffraction_moments
 from ptychodus.api.assemble import AssembledDiffractionData
+from ptychodus.api.scattering.geometry import ScatteringGeometry
 from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry
 from ptychodus.api.probe import (
     OPRWeightPolicy,
@@ -1333,3 +1334,52 @@ class TestAveragePatternOptions:
         expected = original.build(_provider_with(other_pattern)).get_probe_no_opr().get_array()
 
         numpy.testing.assert_allclose(built, expected, atol=1e-9)
+
+
+class _OffAxisProbeGeometryProvider(_StubProbeGeometryProvider):
+    """The stub provider describing a Laue geometry, foreshortened by cos 2θ along x."""
+
+    @property
+    def scattering_geometry(self) -> ScatteringGeometry:
+        return ScatteringGeometry(two_theta_deg=57.42, incidence_angle_deg=90.0)
+
+
+class TestModelProbesInTheExitFrame:
+    """A model probe is the beam's cross section, so off axis it is resampled."""
+
+    def test_a_model_probe_is_foreshortened_along_x(self) -> None:
+        def width_px(probe_seq: ProbeEnsemble, axis: int) -> int:
+            intensity = numpy.sum(numpy.square(numpy.abs(probe_seq.get_array()[0, 0])), axis=axis)
+            return int(numpy.count_nonzero(intensity > 0.5 * intensity.max()))
+
+        forward = _make_builder('disk', _make_settings()).build(_StubProbeGeometryProvider())
+        laue = _make_builder('disk', _make_settings()).build(_OffAxisProbeGeometryProvider())
+
+        assert width_px(laue, axis=0) < width_px(forward, axis=0)
+        assert width_px(laue, axis=1) == width_px(forward, axis=1)
+        assert numpy.sum(numpy.square(numpy.abs(laue.get_array()))) == pytest.approx(
+            numpy.sum(numpy.square(numpy.abs(forward.get_array()))), rel=1e-9
+        )
+
+    def test_a_probe_estimated_from_the_patterns_is_left_alone(self) -> None:
+        rng = numpy.random.default_rng(3)
+        patterns = rng.poisson(
+            100.0, size=(NUM_SCAN_POINTS, PROBE_EXTENT_PX, PROBE_EXTENT_PX)
+        ).astype(float)
+        data = AssembledDiffractionData(
+            numpy.arange(NUM_SCAN_POINTS),
+            patterns,
+            PixelGeometry(width_m=PIXEL_SIZE_M, height_m=PIXEL_SIZE_M),
+            numpy.zeros((PROBE_EXTENT_PX, PROBE_EXTENT_PX), dtype=bool),
+        )
+        # The stub's wavelength over its unit distance, on the stub detector's pitch.
+        far_field_pixel_m = 1.0e-10 * 1.0 / (PROBE_EXTENT_PX * PIXEL_SIZE_M)
+
+        forward = _make_builder('average_pattern', _make_settings()).build(
+            _StubProbeGeometryProvider(assembled_data=data, pixel_size_m=far_field_pixel_m)
+        )
+        laue = _make_builder('average_pattern', _make_settings()).build(
+            _OffAxisProbeGeometryProvider(assembled_data=data, pixel_size_m=far_field_pixel_m)
+        )
+
+        numpy.testing.assert_array_equal(laue.get_array(), forward.get_array())

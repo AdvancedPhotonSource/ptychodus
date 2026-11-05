@@ -3,12 +3,13 @@
 
 Off the forward direction the detector sees the sample projected along the exit beam,
 and pty-chi reconstructs it unchanged once the probe positions are carried into that
-exit frame by :meth:`AffineTransform.from_scattering_geometry`. This script tests that
+exit frame by :func:`~ptychodus.api.scattering.frame.compute_exit_frame_transform`. This script tests that
 claim end to end. It simulates a thin crystal surface with
 :func:`generate_scattering_data` and writes two prepared directories holding the same
 patterns:
 
-- ``corrected``: positions carried into the exit frame;
+- ``corrected``: positions carried into the exit frame, the product tagged with the
+  geometry, as a driver run with the scattering-angle flags writes it;
 - ``control``: positions left as the scan recorded them, the transmission assumption.
 
 Both start from the same probe, the back-propagated mean pattern, and a uniform object.
@@ -16,18 +17,16 @@ Each is reconstructed with ``ptychodus-reconstruct`` and compared with the exit-
 truth. At forward geometry the two runs are identical. Off it, the corrected run should
 match the truth about as well as a forward run does, and the control should not.
 
-Given ``--prepared-directory`` instead, it transforms an existing prepared directory --
-from a reconstruction driver run with ``--prepare-only`` on real data -- into a new
-one for ``ptychodus-reconstruct``, without reconstructing. The source is left untouched.
+For real data, a reconstruction driver that offers ``--two-theta-deg``,
+``--detector-gamma-deg`` and ``--incidence-angle-deg`` prepares the corrected directory
+itself, with ``--prepare-only``.
 
 Example usage:
 
     python scripts/check_scattering_round_trip.py --geometry bragg-asymmetric \\
         --work-directory /tmp/bragg-asymmetric
-    python scripts/check_scattering_round_trip.py --geometry laue \\
-        --prepared-directory prepared --work-directory prepared_exit
 
-Needs the ptychi extra for the simulated mode. No packaged dependency -- this file is
+Needs the ptychi extra. No packaged dependency -- this file is
 intentionally not shipped with the wheel.
 """
 
@@ -37,7 +36,6 @@ from dataclasses import replace
 from pathlib import Path
 import argparse
 import logging
-import shutil
 import subprocess
 import sys
 
@@ -62,7 +60,8 @@ from ptychodus.api.object import (
 from ptychodus.api.probe import ProbeEnsemble, ProbeGeometry
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.scattering import ScatteringGeometry
+from ptychodus.api.scattering.frame import compute_exit_frame_transform
+from ptychodus.api.scattering.geometry import ScatteringGeometry
 from ptychodus.api.simulate.diffraction import generate_scattering_data
 from ptychodus.api.simulate.object import (
     generate_gaussian_random_field_object,
@@ -105,13 +104,7 @@ def _build_parser() -> argparse.ArgumentParser:
         '--work-directory',
         type=Path,
         required=True,
-        help='Where the prepared and reconstructed directories are written; with '
-        '--prepared-directory, the transformed prepared directory itself.',
-    )
-    parser.add_argument(
-        '--prepared-directory',
-        type=Path,
-        help='Transform this prepared directory instead of simulating one.',
+        help='Where the prepared and reconstructed directories are written.',
     )
     parser.add_argument('--photon-energy-eV', type=float, default=11200.0)
     parser.add_argument('--detector-distance-m', type=float, default=0.89)
@@ -142,9 +135,8 @@ def _resolve_geometry(args: argparse.Namespace) -> ScatteringGeometry:
 
 
 def _describe(geometry: ScatteringGeometry, transform: AffineTransform) -> str:
-    kind = 'forward' if geometry.is_forward else 'Bragg' if geometry.is_reflection else 'Laue'
     return (
-        f'{kind} geometry {geometry}: positions map by '
+        f'{geometry.regime.value.capitalize()} geometry {geometry}: positions map by '
         f'[[{transform.a00:+.6f}, {transform.a01:+.6f}], '
         f'[{transform.a10:+.6f}, {transform.a11:+.6f}]]'
     )
@@ -167,29 +159,6 @@ def _write_prepared(directory: Path, data: AssembledDiffractionData, product: Pr
     directory.mkdir(parents=True, exist_ok=True)
     save_diffraction_data(StandardFileLayout.DIFFRACTION.path(directory), data)
     save_product(StandardFileLayout.PRODUCT.path(directory), product)
-
-
-def _transform_prepared(args: argparse.Namespace, geometry: ScatteringGeometry) -> None:
-    source: Path = args.prepared_directory
-    target: Path = args.work_directory
-
-    if target.resolve() == source.resolve():
-        raise SystemExit('--work-directory must differ from --prepared-directory.')
-
-    transform = AffineTransform.from_scattering_geometry(geometry)
-    logger.info(_describe(geometry, transform))
-    product = load_product(StandardFileLayout.PRODUCT.path(source))
-    positions = ProbePositionSequence(
-        list(transform_probe_positions(product.probe_positions, transform))
-    )
-    target.mkdir(parents=True, exist_ok=True)
-
-    for layout in (StandardFileLayout.DIFFRACTION, StandardFileLayout.PTYCHI_OPTIONS):
-        if layout.path(source).is_file():
-            shutil.copy2(layout.path(source), layout.path(target))
-
-    save_product(StandardFileLayout.PRODUCT.path(target), _with_positions(product, positions))
-    logger.info(f'Wrote {target}; reconstruct it with: ptychodus-reconstruct -i {target} -o OUT')
 
 
 def _simulate(
@@ -329,12 +298,7 @@ def main() -> int:
     args = _build_parser().parse_args()
     logging.basicConfig(level=args.log_level, format='%(name)s %(levelname)s: %(message)s')
     geometry = _resolve_geometry(args)
-
-    if args.prepared_directory is not None:
-        _transform_prepared(args, geometry)
-        return 0
-
-    transform = AffineTransform.from_scattering_geometry(geometry)
+    transform = compute_exit_frame_transform(geometry)
     logger.info(_describe(geometry, transform))
     data, truth, initial = _simulate(args, geometry)
     work: Path = args.work_directory
@@ -343,8 +307,11 @@ def main() -> int:
     corrected_positions = ProbePositionSequence(
         list(transform_probe_positions(initial.probe_positions, transform))
     )
+    corrected = _with_positions(initial, corrected_positions)
     runs = {
-        'corrected': _with_positions(initial, corrected_positions),
+        'corrected': replace(
+            corrected, metadata=replace(corrected.metadata, scattering_geometry=geometry)
+        ),
         'control': _with_positions(initial, initial.probe_positions),
     }
     scores = {}

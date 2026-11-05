@@ -21,7 +21,7 @@ from .constants import format_length
 from .files import FileReader, FileWriter
 from .fourier import fourier_shift_2d
 from .geometry import PixelGeometry
-from .interpolate import resample_along_axis
+from .interpolate import resample_complex_on_grid
 from .probe import ProbeGeometry
 from .probe_positions import ProbePosition, ProbePositionSequence, calculate_scan_geometry
 
@@ -585,23 +585,32 @@ def _resample_axis_indexes(
 
 
 def resample_object(
-    obj: Object, target_geometry: ObjectGeometry, *, fill_value: complex = 0.0
+    obj: Object,
+    target_geometry: ObjectGeometry,
+    *,
+    fill_value: complex = 0.0,
+    interpolation_order: int = 3,
 ) -> Object:
     """Resample every layer of ``obj`` onto ``target_geometry``.
 
     Source and target may differ in extent, pitch and center, and the two axes are
     handled independently. Both grids are axis-aligned, so the target is a tensor product
-    of two 1-D grids and the resampling separates into one pass per axis over the whole
-    layer stack: four interpolator calls, counting the real and imaginary parts
-    separately, and no loop over layers. A general affine warp carries rotation and
-    shear, does not separate this way, and belongs to
-    :func:`ptychodus.api.affine.transform_product`.
+    of two 1-D grids (:func:`ptychodus.api.interpolate.resample_complex_on_grid`). A general
+    affine warp carries rotation and shear, does not separate this way, and belongs to
+    :func:`ptychodus.api.product.transform_product`.
+
+    The interpolant is a B-spline of *interpolation_order* on the real and imaginary parts,
+    linear in the field, so the result does not depend on the arbitrary global phase a
+    reconstruction settled on. Lowering the order is faster and blurs fringes; a cubic
+    overshoots by a few percent at a hard edge. A spline is not local, so a discontinuity
+    at the source's border -- a fill sliver from rounding a pixel count -- spreads a few
+    pixels inward, decaying about fourfold per pixel at order 3.
 
     Target pixels falling outside the source take ``fill_value``. Zero is what padding an
     object does elsewhere; pass ``1.0`` for vacuum, the only fill that leaves a
     transmission function's layer product unchanged.
 
-    Evaluating PCHIP at its own grid nodes is exact only to round-off, so a target that
+    Evaluating the spline at its own grid nodes is exact only to round-off, so a target that
     repeats the source grid is not a bit-exact no-op. Callers that rebuild on every
     settings notification must test for that themselves, as
     :func:`resample_object_to_pixel_size` does.
@@ -643,17 +652,14 @@ def resample_object(
         target_geometry.height_px,
     )
 
-    resampled = obj.get_array()
-
-    for indexes, axis in ((columns, -1), (rows, -2)):
-        real = resample_along_axis(resampled.real, indexes, axis=axis, fill_value=fill_value.real)
-        imaginary = resample_along_axis(
-            resampled.imag, indexes, axis=axis, fill_value=fill_value.imag
-        )
-        resampled = real + 1j * imaginary
-
     return Object(
-        array=resampled,
+        array=resample_complex_on_grid(
+            obj.get_array(),
+            rows,
+            columns,
+            order=interpolation_order,
+            fill_value=complex(fill_value),
+        ),
         pixel_geometry=target_geometry.get_pixel_geometry(),
         center=target_geometry.get_center(),
         layer_spacing_m=list(obj.layer_spacing_m),
@@ -661,7 +667,11 @@ def resample_object(
 
 
 def resample_object_to_pixel_size(
-    obj: Object, pixel_geometry: PixelGeometry, *, rel_tol: float = 1.0e-9
+    obj: Object,
+    pixel_geometry: PixelGeometry,
+    *,
+    rel_tol: float = 1.0e-9,
+    interpolation_order: int = 3,
 ) -> Object:
     """Re-express ``obj`` at ``pixel_geometry``, preserving its physical extent and center.
 
@@ -688,6 +698,7 @@ def resample_object_to_pixel_size(
         obj: Object to re-express, typically an initial guess read from a file.
         pixel_geometry: Sampling implied by the run's geometry.
         rel_tol: Largest relative pitch difference that still names the same sampling.
+        interpolation_order: See :func:`resample_object`.
     """
     try:
         source_pixel_geometry = obj.get_pixel_geometry()
@@ -744,7 +755,9 @@ def resample_object_to_pixel_size(
         target_geometry.width_px,
         target_geometry.height_px,
     )
-    resampled = resample_object(obj, target_geometry, fill_value=1.0)
+    resampled = resample_object(
+        obj, target_geometry, fill_value=1.0, interpolation_order=interpolation_order
+    )
 
     if has_center:
         return resampled

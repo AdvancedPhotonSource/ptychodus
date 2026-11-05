@@ -19,7 +19,7 @@ from .constants import format_length
 from .files import FileReader, FileWriter
 from .fourier import fourier_shift_2d
 from .geometry import ImageExtent, PixelGeometry
-from .interpolate import resample_along_axis
+from .interpolate import resample_complex_on_grid
 from .moments import compute_intensity_moments
 from .preprocess.diffraction import inpaint_bad_pixels
 from .preprocess.noise import subtract_noise_floor
@@ -30,6 +30,7 @@ from .propagate import (
     compute_near_field_pixel_geometry,
     intensity,
 )
+from .scattering.geometry import ScatteringGeometry
 from .typing import BooleanArrayType, ComplexArrayType, RealArrayType
 
 logger = logging.getLogger(__name__)
@@ -1057,6 +1058,15 @@ class ProbeGeometryProvider(ABC):
         statistics does not pass over every pattern itself.
         """
 
+    @property
+    def scattering_geometry(self) -> ScatteringGeometry:
+        """The geometry a model probe is carried into the exit frame of; forward by default.
+
+        A provider describing an off-axis product overrides this, so a probe generated
+        across the incident beam can be resampled onto the exit frame the product is in.
+        """
+        return ScatteringGeometry()
+
 
 class Probe:
     """Probe (illumination function) stored as a (modes, height, width) complex array.
@@ -1661,7 +1671,11 @@ def _centered_grid_indexes(
 
 
 def resample_probe_ensemble(
-    probes: ProbeEnsemble, target_geometry: ProbeGeometry, *, rel_tol: float = 1.0e-9
+    probes: ProbeEnsemble,
+    target_geometry: ProbeGeometry,
+    *,
+    rel_tol: float = 1.0e-9,
+    interpolation_order: int = 3,
 ) -> ProbeEnsemble:
     """Re-express ``probes`` on ``target_geometry``, preserving the integrated power.
 
@@ -1672,7 +1686,11 @@ def resample_probe_ensemble(
     interpolates every coherent and incoherent mode onto the target grid.
 
     A probe carries no world center, so both grids are centered on their own arrays and
-    the resampling separates into one monotone-cubic pass per axis. Content beyond the
+    the resampling separates into one pass per axis
+    (:func:`ptychodus.api.interpolate.resample_complex_on_grid`). The interpolant is a
+    B-spline on the real and imaginary parts, linear in the field, so every mode is
+    resampled consistently with its OPR weights and the result does not depend on the
+    probe's arbitrary global phase. Content beyond the
     source is zero: outside the frame there is no illumination, which is the answer, not
     a filler. That is what distinguishes this from an object, where the same fill would
     assert an opaque border.
@@ -1690,6 +1708,8 @@ def resample_probe_ensemble(
         probes: Probe ensemble to re-express, typically an initial guess read from a file.
         target_geometry: Grid implied by the run's detector and illumination geometry.
         rel_tol: Largest relative pitch difference that still names the same sampling.
+        interpolation_order: Spline order of the resampling. Lowering it is faster and
+            blurs the probe's fringes.
     """
     try:
         pixel_geometry = probes.get_pixel_geometry()
@@ -1740,12 +1760,9 @@ def resample_probe_ensemble(
         target_geometry.height_px,
     )
 
-    resampled = probes.get_array()
-
-    for indexes, axis in ((columns, -1), (rows, -2)):
-        real = resample_along_axis(resampled.real, indexes, axis=axis, fill_value=0.0)
-        imaginary = resample_along_axis(resampled.imag, indexes, axis=axis, fill_value=0.0)
-        resampled = real + 1j * imaginary
+    resampled = resample_complex_on_grid(
+        probes.get_array(), rows, columns, order=interpolation_order
+    )
 
     source_area_m2 = pixel_geometry.width_m * pixel_geometry.height_m
     target_area_m2 = target_geometry.pixel_width_m * target_geometry.pixel_height_m

@@ -247,8 +247,19 @@
 
 ## Scattering
 
+### Scattering geometry
+
 ```{eval-rst}
-.. automodule:: ptychodus.api.scattering
+.. automodule:: ptychodus.api.scattering.geometry
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+### Exit frame
+
+```{eval-rst}
+.. automodule:: ptychodus.api.scattering.frame
    :members:
    :undoc-members:
    :show-inheritance:

@@ -19,9 +19,11 @@ Scope and limitations
   takes precedence. Some MDA records carry neither; pass ``--photon-energy-eV`` and
   ``--detector-distance-m`` for those. The pixel pitch is the detector's, supplied by
   the reader.
-- Scans taken with the detector arm off the forward direction load and run, but the
-  forward model is transmission ptychography, so their reconstructions are not
-  physically meaningful.
+- Scans taken with the detector arm off the forward direction (Bragg or Laue) need
+  ``--two-theta-deg``, ``--detector-gamma-deg`` and ``--incidence-angle-deg``: the
+  positions are then carried into the exit frame, where the transmission forward model
+  holds for a thin sample. The reader does not record these angles, and without them
+  such scans are reconstructed as transmission, which is not physically meaningful.
 - Output is a ptychodus product HDF5. Feeding it back as ``--probe-file`` on the next
   scan is the intended warm start.
 - No GPU selection or thread-count side effects. Choose a device with
@@ -70,6 +72,7 @@ PROFILE = InstrumentProfile(
         '.h5': 'CNM_APS_HXN',
         '.hdf5': 'CNM_APS_HXN',
     },
+    offers_scattering_geometry=True,
 )
 
 

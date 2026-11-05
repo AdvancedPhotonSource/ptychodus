@@ -4,6 +4,7 @@ import logging
 from PyQt5.QtCore import QModelIndex, QStringListModel
 from PyQt5.QtWidgets import QAbstractItemView, QDialog, QMessageBox
 
+from ptychodus.api.affine import AffineTransform
 from ptychodus.model.observer import SequenceObserver
 
 from ...model.product import ProbePositionsAPI, ProbePositionsRepository
@@ -179,6 +180,7 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
 
     def _redraw_plot(self) -> None:
         self._plot_view.axes.clear()
+        is_any_exit_frame = False
 
         for row in range(self._table_proxy_model.rowCount()):
             proxy_index = self._table_proxy_model.index(row, 0)
@@ -186,16 +188,21 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
 
             if self._table_model.is_item_checked(item_index):
                 item_name = self._repository.get_name(item_index)
-                probe_positions = self._repository[item_index].get_probe_positions()
+                item = self._repository[item_index]
+                probe_positions = item.get_probe_positions()
                 x = [point.x_m for point in probe_positions]
                 y = [point.y_m for point in probe_positions]
                 self._plot_view.axes.plot(x, y, '.-', label=item_name, linewidth=1.5)
+                is_any_exit_frame |= item.get_exit_transform() != AffineTransform.create_identity()
 
+        # Off axis, positions are shown where the detector's Fourier relation places them,
+        # not where the scan recorded them.
+        frame = ' (exit frame)' if is_any_exit_frame else ''
         self._plot_view.axes.invert_yaxis()
         self._plot_view.axes.axis('equal')
         self._plot_view.axes.grid(True)
-        self._plot_view.axes.set_xlabel('X [m]')
-        self._plot_view.axes.set_ylabel('Y [m]')
+        self._plot_view.axes.set_xlabel(f'X{frame} [m]')
+        self._plot_view.axes.set_ylabel(f'Y{frame} [m]')
 
         if len(self._plot_view.axes.lines) > 0:
             self._plot_view.axes.legend(loc='best')

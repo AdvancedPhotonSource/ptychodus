@@ -4,6 +4,7 @@ import logging
 
 from ptychodus.api.diffraction import Polarization
 from ptychodus.api.product import ProductMetadata
+from ptychodus.api.scattering.geometry import ScatteringGeometry
 
 from ..parameters import Parameter, ParameterGroup
 from .settings import ProductSettings
@@ -67,6 +68,7 @@ class MetadataRepositoryItem(ParameterGroup):
         polarization: Polarization | None = None,
         far_field: bool | None = None,
         i0_photons_per_count: float | None = None,
+        scattering_geometry: ScatteringGeometry | None = None,
     ) -> None:
         super().__init__()
         self._settings = settings
@@ -155,6 +157,19 @@ class MetadataRepositoryItem(ParameterGroup):
 
         self._add_parameter('i0_photons_per_count', self.i0_photons_per_count)
 
+        self.two_theta_deg = settings.two_theta_deg.copy()
+        self.detector_gamma_deg = settings.detector_gamma_deg.copy()
+        self.incidence_angle_deg = settings.incidence_angle_deg.copy()
+
+        if scattering_geometry is not None:
+            self.two_theta_deg.set_value(scattering_geometry.two_theta_deg)
+            self.detector_gamma_deg.set_value(scattering_geometry.detector_gamma_deg)
+            self.incidence_angle_deg.set_value(scattering_geometry.incidence_angle_deg)
+
+        self._add_parameter('two_theta_deg', self.two_theta_deg)
+        self._add_parameter('detector_gamma_deg', self.detector_gamma_deg)
+        self._add_parameter('incidence_angle_deg', self.incidence_angle_deg)
+
     def assign(self, metadata: ProductMetadata) -> None:
         self.name.set_value(metadata.name)
         self.comments.set_value(metadata.comments)
@@ -171,6 +186,9 @@ class MetadataRepositoryItem(ParameterGroup):
         )
         self.far_field.set_value(metadata.far_field)
         self.i0_photons_per_count.set_value(metadata.i0_photons_per_count)
+        self.two_theta_deg.set_value(metadata.scattering_geometry.two_theta_deg)
+        self.detector_gamma_deg.set_value(metadata.scattering_geometry.detector_gamma_deg)
+        self.incidence_angle_deg.set_value(metadata.scattering_geometry.incidence_angle_deg)
 
     def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
@@ -191,6 +209,14 @@ class MetadataRepositoryItem(ParameterGroup):
             polarization=self._parse_polarization(self.polarization.get_value()),
             far_field=self.far_field.get_value(),
             i0_photons_per_count=self.i0_photons_per_count.get_value(),
+            scattering_geometry=self.get_scattering_geometry(),
+        )
+
+    def get_scattering_geometry(self) -> ScatteringGeometry:
+        return ScatteringGeometry(
+            two_theta_deg=self.two_theta_deg.get_value(),
+            detector_gamma_deg=self.detector_gamma_deg.get_value(),
+            incidence_angle_deg=self.incidence_angle_deg.get_value(),
         )
 
     @staticmethod

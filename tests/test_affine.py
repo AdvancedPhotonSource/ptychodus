@@ -6,13 +6,13 @@ import math
 import numpy
 import pytest
 
-from ptychodus.api.affine import estimate_affine_transform, transform_product
+from ptychodus.api.affine import estimate_affine_transform
 from ptychodus.api.affine import AffineTransform, AffineTransformComponents
 from ptychodus.api.object import Object, ObjectGeometry, compute_object_geometry
 from ptychodus.api.probe import ProbeGeometry, ProbeEnsemble
 from ptychodus.api.typing import ComplexArrayType, RealArrayType
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
-from ptychodus.api.product import Product, ProductMetadata
+from ptychodus.api.product import Product, ProductMetadata, transform_product
 from ptychodus.model.analysis.affine import AffineTransformEstimator
 from ptychodus.model.analysis.settings import AffineTransformEstimatorSettings
 from ptychodus.model.product import ProbePositionsRepository
@@ -1213,3 +1213,47 @@ def test_transform_product_rejects_parallel_beam_near_field() -> None:
 
     with pytest.raises(ValueError, match='far-field'):
         transform_product(product, AffineTransform.from_components(_CALIBRATION_COMPONENTS))
+
+
+# ---------------------------------------------------------------------------
+# Linear-matrix accessors and the determinant
+# ---------------------------------------------------------------------------
+
+
+def test_the_linear_matrix_round_trips_with_its_translation() -> None:
+    matrix = numpy.array([[1.02, -0.04], [0.17, 0.95]])
+    transform = AffineTransform.from_linear_matrix(
+        matrix, translation_x_m=3e-7, translation_y_m=-2e-7
+    )
+
+    numpy.testing.assert_array_equal(transform.get_linear_matrix(), matrix)
+    assert (transform.a02, transform.a12) == (3e-7, -2e-7)
+
+
+def test_the_linear_matrix_acts_on_x_y_column_vectors() -> None:
+    transform = AffineTransform(1.1, 0.2, 0.0, -0.3, 0.9, 0.0)
+    position = ProbePosition(index=0, x_m=2.0, y_m=-1.0)
+    moved = transform(position)
+
+    numpy.testing.assert_allclose(
+        transform.get_linear_matrix() @ [position.x_m, position.y_m], [moved.x_m, moved.y_m]
+    )
+
+
+def test_a_linear_part_must_be_two_by_two() -> None:
+    with pytest.raises(ValueError, match='2x2'):
+        AffineTransform.from_linear_matrix(numpy.eye(3))
+
+
+@pytest.mark.parametrize(
+    'transform',
+    [
+        AffineTransform(1.02, -0.04, 1.0, 0.17, 0.95, -1.0),
+        AffineTransform(-1.0, 0.0, 0.0, 0.0, 1.0, 0.0),
+        AffineTransform(1.0, 2.0, 0.0, 2.0, 4.0, 0.0),
+    ],
+)
+def test_the_determinant_is_that_of_the_linear_part(transform: AffineTransform) -> None:
+    assert transform.determinant == pytest.approx(
+        float(numpy.linalg.det(transform.get_linear_matrix())), abs=1e-15
+    )

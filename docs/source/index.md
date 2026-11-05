@@ -17,6 +17,7 @@ initial_guesses
 fluorescence
 xmcd
 near_field
+bragg_laue
 readers
 reconstruction_drivers
 api

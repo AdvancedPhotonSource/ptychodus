@@ -28,6 +28,7 @@ from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import LossValue, Product, ProductMetadata
+from ptychodus.api.scattering.geometry import ScatteringGeometry
 from ptychodus.api.assemble import AssembledDiffractionData
 
 
@@ -898,6 +899,9 @@ DISTINCTIVE_METADATA: Final[dict[str, Any]] = {
     # Away from the True default, so a writer that drops the field is caught.
     'far_field': False,
     'i0_photons_per_count': 37.5,
+    'scattering_geometry': ScatteringGeometry(
+        two_theta_deg=47.35, detector_gamma_deg=-0.27, incidence_angle_deg=24.15
+    ),
 }
 
 
@@ -1124,8 +1128,29 @@ def test_legacy_npz_without_the_new_keys_still_loads(tmp_path: Path) -> None:
     assert loaded.metadata.exposure_time_s == 0.0
     assert loaded.metadata.tilt_angle_deg == 0.0
     assert loaded.metadata.polarization is None
+    assert loaded.metadata.scattering_geometry == ScatteringGeometry()
     assert loaded.probe_positions.get_probe_photon_counts() is None
     assert list(loaded.object_.layer_spacing_m) == []
     assert list(loaded.losses) == []
     # A probe with no pixel size of its own inherits the object's.
     assert loaded.probes.get_pixel_geometry().width_m == pytest.approx(10e-9)
+
+
+def test_hdf5_product_without_scattering_keys_reads_as_forward(tmp_path: Path) -> None:
+    """A product.h5 written before the geometry existed is a transmission product."""
+    import h5py
+
+    from ptychodus.api.io import ProductFileKeys, load_product, save_product
+
+    file = tmp_path / 'legacy.h5'
+    save_product(file, _make_product(metadata=ProductMetadata(**DISTINCTIVE_METADATA)))
+
+    with h5py.File(file, 'r+') as h5_file:
+        for key in (
+            ProductFileKeys.TWO_THETA,
+            ProductFileKeys.DETECTOR_GAMMA,
+            ProductFileKeys.INCIDENCE_ANGLE,
+        ):
+            del h5_file.attrs[key]
+
+    assert load_product(file).metadata.scattering_geometry == ScatteringGeometry()
