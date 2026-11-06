@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy
 from pydantic import BaseModel, Field
 
+from ptychodus.api.constants import PI
 from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.probe import Probe
 from ptychodus.api.simulate.object import ObjectGenerator, generate_siemens_star_object
@@ -23,8 +24,8 @@ class SiemensStarOptions(BaseModel):
     )
     spoke_amplitude: float = Field(0.0, ge=0.0, le=1.0, title='Spoke Amplitude:')
     background_amplitude: float = Field(1.0, ge=0.0, le=1.0, title='Background Amplitude:')
-    spoke_phase_tr: float = Field(-0.25, title='Spoke Phase:')
-    background_phase_tr: float = Field(0.0, title='Background Phase:')
+    spoke_phase_rad: float = Field(-0.5 * PI, title='Spoke Phase:')
+    background_phase_rad: float = Field(0.0, title='Background Phase:')
 
 
 class SiemensStarObjectGenerator(ObjectGenerator):
@@ -48,6 +49,6 @@ class SiemensStarObjectGenerator(ObjectGenerator):
             outer_radius_fraction=star.outer_radius_fraction,
             spoke_amplitude=star.spoke_amplitude,
             background_amplitude=star.background_amplitude,
-            spoke_phase_tr=star.spoke_phase_tr,
-            background_phase_tr=star.background_phase_tr,
+            spoke_phase_rad=star.spoke_phase_rad,
+            background_phase_rad=star.background_phase_rad,
         )

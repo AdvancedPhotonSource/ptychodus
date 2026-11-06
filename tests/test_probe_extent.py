@@ -25,6 +25,7 @@ import pytest
 from ptychodus.api.moments import compute_intensity_moments
 from ptychodus.api.probe import Probe, ProbeGeometry, estimate_probe_extent
 from ptychodus.api.simulate.probe import propagate_probe
+from ptychodus.api.constants import PI
 
 _NUM_PX = 256
 _PIXEL_M = 10e-9
@@ -163,7 +164,7 @@ def test_zero_defocus_warns_that_only_the_waist_is_left(
 
     assert any('transform-limited' in record.message for record in caplog.records)
     sigma_q = 10.0 * _DQ  # a uniform disk of radius 20 dq has sigma_q = 10 dq
-    waist_m = 1.0 / (4.0 * math.pi * sigma_q)
+    waist_m = 1.0 / (4.0 * PI * sigma_q)
     assert extent.beam_sigma_m == pytest.approx(waist_m, rel=0.03)
     assert extent.disk_diameter_m == pytest.approx(4.0 * waist_m, rel=0.03)
 

@@ -16,6 +16,7 @@ from ptychodus.api.product import Product, ProductMetadata, transform_product
 from ptychodus.model.analysis.affine import AffineTransformEstimator
 from ptychodus.model.analysis.settings import AffineTransformEstimatorSettings
 from ptychodus.model.product import ProbePositionsRepository
+from ptychodus.api.constants import TWO_PI
 
 
 # ---------------------------------------------------------------------------
@@ -914,7 +915,7 @@ def _smooth_field(x_m: RealArrayType, y_m: RealArrayType) -> ComplexArrayType:
     interpolator has to stay well away from it.
     """
     envelope = numpy.exp(-(numpy.square(x_m / 4.0e-6) + numpy.square(y_m / 4.0e-6)))
-    phase = 2.0 * numpy.pi * (x_m / 2.0e-6 + y_m / 3.0e-6)
+    phase = TWO_PI * (x_m / 2.0e-6 + y_m / 3.0e-6)
     return (1.0 + 0.5 * envelope) * numpy.exp(1j * phase)
 
 

@@ -10,7 +10,7 @@ import numpy.testing
 import pytest
 from scipy.fft import ifftshift
 
-from ptychodus.api.constants import energy_eV_to_J, energy_eV_to_wavelength_m
+from ptychodus.api.constants import PI, TWO_PI, TWO_PI_J, energy_eV_to_J, energy_eV_to_wavelength_m
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.propagate import (
     AngularSpectrumPropagator,
@@ -890,7 +890,7 @@ _BEAM_WAVELENGTH_M = 1.2398e-10
 """Illumination wavelength at 10 keV."""
 _BEAM_PIXEL_M = 20e-9
 _BEAM_WAIST_M = 100e-9
-_BEAM_RAYLEIGH_M = numpy.pi * numpy.square(_BEAM_WAIST_M) / _BEAM_WAVELENGTH_M
+_BEAM_RAYLEIGH_M = PI * numpy.square(_BEAM_WAIST_M) / _BEAM_WAVELENGTH_M
 """Rayleigh range of the reference beam, about 253 um."""
 
 
@@ -945,7 +945,7 @@ def _dirichlet_profile(
     The continuous sinc is not the right reference for a sampled aperture; the
     exact discrete analogue is the Dirichlet kernel.
     """
-    t = numpy.pi * coordinate_px / num_px
+    t = PI * coordinate_px / num_px
     sin_t = numpy.sin(t)
     safe_sin_t = numpy.where(sin_t == 0.0, 1.0, sin_t)
     kernel = numpy.where(sin_t == 0.0, 1.0, numpy.sin(aperture_px * t) / (aperture_px * safe_sin_t))
@@ -981,7 +981,7 @@ class TestAngularSpectrumAnalytic:
         params = _beam_params(z_m)
         propagated = AngularSpectrumPropagator(params).propagate(_gaussian_beam(params))
 
-        piston = numpy.exp(-2j * numpy.pi * z_m / _BEAM_WAVELENGTH_M)
+        piston = numpy.exp(-TWO_PI_J * z_m / _BEAM_WAVELENGTH_M)
         on_axis = propagated[params.height_px // 2, params.width_px // 2] * piston
         expected_rad = -numpy.arctan(z_over_rayleigh)
         assert float(numpy.angle(on_axis)) == pytest.approx(expected_rad, abs=1e-4)
@@ -1354,7 +1354,7 @@ class TestAnisotropicSingleFftPropagation:
         The distance is chosen to keep the phase span near a radian; at a realistic
         far-field distance it wraps some 10^5 times and no comparison survives.
         """
-        distance_m = 4.0 * _ANISO_PIXEL_WIDTH_M**2 / (numpy.pi * _ANISO_WAVELENGTH_M)
+        distance_m = 4.0 * _ANISO_PIXEL_WIDTH_M**2 / (PI * _ANISO_WAVELENGTH_M)
         params = _aniso_params(distance_m)
         YY, XX = params.get_spatial_coordinates()  # noqa: N806
         propagated = FraunhoferPropagator(params).propagate(_aniso_gaussian(params))
@@ -1362,7 +1362,7 @@ class TestAnisotropicSingleFftPropagation:
         center = (params.height_px // 2, params.width_px // 2)
         relative = numpy.angle(propagated * numpy.conjugate(propagated[center]))
         expected = (
-            numpy.pi
+            PI
             * params.wavelength_m
             * distance_m
             * (
@@ -1685,7 +1685,7 @@ class TestComputeProductGeometryBeam:
         Asserting ``k_ang == 2 pi k`` would restate how the two are computed and would
         hold even if both were wrong.
         """
-        expected = 2.0 * numpy.pi / _PG_WAVELENGTH_M
+        expected = TWO_PI / _PG_WAVELENGTH_M
 
         assert _product_geometry().probe_angular_wavenumber_rad_per_m == pytest.approx(expected)
 

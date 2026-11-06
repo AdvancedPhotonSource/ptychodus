@@ -1,11 +1,11 @@
-"""Unit tests for LengthUnit, AngleUnit, and format_length."""
+"""Unit tests for LengthUnit and format_length."""
 
 from __future__ import annotations
 from decimal import Decimal
 
 import pytest
 
-from ptychodus.api.constants import HC_EV_ANGSTROM, TWO_PI, AngleUnit, LengthUnit, format_length
+from ptychodus.api.constants import HC_EV_ANGSTROM, LengthUnit, format_length
 
 
 @pytest.mark.parametrize(
@@ -100,21 +100,3 @@ def test_meter_scale_factor_does_not_add_a_trailing_zero() -> None:
 
 def test_hc_ev_angstrom_is_unchanged() -> None:
     assert HC_EV_ANGSTROM == pytest.approx(12398.419843320025)
-
-
-def test_angle_units_per_turn() -> None:
-    assert AngleUnit.TURN.units_per_turn == 1.0
-    assert AngleUnit.DEGREE.units_per_turn == 360.0
-    assert AngleUnit.RADIAN.units_per_turn == TWO_PI
-
-
-def test_angle_convert_and_to_turns_are_inverses() -> None:
-    assert AngleUnit.DEGREE.convert(0.25) == pytest.approx(90.0)
-    assert AngleUnit.DEGREE.to_turns(90.0) == pytest.approx(0.25)
-    assert AngleUnit.RADIAN.convert(0.5) == pytest.approx(TWO_PI / 2)
-
-
-def test_decimal_units_per_turn_is_exact_for_the_rational_units() -> None:
-    assert AngleUnit.TURN.decimal_units_per_turn == Decimal(1)
-    assert AngleUnit.DEGREE.decimal_units_per_turn == Decimal(360)
-    assert AngleUnit.RADIAN.decimal_units_per_turn == Decimal.from_float(TWO_PI)

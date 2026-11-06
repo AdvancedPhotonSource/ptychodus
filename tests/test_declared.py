@@ -32,7 +32,7 @@ class TestRenderKey:
 
     def test_a_unit_suffix_is_spelled_out(self) -> None:
         assert render_key('step_size_x_m') == 'StepSizeXInMeters'
-        assert render_key('angular_shift_tr') == 'AngularShiftInTurns'
+        assert render_key('angular_shift_deg') == 'AngularShiftInDegrees'
         assert render_key('probe_energy_eV') == 'ProbeEnergyInElectronVolts'
 
     def test_num_abbreviates_by_default(self) -> None:
@@ -66,9 +66,9 @@ class TestLegacyProbePositionKeys:
             ('radius_scalar_m', 'RadiusScalarInMeters'),
             ('amplitude_x_m', 'AmplitudeXInMeters'),
             ('amplitude_y_m', 'AmplitudeYInMeters'),
-            ('angular_step_x_tr', 'AngularStepXInTurns'),
-            ('angular_step_y_tr', 'AngularStepYInTurns'),
-            ('angular_shift_tr', 'AngularShiftInTurns'),
+            ('angular_step_x_deg', 'AngularStepXInDegrees'),
+            ('angular_step_y_deg', 'AngularStepYInDegrees'),
+            ('angular_shift_deg', 'AngularShiftInDegrees'),
         ],
     )
     def test_the_rule_reproduces_it(self, field_name: str, legacy_key: str) -> None:
@@ -153,7 +153,7 @@ class TestDescribe:
 class TestDisplayUnitIsRefusedWhereItWouldMislead:
     def test_a_field_not_held_in_meters(self) -> None:
         class Bad(BaseModel):
-            angle_tr: float = Field(0.0, json_schema_extra={'display_unit': 'MICROMETER'})
+            angle_deg: float = Field(0.0, json_schema_extra={'display_unit': 'MICROMETER'})
 
         with pytest.raises(ValueError, match='not held in meters'):
             describe(Bad())

@@ -18,7 +18,7 @@ import numpy
 import numpy.polynomial.legendre
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from ..constants import TWO_PI, TWO_PI_J
+from ..constants import PI, TWO_PI, TWO_PI_J
 from ..typing import ComplexArrayType, RealArrayType
 from ..geometry import HermiteMode, ImageExtent, LegendreMode, PixelGeometry, ZernikeMode
 from ..moments import compute_intensity_moments
@@ -193,7 +193,7 @@ def apply_defocus_phase(
         return probe
 
     coords = _probe_geometry(probe).get_transverse_coordinates()
-    phase = numpy.pi * (numpy.square(coords.x_m) + numpy.square(coords.y_m))
+    phase = PI * (numpy.square(coords.x_m) + numpy.square(coords.y_m))
     phase /= photon_wavelength_m * defocus_distance_m
     array = probe.get_array()
     pixel_geometry = probe.get_pixel_geometry()
@@ -594,7 +594,7 @@ class KirkpatrickBaezMirror(BaseModel):
 
     acceptance_length_m: float = Field(gt=0.0)
     """Illuminated length along the mirror surface."""
-    grazing_angle_rad: float = Field(gt=0.0, lt=0.5 * numpy.pi)
+    grazing_angle_rad: float = Field(gt=0.0, lt=0.5 * PI)
     """Angle between the incident beam and the mirror surface.
 
     Bounded below normal incidence, which keeps ``sin(theta)`` positive so the projected
@@ -690,10 +690,10 @@ class KirkpatrickBaezMirrorPreset(BaseModel):
     model_config = ConfigDict(frozen=True, extra='forbid', allow_inf_nan=False)
 
     horizontal_acceptance_length_m: float = Field(gt=0.0)
-    horizontal_grazing_angle_rad: float = Field(gt=0.0, lt=0.5 * numpy.pi)
+    horizontal_grazing_angle_rad: float = Field(gt=0.0, lt=0.5 * PI)
     horizontal_focus_distance_m: float = Field(gt=0.0)
     vertical_acceptance_length_m: float = Field(gt=0.0)
-    vertical_grazing_angle_rad: float = Field(gt=0.0, lt=0.5 * numpy.pi)
+    vertical_grazing_angle_rad: float = Field(gt=0.0, lt=0.5 * PI)
     vertical_focus_distance_m: float = Field(gt=0.0)
 
 
@@ -921,7 +921,7 @@ def generate_kb_mirror_probe(
         )
 
     phase = (
-        -numpy.pi
+        -PI
         / photon_wavelength_m
         * (
             numpy.square(XX_PUPIL) / focus_distance_x_m
@@ -1037,7 +1037,7 @@ def _hermite_gauss_norm(order: int, beam_waist_m: float) -> float:
     ``(2 / pi)**(1/4) / sqrt(2**order * order! * w)``, evaluated through ``lgamma`` so a
     high order does not overflow the factorial before the square root brings it back.
     """
-    log_norm = 0.25 * math.log(2.0 / math.pi) - 0.5 * (
+    log_norm = 0.25 * math.log(2.0 / PI) - 0.5 * (
         order * math.log(2.0) + math.lgamma(order + 1) + math.log(beam_waist_m)
     )
     return math.exp(log_norm)
@@ -1093,7 +1093,7 @@ def generate_hermite_gauss_probe(
 def _random_phase_shift_axis(rng: numpy.random.Generator, size: int) -> ComplexArrayType:
     a = rng.uniform() - 0.5
     b = (size - 1 - 2 * numpy.arange(size)) / size
-    return numpy.exp(1j * numpy.pi * a * b)
+    return numpy.exp(1j * PI * a * b)
 
 
 def _gram_schmidt(rows: ComplexArrayType, *, dependence_floor: float) -> ComplexArrayType:

@@ -10,7 +10,7 @@ from scipy.fft import fft2, fftfreq, fftshift, ifft2, ifftshift
 import numpy
 import numpy.typing
 
-from .constants import TWO_PI_J, energy_eV_to_J, energy_eV_to_wavelength_m
+from .constants import PI, TWO_PI, TWO_PI_J, energy_eV_to_J, energy_eV_to_wavelength_m
 from .typing import ComplexArrayType, RealArrayType
 from .geometry import ImageExtent, PixelGeometry
 
@@ -416,7 +416,7 @@ def compute_product_geometry(
 
     return ProductGeometry(
         probe_wavenumber_per_m=wavenumber_per_m,
-        probe_angular_wavenumber_rad_per_m=2.0 * numpy.pi * wavenumber_per_m,
+        probe_angular_wavenumber_rad_per_m=TWO_PI * wavenumber_per_m,
         probe_photon_flux_per_s=probe_photon_flux_per_s,
         probe_power_W=energy_eV_to_J(photon_energy_eV) * probe_photon_flux_per_s,
         object_plane_propagation_distance_m=propagation_distance_m,
@@ -575,7 +575,7 @@ class FresnelTransformPropagator(Propagator):
                 'AngularSpectrumPropagator, which is the identity there.'
             )
 
-        ipi = 1j * numpy.pi
+        ipi = 1j * PI
 
         # Signed: C2 and _B are pure phases that must conjugate when the direction
         # reverses, which is what makes the backward branch the forward branch's inverse.
@@ -625,7 +625,7 @@ class FraunhoferPropagator(Propagator):
                 'AngularSpectrumPropagator, which is the identity there.'
             )
 
-        ipi = 1j * numpy.pi
+        ipi = 1j * PI
 
         # Signed phase, unit-modulus prefactor -- see FresnelTransformPropagator.
         Fr = parameters.pixel_fresnel_number_x  # noqa: N806

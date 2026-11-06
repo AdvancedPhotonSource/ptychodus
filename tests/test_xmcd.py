@@ -24,6 +24,7 @@ from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import LossValue, Product, ProductMetadata
 from ptychodus.api.diffraction import Polarization
 from ptychodus.api.xmcd import _decompose_objects, estimate_xmcd
+from ptychodus.api.constants import PI
 
 _EPSILON = 1.0e-12
 
@@ -133,14 +134,14 @@ def test_decompose_objects_magnetic_phase_wraps_outside_principal_branch() -> No
     as a regression.
     """
     o_struct = numpy.ones((8, 8), dtype=numpy.complex128) * 0.7
-    alpha = 3 * numpy.pi / 4  # outside (-pi/2, pi/2]
+    alpha = 3 * PI / 4  # outside (-pi/2, pi/2]
     m_factor = numpy.full((8, 8), numpy.exp(1j * alpha), dtype=numpy.complex128)
     rcp, lcp = _build_xmcd_pair(o_struct, m_factor)
 
     structural_object, magnetic_object = _decompose_objects(rcp, lcp, epsilon=_EPSILON)
     recovered_alpha = numpy.angle(magnetic_object.get_array()[0])
 
-    expected_alpha = alpha - numpy.pi  # = -pi/4
+    expected_alpha = alpha - PI  # = -pi/4
     numpy.testing.assert_allclose(recovered_alpha, expected_alpha, atol=1.0e-9)
     structural = structural_object.get_array()[0]
     magnetic = magnetic_object.get_array()[0]

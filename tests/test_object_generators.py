@@ -135,11 +135,11 @@ def test_the_builder_pads_and_rescales_exactly_once(registry: PluginRegistry) ->
     generator = registry.object_generators.get_strategy_by_name('random')
     builder = _make_builder(registry, 'random')
     builder.parameters()['amplitude_deviation'].set_value(0.1)
-    builder.parameters()['phase_deviation_tr'].set_value(0.1)
+    builder.parameters()['phase_deviation_rad'].set_value(0.6)
     builder.extra_padding_x.set_value(3)
     builder.extra_padding_y.set_value(2)
     options = generator.get_default_options().model_copy(
-        update={'amplitude_deviation': 0.1, 'phase_deviation_tr': 0.1}
+        update={'amplitude_deviation': 0.1, 'phase_deviation_rad': 0.6}
     )
 
     raw = generator.generate(options, provider, rng=numpy.random.default_rng(42), probe=None)
@@ -253,7 +253,7 @@ def test_the_probe_is_not_fetched_for_a_generator_that_does_not_read_it(
 def test_a_copy_carries_every_declared_value(registry: PluginRegistry) -> None:
     builder = _make_builder(registry, 'siemens_star')
     builder.parameters()['num_spokes'].set_value(12)
-    builder.parameters()['spoke_phase_tr'].set_value(0.125)
+    builder.parameters()['spoke_phase_rad'].set_value(0.75)
     builder.extra_padding_x.set_value(4)
 
     duplicate = builder.copy()

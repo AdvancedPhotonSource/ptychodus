@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 from typing import Final
 import logging
@@ -57,7 +58,7 @@ class LCLSPositionFileReader(ProbePositionFileReader):
             ycoords = -piezo_stage_position_z_um * LengthUnit.MICROMETER.meters_per_unit
 
             # horizontal coordinate
-            tomography_angle_rad = numpy.deg2rad(self._tomography_angle_deg)
+            tomography_angle_rad = math.radians(self._tomography_angle_deg)
             cos_angle = numpy.cos(tomography_angle_rad)
             sin_angle = numpy.sin(tomography_angle_rad)
             xcoords = (

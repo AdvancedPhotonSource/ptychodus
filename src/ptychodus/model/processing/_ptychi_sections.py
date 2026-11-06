@@ -18,7 +18,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from typing import Any, Final
-import math
 
 from ..declared import fields_of
 from .flatten import (
@@ -32,6 +31,7 @@ from .flatten import (
     StructuralAdapter,
 )
 from .parameter_store import OptionsSection
+from ptychodus.api.constants import PI
 
 __all__ = ['sections_for']
 
@@ -190,8 +190,8 @@ _OBJECT_OVERLAYS: Mapping[str, Overlay] = {
     'AbsMin': Overlay('Magnitude Min:', 'Minimum magnitude value', minimum=0.0),
     'AbsMax': Overlay('Magnitude Max:', 'Maximum magnitude value', minimum=0.0),
     'EnablePhase': Overlay('Limit Phase', 'Whether to apply phase limits'),
-    'PhaseMinDeg': Overlay('Phase Min [deg]:', 'Minimum phase value in degrees'),
-    'PhaseMaxDeg': Overlay('Phase Max [deg]:', 'Maximum phase value in degrees'),
+    'PhaseMinRad': Overlay('Phase Min [rad]:', 'Minimum phase value in radians'),
+    'PhaseMaxRad': Overlay('Phase Max [rad]:', 'Maximum phase value in radians'),
 }
 
 
@@ -235,15 +235,8 @@ def _object_policy(extras: set[str]) -> FlatteningPolicy:
             'hard_limits_magnitude_phase.abs_lim': OptionalRange(
                 'EnableAbs', 'AbsMin', 'AbsMax', fallback=(0.0, 1.0)
             ),
-            # pty-chi takes the phase limit in radians; ptychodus has always
-            # written it in degrees, so the keys carry degrees and the scale
-            # is what rebuilds the declared pair.
             'hard_limits_magnitude_phase.phase_lim': OptionalRange(
-                'EnablePhase',
-                'PhaseMinDeg',
-                'PhaseMaxDeg',
-                fallback=(-180.0, 180.0),
-                scale=math.pi / 180.0,
+                'EnablePhase', 'PhaseMinRad', 'PhaseMaxRad', fallback=(-PI, PI)
             ),
             **_stops(*_OBJECT_BRANCHES),
         },

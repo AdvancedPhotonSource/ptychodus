@@ -4,6 +4,7 @@ import pytest
 
 from ptychodus.api.fourier import fourier_gradient, fourier_shift_2d
 from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.constants import PI, TWO_PI, TWO_PI_J
 
 
 # ---------------------------------------------------------------------------
@@ -28,7 +29,7 @@ def _fft_mode_2d(
     """
     m = numpy.arange(height).reshape(-1, 1)
     n = numpy.arange(width).reshape(1, -1)
-    return numpy.exp(2j * numpy.pi * (ky * m / height + kx * n / width))
+    return numpy.exp(TWO_PI_J * (ky * m / height + kx * n / width))
 
 
 def test_fourier_gradient_constant_input_is_zero() -> None:
@@ -66,8 +67,8 @@ def test_fourier_gradient_matches_analytical_for_fourier_modes(
     image = _fft_mode_2d(height, width, ky, kx)
     gy, gx = fourier_gradient(image)
 
-    expected_gy = 2j * numpy.pi * (ky / height) * image
-    expected_gx = 2j * numpy.pi * (kx / width) * image
+    expected_gy = TWO_PI_J * (ky / height) * image
+    expected_gx = TWO_PI_J * (kx / width) * image
 
     numpy.testing.assert_allclose(gy, expected_gy, atol=1e-10)
     numpy.testing.assert_allclose(gx, expected_gx, atol=1e-10)
@@ -124,8 +125,8 @@ def test_fourier_gradient_pixel_geometry_matches_analytical() -> None:
     pg = PixelGeometry(width_m=dx, height_m=dy)
     gy, gx = fourier_gradient(image, pixel_geometry=pg)
 
-    expected_gy = 2j * numpy.pi * (ky / (height * dy)) * image
-    expected_gx = 2j * numpy.pi * (kx / (width * dx)) * image
+    expected_gy = TWO_PI_J * (ky / (height * dy)) * image
+    expected_gx = TWO_PI_J * (kx / (width * dx)) * image
 
     numpy.testing.assert_allclose(gy, expected_gy, rtol=1e-10, atol=1e-6)
     numpy.testing.assert_allclose(gx, expected_gx, rtol=1e-10, atol=1e-6)
@@ -164,8 +165,8 @@ def test_fourier_gradient_superposition_of_modes() -> None:
     for ky, kx, amp in modes:
         mode = _fft_mode_2d(height, width, ky, kx)
         image = image + amp * mode
-        expected_gy = expected_gy + amp * (2j * numpy.pi * (ky / height)) * mode
-        expected_gx = expected_gx + amp * (2j * numpy.pi * (kx / width)) * mode
+        expected_gy = expected_gy + amp * (TWO_PI_J * (ky / height)) * mode
+        expected_gx = expected_gx + amp * (TWO_PI_J * (kx / width)) * mode
 
     gy, gx = fourier_gradient(image)
     numpy.testing.assert_allclose(gy, expected_gy, atol=1e-10)
@@ -195,10 +196,10 @@ def test_fourier_gradient_real_input_below_nyquist_yields_real_gradient() -> Non
     height, width = 32, 32
     k = 5  # safely below Nyquist (16)
     m = numpy.arange(height).reshape(-1, 1).astype(float)
-    image = numpy.broadcast_to(numpy.cos(2 * numpy.pi * k * m / height), (height, width))
+    image = numpy.broadcast_to(numpy.cos(TWO_PI * k * m / height), (height, width))
     gy, _ = fourier_gradient(image)
     assert numpy.max(numpy.abs(gy.imag)) < 1e-10
-    expected = -2 * numpy.pi * k / height * numpy.sin(2 * numpy.pi * k * m / height)
+    expected = -TWO_PI * k / height * numpy.sin(TWO_PI * k * m / height)
     expected = numpy.broadcast_to(expected, (height, width))
     numpy.testing.assert_allclose(gy.real, expected, atol=1e-10)
 
@@ -213,7 +214,7 @@ def test_fourier_gradient_real_input_at_nyquist_is_purely_imaginary() -> None:
     m = numpy.arange(height).reshape(-1, 1).astype(float)
     image = numpy.broadcast_to((-1.0) ** m, (height, width)).astype(float)
     gy, _ = fourier_gradient(image)
-    expected = -1j * numpy.pi * numpy.broadcast_to((-1.0) ** m, (height, width))
+    expected = -1j * PI * numpy.broadcast_to((-1.0) ** m, (height, width))
     numpy.testing.assert_allclose(gy, expected, atol=1e-10)
 
 
@@ -245,8 +246,8 @@ def test_fourier_gradient_odd_shape_anisotropic_spacing() -> None:
     pg = PixelGeometry(width_m=dx, height_m=dy)
     gy, gx = fourier_gradient(image, pixel_geometry=pg)
 
-    expected_gy = 2j * numpy.pi * (ky / (height * dy)) * image
-    expected_gx = 2j * numpy.pi * (kx / (width * dx)) * image
+    expected_gy = TWO_PI_J * (ky / (height * dy)) * image
+    expected_gx = TWO_PI_J * (kx / (width * dx)) * image
 
     numpy.testing.assert_allclose(gy, expected_gy, rtol=1e-10, atol=1e-6)
     numpy.testing.assert_allclose(gx, expected_gx, rtol=1e-10, atol=1e-6)

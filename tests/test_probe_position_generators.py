@@ -5,7 +5,8 @@ generator never contributed, because a generator that quietly declares nothing
 simply adds nothing to the section. These tests cover that other direction: the
 roster is what it was before the patterns became plugins, every declared key
 lands in the group a scan is configured by, and every field has something to
-write beside it.
+write beside it. The Lissajous figure's angles are pinned to the degrees their
+suffix claims.
 """
 
 from __future__ import annotations
@@ -13,10 +14,14 @@ from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import Path
 
+import numpy
 import pytest
 
 from ptychodus.api.plugins import Plugin, PluginRegistry
-from ptychodus.api.simulate.probe_positions import ProbePositionsGenerator
+from ptychodus.api.simulate.probe_positions import (
+    ProbePositionsGenerator,
+    generate_lissajous_probe_positions,
+)
 from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.declared import declare_in, describe, restore
 
@@ -132,3 +137,40 @@ def test_spiral_and_lissajous_agree_on_the_count_they_share() -> None:
                 defaults[name] = description.default
 
     assert defaults == {'spiral': 100, 'lissajous': 100}
+
+
+def _lissajous(
+    *, step_x_deg: float, step_y_deg: float, shift_deg: float, num_points: int = 8
+) -> tuple[numpy.ndarray, numpy.ndarray]:
+    positions = list(
+        generate_lissajous_probe_positions(
+            num_points,
+            amplitude_x_m=2.0,
+            amplitude_y_m=3.0,
+            angular_step_x_deg=step_x_deg,
+            angular_step_y_deg=step_y_deg,
+            angular_shift_deg=shift_deg,
+        )
+    )
+    return numpy.array([p.x_m for p in positions]), numpy.array([p.y_m for p in positions])
+
+
+def test_a_lissajous_shift_of_ninety_degrees_is_a_quarter_cycle() -> None:
+    """The shift was once applied in radians while labelled in turns."""
+    x_m, y_m = _lissajous(step_x_deg=0.0, step_y_deg=0.0, shift_deg=90.0)
+
+    numpy.testing.assert_allclose(x_m, 2.0)
+    numpy.testing.assert_allclose(y_m, 0.0, atol=1e-15)
+
+
+def test_a_full_cycle_lissajous_step_revisits_the_first_point() -> None:
+    x_m, y_m = _lissajous(step_x_deg=360.0, step_y_deg=-720.0, shift_deg=30.0)
+
+    numpy.testing.assert_allclose(x_m, 1.0)
+    numpy.testing.assert_allclose(y_m, 0.0, atol=1e-12)
+
+
+def test_lissajous_steps_are_in_degrees() -> None:
+    _, y_m = _lissajous(step_x_deg=0.0, step_y_deg=90.0, shift_deg=0.0, num_points=4)
+
+    numpy.testing.assert_allclose(y_m, [0.0, 3.0, 0.0, -3.0], atol=1e-12)

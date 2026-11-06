@@ -15,10 +15,11 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QValidator
 from PyQt5.QtWidgets import QApplication
 
-from ptychodus.api.constants import TWO_PI, AngleUnit, LengthUnit
+from ptychodus.api.constants import PI, TWO_PI, LengthUnit
 from ptychodus.model.parameters import ComplexSequenceParameter, RealParameter, UUIDParameter
 from ptychodus.controller.parameters import (
     AngleParameterViewController,
+    AngleUnit,
     ComplexSequenceParameterViewController,
     ComplexSequenceTableModel,
     LengthParameterViewController,
@@ -157,64 +158,114 @@ class TestLength:
         assert vc._units_combo_box.currentData() is LengthUnit.METER
 
 
+class TestAngleUnit:
+    def test_each_unit_counts_its_units_in_one_cycle(self) -> None:
+        assert AngleUnit.RADIAN.decimal_units_per_turn == Decimal.from_float(TWO_PI)
+        assert AngleUnit.DEGREE.decimal_units_per_turn == Decimal(360)
+        assert AngleUnit.TURN.decimal_units_per_turn == Decimal(1)
+
+    def test_labels(self) -> None:
+        assert [unit.label for unit in AngleUnit] == ['rad', 'deg', 'turn']
+
+
 class TestAngle:
     def test_combo_box_lists_the_angle_units(self, qapp: QApplication) -> None:
-        vc = AngleParameterViewController(_real(0.0))
+        vc = AngleParameterViewController(_real(0.0), unit=AngleUnit.RADIAN)
         combo_box = vc._units_combo_box
         labels = [combo_box.itemText(i) for i in range(combo_box.count())]
 
-        assert labels == ['turn', 'deg', 'rad']
+        assert labels == ['rad', 'deg', 'turn']
 
-    def test_default_unit_is_turns(self, qapp: QApplication) -> None:
-        vc = AngleParameterViewController(_real(0.0))
+    @pytest.mark.parametrize('unit', [AngleUnit.RADIAN, AngleUnit.DEGREE])
+    def test_the_declared_unit_shows_by_default(self, qapp: QApplication, unit: AngleUnit) -> None:
+        vc = AngleParameterViewController(_real(0.0), unit=unit)
 
-        assert vc._units_combo_box.currentData() is AngleUnit.TURN
+        assert vc._units_combo_box.currentData() is unit
 
     def test_preferred_unit_is_honored(self, qapp: QApplication) -> None:
-        vc = AngleParameterViewController(_real(0.0), default_unit=AngleUnit.DEGREE)
+        vc = AngleParameterViewController(
+            _real(0.0), unit=AngleUnit.RADIAN, default_unit=AngleUnit.TURN
+        )
 
-        assert vc._units_combo_box.currentData() is AngleUnit.DEGREE
+        assert vc._units_combo_box.currentData() is AngleUnit.TURN
 
-    def test_degrees_round_trip_exactly(self, qapp: QApplication) -> None:
+    @pytest.mark.parametrize('unit', [AngleUnit.RADIAN, AngleUnit.DEGREE])
+    @pytest.mark.parametrize('value', [0.1, -1.0e-3, 123.456, PI])
+    def test_the_declared_unit_reads_and_writes_exactly(
+        self, qapp: QApplication, unit: AngleUnit, value: float
+    ) -> None:
+        """Shown in its own unit, a value passes through without arithmetic."""
+        parameter = _real(value)
+        vc = AngleParameterViewController(parameter, unit=unit)
+
+        assert vc._line_edit.get_value() == Decimal(str(value))
+
+        vc._line_edit.set_value(Decimal(str(value)))
+
+        assert parameter.get_value() == value
+
+    def test_degrees_shown_for_radians(self, qapp: QApplication) -> None:
         parameter = _real(0.0)
-        vc = AngleParameterViewController(parameter, default_unit=AngleUnit.DEGREE)
+        vc = AngleParameterViewController(
+            parameter, unit=AngleUnit.RADIAN, default_unit=AngleUnit.DEGREE
+        )
         vc._line_edit.set_value(Decimal(90))
 
-        assert parameter.get_value() == 0.25
+        assert parameter.get_value() == pytest.approx(0.5 * PI)
 
-    def test_radians_round_trip(self, qapp: QApplication) -> None:
+    def test_turns_shown_for_radians(self, qapp: QApplication) -> None:
         parameter = _real(0.0)
-        vc = AngleParameterViewController(parameter, default_unit=AngleUnit.RADIAN)
+        vc = AngleParameterViewController(
+            parameter, unit=AngleUnit.RADIAN, default_unit=AngleUnit.TURN
+        )
+        vc._line_edit.set_value(Decimal('-0.25'))
+
+        assert parameter.get_value() == pytest.approx(-0.5 * PI)
+
+    def test_turns_shown_for_degrees_are_exact(self, qapp: QApplication) -> None:
+        parameter = _real(0.0)
+        vc = AngleParameterViewController(
+            parameter, unit=AngleUnit.DEGREE, default_unit=AngleUnit.TURN
+        )
+        vc._line_edit.set_value(Decimal('0.25'))
+
+        assert parameter.get_value() == 90.0
+
+    def test_radians_shown_for_degrees(self, qapp: QApplication) -> None:
+        parameter = _real(0.0)
+        vc = AngleParameterViewController(
+            parameter, unit=AngleUnit.DEGREE, default_unit=AngleUnit.RADIAN
+        )
         vc._line_edit.set_value(Decimal.from_float(TWO_PI))
 
-        assert parameter.get_value() == pytest.approx(1.0)
+        assert parameter.get_value() == pytest.approx(360.0)
 
     def test_the_unit_is_never_auto_selected(self, qapp: QApplication) -> None:
-        """turn/deg/rad is a presentation choice, not a magnitude ladder."""
+        """rad/deg/turn is a presentation choice, not a magnitude ladder."""
         parameter = _real(0.001)
-        vc = AngleParameterViewController(parameter)
+        vc = AngleParameterViewController(parameter, unit=AngleUnit.RADIAN)
 
-        assert vc._units_combo_box.currentData() is AngleUnit.TURN
+        assert vc._units_combo_box.currentData() is AngleUnit.RADIAN
 
-        parameter.set_value(0.25)
+        parameter.set_value(1000.0)
 
-        assert vc._units_combo_box.currentData() is AngleUnit.TURN
+        assert vc._units_combo_box.currentData() is AngleUnit.RADIAN
 
     def test_changing_the_unit_preserves_the_angle(self, qapp: QApplication) -> None:
-        parameter = _real(0.25)
-        vc = AngleParameterViewController(parameter)
-        _activate_unit(vc, 'deg')
+        parameter = _real(90.0)
+        vc = AngleParameterViewController(parameter, unit=AngleUnit.DEGREE)
+        _activate_unit(vc, 'turn')
 
-        assert parameter.get_value() == 0.25
-        assert vc._line_edit.get_value() == Decimal(90)
+        assert parameter.get_value() == 90.0
+        assert vc._line_edit.get_value() == Decimal('0.25')
 
     def test_angles_are_signed_when_the_parameter_has_no_minimum(self, qapp: QApplication) -> None:
         """The angle editor used to hardcode unsigned, so a negative shift was unenterable."""
-        parameter = _real(0.25)
-        vc = AngleParameterViewController(parameter)
-        vc._line_edit.set_value(Decimal('-0.25'))
+        parameter = _real(90.0)
+        vc = AngleParameterViewController(parameter, unit=AngleUnit.DEGREE)
+        vc._line_edit.set_value(Decimal('-90'))
 
-        assert parameter.get_value() == -0.25
+        assert parameter.get_value() == -90.0
 
 
 class TestUUID:
@@ -268,7 +319,7 @@ class TestUUID:
 
 
 class TestComplexSequenceTable:
-    """A coefficient list edited as amplitude and phase in turns, one row per value."""
+    """A coefficient list edited as amplitude and phase in radians, one row per value."""
 
     def _model(
         self, values: list[complex]
@@ -276,11 +327,12 @@ class TestComplexSequenceTable:
         parameter = ComplexSequenceParameter(values, None)
         return parameter, ComplexSequenceTableModel(parameter)
 
-    def test_rows_show_amplitude_and_phase_in_turns(self, qapp: QApplication) -> None:
+    def test_rows_show_amplitude_and_phase_in_radians(self, qapp: QApplication) -> None:
         _, model = self._model([2j])
 
         assert model.data(model.index(0, 0)) == '2'
-        assert model.data(model.index(0, 1)) == '0.25'
+        assert model.data(model.index(0, 1)) == f'{0.5 * PI:.6g}'
+        assert model.headerData(1, Qt.Orientation.Horizontal) == 'Phase [rad]'
         assert model.headerData(0, Qt.Orientation.Vertical) == '0'
 
     def test_an_amplitude_edit_keeps_the_phase(self, qapp: QApplication) -> None:
@@ -290,10 +342,10 @@ class TestComplexSequenceTable:
 
         assert parameter[0] == pytest.approx(3j)
 
-    def test_a_phase_edit_in_turns_keeps_the_amplitude(self, qapp: QApplication) -> None:
+    def test_a_phase_edit_in_radians_keeps_the_amplitude(self, qapp: QApplication) -> None:
         parameter, model = self._model([2 + 0j])
 
-        assert model.setData(model.index(0, 1), '0.5')
+        assert model.setData(model.index(0, 1), repr(PI))
 
         assert parameter[0] == pytest.approx(-2 + 0j)
 

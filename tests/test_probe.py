@@ -29,6 +29,7 @@ from ptychodus.api.probe import (
     shift_probe,
 )
 from ptychodus.api.propagate import PropagatedWavefield
+from ptychodus.api.constants import PI, TWO_PI_J
 
 
 PIXEL_M = 1e-9  # 1 nm per pixel — keeps lengths interpretable as "px == nm"
@@ -88,7 +89,7 @@ class TestEstimateProbeSize:
         """Major/minor axis lengths, ordering, and tilt should all round-trip."""
         sigma_major_px = 12.0
         sigma_minor_px = 6.0
-        tilt = numpy.pi / 6.0  # 30 deg, comfortably inside [-pi/2, pi/2)
+        tilt = PI / 6.0  # 30 deg, comfortably inside [-pi/2, pi/2)
         intensity = _gaussian_2d(128, 128, sigma_major_px, sigma_minor_px, tilt)
 
         metrics = estimate_probe_size(intensity, PIXEL_GEOMETRY)
@@ -580,7 +581,7 @@ class TestComputePhaseDeviation:
         statistic must see a narrow distribution where a plain standard deviation of
         the angle sees a maximally wide one."""
         rng = numpy.random.default_rng(6)
-        phase = numpy.pi + rng.normal(0.0, 0.05, size=(64, 64))
+        phase = PI + rng.normal(0.0, 0.05, size=(64, 64))
         wavefield = numpy.exp(1j * phase)
 
         deviation = compute_phase_deviation_rad(wavefield)
@@ -592,14 +593,14 @@ class TestComputePhaseDeviation:
         """A bright coherent core plus a dim incoherent halo is a low-deviation
         wavefield, because the weighting is by intensity."""
         rng = numpy.random.default_rng(7)
-        wavefield = 1e-3 * numpy.exp(2j * numpy.pi * rng.random((32, 32)))
+        wavefield = 1e-3 * numpy.exp(TWO_PI_J * rng.random((32, 32)))
         wavefield[12:20, 12:20] = 1.0
 
         assert compute_phase_deviation_rad(wavefield) < 0.01
 
     def test_scattered_phase_exceeds_clustered_phase(self) -> None:
         rng = numpy.random.default_rng(8)
-        scattered = numpy.exp(2j * numpy.pi * rng.random((64, 64)))
+        scattered = numpy.exp(TWO_PI_J * rng.random((64, 64)))
         clustered = numpy.exp(1j * rng.normal(0.0, 0.1, size=(64, 64)))
 
         assert compute_phase_deviation_rad(scattered) > compute_phase_deviation_rad(clustered)
@@ -766,9 +767,9 @@ class TestShiftProbe:
         """The reason for a phase ramp rather than bilinear interpolation."""
         n = 16
         x = numpy.arange(n)
-        array = numpy.exp(2j * numpy.pi * x / n)[None, None, :] * numpy.ones((1, n, 1))
+        array = numpy.exp(TWO_PI_J * x / n)[None, None, :] * numpy.ones((1, n, 1))
         shifted = shift_probe(self._probe(array), shift_y_px=0.0, shift_x_px=0.5)
-        expected = numpy.exp(2j * numpy.pi * (x - 0.5) / n)[None, None, :] * numpy.ones((1, n, 1))
+        expected = numpy.exp(TWO_PI_J * (x - 0.5) / n)[None, None, :] * numpy.ones((1, n, 1))
 
         numpy.testing.assert_allclose(shifted.get_array(), expected, atol=1e-10)
 

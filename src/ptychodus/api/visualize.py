@@ -16,6 +16,7 @@ import numpy
 
 from .typing import ComplexArrayType, NumberArrayType, RealArrayType
 from .geometry import Box2D, Interval, Line2D, PixelGeometry
+from .constants import PI, TWO_PI
 
 logger = logging.getLogger(__name__)
 
@@ -609,7 +610,7 @@ def visualize_complex_values(
         amplitude_transformed, value_min=value_min, value_max=value_max, clip=clip
     )
     phase_rad = ComplexComponent.PHASE_RAD.extract_component(values)
-    hue = (phase_rad + numpy.pi) / (2 * numpy.pi)
+    hue = (phase_rad + PI) / TWO_PI
     amplitude_label = amplitude_transform.decorate_text(amplitude_component.name.title())
     return VisualizationProduct(
         value_label=amplitude_label,

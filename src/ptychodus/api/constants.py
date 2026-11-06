@@ -6,11 +6,13 @@ from decimal import Decimal
 from enum import Enum
 from typing import Final
 
-import numpy
 
 # Mathematical Constants
-TWO_PI: Final[float] = 2.0 * numpy.pi
-TWO_PI_J: Final[complex] = 2.0j * numpy.pi
+# The only spelling of pi in ptychodus; ruff bans numpy.pi, math.pi and their kin elsewhere.
+# Any other multiple is arithmetic on these, as in 0.5 * PI.
+PI: Final[float] = math.pi
+TWO_PI: Final[float] = 2.0 * PI
+TWO_PI_J: Final[complex] = 2.0j * PI
 
 # Physical Constants
 # Source: https://physics.nist.gov/cuu/Constants/index.html
@@ -46,7 +48,6 @@ class Unit(Enum):
     RADIAN = ('rad', 'InRadians')
     ELECTRON_VOLT = ('eV', 'InElectronVolts')
     PIXEL = ('px', 'InPixels')
-    TURN = ('tr', 'InTurns')
     METER = ('m', 'InMeters')
     SECOND = ('s', 'InSeconds')
 
@@ -138,37 +139,6 @@ class LengthUnit(Enum):
     def format(self, length_m: float) -> str:
         """Render a length in meters in this unit, e.g. "1.234 nm"."""
         return f'{self.convert(length_m):.4g} {self.label}'
-
-
-class AngleUnit(Enum):
-    """Angle units, with the turn as the canonical value.
-
-    The member value pairs the number of these units in one full turn with its display label,
-    so ``units_per_turn`` is the inverse orientation of :attr:`LengthUnit.meters_per_unit`.
-    That is deliberate: the reciprocals 1/360 and 1/(2*pi) are non-terminating, so keeping the
-    exact 360 and dividing loses nothing. Unlike lengths and bytes these units are a
-    presentation choice rather than a magnitude ladder, so there is no auto-selecting
-    alternate constructor and no formatting facade.
-    """
-
-    TURN = (1.0, 'turn')
-    DEGREE = (360.0, 'deg')
-    RADIAN = (TWO_PI, 'rad')
-
-    def __init__(self, units_per_turn: float, label: str) -> None:
-        self.units_per_turn = units_per_turn
-        self.label = label
-        # Decimal.from_float is exact for every float, including the irrational 2*pi, and is
-        # not rounded by the active decimal context the way 2 * Decimal(pi) would be.
-        self.decimal_units_per_turn: Decimal = Decimal.from_float(units_per_turn)
-
-    def to_turns(self, angle: float) -> float:
-        """Express an angle given in this unit as turns."""
-        return angle / self.units_per_turn
-
-    def convert(self, angle_turns: float) -> float:
-        """Express an angle in turns in this unit."""
-        return angle_turns * self.units_per_turn
 
 
 class EnergyUnit(Enum):

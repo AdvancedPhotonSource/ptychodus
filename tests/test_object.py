@@ -25,6 +25,7 @@ from ptychodus.api.object import (
 )
 from ptychodus.api.probe import ProbeGeometry
 from ptychodus.api.probe_positions import ProbePosition
+from ptychodus.api.constants import TWO_PI, TWO_PI_J
 
 
 def _make_gaussian_feature(
@@ -49,7 +50,7 @@ def _fft_shift_2d(array_2d: numpy.ndarray, shift_yx: tuple[float, float]) -> num
     ky = numpy.fft.fftfreq(height)
     kx = numpy.fft.fftfreq(width)
     ky_grid, kx_grid = numpy.meshgrid(ky, kx, indexing='ij')
-    phase_ramp = numpy.exp(-2j * numpy.pi * (shift_yx[0] * ky_grid + shift_yx[1] * kx_grid))
+    phase_ramp = numpy.exp(-TWO_PI_J * (shift_yx[0] * ky_grid + shift_yx[1] * kx_grid))
     return numpy.fft.ifft2(numpy.fft.fft2(array_2d) * phase_ramp)
 
 
@@ -199,7 +200,7 @@ def test_align_objects_preserves_complex_phase() -> None:
     y = numpy.arange(height)[:, None]
     x = numpy.arange(width)[None, :]
     amplitude = numpy.exp(-(((y - 16) ** 2 + (x - 16) ** 2) / 50.0))
-    phase = 0.5 * numpy.sin(2 * numpy.pi * y / height) + 0.3 * numpy.cos(2 * numpy.pi * x / width)
+    phase = 0.5 * numpy.sin(TWO_PI * y / height) + 0.3 * numpy.cos(TWO_PI * x / width)
     reference_layer = (amplitude * numpy.exp(1j * phase)).astype(numpy.complex128)
     shift_yx = (2.0, -3.0)  # integer pixels keeps interpolation noise low
     moving_layer = _fft_shift_2d(reference_layer, shift_yx=shift_yx)
@@ -471,7 +472,7 @@ def test_ramp_invariant_quantity_does_not_see_a_phase_ramp(
     moving_layer = _fft_shift_2d(reference_layer, shift_yx=shift_yx)
 
     row, column = numpy.mgrid[0 : shape[0], 0 : shape[1]]
-    ramp = numpy.exp(2j * numpy.pi * (3.0 * column / shape[1] - 2.0 * row / shape[0]))
+    ramp = numpy.exp(TWO_PI_J * (3.0 * column / shape[1] - 2.0 * row / shape[0]))
 
     pixel_geom = PixelGeometry(width_m=1.0e-9, height_m=1.0e-9)
     center = ObjectCenter(x_m=0.0, y_m=0.0)
@@ -668,7 +669,7 @@ def _make_smooth_object(
 ) -> Object:
     """A band-limited complex object, the content resampling is expected to preserve."""
     y, x = numpy.mgrid[:height_px, :width_px]
-    amplitude = 1.0 - 0.1 * numpy.cos(2.0 * numpy.pi * x / 40.0)
+    amplitude = 1.0 - 0.1 * numpy.cos(TWO_PI * x / 40.0)
     phase = 0.01 * (x + y)
     array = (amplitude * numpy.exp(1j * phase))[numpy.newaxis, ...]
     return Object(
@@ -749,7 +750,7 @@ def test_resample_keeps_fringes() -> None:
     pixel_m = 2.0e-8
 
     def grating(x_px: numpy.ndarray, y_px: numpy.ndarray) -> numpy.ndarray:
-        return numpy.exp(1.5j * numpy.sin(2.0 * numpy.pi * (x_px + 0.3 * y_px) / 9.0))
+        return numpy.exp(1.5j * numpy.sin(TWO_PI * (x_px + 0.3 * y_px) / 9.0))
 
     y, x = numpy.mgrid[:64, :64] - 31.5
     obj = Object(

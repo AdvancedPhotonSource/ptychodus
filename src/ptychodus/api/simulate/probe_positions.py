@@ -7,12 +7,14 @@ into points, and the functions below are what it turns them with.
 """
 
 from abc import ABC, abstractmethod
+import math
 from collections.abc import Iterator, Sequence
 
 import numpy
 from pydantic import BaseModel
 
 from ..probe_positions import ProbePosition
+from ..constants import PI, TWO_PI
 
 
 class ProbePositionsGenerator(ABC):
@@ -101,7 +103,7 @@ def generate_concentric_probe_positions(
 
         radius_m = radial_step_size_m * (shell_index + 1)
         num_points_in_shell = num_points_1st_shell * (shell_index + 1)
-        theta_rad = 2 * numpy.pi * point_index_in_shell / num_points_in_shell
+        theta_rad = TWO_PI * point_index_in_shell / num_points_in_shell
 
         yield ProbePosition(
             index=index,
@@ -114,15 +116,18 @@ def generate_lissajous_probe_positions(
     num_points: int,
     amplitude_x_m: float,
     amplitude_y_m: float,
-    angular_step_x_tr: float,
-    angular_step_y_tr: float,
-    angular_shift_tr: float,
+    angular_step_x_deg: float,
+    angular_step_y_deg: float,
+    angular_shift_deg: float,
 ) -> Iterator[ProbePosition]:
-    """Yield probe positions following a Lissajous figure parameterized by angular steps and amplitudes."""
+    """Yield probe positions following a Lissajous figure parameterized by angular steps and amplitudes.
+
+    Point *index* sits at ``(amplitude_x_m * sin(angular_step_x_deg * index + angular_shift_deg),
+    amplitude_y_m * sin(angular_step_y_deg * index))``, with every angle in degrees.
+    """
     for index in range(num_points):
-        two_pi = 2 * numpy.pi
-        theta_x = two_pi * angular_step_x_tr * index + angular_shift_tr
-        theta_y = two_pi * angular_step_y_tr * index
+        theta_x = math.radians(angular_step_x_deg * index + angular_shift_deg)
+        theta_y = math.radians(angular_step_y_deg * index)
 
         yield ProbePosition(
             index=index,
@@ -137,7 +142,7 @@ def generate_spiral_probe_positions(
     """https://doi.org/10.1364/OE.22.012634"""
     for index in range(num_points):
         radius_m = radius_scalar_m * numpy.sqrt(index)
-        divergence_angle_rad = (3.0 - numpy.sqrt(5)) * numpy.pi
+        divergence_angle_rad = (3.0 - numpy.sqrt(5)) * PI
         theta_rad = divergence_angle_rad * index
 
         yield ProbePosition(

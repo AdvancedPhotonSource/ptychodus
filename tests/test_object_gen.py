@@ -62,6 +62,7 @@ from ptychodus.api.accumulate import compute_diffraction_moments, estimate_incid
 from ptychodus.api.assemble import (
     AssembledDiffractionData,
 )
+from ptychodus.api.constants import PI, TWO_PI
 
 
 # ---------------------------------------------------------------------------
@@ -345,7 +346,7 @@ class TestGrfSpatialProperties:
 
         # Characteristic frequency: the Gaussian envelope peaks around
         # k/(2π) where k·correlation_length_px ~ 1, i.e. f ~ 1/(2π·L)
-        f_char = 1.0 / (2 * numpy.pi * correlation_length_px)
+        f_char = 1.0 / (TWO_PI * correlation_length_px)
         band_mask = (R >= f_char / 4) & (R <= 4 * f_char)
         power_in_band = power[band_mask].sum()
         total_power = power.sum()
@@ -590,7 +591,7 @@ class TestSimplexCoordinateMappings:
         vertex_i = numpy.zeros((height, width), dtype=int)
         vertex_j = numpy.zeros((height, width), dtype=int)
         rng = _rng()
-        angle = 2 * numpy.pi * rng.uniform(size=(height, width))
+        angle = TWO_PI * rng.uniform(size=(height, width))
         grad_x = numpy.cos(angle)
         grad_y = numpy.sin(angle)
         # Place a vertex exactly at pixel (0, 0); all other pixels have nonzero displacement
@@ -1009,16 +1010,16 @@ def _default_star_kwargs(
     outer_radius_fraction: float = 0.9,
     spoke_amplitude: float = 0.0,
     background_amplitude: float = 1.0,
-    spoke_phase_tr: float = 0.0,
-    background_phase_tr: float = 0.0,
+    spoke_phase_rad: float = 0.0,
+    background_phase_rad: float = 0.0,
 ) -> dict:
     return dict(
         num_spokes=num_spokes,
         outer_radius_fraction=outer_radius_fraction,
         spoke_amplitude=spoke_amplitude,
         background_amplitude=background_amplitude,
-        spoke_phase_tr=spoke_phase_tr,
-        background_phase_tr=background_phase_tr,
+        spoke_phase_rad=spoke_phase_rad,
+        background_phase_rad=background_phase_rad,
     )
 
 
@@ -1105,11 +1106,11 @@ class TestSiemensStarContrast:
         )
         amplitude = numpy.abs(obj.get_array()[0])
         # spoke wedge center: angle = π/8 (below-right at 22.5° in row/col coords)
-        row_spoke = int(round(64 + 20 * numpy.sin(numpy.pi / 8)))
-        col_spoke = int(round(64 + 20 * numpy.cos(numpy.pi / 8)))
+        row_spoke = int(round(64 + 20 * numpy.sin(PI / 8)))
+        col_spoke = int(round(64 + 20 * numpy.cos(PI / 8)))
         # background wedge center: angle = 3π/8 (further below-right, in wedge 1)
-        row_bg = int(round(64 + 20 * numpy.sin(3 * numpy.pi / 8)))
-        col_bg = int(round(64 + 20 * numpy.cos(3 * numpy.pi / 8)))
+        row_bg = int(round(64 + 20 * numpy.sin(3 * PI / 8)))
+        col_bg = int(round(64 + 20 * numpy.cos(3 * PI / 8)))
         assert amplitude[row_spoke, col_spoke] == pytest.approx(0.0, abs=1e-9)
         assert amplitude[row_bg, col_bg] == pytest.approx(1.0, abs=1e-9)
 
@@ -1123,7 +1124,7 @@ class TestSiemensStarContrast:
         amplitude = numpy.abs(obj.get_array()[0])
         # Sample a circular path at radius 60 (well inside the disk of radius 115.2)
         num_samples = 4096
-        angles = numpy.linspace(0.0, 2.0 * numpy.pi, num_samples, endpoint=False)
+        angles = numpy.linspace(0.0, TWO_PI, num_samples, endpoint=False)
         rows = numpy.round(128 + 60 * numpy.sin(angles)).astype(int)
         cols = numpy.round(128 + 60 * numpy.cos(angles)).astype(int)
         # Binary classification (threshold at 0.5) treats each anti-aliased edge
@@ -1141,8 +1142,8 @@ class TestSiemensStarContrast:
             **_default_star_kwargs(
                 spoke_amplitude=1.0,
                 background_amplitude=1.0,
-                spoke_phase_tr=0.25,
-                background_phase_tr=0.0,
+                spoke_phase_rad=0.5 * PI,
+                background_phase_rad=0.0,
                 outer_radius_fraction=0.9,
             ),
         )
@@ -1156,8 +1157,8 @@ class TestSiemensStarContrast:
             **_default_star_kwargs(
                 spoke_amplitude=1.0,
                 background_amplitude=1.0,
-                spoke_phase_tr=0.25,
-                background_phase_tr=0.0,
+                spoke_phase_rad=0.5 * PI,
+                background_phase_rad=0.0,
                 outer_radius_fraction=0.9,
             ),
         )
@@ -1211,8 +1212,8 @@ class TestGenerateUniformObject:
             geometry,
             amplitude_mean=1.0,
             amplitude_deviation=0.0,
-            phase_mean_tr=0.0,
-            phase_deviation_tr=0.0,
+            phase_mean_rad=0.0,
+            phase_deviation_rad=0.0,
             blur_deviation_px=0.0,
         )
 
@@ -1236,34 +1237,34 @@ class TestGenerateUniformObject:
 
 
 class TestRandomObjectPhaseMean:
-    """``phase_mean_tr`` was accepted and ignored until it was wired up.
+    """``phase_mean_rad`` was accepted and ignored until it was wired up.
 
     Every caller in the tree passed 0.0, so the omission was invisible; these pin the
-    behavior so it stays wired, and pin the units the ``_tr`` suffix claims.
+    behavior so it stays wired, and pin the units the ``_rad`` suffix claims.
     """
 
     @staticmethod
-    def _generate(phase_mean_tr: float, seed: int = 11) -> numpy.ndarray:
+    def _generate(phase_mean_rad: float, seed: int = 11) -> numpy.ndarray:
         return generate_random_object(
             _rng(seed),
             _make_geometry(width_px=24, height_px=16),
             amplitude_mean=1.0,
             amplitude_deviation=0.1,
-            phase_mean_tr=phase_mean_tr,
-            phase_deviation_tr=0.05,
+            phase_mean_rad=phase_mean_rad,
+            phase_deviation_rad=0.3,
             blur_deviation_px=0.0,
         ).get_array()
 
     def test_a_nonzero_mean_shifts_the_phase(self) -> None:
-        assert not numpy.allclose(self._generate(0.25), self._generate(0.0))
+        assert not numpy.allclose(self._generate(0.5 * PI), self._generate(0.0))
 
-    def test_the_shift_is_exactly_the_requested_number_of_turns(self) -> None:
-        """The array is amplitude * exp(2*pi*j * phase), so a mean of 0.25 is a quarter turn."""
-        ratio = self._generate(0.25) / self._generate(0.0)
-        assert numpy.allclose(ratio, numpy.exp(2.0j * numpy.pi * 0.25))
+    def test_the_shift_is_exactly_the_requested_number_of_radians(self) -> None:
+        """The array is amplitude * exp(1j * phase), so a mean of pi/2 is a quarter cycle."""
+        ratio = self._generate(0.5 * PI) / self._generate(0.0)
+        assert numpy.allclose(ratio, 1j)
 
-    def test_a_full_turn_is_indistinguishable_from_none(self) -> None:
-        assert numpy.allclose(self._generate(1.0), self._generate(0.0))
+    def test_a_full_cycle_is_indistinguishable_from_none(self) -> None:
+        assert numpy.allclose(self._generate(TWO_PI), self._generate(0.0))
 
     def test_the_phase_mean_leaves_the_amplitude_alone(self) -> None:
-        assert numpy.allclose(numpy.abs(self._generate(0.3)), numpy.abs(self._generate(0.0)))
+        assert numpy.allclose(numpy.abs(self._generate(2.0)), numpy.abs(self._generate(0.0)))

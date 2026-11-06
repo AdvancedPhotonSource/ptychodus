@@ -19,9 +19,9 @@ class LissajousOptions(BaseModel):
     amplitude_x_m: float = Field(4.5e-6, ge=0.0, title='Amplitude X:')
     amplitude_y_m: float = Field(4.5e-6, ge=0.0, title='Amplitude Y:')
     # Unbounded, and so signed: a negative step reverses the sweep.
-    angular_step_x_tr: float = Field(0.03, title='Angular Step X:')
-    angular_step_y_tr: float = Field(0.04, title='Angular Step Y:')
-    angular_shift_tr: float = Field(0.25, title='Angular Shift:')
+    angular_step_x_deg: float = Field(10.8, title='Angular Step X:')
+    angular_step_y_deg: float = Field(14.4, title='Angular Step Y:')
+    angular_shift_deg: float = Field(90.0, title='Angular Shift:')
 
 
 class LissajousProbePositionsGenerator(ProbePositionsGenerator):
@@ -37,8 +37,8 @@ class LissajousProbePositionsGenerator(ProbePositionsGenerator):
                 options.num_points,
                 options.amplitude_x_m,
                 options.amplitude_y_m,
-                options.angular_step_x_tr,
-                options.angular_step_y_tr,
-                options.angular_shift_tr,
+                options.angular_step_x_deg,
+                options.angular_step_y_deg,
+                options.angular_shift_deg,
             )
         ]

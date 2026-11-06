@@ -36,6 +36,7 @@ from ptychodus.api.probe import ProbeEnsemble, shift_probe
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructionAmbiguities
+from ptychodus.api.constants import TWO_PI_J
 
 
 def _make_frc(
@@ -310,9 +311,7 @@ class TestPowerSpectralDensity:
         pixel_m = 1e-6
         num_cycles = 8
         column = numpy.arange(shape[1])
-        image = numpy.exp(2j * numpy.pi * num_cycles * column / shape[1]) * numpy.ones(
-            (shape[0], 1)
-        )
+        image = numpy.exp(TWO_PI_J * num_cycles * column / shape[1]) * numpy.ones((shape[0], 1))
 
         psd = compute_power_spectral_density(image, pixel_m, pixel_m, window=ApodizationWindow.NONE)
 

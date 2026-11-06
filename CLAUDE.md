@@ -98,8 +98,9 @@ The developer-mode Agent panel reaches its model through a `LanguageModelProvide
 
 ## Conventions
 
-- Ruff: **single-quoted** strings, 100-char lines, py311 target. Enabled rules: F, N, NPY.
+- Ruff: **single-quoted** strings, 100-char lines, py311 target. Enabled rules: F, N, NPY, TID251.
 - Preserve unit suffixes on physical quantities (`probe_energy_eV`, `set_value_from_string`) — silence naming lints with `# noqa: N802/N806/N815`, don't rename.
+- **Angles and π.** A user-facing geometric angle is `_deg` and a phase is `_rad`; nothing is stored in turns, which the GUI angle editor offers only as a display unit. π is spelled only `PI`, `TWO_PI` or `TWO_PI_J` from [api/constants.py](src/ptychodus/api/constants.py), other multiples as arithmetic on them (`0.5 * PI`). Convert a scalar with `math.radians`/`math.degrees` and an array with `numpy.deg2rad`/`numpy.rad2deg`. Ruff's TID251 `banned-api` in [pyproject.toml](pyproject.toml) rejects `numpy.pi`, `math.pi`, `numpy.radians` and their kin everywhere but `api/constants.py`.
 - Type hints are mandatory. `pyproject.toml` lists modules whose missing stubs are intentionally ignored — keep new code typed and don't widen that list.
 - `ModelCore.is_developer_mode_enabled` is `True` when the effective log level ≤ DEBUG (`--log-level 10`); some controllers gate features (Agent panel, probe-position analysis) behind it.
 - HTTP-client code uses `httpx` throughout (sync `httpx.Client` for repeated calls, module-level `httpx.get/post` for one-shots). `requests` is not a dependency.

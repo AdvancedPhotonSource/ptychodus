@@ -60,8 +60,8 @@ def _mirror_length_field(default: float, title: str) -> Any:
 
 
 def _grazing_angle_field(title: str) -> Any:
-    # A floor only: with both ends set the editor offers a slider, and a slider to a
-    # quarter turn cannot reach the few milliradians a grazing angle is.
+    # A floor only: the few milliradians a grazing angle is sit far below any useful
+    # ceiling, and the editor reads and writes it in whichever angle unit is chosen.
     return Field(3e-3, ge=0.0, title=title)
 
 

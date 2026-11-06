@@ -18,6 +18,7 @@ from skimage.measure import ransac
 
 from .probe_positions import ProbePosition, ProbePositionSequence
 from .typing import BooleanArrayType, IntegerArrayType, RealArrayType
+from .constants import TWO_PI
 
 __all__ = [
     'AffineFitResult',
@@ -287,7 +288,7 @@ def transform_probe_positions(
         transformed = transform(position)
 
         if rng is not None:
-            angle_rad = 2 * numpy.pi * rng.uniform()
+            angle_rad = TWO_PI * rng.uniform()
             radius_m = jitter_radius_m * numpy.sqrt(rng.uniform())
             transformed = ProbePosition(
                 index=transformed.index,

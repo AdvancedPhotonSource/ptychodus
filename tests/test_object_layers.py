@@ -26,6 +26,7 @@ from ptychodus.api.object import (
     scale_object_phase,
     select_object_layers,
 )
+from ptychodus.api.constants import PI
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -233,7 +234,7 @@ def _make_wrapped_phase_object() -> Object:
     Every wrap draws one contour of adjacent-pixel jumps larger than pi, so a ramp of
     several turns leaves a fraction of jumps well above the default threshold.
     """
-    ramp = numpy.linspace(0.0, 12.0 * numpy.pi, EXTENT_PX * EXTENT_PX)
+    ramp = numpy.linspace(0.0, 12.0 * PI, EXTENT_PX * EXTENT_PX)
     layer = numpy.exp(1j * ramp).reshape(1, EXTENT_PX, EXTENT_PX)
 
     return _make_object(layer)

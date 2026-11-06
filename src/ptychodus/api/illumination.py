@@ -18,6 +18,7 @@ from .object import ObjectCenter
 from .patch import accumulate_probe_intensity, iter_probe_patches
 from .product import Product
 from .propagate import compute_product_geometry
+from .constants import PI
 
 
 @dataclass(frozen=True)
@@ -236,7 +237,7 @@ class ProbeOverlapMetrics:
     @property
     def effective_probe_diameter_m(self) -> float:
         """Diameter of the disc whose area is :attr:`effective_probe_area_m2`."""
-        return 2.0 * math.sqrt(self.effective_probe_area_m2 / math.pi)
+        return 2.0 * math.sqrt(self.effective_probe_area_m2 / PI)
 
     @property
     def effective_step_size_m(self) -> float:
@@ -393,7 +394,7 @@ def compute_probe_overlap(
         pairwise_overlap_by_position=_compute_pairwise_overlap(
             product,
             footprint_power,
-            neighbor_radius_m=2.0 * math.sqrt(effective_probe_area_m2 / math.pi),
+            neighbor_radius_m=2.0 * math.sqrt(effective_probe_area_m2 / PI),
         ),
         effective_probe_area_m2=effective_probe_area_m2,
         effective_covered_area_m2=_participation_ratio(canvas) * pixel_area_m2,

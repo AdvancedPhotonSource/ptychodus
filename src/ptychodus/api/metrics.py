@@ -41,6 +41,7 @@ from .object import (
 from .probe import Probe, ProbeEnsemble, shift_probe
 from .product import Product
 from .reconstruct import ReconstructionAmbiguities
+from .constants import PI
 
 logger = logging.getLogger(__name__)
 
@@ -216,7 +217,7 @@ def estimate_reconstruction_ambiguities(
         # Convention: keep object_scale_factor > 0. Fold any sign flip into phi.
         if s < 0.0:
             s = -s
-            phi = phi + numpy.pi
+            phi = phi + PI
 
     return ReconstructionAmbiguities(
         object_scale_factor=float(s),

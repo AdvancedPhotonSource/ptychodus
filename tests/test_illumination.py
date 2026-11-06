@@ -21,6 +21,7 @@ from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
+from ptychodus.api.constants import PI
 
 
 # ---------------------------------------------------------------------------
@@ -435,7 +436,7 @@ def _make_overlap_metrics(
 class TestProbeOverlapMetrics:
     def test_effective_diameter_is_the_equal_area_disc(self) -> None:
         m = _make_overlap_metrics(effective_probe_area_m2=4.0e-14)
-        assert m.effective_probe_diameter_m == pytest.approx(2.0 * math.sqrt(4.0e-14 / math.pi))
+        assert m.effective_probe_diameter_m == pytest.approx(2.0 * math.sqrt(4.0e-14 / PI))
 
     def test_effective_step_is_the_equal_area_square_per_position(self) -> None:
         m = _make_overlap_metrics(effective_covered_area_m2=1.6e-13, num_positions=4)
@@ -454,7 +455,7 @@ class TestProbeOverlapMetrics:
             1.0 - m.effective_step_size_m / m.effective_probe_diameter_m
         )
         assert m.equivalent_linear_overlap == pytest.approx(
-            1.0 - math.sqrt(math.pi / (4.0 * m.areal_redundancy))
+            1.0 - math.sqrt(PI / (4.0 * m.areal_redundancy))
         )
 
     def test_equivalent_linear_overlap_goes_negative_when_footprints_leave_gaps(self) -> None:
@@ -462,7 +463,7 @@ class TestProbeOverlapMetrics:
         m = _make_overlap_metrics(
             effective_probe_area_m2=1.0e-14, effective_covered_area_m2=1.0e-12, num_positions=4
         )
-        assert m.areal_redundancy < math.pi / 4.0
+        assert m.areal_redundancy < PI / 4.0
         assert m.equivalent_linear_overlap < 0.0
 
     def test_pairwise_statistics(self) -> None:
@@ -598,7 +599,7 @@ class TestComputeProbeOverlap:
         m = compute_probe_overlap(product)
         assert m.effective_probe_area_m2 == pytest.approx(num_probe_px * pixel_size_m**2)
         assert m.effective_probe_diameter_m == pytest.approx(
-            2.0 * math.sqrt(num_probe_px / math.pi) * pixel_size_m
+            2.0 * math.sqrt(num_probe_px / PI) * pixel_size_m
         )
 
     def test_raster_interior_redundancy_is_probe_area_over_step_squared(self) -> None:
@@ -628,7 +629,7 @@ class TestComputeProbeOverlap:
             )
             m = compute_probe_overlap(product)
             assert m.equivalent_linear_overlap == pytest.approx(
-                1.0 - math.sqrt(math.pi / (4.0 * m.areal_redundancy))
+                1.0 - math.sqrt(PI / (4.0 * m.areal_redundancy))
             )
             overlaps.append(m.equivalent_linear_overlap)
 

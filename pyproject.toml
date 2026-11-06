@@ -224,7 +224,22 @@ select = [
     "F",
     "N",
     "NPY",
+    "TID251",
 ]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"numpy.pi".msg = "Use PI from ptychodus.api.constants."
+"math.pi".msg = "Use PI from ptychodus.api.constants."
+"cmath.pi".msg = "Use PI from ptychodus.api.constants."
+"torch.pi".msg = "Use PI from ptychodus.api.constants."
+"scipy.constants.pi".msg = "Use PI from ptychodus.api.constants."
+"math.tau".msg = "Use TWO_PI from ptychodus.api.constants."
+"cmath.tau".msg = "Use TWO_PI from ptychodus.api.constants."
+"numpy.radians".msg = "Use math.radians for a scalar or numpy.deg2rad for an array."
+"numpy.degrees".msg = "Use math.degrees for a scalar or numpy.rad2deg for an array."
+
+[tool.ruff.lint.per-file-ignores]
+"src/ptychodus/api/constants.py" = ["TID251"]
 
 [tool.pymarkdown]
 plugins.md003.style = "atx"      # ATX headings only, never setext

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import math
 from enum import IntEnum
 from pathlib import Path
 import csv
@@ -64,7 +65,7 @@ class VelociprobePositionFileReader(ProbePositionFileReader):
         return {'.txt'}
 
     def _apply_transform(self, positions: ProbePositionSequence) -> ProbePositionSequence:
-        stage_rotation_rad = numpy.deg2rad(self._diffraction_reader.stage_rotation_deg)
+        stage_rotation_rad = math.radians(self._diffraction_reader.stage_rotation_deg)
         stage_rotation_cos = numpy.cos(stage_rotation_rad)
 
         x_mean = sum(p.x_m for p in positions) / len(positions)

@@ -53,6 +53,7 @@ from ptychodus.cli._stream import (
     parse_batched_axes,
     parse_sgsocket_event,
 )
+from ptychodus.api.constants import PI
 from ptychodus.api.storage import (
     DerivedFromRef,
     DiffractionManifest,
@@ -246,7 +247,7 @@ def test_display_images_are_the_first_modes_amplitude_and_phase() -> None:
 
     assert amplitude.dtype == numpy.float32 and phase.dtype == numpy.float32
     numpy.testing.assert_allclose(amplitude, 2.0)
-    numpy.testing.assert_allclose(phase, numpy.pi / 2)
+    numpy.testing.assert_allclose(phase, PI / 2)
 
 
 # ---------------------------------------------------------------------------

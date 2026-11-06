@@ -110,9 +110,13 @@ def test_relative_imports_that_climb_out_of_api_are_caught(tmp_path: Path) -> No
     ('module', 'allowed'),
     [
         # Math only: the transform, its decomposition and its estimator act on positions.
-        ('api/affine.py', {'ptychodus.api.probe_positions', 'ptychodus.api.typing'}),
+        # Constants is the one spelling of pi and imports nothing of ptychodus's own.
+        (
+            'api/affine.py',
+            {'ptychodus.api.constants', 'ptychodus.api.probe_positions', 'ptychodus.api.typing'},
+        ),
         # A leaf the metadata holds; anything heavier here would cycle back through it.
-        ('api/scattering/geometry.py', {'ptychodus.api.typing'}),
+        ('api/scattering/geometry.py', {'ptychodus.api.constants', 'ptychodus.api.typing'}),
     ],
 )
 def test_leaf_modules_import_only_what_they_name(module: str, allowed: set[str]) -> None:

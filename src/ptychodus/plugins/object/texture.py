@@ -9,6 +9,7 @@ from __future__ import annotations
 import numpy
 from pydantic import BaseModel, Field
 
+from ptychodus.api.constants import PI, TWO_PI
 from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.probe import Probe
 from ptychodus.api.simulate.object import (
@@ -25,7 +26,7 @@ from ._options import expect_options
 class RandomOptions(BaseModel):
     amplitude_mean: float = Field(1.0, ge=0.0, le=1.0, title='Amplitude Mean:')
     amplitude_deviation: float = Field(0.0, ge=0.0, le=1.0, title='Amplitude Deviation:')
-    phase_deviation_tr: float = Field(0.0, ge=0.0, le=1.0, title='Phase Deviation:')
+    phase_deviation_rad: float = Field(0.0, ge=0.0, le=TWO_PI, title='Phase Deviation:')
     blur_deviation_px: float = Field(
         0.0,
         ge=0.0,
@@ -54,8 +55,8 @@ class RandomObjectGenerator(ObjectGenerator):
             geometry_provider.get_object_geometry(),
             amplitude_mean=gaussian.amplitude_mean,
             amplitude_deviation=gaussian.amplitude_deviation,
-            phase_mean_tr=0.0,
-            phase_deviation_tr=gaussian.phase_deviation_tr,
+            phase_mean_rad=0.0,
+            phase_deviation_rad=gaussian.phase_deviation_rad,
             blur_deviation_px=gaussian.blur_deviation_px,
         )
 
@@ -135,8 +136,8 @@ class DeadLeavesOptions(BaseModel):
     )
     leaf_amplitude_lower: float = Field(0.0, ge=0.0, le=1.0, title='Leaf Amplitude Lower:')
     leaf_amplitude_upper: float = Field(1.0, ge=0.0, le=1.0, title='Leaf Amplitude Upper:')
-    leaf_phase_lower_tr: float = Field(-0.5, title='Leaf Phase Lower:')
-    leaf_phase_upper_tr: float = Field(0.5, title='Leaf Phase Upper:')
+    leaf_phase_lower_rad: float = Field(-PI, title='Leaf Phase Lower:')
+    leaf_phase_upper_rad: float = Field(PI, title='Leaf Phase Upper:')
 
 
 class DeadLeavesObjectGenerator(ObjectGenerator):
@@ -162,6 +163,6 @@ class DeadLeavesObjectGenerator(ObjectGenerator):
             leaf_radius_power_law_exponent=leaves.leaf_radius_power_law_exponent,
             leaf_amplitude_lower=leaves.leaf_amplitude_lower,
             leaf_amplitude_upper=leaves.leaf_amplitude_upper,
-            leaf_phase_lower_tr=leaves.leaf_phase_lower_tr,
-            leaf_phase_upper_tr=leaves.leaf_phase_upper_tr,
+            leaf_phase_lower_rad=leaves.leaf_phase_lower_rad,
+            leaf_phase_upper_rad=leaves.leaf_phase_upper_rad,
         )

@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import field as dataclass_field
 from enum import StrEnum
 from pathlib import Path
-import math
 import re
 
 from pydantic import BaseModel, Field
@@ -370,7 +369,7 @@ class TestAgainstRealPtyChiOptions:
                     'EnableAbs', 'AbsMin', 'AbsMax'
                 ),
                 'hard_limits_magnitude_phase.phase_lim': OptionalRange(
-                    'EnablePhase', 'PhaseMinDeg', 'PhaseMaxDeg'
+                    'EnablePhase', 'PhaseMinRad', 'PhaseMaxRad'
                 ),
             },
         )
@@ -424,15 +423,6 @@ class TestStructuralAdapters:
         # A list, which is what a serializable pair of bounds has to be; the
         # input is a tuple to show the adapter does not merely pass it back.
         assert adapter.decode(adapter.encode((0.1, 0.9))) == [0.1, 0.9]
-
-    def test_optional_range_converts_between_the_declared_and_persisted_unit(self) -> None:
-        """A pair persisted in degrees comes back in the radians upstream takes."""
-        adapter = OptionalRange('On', 'Min', 'Max', scale=math.pi / 180.0)
-        encoded = adapter.encode((-math.pi, math.pi))
-
-        assert encoded['Min'] == pytest.approx(-180.0)
-        assert encoded['Max'] == pytest.approx(180.0)
-        assert adapter.decode(encoded) == pytest.approx([-math.pi, math.pi])
 
     def test_a_bit_field_round_trips_the_members_it_names(self) -> None:
         """Each member takes the bit at its own position, and absence means zero."""

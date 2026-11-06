@@ -21,6 +21,7 @@ from ptychodus.api.visualize import (
     visualize_complex_values,
     visualize_real_values,
 )
+from ptychodus.api.constants import PI
 
 
 # ---------------------------------------------------------------------------
@@ -334,7 +335,7 @@ class TestEstimateKernelDensity:
         # phase histogram silently showed amplitudes.
         rng = numpy.random.default_rng(11)
         amplitude = rng.random((8, 8)) + 10.0
-        phase_rad = rng.uniform(-numpy.pi, numpy.pi, (8, 8))
+        phase_rad = rng.uniform(-PI, PI, (8, 8))
         arr = amplitude * numpy.exp(1j * phase_rad)
         vp = visualize_complex_component(arr, _pixel_geo(), ComplexComponent.PHASE_RAD)
         box = Box2D(x=0, y=0, width=8, height=8)
@@ -346,7 +347,7 @@ class TestEstimateKernelDensity:
         # A histogram has one value axis, so the Complex renderer keeps showing amplitude.
         rng = numpy.random.default_rng(13)
         amplitude = rng.random((8, 8)) + 1.0
-        phase_rad = rng.uniform(-numpy.pi, numpy.pi, (8, 8))
+        phase_rad = rng.uniform(-PI, PI, (8, 8))
         arr = amplitude * numpy.exp(1j * phase_rad)
         vp = visualize_complex_values(
             arr,

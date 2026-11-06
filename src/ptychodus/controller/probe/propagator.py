@@ -1,6 +1,5 @@
+import math
 import logging
-
-import numpy
 
 from PyQt5.QtWidgets import QSpinBox
 
@@ -177,8 +176,8 @@ class ProbePropagationViewController:
                 label.setText('N/A')
             return
 
-        view.major_axis_tilt_label.setText(f'{numpy.rad2deg(metrics.major_axis_tilt_rad):.4g}')
-        view.minor_axis_tilt_label.setText(f'{numpy.rad2deg(metrics.minor_axis_tilt_rad):.4g}')
+        view.major_axis_tilt_label.setText(f'{math.degrees(metrics.major_axis_tilt_rad):.4g}')
+        view.minor_axis_tilt_label.setText(f'{math.degrees(metrics.minor_axis_tilt_rad):.4g}')
         view.fwhm_major_axis_label.setText(
             f'{LengthUnit.NANOMETER.convert(metrics.fwhm_major_axis_length_m):.4g}'
         )

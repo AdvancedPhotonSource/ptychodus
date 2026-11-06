@@ -2,8 +2,6 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import cast
 
-import numpy
-
 from ptychodus.api.typing import ComplexArrayType
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.visualize import (
@@ -18,6 +16,7 @@ from .color_axis import ColorAxis
 from .color_model import CylindricalColorModelParameter
 from .renderer import Renderer
 from .transformation import ScalarTransformationParameter
+from ptychodus.api.constants import PI, TWO_PI
 
 
 class CylindricalColorModelRenderer(Renderer):
@@ -52,7 +51,7 @@ class CylindricalColorModelRenderer(Renderer):
         phase_rad = self._phase_component.extract_component(complex_array)
 
         model = self._color_model.get_strategy()
-        hue = (phase_rad + numpy.pi) / (2 * numpy.pi)
+        hue = (phase_rad + PI) / TWO_PI
         return model.render_rgba(hue, self._color_normalize()(amplitude_transformed))
 
     def _visualize(

@@ -17,6 +17,7 @@ from ptychodus.api.geometry import (
 )
 from ptychodus.api.affine import AffineTransform
 from ptychodus.api.probe_positions import ProbePosition
+from ptychodus.api.constants import PI
 
 
 def test_str() -> None:
@@ -53,16 +54,16 @@ def test_boundary_included() -> None:
             1,
             1,
             numpy.array([0.5, 1.0]),
-            numpy.array([0.0, numpy.pi / 3]),
-            2.0 * numpy.array([0.5, 1.0]) * numpy.cos(numpy.array([0.0, numpy.pi / 3])),
+            numpy.array([0.0, PI / 3]),
+            2.0 * numpy.array([0.5, 1.0]) * numpy.cos(numpy.array([0.0, PI / 3])),
         ),
         # Z_1^-1 (tip): sqrt(4) * r * sin(theta) = 2r*sin(theta)
         (
             1,
             -1,
             numpy.array([0.5, 1.0]),
-            numpy.array([numpy.pi / 6, numpy.pi / 4]),
-            2.0 * numpy.array([0.5, 1.0]) * numpy.sin(numpy.array([numpy.pi / 6, numpy.pi / 4])),
+            numpy.array([PI / 6, PI / 4]),
+            2.0 * numpy.array([0.5, 1.0]) * numpy.sin(numpy.array([PI / 6, PI / 4])),
         ),
         # Z_2^0 (defocus): sqrt(3) * (2r^2 - 1)
         (
@@ -77,20 +78,20 @@ def test_boundary_included() -> None:
             2,
             2,
             numpy.array([0.5, 0.8]),
-            numpy.array([numpy.pi / 4, numpy.pi / 6]),
+            numpy.array([PI / 4, PI / 6]),
             numpy.sqrt(6)
             * numpy.array([0.5, 0.8]) ** 2
-            * numpy.cos(2 * numpy.array([numpy.pi / 4, numpy.pi / 6])),
+            * numpy.cos(2 * numpy.array([PI / 4, PI / 6])),
         ),
         # Z_2^-2: sqrt(6) * r^2 * sin(2*theta)
         (
             2,
             -2,
             numpy.array([0.5, 0.8]),
-            numpy.array([numpy.pi / 4, numpy.pi / 6]),
+            numpy.array([PI / 4, PI / 6]),
             numpy.sqrt(6)
             * numpy.array([0.5, 0.8]) ** 2
-            * numpy.sin(2 * numpy.array([numpy.pi / 4, numpy.pi / 6])),
+            * numpy.sin(2 * numpy.array([PI / 4, PI / 6])),
         ),
     ],
 )
@@ -133,7 +134,7 @@ def test_normalization(radial_degree: int, angular_frequency: int) -> None:
     Z = mode(distance, angle, undefined_value=0.0)  # noqa: N806
     pixel_area = (2.0 / num_pixels) ** 2
     integral = numpy.sum(Z**2) * pixel_area
-    numpy.testing.assert_allclose(integral, numpy.pi, rtol=0.01)
+    numpy.testing.assert_allclose(integral, PI, rtol=0.01)
 
 
 def test_indexing() -> None:
@@ -481,8 +482,8 @@ def test_affine_transform_pure_scaling() -> None:
 
 def test_affine_transform_pure_rotation() -> None:
     """A 90 deg CCW rotation maps (1, 0) -> (0, 1) and (0, 1) -> (-1, 0)."""
-    cos90 = numpy.cos(numpy.pi / 2)
-    sin90 = numpy.sin(numpy.pi / 2)
+    cos90 = numpy.cos(PI / 2)
+    sin90 = numpy.sin(PI / 2)
     rotate = AffineTransform(cos90, -sin90, 0.0, sin90, cos90, 0.0)
     out_x, out_y = rotate.transform_coordinates(numpy.array([1.0, 0.0]), numpy.array([0.0, 1.0]))
     numpy.testing.assert_allclose(out_x, [0.0, -1.0], atol=1e-12)

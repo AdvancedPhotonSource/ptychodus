@@ -31,6 +31,7 @@ from ptychodus.api.reconstruct import (
     prepare_reconstruct_input,
     warn_if_propagation_regime_disagrees,
 )
+from ptychodus.api.constants import PI, TWO_PI
 
 
 PIXEL_M = 1.0e-9  # 1 nm per pixel for both probe and object
@@ -631,7 +632,7 @@ class TestEstimateRelative:
         numpy.testing.assert_allclose(estimate.object_scale_factor, 1.5, rtol=1.0e-10)
         # phi should be equivalent to pi modulo 2*pi. Reduce to [-pi, pi] via
         # phi mod 2pi - pi, then compare to 0.
-        wrapped = estimate.phase_offset_rad % (2.0 * numpy.pi) - numpy.pi
+        wrapped = estimate.phase_offset_rad % TWO_PI - PI
         assert abs(wrapped) < 1.0e-10
 
     def test_all_ones_weights_match_no_weights(self) -> None:

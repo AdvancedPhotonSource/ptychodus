@@ -32,6 +32,7 @@ intentionally not shipped with the wheel.
 
 from __future__ import annotations
 
+import math
 from dataclasses import replace
 from pathlib import Path
 import argparse
@@ -186,7 +187,7 @@ def _simulate(
     # The scan frame's x is the surface's in-plane axis foreshortened by sin(incidence),
     # and its y is the surface's y, so this surface grid covers the whole lab canvas.
     lab_geometry = compute_object_geometry(positions, probe_geometry)
-    incidence_sine = abs(numpy.sin(numpy.radians(geometry.incidence_angle_deg)))
+    incidence_sine = abs(numpy.sin(math.radians(geometry.incidence_angle_deg)))
     surface_pixel_m = pixel_m / 2.0
     surface_geometry = ObjectGeometry(
         width_px=int(numpy.ceil(1.5 * lab_geometry.width_m / incidence_sine / surface_pixel_m)),

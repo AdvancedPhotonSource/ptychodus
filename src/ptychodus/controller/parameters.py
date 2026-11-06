@@ -2,6 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Sequence
 from decimal import Decimal
+from enum import Enum
 from pathlib import Path
 from typing import Any, Final
 import cmath
@@ -26,7 +27,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ptychodus.api.constants import AngleUnit, LengthUnit, Unit
+from ptychodus.api.constants import TWO_PI, LengthUnit, Unit
 from ptychodus.api.geometry import Interval
 from ptychodus.model.observer import Observable, Observer
 from ptychodus.model.parameters import (
@@ -675,24 +676,49 @@ class LengthParameterViewController(ParameterViewController, Observer):
             self.__sync_model_to_view()
 
 
-class AngleParameterViewController(ParameterViewController, Observer):
-    """Binds an angle parameter in turns to a magnitude line edit plus a unit combo box.
+class AngleUnit(Enum):
+    """The units an angle editor offers to read and write an angle in.
 
-    Unlike :class:`LengthParameterViewController` there is no auto-selection: turn, degree,
-    and radian are a presentation choice rather than a magnitude ladder, so the displayed
-    unit changes only when the user picks one.
+    A presentation choice only: a parameter always holds its value in the unit its
+    field declares, degrees or radians, and the turn is offered for display alone.
+    The member value pairs the number of these units in one full cycle with its
+    display label. Converting by the ratio of two such counts keeps the exact 360,
+    where the reciprocals 1/360 and 1/(2*pi) would not terminate.
+    """
+
+    RADIAN = (TWO_PI, 'rad')
+    DEGREE = (360.0, 'deg')
+    TURN = (1.0, 'turn')
+
+    def __init__(self, units_per_turn: float, label: str) -> None:
+        self.label = label
+        # Decimal.from_float is exact for every float, including the irrational 2*pi, and is
+        # not rounded by the active decimal context the way 2 * Decimal(pi) would be.
+        self.decimal_units_per_turn: Decimal = Decimal.from_float(units_per_turn)
+
+
+class AngleParameterViewController(ParameterViewController, Observer):
+    """Binds an angle parameter to a magnitude line edit plus a unit combo box.
+
+    *unit* is the unit the parameter holds its value in, and *default_unit* the one
+    shown until the user picks another, which defaults to *unit*. Unlike
+    :class:`LengthParameterViewController` there is no auto-selection: degree, radian
+    and turn are a presentation choice rather than a magnitude ladder, so the displayed
+    unit changes only when the user picks one, and the stored value never changes unit.
     """
 
     def __init__(
         self,
         parameter: RealParameter,
         *,
+        unit: AngleUnit,
         is_signed: bool | None = None,
-        default_unit: AngleUnit = AngleUnit.TURN,
+        default_unit: AngleUnit | None = None,
         tool_tip: str = '',
     ) -> None:
         super().__init__()
         self._parameter = parameter
+        self._unit = unit
         signed = _is_signed(parameter, is_signed)
         self._line_edit = DecimalLineEdit.create_instance(is_signed=signed)
 
@@ -704,11 +730,11 @@ class AngleParameterViewController(ParameterViewController, Observer):
         self._unit_indexes: dict[AngleUnit, int] = {}
         self._widget = QWidget()
 
-        for unit in AngleUnit:
-            self._unit_indexes[unit] = self._units_combo_box.count()
-            self._units_combo_box.addItem(unit.label, unit)
+        for member in AngleUnit:
+            self._unit_indexes[member] = self._units_combo_box.count()
+            self._units_combo_box.addItem(member.label, member)
 
-        self._select_unit(default_unit)
+        self._select_unit(unit if default_unit is None else default_unit)
 
         if tool_tip:
             self._line_edit.setToolTip(tool_tip)
@@ -739,11 +765,24 @@ class AngleParameterViewController(ParameterViewController, Observer):
 
     def __sync_view_to_model(self, value: Decimal) -> None:
         magnitude = self._line_edit.get_value()
-        self._parameter.set_value(float(magnitude / self._current_unit.decimal_units_per_turn))
+
+        if self._current_unit is not self._unit:
+            magnitude *= (
+                self._unit.decimal_units_per_turn / self._current_unit.decimal_units_per_turn
+            )
+
+        self._parameter.set_value(float(magnitude))
 
     def __sync_model_to_view(self) -> None:
-        angle_turns = Decimal(str(self._parameter.get_value()))
-        self._line_edit.set_value(angle_turns * self._current_unit.decimal_units_per_turn)
+        # Through str, as the length editor does, so a stored 0.1 reads back as 0.1.
+        magnitude = Decimal(str(self._parameter.get_value()))
+
+        if self._current_unit is not self._unit:
+            magnitude *= (
+                self._current_unit.decimal_units_per_turn / self._unit.decimal_units_per_turn
+            )
+
+        self._line_edit.set_value(magnitude)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
@@ -751,13 +790,13 @@ class AngleParameterViewController(ParameterViewController, Observer):
 
 
 class ComplexSequenceTableModel(QAbstractTableModel):
-    """A sequence of complex values as rows of amplitude and phase, in turns.
+    """A sequence of complex values as rows of amplitude and phase, in radians.
 
     Rows are headed by their index from zero, which is the position a value holds in
     the sequence. An edit changes one of the two polar parts and keeps the other.
     """
 
-    _HEADERS: Final = ('Amplitude', 'Phase [tr]')
+    _HEADERS: Final = ('Amplitude', 'Phase [rad]')
 
     def __init__(self, parameter: ComplexSequenceParameter, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -797,7 +836,7 @@ class ComplexSequenceTableModel(QAbstractTableModel):
         if index.column() == 0:
             return f'{abs(value):.6g}'
 
-        return f'{cmath.phase(value) / (2.0 * math.pi):.6g}'
+        return f'{cmath.phase(value):.6g}'
 
     def setData(  # noqa: N802
         self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole
@@ -819,7 +858,7 @@ class ComplexSequenceTableModel(QAbstractTableModel):
             # A zero value has no phase to keep, so it takes phase zero.
             updated = cmath.rect(number, cmath.phase(current))
         else:
-            updated = cmath.rect(abs(current), 2.0 * math.pi * number)
+            updated = cmath.rect(abs(current), number)
 
         self._parameter[index.row()] = updated
         self.dataChanged.emit(index, index)
@@ -921,18 +960,20 @@ def _real_number_editor(
     slide between and gets a line edit. A real naming a unit gets neither: a
     length is read and written in whichever SI prefix suits its magnitude --
     *display_unit* where the value is zero and suggests none -- and a slider
-    over the whole range would make the small end unreachable.
+    over the whole range would make the small end unreachable. An angle is
+    shown in the unit its field declares until the user picks another.
     """
-    # Only the base unit of each quantity, because each of these controllers
-    # holds one: a field declaring degrees handed to the one that reads turns
-    # would be rescaled by a factor nobody asked for.
+    # A length editor holds meters, and an angle editor holds whichever angle unit
+    # the field declares, so neither rescales the stored value.
     if unit is Unit.METER:
         return LengthParameterViewController(
             parameter, default_unit=display_unit or LengthUnit.METER, tool_tip=tool_tip
         )
 
-    if unit is Unit.TURN:
-        return AngleParameterViewController(parameter, tool_tip=tool_tip)
+    angle_units = {Unit.DEGREE: AngleUnit.DEGREE, Unit.RADIAN: AngleUnit.RADIAN}
+
+    if unit in angle_units:
+        return AngleParameterViewController(parameter, unit=angle_units[unit], tool_tip=tool_tip)
 
     if parameter.get_minimum() is not None and parameter.get_maximum() is not None:
         return DecimalSliderParameterViewController(parameter, tool_tip=tool_tip)
@@ -1195,13 +1236,14 @@ class ParameterViewBuilder:
         parameter: RealParameter,
         label: str,
         *,
+        unit: AngleUnit,
         is_signed: bool | None = None,
-        default_unit: AngleUnit = AngleUnit.TURN,
+        default_unit: AngleUnit | None = None,
         tool_tip: str = '',
         group: str = '',
     ) -> None:
         view_controller = AngleParameterViewController(
-            parameter, is_signed=is_signed, default_unit=default_unit, tool_tip=tool_tip
+            parameter, unit=unit, is_signed=is_signed, default_unit=default_unit, tool_tip=tool_tip
         )
         self.add_view_controller(view_controller, label, group=group)
 

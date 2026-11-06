@@ -13,7 +13,7 @@ from ptychodus.api.scattering.frame import (
     resolve_exit_frame_transform,
     transform_probe_to_exit_frame,
 )
-from ptychodus.api.constants import energy_eV_to_wavelength_m
+from ptychodus.api.constants import PI, TWO_PI, energy_eV_to_wavelength_m
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter, compute_object_geometry
 from ptychodus.api.probe import ProbeEnsemble, ProbeGeometry
@@ -81,8 +81,8 @@ def _incident_probe(x_m: RealArrayType, y_m: RealArrayType) -> ComplexArrayType:
 def _surface_reflectivity(s1_m: RealArrayType, s2_m: RealArrayType) -> ComplexArrayType:
     """A smooth complex surface: amplitude contrast along s1, a displacement-like phase along s2."""
     pixel_m = _probe_geometry().pixel_width_m
-    amplitude = 1.0 + 0.4 * numpy.cos(2.0 * numpy.pi * s1_m / (30.0 * pixel_m))
-    phase = 0.8 * numpy.sin(2.0 * numpy.pi * s2_m / (14.0 * pixel_m) + 0.5)
+    amplitude = 1.0 + 0.4 * numpy.cos(TWO_PI * s1_m / (30.0 * pixel_m))
+    phase = 0.8 * numpy.sin(TWO_PI * s2_m / (14.0 * pixel_m) + 0.5)
     return amplitude * numpy.exp(1j * phase)
 
 
@@ -414,7 +414,7 @@ def _kinematic_patterns(
     phase the displacement causes left to the path lengths rather than written in.
     """
     wavelength_m = product.metadata.photon_wavelength_m
-    wavenumber = 2.0 * numpy.pi / wavelength_m
+    wavenumber = TWO_PI / wavelength_m
     distance_m = product.metadata.detector_distance_m
     column_axis, row_axis = geometry.get_detector_axes()
     exit_direction = geometry.get_exit_direction()
@@ -627,7 +627,7 @@ def test_the_scattering_vector_meets_the_bragg_condition() -> None:
     magnitude_per_m = float(numpy.linalg.norm(geometry.get_scattering_vector_per_m(wavelength_m)))
 
     assert magnitude_per_m == pytest.approx(
-        4.0 * math.pi * math.sin(math.radians(47.35 / 2.0)) / wavelength_m, rel=1e-12
+        4.0 * PI * math.sin(math.radians(47.35 / 2.0)) / wavelength_m, rel=1e-12
     )
     # Symmetric reflection: the scattering vector is along the surface normal.
     normal = geometry.get_surface_normal()
@@ -651,7 +651,7 @@ def test_the_phase_of_a_strained_crystal_is_minus_g_dot_u(sign: float) -> None:
 
     def displacement_m(s1_m: RealArrayType, s2_m: RealArrayType) -> RealArrayType:
         # About a third of a lattice-plane spacing, so the phase swings near ±2 rad.
-        return (2.0 / magnitude_per_m) * numpy.sin(2.0 * numpy.pi * s1_m / (40.0 * pixel_m))
+        return (2.0 / magnitude_per_m) * numpy.sin(TWO_PI * s1_m / (40.0 * pixel_m))
 
     def amplitude(s1_m: RealArrayType, s2_m: RealArrayType) -> ComplexArrayType:
         return numpy.abs(_surface_reflectivity(s1_m, s2_m)) + 0j

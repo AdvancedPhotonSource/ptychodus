@@ -15,7 +15,7 @@ from scipy.fft import fft2
 
 from .accumulate import DiffractionMoments
 from .assemble import AssembledDiffractionData
-from .constants import format_length
+from .constants import PI, format_length
 from .files import FileReader, FileWriter
 from .fourier import fourier_shift_2d
 from .geometry import ImageExtent, PixelGeometry
@@ -355,7 +355,7 @@ def estimate_probe_size(
     def _axis_tilt(axis: RealArrayType) -> float:
         # axis direction is sign-ambiguous; fold the angle into [-pi/2, pi/2)
         angle = numpy.arctan2(axis[1], axis[0])
-        return float((angle + numpy.pi / 2.0) % numpy.pi - numpy.pi / 2.0)
+        return float((angle + PI / 2.0) % PI - PI / 2.0)
 
     major_tilt = _axis_tilt(major_axis)
     minor_tilt = _axis_tilt(minor_axis)
@@ -429,14 +429,14 @@ class ProbeExtent:
     defocus_distance_m: float
 
     def _beam_width_m(self, spread_per_m: float) -> float:
-        waist_m = 1.0 / (4.0 * math.pi * spread_per_m)
+        waist_m = 1.0 / (4.0 * PI * spread_per_m)
         return math.hypot(
             waist_m, self.photon_wavelength_m * self.defocus_distance_m * spread_per_m
         )
 
     def _aperture_width_m(self, spread_per_m: float) -> float:
         if self.defocus_distance_m == 0.0:
-            return 1.0 / (4.0 * math.pi * spread_per_m)
+            return 1.0 / (4.0 * PI * spread_per_m)
 
         return self.photon_wavelength_m * abs(self.defocus_distance_m) * spread_per_m
 

@@ -67,6 +67,7 @@ from ptychodus.model.product.probe.builder_factory import ProbeBuilderFactory
 from ptychodus.model.product.probe.plugin import PluginProbeBuilder
 from ptychodus.model.product.probe.settings import ProbeSettings
 from ptychodus.plugins import probe as probe_plugins
+from ptychodus.api.constants import PI
 
 NUM_SCAN_POINTS = 7
 PROBE_PHOTON_COUNT = 1.0e6
@@ -1207,9 +1208,7 @@ class TestSizeEstimateFromDiffraction:
 
         assert builder.estimate_size_from_diffraction(_provider_with(mean_pattern))
 
-        sigma_m = math.hypot(
-            1.0 / (4.0 * math.pi * sigma_q), 1.0e-10 * _ESTIMATE_DEFOCUS_M * sigma_q
-        )
+        sigma_m = math.hypot(1.0 / (4.0 * PI * sigma_q), 1.0e-10 * _ESTIMATE_DEFOCUS_M * sigma_q)
         assert builder.parameters()['full_width_at_half_maximum_m'].get_value() == pytest.approx(
             2.0 * math.sqrt(2.0 * math.log(2.0)) * sigma_m, rel=0.03
         )

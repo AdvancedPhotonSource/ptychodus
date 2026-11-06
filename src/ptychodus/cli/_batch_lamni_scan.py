@@ -12,6 +12,7 @@ share no output path, so the usual single-writer rules have nothing to protect.
 
 from __future__ import annotations
 
+import math
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -83,8 +84,8 @@ def write_affine_fit(file_path: Path, result: AffineFitResult) -> None:
     payload = {
         'scale': components.scale,
         'asymmetry': components.asymmetry,
-        'rotation_deg': float(numpy.degrees(components.rotation_rad)),
-        'shear_deg': float(numpy.degrees(components.shear_rad)),
+        'rotation_deg': math.degrees(components.rotation_rad),
+        'shear_deg': math.degrees(components.shear_rad),
         'rms_residual_m': result.rms_residual_m,
         'linear_transform': [
             [transform.a00, transform.a01, transform.a02],

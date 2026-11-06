@@ -21,6 +21,7 @@ import math
 import numpy
 
 from ..typing import RealArrayType
+from ..constants import TWO_PI
 
 __all__ = [
     'ScatteringGeometry',
@@ -186,7 +187,7 @@ class ScatteringGeometry:
         In radians per meter, in the frame the angles are stated in. It is zero for a
         forward exit beam.
         """
-        wavenumber_per_m = 2.0 * math.pi / photon_wavelength_m
+        wavenumber_per_m = TWO_PI / photon_wavelength_m
         return wavenumber_per_m * (self.get_exit_direction() - numpy.array([0.0, 0.0, 1.0]))
 
     def project_onto_surface(self, u_m: RealArrayType, v_m: RealArrayType) -> RealArrayType:

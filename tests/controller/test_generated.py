@@ -16,10 +16,11 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any
 
+import pytest
 from PyQt5.QtCore import QModelIndex, Qt
 from PyQt5.QtWidgets import QApplication, QComboBox
 
-from ptychodus.api.constants import LengthUnit
+from ptychodus.api.constants import TWO_PI, LengthUnit
 from ptychodus.model.parameters import (
     BooleanParameter,
     IntegerParameter,
@@ -308,14 +309,31 @@ class TestWhichEditorAFieldGets:
         assert shown_unit(LengthUnit.MICROMETER) == LengthUnit.MICROMETER.label
         assert shown_unit(None) == LengthUnit.METER.label
 
-    def test_an_angle_held_in_turns_does_too(self, qapp: QApplication) -> None:
-        field = _field('phase_tr', RealParameter(0.25, None), unit=Unit.TURN)
+    @pytest.mark.parametrize(
+        'name, parameter, unit, label',
+        [
+            ('tilt_deg', RealParameter(30.0, None), Unit.DEGREE, 'deg'),
+            (
+                'phase_rad',
+                RealParameter(0.5, None, minimum=0.0, maximum=TWO_PI),
+                Unit.RADIAN,
+                'rad',
+            ),
+        ],
+    )
+    def test_an_angle_shows_in_its_declared_unit(
+        self, qapp: QApplication, name: str, parameter: RealParameter, unit: Unit, label: str
+    ) -> None:
+        """Even bounded, an angle gets the angle editor rather than a slider."""
+        editor = _editor(_field(name, parameter, unit=unit))
 
-        assert isinstance(_editor(field), AngleParameterViewController)
+        assert isinstance(editor, AngleParameterViewController)
+        combo_box = editor.get_widget().findChild(QComboBox)
+        assert combo_box is not None
+        assert combo_box.currentText() == label
 
     def test_a_unit_no_controller_reads_falls_back(self, qapp: QApplication) -> None:
-        """Degrees are not turns; a widget holding turns would rescale the value."""
-        field = _field('tilt_deg', RealParameter(30.0, None), unit=Unit.DEGREE)
+        field = _field('width_px', RealParameter(30.0, None), unit=Unit.PIXEL)
 
         assert isinstance(_editor(field), DecimalLineEditParameterViewController)
 

@@ -44,6 +44,7 @@ from ptychodus.api.propagate import (
     PropagatorParameters,
     intensity,
 )
+from ptychodus.api.constants import PI
 
 
 PIXEL_GEOMETRY = PixelGeometry(width_m=1e-8, height_m=1e-8)
@@ -1237,7 +1238,7 @@ class TestApplyDefocusPhase:
         x_m = (numpy.arange(width_px) - (width_px - 1) / 2) * pixel_width_m
         y_m = (numpy.arange(height_px) - (height_px - 1) / 2) * pixel_height_m
         r2_m2 = numpy.square(x_m[numpy.newaxis, :]) + numpy.square(y_m[:, numpy.newaxis])
-        expected = numpy.exp(1j * numpy.pi * r2_m2 / (_DEFOCUS_WAVELENGTH_M * 1.0e-3))
+        expected = numpy.exp(1j * PI * r2_m2 / (_DEFOCUS_WAVELENGTH_M * 1.0e-3))
         numpy.testing.assert_allclose(defocused, expected, atol=1e-12)
 
     def test_centers_the_curvature_between_the_middle_pixels(self) -> None:
@@ -1468,7 +1469,7 @@ class TestKirkpatrickBaezMirror:
             {'acceptance_length_m': -0.1},
             {'acceptance_length_m': math.inf},
             {'grazing_angle_rad': 0.0},
-            {'grazing_angle_rad': 0.5 * math.pi},
+            {'grazing_angle_rad': 0.5 * PI},
             {'grazing_angle_rad': 2.0},
             {'focus_distance_m': 0.0},
             {'focus_distance_m': math.nan},

@@ -40,7 +40,7 @@ with ModelCore(Path('settings.ini')) as model:
         {
             'amplitude_mean': 1.0,
             'amplitude_deviation': 0.0,
-            'phase_deviation_tr': 0.1,
+            'phase_deviation_rad': 0.6,
             'blur_deviation_px': 0.0,
         },
     )
@@ -148,8 +148,8 @@ The other patterns use:
 `radius_scalar_m`
 : Spiral radius at unit index, for `spiral`.
 
-`amplitude_x_m`, `amplitude_y_m`, `angular_step_x_tr`, `angular_step_y_tr`, `angular_shift_tr`
-: Figure extent, the two angular rates whose ratio sets the figure, and the phase offset between them, for `lissajous`. The angular values are in turns and may be negative.
+`amplitude_x_m`, `amplitude_y_m`, `angular_step_x_deg`, `angular_step_y_deg`, `angular_shift_deg`
+: Figure extent, the two angular rates whose ratio sets the figure, and the phase offset between them, for `lissajous`. The angular values are in degrees and may be negative.
 
 ## Probe Generators
 
@@ -170,7 +170,7 @@ Each probe model is a plugin that states the parameters it accepts, so the names
 : Simulates a Fresnel zone plate optic and propagates it to the sample plane with the Fresnel-transform propagator. Parameters are `zone_plate_diameter_m`, `outermost_zone_width_m`, `central_beamstop_diameter_m`, and `defocus_distance_m`. The central beamstop creates the donut-like zone-plate aperture. The focal length is computed as `zone_plate_diameter_m * outermost_zone_width_m / photon_wavelength_m` and the propagation distance is `focal_length_m + defocus_distance_m`. `defocus_distance_m` is the object plane's position relative to the focus, which is the negated product metadata field `focus_object_distance_m`; when the product declares a nonzero focus the product's value is used and a disagreeing builder value is reported.
 
 `kb_mirror`
-: Simulates a Kirkpatrick-Baez mirror pair and propagates it to the sample plane. Each mirror takes an `acceptance_length_m`, a `grazing_angle_rad` and a `focus_distance_m`, from which the projected aperture `L sin(theta)` and the numerical aperture follow; `astigmatism_m` separates the two axis foci along the beam and `defocus_distance_m` moves the sample off the focal plane, deferring to the product's `focus_object_distance_m` the same way the zone plate does. Grazing angles are stored in radians rather than the turns the GUI uses elsewhere, because that is the number an optics log records. The pupil window is `photon_wavelength_m * z / probe_pixel_size_m`, so a high-aperture optic needs a fine probe pixel size; an aperture that does not fit is refused rather than silently clipped, since clipping would quietly change the optic.
+: Simulates a Kirkpatrick-Baez mirror pair and propagates it to the sample plane. Each mirror takes an `acceptance_length_m`, a `grazing_angle_rad` and a `focus_distance_m`, from which the projected aperture `L sin(theta)` and the numerical aperture follow; `astigmatism_m` separates the two axis foci along the beam and `defocus_distance_m` moves the sample off the focal plane, deferring to the product's `focus_object_distance_m` the same way the zone plate does. Grazing angles are in radians, the number an optics log records, where other geometric angles are in degrees. The pupil window is `photon_wavelength_m * z / probe_pixel_size_m`, so a high-aperture optic needs a fine probe pixel size; an aperture that does not fit is refused rather than silently clipped, since clipping would quietly change the optic.
 
 `average_pattern`
 : Estimates a probe from diffraction data by taking the square root of the mean assembled diffraction pattern and back-propagating it to the object plane. Far field takes the square root as the probe's flat-phase angular spectrum and inverse-transforms it onto the probe grid, giving the beam at its waist; the phase the Fresnel transform adds across the detector is not the probe's and is not undone, and no detector pitch is needed. Near field uses the angular spectrum over the demagnified distance, which preserves pitch. Because the far-field estimate is the waist, so `defocus_distance_m` carries it to an object sampled that far past the focus, deferring to the product's `focus_object_distance_m` as the zone plate does. `propagation_distance_m` refines where the probe plane sits without altering the geometry the object pixel size comes from; the two act on the same field and add. Bad pixels are inpainted rather than zeroed, since a hole in the bright field rings through the probe. `bright_field_threshold` (off by default) keeps only the bright field of a far-field mean pattern: the background pedestal is subtracted and the noise around the bright field zeroed, while the bright field keeps its measured values. This requires assembled diffraction data to already be available in the model.
@@ -424,12 +424,12 @@ This replaces the probe with a new `ProbeEnsemble` whose shape is `(2, 3, height
 
 ## Object Generators
 
-Use `WorkflowProductAPI.generate_object(name, parameters)`. Each object model is a plugin, registered under the name passed here, and its parameters are the fields it declares; the settings file holds each under the same name in PascalCase with its unit in words (`phase_deviation_tr` is `PhaseDeviationInTurns` in `[Object]`). Phases are in turns throughout, as the `_tr` suffix says, so an object is `amplitude * exp(2j * pi * phase_tr)`.
+Use `WorkflowProductAPI.generate_object(name, parameters)`. Each object model is a plugin, registered under the name passed here, and its parameters are the fields it declares; the settings file holds each under the same name in PascalCase with its unit in words (`phase_deviation_rad` is `PhaseDeviationInRadians` in `[Object]`). Phases are in radians throughout, as the `_rad` suffix says, so an object is `amplitude * exp(1j * phase_rad)`.
 
 Object geometry is derived from the current probe geometry and scan bounding box. The generated object is then widened by `extra_padding_x` and `extra_padding_y` and scaled to the sample's measured mean transmission (see below); both apply to every generated object and to no file-supplied one.
 
 `random`
-: Generates a complex object from independent Gaussian amplitude and phase fields. Parameters are `amplitude_mean`, `amplitude_deviation`, `phase_deviation_tr`, and `blur_deviation_px`, the width of a Gaussian blur applied to both fields.
+: Generates a complex object from independent Gaussian amplitude and phase fields. Parameters are `amplitude_mean`, `amplitude_deviation`, `phase_deviation_rad`, and `blur_deviation_px`, the width of a Gaussian blur applied to both fields.
 
 `gaussian_random_field`
 : Generates a complex Gaussian random field by spectral synthesis. Parameter: `correlation_length_px`.
@@ -438,10 +438,10 @@ Object geometry is derived from the current probe geometry and scan bounding box
 : Generates a complex fractal-noise object by summing multiple octaves of simplex noise. Parameters are `grid_scale_px`, the grid scale of the first octave, `num_octaves`, `gain`, the amplitude ratio of each octave to the one before, and `lacunarity`, the factor each octave divides the grid scale by.
 
 `dead_leaves`
-: Generates a layered random disk texture. Parameters are `leaf_radius_lower_px`, `leaf_radius_upper_px`, `leaf_radius_power_law_exponent`, `leaf_amplitude_lower`, `leaf_amplitude_upper`, `leaf_phase_lower_tr`, and `leaf_phase_upper_tr`.
+: Generates a layered random disk texture. Parameters are `leaf_radius_lower_px`, `leaf_radius_upper_px`, `leaf_radius_power_law_exponent`, `leaf_amplitude_lower`, `leaf_amplitude_upper`, `leaf_phase_lower_rad`, and `leaf_phase_upper_rad`.
 
 `siemens_star`
-: Generates a Siemens star resolution target: `2 * num_spokes` wedges alternate between the spoke and background values inside a disk whose radius is `outer_radius_fraction` of the canvas's smaller half-extent, and pixels outside it take the background values. Parameters are `num_spokes`, `outer_radius_fraction`, `spoke_amplitude`, `background_amplitude`, `spoke_phase_tr`, and `background_phase_tr`.
+: Generates a Siemens star resolution target: `2 * num_spokes` wedges alternate between the spoke and background values inside a disk whose radius is `outer_radius_fraction` of the canvas's smaller half-extent, and pixels outside it take the background values. Parameters are `num_spokes`, `outer_radius_fraction`, `spoke_amplitude`, `background_amplitude`, `spoke_phase_rad`, and `background_phase_rad`.
 
 The four random textures draw from the application's random number generator, so each rebuild draws a fresh texture.
 
@@ -569,8 +569,8 @@ object_guess = generate_random_object(
     object_geometry,
     amplitude_mean=1.0,
     amplitude_deviation=0.0,
-    phase_mean=0.0,
-    phase_deviation_tr=0.1,
+    phase_mean_rad=0.0,
+    phase_deviation_rad=0.6,
     blur_deviation_px=0.0,
 )
 ```

@@ -22,7 +22,7 @@ from pydantic import BaseModel
 
 from ..accumulate import DiffractionMoments, compute_diffraction_moments
 from ..assemble import AssembledDiffractionData
-from ..constants import TWO_PI_J
+from ..constants import PI, TWO_PI
 from ..geometry import ImageExtent, PixelGeometry
 from ..interpolate import lerp
 from ..object import Object, ObjectGeometry, ObjectGeometryProvider, resample_object_layers
@@ -335,8 +335,8 @@ def _compute_probe_shadow_gradient(
     """
     probe_geometry = probes.get_geometry()
     pixel_geometry = probes.get_pixel_geometry()
-    kx = 2 * numpy.pi * fftfreq(probe_geometry.width_px, d=pixel_geometry.width_m)
-    ky = 2 * numpy.pi * fftfreq(probe_geometry.height_px, d=pixel_geometry.height_m)
+    kx = TWO_PI * fftfreq(probe_geometry.width_px, d=pixel_geometry.width_m)
+    ky = TWO_PI * fftfreq(probe_geometry.height_px, d=pixel_geometry.height_m)
     shadow = numpy.zeros((len(positions), 2))
 
     for index, patch in enumerate(iter_probe_patches_on(probes, positions, geometry)):
@@ -383,8 +383,8 @@ def _integrate_gradient(
             [-gradient_y[::-1, :], -gradient_y[::-1, ::-1]],
         ]
     )
-    kx = 2 * numpy.pi * fftfreq(2 * width_px, d=pixel_geometry.width_m)
-    ky = 2 * numpy.pi * fftfreq(2 * height_px, d=pixel_geometry.height_m)
+    kx = TWO_PI * fftfreq(2 * width_px, d=pixel_geometry.width_m)
+    ky = TWO_PI * fftfreq(2 * height_px, d=pixel_geometry.height_m)
     KY, KX = numpy.meshgrid(ky, kx, indexing='ij')  # noqa: N806
     denominator = numpy.square(KX) + numpy.square(KY) + regularization_per_m2
     denominator[0, 0] = 1.0
@@ -516,8 +516,8 @@ def generate_stxm_dpc_object(
         deviation_x_px[finite] = centroid_x_px[finite] - numpy.mean(centroid_x_px[finite])
         deviation_y_px[finite] = centroid_y_px[finite] - numpy.mean(centroid_y_px[finite])
 
-    radians_per_px_x = 2 * numpy.pi / (detector_extent.width_px * geometry.pixel_width_m)
-    radians_per_px_y = 2 * numpy.pi / (detector_extent.height_px * geometry.pixel_height_m)
+    radians_per_px_x = TWO_PI / (detector_extent.width_px * geometry.pixel_width_m)
+    radians_per_px_y = TWO_PI / (detector_extent.height_px * geometry.pixel_height_m)
     grids, scanned = interpolate_scan_values(
         geometry,
         positions,
@@ -549,7 +549,7 @@ def generate_stxm_dpc_object(
 
     if regularization_fov_fraction > 0.0:
         cutoff_wavelength_m = regularization_fov_fraction * max(geometry.width_m, geometry.height_m)
-        regularization_per_m2 = (2 * numpy.pi / cutoff_wavelength_m) ** 2
+        regularization_per_m2 = (TWO_PI / cutoff_wavelength_m) ** 2
     else:
         regularization_per_m2 = 0.0
 
@@ -622,13 +622,13 @@ def generate_paganin_object(
     intensity_normalized = intensity / mean_intensity
 
     pixel_geometry = geometry.get_pixel_geometry()
-    kx = 2 * numpy.pi * fftfreq(geometry.width_px, d=pixel_geometry.width_m)
-    ky = 2 * numpy.pi * fftfreq(geometry.height_px, d=pixel_geometry.height_m)
+    kx = TWO_PI * fftfreq(geometry.width_px, d=pixel_geometry.width_m)
+    ky = TWO_PI * fftfreq(geometry.height_px, d=pixel_geometry.height_m)
     KY, KX = numpy.meshgrid(ky, kx, indexing='ij')  # noqa: N806
     K2 = numpy.square(KX) + numpy.square(KY)  # noqa: N806
 
     filter_denominator = (
-        1.0 + delta_over_beta * propagation_distance_m * photon_wavelength_m * K2 / (4 * numpy.pi)
+        1.0 + delta_over_beta * propagation_distance_m * photon_wavelength_m * K2 / (4 * PI)
     )
     filtered = numpy.real(numpy.asarray(ifft2(fft2(intensity_normalized) / filter_denominator)))
     filtered = numpy.clip(filtered, small_value, None)
@@ -670,14 +670,14 @@ def generate_random_object(
     *,
     amplitude_mean: float,
     amplitude_deviation: float,
-    phase_mean_tr: float,
-    phase_deviation_tr: float,
+    phase_mean_rad: float,
+    phase_deviation_rad: float,
     blur_deviation_px: float,
 ) -> Object:
     """Generate a random complex object from Gaussian amplitude and phase distributions, with optional Gaussian blur.
 
-    Phase is in turns, as the ``_tr`` suffixes say: the array is
-    ``amplitude * exp(2*pi*j * phase)``, so a `phase_mean_tr` of 0.5 is half a turn.
+    Phase is in radians, as the ``_rad`` suffixes say: the array is
+    ``amplitude * exp(1j * phase)``, so a `phase_mean_rad` of pi is half a cycle.
     """
     object_shape = (1, geometry.height_px, geometry.width_px)
 
@@ -687,8 +687,8 @@ def generate_random_object(
         object_shape,
     )
     phase = rng.normal(
-        phase_mean_tr,
-        phase_deviation_tr,
+        phase_mean_rad,
+        phase_deviation_rad,
         object_shape,
     )
 
@@ -697,7 +697,7 @@ def generate_random_object(
         amplitude = gaussian_filter(amplitude, sigma=blur_deviation_px)
         phase = gaussian_filter(phase, sigma=blur_deviation_px)
 
-    array = amplitude * numpy.exp(TWO_PI_J * phase)
+    array = amplitude * numpy.exp(1j * phase)
 
     return Object(
         array=array.astype('complex'),
@@ -721,7 +721,7 @@ def generate_gaussian_random_field_object(
     K2 = numpy.square(KX) + numpy.square(KY)  # noqa: N806
 
     # power spectrum: Gaussian envelope to control correlation length
-    power_spectrum = numpy.exp(-0.5 * (2 * numpy.pi * correlation_length_px) ** 2 * K2)
+    power_spectrum = numpy.exp(-0.5 * (TWO_PI * correlation_length_px) ** 2 * K2)
     power_spectrum[0, 0] = 0  # zero mean
 
     # shape noise with power spectrum and back-transform
@@ -802,7 +802,7 @@ def _generate_simplex_noise(
     grad_shape_y = numpy.ceil(geometry_coefficient * height_px).astype(int) + 1
     grad_shape = grad_shape_y, grad_shape_x
     logger.debug(f'{geometry_coefficient=} {grad_shape=}')
-    angle_rad = 2 * numpy.pi * rng.uniform(size=grad_shape)
+    angle_rad = TWO_PI * rng.uniform(size=grad_shape)
     vertex_grad_x = numpy.cos(angle_rad)
     vertex_grad_y = numpy.sin(angle_rad)
 
@@ -914,8 +914,8 @@ def generate_dead_leaves_object(
     leaf_radius_power_law_exponent: float,
     leaf_amplitude_lower: float,
     leaf_amplitude_upper: float,
-    leaf_phase_lower_tr: float,
-    leaf_phase_upper_tr: float,
+    leaf_phase_lower_rad: float,
+    leaf_phase_upper_rad: float,
 ) -> Object:
     """Generate a complex object by layering randomly-sized and positioned disks (dead-leaves model)."""
     # TODO consider using Poisson disk sampling or CVT for sample positions
@@ -933,13 +933,13 @@ def generate_dead_leaves_object(
     if leaf_amplitude_lower >= leaf_amplitude_upper:
         raise ValueError('leaf_amplitude_lower must be less than leaf_amplitude_upper')
 
-    if leaf_phase_lower_tr >= leaf_phase_upper_tr:
-        raise ValueError('leaf_phase_lower_tr must be less than leaf_phase_upper_tr')
+    if leaf_phase_lower_rad >= leaf_phase_upper_rad:
+        raise ValueError('leaf_phase_lower_rad must be less than leaf_phase_upper_rad')
 
     object_shape = (geometry.height_px, geometry.width_px)
     is_covered = numpy.zeros(object_shape, dtype=bool)
     amplitude: RealArrayType = numpy.zeros(object_shape, dtype=float)
-    phase_tr: RealArrayType = numpy.zeros(object_shape, dtype=float)
+    phase_rad: RealArrayType = numpy.zeros(object_shape, dtype=float)
 
     position_y_px, position_x_px = numpy.indices(object_shape)
     num_covered_pixels = 0
@@ -951,9 +951,9 @@ def generate_dead_leaves_object(
         leaf_radius_px = leaf_radius_lower_px * numpy.power(1.0 + rng.uniform() * coef, 1.0 / beta)
         leaf_position_x_px = rng.uniform(-leaf_radius_px, geometry.width_px + leaf_radius_px)
         leaf_position_y_px = rng.uniform(-leaf_radius_px, geometry.height_px + leaf_radius_px)
-        leaf_phase_tr = rng.uniform(
-            leaf_phase_lower_tr,
-            leaf_phase_upper_tr,
+        leaf_phase_rad = rng.uniform(
+            leaf_phase_lower_rad,
+            leaf_phase_upper_rad,
             size=(1, 1),
         )
         leaf_amplitude = numpy.sqrt(
@@ -976,7 +976,7 @@ def generate_dead_leaves_object(
         num_samples = len(_sample_positions)
         leaf_coverage = leaf_counts / num_samples
         amplitude = lerp(amplitude, leaf_amplitude, leaf_coverage)
-        phase_tr = lerp(phase_tr, leaf_phase_tr, leaf_coverage)
+        phase_rad = lerp(phase_rad, leaf_phase_rad, leaf_coverage)
 
         is_covered |= leaf_counts == num_samples
         num_covered_pixels = int(numpy.count_nonzero(is_covered))
@@ -987,7 +987,7 @@ def generate_dead_leaves_object(
         if num_covered_pixels == is_covered.size:
             break
 
-    array = amplitude * numpy.exp(TWO_PI_J * phase_tr)
+    array = amplitude * numpy.exp(1j * phase_rad)
 
     return Object(
         array=array.astype('complex'),
@@ -1003,8 +1003,8 @@ def generate_siemens_star_object(
     outer_radius_fraction: float,
     spoke_amplitude: float,
     background_amplitude: float,
-    spoke_phase_tr: float,
-    background_phase_tr: float,
+    spoke_phase_rad: float,
+    background_phase_rad: float,
 ) -> Object:
     """Generate a Siemens star resolution target with alternating angular wedges.
 
@@ -1036,23 +1036,23 @@ def generate_siemens_star_object(
 
     position_y_px, position_x_px = numpy.indices((height_px, width_px)).astype(float)
     amplitude = numpy.zeros((height_px, width_px), dtype=float)
-    phase_tr = numpy.zeros((height_px, width_px), dtype=float)
+    phase_rad = numpy.zeros((height_px, width_px), dtype=float)
 
     for u_y, u_x in _sample_positions:
         dy = position_y_px + u_y - center_y_px
         dx = position_x_px + u_x - center_x_px
         radius_px = numpy.hypot(dy, dx)
-        angle = numpy.mod(numpy.arctan2(dy, dx), 2.0 * numpy.pi)
-        wedge_index = numpy.floor(angle * num_spokes / numpy.pi).astype(int)
+        angle = numpy.mod(numpy.arctan2(dy, dx), TWO_PI)
+        wedge_index = numpy.floor(angle * num_spokes / PI).astype(int)
         is_spoke = (radius_px <= outer_radius_px) & (wedge_index % 2 == 0)
         amplitude += numpy.where(is_spoke, spoke_amplitude, background_amplitude)
-        phase_tr += numpy.where(is_spoke, spoke_phase_tr, background_phase_tr)
+        phase_rad += numpy.where(is_spoke, spoke_phase_rad, background_phase_rad)
 
     num_samples = len(_sample_positions)
     amplitude /= num_samples
-    phase_tr /= num_samples
+    phase_rad /= num_samples
 
-    array = amplitude * numpy.exp(TWO_PI_J * phase_tr)
+    array = amplitude * numpy.exp(1j * phase_rad)
 
     return Object(
         array=array[numpy.newaxis, :, :].astype('complex'),

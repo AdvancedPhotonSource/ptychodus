@@ -109,29 +109,20 @@ class OptionalGate(StructuralAdapter):
 
 @dataclass(frozen=True)
 class OptionalRange(StructuralAdapter):
-    """An optional pair of bounds persisted as a switch plus a low and a high key.
-
-    ``scale`` is how many declared units one persisted unit is worth, for a
-    pair ptychodus persists in a unit the declaration does not use: a phase
-    limit is radians upstream and degrees in the settings file, so the keys
-    carry degrees and the declared value is rebuilt in radians.
-    """
+    """An optional pair of bounds persisted as a switch plus a low and a high key."""
 
     gate: str
     minimum: str
     maximum: str
     value_type: type = float
     fallback: tuple[Any, Any] = (0.0, 0.0)
-    scale: float = 1.0
 
     @property
     def fields(self) -> Mapping[str, type]:
         return {self.gate: bool, self.minimum: self.value_type, self.maximum: self.value_type}
 
     def encode(self, value: Any) -> Mapping[str, Any]:
-        low, high = (
-            self.fallback if value is None else (value[0] / self.scale, value[1] / self.scale)
-        )
+        low, high = self.fallback if value is None else (value[0], value[1])
         return {self.gate: value is not None, self.minimum: low, self.maximum: high}
 
     def decode(self, values: Mapping[str, Any]) -> Any:
@@ -141,7 +132,7 @@ class OptionalRange(StructuralAdapter):
         # A list, not a tuple: a pair of bounds is a serializable field, and
         # pty-chi's own validators take the sequence types its wire format can
         # represent rather than whatever happens to be iterable.
-        return [values[self.minimum] * self.scale, values[self.maximum] * self.scale]
+        return [values[self.minimum], values[self.maximum]]
 
 
 @dataclass(frozen=True)

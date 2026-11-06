@@ -1,9 +1,8 @@
 from __future__ import annotations
+import math
 from enum import Enum, IntEnum
 from typing import Any
 import logging
-
-import numpy
 
 from PyQt5.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt
 
@@ -115,9 +114,9 @@ class ProbeMetricsTableModel(QAbstractTableModel):
 
             match row:
                 case _Row.MAJOR_AXIS_TILT_DEG:
-                    return f'{numpy.rad2deg(self._metrics.major_axis_tilt_rad):.4g}'
+                    return f'{math.degrees(self._metrics.major_axis_tilt_rad):.4g}'
                 case _Row.MINOR_AXIS_TILT_DEG:
-                    return f'{numpy.rad2deg(self._metrics.minor_axis_tilt_rad):.4g}'
+                    return f'{math.degrees(self._metrics.minor_axis_tilt_rad):.4g}'
                 case _Row.FWHM_MAJOR_AXIS_NM:
                     return f'{LengthUnit.NANOMETER.convert(self._metrics.fwhm_major_axis_length_m):.4g}'
                 case _Row.FWHM_MINOR_AXIS_NM:

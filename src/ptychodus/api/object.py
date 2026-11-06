@@ -17,7 +17,7 @@ from skimage.restoration import unwrap_phase
 from .typing import ComplexArrayType, InexactArrayType, RealArrayType
 from .accumulate import DiffractionMoments
 from .assemble import AssembledDiffractionData
-from .constants import format_length
+from .constants import PI, format_length
 from .files import FileReader, FileWriter
 from .fourier import fourier_shift_2d
 from .geometry import PixelGeometry
@@ -804,7 +804,7 @@ def _warn_if_phase_appears_wrapped(phase_rad: RealArrayType, *, jump_fraction: f
 
         for axis in (-2, -1):
             difference = numpy.diff(layer, axis=axis)
-            jumps += int(numpy.count_nonzero(numpy.abs(difference) > numpy.pi))
+            jumps += int(numpy.count_nonzero(numpy.abs(difference) > PI))
             total += difference.size
 
         if total > 0 and jumps / total > jump_fraction:
