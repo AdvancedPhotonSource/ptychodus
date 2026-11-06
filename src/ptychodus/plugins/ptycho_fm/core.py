@@ -10,7 +10,7 @@ class PtychoFMReconstructorLibrary(ReconstructorLibrary):
     """What PtychoFM offers, holding nothing but the names it is built from.
 
     ``ptychi`` is required alongside PtychoFM's own packages because the child
-    borrows ``ptychi.image_proc.place_patches_fourier_shift`` to stitch
+    borrows ``ptychi.image_proc.ObjectPatchSampler`` to stitch
     predicted patches. Only the reconstruct path needs it, but a reconstructor
     that can train and not reconstruct is not worth advertising, so a missing
     pty-chi disables the backend here rather than failing inside a spawned

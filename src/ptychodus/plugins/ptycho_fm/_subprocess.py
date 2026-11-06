@@ -10,7 +10,7 @@ Two entry points are exposed:
 - :func:`run_reconstruct` -- load a ``.pth`` checkpoint into the model chosen by
   ``ptycho_fm.utils.inference.resolve_inference_model``, run one inference pass
   over the diffraction stack, stitch the per-patch amplitude/phase outputs into
-  a full-object array via ``place_patches_fourier_shift``, and stream back a
+  a full-object array via ``ObjectPatchSampler``, and stream back a
   single :class:`ReconstructOutput`.
 - :func:`run_train` -- run one single-device training session (no DDP, no
   mlflow, no wandb) driven by the trainable model that ``coupled_decoder_mode``
@@ -107,7 +107,7 @@ def _build_positions_top_left(parameters: Any) -> RealArrayType:
     """Convert ptychodus probe positions to top-left-origin object-pixel coords.
 
     Returns an ``(N, 2)`` float32 array of ``[y_px, x_px]`` centres, matching
-    what ``place_patches_fourier_shift`` expects.
+    what ``ObjectPatchSampler.place`` expects.
     """
     object_geometry = parameters.product.object_.get_geometry()
     positions = parameters.product.probe_positions
@@ -171,7 +171,7 @@ def run_reconstruct(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None
     model_path = payload.require_model_path()
 
     import torch
-    from ptychi.image_proc import place_patches_fourier_shift
+    from ptychi.image_proc import ObjectPatchSampler
     from ptycho_fm.utils.inference import (
         crop_patch_borders,
         iter_object_patch_predictions,
@@ -256,6 +256,7 @@ def run_reconstruct(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None
 
     central_crop = int(inference_config['central_crop'])
     pad = int(inference_config['pad'])
+    sampler = ObjectPatchSampler(method='fourier', pad=pad)
     batch_size = max(1, int(inference_config['batch_size']))
 
     dataset = _make_inference_dataset(
@@ -277,29 +278,26 @@ def run_reconstruct(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None
         batch_positions = positions[scan_index : scan_index + amp_patches.shape[0]]
         scan_index += amp_patches.shape[0]
 
-        pred_amp_object = place_patches_fourier_shift(
+        pred_amp_object = sampler.place(
             pred_amp_object,
             batch_positions,
             amp_patches,
             op='add',
             adjoint_mode=False,
-            pad=pad,
         )
-        pred_ph_object = place_patches_fourier_shift(
+        pred_ph_object = sampler.place(
             pred_ph_object,
             batch_positions,
             ph_patches,
             op='add',
             adjoint_mode=False,
-            pad=pad,
         )
-        buffer = place_patches_fourier_shift(
+        buffer = sampler.place(
             buffer,
             batch_positions,
             torch.ones_like(ph_patches),
             op='add',
             adjoint_mode=False,
-            pad=pad,
         )
 
     if scan_index != positions.shape[0]:

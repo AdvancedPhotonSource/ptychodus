@@ -604,6 +604,12 @@ _RECONSTRUCTOR_OVERLAYS: Mapping[str, Overlay] = {
         'in both dimensions, and samples patches otherwise. FULL_OBJECT always shifts '
         'the whole slice and ignores Pad For Shift; PATCH always samples patches.',
     ),
+    'forward_model_options.subpixel_shift_all_probe_modes': Overlay(
+        'Shift All Probe Modes',
+        'Apply the subpixel part of each probe position to every incoherent probe mode '
+        'rather than only the first. Enable for mixed-state reconstructions whose later '
+        'modes carry significant power. Full-object sampling ignores it.',
+    ),
     # Typed optional upstream, but zero is its own default and its own
     # meaning -- no padding -- so ptychodus offers the count rather than a
     # switch, and never sends the absent value.
@@ -770,6 +776,7 @@ def _reconstructor_policy(extras: set[str], *, ignores_batching: bool = False) -
             'forward_model_options.low_memory_mode': 'UseLowMemoryMode',
             'forward_model_options.pad_for_shift': 'PadForShift',
             'forward_model_options.shift_operator': 'ShiftOperator',
+            'forward_model_options.subpixel_shift_all_probe_modes': 'SubpixelShiftAllProbeModes',
         },
         structural={
             'default_dtype': _precision(),

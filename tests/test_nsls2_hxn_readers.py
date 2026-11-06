@@ -115,7 +115,7 @@ def test_style2_amplitudes_that_are_not_counts_stay_float(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     counts = _counts().astype(numpy.float64) + 0.25
-    path = _write_style2(tmp_path / 'scan_250000.h5', counts)  # type: ignore[arg-type]
+    path = _write_style2(tmp_path / 'scan_250000.h5', counts)
 
     with caplog.at_level(logging.WARNING):
         dataset = NSLS2HXNDiffractionFileReader().read(path)

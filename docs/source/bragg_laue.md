@@ -73,9 +73,7 @@ from ptychodus.api.scattering.frame import (
 from ptychodus.api.scattering.geometry import ScatteringGeometry
 from ptychodus.api.simulate.object import generate_uniform_object
 
-geometry = ScatteringGeometry(
-    two_theta_deg=33.6, detector_gamma_deg=0.5, incidence_angle_deg=17.2
-)
+geometry = ScatteringGeometry(two_theta_deg=33.6, detector_gamma_deg=0.5, incidence_angle_deg=17.2)
 
 # Positions as the scan recorded them, carried into the exit frame.
 transform = resolve_exit_frame_transform(geometry, far_field=True)

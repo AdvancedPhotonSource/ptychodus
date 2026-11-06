@@ -1294,6 +1294,34 @@ def test_probe_gauge_of_a_matched_product_is_the_propagator_convention(
     assert gauge.sampled_positions == NUM_PATTERNS
 
 
+@pytest.mark.parametrize(
+    'kwargs',
+    [
+        pytest.param({}, id='far-field-fft'),
+        pytest.param(
+            {
+                'far_field': False,
+                'pixel_m': _NEAR_FIELD_PIXEL_M,
+                'distance_m': _NEAR_FIELD_DISTANCE_M,
+            },
+            id='near-field-angular-spectrum',
+        ),
+        pytest.param({'far_field': False}, id='near-field-fresnel-transform'),
+    ],
+)
+def test_fft_shift_agrees_with_the_propagator_ptychi_builds(kwargs: dict[str, object]) -> None:
+    """pty-chi rolls the patterns on `fft_shift`, but leaves setting it to the caller.
+
+    Alignment derives it from the regime; this pins that the regime rule still names
+    exactly the propagator whose plane keeps its DC component at a corner.
+    """
+    parameters = _gauge_input(**kwargs)  # type: ignore[arg-type]
+    aligned = _aligned_for(parameters)
+    propagator = _build_ptychi_propagator(aligned, parameters.product.probes)
+
+    assert aligned.data_options.fft_shift == propagator.is_coordinate_shifted
+
+
 def _gauge_input_matched_per_pixel(
     *,
     far_field: bool = True,
@@ -1327,7 +1355,7 @@ def _gauge_input_matched_per_pixel(
     )
     product = dataclasses.replace(product, probes=probes)
 
-    propagator, corner_ordered = _build_ptychi_propagator(
+    propagator = _build_ptychi_propagator(
         align_task_options_with_product(LSQMLOptions(), product), probes
     )
     import torch
@@ -1336,7 +1364,7 @@ def _gauge_input_matched_per_pixel(
         propagated = propagator.propagate_forward(torch.as_tensor(probe_array[0]))
         intensity = numpy.sum(numpy.abs(propagated.numpy()) ** 2, axis=0)
 
-    if corner_ordered:
+    if propagator.is_coordinate_shifted:
         intensity = numpy.fft.fftshift(intensity, axes=(-2, -1))
 
     pattern = intensity * (_GAUGE_PHOTONS / numpy.sum(intensity))

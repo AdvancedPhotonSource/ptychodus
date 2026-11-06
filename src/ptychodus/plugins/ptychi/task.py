@@ -310,27 +310,20 @@ class ProbeGauge:
         return self.to_ptychi / self.expected_factor
 
 
-def _build_ptychi_propagator(
-    task_options: PtychographyTaskOptions, probe: ProbeEnsemble
-) -> tuple[Any, bool]:
+def _build_ptychi_propagator(task_options: PtychographyTaskOptions, probe: ProbeEnsemble) -> Any:
     """Build the free-space propagator pty-chi's forward model will build.
 
     Mirrors the selection in its forward model: an infinite distance is far field and
     takes the plain FFT, and otherwise the Fresnel number decides between the Fresnel
     transform and the angular spectrum. The probe pixel size is whatever the options
     state, falling back to the object's, which is the same inheritance pty-chi applies.
-
-    Returns the propagator and whether its detector plane comes back in corner order.
-    Only the plain FFT does: it leaves the DC component at a corner, which is why pty-chi
-    rolls the patterns to meet it. Every other propagator is centered in and centered
-    out, so its plane is already in the frame a detector mask is written in.
     """
     from ptychi import propagate
 
     distance_m = task_options.data_options.free_space_propagation_distance_m
 
     if math.isinf(distance_m):
-        return propagate.FourierPropagator(), True
+        return propagate.FourierPropagator()
 
     object_options = task_options.object_options
     probe_options = task_options.probe_options
@@ -347,9 +340,9 @@ def _build_ptychi_propagator(
     )
 
     if parameters.is_fresnel_transform_preferrable():
-        return propagate.FresnelTransformPropagator(parameters), False
+        return propagate.FresnelTransformPropagator(parameters)
 
-    return propagate.AngularSpectrumPropagator(parameters), False
+    return propagate.AngularSpectrumPropagator(parameters)
 
 
 def _propagate_intensity(propagator: Any, wavefield: numpy.ndarray) -> numpy.ndarray:
@@ -379,8 +372,6 @@ def _measure_predicted_intensity(
     product: Product,
     good_pixels: numpy.ndarray,
     num_sample_positions: int,
-    *,
-    corner_ordered: bool,
 ) -> tuple[float, int]:
     """Mean detector total pty-chi's forward model would predict, over sampled positions.
 
@@ -391,7 +382,9 @@ def _measure_predicted_intensity(
     Only the good pixels are summed, because the measured totals it will be compared
     against are summed the same way; counting the masked ones on one side alone would
     bias the result by the dead-pixel fraction. That only holds while both sides index
-    the same frame, so a corner-ordered plane is rolled to meet the mask first.
+    the same frame. A coordinate-shifted propagator -- the plain FFT -- leaves the DC
+    component at a corner, so its plane is rolled to meet the mask first; every other
+    propagator is centered in and centered out.
     """
     object_array = product.object_.get_layers_flattened()
     num_positions = len(product.probe_positions)
@@ -410,7 +403,7 @@ def _measure_predicted_intensity(
         object_patch = object_array[patch.bounds.y_slice, patch.bounds.x_slice]
         intensity = numpy.sum(_propagate_intensity(propagator, patch.modes * object_patch), axis=0)
 
-        if corner_ordered:
+        if propagator.is_coordinate_shifted:
             intensity = numpy.fft.fftshift(intensity, axes=(-2, -1))
 
         total += float(numpy.sum(intensity[good_pixels]))
@@ -463,7 +456,7 @@ def align_probe_gauge_with_ptychi(
     object already agree with the data, rather than raising: an initial guess is not
     worth failing a reconstruction over.
     """
-    propagator, corner_ordered = _build_ptychi_propagator(task_options, parameters.product.probes)
+    propagator = _build_ptychi_propagator(task_options, parameters.product.probes)
     # Summed over the whole plane rather than a mask, so the ordering cannot reach it.
     energy_ratio = _measure_propagator_energy_ratio(propagator, parameters.product.probes)
     expected_factor = 1.0 / math.sqrt(energy_ratio) if energy_ratio > 0.0 else 1.0
@@ -477,7 +470,6 @@ def align_probe_gauge_with_ptychi(
             parameters.product,
             good_pixels,
             num_sample_positions,
-            corner_ordered=corner_ordered,
         )
     except ValueError as exc:
         logger.warning(
