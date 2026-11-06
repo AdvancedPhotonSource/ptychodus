@@ -69,6 +69,12 @@ _CATALOGS: dict[str, tuple[str, ...]] = {
     'ObjectFromFile.file_type': ('object_file_readers',),
     'ProbeFromFile.file_type': ('probe_file_readers',),
     'SimulatedProbe.fzp_preset': ('fresnel_zone_plates',),
+    # ptychodus-stream's configuration; one source type serves every detector map
+    'PixelMapSource.file_type': (
+        'bad_pixels_file_readers',
+        'background_file_readers',
+        'flat_field_file_readers',
+    ),
     # calls into the model
     'save_product.file_type': ('product_file_writers',),
 }

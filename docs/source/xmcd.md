@@ -44,3 +44,17 @@ The alignment is tuned with the same options the decomposition takes:
 | `--epsilon` | `1e-12` | added to the LCP object before dividing, to keep the magnetic amplitude finite where it is zero |
 
 `complex` is the only exact registration quantity, but it is sensitive to a phase ramp between the two reconstructions; `variation` is insensitive to one, at the cost of a small sub-pixel bias.
+
+## How it works
+
+From the aligned, standardized pair, the magnetic factor is recovered first and the structural object derived from it:
+
+```text
+alpha       = 0.5 * angle(O+ * conj(O-))
+M           = sqrt(|O+ / (O- + epsilon)|) * exp(i alpha)
+O_struct    = sqrt(|O+ * O-|) * exp(i angle(O- * exp(i alpha)))
+```
+
+The magnetic phase comes from the cross product `O+ * conj(O-)` rather than from the ratio `O+ / O-`, because the cross product involves no division and stays well conditioned where `|O-|` is small. The magnetic amplitude still needs the ratio, so `epsilon` is added to the LCP denominator. That only guards against exact zeros: the magnetic amplitude near such pixels stays noisy.
+
+The model fixes `(O_struct, M)` only up to a joint sign, since `(-O_struct, -M)` reproduces both measurements. Taking `alpha` on the principal branch `(-π/2, π/2]` picks the `M` near the positive real axis, and deriving the structural phase from `alpha` keeps the pair consistent. Halving the structural and magnetic angles independently would instead flip the sign of `O_struct` alone wherever its phase crossed ±π/2.
