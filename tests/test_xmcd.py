@@ -18,7 +18,7 @@ import numpy.testing
 import pytest
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.object import Object, ObjectCenter, align_objects
+from ptychodus.api.object import Object, ObjectCenter, RegistrationQuantity, align_objects
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import LossValue, Product, ProductMetadata
@@ -443,3 +443,69 @@ def test_estimate_xmcd_recovers_signal_on_the_rcp_product() -> None:
         assert product.probes is rcp.probes
         assert product.object_.get_pixel_geometry() == rcp.object_.get_pixel_geometry()
         assert product.object_.get_center() == rcp.object_.get_center()
+
+
+@pytest.mark.parametrize(
+    'registration_quantity',
+    # VARIATION trades a small sub-pixel bias for ramp insensitivity, so a shifted LCP
+    # object does not reproduce the unshifted decomposition to this tolerance.
+    [
+        quantity
+        for quantity in RegistrationQuantity
+        if quantity is not RegistrationQuantity.VARIATION
+    ],
+)
+def test_estimate_xmcd_is_invariant_to_lcp_shift_and_phase_offset(
+    registration_quantity: RegistrationQuantity,
+) -> None:
+    """Shifting the LCP object and offsetting its phase leaves the decomposition unchanged."""
+    rng = numpy.random.default_rng(10)
+    y = numpy.arange(48)[:, None]
+    x = numpy.arange(48)[None, :]
+    amp = numpy.exp(-(((y - 24) ** 2 + (x - 24) ** 2) / 60.0))
+    o_struct = (amp * (0.7 + 0.05 * rng.standard_normal(amp.shape))).astype(numpy.complex128)
+    m_factor = (1.0 + 0.05 * amp) * numpy.exp(0.05j * amp * numpy.tanh((x - 24) / 4.0))
+    rcp = _product(o_struct, m_factor, name='rcp', polarization=Polarization.RIGHT_CIRCULAR)
+    lcp = _product(o_struct, m_factor, name='lcp', polarization=Polarization.LEFT_CIRCULAR)
+    moved_lcp = replace(
+        lcp,
+        object_=Object(
+            array=numpy.roll(lcp.object_.get_array(), shift=(3, -2), axis=(-2, -1))
+            * numpy.exp(0.3j),
+            pixel_geometry=lcp.object_.get_pixel_geometry(),
+            center=lcp.object_.get_center(),
+        ),
+    )
+
+    expected = estimate_xmcd(lcp, rcp, registration_quantity=registration_quantity)
+    actual = estimate_xmcd(moved_lcp, rcp, registration_quantity=registration_quantity)
+
+    support = amp > 0.2
+    for actual_product, expected_product in (
+        (actual.structural_product, expected.structural_product),
+        (actual.magnetic_product, expected.magnetic_product),
+    ):
+        numpy.testing.assert_allclose(
+            actual_product.object_.get_array()[0][support],
+            expected_product.object_.get_array()[0][support],
+            atol=1e-3,
+        )
+
+    # Against the ground truth, up to the scale and phase ramp standardization absorbs.
+    numpy.testing.assert_allclose(
+        numpy.abs(actual.structural_product.object_.get_array()[0])[support],
+        numpy.abs(o_struct)[support],
+        rtol=5e-2,
+    )
+
+
+def test_estimate_xmcd_warns_on_multi_layer_objects(caplog: pytest.LogCaptureFixture) -> None:
+    single_layer = numpy.ones((8, 8), dtype=numpy.complex128)
+    product = replace(
+        _product(single_layer, single_layer, name='rcp', polarization=Polarization.RIGHT_CIRCULAR),
+        object_=_make_object(numpy.ones((2, 8, 8)), layer_spacing_m=[1.0e-6]),
+    )
+
+    estimate_xmcd(product, product)
+
+    assert 'flattens multi-layer objects' in caplog.text

@@ -1,7 +1,9 @@
-"""``ptychodus-xmcd``: an end-to-end run, path guards, dry run and the polarization check."""
+"""``ptychodus-decompose-xmcd``: an end-to-end run, path and option guards, failure, dry run and
+the polarization check."""
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 import logging
 
@@ -16,7 +18,7 @@ from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.cli import xmcd
+from ptychodus.cli import decompose_xmcd
 
 _CANVAS_PX = 48
 
@@ -24,7 +26,7 @@ _CANVAS_PX = 48
 @pytest.fixture(autouse=True)
 def _no_root_logger(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep ``main()`` from configuring the test process's root logger."""
-    monkeypatch.setattr(xmcd, 'configure_logging', lambda args: None)
+    monkeypatch.setattr(decompose_xmcd, 'configure_logging', lambda args: None)
 
 
 def _truth() -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]:
@@ -87,8 +89,8 @@ def _write_inputs(
 
 
 def _run(monkeypatch: pytest.MonkeyPatch, *argv: str | Path) -> ExitCode:
-    monkeypatch.setattr('sys.argv', ['ptychodus-xmcd', *(str(arg) for arg in argv)])
-    return xmcd.main()
+    monkeypatch.setattr('sys.argv', ['ptychodus-decompose-xmcd', *(str(arg) for arg in argv)])
+    return decompose_xmcd.main()
 
 
 def test_decomposes_a_product_pair_into_two_products(
@@ -156,6 +158,90 @@ def test_refuses_an_output_that_collides(
     assert not magnetic_file.exists()
 
 
+@pytest.mark.parametrize('case', ['missing_input', 'output_is_dir'])
+def test_refuses_an_unusable_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str
+) -> None:
+    lcp_file, rcp_file = _write_inputs(tmp_path)
+    structural_file = tmp_path / 'structural.h5'
+    magnetic_file = tmp_path / 'magnetic.h5'
+
+    match case:
+        case 'missing_input':
+            lcp_file = tmp_path / 'absent.h5'
+        case 'output_is_dir':
+            structural_file = tmp_path
+
+    with pytest.raises(SystemExit) as excinfo:
+        _run(
+            monkeypatch,
+            '--lcp', lcp_file,
+            '--rcp', rcp_file,
+            '--structural', structural_file,
+            '--magnetic', magnetic_file,
+        )  # fmt: skip
+
+    assert excinfo.value.code == ExitCode.USAGE
+    assert not magnetic_file.exists()
+
+
+@pytest.mark.parametrize(
+    'option',
+    [
+        ('--upsample-factor', '0'),
+        ('--high-pass-sigma-px', '-1'),
+        ('--epsilon', '0'),
+        ('--registration-quantity', 'bogus'),
+    ],
+)
+def test_refuses_an_unusable_tunable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, option: tuple[str, str]
+) -> None:
+    lcp_file, rcp_file = _write_inputs(tmp_path)
+
+    with pytest.raises(SystemExit) as excinfo:
+        _run(
+            monkeypatch,
+            '--lcp', lcp_file,
+            '--rcp', rcp_file,
+            '--structural', tmp_path / 'structural.h5',
+            '--magnetic', tmp_path / 'magnetic.h5',
+            *option,
+        )  # fmt: skip
+
+    assert excinfo.value.code == ExitCode.USAGE
+
+
+def test_reports_failure_and_writes_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lcp_file, rcp_file = _write_inputs(tmp_path)
+    lcp = load_product(lcp_file)
+    pixel_geometry = lcp.object_.get_pixel_geometry()
+    coarse_object = Object(
+        array=lcp.object_.get_array(),
+        pixel_geometry=PixelGeometry(
+            width_m=2 * pixel_geometry.width_m, height_m=2 * pixel_geometry.height_m
+        ),
+        center=lcp.object_.get_center(),
+    )
+    save_product(lcp_file, replace(lcp, object_=coarse_object))
+    structural_file = tmp_path / 'structural.h5'
+    magnetic_file = tmp_path / 'magnetic.h5'
+
+    exit_code = _run(
+        monkeypatch,
+        '--lcp', lcp_file,
+        '--rcp', rcp_file,
+        '--structural', structural_file,
+        '--magnetic', magnetic_file,
+    )  # fmt: skip
+
+    assert exit_code == ExitCode.FAILURE
+    assert not structural_file.exists()
+    assert not magnetic_file.exists()
+
+
 def test_dry_run_writes_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     lcp_file, rcp_file = _write_inputs(tmp_path)
     structural_file = tmp_path / 'structural.h5'
@@ -184,7 +270,7 @@ def test_warns_when_recorded_polarizations_look_swapped(
         rcp_polarization=None,
     )
 
-    with caplog.at_level(logging.WARNING, logger='xmcd'):
+    with caplog.at_level(logging.WARNING, logger='decompose_xmcd'):
         _run(
             monkeypatch,
             '--lcp', lcp_file,

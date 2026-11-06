@@ -19,6 +19,7 @@ from pathlib import Path
 import argparse
 import inspect
 import logging
+import signal
 import sys
 
 import ptychodus
@@ -30,7 +31,7 @@ from ptychodus.api.product import Product
 from ptychodus.api.xmcd import estimate_xmcd
 from ptychodus.cli import add_log_level_argument, configure_logging, positive_int
 
-logger = logging.getLogger('xmcd')
+logger = logging.getLogger('decompose_xmcd')
 
 
 def _non_negative_float(text: str) -> float:
@@ -115,8 +116,7 @@ def _build_parser() -> argparse.ArgumentParser:
         f'Defaults to {default_quantity.name.lower()}.',
     )
     parser.add_argument(
-        '--high-pass-sigma',
-        metavar='PIXELS',
+        '--high-pass-sigma-px',
         type=_non_negative_float,
         default=defaults['high_pass_sigma_px'],
         help='Gaussian background sigma removed before alignment, 0 to disable. '
@@ -192,6 +192,13 @@ def main() -> ExitCode:
 
     _warn_if_swapped(lcp_product, Polarization.LEFT_CIRCULAR, lcp_file)
     _warn_if_swapped(rcp_product, Polarization.RIGHT_CIRCULAR, rcp_file)
+    logger.info(
+        'Upsample factor %d, registration quantity %s, high-pass sigma %g px, epsilon %g',
+        args.upsample_factor,
+        args.registration_quantity.name.lower(),
+        args.high_pass_sigma_px,
+        args.epsilon,
+    )
 
     if args.dry_run:
         for label, product in (('LCP', lcp_product), ('RCP', rcp_product)):
@@ -206,19 +213,23 @@ def main() -> ExitCode:
         logger.info('Would write %s and %s', structural_file, magnetic_file)
         return ExitCode.SUCCESS
 
+    # A scheduler ends a job with SIGTERM. Raised as an interrupt it unwinds through the
+    # cancellation path below, so nothing is written.
+    signal.signal(signal.SIGTERM, signal.default_int_handler)
+
     try:
         result = estimate_xmcd(
             lcp_product,
             rcp_product,
             upsample_factor=args.upsample_factor,
             registration_quantity=args.registration_quantity,
-            high_pass_sigma_px=args.high_pass_sigma,
+            high_pass_sigma_px=args.high_pass_sigma_px,
             epsilon=args.epsilon,
         )
     except KeyboardInterrupt:
         logger.warning('XMCD cancelled; nothing written.')
         return ExitCode.CANCELLED
-    except ValueError:
+    except Exception:
         logger.exception('XMCD failed; nothing written.')
         return ExitCode.FAILURE
 

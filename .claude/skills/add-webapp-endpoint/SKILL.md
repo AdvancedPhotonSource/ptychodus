@@ -24,7 +24,7 @@ from ptychodus.webapp.db import repositories as repo
 from ptychodus.webapp.routers._convert import <resource>_to_read
 from ptychodus.webapp.routers.deps import SessionDep, LayoutDep
 from ptychodus.webapp.routers.schemas import <Resource>Read, Page
-from ptychodus.webapp.storage.manifest import ResourceKind
+from ptychodus.api.storage import ResourceKind
 
 router = APIRouter(prefix='/<resource>', tags=['<resource>'])
 

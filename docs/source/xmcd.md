@@ -25,10 +25,10 @@ On the **Object** panel, choose **Analyze** → **XMCD...**, then pick the left 
 
 ## From the command line
 
-`ptychodus-xmcd` decomposes two product files and writes two:
+`ptychodus-decompose-xmcd` decomposes two product files and writes two:
 
 ```sh
-$ ptychodus-xmcd --lcp lcp/product.h5 --rcp rcp/product.h5 \
+$ ptychodus-decompose-xmcd --lcp lcp/product.h5 --rcp rcp/product.h5 \
     --structural xmcd/structural.h5 --magnetic xmcd/magnetic.h5
 ```
 
@@ -40,7 +40,7 @@ The alignment is tuned with the same options the decomposition takes:
 | --- | --- | --- |
 | `--upsample-factor` | `100` | sub-pixel precision of the alignment, as 1/N pixel |
 | `--registration-quantity` | `complex` | quantity correlated to align the objects: `complex`, `variation`, `phasor`, `phase` or `amplitude` |
-| `--high-pass-sigma` | `0` | Gaussian background sigma in pixels removed before alignment; `0` disables it |
+| `--high-pass-sigma-px` | `0` | Gaussian background sigma in pixels removed before alignment; `0` disables it |
 | `--epsilon` | `1e-12` | added to the LCP object before dividing, to keep the magnetic amplitude finite where it is zero |
 
 `complex` is the only exact registration quantity, but it is sensitive to a phase ramp between the two reconstructions; `variation` is insensitive to one, at the cost of a small sub-pixel bias.
