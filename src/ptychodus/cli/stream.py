@@ -169,7 +169,7 @@ class _PvaPublisher:
 
     def publish_estimate(self, product: Product) -> None:
         self._counter += 1
-        self._update(self._image_names['probe'], product.probes.get_probe_no_opr().get_array())
+        self._update(self._image_names['probe'], product.probes.get_mean_probe().get_array())
         self._update(self._image_names['object'], product.object_.get_array())
 
     def publish_scan(self, report: ScanReport) -> None:

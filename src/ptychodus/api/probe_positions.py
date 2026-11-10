@@ -9,7 +9,7 @@ from typing import cast, overload, TypeVar
 import numpy
 
 from .files import FileReader, FileWriter
-from .interpolate import interpolate_at_indexes
+from .interpolate import interpolate_at_indexes, match_at_indexes
 from .typing import BooleanArrayType, IntegerArrayType, RealArrayType
 
 
@@ -208,6 +208,25 @@ class ProbePositionSequence(Sequence[ProbePosition]):
         seq._indexes = numpy.asarray(indexes, dtype=numpy.intp)[in_range]
         seq._coordinates_m = numpy.reshape(yx_m, (-1, 2))
         return in_range, seq
+
+    def match_indexes(
+        self, other: ProbePositionSequence
+    ) -> tuple[IntegerArrayType, RealArrayType, RealArrayType]:
+        """Pair these positions with *other*'s at the scan indexes both sequences have.
+
+        Positions sharing an index average into one per side, and an index present on
+        only one side is left out: nothing is interpolated, so every pair is two recorded
+        positions. Returns the shared indexes in ascending order and the ``(N, 2)``
+        packed ``(x, y)`` coordinates in meters of this sequence and of *other*.
+        """
+        shared = numpy.intersect1d(self._indexes, other._indexes)
+        _, self_yx_m = match_at_indexes(self._indexes, self._coordinates_m, shared)
+        _, other_yx_m = match_at_indexes(other._indexes, other._coordinates_m, shared)
+        return (
+            shared,
+            numpy.ascontiguousarray(numpy.reshape(self_yx_m, (-1, 2))[:, ::-1]),
+            numpy.ascontiguousarray(numpy.reshape(other_yx_m, (-1, 2))[:, ::-1]),
+        )
 
     @property
     def nbytes(self) -> int:

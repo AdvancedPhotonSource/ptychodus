@@ -5,12 +5,8 @@ import numpy
 
 from ptychodus.api.geometry import GeometryNotDefinedError
 from ptychodus.api.probe import (
-    ProbeEntropyMetrics,
     ProbeGeometryProvider,
     ProbeEnsemble,
-    ProbeSizeMetrics,
-    estimate_probe_entropy,
-    estimate_probe_size,
 )
 
 from ...observer import Observable
@@ -64,41 +60,6 @@ class ProbeRepositoryItem(ParameterGroup):
         Named after the geometry-provider property it forwards.
         """
         return self._geometry_provider.num_scan_points
-
-    def get_size_metrics(self) -> ProbeSizeMetrics | None:
-        probe_seq = self._probe_seq
-
-        if probe_seq.width_px == 0 or probe_seq.height_px == 0:
-            return None
-
-        try:
-            pixel_geometry = probe_seq.get_pixel_geometry()
-            probe = probe_seq.get_probe_no_opr()
-        except ValueError:
-            return None
-
-        try:
-            return estimate_probe_size(probe.get_intensity(), pixel_geometry)
-        except Exception:
-            logger.exception('Failed to estimate probe size!')
-            return None
-
-    def get_entropy_metrics(self) -> ProbeEntropyMetrics | None:
-        probe_seq = self._probe_seq
-
-        if probe_seq.width_px == 0 or probe_seq.height_px == 0:
-            return None
-
-        try:
-            probe = probe_seq.get_probe_no_opr()
-        except ValueError:
-            return None
-
-        try:
-            return estimate_probe_entropy(probe)
-        except Exception:
-            logger.exception('Failed to estimate probe entropy!')
-            return None
 
     def can_estimate_size_from_diffraction(self) -> bool:
         """Whether the builder has a size to estimate and the product has data to estimate it from."""

@@ -76,7 +76,7 @@ class ObjectBuilder(ParameterGroup):
         if self._probe_supplier is None:
             return None
 
-        probe = self._probe_supplier().get_probe_no_opr()
+        probe = self._probe_supplier().get_mean_probe()
 
         if probe.get_array().size == 0:
             return None

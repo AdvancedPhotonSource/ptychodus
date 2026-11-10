@@ -799,7 +799,7 @@ def _build_initial_probe(
         logger.info('Reading the initial probe from %s', args.probe_file)
         probe_reader = registry.probe_file_readers.get_strategy_by_name(args.probe_file_type)
         probe_from_file = probe_reader.read(args.probe_file)
-        array = probe_from_file.get_probe_no_opr().get_array()
+        array = probe_from_file.get_mean_probe().get_array()
 
         # The warm-start probe must sit on the same grid as the patterns it will be
         # refined against; a mismatch means the crop changed since it was written.
@@ -833,7 +833,7 @@ def _build_initial_probe(
         )
         return transform_probe_to_exit_frame(
             ProbeEnsemble.from_probe(zone_plate_probe), scattering_geometry, far_field=far_field
-        ).get_probe_no_opr()
+        ).get_mean_probe()
 
     # No zone-plate preset applies, so the cold start comes from the data:
     # back-propagating the mean pattern estimates the probe without asserting an

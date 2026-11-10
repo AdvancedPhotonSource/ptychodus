@@ -392,6 +392,34 @@ def _replace_object(product: Product, new_object: Object) -> Product:
     )
 
 
+def _projected_object(obj: Object) -> Object:
+    """A single-layer object holding *obj*'s projection."""
+    return Object(
+        array=obj.get_layers_flattened()[numpy.newaxis, ...].copy(),
+        pixel_geometry=obj.get_pixel_geometry().copy(),
+        center=obj.get_center().copy(),
+        layer_spacing_m=[],
+    )
+
+
+def _assert_ambiguities_close(
+    actual: ReconstructionAmbiguities,
+    expected: ReconstructionAmbiguities,
+    *,
+    ramp_atol: float = 1.0e-6,
+) -> None:
+    numpy.testing.assert_allclose(
+        actual.object_scale_factor, expected.object_scale_factor, rtol=1.0e-10
+    )
+    numpy.testing.assert_allclose(actual.phase_offset_rad, expected.phase_offset_rad, atol=1.0e-10)
+    numpy.testing.assert_allclose(
+        actual.phase_ramp_x_rad_per_m, expected.phase_ramp_x_rad_per_m, atol=ramp_atol
+    )
+    numpy.testing.assert_allclose(
+        actual.phase_ramp_y_rad_per_m, expected.phase_ramp_y_rad_per_m, atol=ramp_atol
+    )
+
+
 class TestEstimateSingleProduct:
     """Single-product estimator: recover (phi, k_x, k_y); scale fixed at 1.0."""
 
@@ -471,19 +499,13 @@ class TestEstimateSingleProduct:
             atol=1.0e-12,
         )
 
-    def test_multilayer_object_uses_only_layer_zero(self) -> None:
+    def test_multilayer_object_fits_the_projection(self) -> None:
         product = _make_product(num_layers=3)
-        single_layer_obj = Object(
-            array=product.object_.get_array()[0:1].copy(),
-            pixel_geometry=product.object_.get_pixel_geometry().copy(),
-            center=product.object_.get_center().copy(),
-            layer_spacing_m=[],
-        )
-        single_layer_product = _replace_object(product, single_layer_obj)
+        projected_product = _replace_object(product, _projected_object(product.object_))
 
         multi_estimate = estimate_reconstruction_ambiguities(product)
-        single_estimate = estimate_reconstruction_ambiguities(single_layer_product)
-        assert multi_estimate == single_estimate
+        projected_estimate = estimate_reconstruction_ambiguities(projected_product)
+        _assert_ambiguities_close(multi_estimate, projected_estimate)
 
     def test_all_ones_weights_match_no_weights(self) -> None:
         product = _make_product()
@@ -651,7 +673,7 @@ class TestEstimateRelative:
 
         assert without == with_ones
 
-    def test_layer_zero_only_on_multilayer_objects(self) -> None:
+    def test_multilayer_objects_fit_the_projections(self) -> None:
         clean = _make_product(num_layers=3)
         applied = ReconstructionAmbiguities(
             object_scale_factor=1.5,
@@ -661,20 +683,44 @@ class TestEstimateRelative:
         )
         target = self._perturbed_product(clean, applied)
 
-        def first_layer_product(p: Product) -> Product:
-            new_obj = Object(
-                array=p.object_.get_array()[0:1].copy(),
-                pixel_geometry=p.object_.get_pixel_geometry().copy(),
-                center=p.object_.get_center().copy(),
-                layer_spacing_m=[],
-            )
-            return _replace_object(p, new_obj)
-
         multi_estimate = estimate_reconstruction_ambiguities(target, reference=clean)
-        single_estimate = estimate_reconstruction_ambiguities(
-            first_layer_product(target), reference=first_layer_product(clean)
+        projected_estimate = estimate_reconstruction_ambiguities(
+            _replace_object(target, _projected_object(target.object_)),
+            reference=_replace_object(clean, _projected_object(clean.object_)),
         )
-        assert multi_estimate == single_estimate
+        _assert_ambiguities_close(multi_estimate, projected_estimate)
+
+    def test_recovers_ambiguities_placed_in_a_later_layer(self) -> None:
+        clean = _make_product(num_layers=3)
+        applied = ReconstructionAmbiguities(
+            object_scale_factor=1.5,
+            phase_offset_rad=0.2,
+            phase_ramp_x_rad_per_m=5.0e6,
+            phase_ramp_y_rad_per_m=-3.0e6,
+        )
+        coords = clean.object_.get_geometry().get_transverse_coordinates()
+        factor = applied.object_scale_factor * numpy.exp(
+            1j
+            * (
+                applied.phase_offset_rad
+                + applied.phase_ramp_x_rad_per_m * coords.x_m
+                + applied.phase_ramp_y_rad_per_m * coords.y_m
+            )
+        )
+        array = clean.object_.get_array().copy()
+        array[1] *= factor
+        target = _replace_object(
+            clean,
+            Object(
+                array=array,
+                pixel_geometry=clean.object_.get_pixel_geometry().copy(),
+                center=clean.object_.get_center().copy(),
+                layer_spacing_m=list(clean.object_.layer_spacing_m),
+            ),
+        )
+
+        estimate = estimate_reconstruction_ambiguities(target, reference=clean)
+        _assert_ambiguities_close(estimate, applied, ramp_atol=1.0e-3)
 
     def test_shape_mismatch_raises(self) -> None:
         product_a = _make_product()

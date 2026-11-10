@@ -143,3 +143,51 @@ class TestProbePositionSequenceInterpolateAtIndexes:
         numpy.testing.assert_allclose(paired.get_coordinates_x_m(), [3.0, 1.5])
         numpy.testing.assert_allclose(paired.get_coordinates_y_m(), [40.0, 25.0])
         assert paired.get_probe_photon_counts() is None
+
+
+class TestMatchIndexes:
+    def test_pairs_only_shared_indexes_and_averages_duplicates(self) -> None:
+        reference = ProbePositionSequence(
+            [
+                ProbePosition(index=0, x_m=0.0, y_m=0.0),
+                ProbePosition(index=1, x_m=1.0, y_m=10.0),
+                ProbePosition(index=1, x_m=3.0, y_m=30.0),
+                ProbePosition(index=2, x_m=2.0, y_m=20.0),
+                ProbePosition(index=4, x_m=4.0, y_m=40.0),
+            ]
+        )
+        test = ProbePositionSequence(
+            [
+                ProbePosition(index=4, x_m=4.5, y_m=40.5),
+                ProbePosition(index=1, x_m=2.5, y_m=20.5),
+                ProbePosition(index=3, x_m=3.5, y_m=30.5),
+            ]
+        )
+
+        indexes, reference_xy_m, test_xy_m = reference.match_indexes(test)
+
+        numpy.testing.assert_array_equal(indexes, [1, 4])
+        numpy.testing.assert_allclose(reference_xy_m, [[2.0, 20.0], [4.0, 40.0]])
+        numpy.testing.assert_allclose(test_xy_m, [[2.5, 20.5], [4.5, 40.5]])
+
+    def test_index_missing_from_one_side_is_not_interpolated(self) -> None:
+        reference = ProbePositionSequence(
+            [ProbePosition(index=i, x_m=float(i), y_m=0.0) for i in (0, 1, 2)]
+        )
+        test = ProbePositionSequence(
+            [ProbePosition(index=i, x_m=float(i), y_m=0.0) for i in (0, 2)]
+        )
+
+        indexes, reference_xy_m, test_xy_m = reference.match_indexes(test)
+
+        numpy.testing.assert_array_equal(indexes, [0, 2])
+        assert reference_xy_m.shape == test_xy_m.shape == (2, 2)
+
+    def test_disjoint_sequences_share_nothing(self) -> None:
+        reference = ProbePositionSequence([ProbePosition(index=0, x_m=0.0, y_m=0.0)])
+        test = ProbePositionSequence([ProbePosition(index=1, x_m=0.0, y_m=0.0)])
+
+        indexes, reference_xy_m, test_xy_m = reference.match_indexes(test)
+
+        assert indexes.size == 0
+        assert reference_xy_m.shape == test_xy_m.shape == (0, 2)

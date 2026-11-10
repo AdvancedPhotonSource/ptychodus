@@ -45,7 +45,7 @@ def deconvolve(
     if method is DeconvolutionMethod.IDENTITY:
         return emap
 
-    probe_intensity = product.probes.get_probe_no_opr().get_intensity()
+    probe_intensity = product.probes.get_mean_probe().get_intensity()
 
     match method:
         case DeconvolutionMethod.RICHARDSON_LUCY:

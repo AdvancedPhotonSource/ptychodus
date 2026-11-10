@@ -2,7 +2,6 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Any
 import logging
-import math
 import time
 
 import numpy
@@ -23,6 +22,7 @@ from ptychodus.api.propagate import PropagatedWavefield
 from ptychodus.api.typing import RealArrayType
 
 from ...view.probe import ProbeFocusDialog
+from ..dashboard import format_scalar
 from ...view.widgets import ExceptionDialog
 
 logger = logging.getLogger(__name__)
@@ -40,16 +40,6 @@ _DEFAULT_METRICS = frozenset(
         ProbeFocusMetric.PHASE_DEVIATION,
     }
 )
-
-
-def _format_scalar(value: float) -> str:
-    if math.isnan(value):
-        return _PLACEHOLDER
-
-    if math.isinf(value):
-        return '∞'
-
-    return f'{value:.4g}'
 
 
 def _display_suffix(metric: ProbeFocusMetric) -> str:
@@ -176,7 +166,7 @@ class ProbeFocusTableModel(QAbstractTableModel):
                 return (
                     _PLACEHOLDER
                     if plane is None
-                    else _format_scalar(plane.value / _display_scale(metric))
+                    else format_scalar(plane.value / _display_scale(metric), precision=4)
                 )
             case 2:
                 plane = self._planes.get(metric)

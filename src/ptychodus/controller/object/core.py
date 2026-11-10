@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog, QStatusBar
 
 from ptychodus.model.observer import SequenceObserver
 
-from ...model.analysis import FourierAnalyzer, FourierRingCorrelator, XMCDAnalyzer
+from ...model.analysis import FourierAnalyzer, ObjectAnalyzer, XMCDAnalyzer
 from ...model.product import ObjectAPI, ObjectRepository
 from ...model.product.object import ObjectRepositoryItem
 from ..rendering import VisualizationEngine
@@ -16,9 +16,10 @@ from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
 from ..helpers import connect_triggered_signal, create_brush_for_editable_cell
 from ..image import ImageController
+from .compare import ObjectCompareViewController
 from .editor_factory import ObjectEditorViewControllerFactory
 from .fourier import FourierAnalysisViewController
-from .frc import FourierRingCorrelationViewController
+from .metrics import ObjectMetricsViewController
 from .tree_model import Column, ObjectTreeModel, try_get_object
 from .xmcd import XMCDViewController
 
@@ -31,7 +32,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         repository: ObjectRepository,
         api: ObjectAPI,
         image_view: ImageView,
-        correlator: FourierRingCorrelator,
+        object_analyzer: ObjectAnalyzer,
         fourier_analyzer: FourierAnalyzer,
         xmcd_analyzer: XMCDAnalyzer,
         view: RepositoryTreeView,
@@ -52,8 +53,11 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         self._tree_model = ObjectTreeModel(repository, api, create_brush_for_editable_cell(view))
         self._editor_factory = ObjectEditorViewControllerFactory()
 
-        self._frc_view_controller = FourierRingCorrelationViewController(
-            correlator, self._tree_model
+        self._metrics_view_controller = ObjectMetricsViewController(
+            object_analyzer, self._tree_model, file_dialog_factory
+        )
+        self._compare_view_controller = ObjectCompareViewController(
+            object_analyzer, self._tree_model, file_dialog_factory
         )
         self._fourier_view_controller = FourierAnalysisViewController(
             fourier_analyzer,
@@ -107,8 +111,13 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
 
         view.button_box.edit_button.clicked.connect(self._edit_current_object)
 
-        frc_action = view.button_box.analyze_menu.addAction('Fourier Ring Correlation...')
-        connect_triggered_signal(frc_action, self._analyze_frc)
+        metrics_action = view.button_box.analyze_menu.addAction('Metrics...')
+        connect_triggered_signal(metrics_action, self._show_metrics)
+
+        compare_action = view.button_box.analyze_menu.addAction('Compare...')
+        connect_triggered_signal(compare_action, self._compare_objects)
+
+        view.button_box.analyze_menu.addSeparator()
 
         fourier_action = view.button_box.analyze_menu.addAction('Fourier Analysis...')
         connect_triggered_signal(fourier_action, self._analyze_fourier)
@@ -204,13 +213,21 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
             item = self._repository[item_index]
             item.sync_to_settings()
 
-    def _analyze_frc(self) -> None:
+    def _show_metrics(self) -> None:
         item_index = self._get_current_item_index()
 
         if item_index < 0:
             logger.warning('No current item!')
         else:
-            self._frc_view_controller.analyze(item_index, item_index)
+            self._metrics_view_controller.analyze(item_index)
+
+    def _compare_objects(self) -> None:
+        item_index = self._get_current_item_index()
+
+        if item_index < 0:
+            logger.warning('No current item!')
+        else:
+            self._compare_view_controller.compare(item_index)
 
     def _analyze_fourier(self) -> None:
         item_index = self._get_current_item_index()

@@ -277,7 +277,7 @@ def test_the_coefficient_list_is_the_mode_list(registry: PluginRegistry) -> None
     builder.parameters()['zernike_coefficients'].set_value(coefficients)
     provider = _Provider()
 
-    built = builder.build(provider).get_probe_no_opr().get_array()[0]
+    built = builder.build(provider).get_mean_probe().get_array()[0]
 
     expected = generate_zernike_probe(
         provider.get_probe_geometry(),

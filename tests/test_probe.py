@@ -20,11 +20,13 @@ from ptychodus.api.probe import (
     conform_opr_weights,
     compute_phase_deviation_rad,
     compute_probe_focus_curves,
+    compute_probe_mode_spectrum,
     compute_rms_contrast,
     compute_shannon_entropy,
     estimate_focal_plane,
     estimate_probe_entropy,
     estimate_probe_size,
+    orthogonalize_probe_modes,
     resample_probe_ensemble,
     shift_probe,
 )
@@ -453,7 +455,7 @@ class TestProbeEnsembleFromProbe:
         assert sequence.num_incoherent_modes == 3
         assert sequence.get_opr_weights_or_none() is None
         assert sequence.get_pixel_geometry() == pixel_geometry
-        numpy.testing.assert_array_equal(sequence.get_probe_no_opr().get_array(), array)
+        numpy.testing.assert_array_equal(sequence.get_mean_probe().get_array(), array)
 
 
 def _gaussian_caustic_stack(
@@ -1180,7 +1182,7 @@ class TestComputeOPRModeSeries:
         numpy.testing.assert_allclose(series.opr_weight, [[1.0, 0.0, 0.0]])
         numpy.testing.assert_allclose(
             series.total_photon_count,
-            [probes.get_probe_no_opr().get_intensity().sum()],
+            [probes.get_mean_probe().get_intensity().sum()],
             rtol=1e-6,
         )
         assert series.deviation_photon_count == pytest.approx(0.0)
@@ -1408,3 +1410,106 @@ def test_opr_mode_series_mean_weight_matches_the_row_mean() -> None:
     numpy.testing.assert_allclose(
         series.get_mean_weight(), series.opr_weight.mean(axis=0), rtol=0.0, atol=0.0
     )
+
+
+def _random_modes(num_modes: int, *, seed: int = 0, shape: tuple[int, int] = (12, 10)) -> Probe:
+    rng = numpy.random.default_rng(seed)
+    array = rng.standard_normal((num_modes, *shape)) + 1j * rng.standard_normal((num_modes, *shape))
+    return Probe(array.astype(numpy.complex128), PixelGeometry(width_m=1.0e-8, height_m=1.0e-8))
+
+
+def _random_unitary(size: int, *, seed: int) -> numpy.ndarray:
+    rng = numpy.random.default_rng(seed)
+    q, _ = numpy.linalg.qr(
+        rng.standard_normal((size, size)) + 1j * rng.standard_normal((size, size))
+    )
+    return q
+
+
+class TestOrthogonalizeProbeModes:
+    def test_modes_are_orthogonal_and_sorted_by_power(self) -> None:
+        orthogonal = orthogonalize_probe_modes(_random_modes(4))
+        stacked = orthogonal.get_array().reshape(4, -1)
+        gram = stacked @ stacked.conj().T
+        powers = numpy.real(numpy.diag(gram))
+
+        numpy.testing.assert_allclose(gram - numpy.diag(numpy.diag(gram)), 0.0, atol=1.0e-9)
+        assert numpy.all(numpy.diff(powers) <= 0.0)
+
+    def test_power_and_incoherent_intensity_are_preserved(self) -> None:
+        probe = _random_modes(3)
+        orthogonal = orthogonalize_probe_modes(probe)
+
+        numpy.testing.assert_allclose(orthogonal.get_intensity(), probe.get_intensity(), rtol=1e-10)
+        assert orthogonal.get_pixel_geometry() == probe.get_pixel_geometry()
+
+
+class TestComputeProbeModeSpectrum:
+    def test_single_mode_is_pure(self) -> None:
+        spectrum = compute_probe_mode_spectrum(_random_modes(1))
+
+        numpy.testing.assert_allclose(spectrum.relative_power, [1.0])
+        assert spectrum.purity == pytest.approx(1.0)
+        assert spectrum.von_neumann_entropy == pytest.approx(0.0, abs=1e-12)
+        assert spectrum.effective_mode_count == pytest.approx(1.0)
+
+    def test_equal_orthogonal_modes_are_maximally_mixed(self) -> None:
+        num_modes = 4
+        array = numpy.zeros((num_modes, 8, 8), dtype=numpy.complex128)
+
+        for mode in range(num_modes):
+            array[mode, mode, mode] = 2.0
+
+        spectrum = compute_probe_mode_spectrum(
+            Probe(array, PixelGeometry(width_m=1.0e-8, height_m=1.0e-8))
+        )
+
+        numpy.testing.assert_allclose(spectrum.relative_power, 0.25)
+        assert spectrum.purity == pytest.approx(1.0 / num_modes)
+        assert spectrum.von_neumann_entropy == pytest.approx(numpy.log(num_modes))
+        assert spectrum.effective_mode_count == pytest.approx(num_modes)
+
+    def test_spectrum_is_invariant_under_a_unitary_rotation_of_the_modes(self) -> None:
+        probe = _random_modes(3, seed=5)
+        rotated_array = numpy.tensordot(_random_unitary(3, seed=6), probe.get_array(), axes=1)
+        rotated = Probe(rotated_array, probe.get_pixel_geometry())
+
+        original = compute_probe_mode_spectrum(probe)
+        rotated_spectrum = compute_probe_mode_spectrum(rotated)
+
+        numpy.testing.assert_allclose(
+            rotated_spectrum.relative_power, original.relative_power, rtol=1e-10
+        )
+        assert rotated_spectrum.purity == pytest.approx(original.purity)
+
+    def test_powerless_probe_raises(self) -> None:
+        probe = Probe(
+            numpy.zeros((2, 4, 4), dtype=numpy.complex128),
+            PixelGeometry(width_m=1.0e-8, height_m=1.0e-8),
+        )
+
+        with pytest.raises(ValueError, match='no power'):
+            compute_probe_mode_spectrum(probe)
+
+
+class TestGetMeanProbe:
+    def test_without_opr_returns_the_stored_probe(self) -> None:
+        array = _random_modes(2).get_array()[numpy.newaxis]
+        ensemble = ProbeEnsemble(array, None, PixelGeometry(width_m=1.0e-8, height_m=1.0e-8))
+
+        numpy.testing.assert_array_equal(ensemble.get_mean_probe().get_array(), array[0])
+
+    def test_with_opr_composes_the_mean_weights_and_keeps_stable_modes(self) -> None:
+        rng = numpy.random.default_rng(3)
+        array = (rng.standard_normal((3, 2, 6, 6)) + 1j * rng.standard_normal((3, 2, 6, 6))).astype(
+            numpy.complex128
+        )
+        weights = rng.standard_normal((5, 3))
+        ensemble = ProbeEnsemble(array, weights, PixelGeometry(width_m=1.0e-8, height_m=1.0e-8))
+
+        mean_probe = ensemble.get_mean_probe().get_array()
+
+        numpy.testing.assert_allclose(
+            mean_probe[0], numpy.tensordot(weights.mean(axis=0), array[:, 0], axes=1)
+        )
+        numpy.testing.assert_array_equal(mean_probe[1], array[0, 1])

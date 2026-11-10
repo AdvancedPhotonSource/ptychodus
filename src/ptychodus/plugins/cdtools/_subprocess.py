@@ -129,11 +129,11 @@ def _build_model(
     if probes.num_coherent_modes > 1:
         logger.warning(
             'cdtools models no orthogonal probe relaxation; reconstructing from the '
-            'primary of the %d coherent modes alone.',
+            'scan-mean probe of the %d coherent modes.',
             probes.num_coherent_modes,
         )
 
-    probe_array = probes.get_probe_no_opr().get_array() * gauge.to_cdtools
+    probe_array = probes.get_mean_probe().get_array() * gauge.to_cdtools
     refinement = options.refinement
 
     # cdtools stores the square root of the background, and a model with none starts from

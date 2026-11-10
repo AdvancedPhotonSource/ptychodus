@@ -27,7 +27,7 @@ class NPYProbeFileWriter(ProbeFileWriter):
         return FileFormat.NPY.extensions
 
     def write(self, file_path: Path, probes: ProbeEnsemble) -> None:
-        array = probes.get_probe_no_opr().get_array()
+        array = probes.get_mean_probe().get_array()
         numpy.save(file_path, array)
 
 

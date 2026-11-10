@@ -178,7 +178,7 @@ def _compute_pairwise_overlap(
     if pairs.size == 0:
         return overlap
 
-    probe = product.probes.get_probe_no_opr()
+    probe = product.probes.get_mean_probe()
     pixel_geometry = probe.get_pixel_geometry()
     footprint = probe.get_intensity()
     # Linear (zero-padded) autocorrelation, so lag (0, 0) lands at (height_px - 1, width_px - 1).
@@ -297,25 +297,6 @@ class ProbeOverlapMetrics:
 
         return float(numpy.max(self.pairwise_overlap_by_position))
 
-    def save_npz(self, file_path: Path) -> None:
-        numpy.savez_compressed(
-            file_path,
-            allow_pickle=False,
-            redundancy=self.redundancy,
-            pairwise_overlap_by_position=self.pairwise_overlap_by_position,
-            effective_probe_area_m2=self.effective_probe_area_m2,
-            effective_covered_area_m2=self.effective_covered_area_m2,
-            effective_probe_diameter_m=self.effective_probe_diameter_m,
-            effective_step_size_m=self.effective_step_size_m,
-            areal_redundancy=self.areal_redundancy,
-            equivalent_linear_overlap=self.equivalent_linear_overlap,
-            num_positions=self.num_positions,
-            pixel_height_m=self.pixel_geometry.height_m,
-            pixel_width_m=self.pixel_geometry.width_m,
-            center_x_m=self.center.x_m,
-            center_y_m=self.center.y_m,
-        )
-
 
 def compute_probe_overlap(
     product: Product, *, roundoff_floor: float = 1.0e-12
@@ -337,7 +318,7 @@ def compute_probe_overlap(
     weakly constrained points that a global average hides.
 
     The pairwise numerator is sampled from the autocorrelation of the representative
-    probe returned by :meth:`ProbeEnsemble.get_probe_no_opr`, which keeps the cost at
+    probe returned by :meth:`ProbeEnsemble.get_mean_probe`, which keeps the cost at
     ``O(N log N)`` instead of ``O(N^2)``; orthogonal-probe-relaxation variation between
     positions therefore affects the exact per-position normalization but not the shared
     numerator. Treat the pairwise numbers as a scan-geometry diagnostic rather than a

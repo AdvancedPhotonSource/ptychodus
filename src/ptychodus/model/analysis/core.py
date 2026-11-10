@@ -6,10 +6,11 @@ from ..settings import SettingsRegistry
 from .affine import AffineTransformEstimator
 from .diffraction import DiffractionSimulator
 from .fourier import FourierAnalyzer
-from .frc import FourierRingCorrelator
 from .illumination import IlluminationMapper
+from .object import ObjectAnalyzer
 from .opr import OPRModeAnalyzer
-from .overlap import ProbeOverlapAnalyzer
+from .probe import ProbeAnalyzer
+from .probe_positions import ProbePositionsAnalyzer
 from .propagator import ProbePropagator
 from .residuals import ResidualAnalyzer
 from .settings import (
@@ -30,11 +31,11 @@ class AnalysisCore:
         probe_positions_repository: ProbePositionsRepository,
         product_api: ProductAPI,
     ) -> None:
-        self._affine_transform_estimator_settings = AffineTransformEstimatorSettings(
+        self.affine_transform_estimator_settings = AffineTransformEstimatorSettings(
             settings_registry
         )
         self.affine_transform_estimator = AffineTransformEstimator(
-            rng, self._affine_transform_estimator_settings, probe_positions_repository
+            rng, self.affine_transform_estimator_settings, probe_positions_repository
         )
 
         self.diffraction_simulator_settings = DiffractionSimulatorSettings(settings_registry)
@@ -44,13 +45,15 @@ class AnalysisCore:
 
         self.fourier_analyzer = FourierAnalyzer(product_repository)
 
-        self.fourier_ring_correlator = FourierRingCorrelator(product_repository)
-
         self.illumination_mapper = IlluminationMapper(product_repository)
+
+        self.object_analyzer = ObjectAnalyzer(product_repository)
 
         self.opr_mode_analyzer = OPRModeAnalyzer(product_repository)
 
-        self.probe_overlap_analyzer = ProbeOverlapAnalyzer(product_repository)
+        self.probe_analyzer = ProbeAnalyzer(product_repository)
+
+        self.probe_positions_analyzer = ProbePositionsAnalyzer(product_repository)
 
         self.probe_propagator_settings = ProbePropagatorSettings(settings_registry)
         self.probe_propagator = ProbePropagator(self.probe_propagator_settings, product_repository)

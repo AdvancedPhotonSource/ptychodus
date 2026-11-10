@@ -8,7 +8,7 @@ fitted map back into a product's geometry in :func:`ptychodus.api.product.transf
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import logging
 import math
 
@@ -338,13 +338,25 @@ def _is_collinear_scan(coordinates_m: RealArrayType, eps: float) -> bool:
 
 @dataclass(frozen=True)
 class AffinePairFit:
-    """What one (uncorrected, corrected) position pair contributed to a joint affine fit."""
+    """What one (uncorrected, corrected) position pair contributed to a joint affine fit.
+
+    The per-point arrays are row-aligned over the scan indexes the pair shares, in
+    ascending order, and take no part in equality.
+    """
 
     translation_x_m: float
     translation_y_m: float
     num_points: int
     num_inliers: int
     rms_residual_m: float
+    indexes: IntegerArrayType = field(compare=False)
+    """Scan indexes the two sequences share."""
+    coordinates_xy_m: RealArrayType = field(compare=False)
+    """``(N, 2)`` uncorrected coordinates, packed ``(x, y)``."""
+    residual_xy_m: RealArrayType = field(compare=False)
+    """``(N, 2)`` displacement left after the fitted affine, packed ``(x, y)``."""
+    is_inlier: BooleanArrayType = field(compare=False)
+    """Points the final, outlier-trimmed least-squares fit used."""
 
 
 @dataclass(frozen=True)
@@ -386,18 +398,9 @@ class AffineFitResult:
 class _MatchedPair:
     """One position pair reduced to index-matched coordinates and their displacement vectors."""
 
+    indexes: IntegerArrayType  # (N,) shared scan indexes, ascending
     coordinates_m: RealArrayType  # (N, 2) uncorrected, packed (x, y)
     displacements_m: RealArrayType  # (N, 2) corrected minus uncorrected
-
-
-def _extract_indexed_coordinates(
-    positions: ProbePositionSequence,
-) -> tuple[IntegerArrayType, RealArrayType]:
-    """Split a position sequence into its scan-index array and an (N, 2) (x, y) array."""
-    return (
-        positions.get_indexes(),
-        numpy.column_stack((positions.get_coordinates_x_m(), positions.get_coordinates_y_m())),
-    )
 
 
 def _match_pair(
@@ -406,24 +409,17 @@ def _match_pair(
     """Pair two position sequences by scan index and return the displacement vectors.
 
     Positions present on only one side are dropped, so a corrected set that lost scan points
-    still contributes every point it kept.
+    still contributes every point it kept; positions sharing an index average into one.
     """
-    uncorrected_indexes, uncorrected_coordinates = _extract_indexed_coordinates(uncorrected)
-    corrected_indexes, corrected_coordinates = _extract_indexed_coordinates(corrected)
+    indexes, matched_uncorrected, matched_corrected = uncorrected.match_indexes(corrected)
 
-    _, uncorrected_rows, corrected_rows = numpy.intersect1d(
-        uncorrected_indexes, corrected_indexes, assume_unique=False, return_indices=True
-    )
-
-    if uncorrected_rows.size == 0:
+    if indexes.size == 0:
         raise ValueError(
             'An uncorrected/corrected position pair shares no scan indexes '
-            f'({uncorrected_indexes.size} and {corrected_indexes.size} positions).'
+            f'({len(uncorrected)} and {len(corrected)} positions).'
         )
 
-    matched_uncorrected = uncorrected_coordinates[uncorrected_rows]
-    matched_corrected = corrected_coordinates[corrected_rows]
-    return _MatchedPair(matched_uncorrected, matched_corrected - matched_uncorrected)
+    return _MatchedPair(indexes, matched_uncorrected, matched_corrected - matched_uncorrected)
 
 
 def _solve_shared_linear_offset(
@@ -476,6 +472,11 @@ def _solve_shared_linear_offset(
     return solution.T / rms_distance
 
 
+def _residual_magnitudes(residual_xy_m: RealArrayType) -> RealArrayType:
+    """Euclidean lengths (N,) of packed ``(x, y)`` residual vectors (N, 2)."""
+    return numpy.hypot(residual_xy_m[:, 0], residual_xy_m[:, 1])
+
+
 def _rms(values: RealArrayType) -> float:
     """Root mean square of a 1-D array of residual magnitudes."""
     return float(numpy.sqrt(numpy.mean(numpy.square(values))))
@@ -484,7 +485,7 @@ def _rms(values: RealArrayType) -> float:
 def _evaluate_pair_residuals(
     pair: _MatchedPair, mask: BooleanArrayType, offset: RealArrayType
 ) -> tuple[RealArrayType, RealArrayType]:
-    """Return one pair's translation (2,) and the per-point residual magnitudes (N,)."""
+    """Return one pair's translation (2,) and the per-point residual vectors (N, 2)."""
     coordinates = pair.coordinates_m[mask]
     displacements = pair.displacements_m[mask]
 
@@ -494,8 +495,7 @@ def _evaluate_pair_residuals(
         translation = displacements.mean(axis=0) - offset @ coordinates.mean(axis=0)
 
     predicted = pair.coordinates_m @ offset.T + translation
-    delta = pair.displacements_m - predicted
-    return translation, numpy.hypot(delta[:, 0], delta[:, 1])
+    return translation, pair.displacements_m - predicted
 
 
 def _find_pair_inliers(
@@ -635,7 +635,8 @@ def estimate_affine_transform(
     ]
     offset = _solve_shared_linear_offset(matched_pairs, masks)
     residuals = [
-        _evaluate_pair_residuals(pair, mask, offset)[1] for pair, mask in zip(matched_pairs, masks)
+        _residual_magnitudes(_evaluate_pair_residuals(pair, mask, offset)[1])
+        for pair, mask in zip(matched_pairs, masks)
     ]
 
     if math.isfinite(outlier_sigma):
@@ -655,7 +656,8 @@ def estimate_affine_transform(
     inlier_residuals: list[RealArrayType] = []
 
     for pair, mask in zip(matched_pairs, masks):
-        translation, residual = _evaluate_pair_residuals(pair, mask, offset)
+        translation, residual_xy_m = _evaluate_pair_residuals(pair, mask, offset)
+        residual = _residual_magnitudes(residual_xy_m)
         inlier_residuals.append(residual[mask])
         pairs.append(
             AffinePairFit(
@@ -664,6 +666,10 @@ def estimate_affine_transform(
                 num_points=int(pair.coordinates_m.shape[0]),
                 num_inliers=int(numpy.count_nonzero(mask)),
                 rms_residual_m=_rms(residual[mask]) if mask.any() else 0.0,
+                indexes=pair.indexes,
+                coordinates_xy_m=pair.coordinates_m,
+                residual_xy_m=residual_xy_m,
+                is_inlier=mask,
             )
         )
 

@@ -53,7 +53,7 @@ class TestSavePtychopinnTrainingData:
         path = tmp_path / 'training.npz'
         save_ptychopinn_training_data(path, parameters)
 
-        expected = parameters.product.probes.get_array()[0]
+        expected = parameters.product.probes.get_mean_probe().get_array()
 
         with numpy.load(path) as npz_file:
             assert npz_file['probeGuess'].shape == (4, 8, 8)

@@ -133,7 +133,7 @@ def save_training_data(file_path: Path, parameters: ReconstructInput) -> None:
     patterns = zero_bad_pixels(parameters.diffraction_patterns, parameters.bad_pixels)
     object_ = parameters.product.object_
     pixel_geometry = object_.get_pixel_geometry()
-    probe_array = parameters.product.probes.get_probe_no_opr().get_array()
+    probe_array = parameters.product.probes.get_mean_probe().get_array()
     positions = parameters.product.probe_positions
 
     _verify_spatial_size(patterns.shape[-2:], probe_array.shape[-2:])

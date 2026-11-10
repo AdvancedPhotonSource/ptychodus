@@ -1175,6 +1175,68 @@ def estimate_probe_entropy(probe: Probe) -> ProbeEntropyMetrics:
     )
 
 
+def orthogonalize_probe_modes(probe: Probe) -> Probe:
+    """Re-express ``probe``'s incoherent modes as the eigenmodes of the state they describe.
+
+    Any set of modes that mix incoherently describes one mutual coherence function, and
+    so do infinitely many others: reordered, rotated into another orthogonal basis, or
+    split into a different number of non-orthogonal modes. The singular value
+    decomposition of the stacked modes picks the one orthogonal set sorted by
+    descending power, unique up to a global phase per mode, so the result no longer
+    depends on how a reconstruction happened to split the state. The total power and
+    the incoherent intensity are unchanged.
+    """
+    array = probe.get_array()
+    stacked = array.reshape(array.shape[0], -1).astype(numpy.complex128)
+    _, singular_values, right = numpy.linalg.svd(stacked, full_matrices=False)
+    orthogonal = (singular_values[:, numpy.newaxis] * right).reshape(array.shape)
+    return Probe(orthogonal.astype(array.dtype), probe.get_pixel_geometry())
+
+
+@dataclass(frozen=True)
+class ProbeModeSpectrum:
+    """Power spectrum of a probe's orthogonalized incoherent modes."""
+
+    relative_power: RealArrayType
+    """Fraction of the total power in each orthogonal mode, descending; sums to one."""
+    purity: float
+    """``sum(p**2)`` of the relative powers: one for a coherent probe, ``1/N`` for N equal modes."""
+    von_neumann_entropy: float
+    """``-sum(p log p)`` of the relative powers, in nats: zero for a coherent probe."""
+    effective_mode_count: float
+    """``exp(von_neumann_entropy)``: the number of equally powerful modes with that entropy."""
+
+
+def compute_probe_mode_spectrum(probe: Probe) -> ProbeModeSpectrum:
+    """Measure how ``probe``'s power divides among its orthogonalized modes.
+
+    The powers are the squared singular values of the stacked modes, the eigenvalues of
+    the density matrix they describe, so every figure here is independent of how the
+    state was split into modes; see :func:`orthogonalize_probe_modes`.
+
+    Raises:
+        ValueError: If the probe carries no power.
+    """
+    array = probe.get_array()
+    stacked = array.reshape(array.shape[0], -1).astype(numpy.complex128)
+    power = numpy.square(numpy.linalg.svd(stacked, compute_uv=False))
+    total_power = numpy.sum(power)
+
+    if not total_power > 0.0:
+        raise ValueError('Cannot compute a mode spectrum: the probe carries no power.')
+
+    relative_power = power / total_power
+    nonzero = relative_power[relative_power > 0.0]
+    entropy = -numpy.sum(nonzero * numpy.log(nonzero))
+
+    return ProbeModeSpectrum(
+        relative_power=relative_power,
+        purity=float(numpy.sum(numpy.square(relative_power))),
+        von_neumann_entropy=float(entropy),
+        effective_mode_count=float(numpy.exp(entropy)),
+    )
+
+
 def shift_probe(probe: Probe, *, shift_y_px: float, shift_x_px: float) -> Probe:
     """Translate every incoherent mode of ``probe`` by ``(shift_y_px, shift_x_px)``.
 
@@ -1398,8 +1460,21 @@ class ProbeEnsemble:
         """
         return numpy.tensordot(weights, self.get_opr_basis(), axes=1)
 
-    def get_probe_no_opr(self) -> Probe:
+    def get_mean_probe(self) -> Probe:
+        """Return the one probe standing for the whole scan.
+
+        Without OPR weights that is the probe itself. With them, the dominant incoherent
+        mode is the field composed at the across-scan mean weights, and the stable
+        incoherent modes are kept as they are. Mixing the fields before squaring carries
+        slightly less power than averaging the per-position intensities would, since
+        ``|mean field|^2 <= mean |field|^2``; shot-to-shot variation is a property of the
+        ensemble, not of this probe.
+        """
         array = self._array[0, :, :, :].copy()
+
+        if self._opr_weights is not None and self._opr_weights.shape[0] > 0:
+            array[0, :, :] = self.compose_opr_field(self._opr_weights.mean(axis=0))
+
         return Probe(array, self.get_pixel_geometry())
 
     def get_geometry(self) -> ProbeGeometry:

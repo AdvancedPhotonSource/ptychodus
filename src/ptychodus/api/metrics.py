@@ -27,7 +27,7 @@ from .typing import (
     RealArrayType,
 )
 from .diffraction import BadPixels, DiffractionPatterns
-from .illumination import IlluminationMap
+from .illumination import IlluminationMap, compute_illumination_map
 from .patch import accumulate_probe_intensity
 from .simulate.diffraction import generate_diffraction_data
 from .geometry import PixelGeometry
@@ -38,7 +38,7 @@ from .object import (
     estimate_object_alignment_shift,
     shift_object,
 )
-from .probe import Probe, ProbeEnsemble, shift_probe
+from .probe import Probe, shift_probe
 from .product import Product
 from .reconstruct import ReconstructionAmbiguities
 from .constants import PI
@@ -56,8 +56,7 @@ def _validate_weights(
     weights_arr = numpy.asarray(weights, dtype=numpy.float64)
     if weights_arr.shape != expected_shape:
         raise ValueError(
-            f'weights shape {weights_arr.shape} does not match'
-            f' object layer 0 shape {expected_shape}!'
+            f'weights shape {weights_arr.shape} does not match object shape {expected_shape}!'
         )
     if not numpy.all(numpy.isfinite(weights_arr)):
         raise ValueError('weights must all be finite!')
@@ -126,8 +125,14 @@ def estimate_reconstruction_ambiguities(
 ) -> ReconstructionAmbiguities:
     """Estimate the ambiguities present in ``product``.
 
-    Without ``reference``: estimate ``(phi, k_x, k_y)`` that flatten layer
-    0's phase in the amplitude-weighted circular-mean sense.
+    The estimate is fitted to the projection of the object -- the product of its
+    layers, :meth:`Object.get_layers_flattened` -- which every multislice
+    reconstruction of the same sample shares however it splits the phase between
+    slices. :meth:`ReconstructionAmbiguities.standardize_product` applies the
+    correction to layer 0, which corrects that projection exactly.
+
+    Without ``reference``: estimate ``(phi, k_x, k_y)`` that flatten the projected
+    phase in the amplitude-weighted circular-mean sense.
     ``object_scale_factor`` is fixed at ``1.0`` because there is no
     reference amplitude to normalize against.
 
@@ -135,8 +140,8 @@ def estimate_reconstruction_ambiguities(
     on ``product`` such that
     ``estimate.standardize_product(product)`` best matches ``reference`` in
     the weighted least-squares sense. The two products must agree in
-    layer-0 shape and object pixel geometry. The driving signal becomes
-    ``S = product[0] * conj(reference[0])``, whose phase is exactly
+    object shape and pixel geometry. The driving signal becomes
+    ``S = projection * conj(reference projection)``, whose phase is exactly
     ``phi + k_x*x + k_y*y`` and whose magnitude ``|product| * |reference|``
     provides natural amplitude weighting (pixels where either product is
     weak contribute little).
@@ -152,26 +157,26 @@ def estimate_reconstruction_ambiguities(
         reference: Optional anchor product. When supplied, the scale factor
             is estimated too; when ``None``, scale is fixed at ``1.0``.
         weights: Optional non-negative per-pixel weight array, shape
-            ``(height_px, width_px)`` matching layer 0. Multiplies the
+            ``(height_px, width_px)`` matching the object. Multiplies the
             natural amplitude weighting. Pass a 0/1 mask to restrict the
             estimate to a region of interest.
     """
     obj = product.object_
-    layer_zero = obj.get_array()[0].astype(numpy.complex128)
+    projection = obj.get_layers_flattened().astype(numpy.complex128)
     pixel_geometry = obj.get_pixel_geometry()
     coords = obj.get_geometry().get_transverse_coordinates()
-    weights_arr = _validate_weights(weights, layer_zero.shape)
+    weights_arr = _validate_weights(weights, projection.shape)
 
     if reference is None:
-        ref_layer_zero = None
-        signal = layer_zero
+        ref_projection = None
+        signal = projection
     else:
         ref_obj = reference.object_
         ref_shape = ref_obj.get_array().shape[-2:]
 
-        if ref_shape != layer_zero.shape:
+        if ref_shape != projection.shape:
             raise ValueError(
-                f'Object layer-0 shape mismatch: reference {ref_shape} vs product {layer_zero.shape}!'
+                f'Object shape mismatch: reference {ref_shape} vs product {projection.shape}!'
             )
 
         ref_pixel_geometry = ref_obj.get_pixel_geometry()
@@ -181,8 +186,8 @@ def estimate_reconstruction_ambiguities(
                 f'Object pixel geometry mismatch: reference {ref_pixel_geometry} vs product {pixel_geometry}!'
             )
 
-        ref_layer_zero = ref_obj.get_array()[0].astype(numpy.complex128)
-        signal = layer_zero * numpy.conj(ref_layer_zero)
+        ref_projection = ref_obj.get_layers_flattened().astype(numpy.complex128)
+        signal = projection * numpy.conj(ref_projection)
 
     phi, k_x, k_y = _estimate_phase_offset_and_ramp(
         signal=signal,
@@ -193,14 +198,14 @@ def estimate_reconstruction_ambiguities(
         position_y_m=coords.y_m,
     )
 
-    if ref_layer_zero is None:
+    if ref_projection is None:
         s = 1.0
     else:
         # Weighted-LS solution for s in product ≈ s * exp(i(phi + k·r)) * ref:
         # s = Re(sum w * signal * exp(-i(phi + ramp))) / sum(w * |ref|^2).
         ramp = k_x * coords.x_m + k_y * coords.y_m
         correction = numpy.exp(-1j * (phi + ramp))
-        ref_intensity = numpy.square(numpy.abs(ref_layer_zero))
+        ref_intensity = numpy.square(numpy.abs(ref_projection))
 
         if weights_arr is None:
             numerator = numpy.real(numpy.sum(signal * correction))
@@ -300,7 +305,7 @@ def compute_object_comparison(
         upsample_factor: Sub-pixel precision for the phase-cross-correlation
             registration.
         weights: Optional non-negative per-pixel weights for the ambiguity
-            estimate, shape ``(height_px, width_px)`` matching layer 0. Pass
+            estimate, shape ``(height_px, width_px)`` matching the object. Pass
             a 0/1 mask to restrict the estimate to a region of interest.
         registration_quantity: Which quantity derived from the complex object is
             correlated; see :class:`ptychodus.api.object.RegistrationQuantity`.
@@ -435,21 +440,10 @@ class ProbeComparison:
     """
     object_shift_y_px: float
     """Vertical translation that registered the objects, in pixels."""
+    reference_probe: Probe
+    """The reference probe the test was compared against, :meth:`ProbeEnsemble.get_mean_probe`."""
     test_probe: Probe
     """The test probe, standardized and registered onto the reference."""
-
-
-def _representative_probe(probes: ProbeEnsemble) -> Probe:
-    """Return one probe standing for the ensemble: the OPR mean, or the probe itself."""
-    opr_weights = probes.get_opr_weights_or_none()
-    probe = probes.get_probe_no_opr()
-
-    if opr_weights is None:
-        return probe
-
-    array = probe.get_array().copy()
-    array[0, :, :] = probes.compose_opr_field(opr_weights.mean(axis=0))
-    return Probe(array, probes.get_pixel_geometry())
 
 
 def compute_probe_comparison(
@@ -480,8 +474,8 @@ def compute_probe_comparison(
         ValueError: If the probes differ in shape or pixel geometry, or either carries
             no power.
     """
-    reference_probe = _representative_probe(reference.probes)
-    test_raw = _representative_probe(test.probes)
+    reference_probe = reference.probes.get_mean_probe()
+    test_raw = test.probes.get_mean_probe()
 
     if reference_probe.get_array().shape[-2:] != test_raw.get_array().shape[-2:]:
         raise ValueError(
@@ -499,7 +493,7 @@ def compute_probe_comparison(
         reference, test, upsample_factor=upsample_factor, weights=weights
     )
     standardized_test = object_comparison.ambiguities.standardize_product(test)
-    test_probe = _representative_probe(standardized_test.probes)
+    test_probe = standardized_test.probes.get_mean_probe()
 
     # Plain rather than phase-normalized cross-correlation: a probe's intensity is smooth
     # and sits well inside its frame, so whitening its spectrum only amplifies the weak
@@ -540,6 +534,7 @@ def compute_probe_comparison(
         probe_shift_y_px=probe_shift_y_px,
         object_shift_x_px=object_comparison.shift_x_px,
         object_shift_y_px=object_comparison.shift_y_px,
+        reference_probe=reference_probe,
         test_probe=test_probe,
     )
 
@@ -1182,8 +1177,7 @@ def compute_illumination_scoring_region(
     Raises:
         ValueError: If the illumination map is smaller than ``array_shape``,
             carries no photons, or leaves a rectangle too small to carry a
-            meaningful spectrum. Callers are expected to catch the last case
-            and fall back to scoring the whole array.
+            meaningful spectrum.
     """
     photon_number = numpy.asarray(illumination_map.photon_number, dtype=float)
     target_height_px, target_width_px = array_shape
@@ -1242,6 +1236,40 @@ def compute_illumination_scoring_region(
         column_begin=column_begin,
         column_end=column_end,
         weights=weights,
+    )
+
+
+def compute_product_scoring_region(
+    product: Product,
+    array_shape: tuple[int, int],
+    *,
+    erosion_divisor: int = 8,
+) -> ScoringRegion:
+    """Derive the region to score ``product``'s object over from its own illumination.
+
+    The illumination map of the product's probe and scan positions is reduced by
+    :func:`compute_illumination_scoring_region`, with the mask eroded by the probe
+    extent divided by ``erosion_divisor``. The outermost scan positions leave a rim
+    that only part of the probe ever covered, so the photon count there is real but
+    the reconstruction is not converged.
+
+    Args:
+        product: Supplies the probe and scan positions that define the illuminated area.
+        array_shape: Shape of the object array the region will be applied to.
+        erosion_divisor: Erode the illuminated mask by the smaller probe extent divided
+            by this. Larger values erode less.
+
+    Raises:
+        ValueError: If ``erosion_divisor`` is not positive, or the product's
+            illumination leaves no region worth scoring.
+    """
+    if erosion_divisor < 1:
+        raise ValueError(f'erosion_divisor must be positive, got {erosion_divisor}!')
+
+    illumination_map = compute_illumination_map(product)
+    probe_extent_px = min(product.probes.width_px, product.probes.height_px)
+    return compute_illumination_scoring_region(
+        illumination_map, array_shape, erosion_px=probe_extent_px // erosion_divisor
     )
 
 
@@ -1373,6 +1401,106 @@ def compute_normalized_mutual_information(
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
 
     return float(normalized_mutual_information(reference, test, bins=bins))
+
+
+@dataclass(frozen=True)
+class PixelwiseMetrics:
+    """Pixelwise agreement of two real images of the same quantity, after any alignment."""
+
+    root_mean_square_error: float
+    """``sqrt(mean((test - reference)**2))``, in the images' units."""
+    mean_absolute_error: float
+    """``mean(|test - reference|)``, in the images' units."""
+    peak_signal_to_noise_ratio_dB: float  # noqa: N815
+    """Peak signal-to-noise ratio over the data range; ``inf`` for identical images."""
+    structural_similarity: float
+    """Mean structural similarity, in ``[-1, 1]``; NaN when the images are too small."""
+    normalized_mutual_information: float
+    """Studholme normalized mutual information, from 1 (independent) to 2 (identical)."""
+
+
+def compute_pixelwise_metrics(
+    reference: RealArrayType,
+    test: RealArrayType,
+    *,
+    mask: BooleanArrayType | None = None,
+    data_range: float | None = None,
+) -> PixelwiseMetrics:
+    """Score ``test`` against ``reference`` pixel by pixel.
+
+    Every metric is taken over the pixels ``mask`` selects, or over all of them. The
+    structural similarity is computed on the whole images, since its window needs
+    neighbours, and its per-pixel map is averaged over the mask; it is NaN when either
+    side of the images is shorter than the 7-pixel window.
+
+    Args:
+        reference: The image treated as ground truth.
+        test: The image being evaluated, the same shape as ``reference``.
+        mask: Optional pixels to score.
+        data_range: Span of values the peak signal-to-noise ratio and structural
+            similarity are measured against; ``None`` takes the reference's span over
+            the scored pixels.
+
+    Raises:
+        ValueError: If the shapes differ or the mask selects no pixel.
+    """
+    if reference.shape != test.shape:
+        raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
+
+    if mask is not None and mask.shape != reference.shape:
+        raise ValueError(f'Mask shape {mask.shape} does not match array shape {reference.shape}!')
+
+    scored = numpy.ones(reference.shape, dtype=bool) if mask is None else mask
+
+    if not scored.any():
+        raise ValueError('Cannot score an empty set of pixels!')
+
+    reference_scored = reference[scored]
+    test_scored = test[scored]
+    effective_range = _infer_data_range(reference_scored) if data_range is None else data_range
+
+    if min(reference.shape) < 7:
+        similarity = float('nan')
+    else:
+        _, similarity_map = structural_similarity(
+            reference, test, data_range=effective_range, full=True
+        )
+        similarity = float(numpy.mean(similarity_map[scored]))
+
+    return PixelwiseMetrics(
+        root_mean_square_error=compute_root_mean_square_error(reference_scored, test_scored),
+        mean_absolute_error=compute_mean_absolute_error(reference_scored, test_scored),
+        peak_signal_to_noise_ratio_dB=compute_peak_signal_to_noise_ratio(
+            reference_scored, test_scored, data_range=effective_range
+        ),
+        structural_similarity=similarity,
+        normalized_mutual_information=compute_normalized_mutual_information(
+            reference_scored, test_scored
+        ),
+    )
+
+
+def compute_phase_pixelwise_metrics(
+    reference: ComplexArrayType,
+    test: ComplexArrayType,
+    *,
+    mask: BooleanArrayType | None = None,
+) -> PixelwiseMetrics:
+    """Score the phase of ``test`` against the phase of ``reference``, pixel by pixel.
+
+    Phase is defined modulo 2pi, so ``arg(test)`` is compared as
+    ``arg(reference) + arg(test * conj(reference))``: the wrapped difference is added to
+    the reference rather than unwrapping either side, and two phases on opposite sides
+    of the +-pi cut agree. The data range is the full 2pi of a wrapped phase, so scores
+    compare across products however flat the reference is. See
+    :func:`compute_pixelwise_metrics` for ``mask``.
+    """
+    if reference.shape != test.shape:
+        raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
+
+    reference_phase = numpy.angle(reference)
+    test_phase = reference_phase + numpy.angle(test * numpy.conj(reference))
+    return compute_pixelwise_metrics(reference_phase, test_phase, mask=mask, data_range=2.0 * PI)
 
 
 @dataclass(frozen=True)

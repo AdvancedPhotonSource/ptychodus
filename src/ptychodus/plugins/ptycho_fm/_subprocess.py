@@ -220,7 +220,7 @@ def run_reconstruct(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None
     if diff_amp.shape[-1] != image_size or diff_amp.shape[-2] != image_size:
         diff_amp = numpy.stack([_zero_pad_2d_to(p, image_size) for p in diff_amp], axis=0)
 
-    probe_array = parameters.product.probes.get_probe_no_opr().get_array()
+    probe_array = parameters.product.probes.get_mean_probe().get_array()
     if probe_array.ndim != 3:
         raise ValueError(f'Expected probe with shape (N_modes, H, W); got {probe_array.shape}.')
     if coupled_decoder_mode in ('real_imag', 'amp_phase'):

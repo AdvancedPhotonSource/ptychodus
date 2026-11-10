@@ -98,7 +98,7 @@ async def get_probe_image(
     incoherent: int = Query(0, ge=0, description='Incoherent probe mode index.'),
 ) -> RenderedImage:
     product = await _load_product_or_404(uuid, session, layout)
-    probe = product.probes.get_probe_no_opr()
+    probe = product.probes.get_mean_probe()
     if not 0 <= incoherent < probe.num_incoherent_modes:
         raise HTTPException(
             status_code=404,
@@ -116,7 +116,7 @@ async def get_probe_modes_image(
     params: RenderParamsDep,
 ) -> RenderedImage:
     product = await _load_product_or_404(uuid, session, layout)
-    probe = product.probes.get_probe_no_opr()
+    probe = product.probes.get_mean_probe()
     values = probe.get_incoherent_modes_flattened()
     return render_complex(values, product.probes.get_pixel_geometry(), params)
 

@@ -1,34 +1,57 @@
+from .affine import AffineTransformEstimator
 from .core import AnalysisCore
 from .diffraction import DiffractionSimulator
 from .fourier import FourierAnalysisResult, FourierAnalyzer
-from .frc import FourierRingCorrelator, PowerSpectralDensity
 from .illumination import IlluminationMapper, IlluminationMap
+from .object import (
+    ObjectAnalyzer,
+    ObjectComparisonReport,
+    ObjectMetricsReport,
+    SpectralSNRConvention,
+)
 from .opr import OPRModeAnalyzer, OPRModeSeries, OPRModeStatistics
-from .overlap import ProbeOverlapAnalyzer, ProbeOverlapMetrics
+from .probe import ProbeAnalyzer, ProbeComparisonReport, ProbeMetricsReport
+from .probe_positions import (
+    ProbePositionsAnalyzer,
+    ProbePositionsComparisonReport,
+    ProbePositionsMetricsReport,
+)
 from .propagator import ProbePropagator
 from .residuals import ReconstructionResiduals, ResidualAnalyzer
-from .settings import DiffractionSimulatorSettings, ProbePropagatorSettings
+from .settings import (
+    AffineTransformEstimatorSettings,
+    DiffractionSimulatorSettings,
+    ProbePropagatorSettings,
+)
 from .xmcd import XMCDAnalyzer, XMCDResult
 
 __all__ = [
+    'AffineTransformEstimator',
+    'AffineTransformEstimatorSettings',
     'AnalysisCore',
     'DiffractionSimulator',
     'DiffractionSimulatorSettings',
     'FourierAnalysisResult',
     'FourierAnalyzer',
-    'FourierRingCorrelator',
     'IlluminationMap',
     'IlluminationMapper',
+    'ObjectAnalyzer',
+    'ObjectComparisonReport',
+    'ObjectMetricsReport',
     'OPRModeAnalyzer',
     'OPRModeSeries',
     'OPRModeStatistics',
-    'PowerSpectralDensity',
-    'ProbeOverlapAnalyzer',
-    'ProbeOverlapMetrics',
+    'ProbeAnalyzer',
+    'ProbeComparisonReport',
+    'ProbeMetricsReport',
+    'ProbePositionsAnalyzer',
+    'ProbePositionsComparisonReport',
+    'ProbePositionsMetricsReport',
     'ProbePropagator',
     'ProbePropagatorSettings',
     'ReconstructionResiduals',
     'ResidualAnalyzer',
+    'SpectralSNRConvention',
     'XMCDAnalyzer',
     'XMCDResult',
 ]

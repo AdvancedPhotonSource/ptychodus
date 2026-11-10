@@ -29,11 +29,11 @@ from . import resources  # noqa
 from .agent import AgentView, AgentChatView
 from .diffraction import DiffractionView, DiffractionImageView
 from .fluorescence import FluorescenceView
+from .dashboard import PlotView
 from .image import ImageView
 from .product import ProductRightPanelView, ProductView, ProductVisualizationView
 from .processing import ProcessingStatusView
 from .repository import RepositoryTableView, RepositoryTreeView
-from .probe_positions import ProbePositionsPlotView
 from .settings import SettingsView
 
 logger = logging.getLogger(__name__)
@@ -224,7 +224,7 @@ class ViewCore(QMainWindow):
         )
 
         self.probe_positions_view = RepositoryTableView()
-        self.probe_positions_plot_view = ProbePositionsPlotView()
+        self.probe_positions_plot_view = PlotView()
         self.positions_action = self.navigation.add_panel(
             QIcon(':/icons/positions'),
             'Positions',

@@ -484,22 +484,6 @@ class TestProbeOverlapMetrics:
         m = _make_overlap_metrics(effective_covered_area_m2=0.0)
         assert math.isnan(m.areal_redundancy)
 
-    def test_save_npz_round_trip(self, tmp_path: Path) -> None:
-        m = _make_overlap_metrics()
-        file_path = tmp_path / 'overlap.npz'
-        m.save_npz(file_path)
-
-        with numpy.load(file_path) as contents:
-            numpy.testing.assert_allclose(contents['redundancy'], m.redundancy)
-            numpy.testing.assert_allclose(
-                contents['pairwise_overlap_by_position'], m.pairwise_overlap_by_position
-            )
-            assert float(contents['areal_redundancy']) == pytest.approx(m.areal_redundancy)
-            assert float(contents['equivalent_linear_overlap']) == pytest.approx(
-                m.equivalent_linear_overlap
-            )
-            assert int(contents['num_positions']) == m.num_positions
-
 
 # ---------------------------------------------------------------------------
 # compute_probe_overlap — algorithm

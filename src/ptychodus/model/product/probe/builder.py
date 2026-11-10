@@ -365,7 +365,7 @@ class ProbeEnsembleBuilder(ParameterGroup):
 
             return probe_seq
 
-        probe = probe_seq.get_probe_no_opr()
+        probe = probe_seq.get_mean_probe()
         num_imodes_actual = probe.num_incoherent_modes
 
         if num_imodes_actual < num_imodes_requested:

@@ -196,7 +196,7 @@ def _build_initial_probe(
         # from a reconstruction done at a different resolution.
         probes = resample_probe_ensemble(reader.read(file_path), probe_geometry)
 
-    probe = probes.get_probe_no_opr()
+    probe = probes.get_mean_probe()
 
     # Only ever grows the stack. A file carrying more modes than were asked for keeps
     # them, because discarding reconstructed modes is the worse of the two surprises.

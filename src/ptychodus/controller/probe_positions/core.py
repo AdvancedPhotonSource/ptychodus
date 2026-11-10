@@ -2,15 +2,20 @@ from __future__ import annotations
 import logging
 
 from PyQt5.QtCore import QModelIndex, QStringListModel
-from PyQt5.QtWidgets import QAbstractItemView, QDialog, QMessageBox
+from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ptychodus.api.affine import AffineTransform
 from ptychodus.model.observer import SequenceObserver
 
+from ...model.analysis import (
+    AffineTransformEstimator,
+    AffineTransformEstimatorSettings,
+    ProbePositionsAnalyzer,
+)
 from ...model.product import ProbePositionsAPI, ProbePositionsRepository
 from ...model.product.probe_positions import ProbePositionsRepositoryItem
 from ...view.repository import RepositoryTableView
-from ...view.probe_positions import ProbePositionsPlotView
+from ...view.dashboard import PlotView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
 from ..helpers import (
@@ -19,7 +24,10 @@ from ..helpers import (
     connect_triggered_signal,
     create_brush_for_editable_cell,
 )
+from .affine import AffineTransformViewController
+from .compare import ProbePositionsCompareViewController
 from .editor_factory import ProbePositionsEditorViewControllerFactory
+from .metrics import ProbePositionsMetricsViewController
 from .table_model import Column, ProbePositionsTableModel
 
 logger = logging.getLogger(__name__)
@@ -31,10 +39,11 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
         repository: ProbePositionsRepository,
         api: ProbePositionsAPI,
         view: RepositoryTableView,
-        plot_view: ProbePositionsPlotView,
+        plot_view: PlotView,
+        analyzer: ProbePositionsAnalyzer,
+        affine_transform_estimator: AffineTransformEstimator,
+        affine_transform_estimator_settings: AffineTransformEstimatorSettings,
         file_dialog_factory: FileDialogFactory,
-        *,
-        is_developer_mode_enabled: bool,
     ) -> None:
         super().__init__()
         self._repository = repository
@@ -47,6 +56,15 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
         )
         self._table_proxy_model = UserRoleSortFilterProxyModel()
         self._editor_factory = ProbePositionsEditorViewControllerFactory()
+        self._metrics_view_controller = ProbePositionsMetricsViewController(
+            analyzer, self._table_model
+        )
+        self._compare_view_controller = ProbePositionsCompareViewController(
+            analyzer, self._table_model
+        )
+        self._affine_view_controller = AffineTransformViewController(
+            affine_transform_estimator, affine_transform_estimator_settings, self._table_model
+        )
 
         self._table_proxy_model.setSourceModel(self._table_model)
         self._table_proxy_model.dataChanged.connect(
@@ -91,9 +109,16 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
 
         view.button_box.edit_button.clicked.connect(self._edit_current_scan)
 
+        metrics_action = view.button_box.analyze_menu.addAction('Metrics...')
+        connect_triggered_signal(metrics_action, self._show_metrics)
+
+        compare_action = view.button_box.analyze_menu.addAction('Compare...')
+        connect_triggered_signal(compare_action, self._compare_positions)
+
+        view.button_box.analyze_menu.addSeparator()
+
         estimate_transform_action = view.button_box.analyze_menu.addAction('Estimate Transform...')
         connect_triggered_signal(estimate_transform_action, self._estimate_transform)
-        estimate_transform_action.setEnabled(is_developer_mode_enabled)
 
     def _get_current_item_index(self) -> int:
         proxy_index = self._view.table_view.currentIndex()
@@ -209,18 +234,29 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
 
         self._plot_view.figure_canvas.draw()
 
-    def _estimate_transform(self) -> None:  # TODO
+    def _show_metrics(self) -> None:
         item_index = self._get_current_item_index()
 
         if item_index < 0:
             logger.warning('No current item!')
-            return
+        else:
+            self._metrics_view_controller.analyze(item_index)
 
-        _ = QMessageBox.information(
-            self._view,
-            'Not Implemented',
-            'Affine transform estimator is not yet implemented.',
-        )
+    def _compare_positions(self) -> None:
+        item_index = self._get_current_item_index()
+
+        if item_index < 0:
+            logger.warning('No current item!')
+        else:
+            self._compare_view_controller.compare(item_index)
+
+    def _estimate_transform(self) -> None:
+        item_index = self._get_current_item_index()
+
+        if item_index < 0:
+            logger.warning('No current item!')
+        else:
+            self._affine_view_controller.launch(item_index)
 
     def _update_view(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()

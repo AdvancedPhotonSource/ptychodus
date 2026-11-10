@@ -208,7 +208,9 @@ def test_build_arrays_passes_every_probe_mode() -> None:
     probe_guess = _build_arrays(parameters)['probeGuess']
 
     assert probe_guess.shape == (NUM_MODES, DETECTOR_PX, DETECTOR_PX)
-    numpy.testing.assert_array_equal(probe_guess, parameters.product.probes.get_array()[0])
+    numpy.testing.assert_array_equal(
+        probe_guess, parameters.product.probes.get_mean_probe().get_array()
+    )
 
 
 def test_build_arrays_repairs_bad_pixels() -> None:

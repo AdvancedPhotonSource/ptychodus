@@ -10,7 +10,7 @@ from ptychodus.model.observer import SequenceObserver
 from ...model.analysis import (
     IlluminationMapper,
     OPRModeAnalyzer,
-    ProbeOverlapAnalyzer,
+    ProbeAnalyzer,
     ProbePropagatorSettings,
     ProbePropagator,
 )
@@ -29,9 +29,10 @@ from ..data import FileDialogFactory
 from ..helpers import connect_triggered_signal, create_brush_for_editable_cell
 from ..image import ImageController
 from .editor_factory import ProbeEditorViewControllerFactory
+from .compare import ProbeCompareViewController
 from .illumination import IlluminationViewController
+from .metrics import ProbeMetricsViewController
 from .opr import OPRModeViewController
-from .overlap import ProbeOverlapViewController
 from .propagator import ProbePropagationViewController
 from .tree_model import Column, ProbeTreeModel, try_get_probe
 
@@ -47,7 +48,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         propagator: ProbePropagator,
         propagator_settings: ProbePropagatorSettings,
         illumination_mapper: IlluminationMapper,
-        overlap_analyzer: ProbeOverlapAnalyzer,
+        probe_analyzer: ProbeAnalyzer,
         opr_mode_analyzer: OPRModeAnalyzer,
         view: RepositoryTreeView,
         status_bar: QStatusBar,
@@ -74,9 +75,11 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             illumination_mapper,
             file_dialog_factory,
         )
-        self._overlap_view_controller = ProbeOverlapViewController(
-            overlap_analyzer,
-            file_dialog_factory,
+        self._metrics_view_controller = ProbeMetricsViewController(
+            probe_analyzer, self._tree_model, file_dialog_factory
+        )
+        self._compare_view_controller = ProbeCompareViewController(
+            probe_analyzer, self._tree_model, file_dialog_factory
         )
         self._opr_mode_view_controller = OPRModeViewController(
             opr_mode_analyzer,
@@ -128,14 +131,19 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         view.button_box.edit_button.clicked.connect(self._edit_current_probe)
 
+        metrics_action = view.button_box.analyze_menu.addAction('Metrics...')
+        connect_triggered_signal(metrics_action, self._show_metrics)
+
+        compare_action = view.button_box.analyze_menu.addAction('Compare...')
+        connect_triggered_signal(compare_action, self._compare_probes)
+
+        view.button_box.analyze_menu.addSeparator()
+
         propagate_action = view.button_box.analyze_menu.addAction('Propagate...')
         connect_triggered_signal(propagate_action, self._propagate_probe)
 
         illumination_action = view.button_box.analyze_menu.addAction('Map Illumination...')
         connect_triggered_signal(illumination_action, self._map_illumination)
-
-        overlap_action = view.button_box.analyze_menu.addAction('Overlap Metrics...')
-        connect_triggered_signal(overlap_action, self._analyze_overlap)
 
         opr_mode_action = view.button_box.analyze_menu.addAction('Coherent (OPR) Modes...')
         connect_triggered_signal(opr_mode_action, self._analyze_opr_modes)
@@ -285,13 +293,21 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         else:
             self._illumination_view_controller.map(item_index)
 
-    def _analyze_overlap(self) -> None:
+    def _show_metrics(self) -> None:
         item_index = self._get_current_item_index()
 
         if item_index < 0:
             logger.warning('No current item!')
         else:
-            self._overlap_view_controller.analyze(item_index)
+            self._metrics_view_controller.analyze(item_index)
+
+    def _compare_probes(self) -> None:
+        item_index = self._get_current_item_index()
+
+        if item_index < 0:
+            logger.warning('No current item!')
+        else:
+            self._compare_view_controller.compare(item_index)
 
     def _analyze_opr_modes(self) -> None:
         item_index = self._get_current_item_index()

@@ -389,7 +389,7 @@ with ModelCore(Path('settings.ini')) as model:
 
     # Collapse any OPR handling in the loaded ProbeEnsemble and start from
     # the first coherent/OPR mode as a regular Probe.
-    base_probe = product.probes.get_probe_no_opr()
+    base_probe = product.probes.get_mean_probe()
 
     probe_with_incoherent_modes = generate_incoherent_probe_modes(
         base_probe,

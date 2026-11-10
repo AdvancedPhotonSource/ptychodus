@@ -500,6 +500,42 @@ def test_estimate_xmcd_is_invariant_to_lcp_shift_and_phase_offset(
     )
 
 
+def test_estimate_xmcd_fits_the_ambiguities_on_the_projection() -> None:
+    """Splitting the LCP object over two slices, ramp and all, leaves the result unchanged."""
+    rng = numpy.random.default_rng(10)
+    y = numpy.arange(48)[:, None]
+    x = numpy.arange(48)[None, :]
+    amp = numpy.exp(-(((y - 24) ** 2 + (x - 24) ** 2) / 60.0))
+    o_struct = (amp * (0.7 + 0.05 * rng.standard_normal(amp.shape))).astype(numpy.complex128)
+    m_factor = (1.0 + 0.05 * amp).astype(numpy.complex128)
+    rcp = _product(o_struct, m_factor, name='rcp', polarization=Polarization.RIGHT_CIRCULAR)
+    lcp = _product(o_struct, m_factor, name='lcp', polarization=Polarization.LEFT_CIRCULAR)
+    # A ramp in one slice cancelled by the other: invisible in the projection, so a fit
+    # to the projection must not respond to it.
+    slice_ramp = numpy.exp(0.2j * (x - 24) + 0.1j * (y - 24)) * numpy.ones_like(amp)
+    lcp_array = lcp.object_.get_array()[0]
+    split_lcp = replace(
+        lcp,
+        object_=Object(
+            array=numpy.stack((lcp_array * slice_ramp, numpy.conj(slice_ramp))),
+            pixel_geometry=lcp.object_.get_pixel_geometry(),
+            center=lcp.object_.get_center(),
+            layer_spacing_m=[1.0e-6],
+        ),
+    )
+
+    expected = estimate_xmcd(lcp, rcp)
+    actual = estimate_xmcd(split_lcp, rcp)
+
+    for actual_product, expected_product in (
+        (actual.structural_product, expected.structural_product),
+        (actual.magnetic_product, expected.magnetic_product),
+    ):
+        numpy.testing.assert_allclose(
+            actual_product.object_.get_array(), expected_product.object_.get_array(), atol=1e-9
+        )
+
+
 def test_estimate_xmcd_warns_on_multi_layer_objects(caplog: pytest.LogCaptureFixture) -> None:
     single_layer = numpy.ones((8, 8), dtype=numpy.complex128)
     product = replace(

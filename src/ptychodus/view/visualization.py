@@ -93,6 +93,15 @@ class ImageItem(QGraphicsPixmapItem):
         self._z_indicator_item.hide()
         self._z_indicator_item.setZValue(100)
 
+        region_pen = QPen(Qt.GlobalColor.green)
+        region_pen.setWidth(2)
+        region_pen.setCosmetic(True)
+
+        self._region_item = QGraphicsRectItem(self)
+        self._region_item.setPen(region_pen)
+        self._region_item.hide()
+        self._region_item.setZValue(100)
+
         self.setTransformationMode(Qt.TransformationMode.FastTransformation)
         self.setAcceptedMouseButtons(Qt.MouseButton.LeftButton)
         self.setAcceptHoverEvents(True)
@@ -144,6 +153,23 @@ class ImageItem(QGraphicsPixmapItem):
 
     def clear_vertical_indicator(self) -> None:
         self._z_indicator_item.hide()
+
+    def set_region_outline(
+        self, row_begin: int, row_end: int, column_begin: int, column_end: int
+    ) -> None:
+        """Outline the array rows ``[row_begin, row_end)`` and columns ``[column_begin, column_end)``."""
+        self._region_item.setRect(
+            QRectF(
+                float(column_begin),
+                float(row_begin),
+                float(column_end - column_begin),
+                float(row_end - row_begin),
+            )
+        )
+        self._region_item.show()
+
+    def clear_region_outline(self) -> None:
+        self._region_item.hide()
 
     def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent | None) -> None:  # noqa: N802
         if event is None:

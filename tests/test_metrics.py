@@ -24,8 +24,11 @@ from ptychodus.api.metrics import (
     compute_normalized_mutual_information,
     compute_object_comparison,
     compute_peak_signal_to_noise_ratio,
+    compute_phase_pixelwise_metrics,
+    compute_pixelwise_metrics,
     compute_power_spectral_density,
     compute_probe_comparison,
+    compute_product_scoring_region,
     compute_r_factor,
     compute_reconstruction_residuals,
     compute_root_mean_square_error,
@@ -36,7 +39,7 @@ from ptychodus.api.probe import ProbeEnsemble, shift_probe
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructionAmbiguities
-from ptychodus.api.constants import TWO_PI_J
+from ptychodus.api.constants import PI, TWO_PI_J
 
 
 def _make_frc(
@@ -1399,7 +1402,7 @@ class TestProbeComparison:
         reference = _probe_product(modes)
         pixel_geometry = PixelGeometry(width_m=_PIXEL_M, height_m=_PIXEL_M)
         shifted = shift_probe(
-            reference.probes.get_probe_no_opr(), shift_y_px=1.3, shift_x_px=-0.7
+            reference.probes.get_mean_probe(), shift_y_px=1.3, shift_x_px=-0.7
         ).get_array()
         test = replace(
             reference,
@@ -1662,4 +1665,81 @@ class TestComputeReconstructionResiduals:
             baseline_result.reciprocal_space_error_map,
             atol=1e-10,
             equal_nan=True,
+        )
+
+
+class TestPixelwiseMetrics:
+    def test_identical_images_agree_perfectly(self) -> None:
+        image = _band_limited_image((32, 32), seed=3, cutoff=0.2).real
+
+        metrics = compute_pixelwise_metrics(image, image)
+
+        assert metrics.root_mean_square_error == 0.0
+        assert metrics.mean_absolute_error == 0.0
+        assert metrics.peak_signal_to_noise_ratio_dB == numpy.inf
+        assert metrics.structural_similarity == pytest.approx(1.0)
+        assert metrics.normalized_mutual_information == pytest.approx(2.0)
+
+    def test_mask_restricts_the_scored_pixels(self) -> None:
+        reference = numpy.zeros((16, 16))
+        test = reference.copy()
+        test[:, 8:] = 1.0
+        mask = numpy.zeros((16, 16), dtype=bool)
+        mask[:, :8] = True
+
+        metrics = compute_pixelwise_metrics(reference, test, mask=mask, data_range=1.0)
+
+        assert metrics.root_mean_square_error == 0.0
+        assert metrics.mean_absolute_error == 0.0
+
+    def test_structural_similarity_is_nan_below_its_window(self) -> None:
+        image = numpy.arange(30.0).reshape(5, 6)
+
+        metrics = compute_pixelwise_metrics(image, image)
+
+        assert numpy.isnan(metrics.structural_similarity)
+
+    def test_empty_mask_raises(self) -> None:
+        image = numpy.ones((8, 8))
+
+        with pytest.raises(ValueError, match='empty'):
+            compute_pixelwise_metrics(image, image, mask=numpy.zeros((8, 8), dtype=bool))
+
+    def test_phase_wrap_is_not_an_error(self) -> None:
+        reference = numpy.full((16, 16), numpy.exp(1j * (PI - 1.0e-3)))
+        test = numpy.full((16, 16), numpy.exp(1j * (-PI + 1.0e-3)))
+
+        metrics = compute_phase_pixelwise_metrics(reference, test)
+
+        assert metrics.root_mean_square_error == pytest.approx(2.0e-3, rel=1e-6)
+        assert metrics.mean_absolute_error == pytest.approx(2.0e-3, rel=1e-6)
+
+
+class TestProductScoringRegion:
+    def test_dark_probe_yields_no_region(self) -> None:
+        product = _probe_product(numpy.zeros((1, _CMP_PROBE_PX, _CMP_PROBE_PX)))
+
+        with pytest.raises(ValueError):
+            compute_product_scoring_region(product, (_OBJ_HEIGHT_PX, _OBJ_WIDTH_PX))
+
+    def test_erosion_divisor_must_be_positive(self) -> None:
+        with pytest.raises(ValueError, match='erosion_divisor'):
+            compute_product_scoring_region(
+                _make_product(), (_OBJ_HEIGHT_PX, _OBJ_WIDTH_PX), erosion_divisor=0
+            )
+
+
+class TestProbeComparisonReferenceProbe:
+    def test_reference_probe_is_the_opr_mean(self) -> None:
+        rng = numpy.random.default_rng(8)
+        modes = _structured_modes(2)
+        array = numpy.stack([modes, 0.1 * _structured_modes(2, seed=9)])
+        weights = numpy.column_stack((1.0 + 0.1 * rng.standard_normal(4), rng.standard_normal(4)))
+        product = _probe_product(array, opr_weights=weights)
+
+        comparison = compute_probe_comparison(product, product)
+
+        numpy.testing.assert_allclose(
+            comparison.reference_probe.get_array(),
+            product.probes.get_mean_probe().get_array(),
         )

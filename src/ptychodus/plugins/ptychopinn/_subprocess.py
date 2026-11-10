@@ -95,7 +95,7 @@ def _build_arrays(parameters: Any) -> dict[str, Any]:
         'ycoords_start': ycoords,
         # Repaired the same way exported training data is.
         'diff3d': inpaint_bad_pixels(parameters.diffraction_patterns, parameters.bad_pixels),
-        'probeGuess': parameters.product.probes.get_probe_no_opr().get_array(),
+        'probeGuess': parameters.product.probes.get_mean_probe().get_array(),
         'objectGuess': parameters.product.object_.get_layer(0),
         'scan_index': numpy.zeros(len(positions), dtype=int),
         'scale_contract_version': _SCALE_CONTRACT_VERSION,

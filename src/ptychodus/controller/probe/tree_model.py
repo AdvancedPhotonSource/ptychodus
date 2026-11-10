@@ -50,10 +50,9 @@ def calc_coherent_percent(probe: Probe) -> int:
 
 def try_get_probe(item: ProbeRepositoryItem) -> Probe | None:
     # Returns None when the probe sequence is the null sentinel (no dataset
-    # bound yet — see ProbeRepositoryItem._rebuild). Same pattern used by
-    # ProbeRepositoryItem.get_size_metrics / get_entropy_metrics.
+    # bound yet — see ProbeRepositoryItem._rebuild).
     try:
-        return item.get_probes().get_probe_no_opr()
+        return item.get_probes().get_mean_probe()
     except ValueError:
         return None
 

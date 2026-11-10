@@ -64,11 +64,23 @@ class VisualizationWidgetController:
     def clear_array(self) -> None:
         self._controller.clear_array()
 
+    def zoom_to_fit(self) -> None:
+        """Fit this view, and every view linked to it, to its contents."""
+        self._controller.zoom_to_fit()
+
     def set_vertical_indicator(self, x: float) -> None:
         self._controller.get_item().set_vertical_indicator(x)
 
     def clear_vertical_indicator(self) -> None:
         self._controller.get_item().clear_vertical_indicator()
+
+    def set_region_outline(
+        self, row_begin: int, row_end: int, column_begin: int, column_end: int
+    ) -> None:
+        self._controller.get_item().set_region_outline(row_begin, row_end, column_begin, column_end)
+
+    def clear_region_outline(self) -> None:
+        self._controller.get_item().clear_region_outline()
 
     def _set_mouse_tool(self, mouse_tool_action: QAction) -> None:
         tool_id = mouse_tool_action.data()

@@ -905,7 +905,7 @@ def main() -> ExitCode:
     else:
         logger.info('Reading the initial probe from %s', probe_file)
         probe_reader = registry.probe_file_readers.get_strategy_by_name(params.init_probe_file_type)
-        probe_array = probe_reader.read(probe_file).get_probe_no_opr().get_array()
+        probe_array = probe_reader.read(probe_file).get_mean_probe().get_array()
 
     probe_array = _set_num_incoherent_modes(probe_array, num_incoherent_modes)
     probe = Probe(array=probe_array, pixel_geometry=probe_geometry.get_pixel_geometry())

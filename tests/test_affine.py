@@ -187,6 +187,75 @@ def test_coarse_pass_recovers_transform_from_clean_data() -> None:
     )
 
 
+def test_pair_fit_reports_per_point_residuals_and_inliers() -> None:
+    """The per-point arrays explain the fit: exact points sit at zero, an outlier is flagged."""
+    truth = AffineTransform(1.02, 0.01, 3e-6, -0.015, 0.99, -1e-6)
+    rng = numpy.random.default_rng(11)
+    measured = rng.uniform(-1e-4, 1e-4, size=(60, 2))
+    corrected = _transform_xy(truth, measured)
+    corrected[17] += (5e-6, -4e-6)
+
+    result = estimate_affine_transform(
+        [(_sequence_from_xy(measured), _sequence_from_xy(corrected))],
+        num_iterations=200,
+        inlier_threshold_m=1e-8,
+        min_inliers=20,
+        rng=numpy.random.default_rng(3),
+    )
+    pair = result.pairs[0]
+
+    numpy.testing.assert_array_equal(pair.indexes, numpy.arange(60))
+    numpy.testing.assert_allclose(pair.coordinates_xy_m, measured)
+    assert not pair.is_inlier[17]
+    assert numpy.count_nonzero(pair.is_inlier) == pair.num_inliers == 59
+    numpy.testing.assert_allclose(pair.residual_xy_m[pair.is_inlier], 0.0, atol=1e-12)
+    numpy.testing.assert_allclose(pair.residual_xy_m[17], (5e-6, -4e-6), rtol=1e-6)
+
+
+def test_pair_fit_averages_duplicate_indexes() -> None:
+    """Positions sharing a scan index are averaged before fitting, as the matcher pairs them."""
+    truth = AffineTransform(1.01, 0.0, 0.0, 0.0, 1.01, 0.0)
+    rng = numpy.random.default_rng(12)
+    measured = rng.uniform(-1e-4, 1e-4, size=(30, 2))
+    corrected = _transform_xy(truth, measured)
+    jitter = numpy.array([1e-7, -1e-7])
+    measured_points = [
+        ProbePosition(index=i, x_m=float(measured[i, 0]), y_m=float(measured[i, 1]))
+        for i in range(30)
+    ]
+    measured_points.append(
+        ProbePosition(index=0, x_m=float(measured[0, 0] + 2 * jitter[0]), y_m=float(measured[0, 1]))
+    )
+    measured_points[0] = ProbePosition(
+        index=0, x_m=float(measured[0, 0] - 2 * jitter[0]), y_m=float(measured[0, 1])
+    )
+
+    result = estimate_affine_transform(
+        [(ProbePositionSequence(measured_points), _sequence_from_xy(corrected))],
+        num_iterations=100,
+        inlier_threshold_m=1e-9,
+        min_inliers=10,
+        rng=numpy.random.default_rng(0),
+    )
+
+    assert result.pairs[0].num_points == 30
+    numpy.testing.assert_allclose(result.pairs[0].coordinates_xy_m[0], measured[0], atol=1e-18)
+
+
+def test_fit_is_deterministic_for_a_fixed_rng() -> None:
+    rng = numpy.random.default_rng(13)
+    measured = rng.uniform(-1e-4, 1e-4, size=(40, 2))
+    corrected = _transform_xy(AffineTransform(1.03, 0.0, 0.0, 0.0, 0.97, 0.0), measured)
+    corrected[::7] += 3e-6
+    pairs = [(_sequence_from_xy(measured), _sequence_from_xy(corrected))]
+
+    first = estimate_affine_transform(pairs, rng=numpy.random.default_rng(5))
+    second = estimate_affine_transform(pairs, rng=numpy.random.default_rng(5))
+
+    assert first == second
+    numpy.testing.assert_array_equal(first.pairs[0].is_inlier, second.pairs[0].is_inlier)
+
+
 @pytest.mark.parametrize('half_extent_m', [1.0e-4, 1.0e-5, 2.5e-6, 1.0e-7])
 def test_coarse_pass_is_scale_free(half_extent_m: float) -> None:
     """A clean scan fits whatever its physical size.

@@ -33,7 +33,7 @@ class CSVProbeFileWriter(ProbeFileWriter):
         return FileFormat.CSV.extensions
 
     def write(self, file_path: Path, probes: ProbeEnsemble) -> None:
-        array = probes.get_probe_no_opr().get_array()
+        array = probes.get_mean_probe().get_array()
         array_flat = array.reshape(-1, array.shape[-1])
         numpy.savetxt(file_path, array_flat, delimiter=',')
 

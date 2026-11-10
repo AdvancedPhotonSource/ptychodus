@@ -41,7 +41,7 @@ class ProbePropagator:
                 'and discards per-position variation.'
             )
 
-        probe = probes.get_probe_no_opr()
+        probe = probes.get_mean_probe()
 
         logger.info('Computing probe propagation...')
         tic = time.perf_counter()

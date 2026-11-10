@@ -79,7 +79,7 @@ def save_ptychopinn_training_data(
         ycoords_start=ycoords,
         diff3d=diff3d,
         bad_pixels=bad_pixels,
-        probeGuess=parameters.product.probes.get_probe_no_opr().get_array(),
+        probeGuess=parameters.product.probes.get_mean_probe().get_array(),
         objectGuess=parameters.product.object_.get_layer(0),
         scan_index=numpy.zeros(len(parameters.product.probe_positions), dtype=int),
         scale_contract_version='ci_intensity_v2',

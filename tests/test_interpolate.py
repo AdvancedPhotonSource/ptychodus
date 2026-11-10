@@ -5,6 +5,7 @@ from ptychodus.api.interpolate import (
     BarycentricArrayInterpolator,
     interpolate_at_indexes,
     lerp,
+    match_at_indexes,
     resample_complex_at,
     resample_complex_on_grid,
 )
@@ -355,3 +356,42 @@ def test_resample_complex_on_grid_matches_the_scattered_resampler_inside() -> No
         resample_complex_at(field, row_grid, column_grid, order=1),
         atol=1e-12,
     )
+
+
+def test_match_at_indexes_averages_duplicates_like_interpolate_at_indexes() -> None:
+    source = numpy.array([3, 1, 3, 5])
+    values = numpy.array([[2.0, 20.0], [1.0, 10.0], [4.0, 40.0], [5.0, 50.0]])
+    target = numpy.array([5, 3, 1])
+
+    matched_mask, matched = match_at_indexes(source, values, target)
+    interpolated_mask, interpolated = interpolate_at_indexes(source, values, target)
+
+    numpy.testing.assert_array_equal(matched_mask, [True, True, True])
+    numpy.testing.assert_array_equal(matched, [[5.0, 50.0], [3.0, 30.0], [1.0, 10.0]])
+    numpy.testing.assert_array_equal(matched_mask, interpolated_mask)
+    numpy.testing.assert_allclose(matched, interpolated)
+
+
+def test_match_at_indexes_never_imputes_between_or_beyond_anchors() -> None:
+    source = numpy.array([0, 2, 4])
+    values = numpy.array([0.0, 2.0, 4.0])
+    target = numpy.array([1, 2, 3, 6, -1])
+
+    mask, matched = match_at_indexes(source, values, target)
+
+    numpy.testing.assert_array_equal(mask, [False, True, False, False, False])
+    numpy.testing.assert_array_equal(matched, [2.0])
+
+
+def test_match_at_indexes_with_empty_source_matches_nothing() -> None:
+    mask, matched = match_at_indexes(
+        numpy.array([], dtype=numpy.intp), numpy.empty((0, 2)), numpy.array([0, 1])
+    )
+
+    numpy.testing.assert_array_equal(mask, [False, False])
+    assert matched.shape == (0, 2)
+
+
+def test_match_at_indexes_rejects_misaligned_values() -> None:
+    with pytest.raises(ValueError, match='one row of values per source index'):
+        match_at_indexes(numpy.array([0, 1]), numpy.array([1.0]), numpy.array([0]))

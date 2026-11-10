@@ -562,7 +562,7 @@ class TestIncoherentModeDecaySettings:
         settings.incoherent_mode_decay_ratio.set_value(decay_ratio)
 
         probe_seq = _make_builder('disk', settings).build(_StubProbeGeometryProvider())
-        array = probe_seq.get_probe_no_opr().get_array()
+        array = probe_seq.get_mean_probe().get_array()
         powers = numpy.array([numpy.square(numpy.abs(mode)).sum() for mode in array])
         return powers / powers.sum()
 
@@ -634,7 +634,7 @@ class TestKBMirrorProbeBuilder:
             _settings_parameters(settings)['VerticalAcceptanceLengthInMeters'].set_value(
                 acceptance_length_m
             )
-            array = self._build(settings).get_probe_no_opr().get_array()
+            array = self._build(settings).get_mean_probe().get_array()
             cut = numpy.square(numpy.abs(array[0]))[PROBE_EXTENT_PX // 2, :]
             return int(numpy.count_nonzero(cut >= 0.5 * cut.max()))
 
@@ -663,7 +663,7 @@ class TestIncoherentModeStrategySettings:
         settings.incoherent_mode_decay_ratio.set_value(0.5)
 
         probe_seq = _make_builder('disk', settings).build(_StubProbeGeometryProvider())
-        array = probe_seq.get_probe_no_opr().get_array()
+        array = probe_seq.get_mean_probe().get_array()
         powers = numpy.array([numpy.square(numpy.abs(mode)).sum() for mode in array])
         return powers / powers.sum()
 
@@ -1281,7 +1281,7 @@ class TestAveragePatternOptions:
         builder.parameters()['defocus_distance_m'].set_value(2.0e-6)
         builder.parameters()['propagation_distance_m'].set_value(1.0e-6)
 
-        built = builder.build(_provider_with(self._mean_pattern())).get_probe_no_opr().get_array()
+        built = builder.build(_provider_with(self._mean_pattern())).get_mean_probe().get_array()
 
         numpy.testing.assert_allclose(built, self._expected(defocus_distance_m=3.0e-6), atol=1e-9)
 
@@ -1289,7 +1289,7 @@ class TestAveragePatternOptions:
         builder = self._builder()
         provider = _provider_with(self._mean_pattern(), focus_object_distance_m=-2.0e-6)
 
-        built = builder.build(provider).get_probe_no_opr().get_array()
+        built = builder.build(provider).get_mean_probe().get_array()
 
         numpy.testing.assert_allclose(built, self._expected(defocus_distance_m=2.0e-6), atol=1e-9)
 
@@ -1298,13 +1298,13 @@ class TestAveragePatternOptions:
         provider = _provider_with(self._mean_pattern())
 
         numpy.testing.assert_allclose(
-            builder.build(provider).get_probe_no_opr().get_array(), self._expected(), atol=1e-9
+            builder.build(provider).get_mean_probe().get_array(), self._expected(), atol=1e-9
         )
 
         builder.parameters()['bright_field_threshold'].set_value(True)
 
         numpy.testing.assert_allclose(
-            builder.build(provider).get_probe_no_opr().get_array(),
+            builder.build(provider).get_mean_probe().get_array(),
             self._expected(bright_field_mad_threshold=4.5),
             atol=1e-9,
         )
@@ -1320,8 +1320,8 @@ class TestAveragePatternOptions:
         moments_only.get_assembled_data = lambda: None  # type: ignore[method-assign]
 
         numpy.testing.assert_array_equal(
-            self._builder().build(moments_only).get_probe_no_opr().get_array(),
-            self._builder().build(with_data).get_probe_no_opr().get_array(),
+            self._builder().build(moments_only).get_mean_probe().get_array(),
+            self._builder().build(with_data).get_mean_probe().get_array(),
         )
 
     def test_a_copy_builds_from_the_data_of_the_product_it_is_in(self) -> None:
@@ -1329,8 +1329,8 @@ class TestAveragePatternOptions:
         copy = original.copy()
         other_pattern = 2.0 * self._mean_pattern()
 
-        built = copy.build(_provider_with(other_pattern)).get_probe_no_opr().get_array()
-        expected = original.build(_provider_with(other_pattern)).get_probe_no_opr().get_array()
+        built = copy.build(_provider_with(other_pattern)).get_mean_probe().get_array()
+        expected = original.build(_provider_with(other_pattern)).get_mean_probe().get_array()
 
         numpy.testing.assert_allclose(built, expected, atol=1e-9)
 

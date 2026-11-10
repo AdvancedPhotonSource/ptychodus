@@ -30,6 +30,7 @@ from matplotlib.figure import Figure
 
 from ptychodus.api.probe import OPRWeightPolicy
 
+from .dashboard import DashboardDialog, MetricsGroupView, MetricsTableView, PlotView
 from .image import ImageView, box_image_view
 from .visualization import VisualizationParametersView, VisualizationWidget
 from .widgets import DecimalLineEdit
@@ -636,63 +637,142 @@ class IlluminationDialog(QDialog):
         self.setLayout(layout)
 
 
-class ProbeOverlapMetricsView(QGroupBox):
-    """How densely the scan's probe footprints tile the illuminated region.
+class ProbeMetricsDialog(DashboardDialog):
+    """Everything one probe says about itself and about its scan's overlap."""
 
-    Redundancy and the equivalent linear overlap answer "is this scan dense enough";
-    the pairwise rows answer "is any single position weakly constrained", which the
-    global figures average away.
-    """
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Metrics', parent)
-        self.areal_redundancy_label = QLabel('—')
-        self.equivalent_linear_overlap_label = QLabel('—')
-        self.effective_probe_diameter_label = QLabel('—')
-        self.effective_step_size_label = QLabel('—')
-        self.mean_pairwise_overlap_label = QLabel('—')
-        self.median_pairwise_overlap_label = QLabel('—')
-        self.minimum_pairwise_overlap_label = QLabel('—')
-        self.maximum_pairwise_overlap_label = QLabel('—')
-        self.num_positions_label = QLabel('—')
-
-        self.minimum_pairwise_overlap_label.setToolTip(
-            'A value near zero marks a scan position that no neighbor overlaps'
-        )
-
-        layout = QFormLayout()
-        layout.addRow('Areal Redundancy:', self.areal_redundancy_label)
-        layout.addRow('Equivalent Linear Overlap [%]:', self.equivalent_linear_overlap_label)
-        layout.addRow('Effective Probe Diameter [nm]:', self.effective_probe_diameter_label)
-        layout.addRow('Effective Step Size [nm]:', self.effective_step_size_label)
-        layout.addRow('Pairwise Overlap Mean:', self.mean_pairwise_overlap_label)
-        layout.addRow('Pairwise Overlap Median:', self.median_pairwise_overlap_label)
-        layout.addRow('Pairwise Overlap Minimum:', self.minimum_pairwise_overlap_label)
-        layout.addRow('Pairwise Overlap Maximum:', self.maximum_pairwise_overlap_label)
-        layout.addRow('Number of Positions:', self.num_positions_label)
-        self.setLayout(layout)
-
-
-class ProbeOverlapDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.visualization_widget = VisualizationWidget('Redundancy')
-        self.metrics_view = ProbeOverlapMetricsView()
+        self.product_combo_box = QComboBox()
+        self.inputs_layout.addRow('Product:', self.product_combo_box)
+
+        self.size_group = MetricsGroupView('Size')
+        self.major_axis_tilt_label = self.size_group.add_row('Major Axis Tilt [deg]')
+        self.fwhm_major_label = self.size_group.add_row('FWHM Major Axis [nm]')
+        self.fwhm_minor_label = self.size_group.add_row('FWHM Minor Axis [nm]')
+        self.rms_major_label = self.size_group.add_row('RMS Major Axis [nm]')
+        self.rms_minor_label = self.size_group.add_row('RMS Minor Axis [nm]')
+        self.encircled_energy_label = self.size_group.add_row(
+            'Encircled Energy Diameter [nm]', 'Diameter holding 80% of the intensity'
+        )
+
+        self.entropy_group = MetricsGroupView('Intensity Entropy')
+        self.real_space_entropy_label = self.entropy_group.add_row(
+            'Real Space [norm]', 'Normalized Shannon entropy of the incoherent intensity'
+        )
+        self.spectral_entropy_label = self.entropy_group.add_row(
+            'Spectral [norm]', 'Normalized Shannon entropy of the power spectrum'
+        )
+
+        self.modes_group = MetricsGroupView('Modes')
+        self.num_modes_label = self.modes_group.add_row('Incoherent Modes')
+        self.purity_label = self.modes_group.add_row(
+            'Purity', 'Sum of squared orthogonal-mode power fractions; 1 for a coherent probe'
+        )
+        self.von_neumann_entropy_label = self.modes_group.add_row(
+            'Von Neumann Entropy [nats]', 'Entropy of the orthogonal-mode power fractions'
+        )
+        self.effective_mode_count_label = self.modes_group.add_row(
+            'Effective Mode Count', 'Number of equal modes with the same entropy'
+        )
+
+        self.overlap_group = MetricsGroupView('Overlap')
+        self.areal_redundancy_label = self.overlap_group.add_row('Areal Redundancy')
+        self.equivalent_linear_overlap_label = self.overlap_group.add_row(
+            'Equivalent Linear Overlap [%]'
+        )
+        self.effective_probe_diameter_label = self.overlap_group.add_row(
+            'Effective Probe Diameter [nm]'
+        )
+        self.effective_step_size_label = self.overlap_group.add_row('Effective Step Size [nm]')
+        self.mean_pairwise_overlap_label = self.overlap_group.add_row('Pairwise Overlap Mean')
+        self.median_pairwise_overlap_label = self.overlap_group.add_row('Pairwise Overlap Median')
+        self.minimum_pairwise_overlap_label = self.overlap_group.add_row(
+            'Pairwise Overlap Minimum',
+            'A value near zero marks a scan position that no neighbor overlaps',
+        )
+        self.maximum_pairwise_overlap_label = self.overlap_group.add_row('Pairwise Overlap Maximum')
+        self.num_positions_label = self.overlap_group.add_row('Number of Positions')
+
         self.visualization_parameters_view = VisualizationParametersView()
-        self.save_button = QPushButton('Save')
-        self.status_bar = QStatusBar()
 
-        parameter_layout = QVBoxLayout()
-        parameter_layout.addWidget(self.metrics_view)
-        parameter_layout.addWidget(self.visualization_parameters_view)
-        parameter_layout.addWidget(self.save_button)
-        parameter_layout.addStretch()
+        for group in (self.size_group, self.entropy_group, self.modes_group, self.overlap_group):
+            self.numbers_layout.addWidget(group)
 
-        contents_layout = QHBoxLayout()
-        contents_layout.addWidget(self.visualization_widget, 1)
-        contents_layout.addLayout(parameter_layout)
+        self.numbers_layout.addWidget(self.visualization_parameters_view)
+        self.finish_numbers()
 
-        layout = QVBoxLayout()
-        layout.addLayout(contents_layout)
-        layout.addWidget(self.status_bar)
-        self.setLayout(layout)
+        self.modes_widget = VisualizationWidget('Orthogonal Modes')
+        self.redundancy_widget = VisualizationWidget('Redundancy')
+        self.images_layout.addWidget(self.modes_widget, 0, 0)
+        self.images_layout.addWidget(self.redundancy_widget, 0, 1)
+
+        self.spectrum_plot_view = PlotView()
+        self.plots_layout.addWidget(self.spectrum_plot_view)
+
+
+class ProbeCompareDialog(DashboardDialog):
+    """How a test probe agrees with a reference probe."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.reference_combo_box = QComboBox()
+        self.test_combo_box = QComboBox()
+        self.inputs_layout.addRow('Reference:', self.reference_combo_box)
+        self.inputs_layout.addRow('Test:', self.test_combo_box)
+
+        self.registration_group = MetricsGroupView('Registration')
+        self.fidelity_label = self.registration_group.add_row(
+            'Fidelity', 'Mixed-state fidelity; 1 for identical states'
+        )
+        self.rms_error_label = self.registration_group.add_row(
+            'Normalized RMS Error', 'Mixed-state RMS error, normalized by the reference power'
+        )
+        self.probe_shift_x_label = self.registration_group.add_row('Probe Shift X [px]')
+        self.probe_shift_y_label = self.registration_group.add_row('Probe Shift Y [px]')
+        self.object_shift_x_label = self.registration_group.add_row('Object Shift X [px]')
+        self.object_shift_y_label = self.registration_group.add_row('Object Shift Y [px]')
+        shift_tooltip = (
+            'When the reconstructions share their scan positions, the probe and object '
+            'shifts agree. A large difference means they disagree about the positions.'
+        )
+        self.shift_difference_x_label = self.registration_group.add_row(
+            'Probe − Object Shift X [px]', shift_tooltip
+        )
+        self.shift_difference_y_label = self.registration_group.add_row(
+            'Probe − Object Shift Y [px]', shift_tooltip
+        )
+        self.resampled_label = self.registration_group.add_row('Test Resampled')
+
+        self.profile_group = QGroupBox('Probes')
+        self.profile_table_view = MetricsTableView(['Reference', 'Test', 'Δ'])
+        profile_layout = QVBoxLayout()
+        profile_layout.addWidget(self.profile_table_view)
+        self.profile_group.setLayout(profile_layout)
+
+        self.pixelwise_group = QGroupBox('Pixelwise Agreement')
+        self.pixelwise_table_view = MetricsTableView(['Amplitude', 'Phase'])
+        self.pixelwise_table_view.setToolTip(
+            'Amplitude compares the square roots of the incoherent intensities; phase compares '
+            'the phase-aligned top orthogonal modes where the reference rises above its noise floor.'
+        )
+        pixelwise_layout = QVBoxLayout()
+        pixelwise_layout.addWidget(self.pixelwise_table_view)
+        self.pixelwise_group.setLayout(pixelwise_layout)
+
+        self.visualization_parameters_view = VisualizationParametersView()
+
+        self.numbers_layout.addWidget(self.registration_group)
+        self.numbers_layout.addWidget(self.profile_group)
+        self.numbers_layout.addWidget(self.pixelwise_group)
+        self.numbers_layout.addWidget(self.visualization_parameters_view)
+        self.finish_numbers()
+
+        self.reference_widget = VisualizationWidget('Reference Top Mode')
+        self.test_widget = VisualizationWidget('Test Top Mode')
+        self.difference_widget = VisualizationWidget('Difference')
+        self.images_layout.addWidget(self.reference_widget, 0, 0)
+        self.images_layout.addWidget(self.test_widget, 0, 1)
+        self.images_layout.addWidget(self.difference_widget, 0, 2)
+
+        self.spectrum_plot_view = PlotView()
+        self.plots_layout.addWidget(self.spectrum_plot_view)

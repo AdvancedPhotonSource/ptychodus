@@ -446,7 +446,7 @@ def create_mcp_server() -> FastMCP:
         await _ensure_row_exists(ResourceKind.PRODUCT, target)
         path = _resolve_resource_file(ResourceKind.PRODUCT, target, 'product.h5')
         product = load_product(path)
-        probe = product.probes.get_probe_no_opr()
+        probe = product.probes.get_mean_probe()
         if not 0 <= incoherent < probe.num_incoherent_modes:
             raise ToolError(
                 f'incoherent mode {incoherent} out of range [0, {probe.num_incoherent_modes})'
@@ -480,7 +480,7 @@ def create_mcp_server() -> FastMCP:
         await _ensure_row_exists(ResourceKind.PRODUCT, target)
         path = _resolve_resource_file(ResourceKind.PRODUCT, target, 'product.h5')
         product = load_product(path)
-        probe = product.probes.get_probe_no_opr()
+        probe = product.probes.get_mean_probe()
         params = _coerce_render_params_or_error(
             colormap, transform, component, color_model, value_min, value_max, clip
         )

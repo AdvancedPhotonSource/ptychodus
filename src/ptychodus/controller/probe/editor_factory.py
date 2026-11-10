@@ -8,8 +8,6 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QRadioButton,
     QStackedWidget,
-    QTableView,
-    QVBoxLayout,
     QWidget,
 )
 
@@ -36,7 +34,6 @@ from ..parameters import (
     ParameterViewController,
     create_parameter_view_controller,
 )
-from .metrics import ProbeMetricsTableModel
 
 __all__ = [
     'ProbeEditorViewControllerFactory',
@@ -234,44 +231,6 @@ class LabelViewController(ParameterViewController):
         return self._widget
 
 
-class ProbeMetricsViewController(ParameterViewController, Observer):
-    def __init__(self, title: str, probe_item: ProbeRepositoryItem) -> None:
-        super().__init__()
-        self._probe_item = probe_item
-        self._widget = QGroupBox(title)
-        self._table_model = ProbeMetricsTableModel()
-        self._table_view = QTableView()
-        self._table_view.setModel(self._table_model)
-
-        vertical_header = self._table_view.verticalHeader()
-        if vertical_header is not None:
-            vertical_header.hide()
-
-        header = self._table_view.horizontalHeader()
-        header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
-
-        layout = QVBoxLayout()
-        layout.addWidget(self._table_view)
-        self._widget.setLayout(layout)
-
-        self._refresh_metrics()
-        probe_item.add_observer(self)
-
-    def get_widget(self) -> QWidget:
-        return self._widget
-
-    def _refresh_metrics(self) -> None:
-        metrics = self._probe_item.get_size_metrics()
-        self._table_model.set_metrics(metrics)
-        entropy_metrics = self._probe_item.get_entropy_metrics()
-        self._table_model.set_entropy_metrics(entropy_metrics)
-        self._table_view.resizeRowsToContents()
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._probe_item:
-            self._refresh_metrics()
-
-
 class EstimateSizeViewController(ParameterViewController):
     """A button that sets a parametric probe's size from the measured patterns."""
 
@@ -431,7 +390,6 @@ class ProbeEditorViewControllerFactory:
         title = f'{item_name} [{builder_name}]'
 
         dialog_builder = ParameterViewBuilder()
-        dialog_builder.add_view_controller_to_top(ProbeMetricsViewController('Probe Metrics', item))
 
         # A from-file probe is conditioned on the way in, so the mode parameters
         # do something and belong in the dialog. A from-memory probe holds an
