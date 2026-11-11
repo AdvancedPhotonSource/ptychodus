@@ -35,6 +35,11 @@ class IntensityMoments:
     covariance_yy_px2: RealArrayType
 
 
+def _nan_where_empty(moment: RealArrayType, positive: BooleanArrayType) -> RealArrayType:
+    """*moment* where its image holds intensity, NaN where it holds none."""
+    return numpy.where(positive, moment, numpy.nan)
+
+
 def compute_intensity_moments(
     intensity: NumberArrayType, *, bad_pixels: BooleanArrayType | None = None
 ) -> IntensityMoments:
@@ -69,16 +74,13 @@ def compute_intensity_moments(
     covariance_xy_px2 = numpy.sum(weights * deviation_x_px * deviation_y_px, axis=(-2, -1))
     covariance_yy_px2 = numpy.sum(weights * numpy.square(deviation_y_px), axis=(-2, -1))
 
-    def _defined(moment: RealArrayType) -> RealArrayType:
-        return numpy.where(positive, moment, numpy.nan)
-
     return IntensityMoments(
         total=total,
-        centroid_x_px=_defined(centroid_x_px),
-        centroid_y_px=_defined(centroid_y_px),
-        covariance_xx_px2=_defined(covariance_xx_px2 / safe_total),
-        covariance_xy_px2=_defined(covariance_xy_px2 / safe_total),
-        covariance_yy_px2=_defined(covariance_yy_px2 / safe_total),
+        centroid_x_px=_nan_where_empty(centroid_x_px, positive),
+        centroid_y_px=_nan_where_empty(centroid_y_px, positive),
+        covariance_xx_px2=_nan_where_empty(covariance_xx_px2 / safe_total, positive),
+        covariance_xy_px2=_nan_where_empty(covariance_xy_px2 / safe_total, positive),
+        covariance_yy_px2=_nan_where_empty(covariance_yy_px2 / safe_total, positive),
     )
 
 

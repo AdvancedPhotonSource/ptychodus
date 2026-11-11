@@ -236,6 +236,15 @@ def _projected_fwhm(
     return float(right_x - left_x)
 
 
+def _compute_axis_tilt_rad(axis: RealArrayType) -> float:
+    """The angle of *axis* from the x axis, folded into ``[-pi/2, pi/2)``.
+
+    An eigenvector's direction is sign-ambiguous, so its angle is only defined modulo pi.
+    """
+    angle = numpy.arctan2(axis[1], axis[0])
+    return float((angle + PI / 2.0) % PI - PI / 2.0)
+
+
 def estimate_probe_size(
     probe_intensity: RealArrayType,
     pixel_geometry: PixelGeometry,
@@ -352,13 +361,8 @@ def estimate_probe_size(
     minor_axis = eigenvectors[:, 0]
     major_axis = eigenvectors[:, 1]
 
-    def _axis_tilt(axis: RealArrayType) -> float:
-        # axis direction is sign-ambiguous; fold the angle into [-pi/2, pi/2)
-        angle = numpy.arctan2(axis[1], axis[0])
-        return float((angle + PI / 2.0) % PI - PI / 2.0)
-
-    major_tilt = _axis_tilt(major_axis)
-    minor_tilt = _axis_tilt(minor_axis)
+    major_tilt = _compute_axis_tilt_rad(major_axis)
+    minor_tilt = _compute_axis_tilt_rad(minor_axis)
 
     num_bins = max(height_px, width_px)
     projection_major = dx * major_axis[0] + dy * major_axis[1]

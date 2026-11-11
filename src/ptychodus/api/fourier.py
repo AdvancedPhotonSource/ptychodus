@@ -5,7 +5,7 @@ import numpy
 
 from .constants import TWO_PI_J
 from .geometry import PixelGeometry
-from .typing import ComplexArrayType
+from .typing import ComplexArrayType, RealArrayType
 
 
 def fourier_gradient(
@@ -28,14 +28,21 @@ def fourier_gradient(
     return grad_y, grad_x
 
 
-def fourier_shift_2d(array: ComplexArrayType, dx: float, dy: float) -> ComplexArrayType:
+def fourier_shift_2d(
+    array: ComplexArrayType, dx: float | RealArrayType, dy: float | RealArrayType
+) -> ComplexArrayType:
     """Translate the last two axes of ``array`` by ``(dx, dy)`` pixels via
     a Fourier phase ramp. Subpixel shifts are exact for bandlimited signals; positive
     shifts move features toward larger x/y indices. Leading axes are treated as a
-    batch dimension. The output preserves the input's dtype."""
+    batch dimension. The output preserves the input's dtype.
+
+    Array-valued shifts give each batch member its own: shaped like the leading axes
+    with two trailing singleton axes, ``(n, 1, 1)`` for an ``(n, H, W)`` stack, they
+    broadcast against the frame."""
     height_px, width_px = array.shape[-2:]
     fy = fftfreq(height_px).reshape(-1, 1)
     fx = fftfreq(width_px)
-    phase = numpy.exp(-TWO_PI_J * (fy * dy + fx * dx))
+    # Separable, so two one-dimensional exponentials replace one over every pixel.
+    phase = numpy.exp(-TWO_PI_J * fy * dy) * numpy.exp(-TWO_PI_J * fx * dx)
     shifted = ifft2(fft2(array, axes=(-2, -1)) * phase, axes=(-2, -1))
     return shifted.astype(array.dtype)

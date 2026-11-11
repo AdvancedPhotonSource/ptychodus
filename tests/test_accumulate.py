@@ -29,6 +29,7 @@ from ptychodus.api.accumulate import (
     DiffractionMomentAccumulator,
     DiffractionMoments,
     compute_diffraction_moments,
+    compute_i0_scale,
     estimate_incident_beam,
     iterate_diffraction_moments,
 )
@@ -401,6 +402,22 @@ def test_i0_removes_a_beam_decay(caplog: pytest.LogCaptureFixture) -> None:
     assert partial.total_counts[3] == moments.total_counts[3]
     assert partial.total_counts[9] == moments.total_counts[9]
     assert any('2 I0 readings' in record.message for record in caplog.records)
+
+
+def test_the_i0_scale_is_the_factor_the_totals_take() -> None:
+    moments = _accumulate(numpy.arange(6), _patterns(6), chunk_size=4, step=6)
+    # Index 2 reads zero, index 4 is not finite and index 5 has no reading at all.
+    i0_indexes = numpy.array([4, 3, 2, 1, 0])
+    i0_counts = numpy.array([numpy.nan, 4.0, 0.0, 2.0, 1.0])
+
+    scale = compute_i0_scale(moments.indexes, i0_indexes, i0_counts)
+
+    numpy.testing.assert_allclose(
+        moments.normalize_by_i0(i0_indexes, i0_counts).total_counts,
+        moments.total_counts * scale,
+    )
+    expected = {0: 7.0 / 3.0, 1: 7.0 / 6.0, 2: 1.0, 3: 7.0 / 12.0, 4: 1.0, 5: 1.0}
+    numpy.testing.assert_allclose(scale, [expected[int(index)] for index in moments.indexes])
 
 
 def test_i0_indexes_must_be_unique() -> None:

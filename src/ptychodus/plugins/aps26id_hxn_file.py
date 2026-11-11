@@ -124,6 +124,21 @@ def _find_mda(directory: Path, scan: int) -> Path | None:
     return None
 
 
+def _read_mda_channel_median(
+    mda_file: MDAFile, mda_path: Path, name: str, scale: float = 1.0
+) -> float | None:
+    """The median of the MDA detector channel *name*, times *scale*; None when unrecorded."""
+    values = read_detector_channel(mda_file, name)
+
+    if values is None or values.size == 0:
+        logger.debug(f'"{mda_path}" records no {name}.')
+        return None
+
+    value = float(numpy.median(values)) * scale
+    logger.debug(f'{name} = {value} from "{mda_path}".')
+    return value
+
+
 def _read_mda_metadata(directory: Path, scan: int) -> _ScanMetadata:
     """The energy and detector distance the scan's MDA records, each None when absent."""
     mda_path = _find_mda(directory, scan)
@@ -137,41 +152,37 @@ def _read_mda_metadata(directory: Path, scan: int) -> _ScanMetadata:
         logger.warning(f'Failed to read "{mda_path}"; the scan metadata is left unset: {exc}')
         return _ScanMetadata()
 
-    def median(name: str, scale: float = 1.0) -> float | None:
-        values = read_detector_channel(mda_file, name)
-
-        if values is None or values.size == 0:
-            logger.debug(f'"{mda_path}" records no {name}.')
-            return None
-
-        value = float(numpy.median(values)) * scale
-        logger.debug(f'{name} = {value} from "{mda_path}".')
-        return value
-
     return _ScanMetadata(
-        photon_energy_eV=median('26idbDCM:sm8.RBV'),
-        detector_distance_m=median('26idcSOFT:sm5.RBV', _METERS_PER_MILLIMETER),
+        photon_energy_eV=_read_mda_channel_median(mda_file, mda_path, '26idbDCM:sm8.RBV'),
+        detector_distance_m=_read_mda_channel_median(
+            mda_file, mda_path, '26idcSOFT:sm5.RBV', _METERS_PER_MILLIMETER
+        ),
     )
+
+
+def _read_snapshot_scalar(h5_file: h5py.File, path: str, scale: float = 1.0) -> float | None:
+    """The scalar dataset at *path*, times *scale*; None when absent or not one value."""
+    item = h5_file.get(path)
+
+    if not isinstance(item, h5py.Dataset) or item.size != 1:
+        logger.debug(f'"{h5_file.filename}" records no {path}.')
+        return None
+
+    value = float(numpy.squeeze(item[()])) * scale
+    logger.debug(f'{path} = {value} from "{h5_file.filename}".')
+    return value
 
 
 def _read_snapshot_metadata(h5_file: h5py.File) -> _ScanMetadata:
     """The energy, detector distance and exposure an HDF5 instrument snapshot records."""
-
-    def scalar(path: str, scale: float = 1.0) -> float | None:
-        item = h5_file.get(path)
-
-        if not isinstance(item, h5py.Dataset) or item.size != 1:
-            logger.debug(f'"{h5_file.filename}" records no {path}.')
-            return None
-
-        value = float(numpy.squeeze(item[()])) * scale
-        logger.debug(f'{path} = {value} from "{h5_file.filename}".')
-        return value
-
     return _ScanMetadata(
-        photon_energy_eV=scalar('/entry/instrument/26-ID-B/Channel Cut Energy'),
-        detector_distance_m=scalar('/entry/instrument/26-ID-C/Det R', _METERS_PER_MILLIMETER),
-        exposure_time_s=scalar('/entry/instrument/26-ID-C/count_time'),
+        photon_energy_eV=_read_snapshot_scalar(
+            h5_file, '/entry/instrument/26-ID-B/Channel Cut Energy'
+        ),
+        detector_distance_m=_read_snapshot_scalar(
+            h5_file, '/entry/instrument/26-ID-C/Det R', _METERS_PER_MILLIMETER
+        ),
+        exposure_time_s=_read_snapshot_scalar(h5_file, '/entry/instrument/26-ID-C/count_time'),
     )
 
 

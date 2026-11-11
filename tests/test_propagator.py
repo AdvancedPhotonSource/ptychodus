@@ -1,5 +1,6 @@
 """Unit tests for wavefield propagators in ptychodus.api.propagate."""
 
+from collections.abc import Callable
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from ptychodus.api.propagate import (
     FresnelTransformPropagator,
     PropagatedWavefield,
     ProductGeometry,
+    Propagator,
     PropagatorParameters,
     choose_propagator,
     compute_far_field_pixel_geometry,
@@ -1909,3 +1911,29 @@ class TestComputeProductGeometryMagnificationInvariance:
         ).detector_numerical_aperture
 
         assert with_optic == without_optic
+
+
+@pytest.mark.parametrize(
+    'propagator_type',
+    [
+        AngularSpectrumPropagator,
+        FresnelTransferFunctionPropagator,
+        FresnelTransformPropagator,
+        FraunhoferPropagator,
+    ],
+)
+@pytest.mark.parametrize('distance_m', [0.1, -0.1])
+def test_a_batch_propagates_frame_by_frame(
+    propagator_type: Callable[[PropagatorParameters], Propagator], distance_m: float
+) -> None:
+    params = _make_params(distance_m, width_px=32, height_px=25)
+    rng = numpy.random.default_rng(3)
+    batch = rng.standard_normal((2, 3, 25, 32)) + 1j * rng.standard_normal((2, 3, 25, 32))
+    propagator = propagator_type(params)
+
+    propagated = propagator.propagate(batch)
+
+    for index in numpy.ndindex(*batch.shape[:2]):
+        numpy.testing.assert_allclose(
+            propagated[index], propagator.propagate(batch[index]), atol=1e-12
+        )

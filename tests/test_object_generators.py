@@ -226,8 +226,8 @@ def test_exactly_the_phase_retrievals_read_the_data_and_the_probe(
     }
     reading_probe = {p.simple_name for p in registry.object_generators if p.strategy.reads_probe}
 
-    assert reading_data == {'paganin', 'stxm_dpc'}
-    assert reading_probe == {'paganin', 'stxm_dpc'}
+    assert reading_data == {'paganin', 'spectral', 'stxm_dpc'}
+    assert reading_probe == {'paganin', 'spectral', 'stxm_dpc'}
 
 
 def test_a_builder_that_reads_data_needs_data(registry: PluginRegistry) -> None:

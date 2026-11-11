@@ -11,14 +11,19 @@ from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.interpolate import BarycentricArrayInterpolator
 from ptychodus.api.object import Object, ObjectCenter, compute_object_geometry
 from ptychodus.api.patch import (
+    accumulate_patches_on,
     accumulate_probe_intensity,
     accumulate_probe_intensity_on,
+    compute_patch_pixel_indexes,
     iter_probe_patches,
     iter_probe_patches_on,
+    resolve_probe_patch_bounds_on,
+    shift_probe_onto_patches,
 )
-from ptychodus.api.probe import ProbeGeometry, ProbeEnsemble
+from ptychodus.api.probe import PatchBounds, ProbeEnsemble, ProbeGeometry
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
+from ptychodus.api.typing import ComplexArrayType, RealArrayType
 
 _PIXEL_SIZE_M = 1.0e-7
 _PROBE_PX = 6
@@ -313,4 +318,90 @@ def test_the_unpacked_forms_equal_the_product_forms() -> None:
             product.probes, product.probe_positions, geometry, weights=weights
         ),
         accumulate_probe_intensity(product, weights=weights),
+    )
+
+
+def test_resolved_bounds_are_those_the_patches_carry() -> None:
+    product = _make_product(_SUBPIXEL)
+
+    bounds = resolve_probe_patch_bounds_on(
+        product.probes.get_geometry(), product.probe_positions, product.object_.get_geometry()
+    )
+
+    assert bounds == [patch.bounds for patch in iter_probe_patches(product)]
+
+
+def test_resolving_bounds_raises_for_a_position_off_the_canvas() -> None:
+    product = _make_product([(1.0, 12.0)])
+
+    with pytest.raises(ValueError, match='falls outside the object canvas'):
+        resolve_probe_patch_bounds_on(
+            product.probes.get_geometry(),
+            product.probe_positions,
+            product.object_.get_geometry(),
+        )
+
+
+def _resolved_bounds(product: Product) -> list[PatchBounds]:
+    return resolve_probe_patch_bounds_on(
+        product.probes.get_geometry(), product.probe_positions, product.object_.get_geometry()
+    )
+
+
+def test_shifting_onto_every_patch_at_once_matches_one_at_a_time() -> None:
+    product = _make_product(_SUBPIXEL, num_modes=2)
+
+    shifted = shift_probe_onto_patches(product.probes.get_array()[0], _resolved_bounds(product))
+
+    expected = numpy.stack([patch.modes for patch in iter_probe_patches(product)])
+    numpy.testing.assert_allclose(shifted, expected, atol=1e-12)
+
+
+def test_pixel_indexes_gather_what_the_bounds_slice() -> None:
+    product = _make_product(_SUBPIXEL)
+    canvas = product.object_.get_layer(0)
+    bounds = _resolved_bounds(product)
+
+    indexes = compute_patch_pixel_indexes(bounds, product.object_.get_geometry())
+
+    for gathered, placement in zip(canvas.ravel()[indexes], bounds):
+        numpy.testing.assert_array_equal(gathered, canvas[placement.y_slice, placement.x_slice])
+
+
+@pytest.mark.parametrize('complex_valued', [False, True])
+def test_accumulated_patches_match_a_per_patch_loop(complex_valued: bool) -> None:
+    product = _make_product(_SUBPIXEL)
+    geometry = product.object_.get_geometry()
+    bounds = _resolved_bounds(product)
+    rng = numpy.random.default_rng(8)
+    shape = (len(bounds), _PROBE_PX, _PROBE_PX)
+    real = rng.standard_normal(shape)
+    patches: RealArrayType | ComplexArrayType = (
+        real + 1j * rng.standard_normal(shape) if complex_valued else real
+    )
+
+    canvas = accumulate_patches_on(patches, compute_patch_pixel_indexes(bounds, geometry), geometry)
+
+    expected = numpy.zeros_like(canvas)
+
+    for patch, placement in zip(patches, bounds):
+        expected[placement.y_slice, placement.x_slice] += patch
+
+    numpy.testing.assert_allclose(canvas, expected, atol=1e-12)
+    assert numpy.iscomplexobj(canvas) == numpy.iscomplexobj(patches)
+
+
+def test_accumulated_intensities_are_the_illumination() -> None:
+    product = _make_product(_SUBPIXEL, num_modes=2)
+    geometry = product.object_.get_geometry()
+    bounds = _resolved_bounds(product)
+    intensities = numpy.sum(
+        numpy.square(numpy.abs(shift_probe_onto_patches(product.probes.get_array()[0], bounds))),
+        axis=1,
+    )
+
+    numpy.testing.assert_allclose(
+        accumulate_patches_on(intensities, compute_patch_pixel_indexes(bounds, geometry), geometry),
+        accumulate_probe_intensity(product),
+        atol=1e-12,
     )

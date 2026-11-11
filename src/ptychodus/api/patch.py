@@ -29,22 +29,27 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
+from typing import overload
 
 import numpy
 
 from .fourier import fourier_shift_2d
 from .object import ObjectGeometry
-from .probe import PatchBounds, ProbeEnsemble
+from .probe import PatchBounds, ProbeEnsemble, ProbeGeometry
 from .probe_positions import ProbePosition
 from .product import Product
-from .typing import ComplexArrayType, RealArrayType
+from .typing import ComplexArrayType, IntegerArrayType, RealArrayType
 
 __all__ = [
     'ProbePatch',
+    'accumulate_patches_on',
     'accumulate_probe_intensity',
     'accumulate_probe_intensity_on',
+    'compute_patch_pixel_indexes',
     'iter_probe_patches',
     'iter_probe_patches_on',
+    'resolve_probe_patch_bounds_on',
+    'shift_probe_onto_patches',
 ]
 
 
@@ -86,6 +91,113 @@ def _validate_patch_bounds(bounds: PatchBounds, geometry: ObjectGeometry, index:
         )
 
 
+def _resolve_patch_bounds(
+    probe_geometry: ProbeGeometry, scan_point: ProbePosition, object_geometry: ObjectGeometry
+) -> PatchBounds:
+    object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
+    bounds = probe_geometry.resolve_patch_bounds(object_point.x_px, object_point.y_px)
+    _validate_patch_bounds(bounds, object_geometry, scan_point.index)
+    return bounds
+
+
+def resolve_probe_patch_bounds_on(
+    probe_geometry: ProbeGeometry,
+    positions: Sequence[ProbePosition],
+    object_geometry: ObjectGeometry,
+) -> list[PatchBounds]:
+    """Return the object-canvas placement of every scan position, in order.
+
+    The placement :func:`iter_probe_patches_on` yields, without shifting a probe: each
+    bounds holds exact-width integer slices and the sub-pixel residual a Fourier shift
+    of the probe must apply.
+
+    Raises:
+        ValueError: for a position whose footprint leaves the canvas.
+    """
+    return [_resolve_patch_bounds(probe_geometry, point, object_geometry) for point in positions]
+
+
+def shift_probe_onto_patches(
+    probe_modes: ComplexArrayType, bounds: Sequence[PatchBounds]
+) -> ComplexArrayType:
+    """Return the probe shifted onto every placement at once, ``(n, modes, height, width)``.
+
+    Each placement's modes carry its sub-pixel residual, as :func:`iter_probe_patches_on`
+    shifts them one position at a time; *probe_modes* is ``(modes, height, width)``.
+    """
+    dx = numpy.array([placement.dx for placement in bounds])[:, None, None, None]
+    dy = numpy.array([placement.dy for placement in bounds])[:, None, None, None]
+    return fourier_shift_2d(probe_modes[numpy.newaxis], dx, dy)
+
+
+def compute_patch_pixel_indexes(
+    bounds: Sequence[PatchBounds], object_geometry: ObjectGeometry
+) -> IntegerArrayType:
+    """Return the row-major canvas index of every patch pixel, ``(n, height, width)``.
+
+    ``canvas.ravel()[indexes]`` gathers every patch at once, and
+    :func:`accumulate_patches_on` scatters patches back. The bounds must share one
+    extent, as those of one probe do.
+    """
+    if not bounds:
+        return numpy.zeros((0, 0, 0), dtype=numpy.intp)
+
+    first = bounds[0]
+    height_px = first.y_slice.stop - first.y_slice.start
+    width_px = first.x_slice.stop - first.x_slice.start
+    starts = numpy.array(
+        [
+            placement.y_slice.start * object_geometry.width_px + placement.x_slice.start
+            for placement in bounds
+        ],
+        dtype=numpy.intp,
+    )
+    offsets = (
+        numpy.arange(height_px, dtype=numpy.intp)[:, None] * object_geometry.width_px
+        + numpy.arange(width_px, dtype=numpy.intp)[None, :]
+    )
+    return starts[:, None, None] + offsets
+
+
+@overload
+def accumulate_patches_on(
+    patches: RealArrayType, pixel_indexes: IntegerArrayType, object_geometry: ObjectGeometry
+) -> RealArrayType: ...
+
+
+@overload
+def accumulate_patches_on(
+    patches: ComplexArrayType, pixel_indexes: IntegerArrayType, object_geometry: ObjectGeometry
+) -> ComplexArrayType: ...
+
+
+def accumulate_patches_on(
+    patches: RealArrayType | ComplexArrayType,
+    pixel_indexes: IntegerArrayType,
+    object_geometry: ObjectGeometry,
+) -> RealArrayType | ComplexArrayType:
+    """Sum *patches* onto a zero canvas at *pixel_indexes*, ``(height_px, width_px)``.
+
+    The scatter that undoes the gather :func:`compute_patch_pixel_indexes` describes:
+    overlapping pixels add. Real patches give a float64 canvas, complex ones complex128.
+    """
+    num_pixels = object_geometry.height_px * object_geometry.width_px
+    flat_indexes = pixel_indexes.ravel()
+    flat_patches = patches.ravel()
+    # Weighted, bincount sums in float64; the stubs promise only its unweighted counts.
+    real = numpy.asarray(
+        numpy.bincount(flat_indexes, weights=flat_patches.real, minlength=num_pixels),
+        dtype=numpy.float64,
+    )
+    canvas_shape = (object_geometry.height_px, object_geometry.width_px)
+
+    if numpy.iscomplexobj(patches):
+        imaginary = numpy.bincount(flat_indexes, weights=flat_patches.imag, minlength=num_pixels)
+        return (real + 1j * imaginary).reshape(canvas_shape)
+    else:
+        return real.reshape(canvas_shape)
+
+
 def iter_probe_patches_on(
     probes: ProbeEnsemble,
     positions: Sequence[ProbePosition],
@@ -105,9 +217,7 @@ def iter_probe_patches_on(
     probe_geometry = probes.get_geometry()
 
     for scan_point, probe in probes.iter_position_probes(positions):
-        object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        bounds = probe_geometry.resolve_patch_bounds(object_point.x_px, object_point.y_px)
-        _validate_patch_bounds(bounds, object_geometry, scan_point.index)
+        bounds = _resolve_patch_bounds(probe_geometry, scan_point, object_geometry)
 
         yield ProbePatch(
             position=scan_point,

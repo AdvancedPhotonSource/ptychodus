@@ -1359,6 +1359,12 @@ def _read_extension_pixel_geometry(
     return PixelGeometry(width_m, height_m)
 
 
+def _read_cxi_float_or_zero(group: h5py.Group, key: str) -> float:
+    """:func:`_read_cxi_float`, with zero where the quantity is absent or unusable."""
+    value = _read_cxi_float(group, key)
+    return 0.0 if value is None else value
+
+
 def _read_cxi_product_metadata(entry: h5py.Group, file_path: Path) -> ProductMetadata:
     name = (
         _read_cxi_string(entry, CXIFileKeys.TITLE)
@@ -1377,26 +1383,22 @@ def _read_cxi_product_metadata(entry: h5py.Group, file_path: Path) -> ProductMet
     raw_polarization = _read_cxi_string(entry, CXIFileKeys.POLARIZATION)
     far_field = _read_cxi_array(entry, CXIFileKeys.FAR_FIELD)
 
-    def scalar(key: str) -> float:
-        value = _read_cxi_float(entry, key)
-        return 0.0 if value is None else value
-
     return ProductMetadata(
         name=name,
         comments=_read_cxi_string(entry, CXIFileKeys.EXPERIMENT_DESCRIPTION) or '',
         detector_distance_m=0.0 if detector_distance_m is None else detector_distance_m,
         photon_energy_eV=0.0 if photon_energy_eV is None else photon_energy_eV,
-        probe_photon_count=scalar(CXIFileKeys.PROBE_PHOTON_COUNT),
-        exposure_time_s=scalar(CXIFileKeys.EXPOSURE_TIME),
-        mass_attenuation_m2_per_kg=scalar(CXIFileKeys.MASS_ATTENUATION),
-        tomography_angle_deg=scalar(CXIFileKeys.TOMOGRAPHY_ANGLE),
-        focus_object_distance_m=scalar(CXIFileKeys.FOCUS_OBJECT_DISTANCE),
-        tilt_angle_deg=scalar(CXIFileKeys.TILT_ANGLE),
+        probe_photon_count=_read_cxi_float_or_zero(entry, CXIFileKeys.PROBE_PHOTON_COUNT),
+        exposure_time_s=_read_cxi_float_or_zero(entry, CXIFileKeys.EXPOSURE_TIME),
+        mass_attenuation_m2_per_kg=_read_cxi_float_or_zero(entry, CXIFileKeys.MASS_ATTENUATION),
+        tomography_angle_deg=_read_cxi_float_or_zero(entry, CXIFileKeys.TOMOGRAPHY_ANGLE),
+        focus_object_distance_m=_read_cxi_float_or_zero(entry, CXIFileKeys.FOCUS_OBJECT_DISTANCE),
+        tilt_angle_deg=_read_cxi_float_or_zero(entry, CXIFileKeys.TILT_ANGLE),
         polarization=(
             None if raw_polarization is None else _parse_polarization(raw_polarization, file_path)
         ),
         far_field=True if far_field is None else bool(far_field),
-        i0_photons_per_count=scalar(CXIFileKeys.I0_PHOTONS_PER_COUNT),
+        i0_photons_per_count=_read_cxi_float_or_zero(entry, CXIFileKeys.I0_PHOTONS_PER_COUNT),
         scattering_geometry=_read_cxi_scattering_geometry(entry) or ScatteringGeometry(),
     )
 

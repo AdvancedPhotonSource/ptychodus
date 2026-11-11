@@ -303,6 +303,17 @@ class TestFourierShift2D:
                 atol=1e-12,
             )
 
+    def test_array_shifts_move_each_batch_plane_by_its_own(self) -> None:
+        rng = numpy.random.default_rng(1)
+        batch = rng.standard_normal((3, 2, 16, 12)) + 1j * rng.standard_normal((3, 2, 16, 12))
+        dx = numpy.array([-0.3, 0.0, 1.7])
+        dy = numpy.array([0.4, -2.0, 0.25])
+        shifted = fourier_shift_2d(batch, dx=dx[:, None, None, None], dy=dy[:, None, None, None])
+        for i in range(batch.shape[0]):
+            numpy.testing.assert_allclose(
+                shifted[i], fourier_shift_2d(batch[i], dx=dx[i], dy=dy[i]), atol=1e-12
+            )
+
     def test_preserves_complex64_dtype(self) -> None:
         image = _gaussian_2d(16, 16).astype(numpy.complex64)
         shifted = fourier_shift_2d(image, dx=0.7, dy=0.3)

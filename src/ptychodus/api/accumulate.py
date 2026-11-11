@@ -37,6 +37,7 @@ __all__ = [
     'DiffractionMoments',
     'IncidentBeamEstimate',
     'compute_diffraction_moments',
+    'compute_i0_scale',
     'estimate_incident_beam',
     'iterate_diffraction_moments',
 ]
@@ -110,27 +111,7 @@ class DiffractionMoments:
         that is not a positive finite number cannot correct anything and leaves its total
         unscaled, with a warning, as does a pattern whose index has no reading.
         """
-        unique_indexes, first = numpy.unique(i0_indexes, return_index=True)
-
-        if unique_indexes.size != i0_indexes.size:
-            raise ValueError('I0 indexes must be unique!')
-
-        i0 = _pair_by_index(
-            self.indexes, unique_indexes, numpy.asarray(i0_counts, dtype=numpy.float64)[first]
-        )
-        usable = numpy.isfinite(i0) & (i0 > 0.0)
-        scale = numpy.ones(self.indexes.shape)
-
-        if usable.any():
-            scale[usable] = numpy.mean(i0[usable]) / i0[usable]
-            logger.info('Correcting the totals for beam decay by I0.')
-
-        if not usable.all():
-            logger.warning(
-                f'{int(numpy.count_nonzero(~usable))} I0 readings are missing or not positive;'
-                ' leaving those totals uncorrected.'
-            )
-
+        scale = compute_i0_scale(self.indexes, i0_indexes, i0_counts)
         binned_patterns = self.binned_patterns
 
         if binned_patterns is not None:
@@ -561,6 +542,44 @@ def estimate_incident_beam(
         mean_amplitude_transmission=float(numpy.sqrt(numpy.clip(intensity_transmission, 0, 1))),
         decay_corrected=decay_corrected,
     )
+
+
+def compute_i0_scale(
+    indexes: IntegerArrayType, i0_indexes: IntegerArrayType, i0_counts: RealArrayType
+) -> RealArrayType:
+    """The factor ``mean(I0) / I0_j`` that corrects each pattern of *indexes* for beam decay.
+
+    *i0_counts* are the incident-beam readings an upstream ion chamber, diode or scaler
+    records, in any units, keyed by *i0_indexes*; each index must be unique. A reading
+    that is not a positive finite number cannot correct anything and leaves its pattern
+    unscaled, with a warning, as does a pattern whose index has no reading. The mean is
+    over the usable readings paired with *indexes*.
+
+    Raises:
+        ValueError: if *i0_indexes* repeats an index.
+    """
+    unique_indexes, first = numpy.unique(i0_indexes, return_index=True)
+
+    if unique_indexes.size != i0_indexes.size:
+        raise ValueError('I0 indexes must be unique!')
+
+    i0 = _pair_by_index(
+        indexes, unique_indexes, numpy.asarray(i0_counts, dtype=numpy.float64)[first]
+    )
+    usable = numpy.isfinite(i0) & (i0 > 0.0)
+    scale = numpy.ones(indexes.shape)
+
+    if usable.any():
+        scale[usable] = numpy.mean(i0[usable]) / i0[usable]
+        logger.info('Correcting for beam decay by I0.')
+
+    if not usable.all():
+        logger.warning(
+            f'{int(numpy.count_nonzero(~usable))} I0 readings are missing or not positive;'
+            ' leaving those patterns uncorrected.'
+        )
+
+    return scale
 
 
 def _pair_by_index(

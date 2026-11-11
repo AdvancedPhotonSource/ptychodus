@@ -2,7 +2,11 @@
 
 from ptychodus.api.plugins import PluginRegistry
 
-from .phase_retrieval import PaganinObjectGenerator, STXMDPCObjectGenerator
+from .phase_retrieval import (
+    PaganinObjectGenerator,
+    SpectralObjectGenerator,
+    STXMDPCObjectGenerator,
+)
 from .siemens_star import SiemensStarObjectGenerator
 from .texture import (
     DeadLeavesObjectGenerator,
@@ -19,6 +23,7 @@ __all__ = [
     'RandomObjectGenerator',
     'STXMDPCObjectGenerator',
     'SiemensStarObjectGenerator',
+    'SpectralObjectGenerator',
 ]
 
 
@@ -33,6 +38,7 @@ def register_plugins(registry: PluginRegistry) -> None:
         'paganin': PaganinObjectGenerator(),
         'random': RandomObjectGenerator(),
         'siemens_star': SiemensStarObjectGenerator(),
+        'spectral': SpectralObjectGenerator(),
         'stxm_dpc': STXMDPCObjectGenerator(),
     }
 
