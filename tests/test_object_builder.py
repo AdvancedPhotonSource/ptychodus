@@ -32,7 +32,7 @@ import pytest
 
 from ptychodus.api.accumulate import DiffractionMoments, compute_diffraction_moments
 from ptychodus.api.assemble import AssembledDiffractionData
-from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry
 from ptychodus.api.object import (
     Object,
     ObjectCenter,
@@ -152,6 +152,13 @@ def _make_object(num_layers: int) -> Object:
         center=ObjectCenter(x_m=0.0, y_m=0.0),
         layer_spacing_m=[LAYER_SPACING_M] * (num_layers - 1),
     )
+
+
+class _UnboundObjectGeometryProvider(_StubObjectGeometryProvider):
+    """No diffraction data bound, as for a product opened without its patterns."""
+
+    def get_object_geometry(self) -> ObjectGeometry:
+        raise GeometryNotDefinedError('No diffraction dataset is bound.')
 
 
 class _StubObjectFileReader(ObjectFileReader):
@@ -287,6 +294,18 @@ def test_from_memory_builder_ignores_conditioning() -> None:
 
     assert numpy.array_equal(object_.get_array(), raw.get_array())
     assert list(object_.layer_spacing_m) == list(raw.layer_spacing_m)
+
+
+def test_from_memory_builder_needs_no_diffraction_data() -> None:
+    """A product opened without its patterns keeps the object it was saved with."""
+    raw = _make_object(2)
+    builder = FromMemoryObjectBuilder(_make_settings(), raw)
+
+    object_ = builder.build(_UnboundObjectGeometryProvider(), [])
+
+    assert numpy.array_equal(object_.get_array(), raw.get_array())
+    assert object_.get_pixel_geometry() == raw.get_pixel_geometry()
+    assert object_.get_center() == raw.get_center()
 
 
 def test_an_editable_from_memory_object_is_resliced_but_not_padded() -> None:

@@ -207,6 +207,13 @@ class _StubProbeGeometryProvider(ProbeGeometryProvider):
         )
 
 
+class _UnboundProbeGeometryProvider(_StubProbeGeometryProvider):
+    """No diffraction data bound, as for a product opened without its patterns."""
+
+    def get_probe_geometry(self) -> ProbeGeometry:
+        raise GeometryNotDefinedError('No diffraction dataset is bound.')
+
+
 def _make_probe_seq(
     num_cmodes: int,
     num_imodes: int,
@@ -412,6 +419,18 @@ def test_from_memory_builder_ignores_conditioning() -> None:
 
     assert numpy.array_equal(probe_seq.get_array(), raw.get_array())
     assert numpy.array_equal(probe_seq.get_opr_weights(), raw.get_opr_weights())
+
+
+def test_from_memory_builder_needs_no_diffraction_data() -> None:
+    """A product opened without its patterns keeps the probe it was saved with."""
+    raw = _make_probe_seq(2, 3, with_opr_weights=True)
+    builder = FromMemoryProbeBuilder(_make_rng(), _make_settings(), raw)
+
+    probe_seq = builder.build(_UnboundProbeGeometryProvider())
+
+    assert numpy.array_equal(probe_seq.get_array(), raw.get_array())
+    assert numpy.array_equal(probe_seq.get_opr_weights(), raw.get_opr_weights())
+    assert probe_seq.get_pixel_geometry() == raw.get_pixel_geometry()
 
 
 def test_making_a_from_memory_probe_editable_changes_nothing_until_a_count_is_raised() -> None:
