@@ -1025,56 +1025,58 @@ def _default_star_kwargs(
 
 class TestSiemensStarOutputShapeAndDtype:
     def test_square_shape(self) -> None:
-        obj = generate_siemens_star_object(_make_geometry(64, 64), **_default_star_kwargs())
+        obj = generate_siemens_star_object(_rng(), _make_geometry(64, 64), **_default_star_kwargs())
         assert obj.get_array().shape == (1, 64, 64)
 
     def test_rectangular_wide_shape(self) -> None:
-        obj = generate_siemens_star_object(_make_geometry(80, 40), **_default_star_kwargs())
+        obj = generate_siemens_star_object(_rng(), _make_geometry(80, 40), **_default_star_kwargs())
         assert obj.get_array().shape == (1, 40, 80)
 
     def test_rectangular_tall_shape(self) -> None:
-        obj = generate_siemens_star_object(_make_geometry(40, 80), **_default_star_kwargs())
+        obj = generate_siemens_star_object(_rng(), _make_geometry(40, 80), **_default_star_kwargs())
         assert obj.get_array().shape == (1, 80, 40)
 
     def test_dtype_is_complex(self) -> None:
-        obj = generate_siemens_star_object(_make_geometry(), **_default_star_kwargs())
+        obj = generate_siemens_star_object(_rng(), _make_geometry(), **_default_star_kwargs())
         assert numpy.issubdtype(obj.get_array().dtype, numpy.complexfloating)
 
     def test_no_nans(self) -> None:
-        obj = generate_siemens_star_object(_make_geometry(), **_default_star_kwargs())
+        obj = generate_siemens_star_object(_rng(), _make_geometry(), **_default_star_kwargs())
         assert not numpy.any(numpy.isnan(obj.get_array()))
 
     def test_no_infs(self) -> None:
-        obj = generate_siemens_star_object(_make_geometry(), **_default_star_kwargs())
+        obj = generate_siemens_star_object(_rng(), _make_geometry(), **_default_star_kwargs())
         assert not numpy.any(numpy.isinf(obj.get_array()))
 
 
 class TestSiemensStarDeterminism:
-    def test_identical_calls_are_bit_identical(self) -> None:
-        """No RNG dependency: two calls with the same args produce the same array."""
+    def test_same_seed_reproduces_and_different_seeds_differ(self) -> None:
         geom = _make_geometry(128, 128)
-        arr1 = generate_siemens_star_object(geom, **_default_star_kwargs()).get_array()
-        arr2 = generate_siemens_star_object(geom, **_default_star_kwargs()).get_array()
+        kwargs = _default_star_kwargs()
+        arr1 = generate_siemens_star_object(_rng(1), geom, **kwargs).get_array()
+        arr2 = generate_siemens_star_object(_rng(1), geom, **kwargs).get_array()
+        arr3 = generate_siemens_star_object(_rng(2), geom, **kwargs).get_array()
         numpy.testing.assert_array_equal(arr1, arr2)
+        assert not numpy.array_equal(arr1, arr3)
 
 
 class TestSiemensStarGeometryMetadata:
     def test_pixel_geometry_preserved(self) -> None:
         geom = _make_geometry(pixel_width_m=2e-9, pixel_height_m=3e-9)
-        obj = generate_siemens_star_object(geom, **_default_star_kwargs())
+        obj = generate_siemens_star_object(_rng(), geom, **_default_star_kwargs())
         pg = obj.get_pixel_geometry()
         assert pg.width_m == pytest.approx(2e-9)
         assert pg.height_m == pytest.approx(3e-9)
 
     def test_center_preserved(self) -> None:
         geom = _make_geometry(center_x_m=1e-6, center_y_m=-2e-6)
-        obj = generate_siemens_star_object(geom, **_default_star_kwargs())
+        obj = generate_siemens_star_object(_rng(), geom, **_default_star_kwargs())
         center = obj.get_center()
         assert center.x_m == pytest.approx(1e-6)
         assert center.y_m == pytest.approx(-2e-6)
 
     def test_single_layer(self) -> None:
-        obj = generate_siemens_star_object(_make_geometry(), **_default_star_kwargs())
+        obj = generate_siemens_star_object(_rng(), _make_geometry(), **_default_star_kwargs())
         assert obj.get_array().shape[0] == 1
 
 
@@ -1086,7 +1088,7 @@ class TestSiemensStarContrast:
     def test_corners_are_background_amplitude(self) -> None:
         """Corner pixels lie outside the outer disk and take the background value."""
         obj = generate_siemens_star_object(
-            _make_geometry(128, 128), **_default_star_kwargs(outer_radius_fraction=0.5)
+            _rng(), _make_geometry(128, 128), **_default_star_kwargs(outer_radius_fraction=0.5)
         )
         array = obj.get_array()[0]
         amplitude = numpy.abs(array)
@@ -1101,6 +1103,7 @@ class TestSiemensStarContrast:
         # a spoke because floor(angle*4/π) % 2 == 0. The angular center of wedge 0
         # is π/8 = 22.5°. Sample a pixel at radius 20 along that direction.
         obj = generate_siemens_star_object(
+            _rng(),
             _make_geometry(128, 128),
             **_default_star_kwargs(num_spokes=4, outer_radius_fraction=0.9),
         )
@@ -1118,6 +1121,7 @@ class TestSiemensStarContrast:
         """Traversing a mid-radius circle yields ``2 * num_spokes`` boundary crossings."""
         num_spokes = 8
         obj = generate_siemens_star_object(
+            _rng(),
             _make_geometry(256, 256),
             **_default_star_kwargs(num_spokes=num_spokes, outer_radius_fraction=0.9),
         )
@@ -1135,9 +1139,11 @@ class TestSiemensStarContrast:
         transitions = int(numpy.sum(numpy.diff(is_background.astype(int)) != 0))
         assert transitions == 2 * num_spokes
 
-    def test_phase_only_mode_has_unit_amplitude(self) -> None:
-        """With both amplitudes = 1, |array| = 1 everywhere (only the phase channel differs)."""
+    def test_pixels_are_complex_means_of_the_two_values(self) -> None:
+        """Every pixel lies on the chord between the two transmissions, unit modulus off edges."""
+        spoke = numpy.exp(0.5j * PI)
         obj = generate_siemens_star_object(
+            _rng(),
             _make_geometry(64, 64),
             **_default_star_kwargs(
                 spoke_amplitude=1.0,
@@ -1147,12 +1153,21 @@ class TestSiemensStarContrast:
                 outer_radius_fraction=0.9,
             ),
         )
-        amplitude = numpy.abs(obj.get_array()[0])
-        numpy.testing.assert_allclose(amplitude, 1.0, atol=1e-12)
+        array = obj.get_array()[0]
+        weight = (array - 1.0) / (spoke - 1.0)
+
+        numpy.testing.assert_allclose(weight.imag, 0.0, atol=1e-12)
+        assert weight.real.min() >= -1e-12
+        assert weight.real.max() <= 1.0 + 1e-12
+        is_pure = (weight.real < 1e-12) | (weight.real > 1.0 - 1e-12)
+        numpy.testing.assert_allclose(numpy.abs(array[is_pure]), 1.0, atol=1e-12)
+        # A phase step averaged as a transmission dims its edge pixels.
+        assert numpy.abs(array).min() < 0.99
 
     def test_phase_only_mode_has_nonzero_phase_variation(self) -> None:
         """Phase-only mode still produces the star pattern in the phase channel."""
         obj = generate_siemens_star_object(
+            _rng(),
             _make_geometry(64, 64),
             **_default_star_kwargs(
                 spoke_amplitude=1.0,
@@ -1169,19 +1184,72 @@ class TestSiemensStarContrast:
 class TestSiemensStarValidation:
     def test_rejects_single_spoke(self) -> None:
         with pytest.raises(ValueError, match='num_spokes'):
-            generate_siemens_star_object(_make_geometry(), **_default_star_kwargs(num_spokes=1))
+            generate_siemens_star_object(
+                _rng(), _make_geometry(), **_default_star_kwargs(num_spokes=1)
+            )
 
     def test_rejects_zero_radius_fraction(self) -> None:
         with pytest.raises(ValueError, match='outer_radius_fraction'):
             generate_siemens_star_object(
-                _make_geometry(), **_default_star_kwargs(outer_radius_fraction=0.0)
+                _rng(), _make_geometry(), **_default_star_kwargs(outer_radius_fraction=0.0)
             )
 
     def test_rejects_negative_radius_fraction(self) -> None:
         with pytest.raises(ValueError, match='outer_radius_fraction'):
             generate_siemens_star_object(
-                _make_geometry(), **_default_star_kwargs(outer_radius_fraction=-0.5)
+                _rng(), _make_geometry(), **_default_star_kwargs(outer_radius_fraction=-0.5)
             )
+
+    def test_rejects_zero_subsamples(self) -> None:
+        with pytest.raises(ValueError, match='num_subsamples_per_axis'):
+            generate_siemens_star_object(
+                _rng(), _make_geometry(), num_subsamples_per_axis=0, **_default_star_kwargs()
+            )
+
+
+def _star_spoke_fraction(array: numpy.ndarray) -> float:
+    # spoke amplitude 0 and background 1 with zero phase: 1 - mean is the spoke area
+    return float(1.0 - array.real.mean())
+
+
+class TestSiemensStarAntialiasing:
+    """Each pixel is an unbiased estimate of the box-filtered star, in physical space."""
+
+    def test_spoke_area_is_unbiased(self) -> None:
+        width_px = height_px = 96
+        fraction = 0.8
+        radius_px = fraction * width_px / 2.0
+        expected = 0.5 * PI * radius_px**2 / (width_px * height_px)
+        estimates = [
+            _star_spoke_fraction(
+                generate_siemens_star_object(
+                    _rng(seed),
+                    _make_geometry(width_px, height_px),
+                    **_default_star_kwargs(num_spokes=16, outer_radius_fraction=fraction),
+                ).get_array()[0]
+            )
+            for seed in range(20)
+        ]
+        standard_error = numpy.std(estimates, ddof=1) / numpy.sqrt(len(estimates))
+
+        assert abs(numpy.mean(estimates) - expected) < 4.0 * standard_error + 1e-4
+
+    def test_non_square_pixels_give_a_circular_star(self) -> None:
+        kwargs = _default_star_kwargs(num_spokes=16, outer_radius_fraction=0.8)
+        square = generate_siemens_star_object(
+            _rng(3), _make_geometry(64, 64), **kwargs
+        ).get_array()[0]
+        tall = generate_siemens_star_object(
+            _rng(3), _make_geometry(64, 32, pixel_width_m=1e-9, pixel_height_m=2e-9), **kwargs
+        ).get_array()[0]
+
+        assert _star_spoke_fraction(tall) == pytest.approx(_star_spoke_fraction(square), abs=0.01)
+        # The disk spans half as many rows as columns when rows are twice as tall.
+        rows = numpy.flatnonzero((tall.real < 0.999).any(axis=1))
+        columns = numpy.flatnonzero((tall.real < 0.999).any(axis=0))
+        assert (rows[-1] - rows[0] + 1) == pytest.approx(
+            0.5 * (columns[-1] - columns[0] + 1), abs=1
+        )
 
 
 class TestGenerateUniformObject:

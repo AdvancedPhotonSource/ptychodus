@@ -26,10 +26,21 @@ class SiemensStarOptions(BaseModel):
     background_amplitude: float = Field(1.0, ge=0.0, le=1.0, title='Background Amplitude:')
     spoke_phase_rad: float = Field(-0.5 * PI, title='Spoke Phase:')
     background_phase_rad: float = Field(0.0, title='Background Phase:')
+    num_subsamples_per_axis: int = Field(
+        4,
+        ge=1,
+        le=16,
+        title='Number of Subsamples Per Axis:',
+        description='Each pixel averages this many jittered points along each axis.',
+    )
 
 
 class SiemensStarObjectGenerator(ObjectGenerator):
-    """Alternating angular wedges of two transmissions."""
+    """Alternating angular wedges of two transmissions, circular in physical space.
+
+    Each pixel is the mean transmission over its jittered subsamples, so wedge edges and
+    the singular center are box filtered.
+    """
 
     def get_default_options(self) -> BaseModel:
         return SiemensStarOptions()
@@ -44,6 +55,7 @@ class SiemensStarObjectGenerator(ObjectGenerator):
     ) -> Object:
         star = expect_options(options, SiemensStarOptions)
         return generate_siemens_star_object(
+            rng,
             geometry_provider.get_object_geometry(),
             num_spokes=star.num_spokes,
             outer_radius_fraction=star.outer_radius_fraction,
@@ -51,4 +63,5 @@ class SiemensStarObjectGenerator(ObjectGenerator):
             background_amplitude=star.background_amplitude,
             spoke_phase_rad=star.spoke_phase_rad,
             background_phase_rad=star.background_phase_rad,
+            num_subsamples_per_axis=star.num_subsamples_per_axis,
         )

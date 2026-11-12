@@ -139,9 +139,9 @@ class DeadLeavesOptions(BaseModel):
     leaf_phase_lower_rad: float = Field(-PI, title='Leaf Phase Lower:')
     leaf_phase_upper_rad: float = Field(PI, title='Leaf Phase Upper:')
     num_subsamples_per_axis: int = Field(
-        2,
+        4,
         ge=1,
-        le=4,
+        le=16,
         title='Number of Subsamples Per Axis:',
         description='Each pixel averages this many jittered points along each axis.',
     )

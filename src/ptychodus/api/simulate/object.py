@@ -1752,7 +1752,7 @@ def generate_dead_leaves_object(
     leaf_amplitude_upper: float,
     leaf_phase_lower_rad: float,
     leaf_phase_upper_rad: float,
-    num_subsamples_per_axis: int = 2,
+    num_subsamples_per_axis: int = 4,
 ) -> Object:
     """Generate a complex object from the stationary dead-leaves model.
 
@@ -1819,6 +1819,7 @@ def generate_dead_leaves_object(
 
 
 def generate_siemens_star_object(
+    rng: numpy.random.Generator,
     geometry: ObjectGeometry,
     *,
     num_spokes: int,
@@ -1827,15 +1828,17 @@ def generate_siemens_star_object(
     background_amplitude: float,
     spoke_phase_rad: float,
     background_phase_rad: float,
+    num_subsamples_per_axis: int = 4,
 ) -> Object:
     """Generate a Siemens star resolution target with alternating angular wedges.
 
-    ``2 * num_spokes`` wedges alternate between the spoke and background
-    values inside a disk of radius
-    ``outer_radius_fraction * min(width_px, height_px) / 2`` centered on the
-    canvas; pixels outside the disk take the background values. Amplitude and
-    phase are averaged over a 4-point sub-pixel pattern to soften wedge edges
-    and the singular center.
+    ``2 * num_spokes`` wedges alternate between the spoke and background values inside a
+    disk whose radius is ``outer_radius_fraction`` of the canvas's smaller physical
+    half-extent, centered on the canvas; outside the disk is background. The star is
+    circular in physical space, also on non-square pixels. Each pixel is the mean
+    transmission over ``num_subsamples_per_axis**2`` stratified points, one uniformly
+    jittered point per cell, so edges and the singular center are box filtered without
+    a fixed sampling pattern; the result is reproducible for a given *rng*.
     """
     if num_spokes < 2:
         raise ValueError('num_spokes must be at least 2!')
@@ -1843,42 +1846,34 @@ def generate_siemens_star_object(
     if outer_radius_fraction <= 0.0:
         raise ValueError('outer_radius_fraction must be strictly positive!')
 
-    _sample_positions = [
-        (1.0 / 3, 1.0 / 3),
-        (1.0 / 3, 2.0 / 3),
-        (2.0 / 3, 1.0 / 3),
-        (2.0 / 3, 2.0 / 3),
-    ]
+    if num_subsamples_per_axis < 1:
+        raise ValueError('num_subsamples_per_axis must be at least one!')
 
-    height_px = geometry.height_px
-    width_px = geometry.width_px
-    outer_radius_px = outer_radius_fraction * min(width_px, height_px) / 2.0
-    center_y_px = height_px / 2.0
-    center_x_px = width_px / 2.0
+    pixel_geometry = geometry.get_pixel_geometry()
+    aspect = pixel_geometry.height_m / pixel_geometry.width_m
+    width = float(geometry.width_px)
+    height = geometry.height_px * aspect
+    outer_radius = outer_radius_fraction * min(width, height) / 2.0
+    spoke_value = spoke_amplitude * numpy.exp(1j * spoke_phase_rad)
+    background_value = background_amplitude * numpy.exp(1j * background_phase_rad)
 
-    position_y_px, position_x_px = numpy.indices((height_px, width_px)).astype(float)
-    amplitude = numpy.zeros((height_px, width_px), dtype=float)
-    phase_rad = numpy.zeros((height_px, width_px), dtype=float)
+    shape = (geometry.height_px, geometry.width_px)
+    rows, columns = numpy.indices(shape, dtype=float)
+    pixel_sum: ComplexArrayType = numpy.zeros(shape, dtype=complex)
 
-    for u_y, u_x in _sample_positions:
-        dy = position_y_px + u_y - center_y_px
-        dx = position_x_px + u_x - center_x_px
-        radius_px = numpy.hypot(dy, dx)
+    for cell in range(num_subsamples_per_axis**2):
+        cell_y, cell_x = divmod(cell, num_subsamples_per_axis)
+        jitter = rng.uniform(size=(2, *shape))
+        dx = columns + (cell_x + jitter[0]) / num_subsamples_per_axis - 0.5 * width
+        dy = (rows + (cell_y + jitter[1]) / num_subsamples_per_axis) * aspect - 0.5 * height
         angle = numpy.mod(numpy.arctan2(dy, dx), TWO_PI)
         wedge_index = numpy.floor(angle * num_spokes / PI).astype(int)
-        is_spoke = (radius_px <= outer_radius_px) & (wedge_index % 2 == 0)
-        amplitude += numpy.where(is_spoke, spoke_amplitude, background_amplitude)
-        phase_rad += numpy.where(is_spoke, spoke_phase_rad, background_phase_rad)
-
-    num_samples = len(_sample_positions)
-    amplitude /= num_samples
-    phase_rad /= num_samples
-
-    array = amplitude * numpy.exp(1j * phase_rad)
+        is_spoke = (numpy.hypot(dx, dy) <= outer_radius) & (wedge_index % 2 == 0)
+        pixel_sum += numpy.where(is_spoke, spoke_value, background_value)
 
     return Object(
-        array=array[numpy.newaxis, :, :].astype('complex'),
-        pixel_geometry=geometry.get_pixel_geometry(),
+        array=pixel_sum[numpy.newaxis] / num_subsamples_per_axis**2,
+        pixel_geometry=pixel_geometry,
         center=geometry.get_center(),
     )
 

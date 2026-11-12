@@ -173,7 +173,8 @@ def test_generators_hold_no_state(registry: PluginRegistry) -> None:
 def test_keys_shared_by_several_generators_agree(registry: PluginRegistry) -> None:
     """A key shared across generators holds one value, so its declarations must agree.
 
-    No object key is shared today; this guards the day a field name is reused.
+    The first generator to register sets the value's default and bounds, so a field
+    reused by another, as ``num_subsamples_per_axis`` is, must declare it identically.
     """
     by_key: dict[str, list[tuple[str, ParameterDescription]]] = defaultdict(list)
 
