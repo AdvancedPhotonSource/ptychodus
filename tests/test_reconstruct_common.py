@@ -838,9 +838,15 @@ def _resolve(dataset: _FakeDataset, **kwargs: object) -> CropRegion | None:
     return resolve_crop_region(logging.getLogger('test'), dataset, **defaults)  # type: ignore[arg-type]
 
 
-def test_no_crop_requested_reads_the_whole_frame() -> None:
+def test_a_full_extent_reads_the_whole_frame_without_summarizing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    summarize = _CountingSummarize()
+    monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', summarize)
     dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512))
-    assert _resolve(dataset) is None
+
+    assert _resolve(dataset, crop_extent_px='full') is None
+    assert summarize.num_calls == 0
 
 
 def test_a_crop_matching_the_detector_reads_the_whole_frame() -> None:
@@ -1054,8 +1060,107 @@ def test_an_auto_extent_without_signal_is_an_error_naming_the_flag(
     monkeypatch.setattr(_reconstruct_common, 'suggest_crop_region', _FakeSuggest(0))
     dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), BeamCenter(x_px=256, y_px=256))
 
-    with pytest.raises(ValueError, match='noise floor.*Give --crop-extent-px explicitly'):
+    with pytest.raises(ValueError, match='noise floor.*--crop-extent-px.*"full"'):
         _resolve(dataset, crop_extent_px='auto')
+
+
+def test_an_omitted_extent_without_signal_reads_the_whole_frame(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Nobody asked for a crop, so failing to size one must not fail the run."""
+    monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', _CountingSummarize())
+    monkeypatch.setattr(_reconstruct_common, 'suggest_crop_region', _FakeSuggest(0))
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), BeamCenter(x_px=256, y_px=256))
+
+    with caplog.at_level(logging.WARNING):
+        assert _resolve(dataset) is None
+
+    assert 'Reading the whole detector frame: No signal' in caplog.text
+
+
+def test_an_omitted_extent_is_estimated(monkeypatch: pytest.MonkeyPatch) -> None:
+    suggest = _FakeSuggest(20)
+    monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', _CountingSummarize())
+    monkeypatch.setattr(_reconstruct_common, 'suggest_crop_region', suggest)
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), BeamCenter(x_px=200, y_px=300))
+
+    region = _resolve(dataset)
+
+    assert len(suggest.calls) == 1
+    assert region == CropRegion.from_center_extent(
+        BeamCenter(x_px=200, y_px=300), ImageExtent(width_px=64, height_px=64)
+    )
+
+
+def test_an_omitted_extent_takes_the_warm_start_extent_without_summarizing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    summarize = _CountingSummarize()
+    monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', summarize)
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), BeamCenter(x_px=200, y_px=300))
+
+    region = _resolve(dataset, warm_start_extent=ImageExtent(width_px=96, height_px=96))
+
+    assert summarize.num_calls == 0
+    assert region == CropRegion.from_center_extent(
+        BeamCenter(x_px=200, y_px=300), ImageExtent(width_px=96, height_px=96)
+    )
+
+
+def test_a_warm_start_extent_need_not_be_square() -> None:
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), BeamCenter(x_px=256, y_px=256))
+
+    region = _resolve(dataset, warm_start_extent=ImageExtent(width_px=128, height_px=64))
+
+    assert region is not None
+    assert (region.width_px, region.height_px) == (128, 64)
+
+
+def test_a_warm_start_without_a_recorded_center_summarizes_once_for_the_center(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    summarize = _CountingSummarize()
+    suggest = _FakeSuggest(20)
+    monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', summarize)
+    monkeypatch.setattr(_reconstruct_common, 'suggest_crop_region', suggest)
+    monkeypatch.setattr(
+        _reconstruct_common, 'estimate_beam_center', lambda pattern: BeamCenter(x_px=256, y_px=256)
+    )
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), beam_center=None)
+
+    region = _resolve(dataset, warm_start_extent=ImageExtent(width_px=96, height_px=96))
+
+    assert summarize.num_calls == 1
+    assert suggest.calls == []
+    assert region == CropRegion.from_center_extent(
+        BeamCenter(x_px=256, y_px=256), ImageExtent(width_px=96, height_px=96)
+    )
+
+
+def test_an_explicit_auto_extent_overrides_the_warm_start(monkeypatch: pytest.MonkeyPatch) -> None:
+    suggest = _FakeSuggest(20)
+    monkeypatch.setattr(_reconstruct_common, 'summarize_dataset', _CountingSummarize())
+    monkeypatch.setattr(_reconstruct_common, 'suggest_crop_region', suggest)
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), BeamCenter(x_px=256, y_px=256))
+
+    region = _resolve(
+        dataset, crop_extent_px='auto', warm_start_extent=ImageExtent(width_px=96, height_px=96)
+    )
+
+    assert len(suggest.calls) == 1
+    assert region is not None
+    assert region.width_px == 64
+
+
+def test_an_explicit_extent_overrides_the_warm_start() -> None:
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), BeamCenter(x_px=256, y_px=256))
+
+    region = _resolve(
+        dataset, crop_extent_px=32, warm_start_extent=ImageExtent(width_px=96, height_px=96)
+    )
+
+    assert region is not None
+    assert region.width_px == 32
 
 
 class TestResolveFlag:

@@ -4,8 +4,8 @@
 LamNI records much of its geometry in the HDF5 itself, so the fallbacks below are often
 unused. Position files come in three header layouts (Orchestra, softGlueZynq raw and
 processed), all handled by one reader that carries a real per-frame index rather than relying
-on array order. The whole scan is one array, so the beam center is taken from the file or
-given on the command line rather than estimated.
+on array order. The beam center is taken from the command line, then the file, and is
+estimated from the patterns only when neither gives one.
 
 Scope and limitations
 ---------------------

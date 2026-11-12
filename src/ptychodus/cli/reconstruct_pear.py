@@ -99,6 +99,7 @@ from ptychodus.api.typing import ComplexArrayType
 from ptychodus.api.preprocess.diffraction import (
     DiffractionPrepPipeline,
     DiffractionPrepStepUnion,
+    FilterValuesStep,
     HorizontalFlipStep,
     TransposeStep,
     VerticalFlipStep,
@@ -118,8 +119,10 @@ from ptychodus.api.simulate.probe import (
     propagate_probe,
 )
 from ptychodus.cli._reconstruct_common import (
+    estimate_dataset_beam_center,
     estimate_incident_beam_from_assembled_data,
     install_signal_handlers,
+    invalid_count_threshold,
     run_reconstruction,
     save_assembled_diffraction,
 )
@@ -799,11 +802,9 @@ def main() -> ExitCode:
     if crop_px > 0 and raw_metadata.detector_extent is not None:
         from ptychodus.api.diffraction import BeamCenter
 
-        extent = raw_metadata.detector_extent
-
-        # Precedence: the parameter file, then whatever the instrument recorded, then
-        # the detector midpoint. The midpoint is a guess and is logged as one -- on a
-        # 1028x512 Eiger the real center sits nowhere near it.
+        # Precedence: the parameter file, then whatever the instrument recorded, then an
+        # estimate from the data, logged as one. The detector midpoint would be no
+        # substitute -- on a 1028x512 Eiger the real center sits nowhere near it.
         if params.diff_pattern_center_x is not None and params.diff_pattern_center_y is not None:
             center = BeamCenter(
                 x_px=params.diff_pattern_center_x, y_px=params.diff_pattern_center_y
@@ -813,8 +814,20 @@ def main() -> ExitCode:
             center = raw_metadata.beam_center
             center_source = 'the diffraction file'
         else:
-            center = BeamCenter(x_px=extent.width_px // 2, y_px=extent.height_px // 2)
-            center_source = 'the detector midpoint (no value given or recorded)'
+            logger.info('Summarizing the dataset to estimate the beam center')
+            # Cut only for the estimate: invalid-pixel markers at the dtype maximum would
+            # otherwise dominate the mean and drag the estimate to the midpoint.
+            max_valid_count = invalid_count_threshold(raw_metadata.pattern_dtype)
+            center, _ = estimate_dataset_beam_center(
+                raw_dataset,
+                bad_pixels=None,
+                value_filter=(
+                    None
+                    if max_valid_count is None
+                    else FilterValuesStep(lower_bound=0, upper_bound=max_valid_count)
+                ),
+            )
+            center_source = 'an estimate over the whole dataset'
 
         logger.info('Beam center (%d, %d) from %s', center.x_px, center.y_px, center_source)
         region = CropRegion.from_center_extent(center, ImageExtent(crop_px, crop_px))

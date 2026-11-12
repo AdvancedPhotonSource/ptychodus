@@ -80,6 +80,7 @@ from pathlib import Path
 from ptychi.api.options.task import PtychographyTaskOptions
 
 from ptychodus.api.exit_codes import ExitCode
+from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import FilterValuesStep
@@ -448,13 +449,24 @@ def reconstruct_batch_lamni(
             settings.diffraction.bad_pixels_file_type
         ).read(settings.diffraction.bad_pixels_file)
 
+    # The initial probe file's extent is the crop when crop_extent_px is unset.
+    warm_start_extent: ImageExtent | None = None
+
     if settings.initial_probe.probe_source == 'file':
         probe_file = settings.initial_probe.probe_from_file.file_path
         assert probe_file is not None  # the settings model requires it for "file"
         logger.info('Checking the initial probe file %s', probe_file)
-        registry.probe_file_readers.get_strategy_by_name(
-            settings.initial_probe.probe_from_file.file_type
-        ).read(probe_file)
+        warm_start_shape = (
+            registry.probe_file_readers.get_strategy_by_name(
+                settings.initial_probe.probe_from_file.file_type
+            )
+            .read(probe_file)
+            .get_array()
+            .shape
+        )
+        warm_start_extent = ImageExtent(
+            width_px=warm_start_shape[-1], height_px=warm_start_shape[-2]
+        )
 
     # One crop for the whole run, settled from the first selected scan.
     first_dataset = registry.diffraction_file_readers.get_strategy_by_name(DIFFRACTION_READER).read(
@@ -483,6 +495,7 @@ def reconstruct_batch_lamni(
         beam_center_y_px=settings.diffraction.beam_center_y_px,
         bad_pixels=bad_pixels,
         value_filter=value_filter,
+        warm_start_extent=warm_start_extent,
         subject='first scan',
     )
     del first_dataset, bad_pixels

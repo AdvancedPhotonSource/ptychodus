@@ -85,6 +85,7 @@ __all__ = [
     'estimate_incident_beam_from_assembled_data',
     'add_print_ptychi_options_argument',
     'add_ptychi_options_argument',
+    'estimate_dataset_beam_center',
     'format_ptychi_options_defaults',
     'install_signal_handlers',
     'invalid_count_threshold',
@@ -384,19 +385,18 @@ def _estimate_crop_region(
     value_filter: FilterValuesStep | None,
     corrections: DetectorCorrections | None,
 ) -> CropRegion:
-    """The power-of-two square about `beam_center` holding the signal in `mean_pattern`."""
-    try:
-        suggestion = suggest_crop_region(
-            mean_pattern,
-            beam_center,
-            detector_extent,
-            bad_pixels=bad_pixels,
-            value_filter=value_filter,
-            corrections=corrections,
-        )
-    except ValueError as exc:
-        raise ValueError(f'{exc} Give --crop-extent-px explicitly.') from exc
+    """The power-of-two square about `beam_center` holding the signal in `mean_pattern`.
 
+    Raises ``ValueError`` as :func:`suggest_crop_region` does.
+    """
+    suggestion = suggest_crop_region(
+        mean_pattern,
+        beam_center,
+        detector_extent,
+        bad_pixels=bad_pixels,
+        value_filter=value_filter,
+        corrections=corrections,
+    )
     signal = suggestion.signal
     region = suggestion.region
     logger.info(
@@ -419,42 +419,64 @@ def _estimate_crop_region(
     return region
 
 
+def estimate_dataset_beam_center(
+    raw_dataset: DiffractionDataset,
+    *,
+    bad_pixels: BadPixels | None,
+    value_filter: FilterValuesStep | None,
+) -> tuple[BeamCenter, DiffractionSummary]:
+    """Estimate the beam center from the mean of every pattern, and return that summary too.
+
+    Reads every pattern. :func:`summarize_dataset` inpaints the bad pixels that
+    :func:`estimate_beam_center` requires the caller to have handled, and `value_filter` cuts
+    the mean as assembly cuts each pattern, so invalid-pixel markers cannot pull the estimate.
+    """
+    summary = summarize_dataset(raw_dataset, bad_pixels=bad_pixels)
+    mean_pattern = summary.mean_pattern
+    beam_center = estimate_beam_center(
+        mean_pattern if value_filter is None else value_filter.apply(mean_pattern)
+    )
+    return beam_center, summary
+
+
 def resolve_crop_region(
     logger: logging.Logger,
     raw_dataset: DiffractionDataset,
     *,
-    crop_extent_px: int | Literal['auto'] | None,
+    crop_extent_px: int | Literal['auto', 'full'] | None,
     beam_center_x_px: int | None,
     beam_center_y_px: int | None,
     bad_pixels: BadPixels | None,
     value_filter: FilterValuesStep | None,
     corrections: DetectorCorrections | None = None,
+    warm_start_extent: ImageExtent | None = None,
     subject: str = 'dataset',
 ) -> CropRegion | None:
     """The detector region to read, or None to read the whole frame.
 
+    `crop_extent_px` is a square side in pixels, ``auto`` to estimate one, ``full`` to read
+    the whole frame, or None when none was asked for. None takes `warm_start_extent`, the
+    extent of an initial probe read from a file, which the patterns must match; without one
+    it is ``auto``. Every extent but ``full`` is centered on the beam center, taken from the
+    arguments, then the file, then an estimate from the data.
+
+    An ``auto`` extent is the smallest power-of-two square about the beam center that holds
+    the signal above the noise floor of the mean pattern, capped at the largest that fits.
+    The mean pattern is cut by `value_filter` and corrected by `corrections` first, as the
+    assembled patterns are; one summary serves both that and any beam-center estimate. When
+    no extent can be estimated, an explicit ``auto`` is an error, while an omitted extent
+    falls back to the whole frame with a warning, so a run that asked for nothing still runs.
+
     `subject` names what the beam center is estimated over, for the two log lines that say
     so: a caller that settles one region for a whole run of scans is not summarizing the
     same thing as a caller handling a single dataset.
-
-    An `auto` extent is the smallest power-of-two square about the beam center that holds
-    the signal above the noise floor of the mean pattern, capped at the largest that fits.
-    The mean pattern is cut by `value_filter` and corrected by `corrections` first, as the
-    assembled patterns are; one summary serves both that and any beam-center estimate.
     """
-    if crop_extent_px is None:
+    if crop_extent_px == 'full':
+        logger.info('Reading the whole detector frame')
         return None
 
     metadata = raw_dataset.get_metadata()
     summary: DiffractionSummary | None = None
-
-    def get_summary() -> DiffractionSummary:
-        nonlocal summary
-
-        if summary is None:
-            summary = summarize_dataset(raw_dataset, bad_pixels=bad_pixels)
-
-        return summary
 
     # Beam center precedence: command line, then the file, then an estimate from the data.
     # The estimate is logged as such -- a wrong center crops the wrong part of the
@@ -466,34 +488,48 @@ def resolve_crop_region(
         beam_center = metadata.beam_center
         center_source = 'the diffraction file'
     else:
-        # Reads every pattern, so it is reached only when no center was supplied by flag or
-        # file. summarize_dataset inpaints the bad pixels that estimate_beam_center requires
-        # the caller to have handled.
         logger.info('Summarizing the %s to estimate the beam center', subject)
-        mean_pattern = get_summary().mean_pattern
-        beam_center = estimate_beam_center(
-            mean_pattern if value_filter is None else value_filter.apply(mean_pattern)
+        beam_center, summary = estimate_dataset_beam_center(
+            raw_dataset, bad_pixels=bad_pixels, value_filter=value_filter
         )
         center_source = f'an estimate over the whole {subject}'
 
     logger.info('Beam center: (%d, %d) from %s', beam_center.x_px, beam_center.y_px, center_source)
 
-    if crop_extent_px == 'auto':
+    if crop_extent_px is None and warm_start_extent is not None:
+        extent = warm_start_extent
+        logger.info(
+            'Crop extent: %dx%d px from the initial probe file',
+            extent.width_px,
+            extent.height_px,
+        )
+    elif crop_extent_px is None or crop_extent_px == 'auto':
         if summary is None:
             logger.info('Summarizing the %s to estimate the crop extent', subject)
+            summary = summarize_dataset(raw_dataset, bad_pixels=bad_pixels)
 
-        region = _estimate_crop_region(
-            logger,
-            get_summary().mean_pattern,
-            beam_center,
-            metadata.detector_extent,
-            raw_dataset.get_bad_pixels() if bad_pixels is None else bad_pixels,
-            value_filter,
-            corrections,
-        )
-        crop_extent_px = region.width_px
+        try:
+            region = _estimate_crop_region(
+                logger,
+                summary.mean_pattern,
+                beam_center,
+                metadata.detector_extent,
+                raw_dataset.get_bad_pixels() if bad_pixels is None else bad_pixels,
+                value_filter,
+                corrections,
+            )
+        except ValueError as exc:
+            hint = 'Give --crop-extent-px a size in pixels, or "full" to read the whole frame.'
 
-    extent = ImageExtent(width_px=crop_extent_px, height_px=crop_extent_px)
+            if crop_extent_px == 'auto':
+                raise ValueError(f'{exc} {hint}') from exc
+
+            logger.warning('Reading the whole detector frame: %s %s', exc, hint)
+            return None
+
+        extent = ImageExtent(width_px=region.width_px, height_px=region.height_px)
+    else:
+        extent = ImageExtent(width_px=crop_extent_px, height_px=crop_extent_px)
 
     if extent == metadata.detector_extent:
         return None
@@ -504,7 +540,7 @@ def resolve_crop_region(
     # different region than asked for, so an overhanging crop is an error.
     if region.clamp_to_detector_extent(metadata.detector_extent) != region:
         raise ValueError(
-            f'A {crop_extent_px}px crop about ({beam_center.x_px}, '
+            f'A {extent.width_px}x{extent.height_px}px crop about ({beam_center.x_px}, '
             f'{beam_center.y_px}) runs off the '
             f'{metadata.detector_extent.width_px}x{metadata.detector_extent.height_px} '
             f'detector (x={region.x_range} y={region.y_range}). '

@@ -107,6 +107,19 @@ def test_instrument_defaults_are_carried_from_the_profile() -> None:
     assert profiles['velociprobe'].position_reader == 'APS_Velociprobe_PE'
 
 
+def test_the_crop_extent_is_left_unset_by_default_and_accepts_full() -> None:
+    """Unset is resolved later: the --probe-file extent, else auto."""
+    profile = _profiles()['12ide']
+    assert _defaults(profile).crop_extent_px is None
+
+    parser = rs.build_standard_parser(profile)
+    args = parser.parse_args(
+        ['--diffraction-file', 'd', '--position-file', 'p', '--output-directory', 'o']
+        + ['--crop-extent-px', 'full']
+    )
+    assert args.crop_extent_px == 'full'
+
+
 def test_unconditioned_profile_drops_the_conditioning_options() -> None:
     args = _defaults(_profiles()['foldslice'])
 

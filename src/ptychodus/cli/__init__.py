@@ -6,7 +6,7 @@ bare install, so this module must not reach anything behind an optional extra.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 import argparse
 import logging
 import sys
@@ -22,8 +22,8 @@ __all__ = [
     'add_detector_map_arguments',
     'add_log_level_argument',
     'configure_logging',
+    'crop_extent_px',
     'positive_int',
-    'positive_int_or_auto',
     'read_detector_corrections',
     'verify_all_arguments_parsed',
 ]
@@ -52,15 +52,17 @@ def positive_int(text: str) -> int:
     return value
 
 
-def positive_int_or_auto(text: str) -> int | Literal['auto']:
-    """An argparse type for a positive count, or the word ``auto`` to have one estimated."""
-    if text == 'auto':
-        return 'auto'
+def crop_extent_px(text: str) -> int | Literal['auto', 'full']:
+    """An argparse type for a crop side in pixels, ``auto`` to estimate one, or ``full``."""
+    if text in ('auto', 'full'):
+        return cast(Literal['auto', 'full'], text)
 
     try:
         return positive_int(text)
     except ValueError as exc:
-        raise argparse.ArgumentTypeError(f'"{text}" must be a positive integer or "auto"!') from exc
+        raise argparse.ArgumentTypeError(
+            f'"{text}" must be a positive integer, "auto" or "full"!'
+        ) from exc
 
 
 def verify_all_arguments_parsed(parser: argparse.ArgumentParser, argv: list[str]) -> None:

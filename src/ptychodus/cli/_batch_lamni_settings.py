@@ -170,8 +170,9 @@ class MetadataOverrides(_Section):
 
 
 class Diffraction(_Section):
-    # 'auto' suggests the smallest power of two holding the signal above the noise floor.
-    crop_extent_px: Annotated[int, Field(ge=1)] | Literal['auto'] | None = None
+    # 'auto' suggests the smallest power of two holding the signal above the noise floor and
+    # 'full' reads the whole frame. Unset, it is the initial probe file's extent, else 'auto'.
+    crop_extent_px: Annotated[int, Field(ge=1)] | Literal['auto', 'full'] | None = None
     beam_center_x_px: int | None = None
     beam_center_y_px: int | None = None
     min_total_counts: int | None = None

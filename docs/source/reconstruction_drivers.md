@@ -49,11 +49,7 @@ Only one member of a multi-file detector series need be named; the reader globs 
 The remaining arguments fall into four groups.
 
 `--crop-extent-px`, `--beam-center-x-px`, `--beam-center-y-px`
-: Cut a square region out of each raw frame about the beam centre. The centre comes from the
-  data file when it records one, and is estimated from the patterns otherwise. Cropping is
-  usually what decides reconstruction time, since it sets the array size. `--crop-extent-px auto`
-  (`crop_extent_px: auto` in a batch settings file) picks the smallest power-of-two side that
-  holds the mean pattern's signal above its noise floor, capped at the largest that fits.
+: Cut a square region out of each raw frame about the beam centre. The centre comes from the flags, then from the data file when it records one, and is estimated from the patterns otherwise. Cropping is usually what decides reconstruction time, since it sets the array size. Left out, the crop is the extent of `--probe-file` when one is given, so a warm start from an earlier scan matches it; otherwise it is `auto`, the smallest power-of-two side that holds the mean pattern's signal above its noise floor, capped at the largest that fits. When nothing rises above the noise floor, an omitted crop reads the whole frame with a warning, while an explicit `auto` is an error. Pass a side in pixels to choose one, or `full` to read the whole frame. `crop_extent_px` in a batch settings file takes the same values and behaves the same way, sized from `initial_probe.probe_from_file` when left out.
 
 `--detector-distance-m`, `--photon-energy-eV`, `--detector-pixel-size-m`, `--probe-photon-count`, `--tomography-angle-deg`
 : Override metadata the data file records wrongly or not at all. Each is used only when given.

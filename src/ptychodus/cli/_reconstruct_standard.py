@@ -49,7 +49,7 @@ from ptychodus.api.diffraction import (
 )
 from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.typing import BooleanArrayType, RealArrayType
-from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.io import StandardFileLayout, save_product
 from ptychodus.api.object import compute_object_geometry
 from ptychodus.api.propagate import compute_magnification
@@ -80,8 +80,8 @@ from ptychodus.cli import (
     add_detector_map_arguments,
     add_log_level_argument,
     configure_logging,
+    crop_extent_px,
     positive_int,
-    positive_int_or_auto,
     read_detector_corrections,
 )
 from ptychodus.cli._reconstruct_common import (
@@ -199,11 +199,12 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
     if profile.conditions_patterns:
         parser.add_argument(
             '--crop-extent-px',
-            type=positive_int_or_auto,
+            type=crop_extent_px,
             default=None,
-            help='Square crop side in raw detector pixels, about the beam center, or "auto" '
-            'for the smallest power of two holding the signal above the noise floor. '
-            'Omit to skip.',
+            help='Square crop side in raw detector pixels, about the beam center; "auto" for '
+            'the smallest power of two holding the signal above the noise floor; or "full" '
+            'to read the whole frame. Omitted, it is the --probe-file extent when one is '
+            'given and "auto" otherwise.',
         )
         parser.add_argument(
             '--beam-center-x-px',
@@ -771,10 +772,28 @@ def _warn_unused_probe_propagation(
     )
 
 
+def _read_initial_probe(
+    logger: logging.Logger, args: argparse.Namespace, registry: PluginRegistry
+) -> ProbeEnsemble | None:
+    """The --probe-file warm start, read ahead of the crop it may size, or None."""
+    if args.probe_file is None:
+        return None
+
+    logger.info('Reading the initial probe from %s', args.probe_file)
+    probe_reader = registry.probe_file_readers.get_strategy_by_name(args.probe_file_type)
+    return probe_reader.read(args.probe_file)
+
+
+def _get_probe_extent(probe: ProbeEnsemble) -> ImageExtent:
+    height_px, width_px = probe.get_array().shape[-2:]
+    return ImageExtent(width_px=width_px, height_px=height_px)
+
+
 def _build_initial_probe(
     logger: logging.Logger,
     args: argparse.Namespace,
     registry: PluginRegistry,
+    probe_from_file: ProbeEnsemble | None,
     probe_geometry: ProbeGeometry,
     assembled_data: AssembledDiffractionData,
     *,
@@ -796,19 +815,17 @@ def _build_initial_probe(
     Off axis, a zone-plate probe describes the beam's cross section and is carried into
     the exit frame. A warm start and a probe estimated from the patterns are already in it.
     """
-    if args.probe_file is not None:
-        logger.info('Reading the initial probe from %s', args.probe_file)
-        probe_reader = registry.probe_file_readers.get_strategy_by_name(args.probe_file_type)
-        probe_from_file = probe_reader.read(args.probe_file)
+    if probe_from_file is not None:
         array = probe_from_file.get_mean_probe().get_array()
 
         # The warm-start probe must sit on the same grid as the patterns it will be
-        # refined against; a mismatch means the crop changed since it was written.
+        # refined against. Omitting --crop-extent-px crops to it, so a mismatch means an
+        # explicit or estimated extent disagreed with it.
         if array.shape[-2:] != (probe_geometry.height_px, probe_geometry.width_px):
             raise ValueError(
                 f'Probe file extent {array.shape[-2]}x{array.shape[-1]} does not match the '
                 f'patterns {probe_geometry.height_px}x{probe_geometry.width_px}. '
-                'Reconstruct with the same --crop-extent-px that produced it.'
+                'Omit --crop-extent-px to crop to the probe file.'
             )
 
         _warn_unused_probe_propagation(logger, args, '--probe-file')
@@ -936,6 +953,8 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
     position_reader = registry.probe_position_file_readers.get_strategy_by_name(
         profile.position_reader
     )
+    # Read first, because its extent is the crop when --crop-extent-px is omitted.
+    probe_from_file = _read_initial_probe(logger, args, registry)
 
     logger.info('Reading diffraction from %s as %s', args.diffraction_file, diffraction_reader_name)
     raw_dataset = diffraction_reader.read(args.diffraction_file)
@@ -1032,6 +1051,9 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             bad_pixels=bad_pixels,
             value_filter=value_filter,
             corrections=corrections,
+            warm_start_extent=(
+                None if probe_from_file is None else _get_probe_extent(probe_from_file)
+            ),
         )
         lower_counts, upper_counts = _total_counts_bounds(
             logger, args, raw_dataset, pipeline, bad_pixels, read_region, corrections
@@ -1141,6 +1163,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         logger,
         args,
         registry,
+        probe_from_file,
         probe_geometry,
         assembled_data,
         photon_wavelength_m=photon_wavelength_m,

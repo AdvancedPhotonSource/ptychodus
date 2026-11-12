@@ -30,8 +30,8 @@ Scope and limitations
   reader rather than flattened, because its outer axis is a different stage in
   different units.
 - Diffraction from this instrument is compact: most of the signal sits within a few tens
-  of pixels of the beam center. Crop with --crop-extent-px rather than reconstructing
-  the full frame, and expect the usable radius to bound the resolution.
+  of pixels of the beam center, which the default ``--crop-extent-px`` (auto) keeps
+  without the rest of the frame. Expect the usable radius to bound the resolution.
 - One scan, stock LSQML unless ``--ptychi-options`` names something else.
 - Output is a ptychodus product HDF5. Feeding it back as ``--probe-file`` on the next
   scan is the intended warm start.

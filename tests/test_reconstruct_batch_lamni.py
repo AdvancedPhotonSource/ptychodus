@@ -78,6 +78,17 @@ def test_a_minimal_file_is_valid_and_every_other_section_defaults() -> None:
     assert settings.misc.save_diffraction
 
 
+@pytest.mark.parametrize('value', ['auto', 'full', 128])
+def test_the_crop_extent_takes_auto_full_or_a_size(value: str | int) -> None:
+    settings = _settings(f'diffraction:\n  crop_extent_px: {value}\n')
+    assert settings.diffraction.crop_extent_px == value
+
+
+def test_an_unset_crop_extent_is_left_for_the_run_to_resolve() -> None:
+    """Unset is not "full": it means the initial probe file's extent, else auto."""
+    assert _settings().diffraction.crop_extent_px is None
+
+
 def test_skipping_finished_scans_is_the_default() -> None:
     """A 1400-projection run that dies partway must resume by re-running the command."""
     assert not _settings().batch.overwrite_existing_products
