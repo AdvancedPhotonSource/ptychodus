@@ -296,7 +296,8 @@ class PtychoFMTrainingDataFileWriter(TrainingDataFileWriter):
         return 'PtychoFM Training Pair'
 
     def get_file_extensions(self) -> set[str]:
-        return FileFormat.HDF5.extensions
+        # ptycho_fm opens a training pair only under '.hdf5', so offer no other spelling
+        return {'.hdf5'}
 
     def write(self, file_path: Path, parameters: ReconstructInput) -> None:
         save_training_data(file_path, parameters)

@@ -90,8 +90,21 @@ def _captured(excinfo: pytest.ExceptionInfo[ChildError]) -> dict[str, Any]:
 # ----------------------------- spawned child -----------------------------
 
 
-def _capture_train_call(options: dict[str, Any]) -> dict[str, Any]:
-    """What the child hands the stubbed training door, given these dumped options."""
+def _write_training_archive(file_path: Path, num_frames: int) -> None:
+    numpy.savez(
+        file_path,
+        xcoords=numpy.arange(num_frames, dtype=float),
+        ycoords=numpy.arange(num_frames, dtype=float),
+        diff3d=numpy.ones((num_frames, DETECTOR_PX, DETECTOR_PX)),
+        probeGuess=numpy.ones((DETECTOR_PX, DETECTOR_PX), dtype=complex),
+        objectGuess=numpy.ones((32, 32), dtype=complex),
+    )
+
+
+def _train_error(
+    options: dict[str, Any], input_directory: Path, output_directory: Path
+) -> pytest.ExceptionInfo[ChildError]:
+    """The error the child ends a training session with, given these dumped options."""
     adapter = SubprocessReconstructor(
         name='PtychoPINN train probe',
         child_module=FIXTURES_MODULE,
@@ -104,25 +117,43 @@ def _capture_train_call(options: dict[str, Any]) -> dict[str, Any]:
 
     with pytest.raises(ChildError) as excinfo:
         list(
-            adapter.train(
-                Path('/unused/input'), Path('/unused/output'), options=adapter.get_default_options()
-            )
+            adapter.train(input_directory, output_directory, options=adapter.get_default_options())
         )
 
-    return _captured(excinfo)
+    return excinfo
 
 
-def test_train_hands_the_public_door_a_settings_mapping(monkeypatch: pytest.MonkeyPatch) -> None:
+def _capture_train_call(
+    options: dict[str, Any], input_directory: Path, output_directory: Path
+) -> dict[str, Any]:
+    """What the child hands the stubbed training door, given these dumped options."""
+    return _captured(_train_error(options, input_directory, output_directory))
+
+
+_UNSUPERVISED_OPTIONS: dict[str, Any] = {
+    'settings': {'mode': 'Unsupervised', 'epochs': 3},
+    'accelerator': 'cpu',
+    'num_workers': 2,
+}
+
+
+@pytest.fixture
+def one_archive(tmp_path: Path) -> Path:
+    directory = tmp_path / 'input'
+    directory.mkdir()
+    _write_training_archive(directory / 'train_data.npz', NUM_POSITIONS)
+    return directory
+
+
+def test_train_hands_the_public_door_a_settings_mapping(
+    monkeypatch: pytest.MonkeyPatch, one_archive: Path, tmp_path: Path
+) -> None:
     """Training goes through the dataset-to-bundle door, not a config object."""
     monkeypatch.delenv('LOCAL_WORLD_SIZE', raising=False)
-    captured = _capture_train_call(
-        {
-            'settings': {'mode': 'Unsupervised', 'epochs': 3},
-            'accelerator': 'cpu',
-            'num_workers': 2,
-        }
-    )
+    captured = _capture_train_call(_UNSUPERVISED_OPTIONS, one_archive, tmp_path / 'output')
+    # A lone archive is handed over as it is, whatever its name.
     assert captured['dataset_name'] == 'train_data.npz'
+    assert captured['dataset_parent'] == str(one_archive)
     assert captured['settings_is_mapping'] is True
     assert captured['mode'] == 'Unsupervised'
     # Naming nphotons would rescale already-counted data; see _build_settings.
@@ -136,7 +167,7 @@ def test_train_hands_the_public_door_a_settings_mapping(monkeypatch: pytest.Monk
 
 
 def test_train_under_a_distributed_launcher_claims_one_device_per_local_rank(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, one_archive: Path, tmp_path: Path
 ) -> None:
     """Lightning's TorchElastic environment rejects a device count other than its own."""
     # Inherited by the spawned child, as a launcher's variables are.
@@ -146,11 +177,45 @@ def test_train_under_a_distributed_launcher_claims_one_device_per_local_rank(
             'settings': {'mode': 'Unsupervised', 'epochs': 3},
             'accelerator': 'gpu',
             'num_workers': 0,
-        }
+        },
+        one_archive,
+        tmp_path / 'output',
     )
 
     assert captured['execution_values']['devices'] == 2
     assert 'devices' in captured['explicit_fields']
+
+
+def test_train_merges_several_archives_into_one_object_bank(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv('LOCAL_WORLD_SIZE', raising=False)
+    input_directory = tmp_path / 'input'
+    input_directory.mkdir()
+    _write_training_archive(input_directory / 'train_data_0000.npz', 3)
+    _write_training_archive(input_directory / 'train_data_0001.npz', 5)
+    (input_directory / 'notes.npz').write_bytes(b'not an archive')
+    output_directory = tmp_path / 'output'
+
+    captured = _capture_train_call(_UNSUPERVISED_OPTIONS, input_directory, output_directory)
+
+    assert captured['num_frames'] == 8
+    assert captured['object_indexes'] == [0, 1]
+    # One canvas cannot hold two objects, and unsupervised training needs no patches.
+    assert 'objectGuess' not in captured['dataset_keys']
+    assert 'Y' not in captured['dataset_keys']
+    assert Path(captured['dataset_parent']).parent == output_directory
+    # The private merge directory is gone once training returns, or fails.
+    assert list(output_directory.iterdir()) == []
+
+
+def test_train_refuses_a_directory_without_archives(tmp_path: Path) -> None:
+    input_directory = tmp_path / 'input'
+    input_directory.mkdir()
+
+    excinfo = _train_error(_UNSUPERVISED_OPTIONS, input_directory, tmp_path / 'output')
+
+    assert excinfo.value.child_exception_type == 'FileNotFoundError'
 
 
 def test_reconstruct_stages_declared_arrays_through_the_embedder_seam() -> None:

@@ -28,7 +28,6 @@ from ..assemble import AssembledDiffractionData, DetectorCorrections
 from ..constants import PI, TWO_PI
 from ..diffraction import DiffractionPatterns
 from ..geometry import ImageExtent, PixelGeometry
-from ..interpolate import lerp
 from ..object import Object, ObjectGeometry, ObjectGeometryProvider, resample_object_layers
 from ..patch import (
     accumulate_patches_on,
@@ -1488,6 +1487,260 @@ def generate_fractal_noise_object(
     )
 
 
+def _integrate_power_law(lower: float, upper: float, exponent: float) -> float:
+    """Return the integral of ``r**-exponent`` over ``[lower, upper]``."""
+    if math.isclose(exponent, 1.0):
+        return math.log(upper / lower)
+
+    power = 1.0 - exponent
+    return (upper**power - lower**power) / power
+
+
+def _sample_truncated_power_law(
+    rng: numpy.random.Generator, lower: float, upper: float, exponent: float, size: int
+) -> RealArrayType:
+    """Draw *size* values with density proportional to ``r**-exponent`` on ``[lower, upper]``.
+
+    Inverse-CDF sampling, valid for any real exponent; an exponent of one is log-uniform.
+    """
+    uniform = rng.uniform(size=size)
+
+    if math.isclose(exponent, 1.0):
+        return lower * numpy.power(upper / lower, uniform)
+
+    power = 1.0 - exponent
+    lower_power = lower**power
+    upper_power = upper**power
+    return numpy.power(lower_power + uniform * (upper_power - lower_power), 1.0 / power)
+
+
+def _sample_window_leaves(
+    rng: numpy.random.Generator,
+    lower: float,
+    upper: float,
+    exponent: float,
+    width: float,
+    height: float,
+    size: int,
+) -> tuple[RealArrayType, RealArrayType, RealArrayType]:
+    """Draw *size* leaves of a Poisson dead-leaves process that can reach a window.
+
+    The window is ``[0, width) x [0, height)`` and leaf radii have density proportional to
+    ``r**-exponent`` on ``[lower, upper]``. A leaf of radius r is kept when its center
+    lies in the window widened by r, so the kept radii have density proportional to
+    ``r**-exponent * (width + 2r) * (height + 2r)``: a three-term mixture of truncated
+    power laws, sampled exactly. The centers are then uniform in the widened window.
+
+    Returns:
+        The center x, center y and radius of each leaf.
+    """
+    weights = numpy.array(
+        [
+            width * height * _integrate_power_law(lower, upper, exponent),
+            2.0 * (width + height) * _integrate_power_law(lower, upper, exponent - 1.0),
+            4.0 * _integrate_power_law(lower, upper, exponent - 2.0),
+        ]
+    )
+    component = rng.choice(len(weights), size=size, p=weights / weights.sum())
+    radius: RealArrayType = numpy.empty(size)
+
+    for degree in range(len(weights)):
+        is_component = component == degree
+        radius[is_component] = _sample_truncated_power_law(
+            rng, lower, upper, exponent - degree, int(numpy.count_nonzero(is_component))
+        )
+
+    center_x = rng.uniform(-radius, width + radius)
+    center_y = rng.uniform(-radius, height + radius)
+    return center_x, center_y, radius
+
+
+def _propose_leaf_hitting_points(
+    rng: numpy.random.Generator,
+    points_x: RealArrayType,
+    points_y: RealArrayType,
+    lower: float,
+    upper: float,
+    exponent: float,
+) -> tuple[float, float, float, BooleanArrayType, int]:
+    """Draw the next leaf of a Poisson dead-leaves process that covers one of the points.
+
+    Karp-Luby-Madras union sampling: a radius weighted by leaf area, a point chosen
+    uniformly, and a center uniform in the disk of that radius about it propose a leaf
+    with density proportional to ``p(r) * k``, where k counts the points it covers.
+    Accepting with probability ``1 / k`` leaves exactly the process's leaves that cover
+    at least one point, so no draw is ever spent on a leaf that covers none.
+
+    Returns:
+        The accepted leaf's center x, center y and radius, the mask of the points it
+        covers (never empty), and the number of proposals it took.
+    """
+    num_proposals = 0
+
+    while True:
+        num_proposals += 1
+        radius = float(_sample_truncated_power_law(rng, lower, upper, exponent - 2.0, 1)[0])
+        anchor = int(rng.integers(len(points_x)))
+        distance = radius * math.sqrt(rng.uniform())
+        angle = TWO_PI * rng.uniform()
+        center_x = float(points_x[anchor]) + distance * math.cos(angle)
+        center_y = float(points_y[anchor]) + distance * math.sin(angle)
+        is_covered = numpy.hypot(points_x - center_x, points_y - center_y) <= radius
+        num_covered = int(numpy.count_nonzero(is_covered))
+
+        # num_covered is zero only when rounding puts the anchor just outside the disk
+        if num_covered > 0 and rng.uniform() * num_covered < 1.0:
+            return center_x, center_y, radius, is_covered, num_proposals
+
+
+@dataclass(frozen=True)
+class _LeafMarks:
+    """The transmission each leaf carries: uniform phase, amplitude uniform in intensity."""
+
+    amplitude_lower: float
+    amplitude_upper: float
+    phase_lower_rad: float
+    phase_upper_rad: float
+
+    def draw(self, rng: numpy.random.Generator, size: int) -> ComplexArrayType:
+        phase_rad = rng.uniform(self.phase_lower_rad, self.phase_upper_rad, size=size)
+        amplitude = numpy.sqrt(
+            rng.uniform(self.amplitude_lower**2, self.amplitude_upper**2, size=size)
+        )
+        return amplitude * numpy.exp(1j * phase_rad)
+
+
+class _DeadLeavesCanvas:
+    """A dead-leaves field painted front to back onto jittered pixel subsamples.
+
+    Coordinates are in pixel widths, with y scaled by the pixel aspect ratio so leaves are
+    disks in physical space. Each pixel holds a stratified n x n grid of subsamples, one
+    uniformly jittered point per cell. A leaf lies beneath every leaf painted before it,
+    so it claims only subsamples still uncovered, and a pixel's value is the mean
+    transmission of its subsamples. The field is complete, and exact, once every
+    subsample is claimed.
+    """
+
+    _BATCH_SIZE: Final[int] = 1024
+    _TAIL_SIZE: Final[int] = 2048
+    """Uncovered subsamples at which painting switches to drawing only leaves that cover one."""
+
+    def __init__(
+        self,
+        rng: numpy.random.Generator,
+        *,
+        width_px: int,
+        height_px: int,
+        aspect: float,
+        num_subsamples_per_axis: int,
+    ) -> None:
+        num_subsamples = num_subsamples_per_axis**2
+        shape = (height_px, width_px, num_subsamples)
+        cell_y, cell_x = numpy.divmod(numpy.arange(num_subsamples), num_subsamples_per_axis)
+        jitter = rng.uniform(size=(2, *shape))
+
+        self._width_px = width_px
+        self._height_px = height_px
+        self._aspect = aspect
+        self._num_subsamples = num_subsamples
+        self._offset_x: RealArrayType = ((cell_x + jitter[0]) / num_subsamples_per_axis).astype(
+            numpy.float32
+        )
+        self._offset_y: RealArrayType = ((cell_y + jitter[1]) / num_subsamples_per_axis).astype(
+            numpy.float32
+        )
+        self._is_uncovered: BooleanArrayType = numpy.ones(shape, dtype=bool)
+        self._num_uncovered = self._is_uncovered.size
+        self._pixel_sum: ComplexArrayType = numpy.zeros((height_px, width_px), dtype=complex)
+        self.num_leaves = 0
+        self.num_tail_leaves = 0
+        self.num_tail_proposals = 0
+
+    def fill(
+        self,
+        rng: numpy.random.Generator,
+        marks: _LeafMarks,
+        *,
+        radius_lower_px: float,
+        radius_upper_px: float,
+        radius_exponent: float,
+    ) -> None:
+        """Paint leaves until every subsample is covered."""
+        width = float(self._width_px)
+        height = self._height_px * self._aspect
+
+        while self._num_uncovered > self._TAIL_SIZE:
+            centers_x, centers_y, radii = _sample_window_leaves(
+                rng,
+                radius_lower_px,
+                radius_upper_px,
+                radius_exponent,
+                width,
+                height,
+                self._BATCH_SIZE,
+            )
+            values = marks.draw(rng, self._BATCH_SIZE)
+
+            for center_x, center_y, radius, value in zip(centers_x, centers_y, radii, values):
+                self._paint(float(center_x), float(center_y), float(radius), complex(value))
+                self.num_leaves += 1
+
+                if self._num_uncovered <= self._TAIL_SIZE:
+                    break
+
+        rows, columns, subsamples = numpy.nonzero(self._is_uncovered)
+        points_x = columns + self._offset_x[rows, columns, subsamples]
+        points_y = (rows + self._offset_y[rows, columns, subsamples]) * self._aspect
+        pixel_indexes = rows * self._width_px + columns
+        flat_pixel_sum = self._pixel_sum.reshape(-1)
+
+        while points_x.size > 0:
+            _, _, _, is_covered, num_proposals = _propose_leaf_hitting_points(
+                rng, points_x, points_y, radius_lower_px, radius_upper_px, radius_exponent
+            )
+            value = marks.draw(rng, 1)[0]
+            numpy.add.at(flat_pixel_sum, pixel_indexes[is_covered], value)
+            is_kept = ~is_covered
+            points_x = points_x[is_kept]
+            points_y = points_y[is_kept]
+            pixel_indexes = pixel_indexes[is_kept]
+            self.num_leaves += 1
+            self.num_tail_leaves += 1
+            self.num_tail_proposals += num_proposals
+
+        self._is_uncovered[...] = False
+        self._num_uncovered = 0
+
+    def _paint(self, center_x: float, center_y: float, radius: float, value: complex) -> None:
+        """Lay one leaf beneath those already painted, within its clipped bounding box."""
+        column_start = max(math.floor(center_x - radius), 0)
+        column_stop = min(math.floor(center_x + radius) + 1, self._width_px)
+        row_start = max(math.floor((center_y - radius) / self._aspect), 0)
+        row_stop = min(math.floor((center_y + radius) / self._aspect) + 1, self._height_px)
+
+        if column_start >= column_stop or row_start >= row_stop:
+            return
+
+        box = (slice(row_start, row_stop), slice(column_start, column_stop))
+        is_uncovered = self._is_uncovered[box]
+
+        if not is_uncovered.any():
+            return
+
+        dx = numpy.arange(column_start, column_stop)[None, :, None] + self._offset_x[box]
+        dx -= center_x
+        dy = (numpy.arange(row_start, row_stop)[:, None, None] + self._offset_y[box]) * self._aspect
+        dy -= center_y
+        is_claimed = is_uncovered & (dx * dx + dy * dy <= radius * radius)
+        num_claimed = numpy.count_nonzero(is_claimed, axis=-1)
+        self._pixel_sum[box] += value * num_claimed
+        is_uncovered &= ~is_claimed
+        self._num_uncovered -= int(num_claimed.sum())
+
+    def to_array(self) -> ComplexArrayType:
+        return self._pixel_sum / self._num_subsamples
+
+
 def generate_dead_leaves_object(
     rng: numpy.random.Generator,
     geometry: ObjectGeometry,
@@ -1499,16 +1752,27 @@ def generate_dead_leaves_object(
     leaf_amplitude_upper: float,
     leaf_phase_lower_rad: float,
     leaf_phase_upper_rad: float,
+    num_subsamples_per_axis: int = 2,
 ) -> Object:
-    """Generate a complex object by layering randomly-sized and positioned disks (dead-leaves model)."""
-    # TODO consider using Poisson disk sampling or CVT for sample positions
-    # TODO include pixel aspect ratio in sample position calculation
-    _sample_positions = [
-        (1.0 / 3, 1.0 / 3),
-        (1.0 / 3, 2.0 / 3),
-        (2.0 / 3, 1.0 / 3),
-        (2.0 / 3, 2.0 / 3),
-    ]
+    """Generate a complex object from the stationary dead-leaves model.
+
+    Leaves are disks dropped by a Poisson process, each hiding whatever lies beneath it.
+    Radii have density proportional to ``r**-leaf_radius_power_law_exponent`` on
+    ``[leaf_radius_lower_px, leaf_radius_upper_px]``, in pixel widths, and an exponent of
+    three makes the field scale invariant. Leaves are circular in physical space, also on
+    non-square pixels. Each leaf's transmission has a phase uniform on ``[leaf_phase_lower_rad,
+    leaf_phase_upper_rad)`` and an amplitude whose square is uniform on
+    ``[leaf_amplitude_lower**2, leaf_amplitude_upper**2)``.
+
+    The sample is exact, not an approximation that improves with more leaves: leaves are
+    painted front to back, so the field seen through the window is final as soon as the
+    window is covered, and once few points remain uncovered only leaves that cover one
+    are drawn. Each pixel is the mean transmission over ``num_subsamples_per_axis**2``
+    stratified, jittered points, the box-filtered sample of the continuous field. Memory
+    grows as about ``9 * num_subsamples_per_axis**2`` bytes per pixel.
+    """
+    if leaf_radius_lower_px <= 0.0:
+        raise ValueError('leaf_radius_lower_px must be strictly positive')
 
     if leaf_radius_lower_px >= leaf_radius_upper_px:
         raise ValueError('leaf_radius_lower_px must be less than leaf_radius_upper_px')
@@ -1519,62 +1783,37 @@ def generate_dead_leaves_object(
     if leaf_phase_lower_rad >= leaf_phase_upper_rad:
         raise ValueError('leaf_phase_lower_rad must be less than leaf_phase_upper_rad')
 
-    object_shape = (geometry.height_px, geometry.width_px)
-    is_covered = numpy.zeros(object_shape, dtype=bool)
-    amplitude: RealArrayType = numpy.zeros(object_shape, dtype=float)
-    phase_rad: RealArrayType = numpy.zeros(object_shape, dtype=float)
+    if num_subsamples_per_axis < 1:
+        raise ValueError('num_subsamples_per_axis must be at least one')
 
-    position_y_px, position_x_px = numpy.indices(object_shape)
-    num_covered_pixels = 0
-
-    beta = 1.0 - leaf_radius_power_law_exponent
-    coef = numpy.power(leaf_radius_upper_px / leaf_radius_lower_px, beta) - 1.0
-
-    for leaf in range(100000):  # large value eliminates possiblity of infinite loop
-        leaf_radius_px = leaf_radius_lower_px * numpy.power(1.0 + rng.uniform() * coef, 1.0 / beta)
-        leaf_position_x_px = rng.uniform(-leaf_radius_px, geometry.width_px + leaf_radius_px)
-        leaf_position_y_px = rng.uniform(-leaf_radius_px, geometry.height_px + leaf_radius_px)
-        leaf_phase_rad = rng.uniform(
-            leaf_phase_lower_rad,
-            leaf_phase_upper_rad,
-            size=(1, 1),
-        )
-        leaf_amplitude = numpy.sqrt(
-            rng.uniform(
-                leaf_amplitude_lower**2,
-                leaf_amplitude_upper**2,
-                size=(1, 1),
-            )
-        )
-
-        leaf_counts = numpy.zeros_like(is_covered, dtype=int)
-        dx = position_x_px - leaf_position_x_px
-        dy = position_y_px - leaf_position_y_px
-
-        # multi-sample anti-aliasing
-        for u_y, u_x in _sample_positions:
-            sample_distance_px = numpy.hypot(dy + u_y, dx + u_x)
-            leaf_counts[sample_distance_px <= leaf_radius_px] += 1
-
-        num_samples = len(_sample_positions)
-        leaf_coverage = leaf_counts / num_samples
-        amplitude = lerp(amplitude, leaf_amplitude, leaf_coverage)
-        phase_rad = lerp(phase_rad, leaf_phase_rad, leaf_coverage)
-
-        is_covered |= leaf_counts == num_samples
-        num_covered_pixels = int(numpy.count_nonzero(is_covered))
-
-        covered_pct = 100 * num_covered_pixels / is_covered.size
-        logger.info(f'leaves = {leaf}, covered = {covered_pct:.2f}%')
-
-        if num_covered_pixels == is_covered.size:
-            break
-
-    array = amplitude * numpy.exp(1j * phase_rad)
+    pixel_geometry = geometry.get_pixel_geometry()
+    canvas = _DeadLeavesCanvas(
+        rng,
+        width_px=geometry.width_px,
+        height_px=geometry.height_px,
+        aspect=pixel_geometry.height_m / pixel_geometry.width_m,
+        num_subsamples_per_axis=num_subsamples_per_axis,
+    )
+    canvas.fill(
+        rng,
+        _LeafMarks(
+            amplitude_lower=leaf_amplitude_lower,
+            amplitude_upper=leaf_amplitude_upper,
+            phase_lower_rad=leaf_phase_lower_rad,
+            phase_upper_rad=leaf_phase_upper_rad,
+        ),
+        radius_lower_px=leaf_radius_lower_px,
+        radius_upper_px=leaf_radius_upper_px,
+        radius_exponent=leaf_radius_power_law_exponent,
+    )
+    logger.debug(
+        f'Dead leaves: {canvas.num_leaves} leaves, the last {canvas.num_tail_leaves} '
+        f'from {canvas.num_tail_proposals} proposals.'
+    )
 
     return Object(
-        array=array.astype('complex'),
-        pixel_geometry=geometry.get_pixel_geometry(),
+        array=canvas.to_array(),
+        pixel_geometry=pixel_geometry,
         center=geometry.get_center(),
     )
 

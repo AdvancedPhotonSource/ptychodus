@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 """Train a reconstructor's model from a directory of training data.
 
-The training data are in the backend's own format -- ``train_data.npz`` for PtychoPINN --
-as the GUI exports them, and are only read. The backend writes what it trains into the output
+The training data are in the backend's own format -- for PtychoPINN, every ``*.npz``
+archive in the directory -- as the GUI or ``ptychodus-generate-training-data`` writes them,
+and are only read. The backend writes what it trains into the output
 directory, and the main process adds the trained model there as ``model`` with the backend's
 extension, the name a later run reads it under. It reads no settings file and builds no
 application model.

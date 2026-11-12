@@ -129,7 +129,7 @@ class FractalNoiseObjectGenerator(ObjectGenerator):
 
 
 class DeadLeavesOptions(BaseModel):
-    leaf_radius_lower_px: float = Field(2.0, ge=0.0, title='Leaf Radius Lower:')
+    leaf_radius_lower_px: float = Field(2.0, gt=0.0, title='Leaf Radius Lower:')
     leaf_radius_upper_px: float = Field(999.0, ge=0.0, title='Leaf Radius Upper:')
     leaf_radius_power_law_exponent: float = Field(
         3.0, ge=1.0, title='Leaf Radius Power Law Exponent:'
@@ -138,10 +138,21 @@ class DeadLeavesOptions(BaseModel):
     leaf_amplitude_upper: float = Field(1.0, ge=0.0, le=1.0, title='Leaf Amplitude Upper:')
     leaf_phase_lower_rad: float = Field(-PI, title='Leaf Phase Lower:')
     leaf_phase_upper_rad: float = Field(PI, title='Leaf Phase Upper:')
+    num_subsamples_per_axis: int = Field(
+        2,
+        ge=1,
+        le=4,
+        title='Number of Subsamples Per Axis:',
+        description='Each pixel averages this many jittered points along each axis.',
+    )
 
 
 class DeadLeavesObjectGenerator(ObjectGenerator):
-    """Disks of power-law radii and uniform transmissions, layered over one another."""
+    """Disks of power-law radii and uniform transmissions, each hiding those beneath it.
+
+    An exact sample of the stationary dead-leaves model, with leaves circular in physical
+    space and each pixel the mean transmission over its jittered subsamples.
+    """
 
     def get_default_options(self) -> BaseModel:
         return DeadLeavesOptions()
@@ -165,4 +176,5 @@ class DeadLeavesObjectGenerator(ObjectGenerator):
             leaf_amplitude_upper=leaves.leaf_amplitude_upper,
             leaf_phase_lower_rad=leaves.leaf_phase_lower_rad,
             leaf_phase_upper_rad=leaves.leaf_phase_upper_rad,
+            num_subsamples_per_axis=leaves.num_subsamples_per_axis,
         )

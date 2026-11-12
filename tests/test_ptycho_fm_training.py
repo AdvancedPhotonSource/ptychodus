@@ -175,11 +175,14 @@ class TestPtychoFMTrainingDataFileWriter:
         product = PtychoFMProductFileReader().read(tmp_path / 'scan_para.h5')
         assert len(product.probe_positions) == NUM_POSITIONS
 
-    def test_the_readers_offer_the_extensions_the_writer_does(self) -> None:
+    def test_the_readers_accept_every_extension_the_writer_offers(self) -> None:
         assert (
-            PtychoFMProductFileReader().get_file_extensions()
-            == PtychoFMTrainingDataFileWriter().get_file_extensions()
+            PtychoFMTrainingDataFileWriter().get_file_extensions()
+            <= PtychoFMProductFileReader().get_file_extensions()
         )
+
+    def test_the_writer_offers_only_the_extension_ptycho_fm_trains_from(self) -> None:
+        assert PtychoFMTrainingDataFileWriter().get_file_extensions() == {'.hdf5'}
 
 
 class TestPtychoFMProductFileReader:

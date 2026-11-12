@@ -125,9 +125,23 @@ def capture_ptychopinn_train_call(payload: Any, queue: Any) -> None:
 
     def train(dataset: Any, output_dir: Any, settings: Any, **kwargs: Any) -> None:
         execution_config = kwargs['execution_config']
+
+        with numpy.load(dataset, allow_pickle=False) as archive:
+            dataset_keys = sorted(archive.files)
+            num_frames = len(archive['xcoords'])
+            object_indexes = (
+                sorted({int(i) for i in archive['object_index']})
+                if 'object_index' in archive.files
+                else None
+            )
+
         raise ChildCallCapturedError(
             {
                 'dataset_name': str(dataset.name),
+                'dataset_parent': str(dataset.parent),
+                'dataset_keys': dataset_keys,
+                'num_frames': num_frames,
+                'object_indexes': object_indexes,
                 'settings_is_mapping': isinstance(settings, Mapping),
                 'has_nphotons': 'nphotons' in settings,
                 'mode': settings.get('mode'),

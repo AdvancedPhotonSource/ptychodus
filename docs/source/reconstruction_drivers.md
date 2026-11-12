@@ -352,7 +352,7 @@ uses, so results land where that workflow expects them.
 
 ## Training a model
 
-`ptychodus-train` trains a learned reconstructor such as PtychoPINN from training data in the backend's own format, as the GUI's export writes it — `train_data.npz` for PtychoPINN. It reads no raw beamline files and no settings file, and leaves the input directory untouched.
+`ptychodus-train` trains a learned reconstructor such as PtychoPINN from a directory of training data in the backend's own format, as the GUI's export or `ptychodus-generate-training-data` writes it — every PtychoPINN archive (`*.npz`) in the directory, merged into one object bank when there are several, or PtychoFM's `_dp`/`_para` pairs. It reads no raw beamline files and no settings file, and leaves the input directory untouched. [Training Data](training.md) shows how to write such a directory from measured scans and synthetic objects.
 
 Its options come from a YAML document, as `ptychodus-enhance-xrf`'s do. `--print-options` writes one at the defaults, naming the library and the algorithm beside every field, and `--options` passes an edited copy back. Fields it omits keep their defaults; a misspelled field, or one the backend fixes, is refused rather than ignored.
 

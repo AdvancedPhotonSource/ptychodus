@@ -20,6 +20,7 @@ near_field
 bragg_laue
 readers
 reconstruction_drivers
+training
 api
 globus
 stream

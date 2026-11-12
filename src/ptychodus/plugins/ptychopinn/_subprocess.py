@@ -10,8 +10,8 @@ Two entry points are exposed:
 - :func:`run_reconstruct` -- load a trained bundle, run one inference pass,
   stream back a single :class:`ReconstructOutput`.
 - :func:`run_train` -- run one training session through the backend's public
-  dataset-to-bundle door, then stream back the final :class:`TrainOutput`
-  plus the saved bundle path.
+  dataset-to-bundle door on every training archive in the input directory,
+  then stream back the final :class:`TrainOutput` plus the saved bundle path.
 
 Neither entry point reads ptychodus settings. Training receives an
 already-translated settings mapping on its payload; inference takes its model,
@@ -21,8 +21,10 @@ data and probe identity from the bundle.
 from __future__ import annotations
 
 import csv
+import importlib
 import logging
 import os
+import shutil
 import tempfile
 from collections.abc import Sequence
 from dataclasses import replace
@@ -40,6 +42,11 @@ from ptychodus.api.reconstruct import (
     ReconstructorMessage,
     SubprocessPayload,
     TrainOutput,
+)
+from ptychodus.api.typing import ComplexArrayType
+from ptychodus.plugins.ptychopinn.training_file import (
+    find_ptychopinn_training_archives,
+    merge_ptychopinn_training_archives,
 )
 
 logger = logging.getLogger(__name__)
@@ -260,11 +267,37 @@ def _read_epoch_losses(output_path: Path) -> tuple[list[LossValue], list[LossVal
     return collect(train_column), collect(val_column)
 
 
+def _compute_truth_patches(file_path: Path) -> ComplexArrayType:
+    """Each frame's ground-truth object patch, cut from the archive's objectGuess by the backend.
+
+    Cutting with the backend's own grouping keeps the patch convention its supervised loss
+    expects; one-member groups taken in order give one patch per frame.
+    """
+    # ptycho ships beside ptycho_torch, without type information
+    raw_data = importlib.import_module('ptycho.raw_data').RawData.from_file(str(file_path))
+    num_frames, patch_size = raw_data.diff3d.shape[:2]
+    grouped = raw_data.generate_grouped_data(
+        patch_size, nsamples=num_frames, gridsize=1, sequential_sampling=True
+    )
+
+    if grouped.get('Y') is None:
+        raise ValueError(
+            f'{file_path.name} holds no objectGuess, which supervised training of several '
+            'archives cuts its ground truth from.'
+        )
+
+    return numpy.asarray(grouped['Y'])[..., 0]
+
+
 def run_train(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None:
     """Child entry point for one training session.
 
     Hands the already-translated settings mapping to the backend's public
     dataset-to-bundle training door, on the devices this child was started to see.
+    That door takes one archive, so several in the input directory are first merged
+    into one object bank in a private directory under the output directory -- private
+    so that ranks of a distributed launch never share it -- and removed afterwards.
+    A supervised bank carries ground-truth patches; an unsupervised one needs none.
     """
 
     from ptycho_torch.execution_request import ExecutionRequest
@@ -286,15 +319,35 @@ def run_train(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None:
         'enable_progress_bar': False,
     }
 
-    bundle_path = train(
-        input_directory / 'train_data.npz',
-        output_directory,
-        settings,
-        execution_config=ExecutionRequest(
-            values=execution_values,
-            explicit_fields=frozenset(execution_values),
-        ),
-    )
+    archives = find_ptychopinn_training_archives(input_directory)
+    merge_directory: Path | None = None
+
+    try:
+        if len(archives) == 1:
+            dataset = archives[0]
+        else:
+            output_directory.mkdir(parents=True, exist_ok=True)
+            merge_directory = Path(tempfile.mkdtemp(prefix='.merged-', dir=output_directory))
+            is_supervised = settings.get('mode') == 'Supervised'
+            dataset = merge_ptychopinn_training_archives(
+                archives,
+                merge_directory / 'train_data',
+                truth_patches=_compute_truth_patches if is_supervised else None,
+            )
+            logger.info(f'Merged {len(archives)} training archives into one object bank.')
+
+        bundle_path = train(
+            dataset,
+            output_directory,
+            settings,
+            execution_config=ExecutionRequest(
+                values=execution_values,
+                explicit_fields=frozenset(execution_values),
+            ),
+        )
+    finally:
+        if merge_directory is not None:
+            shutil.rmtree(merge_directory, ignore_errors=True)
 
     training_loss, validation_loss = _read_epoch_losses(output_directory)
 
