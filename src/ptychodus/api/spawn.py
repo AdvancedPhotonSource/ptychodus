@@ -217,10 +217,17 @@ def _child_main(
 
 @dataclass
 class _RunState:
-    """A spawned child process and the queue it reports on."""
+    """A spawned child process and the queue it reports on.
+
+    ``is_exiting`` is set once the child reports an error or the end-of-stream
+    sentinel, after which it exits on its own and is waited for rather than
+    terminated: a SIGTERM landing in its exit cleanup would leave the semaphores
+    it created registered with the resource tracker.
+    """
 
     process: SpawnProcess
     queue: SimpleQueue[Any]
+    is_exiting: bool = False
 
 
 @contextmanager
@@ -250,9 +257,11 @@ def run_subprocess(
     ``environment`` is applied in the child before its entry point is imported,
     which is what makes it the place to restrict the devices the child can see.
 
-    On ``__exit__``, the child is terminated (SIGTERM), joined with
-    ``terminate_grace_sec`` seconds of grace, then killed (SIGKILL) if it did
-    not exit. This mirrors the ptychozoon shutdown discipline.
+    On ``__exit__``, a child that has reported an error or the end-of-stream
+    sentinel is joined, since it is already exiting; any other child is
+    terminated (SIGTERM) first. Either way it gets ``terminate_grace_sec``
+    seconds of grace, then is killed (SIGKILL) if it did not exit. This mirrors
+    the ptychozoon shutdown discipline.
     """
     if log_level is None:
         log_level = logging.getLogger().getEffectiveLevel()
@@ -276,6 +285,7 @@ def _iter_events(state: _RunState) -> Iterator[tuple[Any, ...]]:
     while True:
         item = state.queue.get()
         if item is None:
+            state.is_exiting = True
             return
 
         tag = item[0]
@@ -286,6 +296,7 @@ def _iter_events(state: _RunState) -> Iterator[tuple[Any, ...]]:
             continue
 
         if tag == ChildMessage.ERROR:
+            state.is_exiting = True
             _, tb, type_name, pickled_exc = item
             child_exc: BaseException | None = None
             if pickled_exc is not None:
@@ -305,7 +316,7 @@ def _iter_events(state: _RunState) -> Iterator[tuple[Any, ...]]:
 
 def _shutdown(state: _RunState, grace_sec: float) -> None:
     process = state.process
-    if process.is_alive():
+    if process.is_alive() and not state.is_exiting:
         process.terminate()
     process.join(timeout=grace_sec)
     if process.is_alive():

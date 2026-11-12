@@ -217,6 +217,43 @@ def test_hanging_child_is_terminated_on_iterator_close(monkeypatch: pytest.Monke
     assert process.exitcode is not None
 
 
+@pytest.mark.parametrize('reconstruct_function', ['yield_n_outputs', 'raise_immediately'])
+def test_finished_child_exits_on_its_own(
+    monkeypatch: pytest.MonkeyPatch, reconstruct_function: str
+) -> None:
+    """A child that has sent its sentinel is joined, not terminated.
+
+    A SIGTERM landing in the child's exit cleanup leaves the semaphores it
+    created registered with the resource tracker, which warns about them when
+    the parent exits; a zero exit code shows the child was left to finish.
+    """
+
+    product = _minimal_product()
+
+    def dump_options(parameters: ReconstructInput, _options: BaseModel) -> Any:
+        return {'n': 1, 'product': product, 'message': 'boom'}
+
+    recorded = _ProcessRecordingContext(multiprocessing.get_context('spawn'))
+    monkeypatch.setattr(spawn.multiprocessing, 'get_context', lambda method: recorded)
+
+    adapter = SubprocessReconstructor(
+        name='FAKE',
+        child_module=FIXTURES_MODULE,
+        reconstruct_function=reconstruct_function,
+        dump_reconstruct_options=dump_options,
+    )
+
+    try:
+        list(
+            adapter.reconstruct(_minimal_reconstruct_input(), options=adapter.get_default_options())
+        )
+    except ChildError:
+        pass
+
+    (process,) = recorded.processes
+    assert process.exitcode == 0
+
+
 def test_child_log_is_forwarded_to_parent_logger(caplog: pytest.LogCaptureFixture) -> None:
     product = _minimal_product()
 
