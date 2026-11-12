@@ -25,6 +25,7 @@ File readers are implemented using a Python namespace plugin system. We would be
   - [NanoMAX](https://www.maxiv.lu.se/beamlines-accelerators/beamlines/nanomax/) (`*.h5`)
 - [National Synchrotron Light Source II (NSLS-II)](https://www.bnl.gov/nsls2/beamlines)
   - [3-ID Hard X-ray Nanoprobe (HXN)](https://www.bnl.gov/nsls2/beamlines/beamline.php?r=3-ID) (`*.h5`, `*.hdf5`, `*.mat`)
+  - PyXRF fluorescence maps (`*.h5`, `*.hdf5`)
 - [Swiss Light Source (SLS)](https://www.psi.ch/en/sls/beamlines-at-sls)
   - [X12SA cSAXS: Coherent Small-Angle X-ray Scattering](https://www.psi.ch/en/node/508)
 - Common File Formats
@@ -32,11 +33,11 @@ File readers are implemented using a Python namespace plugin system. We would be
   - Comma-Separated Values (`*.csv`)
   - EPICS Multi-Dimensional Archive (`*.mda`)
   - [fold_slice](https://github.com/yijiang1/fold_slice) (`*.mat`, `*.h5`)
-  - NumPy Binary Files (`*.npy`, `*.npz`)
+  - NumPy Binary Files (`*.npy`)
   - PEAR reconstructions (`recon_Niter*.h5`)
   - PtychoFM training pairs (`*_dp.hdf5`, `*_para.hdf5`)
-  - Ptychodus Diffraction Patterns (`*.h5`, `*.npz`)
-  - Ptychodus Product (`*.h5`, `*.npz`)
+  - Ptychodus Diffraction Patterns (`*.h5`, `*.hdf5`)
+  - Ptychodus Product (`*.h5`, `*.hdf5`)
   - Space-Separated Values (`*.txt`)
   - Tagged Image File Format (`*.tif`, `*.tiff`)
 

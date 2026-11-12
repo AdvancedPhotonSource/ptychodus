@@ -293,7 +293,7 @@ class DiffractionMetadata:
 class DiffractionDatasetLayoutNode:
     """Node in the layout tree returned by DiffractionFileReader.
 
-    Each node describes one entry (HDF5 group/dataset/attribute, NPZ array,
+    Each node describes one entry (HDF5 group/dataset/attribute, NumPy array,
     TIFF file, ...) with three display columns: name, dtype, details.
     """
 

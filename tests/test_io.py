@@ -783,33 +783,13 @@ class TestFocusObjectDistanceRoundTrip:
 
         assert load_product(file).metadata.focus_object_distance_m == 0.0
 
-    def test_npz_round_trip(self, tmp_path: Path) -> None:
-        from ptychodus.plugins.npz_product_file import NPZProductFileIO
-
-        product = _make_product()
-        product = Product(
-            metadata=replace(product.metadata, focus_object_distance_m=-2.5e-3),
-            probe_positions=product.probe_positions,
-            probes=product.probes,
-            object_=product.object_,
-            losses=product.losses,
-        )
-        file = tmp_path / 'product.npz'
-        file_io = NPZProductFileIO()
-
-        file_io.write(file, product)
-        loaded = file_io.read(file)
-
-        assert loaded.metadata.focus_object_distance_m == pytest.approx(-2.5e-3)
-
 
 class TestTomographyAngleRoundTrip:
     """The angle identifies which projection a product is, so every writer must keep it.
 
     A tomographic solver reads a stack of products and needs each one's rotation angle;
     a writer that drops it turns the stack into an unordered pile. The canonical HDF5
-    writer always kept it, but the NPZ writer omitted the very key its own reader looks
-    for, and the CXI writer skipped it whenever it was zero.
+    writer always kept it, but the CXI writer skipped it whenever it was zero.
     """
 
     ANGLE_DEG = -90.0461
@@ -830,28 +810,6 @@ class TestTomographyAngleRoundTrip:
 
         assert load_product(file).metadata.tomography_angle_deg == pytest.approx(self.ANGLE_DEG)
 
-    def test_npz_round_trip(self, tmp_path: Path) -> None:
-        from ptychodus.plugins.npz_product_file import NPZProductFileIO
-
-        file = tmp_path / 'product.npz'
-        file_io = NPZProductFileIO()
-        file_io.write(file, self._product(self.ANGLE_DEG))
-
-        assert file_io.read(file).metadata.tomography_angle_deg == pytest.approx(self.ANGLE_DEG)
-
-    def test_npz_keeps_a_zero_angle_distinguishable_from_a_missing_one(
-        self, tmp_path: Path
-    ) -> None:
-        """Zero is a real angle -- the first projection of a tomogram -- not an absence."""
-        from ptychodus.plugins.npz_product_file import NPZProductFileIO
-
-        file = tmp_path / 'product.npz'
-        file_io = NPZProductFileIO()
-        file_io.write(file, self._product(0.0))
-
-        with numpy.load(file) as npz_file:
-            assert NPZProductFileIO.TOMOGRAPHY_ANGLE in npz_file
-
 
 # ---------------------------------------------------------------------------
 # Cross-format product round-trip
@@ -867,11 +825,9 @@ def _product_file_io() -> list[Any]:
     """The registered read+write product formats, imported lazily to keep this module light."""
     from ptychodus.plugins.cxi_file import CXIProductFileIO
     from ptychodus.plugins.h5_product_file import H5ProductFileIO
-    from ptychodus.plugins.npz_product_file import NPZProductFileIO
 
     return [
         pytest.param(H5ProductFileIO(), '.h5', id='hdf5'),
-        pytest.param(NPZProductFileIO(), '.npz', id='npz'),
         pytest.param(CXIProductFileIO(), '.cxi', id='cxi'),
     ]
 
@@ -1062,78 +1018,6 @@ def test_no_losses_round_trips_empty(tmp_path: Path, file_io: Any, suffix: str) 
     loaded = _round_trip_product(file_io, tmp_path / f'product{suffix}', product)
 
     assert list(loaded.losses) == []
-
-
-def test_formats_agree_with_each_other(tmp_path: Path) -> None:
-    """The point of the alignment: one product, two formats, one result."""
-    from ptychodus.plugins.h5_product_file import H5ProductFileIO
-    from ptychodus.plugins.npz_product_file import NPZProductFileIO
-
-    product = _make_product(
-        metadata=ProductMetadata(**DISTINCTIVE_METADATA),
-        with_opr=True,
-        with_layer_spacing=True,
-        with_losses=True,
-        with_position_photon_counts=True,
-    )
-
-    from_h5 = _round_trip_product(H5ProductFileIO(), tmp_path / 'p.h5', product)
-    from_npz = _round_trip_product(NPZProductFileIO(), tmp_path / 'p.npz', product)
-
-    assert from_h5.metadata == from_npz.metadata
-    numpy.testing.assert_allclose(
-        from_h5.probe_positions.get_coordinates_x_m(),
-        from_npz.probe_positions.get_coordinates_x_m(),
-    )
-    h5_counts = from_h5.probe_positions.get_probe_photon_counts()
-    npz_counts = from_npz.probe_positions.get_probe_photon_counts()
-    assert h5_counts is not None and npz_counts is not None
-    numpy.testing.assert_allclose(h5_counts, npz_counts)
-    numpy.testing.assert_allclose(from_h5.probes.get_array(), from_npz.probes.get_array())
-    numpy.testing.assert_allclose(from_h5.object_.get_array(), from_npz.object_.get_array())
-
-
-def test_legacy_npz_without_the_new_keys_still_loads(tmp_path: Path) -> None:
-    """An archive written before tilt, polarization and per-position counts existed.
-
-    Built key-by-key rather than by deleting from a fresh file, because an .npz is a zip
-    and cannot have entries removed in place.
-    """
-    from ptychodus.plugins.npz_product_file import NPZProductFileIO
-
-    file_io = NPZProductFileIO()
-    file = tmp_path / 'legacy.npz'
-    # Annotated: the mix of scalars and arrays otherwise widens to a single
-    # `object`, which mypy then matches against every savez parameter.
-    legacy_keys: dict[str, Any] = {
-        NPZProductFileIO.DETECTOR_OBJECT_DISTANCE: 1.5,
-        NPZProductFileIO.PHOTON_ENERGY: 10_000.0,
-        NPZProductFileIO.PROBE_POSITION_INDEXES: numpy.arange(2),
-        NPZProductFileIO.PROBE_POSITION_X: numpy.zeros(2),
-        NPZProductFileIO.PROBE_POSITION_Y: numpy.zeros(2),
-        NPZProductFileIO.PROBE_ARRAY: numpy.zeros((1, 1, 4, 4), dtype=complex),
-        NPZProductFileIO.OBJECT_ARRAY: numpy.zeros((1, 8, 8), dtype=complex),
-        NPZProductFileIO.OBJECT_CENTER_X: 0.0,
-        NPZProductFileIO.OBJECT_CENTER_Y: 0.0,
-        NPZProductFileIO.OBJECT_PIXEL_WIDTH: 10e-9,
-        NPZProductFileIO.OBJECT_PIXEL_HEIGHT: 10e-9,
-    }
-    numpy.savez(file, **legacy_keys)
-
-    loaded = file_io.read(file)
-
-    # Absent optional keys take the same defaults the HDF5 reader uses.
-    assert loaded.metadata.name == 'Unnamed'
-    assert loaded.metadata.comments == ''
-    assert loaded.metadata.exposure_time_s == 0.0
-    assert loaded.metadata.tilt_angle_deg == 0.0
-    assert loaded.metadata.polarization is None
-    assert loaded.metadata.scattering_geometry == ScatteringGeometry()
-    assert loaded.probe_positions.get_probe_photon_counts() is None
-    assert list(loaded.object_.layer_spacing_m) == []
-    assert list(loaded.losses) == []
-    # A probe with no pixel size of its own inherits the object's.
-    assert loaded.probes.get_pixel_geometry().width_m == pytest.approx(10e-9)
 
 
 def test_hdf5_product_without_scattering_keys_reads_as_forward(tmp_path: Path) -> None:

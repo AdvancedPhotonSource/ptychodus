@@ -193,7 +193,7 @@ class FromMemoryProbePositionsBuilder(ProbePositionsBuilder):
 
     Two things produce these. Reconstruction output, which `ProcessingTaskMonitor`
     re-assigns to the output product item on every reconstructor iteration (see
-    `model/processing/monitor.py`), and products loaded from HDF5/NPZ, whose
+    `model/processing/monitor.py`), and products loaded from a product file, whose
     positions were conditioned before they were saved. In both cases the trim,
     affine transform, and jitter have already been applied upstream. Re-applying
     them here would corrupt position-corrected output a little more on every

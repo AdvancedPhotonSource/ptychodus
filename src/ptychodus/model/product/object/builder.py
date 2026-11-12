@@ -217,7 +217,7 @@ class FromMemoryObjectBuilder(ObjectBuilder):
 
     Two things produce these. Reconstruction output, which `ProcessingTaskMonitor`
     re-assigns to the output product item on every reconstructor iteration (see
-    `model/processing/monitor.py`), and products loaded from HDF5/NPZ. In both
+    `model/processing/monitor.py`), and products loaded from a product file. In both
     cases the layer structure and the canvas size are already what the
     reconstructor solved for. `generate_layers` would truncate a multislice result
     back to whatever the item's `layer_spacing_m` parameter happens to say, and

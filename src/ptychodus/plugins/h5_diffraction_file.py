@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Final
 import logging
 
 try:
@@ -15,6 +16,7 @@ except ModuleNotFoundError:
 import h5py
 import numpy
 
+from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     CropRegion,
@@ -26,8 +28,11 @@ from ptychodus.api.diffraction import (
     DiffractionIndexes,
     DiffractionMetadata,
     DiffractionPatterns,
+    SimpleDiffractionArray,
     SimpleDiffractionDataset,
 )
+from ptychodus.api.files import FileFormat
+from ptychodus.api.io import DiffractionFileKeys, load_diffraction_data, save_diffraction_data
 from ptychodus.api.plugins import PluginRegistry
 
 logger = logging.getLogger(__name__)
@@ -317,7 +322,87 @@ class H5DiffractionFileWriter(DiffractionFileWriter):
             h5_file.create_dataset(self._data_path, data=data, compression='lzf')
 
 
+class H5DiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
+    """Reads and writes the ptychodus diffraction file, the ``diffraction.h5`` of a run.
+
+    The file holds one block of indexed patterns, so a dataset of several arrays is
+    written as their concatenation and reads back as a single array. Its pixel size is
+    required, because the file cannot be read back without one.
+    """
+
+    SIMPLE_NAME: Final[str] = 'HDF5'
+
+    def get_file_description(self) -> str:
+        return 'Ptychodus Diffraction Files'
+
+    def get_file_extensions(self) -> set[str]:
+        return FileFormat.HDF5.extensions
+
+    def read(self, file_path: Path) -> DiffractionDataset:
+        data = load_diffraction_data(file_path)
+        patterns = data.get_patterns()
+
+        metadata = DiffractionMetadata(
+            num_patterns_per_array=[patterns.shape[0]],
+            pattern_dtype=patterns.dtype,
+            detector_extent=data.get_image_extent(),
+            detector_pixel_geometry=data.get_pixel_geometry(),
+            file_path=file_path,
+        )
+
+        contents_tree = DiffractionDatasetLayoutNode.create_root()
+        contents_tree.add_child(
+            DiffractionFileKeys.PATTERNS,
+            type(patterns).__name__,
+            f'{patterns.dtype}{patterns.shape}',
+        )
+
+        array = SimpleDiffractionArray(
+            label=file_path.stem,
+            indexes=data.get_indexes(),
+            patterns=patterns,
+        )
+
+        return SimpleDiffractionDataset(
+            metadata,
+            contents_tree,
+            [array],
+            bad_pixels=data.get_bad_pixels(),
+            background=data.get_background(),
+            flat_field=data.get_flat_field(),
+        )
+
+    def write(self, file_path: Path, dataset: DiffractionDataset) -> None:
+        pixel_geometry = dataset.get_metadata().detector_pixel_geometry
+
+        if pixel_geometry is None:
+            raise ValueError(
+                f'Cannot write "{file_path}": the dataset has no detector pixel size, '
+                'which the ptychodus diffraction file requires.'
+            )
+
+        data = AssembledDiffractionData(
+            numpy.concatenate([array.get_indexes() for array in dataset]),
+            numpy.concatenate([array.get_patterns() for array in dataset]),
+            pixel_geometry,
+            dataset.get_bad_pixels(),
+            background=dataset.get_background(),
+            flat_field=dataset.get_flat_field(),
+        )
+        save_diffraction_data(file_path, data)
+
+
 def register_plugins(registry: PluginRegistry) -> None:
+    h5_diffraction_file_io = H5DiffractionFileIO()
+
+    registry.diffraction_file_readers.register_plugin(
+        h5_diffraction_file_io,
+        simple_name=H5DiffractionFileIO.SIMPLE_NAME,
+    )
+    registry.diffraction_file_writers.register_plugin(
+        h5_diffraction_file_io,
+        simple_name=H5DiffractionFileIO.SIMPLE_NAME,
+    )
     registry.diffraction_file_readers.register_plugin(
         H5DiffractionFileReader(
             data_path='/exchange/data',

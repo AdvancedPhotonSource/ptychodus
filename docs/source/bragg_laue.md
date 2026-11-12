@@ -154,7 +154,6 @@ The geometry is part of the external file interface: three scalars beside the ot
 | Format | Keys |
 | --- | --- |
 | `product.h5` | Root attributes `two_theta_deg`, `detector_gamma_deg`, `incidence_angle_deg` |
-| NPZ product | Arrays of the same names |
 | CXI | `ptychodus/two_theta_deg`, `ptychodus/detector_gamma_deg`, `ptychodus/incidence_angle_deg` in the entry |
 
 A file written before the geometry existed reads as forward (0, 0, 90), so it is a transmission product as before. The standard CXI detector and sample orientation fields are not changed, and `diffraction.h5` carries no geometry.

@@ -419,7 +419,7 @@ class FromMemoryProbeBuilder(ProbeEnsembleBuilder):
 
     Two things produce these. Reconstruction output, which `ProcessingTaskMonitor`
     re-assigns to the output product item on every reconstructor iteration (see
-    `model/processing/monitor.py`), and products loaded from HDF5/NPZ, whose probe
+    `model/processing/monitor.py`), and products loaded from a product file, whose probe
     was conditioned before it was saved. In both cases the incoherent and coherent
     (OPR) mode structure is already what the reconstructor solved for, so
     re-running the mode generators would be catastrophic rather than merely lossy:
