@@ -1,7 +1,7 @@
 """What the ptychozoon enhancer accepts.
 
 The field names are upstream's own, from ``ptychozoon.settings.LSMRSettings``, so
-each maps onto the setting of the same name in the child.
+each maps onto the ptychozoon setting of the same name.
 """
 
 from __future__ import annotations

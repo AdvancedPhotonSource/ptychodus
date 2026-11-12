@@ -15,7 +15,6 @@ from PyQt5.QtWidgets import (
 
 from ptychodus.api.reconstruct import (
     ReconstructorLibrary,
-    SubprocessReconstructor,
     TrainableReconstructor,
 )
 from ptychodus.model.observer import Observable, Observer
@@ -436,11 +435,7 @@ class ProcessingController(Observer):
         reconstructor = self._algorithm_parameter.get_current_reconstructor()
         is_trainable = isinstance(reconstructor, TrainableReconstructor)
 
-        if isinstance(reconstructor, SubprocessReconstructor):
-            is_trainable = reconstructor.is_trainable
-
-        if is_trainable:
-            assert isinstance(reconstructor, TrainableReconstructor)
+        if isinstance(reconstructor, TrainableReconstructor):
             is_model_loaded = reconstructor.is_model_loaded()
             self._actions_view.reconstruct_button.setText('Infer')
             self._actions_view.reconstruct_button.setEnabled(is_model_loaded)

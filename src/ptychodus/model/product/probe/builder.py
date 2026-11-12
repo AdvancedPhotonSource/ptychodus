@@ -482,12 +482,12 @@ class FromMemoryProbeBuilder(ProbeEnsembleBuilder):
         return builder
 
     def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeEnsemble:
-        probe_geometry = geometry_provider.get_probe_geometry()
-
+        # Consult the provider only for what the probe lacks: a product loaded without
+        # its diffraction data carries its own sampling, and the provider cannot answer.
         try:
             pixel_geometry = self._probe.get_pixel_geometry()
         except ValueError:
-            pixel_geometry = probe_geometry.get_pixel_geometry()
+            pixel_geometry = geometry_provider.get_probe_geometry().get_pixel_geometry()
 
         # TODO regrid probe as needed based on probe geometry from file/provider
         return self._conform_opr_weights(

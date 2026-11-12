@@ -153,6 +153,7 @@ def _make_processing_api(item: MagicMock) -> ProcessingAPI:
         MagicMock(),
         MagicMock(),
         MagicMock(),
+        MagicMock(),
     )
 
 
@@ -178,6 +179,7 @@ def test_reconstruct_without_a_reconstructor_raises_before_inserting_a_product()
         MagicMock(),
         algorithm,
         {},
+        MagicMock(),
         MagicMock(),
         MagicMock(),
         MagicMock(),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from functools import partial
 from unittest.mock import MagicMock
 import logging
 
@@ -15,7 +16,6 @@ from ptychodus.api.fluorescence import (
     FluorescenceEnhancer,
     FluorescenceEnhancerInput,
     FluorescenceEnhancerOutput,
-    SubprocessFluorescenceEnhancer,
 )
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
@@ -23,7 +23,7 @@ from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.spawn import ChildError
+from ptychodus.api.spawn import ChildError, iterate_in_subprocess
 from ptychodus.model.plugins import PluginChooser
 from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.fluorescence import ENHANCER_LIBRARY, FluorescenceCore
@@ -228,27 +228,16 @@ def test_an_override_the_declaration_rejects_fails_before_the_run() -> None:
         core.fluorescence_api._get_options('vspi', {'max_iterations': 0})
 
 
-def test_placement_is_attached_only_to_an_enhancer_run_in_a_child() -> None:
-    pytest.importorskip('ptychozoon')
-    plugins = PluginRegistry.load_plugins()
-    _make_core(SettingsRegistry(), plugins)
-
-    for plugin in plugins.fluorescence_enhancers:
-        if isinstance(plugin.strategy, SubprocessFluorescenceEnhancer):
-            assert plugin.simple_name == 'ptychozoon'
-            assert plugin.strategy.device_environment() == {}
-        else:
-            assert not hasattr(plugin.strategy, 'device_environment')
-
-
 def test_ptychozoon_runs_in_its_child() -> None:
     pytest.importorskip('ptychozoon')
     pytest.importorskip('cupy')
     input_ = _make_input()
     options = PtychozoonOptions(max_iter=4, checkpoint_interval=2)
 
+    work = partial(PtychozoonFluorescenceEnhancer().enhance, input_, options=options)
+
     try:
-        outputs = list(PtychozoonFluorescenceEnhancer().enhance(input_, options=options))
+        outputs = list(iterate_in_subprocess(work))
     except ChildError as exc:
         if exc.child_exception_type == 'RuntimeError' and 'CUDA device' in str(exc):
             pytest.skip('No CUDA device is visible to ptychozoon.')
@@ -265,8 +254,9 @@ def test_ptychozoon_says_so_when_the_selection_leaves_no_gpu() -> None:
     """ptychozoon cannot even be imported without a CUDA device, so the child says why."""
     pytest.importorskip('ptychozoon')
     pytest.importorskip('cupy')
-    enhancer = PtychozoonFluorescenceEnhancer()
-    enhancer.device_environment = lambda: {'CUDA_VISIBLE_DEVICES': ''}
+    work = partial(
+        PtychozoonFluorescenceEnhancer().enhance, _make_input(), options=PtychozoonOptions()
+    )
 
     with pytest.raises(ChildError, match='needs a visible CUDA device'):
-        list(enhancer.enhance(_make_input(), options=PtychozoonOptions()))
+        list(iterate_in_subprocess(work, environment={'CUDA_VISIBLE_DEVICES': ''}))

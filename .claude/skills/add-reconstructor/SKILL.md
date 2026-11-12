@@ -18,8 +18,7 @@ Create `src/ptychodus/plugins/<backend>/` with:
 - `__init__.py` — `register_plugins(registry)`, registering one library instance.
 - `core.py` — the `*ReconstructorLibrary` class.
 - `options.py` — the pydantic declaration plus a `default_options()` factory.
-- `reconstructor.py` — builds the `Reconstructor` / `TrainableReconstructor`. Imported only from `_build()`, never at module scope.
-- `_subprocess.py` — the child-side entry points, if the backend touches a GPU. The name is the contract: the dispatcher derives it from the library's own package and looks for `run_reconstruct` and `run_train` inside it.
+- `reconstructor.py` — the `Reconstructor` / `TrainableReconstructor` class and the computation it runs. Imported only from `_build()`, never at module scope.
 
 Write no `settings.py`. The hand-written `*Settings` class is the retired idiom; a new backend declares instead.
 
@@ -59,9 +58,9 @@ class <Backend>ReconstructorLibrary(ReconstructorLibrary):
 
     def _build(self) -> list[TrainableReconstructor]:
         # Imported lazily so this module's own import cost stays small.
-        from .reconstructor import build_reconstructor
+        from .reconstructor import <Backend>Reconstructor
 
-        return [build_reconstructor(mode) for mode in ('Algorithm1', 'Algorithm2')]
+        return [<Backend>Reconstructor(mode) for mode in ('Algorithm1', 'Algorithm2')]
 ```
 
 Key rules:
@@ -71,9 +70,13 @@ Key rules:
 - **Write no availability logic.** The base calls `_build()` once on first iteration and announces either outcome through the library's own logger: the version on success, `<Backend> not found.` when a required module is absent or when `_build()` raises `ImportError`.
 - **A library does not name itself.** It is named where it registers: `display_name` is what a person picks and what the section table and the parameter store are keyed on, `simple_name` is the form a settings file persists, and `distribution` is the PyPI package a version lives under — which is what the backend's own log lines report.
 
-### 4. Build the reconstructor
+### 4. Write the reconstructor
 
-In `reconstructor.py`, narrow the incoming options once and pass `default_options` to the reconstructor so the settings layer knows what to generate:
+In `reconstructor.py`, a module-level class whose `reconstruct` (and, for a trainable backend, `train`) is an ordinary generator. It knows nothing about processes: the application pickles the object and its arguments to a spawned child restricted to the selected devices, and iterates the generator there. That asks three things of the class:
+
+- **It pickles.** Module-level class, plain attributes — no closures, lambdas or open handles. [tests/test_plugin_pickling.py](../../tests/test_plugin_pickling.py) round-trips every registered reconstructor.
+- **`reconstruct` and `train` leave `self` unchanged and import the framework inside the method.** What they change about themselves is lost with the child; only what they yield comes back. Ask torch which device is visible from inside the method too — the selection has already been applied.
+- **Every other method imports no GPU framework.** `get_default_options`, `load_model` and `save_model` run in the application process. `load_model` records the path (and may unpack an archive); the model is loaded inside `reconstruct`.
 
 ```python
 def _declared(options: BaseModel) -> <Backend>Options:
@@ -81,13 +84,32 @@ def _declared(options: BaseModel) -> <Backend>Options:
         raise TypeError(f'Expected <Backend>Options, got {type(options).__name__}.')
 
     return options
+
+
+class <Backend>Reconstructor(Reconstructor):
+    def __init__(self, name: str) -> None:
+        super().__init__()
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def get_default_options(self) -> BaseModel:
+        return default_options()
+
+    def reconstruct(
+        self, input_: ReconstructInput, *, options: BaseModel
+    ) -> Iterator[ReconstructOutput]:
+        declared = _declared(options)
+        import torch  # here, never at module scope
+        ...
+        yield ReconstructOutput(product=product, progress=epoch, progress_goal=num_epochs)
 ```
 
-GPU work belongs in a spawned child: wrap it with `SubprocessReconstructor` (see [src/ptychodus/api/reconstruct.py](../../src/ptychodus/api/reconstruct.py)), passing `default_options=default_options` and a `dump_reconstruct_options` callback returning the subset of the declaration the child reads — plus `dump_train_options` if the backend trains, and `resolve_model_path` if it unpacks what the user loaded. Yield one `ReconstructOutput` per iteration so the GUI can stream progress; set `progress_goal` once the run knows its own iteration count.
+Validate the input at the top of `reconstruct`, before reaching for the framework, so a bad product fails as soon as possible. Yield one `ReconstructOutput` per iteration so the GUI can stream progress; set `progress_goal` once the run knows its own iteration count.
 
-**Name no entry point.** The library stamps each reconstructor it builds with `<its own package>._subprocess`, and every child is spawned through one dispatcher that calls `run_reconstruct` or `run_train` there.
-
-A child entry point takes `(payload, queue)`. The `SubprocessPayload` carries the operation, whatever the dump returned, and whichever of the input, the two directories and the model path that operation fills; ask for those with `require_input()`, `require_directories()` and `require_model_path()` rather than reading the optional fields, so a payload built wrong says so by name. Put results on the queue tagged with a `ReconstructorMessage` member.
+A trainable backend's `train` writes into the output directory and names the model it wrote in its last `TrainOutput.trained_model`, in the form its `load_model` accepts. It does not load it: whoever asked for the training does. [src/ptychodus/plugins/ptychopinn/reconstructor.py](../../src/ptychodus/plugins/ptychopinn/reconstructor.py) is the worked example.
 
 ### 5. Reconcile conventions at the boundary
 

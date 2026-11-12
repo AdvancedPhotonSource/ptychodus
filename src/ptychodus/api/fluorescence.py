@@ -14,7 +14,6 @@ from .typing import RealArrayType
 from .files import FileReader, FileWriter
 from .interpolate import BarycentricArrayInterpolator
 from .product import Product
-from .reconstruct import DeviceEnvironment
 
 
 class VSPILinearOperator(LinearOperator):
@@ -156,6 +155,10 @@ class FluorescenceEnhancer(ABC):
     An enhancer knows nothing about where its option values come from. Its
     options may state what a field *is* -- its unit, its bounds -- but never
     where a value for it is found.
+
+    Nor where it runs. An enhancer is picklable, and whatever runs
+    :meth:`enhance` may do so in another process, so that method leaves
+    ``self`` unchanged and imports the framework it computes with inside itself.
     """
 
     @abstractmethod
@@ -177,23 +180,6 @@ class FluorescenceEnhancer(ABC):
         self, input_: FluorescenceEnhancerInput, *, options: BaseModel
     ) -> Iterator[FluorescenceEnhancerOutput]:
         pass
-
-
-class SubprocessFluorescenceEnhancer(FluorescenceEnhancer):
-    """An enhancer whose work runs in a spawned child rather than in this process.
-
-    Carries only where that child may run. Placement says nothing about the
-    algorithm, so it is neither declared in the options nor passed through
-    :meth:`enhance`; whatever owns the device selection attaches it after
-    construction.
-    """
-
-    def __init__(self) -> None:
-        super().__init__()
-        # Where the work runs, which is the spawning process's to decide and
-        # not the backend's. Replaced after construction by whatever owns the
-        # selection; until then a child sees every device this process does.
-        self.device_environment: DeviceEnvironment = dict
 
 
 class FluorescenceFileReader(FileReader[FluorescenceDataset]):

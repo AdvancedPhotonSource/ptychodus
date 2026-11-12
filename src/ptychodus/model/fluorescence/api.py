@@ -11,6 +11,7 @@ from ptychodus.api.fluorescence import (
     FluorescenceFileWriter,
 )
 
+from ..devices import DeviceSelection
 from ..file_types import FileTypeChooser
 from ..plugins import PluginChooser
 from ..processing.parameter_store import ProcessingParameterStore
@@ -39,6 +40,7 @@ class FluorescenceAPI:
         task_monitor: FluorescenceTaskMonitor,
         file_reader_chooser: PluginChooser[FluorescenceFileReader],
         file_writer_chooser: PluginChooser[FluorescenceFileWriter],
+        device_selection: DeviceSelection,
     ) -> None:
         self._task_manager = task_manager
         self._settings = settings
@@ -49,6 +51,7 @@ class FluorescenceAPI:
         self._task_monitor = task_monitor
         self.file_readers = FileTypeChooser(file_reader_chooser)
         self.file_writers = FileTypeChooser(file_writer_chooser)
+        self._device_selection = device_selection
 
     def get_task_monitor(self) -> FluorescenceTaskMonitor:
         return self._task_monitor
@@ -205,6 +208,7 @@ class FluorescenceAPI:
             item,
             output_file_path,
             output_file_writer,
+            self._device_selection.environment,
         )
         snapshot = self._task_monitor.get_completed_runs()
         self._task_manager.put_background_task(background_task)

@@ -3,14 +3,14 @@
 The conventions are checked against cdtools itself: a model built from the fixture
 product must predict the fixture's patterns, which ptychodus simulated with its own
 probe placement. That pins the corner frame, the sub-pixel shift's sign, the probe
-scale and the forward model together. The child then runs for real, once called
-directly and once spawned through its library.
+scale and the forward model together. The reconstructor then runs for real, once
+called directly and once spawned through its library, as the application runs it.
 """
 
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Any
+from functools import partial
 from unittest import mock
 import contextlib
 
@@ -28,20 +28,15 @@ from cdtools_fixtures import (  # noqa: E402
     make_input,
     make_product,
 )
-from ptychodus.api.reconstruct import (  # noqa: E402
-    ReconstructInput,
-    ReconstructOutput,
-    ReconstructorMessage,
-    SubprocessOperation,
-    SubprocessPayload,
-)
+from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput  # noqa: E402
+from ptychodus.api.spawn import iterate_in_subprocess  # noqa: E402
 from ptychodus.plugins.cdtools import CDToolsReconstructorLibrary  # noqa: E402
-from ptychodus.plugins.cdtools._subprocess import (  # noqa: E402
+from ptychodus.plugins.cdtools.reconstructor import (  # noqa: E402
+    CDToolsReconstructor,
     _build_model,
     _far_field_intensity,
     _object_guess,
     _object_transmission,
-    run_reconstruct,
 )
 from ptychodus.plugins.cdtools.gauge import ProbeGauge  # noqa: E402
 from ptychodus.plugins.cdtools.geometry import build_frame  # noqa: E402
@@ -50,17 +45,8 @@ from ptychodus.plugins.cdtools.options import (  # noqa: E402
     CDToolsOptimizer,
     CDToolsOptions,
 )
-from ptychodus.plugins.cdtools.reconstructor import build_reconstructor  # noqa: E402
 
 _UNIT_GAUGE = ProbeGauge(to_cdtools=1.0, expected_factor=1.0, sampled_positions=0)
-
-
-class _ListQueue:
-    def __init__(self) -> None:
-        self.items: list[Any] = []
-
-    def put(self, item: Any) -> None:
-        self.items.append(item)
 
 
 def _predict(parameters: ReconstructInput, options: CDToolsOptions) -> numpy.ndarray:
@@ -83,10 +69,10 @@ def _short_options(**refinement: bool) -> CDToolsOptions:
     options.schedule.stage2.epochs = 2
     options.schedule.stage3.epochs = 0
     options.optimizer.num_sync_epochs = 2
-    # These tests run the child's work in this process, so the device is pinned
-    # rather than resolved: a run that took a CUDA device would leave a context
-    # behind in a parent that is supposed never to hold one, and would make the
-    # result depend on whether the machine running the tests has a GPU.
+    # These tests reconstruct in this process, so the device is pinned rather than
+    # resolved: a run that took a CUDA device would leave a context behind in a
+    # test process that is supposed never to hold one, and would make the result
+    # depend on whether the machine running the tests has a GPU.
     options.optimizer.device = CDToolsDevice.CPU
 
     for name, value in refinement.items():
@@ -96,13 +82,6 @@ def _short_options(**refinement: bool) -> CDToolsOptions:
 
 
 def _run(parameters: ReconstructInput, options: CDToolsOptions) -> list[ReconstructOutput]:
-    queue = _ListQueue()
-    payload = SubprocessPayload(
-        operation=SubprocessOperation.RECONSTRUCT,
-        reconstructor='FancyPtycho',
-        options=build_reconstructor()._dump_reconstruct_options(parameters, options),
-        input_=parameters,
-    )
     # Pinning the device is not enough on its own: from torch 2.14, Optimizer.step()
     # asks torch.accelerator for the current stream, which initialises CUDA on any GPU
     # host even when every parameter is on the CPU. Hiding the accelerator makes that
@@ -114,10 +93,7 @@ def _run(parameters: ReconstructInput, options: CDToolsOptions) -> list[Reconstr
     )
 
     with hide_accelerator:
-        run_reconstruct(payload, queue)  # type: ignore[arg-type]
-
-    assert all(tag is ReconstructorMessage.OUTPUT for tag, _ in queue.items)
-    return [output for _, output in queue.items]
+        return list(CDToolsReconstructor().reconstruct(parameters, options=options))
 
 
 def _probe_power(output: ReconstructOutput) -> float:
@@ -242,18 +218,19 @@ def test_refined_positions_move_and_keep_their_indexes() -> None:
     assert list(positions_out) != list(positions_in)
 
 
-def test_the_parent_refuses_an_empty_schedule() -> None:
+def test_an_empty_schedule_is_refused() -> None:
     options = CDToolsOptions()
     options.schedule.stage1.epochs = 0
     options.schedule.stage2.epochs = 0
     options.schedule.stage3.epochs = 0
 
     with pytest.raises(ValueError, match='zero epochs'):
-        build_reconstructor()._dump_reconstruct_options(make_input(), options)
+        list(CDToolsReconstructor().reconstruct(make_input(), options=options))
 
 
 def test_a_spawned_run_streams_through_the_library() -> None:
     (reconstructor,) = list(CDToolsReconstructorLibrary())
     options = _short_options()
-    outputs = list(reconstructor.reconstruct(make_input(), options=options))
+    work = partial(reconstructor.reconstruct, make_input(), options=options)
+    outputs = list(iterate_in_subprocess(work))
     assert [output.progress for output in outputs] == [2, 3, 4, 5]

@@ -16,6 +16,7 @@ from ptychodus.api.reconstruct import (
     prepare_reconstruct_input,
 )
 
+from ..devices import DeviceSelection
 from ..naming import split_name_counter
 from ..observer import Observable, Observer
 from ..parameters import Parameter, StringParameter
@@ -240,6 +241,7 @@ class ProcessingAPI:
         task_monitor: ProcessingTaskMonitor,
         parameter_store: ProcessingParameterStore,
         training_data_file_writers: PluginCatalog[TrainingDataFileWriter],
+        device_selection: DeviceSelection,
     ) -> None:
         self._task_manager = task_manager
         self._product_api = product_api
@@ -251,6 +253,7 @@ class ProcessingAPI:
         self._task_monitor = task_monitor
         self._parameter_store = parameter_store
         self._training_data_file_writers = training_data_file_writers
+        self._device_selection = device_selection
 
     def _options_for(self, reconstructor: Reconstructor) -> BaseModel:
         """Return the options to run *reconstructor* with, as currently edited.
@@ -352,6 +355,7 @@ class ProcessingAPI:
             output_product_item,
             output_product_file,
             options,
+            self._device_selection.environment,
         )
         snapshot = self._task_monitor.get_completed_runs()
         self._task_manager.put_background_task(background_task)
@@ -475,6 +479,7 @@ class ProcessingAPI:
                 input_directory,
                 output_directory,
                 options,
+                self._device_selection.environment,
             )
             snapshot = self._task_monitor.get_completed_runs()
             self._task_manager.put_background_task(background_task)

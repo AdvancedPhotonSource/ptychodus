@@ -192,9 +192,9 @@ def test_parent_imports_no_child_only_modules(probe_result: dict[str, list[str]]
         These modules acquire a GPU context just by being imported, or are
         backend packages the parent has no reason to touch. Importing a GPU
         framework parent-side to build a picklable payload is fine -- see
-        CONTEXT_CAPABLE_MODULES -- but these are not in that category. Wire the
-        backend through SubprocessReconstructor with a child-side entry point
-        instead.
+        CONTEXT_CAPABLE_MODULES -- but these are not in that category. Import
+        them inside the backend's reconstruct/train/enhance, which ptychodus runs
+        in a spawned child, instead of at module scope.
         """
     )
 
@@ -211,8 +211,8 @@ def test_parent_holds_no_gpu_context(probe_result: dict[str, list[str]]) -> None
         Importing torch/tensorflow/ptychi in the parent is allowed; acquiring a
         context is not. Something at import time placed a tensor on a device,
         constructed a PtychographyTask/Trainer, or otherwise initialised the
-        runtime. Move that work into a child entry point dispatched through
-        SubprocessReconstructor (see
-        ptychodus.api.spawn).
+        runtime. Move that work into the backend's reconstruct/train/enhance,
+        which ptychodus runs in a spawned child (see
+        ptychodus.api.spawn.iterate_in_subprocess).
         """
     )

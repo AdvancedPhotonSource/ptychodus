@@ -13,13 +13,13 @@ fields. ``--print-options`` writes one at its defaults, to edit and pass back wi
 ``--options``.
 
 **Under torchrun.** ``torchrun --standalone --nproc-per-node=N -m ptychodus.cli.train ...``
-runs this command once per rank, and each runs the backend in a child process of its own,
-which inherits the launcher's variables and joins one process group from them. Every rank
+runs this command once per rank, and each runs the backend in its own process, joining one
+process group from the launcher's variables. Every rank
 makes the same checks in the same order, so a run that cannot go ahead stops on every rank;
 only the main process logs progress and saves the model. A backend that cannot train one model
 across ranks is refused rather than run once per rank into the same directory, and so is a
 launch across more than one node. A SIGTERM -- which torchrun sends to the surviving ranks
-when one fails -- ends the child with its parent.
+when one fails -- unwinds the backend as an interrupt.
 
 No GPU selection side effects: choose devices with ``CUDA_VISIBLE_DEVICES``. Under torchrun
 every rank on a node must see the same devices, as many as ``--nproc-per-node``.
@@ -41,7 +41,6 @@ from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.plugins import Plugin, PluginCatalog, PluginRegistry
 from ptychodus.api.reconstruct import (
     ReconstructorLibrary,
-    SubprocessReconstructor,
     TrainableReconstructor,
     TrainOutput,
 )
@@ -62,18 +61,11 @@ logger = logging.getLogger('train')
 
 
 def _trainers(library: ReconstructorLibrary) -> list[TrainableReconstructor]:
-    """The algorithms `library` offers that can train, in the order it offers them.
-
-    A :class:`SubprocessReconstructor` is a trainable reconstructor by type whether or not
-    its backend trains, so it says which with ``is_trainable``.
-    """
+    """The algorithms `library` offers that can train, in the order it offers them."""
     return [
         reconstructor
         for reconstructor in library
         if isinstance(reconstructor, TrainableReconstructor)
-        and not (
-            isinstance(reconstructor, SubprocessReconstructor) and not reconstructor.is_trainable
-        )
     ]
 
 
@@ -341,11 +333,17 @@ def main() -> ExitCode:
     output_directory.mkdir(parents=True, exist_ok=True)
 
     # A scheduler or launcher ends a job with SIGTERM. Raised as an interrupt it unwinds
-    # through the backend, so the child it spawned is torn down rather than orphaned.
+    # through the backend, so whatever it holds open is released rather than abandoned.
     signal.signal(signal.SIGTERM, signal.default_int_handler)
+    trained_model: Path | None = None
 
+    # In this process: a one-shot command gains nothing from a child of its own, and a
+    # distributed launcher's ranks are then exactly the processes it started.
     try:
         for output in trainer.train(input_directory, output_directory, options=options):
+            if output.trained_model is not None:
+                trained_model = output.trained_model
+
             if is_main_process:
                 _log_progress(output)
     except KeyboardInterrupt:
@@ -358,11 +356,12 @@ def main() -> ExitCode:
     if not is_main_process:
         return ExitCode.SUCCESS
 
-    if not trainer.is_model_loaded():
+    if trained_model is None:
         logger.error('%s finished without reporting a trained model; none saved.', subject)
         return ExitCode.FAILURE
 
     try:
+        trainer.load_model(trained_model)
         trainer.save_model(model_file)
     except Exception:
         logger.exception('Saving the trained model to %s failed.', model_file)

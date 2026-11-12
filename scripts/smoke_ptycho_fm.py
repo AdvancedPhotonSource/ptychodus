@@ -6,8 +6,8 @@ run manually with PYTHONPATH pointing at the sibling checkout:
     PYTHONPATH=/home/beams0/SHENKE/Ptychography/ptycho-fm \
         uv run --no-sync python scripts/smoke_ptycho_fm.py [--cpu]
 
-Drives the child entry points directly (no GUI, no subprocess) so failures
-surface as ordinary tracebacks. Covers both training objectives, each
+Drives the reconstructor's ``train`` and ``reconstruct`` directly in this process
+(no GUI, no subprocess) so failures surface as ordinary tracebacks. Covers both training objectives, each
 ``coupled_decoder_mode`` and each offered loss -- everything that needs a real
 ptycho_fm to prove.
 """
@@ -15,11 +15,9 @@ ptycho_fm to prove.
 from __future__ import annotations
 
 import argparse
-import queue
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any
 
 import numpy
 
@@ -28,20 +26,8 @@ from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.reconstruct import (
-    ReconstructInput,
-    ReconstructorMessage,
-    SubprocessOperation,
-    SubprocessPayload,
-)
-from ptychodus.plugins.ptycho_fm._subprocess import (
-    run_reconstruct,
-    run_train,
-)
-from ptychodus.plugins.ptycho_fm.reconstructor import (
-    build_reconstruct_config,
-    build_train_config,
-)
+from ptychodus.api.reconstruct import ReconstructInput
+from ptychodus.plugins.ptycho_fm.reconstructor import PtychoFMReconstructor
 from ptychodus.plugins.ptycho_fm.options import PtychoFMOptions, default_options
 from ptychodus.plugins.ptycho_fm.training_file import PtychoFMTrainingDataFileWriter
 
@@ -140,13 +126,6 @@ def _reconstruct_input(pattern_size: int) -> ReconstructInput:
     )
 
 
-def _drain(q: queue.Queue[Any]) -> list[Any]:
-    events = []
-    while not q.empty():
-        events.append(q.get_nowait())
-    return events
-
-
 def check_export_validation() -> None:
     """The writer must refuse a probe that does not match the patterns."""
     writer = PtychoFMTrainingDataFileWriter()
@@ -177,43 +156,25 @@ def run_training(mode: str, options: PtychoFMOptions, out_dir: Path) -> tuple[Pa
     PtychoFMTrainingDataFileWriter().write(in_dir / 'scan', _reconstruct_input(IMG_SIZE))
 
     model_dir = out_dir / 'output'
-    payload = SubprocessPayload(
-        operation=SubprocessOperation.TRAIN,
-        reconstructor=mode,
-        options=build_train_config(mode, options),
-        input_directory=in_dir,
-        output_directory=model_dir,
-    )
-    q: queue.Queue[Any] = queue.Queue()
-    run_train(payload, q)  # type: ignore[arg-type]
+    reconstructor = PtychoFMReconstructor(mode)
+    train_outputs = list(reconstructor.train(in_dir, model_dir, options=options))
+    saved = [output.trained_model for output in train_outputs if output.trained_model is not None]
 
-    events = _drain(q)
-    train_outputs = [e[1] for e in events if e[0] == ReconstructorMessage.TRAIN_OUTPUT]
-    saved = [e[1] for e in events if e[0] == ReconstructorMessage.MODEL_SAVED]
-
-    assert len(train_outputs) == 2, f'expected 2 TrainOutput, got {len(train_outputs)}'
-    assert len(saved) == 1, f'expected 1 ReconstructorMessage.MODEL_SAVED, got {len(saved)}'
-    assert Path(saved[0]).is_file(), saved[0]
+    # One per epoch, then the final one naming the best checkpoint.
+    assert len(train_outputs) == 3, f'expected 3 TrainOutput, got {len(train_outputs)}'
+    assert len(saved) == 1, f'expected 1 trained model, got {len(saved)}'
+    assert saved[0].is_file(), saved[0]
 
     losses = [lv.value for lv in train_outputs[-1].training_loss]
-    print(f'  [ok] {mode}: 2 epochs, training loss {losses}, checkpoint {Path(saved[0]).name}')
-    return Path(saved[0]), losses
+    print(f'  [ok] {mode}: 2 epochs, training loss {losses}, checkpoint {saved[0].name}')
+    return saved[0], losses
 
 
 def run_inference(checkpoint: Path, options: PtychoFMOptions) -> None:
     parameters = _reconstruct_input(IMG_SIZE)
-    payload = SubprocessPayload(
-        operation=SubprocessOperation.RECONSTRUCT,
-        reconstructor='Supervised',
-        options=build_reconstruct_config('Supervised', options),
-        model_path=checkpoint,
-        input_=parameters,
-    )
-    q: queue.Queue[Any] = queue.Queue()
-    run_reconstruct(payload, q)  # type: ignore[arg-type]
-
-    events = _drain(q)
-    outputs = [e[1] for e in events if e[0] == ReconstructorMessage.OUTPUT]
+    reconstructor = PtychoFMReconstructor('Supervised')
+    reconstructor.load_model(checkpoint)
+    outputs = list(reconstructor.reconstruct(parameters, options=options))
     assert len(outputs) == 1, f'expected 1 ReconstructOutput, got {len(outputs)}'
 
     array = outputs[0].product.object_.get_array()
@@ -266,17 +227,11 @@ def check_mode_mismatch_is_reported(options: PtychoFMOptions) -> None:
         checkpoint, _ = run_training('Unsupervised', options, Path(tmp) / 'mismatch')
 
         options.model.coupled_decoder_mode = None
-        payload = SubprocessPayload(
-            operation=SubprocessOperation.RECONSTRUCT,
-            reconstructor='Unsupervised',
-            options=build_reconstruct_config('Unsupervised', options),
-            model_path=checkpoint,
-            input_=_reconstruct_input(IMG_SIZE),
-        )
-        q: queue.Queue[Any] = queue.Queue()
+        reconstructor = PtychoFMReconstructor('Unsupervised')
+        reconstructor.load_model(checkpoint)
 
         try:
-            run_reconstruct(payload, q)  # type: ignore[arg-type]
+            list(reconstructor.reconstruct(_reconstruct_input(IMG_SIZE), options=options))
         except ValueError as exc:
             assert 'state dict' in str(exc), f'unhelpful message: {exc}'
             print(f'  [ok] mismatch reported: {str(exc).splitlines()[0][:80]}...')

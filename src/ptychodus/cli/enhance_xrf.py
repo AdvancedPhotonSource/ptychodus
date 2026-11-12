@@ -293,7 +293,7 @@ def main() -> ExitCode:
         logger.warning('%s will be overwritten.', output_file)
 
     # A scheduler ends a job with SIGTERM. Raised as an interrupt it unwinds through the
-    # enhancer, so a backend that spawned a child tears it down rather than orphaning it.
+    # enhancer, so whatever it holds open is released rather than abandoned.
     signal.signal(signal.SIGTERM, signal.default_int_handler)
 
     enhanced: FluorescenceDataset | None = None

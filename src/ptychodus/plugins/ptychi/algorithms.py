@@ -9,13 +9,16 @@ that object states. Adding an engine is one subclass plus one entry in
 
 The module imports ``ptychi.api`` (for the Options dataclasses), which pulls
 torch in for type annotations only -- no CUDA runtime is acquired. That
-happens child-side when ``PtychographyTask`` is instantiated in :mod:`.task`.
+happens when ``PtychographyTask`` is instantiated in :mod:`.task`, inside
+:meth:`PtyChiReconstructor.reconstruct`.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, ClassVar, Final
+from typing import ClassVar, Final
+import logging
 
 from ptychi.api import (
     AutodiffPtychographyOPRModeWeightsOptions,
@@ -62,16 +65,19 @@ from ptychi.api import (
 from ptychi.api.options.task import PtychographyTaskOptions
 from pydantic import BaseModel
 
-from ptychodus.api.reconstruct import ReconstructInput, SubprocessReconstructor
+from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput, Reconstructor
 
 from .options import PtyChiOptions, apply_to_task, default_options
-from .task import align_task_options_with_product
+from .task import align_task_options_with_product, reconstruct_with_ptychi
 
 __all__ = [
     'PtyChiAlgorithm',
+    'PtyChiReconstructor',
     'build_reconstructors',
     'task_options_classes',
 ]
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -232,39 +238,55 @@ def _declared(options: BaseModel) -> PtyChiOptions:
     return options
 
 
-def _wrap_as_subprocess_reconstructor(
-    algorithm: type[PtyChiAlgorithm],
-) -> SubprocessReconstructor:
-    task_options_cls = algorithm.spec.task_options_cls
+def _resolve_default_device(task_options: PtychographyTaskOptions) -> None:
+    """Point the options at a GPU if one is visible here, and at the CPU if not.
 
-    def dump_options(parameters: ReconstructInput, options: BaseModel) -> dict[str, Any]:
-        """The two things the child reads, under the names the declaration gives them.
+    Settled where the reconstruction runs, because that is the process whose
+    devices count. ptychodus restricts that process to the devices a run
+    selected, so asking torch what is visible is the same question as asking
+    what the user chose -- and a selection naming only the CPU leaves nothing
+    for ``Devices.GPU`` to mean.
+    """
+    import torch
 
-        The task options stay the object pty-chi declares rather than becoming
-        a mapping of their own: they are a pydantic dataclass whose float
-        fields are defaulted with int literals, so a dump and a reparse would
-        hand pty-chi floats where it had ints. Nothing would be gained -- the
-        payload is pickled either way.
-        """
-        declared = _declared(options)
-        return {
-            # Every field that must agree with the product rather than with a
-            # setting is applied here, in one place, rather than being read
-            # off the product wherever it happens to be needed.
-            'task': align_task_options_with_product(apply_to_task(declared), parameters.product),
-            'num_sync_epochs': declared.num_sync_epochs,
-        }
+    from ptychi.api.enums import Devices
 
-    def build_default_options() -> BaseModel:
-        return default_options(task_options_cls)
-
-    return SubprocessReconstructor(
-        name=algorithm.spec.display_name,
-        default_options=build_default_options,
-        dump_reconstruct_options=dump_options,
+    visible = (
+        torch.cuda.is_available()
+        or getattr(torch, 'xpu', None) is not None
+        and (torch.xpu.is_available())
     )
+    device = Devices.GPU if visible else Devices.CPU
+    task_options.reconstructor_options.default_device = device
+    logger.info(f'Reconstructing on the {device.name}.')
 
 
-def build_reconstructors() -> list[SubprocessReconstructor]:
+class PtyChiReconstructor(Reconstructor):
+    """One pty-chi algorithm, holding nothing but the class that names it."""
+
+    def __init__(self, algorithm: type[PtyChiAlgorithm]) -> None:
+        super().__init__()
+        self._algorithm = algorithm
+
+    @property
+    def name(self) -> str:
+        return self._algorithm.spec.display_name
+
+    def get_default_options(self) -> BaseModel:
+        return default_options(self._algorithm.spec.task_options_cls)
+
+    def reconstruct(
+        self, input_: ReconstructInput, *, options: BaseModel
+    ) -> Iterator[ReconstructOutput]:
+        declared = _declared(options)
+        # Every field that must agree with the product rather than with a setting
+        # is applied here, in one place, rather than being read off the product
+        # wherever it happens to be needed.
+        task_options = align_task_options_with_product(apply_to_task(declared), input_.product)
+        _resolve_default_device(task_options)
+        yield from reconstruct_with_ptychi(input_, task_options, declared.num_sync_epochs)
+
+
+def build_reconstructors() -> list[PtyChiReconstructor]:
     """One reconstructor per algorithm, in the order the GUI lists them."""
-    return [_wrap_as_subprocess_reconstructor(cls) for cls in _ALGORITHM_CLASSES]
+    return [PtyChiReconstructor(cls) for cls in _ALGORITHM_CLASSES]

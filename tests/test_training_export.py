@@ -61,6 +61,7 @@ def _processing_api(
         MagicMock(),
         MagicMock(),
         writers,
+        MagicMock(),
     )
 
 

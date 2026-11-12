@@ -1,238 +1,159 @@
-"""Child-side entry points used by ``test_subprocess_reconstructor``.
+"""Work run in a spawned child by the ``iterate_in_subprocess`` and device tests.
 
-The ``spawn``-context child imports this module by dotted path, so it must be
-resolvable on the child's ``sys.path``; the test module puts the tests
-directory there before spawning. Not collected by pytest (the filename does
-not match ``test_*.py``). Only the device-probing entry points import a GPU
-framework, and only when they run, so importing this module never does. Do not
-import from application code.
+What crosses to the child is pickled by reference, so everything here is defined
+at module scope and the module must be resolvable on the child's ``sys.path``;
+the test modules put the tests directory there before spawning. Not collected by
+pytest (the filename does not match ``test_*.py``). Only the device-probing
+functions import a GPU framework, and only when they run, so importing this
+module never does. Do not import from application code.
 """
 
 from __future__ import annotations
 
 import logging
-import sys
+import os
 import time
-from collections.abc import Mapping
-from multiprocessing.queues import SimpleQueue
-from types import ModuleType, SimpleNamespace
+from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import numpy
+from pydantic import BaseModel
 
+from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import (
+    NoOptions,
+    ReconstructInput,
     ReconstructOutput,
-    ReconstructorMessage,
+    TrainableReconstructor,
     TrainOutput,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def _set_attrs(module: ModuleType, **attrs: Any) -> None:
-    """Attach attributes to a module.
-
-    Via setattr because a ModuleType has no declared attributes, so assigning them
-    directly is an attr-defined error on every line.
-    """
-    for name, value in attrs.items():
-        setattr(module, name, value)
+def yield_outputs(product: Product, count: int) -> Iterator[ReconstructOutput]:
+    """Yield *count* outputs, numbered from one."""
+    for index in range(count):
+        yield ReconstructOutput(product=product, progress=index + 1)
 
 
-def _fake_module(name: str, **attrs: Any) -> ModuleType:
-    """A stand-in module carrying `attrs`, for faking an absent optional package."""
-    module = ModuleType(name)
-    _set_attrs(module, **attrs)
-    return module
+def raise_immediately(message: str) -> Iterator[Any]:
+    """Raise a :class:`ValueError` before producing anything."""
+    raise ValueError(message)
 
 
-class ChildCallCapturedError(Exception):
-    """Carries what a stubbed backend call received, back across the spawn."""
-
-
-def _install_fake_ptycho_torch(**module_attrs: Any) -> None:
-    """Put a minimal fake ``ptycho_torch`` (and ``torch``) on ``sys.modules``.
-
-    ``module_attrs`` maps a dotted submodule name, with dots replaced by
-    underscores, to the attributes that submodule should carry.
-    """
-    package = _fake_module('ptycho_torch', __path__=[])
-    modules: dict[str, ModuleType] = {
-        'ptycho_torch': package,
-        'ptycho_torch.workflows': _fake_module('ptycho_torch.workflows', __path__=[]),
-        # _resolve_device asks torch whether a device is present; say no, so the
-        # fixture resolves to CPU without a real runtime.
-        'torch': _fake_module('torch', cuda=SimpleNamespace(is_available=lambda: False)),
-    }
-
-    for dotted, attrs in module_attrs.items():
-        name = dotted.replace('_DOT_', '.')
-        modules[name] = _fake_module(name, **attrs)
-
-    sys.modules.update(modules)
-
-
-def capture_ptychopinn_reconstruct_call(payload: Any, queue: Any) -> None:
-    """Run the real child inference entry point against a stubbed backend."""
-    from dataclasses import dataclass
-
-    @dataclass
-    class FakeInferenceConfig:
-        patch_weighting: str = 'probe'
-        batch_size: int = 1
-
-    loaded_model = SimpleNamespace(
-        model_config=SimpleNamespace(mode='Unsupervised'),
-        inference_config=FakeInferenceConfig(),
-        data_config=object(),
-        training_config=object(),
-    )
-
-    def reconstruct_from_arrays(model: Any, arrays: Any, **kwargs: Any) -> None:
-        runtime_params = kwargs['runtime_params']
-        raise ChildCallCapturedError(
-            {
-                'array_keys': sorted(arrays),
-                'device': kwargs['device'],
-                'num_workers': kwargs['num_workers'],
-                'patch_weighting': runtime_params.inference_config.patch_weighting,
-                'batch_size': runtime_params.inference_config.batch_size,
-            }
-        )
-
-    _install_fake_ptycho_torch(
-        ptycho_torch_DOT_inference={
-            'ReconstructionRuntimeParams': SimpleNamespace,
-            'reconstruct_from_arrays': reconstruct_from_arrays,
-        },
-        ptycho_torch_DOT_workflows_DOT_bundle_io={
-            'load_inference_bundle_torch': lambda _dir: (loaded_model, {}),
-        },
-    )
-
-    from ptychodus.plugins.ptychopinn import _subprocess
-
-    _subprocess.run_reconstruct(payload, queue)
-
-
-def capture_ptychopinn_train_call(payload: Any, queue: Any) -> None:
-    """Run the real child training entry point against a stubbed backend."""
-
-    class FakeExecutionRequest:
-        def __init__(self, values: Any, explicit_fields: Any) -> None:
-            self.values = dict(values)
-            self.explicit_fields = set(explicit_fields)
-
-    def train(dataset: Any, output_dir: Any, settings: Any, **kwargs: Any) -> None:
-        execution_config = kwargs['execution_config']
-
-        with numpy.load(dataset, allow_pickle=False) as archive:
-            dataset_keys = sorted(archive.files)
-            num_frames = len(archive['xcoords'])
-            object_indexes = (
-                sorted({int(i) for i in archive['object_index']})
-                if 'object_index' in archive.files
-                else None
-            )
-
-        raise ChildCallCapturedError(
-            {
-                'dataset_name': str(dataset.name),
-                'dataset_parent': str(dataset.parent),
-                'dataset_keys': dataset_keys,
-                'num_frames': num_frames,
-                'object_indexes': object_indexes,
-                'settings_is_mapping': isinstance(settings, Mapping),
-                'has_nphotons': 'nphotons' in settings,
-                'mode': settings.get('mode'),
-                'execution_values': execution_config.values,
-                'explicit_fields': sorted(execution_config.explicit_fields),
-            }
-        )
-
-    _install_fake_ptycho_torch(
-        ptycho_torch_DOT_execution_request={'ExecutionRequest': FakeExecutionRequest},
-        ptycho_torch_DOT_train={'train': train},
-    )
-
-    from ptychodus.plugins.ptychopinn import _subprocess
-
-    _subprocess.run_train(payload, queue)
-
-
-def yield_n_outputs(payload: Any, queue: Any) -> None:
-    """Emit ``payload.options['n']`` :class:`ReconstructOutput`s with product=None."""
-    n = int(payload.options['n'])
-    for i in range(n):
-        output = ReconstructOutput(product=payload.options['product'], progress=i + 1)
-        queue.put((ReconstructorMessage.OUTPUT, output))
-
-
-def raise_immediately(payload: Any, queue: Any) -> None:
-    """Raise a :class:`ValueError` before emitting anything."""
-    raise ValueError(payload.options['message'])
-
-
-def hang_forever(payload: Any, queue: Any) -> None:
-    """Sleep so the parent must terminate us."""
-    time.sleep(3600.0)
-
-
-def emit_output_then_hang(payload: Any, queue: Any) -> None:
-    """Emit one output, then sleep so the parent must terminate us.
+def yield_one_then_hang(product: Product) -> Iterator[ReconstructOutput]:
+    """Yield one output, then sleep so the parent must terminate us.
 
     The output is what lets the parent reach its first ``yield``: a child that
     only sleeps leaves the parent generator un-started, and closing a generator
     that never ran executes no cleanup at all.
     """
-    queue.put(
-        (
-            ReconstructorMessage.OUTPUT,
-            ReconstructOutput(product=payload.options['product'], progress=1),
-        )
-    )
+    yield ReconstructOutput(product=product, progress=1)
     time.sleep(3600.0)
 
 
-def emit_log_then_output(payload: Any, queue: Any) -> None:
-    """Log a message, then emit one output; parent must see log before output."""
-    logger.warning(payload.options['log_message'])
-    output = ReconstructOutput(product=payload.options['product'], progress=1)
-    queue.put((ReconstructorMessage.OUTPUT, output))
+def log_then_yield(message: str, product: Product) -> Iterator[ReconstructOutput]:
+    """Log a message, then yield one output; the parent must see the log first."""
+    logger.warning(message)
+    yield ReconstructOutput(product=product, progress=1)
 
 
-def emit_settings_sync_then_output(payload: Any, queue: Any) -> None:
-    """Emit a settings-sync message, then an output."""
-    queue.put((ReconstructorMessage.SETTINGS_SYNC, payload.options['settings']))
-    output = ReconstructOutput(product=payload.options['product'], progress=1)
-    queue.put((ReconstructorMessage.OUTPUT, output))
+def yield_environment(name: str) -> Iterator[str | None]:
+    """Yield the value of environment variable *name* as the child sees it."""
+    yield os.environ.get(name)
 
 
-def train_and_save(payload: Any, queue: Any) -> None:
-    """Emit one :class:`TrainOutput` and a model-saved path."""
-    queue.put((ReconstructorMessage.TRAIN_OUTPUT, TrainOutput(progress=1)))
-    queue.put((ReconstructorMessage.MODEL_SAVED, payload.options['saved_path']))
+def yield_unpicklable() -> Iterator[Any]:
+    """Yield an item that cannot be pickled; putting it must raise."""
+    yield lambda: None
 
 
-def probe_cuda_uuids(_payload: Any, queue: SimpleQueue[Any]) -> None:
-    """Report the UUID of every CUDA device visible to this child.
+def yield_then_modify_in_place() -> Iterator[Any]:
+    """Yield an array, then overwrite it; the parent must see what was yielded."""
+    array = numpy.zeros(1 << 20)
+    yield array
+    array += 1.0
+
+
+class FakeTrainableReconstructor(TrainableReconstructor):
+    """A trainable reconstructor touching no GPU framework, as a backend would be written.
+
+    ``reconstruct`` yields the input product ``num_outputs`` times. ``train``
+    writes a model file into the output directory and names it in its last
+    output, mutating ``self`` along the way so a test can show the mutation is
+    not seen by whoever ran it in a child.
+    """
+
+    def __init__(self, num_outputs: int = 1) -> None:
+        super().__init__()
+        self._num_outputs = num_outputs
+        self.loaded_model: Path | None = None
+        self.trained_in_this_process = False
+
+    @property
+    def name(self) -> str:
+        return 'Fake'
+
+    def get_default_options(self) -> BaseModel:
+        return NoOptions()
+
+    def reconstruct(
+        self, input_: ReconstructInput, *, options: BaseModel
+    ) -> Iterator[ReconstructOutput]:
+        for index in range(self._num_outputs):
+            yield ReconstructOutput(
+                product=input_.product, progress=index + 1, progress_goal=self._num_outputs
+            )
+
+    def is_model_loaded(self) -> bool:
+        return self.loaded_model is not None
+
+    def get_model_file_filter(self) -> str:
+        return 'Fake Model (*.fake)'
+
+    def load_model(self, file_path: Path) -> None:
+        self.loaded_model = file_path
+
+    def get_model_file_extension(self) -> str:
+        return '.fake'
+
+    def save_model(self, file_path: Path) -> None:
+        if self.loaded_model is None:
+            raise RuntimeError('No model has been loaded or trained.')
+
+        file_path.write_bytes(self.loaded_model.read_bytes())
+
+    def train(
+        self, input_directory: Path, output_directory: Path, *, options: BaseModel
+    ) -> Iterator[TrainOutput]:
+        self.trained_in_this_process = True
+        yield TrainOutput(progress=1, progress_goal=2)
+
+        model_path = output_directory / 'model.fake'
+        model_path.write_bytes(b'trained')
+        yield TrainOutput(progress=2, progress_goal=2, trained_model=model_path)
+
+
+def probe_cuda_uuids() -> Iterator[list[str]]:
+    """Yield the UUID of every CUDA device visible to this child.
 
     A name does not identify a device when a host holds two of the same model,
     so proving a restriction reached the right one takes something unique.
     """
     import torch
 
-    uuids = [
+    yield [
         str(torch.cuda.get_device_properties(index).uuid)
         for index in range(torch.cuda.device_count())
     ]
-    queue.put((ReconstructorMessage.OUTPUT, uuids))
 
 
-def probe_devices_from_a_clean_process(_payload: Any, queue: SimpleQueue[Any]) -> None:
+def probe_devices_from_a_clean_process() -> Iterator[tuple[list[str], bool, bool]]:
     """Probe the devices from a process that has never touched CUDA, and say whether it now has.
 
-    Reports the identifiers, whether every device carries a name, and whether this
+    Yields the identifiers, whether every device carries a name, and whether this
     process holds a CUDA context once the probe returns.
     """
     import torch
@@ -240,21 +161,8 @@ def probe_devices_from_a_clean_process(_payload: Any, queue: SimpleQueue[Any]) -
     from ptychodus.api.devices import probe_devices
 
     devices = probe_devices()
-    report = (
+    yield (
         [device.identifier for device in devices],
         all(device.name for device in devices),
         torch.cuda.is_initialized(),
     )
-    queue.put((ReconstructorMessage.OUTPUT, report))
-
-
-def emit_unpicklable(payload: Any, queue: Any) -> None:
-    """Put a message that cannot be pickled; the put itself must raise."""
-    queue.put((ReconstructorMessage.OUTPUT, lambda: None))
-
-
-def emit_then_modify_in_place(payload: Any, queue: Any) -> None:
-    """Put an array, then overwrite it; the parent must see what was put."""
-    array = numpy.zeros(1 << 20)
-    queue.put(('array', array))
-    array += 1.0

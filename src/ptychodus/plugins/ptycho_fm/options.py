@@ -7,7 +7,7 @@ table beside the flattener says which of its 165 fields are surfaced and what
 each is called.
 
 Importing ``ptycho_fm.config`` costs exactly two modules -- the package root is
-empty and the config module imports only pydantic -- so the parent can read the
+empty and the config module imports only pydantic -- so the application can read the
 declaration without pulling torch in. That is what makes the overlay possible
 here and not for PtychoPINN, whose configuration is inseparable from its
 backend.
@@ -73,7 +73,7 @@ class PtychoFMOptions(PtychoFMConfig):
     """Upstream's configuration plus the inference branch ptychodus adds.
 
     A subclass rather than a wrapper, so the object stays a ``PtychoFMConfig``
-    and dumps to the same nested shape the child already reads. Upstream allows
+    and dumps to the same nested shape the backend already reads. Upstream allows
     extra keys, so the added branch rides along as a top-level section.
 
     ``model`` is redeclared only to mark it frozen, pydantic's own statement that

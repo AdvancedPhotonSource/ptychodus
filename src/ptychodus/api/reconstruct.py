@@ -1,24 +1,14 @@
-"""Reconstructor interfaces, I/O data containers, and product standardization.
-
-Also home to :class:`SubprocessReconstructor`, the adapter that runs a backend
-in a spawned child so the parent process never acquires a GPU context. It sits
-beside the interface it implements because it implements the whole of it, and
-the only thing it adds is where the work happens.
-"""
+"""Reconstructor interfaces, I/O data containers, and product standardization."""
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field, fields
-from enum import auto, Enum, StrEnum
+from enum import auto, Enum
 from importlib.metadata import PackageNotFoundError, version
-from importlib import import_module
 from importlib.util import find_spec
-from multiprocessing.queues import SimpleQueue
 from pathlib import Path
-from typing import Any
 import logging
-import shutil
 
 import numpy
 from pydantic import BaseModel
@@ -39,15 +29,9 @@ from .probe_positions import ProbePositionSequence, ProbePosition
 from .product import LossValue, Product
 from .propagate import compute_full_aperture_fresnel_number
 from .scattering.geometry import find_scattering_issues
-from .spawn import run_subprocess
 from .typing import RealArrayType
 
 __all__ = [
-    'ApplySettingsSync',
-    'DefaultOptions',
-    'DeviceEnvironment',
-    'DumpReconstructOptions',
-    'DumpTrainOptions',
     'NoOptions',
     'PositionIndexFilter',
     'ReconstructInput',
@@ -55,12 +39,6 @@ __all__ = [
     'ReconstructOutput',
     'Reconstructor',
     'ReconstructorLibrary',
-    'ReconstructorMessage',
-    'ResolveModelPath',
-    'SaveModel',
-    'SubprocessOperation',
-    'SubprocessPayload',
-    'SubprocessReconstructor',
     'TrainOutput',
     'TrainableReconstructor',
     'TrainingDataFileWriter',
@@ -120,7 +98,15 @@ class ReconstructOutput:
 
 
 class Reconstructor(ABC):
-    """Abstract interface for iterative ptychography reconstruction algorithms."""
+    """Abstract interface for iterative ptychography reconstruction algorithms.
+
+    An implementation is picklable, and whatever runs :meth:`reconstruct` may do
+    so in another process: the reconstructor and its arguments travel there,
+    and only what the method yields comes back. So :meth:`reconstruct` leaves
+    ``self`` unchanged and imports the framework it computes with inside the
+    method, while every other method -- the options, and for a trainable
+    reconstructor the model file handling -- imports no GPU framework at all.
+    """
 
     @property
     @abstractmethod
@@ -155,6 +141,10 @@ class TrainOutput:
     """Training result yielded at each step: loss curves, progress, and status code.
 
     ``progress_goal`` is reported by the run, as for :class:`ReconstructOutput`.
+
+    ``trained_model`` is the model the run wrote, in the form
+    :meth:`TrainableReconstructor.load_model` accepts, set on the output that
+    reports it. Training does not load it; whoever asked for the training does.
     """
 
     training_loss: Sequence[LossValue] = field(default_factory=list)
@@ -162,10 +152,18 @@ class TrainOutput:
     progress: int = 0
     progress_goal: int = 0
     status: int = 0
+    trained_model: Path | None = None
 
 
 class TrainableReconstructor(Reconstructor):
-    """Reconstructor that also supports ML model loading and training."""
+    """Reconstructor that also supports ML model loading and training.
+
+    :meth:`train` is held to what :class:`Reconstructor` asks of
+    :meth:`~Reconstructor.reconstruct`, and so announces the model it wrote in
+    :attr:`TrainOutput.trained_model` rather than loading it. :meth:`load_model`
+    records what a later :meth:`~Reconstructor.reconstruct` reads, and does no
+    more than that needs.
+    """
 
     @abstractmethod
     def is_model_loaded(self) -> bool:
@@ -207,386 +205,6 @@ class TrainableReconstructor(Reconstructor):
         Override when the backend makes that promise.
         """
         return False
-
-
-class ReconstructorMessage(StrEnum):
-    """What a reconstructor's child has to say, beside what the transport owns.
-
-    One place names every message :class:`SubprocessReconstructor` acts on,
-    so a backend writing a child can see the whole vocabulary without
-    reading the adapter. A string enum, because the tag is pickled to the
-    parent and a child writing the bare string must still compare equal.
-
-    What rides with each is fixed by the tag:
-
-    - ``OUTPUT`` -- a :class:`ReconstructOutput`
-    - ``TRAIN_OUTPUT`` -- a :class:`TrainOutput`
-    - ``MODEL_SAVED`` -- the path, as a string, the child wrote a checkpoint to
-    - ``SETTINGS_SYNC`` -- ``{group_name: {parameter_name: value_as_string}}``
-    """
-
-    OUTPUT = 'output'
-    TRAIN_OUTPUT = 'train_output'
-    MODEL_SAVED = 'model_saved'
-    SETTINGS_SYNC = 'settings_sync'
-
-
-class SubprocessOperation(StrEnum):
-    """What a child was spawned to do, and so which payload fields are filled."""
-
-    RECONSTRUCT = 'reconstruct'
-    TRAIN = 'train'
-
-    @property
-    def child_function(self) -> str:
-        """What a backend following the convention calls this operation's entry point.
-
-        Derived from the operation rather than tabulated beside it, so the
-        two cannot disagree and a backend reading this knows the rule rather
-        than a pair of names.
-        """
-        return f'run_{self.value}'
-
-
-@dataclass(frozen=True)
-class SubprocessPayload:
-    """What a child is handed, whichever backend and whichever operation.
-
-    One envelope rather than a pair of dataclasses per backend, so every
-    child reads the same shape and a new backend states only what goes in
-    ``options``. Which fields are filled follows from ``operation``:
-    reconstructing supplies ``input_`` and, where a backend loads one,
-    ``model_path``; training supplies the two directories.
-
-    ``options`` is the subset of the declaration this operation's child
-    reads, in the form that child consumes -- usually a mapping, since
-    dumping only what is read keeps a reconstruct payload free of
-    training-only values. A declaration that cannot dump itself to a mapping
-    without changing what it holds travels as the object it built instead;
-    the payload is pickled either way, so nothing is gained by a round trip
-    that would coerce the values on the way through.
-    """
-
-    operation: SubprocessOperation
-    reconstructor: str
-    options: Any
-    # Where the child code lives. Derived from the library that built this
-    # reconstructor rather than written down, so there is no dotted string to
-    # go stale when a module moves.
-    child_module: str = ''
-    child_function: str = ''
-    input_: ReconstructInput | None = None
-    input_directory: Path | None = None
-    output_directory: Path | None = None
-    model_path: Path | None = None
-
-    def require_input(self) -> ReconstructInput:
-        """The data to reconstruct, or a complaint naming what was missing.
-
-        A child is spawned for one operation and reads the fields that
-        operation fills. Asking rather than assuming turns a payload built
-        wrong into one message here, instead of an attribute error on None
-        several frames into a GPU framework.
-        """
-        if self.input_ is None:
-            raise ValueError(f'{self.reconstructor}: {self.operation} payload carries no input.')
-
-        return self.input_
-
-    def require_model_path(self) -> Path:
-        """The model to load, or a complaint naming what was missing."""
-        if self.model_path is None:
-            raise ValueError(
-                f'{self.reconstructor}: {self.operation} payload carries no model path.'
-            )
-
-        return self.model_path
-
-    def require_directories(self) -> tuple[Path, Path]:
-        """The directories to read from and write to, or a complaint."""
-        if self.input_directory is None or self.output_directory is None:
-            raise ValueError(
-                f'{self.reconstructor}: {self.operation} payload carries no directories.'
-            )
-
-        return self.input_directory, self.output_directory
-
-
-# Type aliases for the callbacks each backend supplies.
-DumpReconstructOptions = Callable[[ReconstructInput, BaseModel], Any]
-"""(reconstruct_input, options) -> the subset of the declaration the child reads."""
-
-DumpTrainOptions = Callable[[BaseModel], Any]
-"""(options) -> the subset of the declaration the training child reads."""
-
-ResolveModelPath = Callable[[Path | None], Path]
-"""(path recorded by load_model) -> the path the child loads from.
-
-Runs parent-side, before the child is spawned, so a backend that unpacks an
-archive or picks a file out of a bundle directory does it once and complains
-here rather than in the child when there is nothing to load.
-"""
-
-SaveModel = Callable[[Path, Path], None]
-"""(source_path_loaded_by_child, destination_path) -> None. Runs parent-side."""
-
-ApplySettingsSync = Callable[[dict[str, dict[str, str]]], None]
-"""Optional handler for the settings a child reports back; see ReconstructorMessage."""
-
-DefaultOptions = Callable[[], BaseModel]
-"""() -> a fresh object describing what this backend accepts, at its defaults."""
-
-DeviceEnvironment = Callable[[], Mapping[str, str]]
-"""() -> the environment entries restricting a child to the chosen devices."""
-
-
-class SubprocessReconstructor(TrainableReconstructor):
-    """Parent-side adapter that runs any reconstructor in a fresh subprocess.
-
-    Wraps any backend reachable as a child-side entry point, so a caller can
-    dispatch to it without importing a GPU framework. When ``is_trainable`` is
-    False the trainable methods raise :class:`NotImplementedError`, so the
-    object is still a single kind that needs no special-casing in a list.
-
-    The parent-side object holds no GPU state. It stores:
-
-    - the module its child code lives in, stamped on by its library,
-    - backend-supplied callbacks that dump options and save models,
-    - the loaded-model path (as recorded by ``load_model`` /
-      remembered from the last ``train`` call).
-
-    Each ``reconstruct()`` / ``train()`` call spawns exactly one child; the
-    child dies before the call returns, and the iterator yields the same
-    per-iteration output an in-process backend would. The child inherits this
-    process's environment, a distributed launcher's rank variables included,
-    which is what lets a backend passing ``distributed_training`` join one
-    process group from a child per rank.
-
-    **Trainable-model lifecycle.** ``load_model`` records the path and nothing
-    else -- the fresh inference child does the real load, once per call.
-    ``save_model`` copies or archives that path to the destination through a
-    backend-supplied callback, so a backend persisting one file and a backend
-    persisting a whole bundle directory share this adapter unchanged.
-    """
-
-    def __init__(
-        self,
-        *,
-        name: str,
-        dump_reconstruct_options: DumpReconstructOptions,
-        child_module: str = '',
-        reconstruct_function: str = '',
-        default_options: DefaultOptions = NoOptions,
-        resolve_model_path: ResolveModelPath | None = None,
-        is_trainable: bool = False,
-        train_function: str = '',
-        dump_train_options: DumpTrainOptions | None = None,
-        distributed_training: bool = False,
-        model_file_filter: str = '',
-        model_file_extension: str = '',
-        save_model: SaveModel | None = None,
-        apply_settings_sync: ApplySettingsSync | None = None,
-        terminate_grace_sec: float = 10.0,
-    ) -> None:
-        super().__init__()
-        self._name = name
-        self._dump_reconstruct_options = dump_reconstruct_options
-        self._reconstruct_function = reconstruct_function
-        self._default_options = default_options
-        self._resolve_model_path = resolve_model_path
-        self._is_trainable = is_trainable
-        self._train_function = train_function
-        self._dump_train_options = dump_train_options
-        self._distributed_training = distributed_training
-
-        # Where this reconstructor's child code lives. Stamped by the library
-        # that builds it, which is the thing that knows; set directly only by
-        # a caller building one outside a library.
-        self.child_module = child_module
-        self._model_file_filter = model_file_filter
-        self._model_file_extension = model_file_extension
-        self._save_model_fn = save_model
-        self._apply_settings_sync = apply_settings_sync
-        self._terminate_grace_sec = terminate_grace_sec
-
-        self._loaded_model_path: Path | None = None
-        # Where the work runs, which is the spawning process's to decide and
-        # not the backend's. Replaced after construction by whatever owns the
-        # selection; until then a child sees every device this process does.
-        self.device_environment: DeviceEnvironment = dict
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @property
-    def is_trainable(self) -> bool:
-        return self._is_trainable
-
-    def supports_distributed_training(self) -> bool:
-        return self._is_trainable and self._distributed_training
-
-    def get_default_options(self) -> BaseModel:
-        # A fresh object per call, so a caller editing what it was handed
-        # cannot change what the next caller is handed.
-        return self._default_options()
-
-    def reconstruct(
-        self, input_: ReconstructInput, *, options: BaseModel
-    ) -> Iterator[ReconstructOutput]:
-        payload = SubprocessPayload(
-            operation=SubprocessOperation.RECONSTRUCT,
-            reconstructor=self._name,
-            options=self._dump_reconstruct_options(input_, options),
-            child_module=self.child_module,
-            child_function=self._reconstruct_function,
-            input_=input_,
-            model_path=(
-                self._loaded_model_path
-                if self._resolve_model_path is None
-                else self._resolve_model_path(self._loaded_model_path)
-            ),
-        )
-
-        with run_subprocess(
-            _DISPATCH_ENTRY_POINT,
-            payload,
-            terminate_grace_sec=self._terminate_grace_sec,
-            environment=self.device_environment(),
-        ) as events:
-            for event in events:
-                tag = event[0]
-                if tag == ReconstructorMessage.OUTPUT:
-                    yield event[1]
-                elif tag == ReconstructorMessage.SETTINGS_SYNC:
-                    if self._apply_settings_sync is not None:
-                        try:
-                            self._apply_settings_sync(event[1])
-                        except Exception:
-                            logger.exception('Failed to apply settings sync from subprocess.')
-                else:
-                    logger.debug(
-                        f'{self._name}: dropping unrecognized subprocess message tag {tag!r}'
-                    )
-
-    def is_model_loaded(self) -> bool:
-        return self._loaded_model_path is not None
-
-    def get_model_file_filter(self) -> str:
-        return self._model_file_filter
-
-    def load_model(self, file_path: Path) -> None:
-        # Parent-side: just remember the path. The child does the actual load
-        # (which touches GPU frameworks) per reconstruct/train call.
-        self._loaded_model_path = file_path
-
-    def get_model_file_extension(self) -> str:
-        return self._model_file_extension
-
-    def save_model(self, file_path: Path) -> None:
-        if self._loaded_model_path is None:
-            raise RuntimeError(
-                f'Cannot save {self._name} model: no model has been loaded or trained.'
-            )
-        if self._save_model_fn is not None:
-            self._save_model_fn(self._loaded_model_path, file_path)
-        else:
-            shutil.copyfile(self._loaded_model_path, file_path)
-
-    def train(
-        self, input_directory: Path, output_directory: Path, *, options: BaseModel
-    ) -> Iterator[TrainOutput]:
-        if not self._is_trainable:
-            raise NotImplementedError(f'{self._name} does not support training.')
-        if self._dump_train_options is None:
-            raise NotImplementedError(f'{self._name} does not support training.')
-
-        payload = SubprocessPayload(
-            operation=SubprocessOperation.TRAIN,
-            reconstructor=self._name,
-            options=self._dump_train_options(options),
-            child_module=self.child_module,
-            child_function=self._train_function,
-            input_directory=input_directory,
-            output_directory=output_directory,
-        )
-
-        with run_subprocess(
-            _DISPATCH_ENTRY_POINT,
-            payload,
-            terminate_grace_sec=self._terminate_grace_sec,
-            environment=self.device_environment(),
-        ) as events:
-            for event in events:
-                tag = event[0]
-                if tag == ReconstructorMessage.TRAIN_OUTPUT:
-                    yield event[1]
-                elif tag == ReconstructorMessage.MODEL_SAVED:
-                    self._loaded_model_path = Path(event[1])
-                elif tag == ReconstructorMessage.SETTINGS_SYNC:
-                    if self._apply_settings_sync is not None:
-                        try:
-                            self._apply_settings_sync(event[1])
-                        except Exception:
-                            logger.exception('Failed to apply settings sync from subprocess.')
-                else:
-                    logger.debug(
-                        f'{self._name}: dropping unrecognized subprocess message tag {tag!r}'
-                    )
-
-
-def _child_module_for(library_class: type) -> str:
-    """The module a library's reconstructors run their children in.
-
-    Derived from where the library class lives rather than written down by
-    the backend: a plugin lives in a package of its own and keeps its child
-    entry points in one module there, so the path follows from the class and
-    cannot disagree with it.
-    """
-    package, _, _ = library_class.__module__.rpartition('.')
-    return f'{package}._subprocess'
-
-
-# Module scope, and underscored, for the reason tests/test_subprocess_entry_points.py
-# states: it discovers entry points by AST-scanning module-level assignments whose
-# name carries ENTRY, so inlining this into its one reader would drop it from that
-# guard with nothing to show for it.
-_DISPATCH_ENTRY_POINT = 'ptychodus.api.reconstruct:_run_in_child'
-
-
-def _run_in_child(payload: SubprocessPayload, queue: SimpleQueue[Any]) -> None:
-    """Import the backend the payload names and hand it the payload.
-
-    Runs in the child. One entry point for every backend and both
-    operations, so what varies is data rather than a dotted string written
-    per backend per operation -- a string that resolves only when a child is
-    actually spawned, and so goes stale without anything noticing.
-
-    Only the module this payload names is imported. Rebuilding the plugin
-    registry here would work too, and would cost a second of importing every
-    plugin to recover a mapping the parent already had.
-    """
-    if not payload.child_module:
-        raise ValueError(
-            f'{payload.reconstructor}: no child module to run {payload.operation} in. '
-            'A reconstructor is given one by the library that builds it.'
-        )
-
-    # Coerced rather than trusted: a payload is unpickled from another
-    # process, and a bare string where the member was still names the
-    # operation. An unknown one says so here instead of failing to find a
-    # function nobody named.
-    function = payload.child_function or SubprocessOperation(payload.operation).child_function
-    module = import_module(payload.child_module)
-
-    try:
-        entry = getattr(module, function)
-    except AttributeError:
-        raise AttributeError(
-            f'{payload.reconstructor}: {payload.child_module} defines no "{function}".'
-        ) from None
-
-    entry(payload, queue)
 
 
 class ReconstructorLibrary(Iterable[Reconstructor], ABC):
@@ -685,21 +303,7 @@ class ReconstructorLibrary(Iterable[Reconstructor], ABC):
             return []
 
         self.log_version()
-        self._locate_child_code(reconstructors)
         return reconstructors
-
-    def _locate_child_code(self, reconstructors: Iterable[Reconstructor]) -> None:
-        """Tell each reconstructor where its child code lives.
-
-        One already carrying a module keeps it, which is how a backend
-        laid out differently -- or a caller building one in a test -- says so.
-        """
-        child_module = _child_module_for(type(self))
-
-        for reconstructor in reconstructors:
-            if isinstance(reconstructor, SubprocessReconstructor):
-                if not reconstructor.child_module:
-                    reconstructor.child_module = child_module
 
     @abstractmethod
     def _build(self) -> Iterable[Reconstructor]:

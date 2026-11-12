@@ -264,17 +264,17 @@ class FromMemoryObjectBuilder(ObjectBuilder):
         return builder
 
     def _build_raw(self, geometry_provider: ObjectGeometryProvider) -> Object:
-        object_geometry = geometry_provider.get_object_geometry()
-
+        # Consult the provider only for what the object lacks: a product loaded without
+        # its diffraction data carries its own sampling, and the provider cannot answer.
         try:
             pixel_geometry = self._object.get_pixel_geometry()
         except ValueError:
-            pixel_geometry = object_geometry.get_pixel_geometry()
+            pixel_geometry = geometry_provider.get_object_geometry().get_pixel_geometry()
 
         try:
             center = self._object.get_center()
         except ValueError:
-            center = object_geometry.get_center()
+            center = geometry_provider.get_object_geometry().get_center()
 
         return Object(
             self._object.get_array(),

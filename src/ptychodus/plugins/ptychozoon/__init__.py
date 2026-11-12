@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    # Located rather than imported: the package pulls CuPy, which only the child may
-    # load, and whether it is present is all registration needs to know.
+    # Located rather than imported: the package pulls CuPy, which only an enhancement
+    # may load, and whether it is present is all registration needs to know.
     if find_spec('ptychozoon') is None:
         logger.info('ptychozoon not found.')
         return

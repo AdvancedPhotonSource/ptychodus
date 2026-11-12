@@ -5,7 +5,6 @@ from ptychodus.api.fluorescence import (
     FluorescenceEnhancer,
     FluorescenceFileReader,
     FluorescenceFileWriter,
-    SubprocessFluorescenceEnhancer,
 )
 
 from ..devices import DeviceSelection
@@ -73,11 +72,6 @@ class FluorescenceCore(Observer):
                 branches or (),
             )
 
-            # Placement is ptychodus's to decide, so it is attached here rather than
-            # declared by the backend or passed through every call.
-            if isinstance(enhancer, SubprocessFluorescenceEnhancer):
-                enhancer.device_environment = device_selection.environment
-
             # The package rather than the module, so a backend's forwarded child logs
             # reach the monitor too.
             package_loggers.add(type(enhancer).__module__.rpartition('.')[0])
@@ -107,6 +101,7 @@ class FluorescenceCore(Observer):
             self.task_monitor,
             file_reader_chooser,
             file_writer_chooser,
+            device_selection,
         )
 
         self._reinit_observable = reinit_observable

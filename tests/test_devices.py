@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+import importlib
 import sys
 
 import pytest
@@ -202,24 +203,21 @@ def _probed_gpus() -> list[Device]:
     return gpus
 
 
-def _ask_a_child(entry_point: str, environment: dict[str, str] | None = None) -> Any:
-    """Run a ``subprocess_child_fixtures`` entry point and return what it reports."""
-    from ptychodus.api.reconstruct import ReconstructorMessage
-    from ptychodus.api.spawn import run_subprocess
+def _ask_a_child(probe_name: str, environment: dict[str, str] | None = None) -> Any:
+    """Run a ``subprocess_child_fixtures`` probe in a child and return what it yields."""
+    from ptychodus.api.spawn import iterate_in_subprocess
 
     sys.path.insert(0, str(Path(__file__).parent))
 
     try:
-        with run_subprocess(
-            f'subprocess_child_fixtures:{entry_point}', None, environment=environment
-        ) as events:
-            for event in events:
-                if event[0] == ReconstructorMessage.OUTPUT:
-                    return event[1]
+        fixtures = importlib.import_module('subprocess_child_fixtures')
+        reports = list(
+            iterate_in_subprocess(getattr(fixtures, probe_name), environment=environment)
+        )
     finally:
         sys.path.pop(0)
 
-    return None
+    return reports[0] if reports else None
 
 
 def test_the_probe_reports_devices_a_child_can_actually_see() -> None:

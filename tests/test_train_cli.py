@@ -110,10 +110,12 @@ class _FakeTrainer(TrainableReconstructor):
         weights = output_directory / 'weights.bin'
         weights.write_bytes(b'weights')
 
-        if self.report_model:
-            self._model_path = weights
-
-        yield TrainOutput(training_loss=[LossValue(1, 0.5)], progress=2, progress_goal=2)
+        yield TrainOutput(
+            training_loss=[LossValue(1, 0.5)],
+            progress=2,
+            progress_goal=2,
+            trained_model=weights if self.report_model else None,
+        )
 
     def supports_distributed_training(self) -> bool:
         return self._distributed

@@ -1,11 +1,11 @@
 """The pty-chi task boundary: options serialization plus the task run loop.
 
-This module is PARENT-SAFE TO IMPORT. Like :mod:`._payload` it pulls
-``ptychi.api`` in for the options dataclasses, which imports torch for its type
-annotations but acquires no CUDA context. :func:`reconstruct_with_ptychi` must
-only be CALLED from a child process: it is the only place in the ptychodus tree
-that instantiates ``ptychi.api.task.PtychographyTask``, and the import of that
-class is deferred to call time so the module itself stays context-free.
+This module is SAFE TO IMPORT anywhere. It pulls ``ptychi.api`` in for the
+options dataclasses, which imports torch for its type annotations but acquires
+no CUDA context. :func:`reconstruct_with_ptychi` is the only place in the
+ptychodus tree that instantiates ``ptychi.api.task.PtychographyTask``, which is
+what acquires one, and the import of that class is deferred to call time so the
+module itself stays context-free.
 
 Wire format
 -----------
@@ -685,8 +685,7 @@ def reconstruct_with_ptychi(
 ) -> Iterator[ReconstructOutput]:
     """Instantiate ``PtychographyTask`` and yield a ``ReconstructOutput`` every
     ``num_sync_epochs`` epochs. The ``PtychographyTask`` import is deferred to
-    call time so importing this module parent-side does not acquire a GPU
-    context."""
+    call time so importing this module does not acquire a GPU context."""
     from ptychi.api.task import PtychographyTask
 
     # A hand-built options object that skipped alignment. pty-chi neither validates

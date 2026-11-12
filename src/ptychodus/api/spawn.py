@@ -34,6 +34,7 @@ that cannot be pickled raises at its own ``put`` and reaches the parent as a
 
 - ``(ChildMessage.LOG, levelno, logger_name, formatted_message)``
 - ``(ChildMessage.ERROR, traceback_str, exception_type_name, pickled_exc_or_none)``
+- ``(ChildMessage.ITEM, item)`` -- one item from :func:`iterate_in_subprocess`'s work
 - ``None`` -- end-of-stream sentinel (always the final message)
 
 Any other tag is passed through to the consumer verbatim. A consumer names
@@ -44,6 +45,11 @@ Child entry points are addressed by ``'dotted.module.path:function_name'``
 strings; the child imports the module lazily and calls
 ``function(payload, queue)``. The parent never imports the entry-point
 module.
+
+:func:`iterate_in_subprocess` needs no entry point of its own: it runs any
+picklable callable returning an iterable -- typically a ``functools.partial``
+over a bound method -- and yields what it produces. The callable crosses as
+itself, so its module is what the child imports.
 """
 
 from __future__ import annotations
@@ -54,13 +60,13 @@ import multiprocessing
 import os
 import pickle
 import traceback
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Generator, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
 from multiprocessing.context import SpawnProcess
 from multiprocessing.queues import SimpleQueue
-from typing import Any
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -69,13 +75,14 @@ __all__ = [
     'ChildMessage',
     'SubprocessLogHandler',
     'install_child_log_forwarder',
+    'iterate_in_subprocess',
     'run_subprocess',
     'send_error',
 ]
 
 
 class ChildMessage(StrEnum):
-    """The two messages this module itself puts on the queue.
+    """The messages this module itself puts on the queue.
 
     A string enum rather than a pair of constants, so one place names every
     tag the transport owns and a reader need not go looking for the others.
@@ -86,6 +93,7 @@ class ChildMessage(StrEnum):
 
     LOG = 'log'
     ERROR = 'error'
+    ITEM = 'item'
 
 
 class ChildError(RuntimeError):
@@ -326,3 +334,54 @@ def _shutdown(state: _RunState, grace_sec: float) -> None:
         state.queue.close()
     except Exception:
         pass
+
+
+_T = TypeVar('_T')
+
+# Module scope for the reason tests/test_subprocess_entry_points.py states: it
+# discovers entry points by AST-scanning module-level assignments whose name
+# carries ENTRY.
+_ITERATE_ENTRY = 'ptychodus.api.spawn:_iterate_work'
+
+
+def _iterate_work(work: Callable[[], Iterable[Any]], result_queue: SimpleQueue[Any]) -> None:
+    """Child entry point: call *work* and put each item it yields on the queue."""
+    for item in work():
+        result_queue.put((ChildMessage.ITEM, item))
+
+
+def iterate_in_subprocess(
+    work: Callable[[], Iterable[_T]],
+    *,
+    environment: Mapping[str, str] | None = None,
+    terminate_grace_sec: float = 10.0,
+    log_level: int | None = None,
+) -> Generator[_T, None, None]:
+    """Call *work* in a spawned child and yield each item it produces, in order.
+
+    *work* and every item cross the process boundary by pickling, so *work* is
+    a picklable callable -- a ``functools.partial`` over a bound method of a
+    module-level class, say -- and nothing it does to its own state is seen
+    here. An unpicklable *work* raises when the child is started.
+
+    The child runs as :func:`run_subprocess` describes: *environment* is
+    applied before *work* is called, its logs reach this process's loggers,
+    and an exception it raises arrives as :class:`ChildError`. Closing the
+    returned iterator before it is exhausted terminates the child.
+
+    Unpickling *work* imports the module defining it before *environment* is
+    applied, so that module must not initialize a device runtime at import --
+    which is what a module safe to import in this process already guarantees.
+    """
+    with run_subprocess(
+        _ITERATE_ENTRY,
+        work,
+        log_level=log_level,
+        terminate_grace_sec=terminate_grace_sec,
+        environment=environment,
+    ) as events:
+        for event in events:
+            if event[0] == ChildMessage.ITEM:
+                yield event[1]
+            else:
+                logger.debug(f'Dropping unrecognized subprocess message tag {event[0]!r}')

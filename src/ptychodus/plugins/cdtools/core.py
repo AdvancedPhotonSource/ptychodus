@@ -21,8 +21,8 @@ class CDToolsReconstructorLibrary(ReconstructorLibrary):
         super().__init__('cdtools', 'cdtools-py', requires=('cdtools', 'torch'))
 
     def _build(self) -> list[Reconstructor]:
-        # Deferred so that importing this module costs nothing: the factory reaches for
-        # numpy, and the child it configures reaches for torch.
-        from .reconstructor import build_reconstructor
+        # Deferred so that importing this module costs nothing: the reconstructor
+        # module reaches for numpy, and its reconstruct for torch.
+        from .reconstructor import CDToolsReconstructor
 
-        return [build_reconstructor()]
+        return [CDToolsReconstructor()]

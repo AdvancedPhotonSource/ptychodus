@@ -1,25 +1,27 @@
-"""Parent side of the ptychozoon enhancer: hand the inputs to a child and relay what it reports.
+"""Virtual single pixel imaging as ptychozoon implements it.
 
-The CuPy computation runs in a freshly spawned child (see :mod:`._subprocess`), so
-each run gets a clean GPU context and all GPU memory is released when the run
-finishes or is stopped. Nothing here imports ptychozoon.
+Every ptychozoon and CuPy import is local to :meth:`PtychozoonFluorescenceEnhancer.enhance`,
+so importing this module creates no CuPy context. The inputs are ptychodus types;
+the ptychozoon objects are built inside the method.
 """
 
 from __future__ import annotations
 from collections.abc import Iterator
+from importlib import import_module
 from importlib.metadata import PackageNotFoundError, version
 import logging
 
+import numpy
 from pydantic import BaseModel
 
 from ptychodus.api.fluorescence import (
+    ElementMap,
+    FluorescenceDataset,
+    FluorescenceEnhancer,
     FluorescenceEnhancerInput,
     FluorescenceEnhancerOutput,
-    SubprocessFluorescenceEnhancer,
 )
-from ptychodus.api.spawn import run_subprocess
 
-from ._payload import PtychozoonMessage, PtychozoonPayload
 from .options import PtychozoonOptions
 
 __all__ = [
@@ -28,13 +30,25 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-# Module scope for the reason tests/test_subprocess_entry_points.py states: it
-# discovers entry points by AST-scanning module-level assignments whose name carries
-# ENTRY.
-_CHILD_ENTRY = 'ptychodus.plugins.ptychozoon._subprocess:run_enhancement'
+
+def _count_visible_gpus() -> int:
+    """How many CUDA devices this process can see once any device mask is applied.
+
+    Asked only inside :meth:`PtychozoonFluorescenceEnhancer.enhance`, because asking
+    CuPy acquires a context. A mask that hides every device makes the runtime raise
+    rather than report zero.
+    """
+    # Through importlib because CuPy ships no type information, and naming it in the
+    # project's list of untyped modules would excuse it everywhere rather than here.
+    cupy = import_module('cupy')
+
+    try:
+        return int(cupy.cuda.runtime.getDeviceCount())
+    except cupy.cuda.runtime.CUDARuntimeError:
+        return 0
 
 
-class PtychozoonFluorescenceEnhancer(SubprocessFluorescenceEnhancer):
+class PtychozoonFluorescenceEnhancer(FluorescenceEnhancer):
     """Virtual single pixel imaging as ptychozoon implements it, on a GPU where one is visible."""
 
     def get_default_options(self) -> BaseModel:
@@ -43,6 +57,11 @@ class PtychozoonFluorescenceEnhancer(SubprocessFluorescenceEnhancer):
     def enhance(
         self, input_: FluorescenceEnhancerInput, *, options: BaseModel
     ) -> Iterator[FluorescenceEnhancerOutput]:
+        """Run the ptychozoon enhancement, yielding the maps enhanced so far at each checkpoint.
+
+        Raises:
+            RuntimeError: if the device mask leaves no CUDA device visible.
+        """
         if not isinstance(options, PtychozoonOptions):
             raise TypeError(f'Expected PtychozoonOptions, got {type(options).__name__}.')
 
@@ -53,11 +72,75 @@ class PtychozoonFluorescenceEnhancer(SubprocessFluorescenceEnhancer):
         except PackageNotFoundError:
             logger.info('ptychozoon unknown')
 
-        payload = PtychozoonPayload(input_=input_, options=options)
+        # Checked before ptychozoon is imported, because importing it is what fails:
+        # ptychozoon times itself with chronos, which counts the GPUs at import and
+        # raises when there are none. Its own CPU path is therefore out of reach.
+        if _count_visible_gpus() == 0:
+            raise RuntimeError(
+                'ptychozoon needs a visible CUDA device, and the device selection leaves '
+                'none. Select a GPU, or enhance on the CPU with the vspi enhancer.'
+            )
 
-        with run_subprocess(_CHILD_ENTRY, payload, environment=self.device_environment()) as events:
-            for event in events:
-                if event[0] == PtychozoonMessage.OUTPUT:
-                    yield event[1]
-                else:
-                    logger.debug(f'Dropping unrecognized subprocess message tag {event[0]!r}')
+        from ptychozoon.data_structures import ElementMap as PtychozoonElementMap
+        from ptychozoon.data_structures import FluorescenceDataset as PtychozoonFluorescenceDataset
+        from ptychozoon.data_structures import PtychographyProduct
+        from ptychozoon.settings import DeconvolutionEnhancementSettings, InterpolationTypes
+        from ptychozoon.vspi_enhance import VSPIFluorescenceEnhancingAlgorithm
+
+        product = input_.product
+        dataset = input_.dataset
+        object_geometry = product.object_.get_geometry()
+
+        probe_positions_m = numpy.array(
+            [[p.y_m, p.x_m] for p in product.probe_positions],
+            dtype=float,
+        ).reshape((-1, 2))
+
+        opr_weights = product.probes.get_opr_weights_or_none()
+        opr_mode_weights = None if opr_weights is None else numpy.ascontiguousarray(opr_weights.T)
+
+        ptychozoon_product = PtychographyProduct(
+            probe_positions=probe_positions_m,
+            probe=product.probes.get_array(),
+            object_array=product.object_.get_layers_flattened(),
+            pixel_size_m=(object_geometry.pixel_height_m, object_geometry.pixel_width_m),
+            object_center_m=(object_geometry.center_y_m, object_geometry.center_x_m),
+            opr_mode_weights=opr_mode_weights,
+        )
+        ptychozoon_dataset = PtychozoonFluorescenceDataset(
+            element_maps=[
+                PtychozoonElementMap(name=emap.name, counts_per_second=emap.counts_per_second)
+                for emap in dataset
+            ]
+        )
+
+        settings = DeconvolutionEnhancementSettings()
+        settings.lsmr.damping_factor = options.damping_factor
+        settings.lsmr.max_iter = options.max_iter
+        settings.lsmr.atol = options.atol
+        settings.lsmr.btol = options.btol
+        settings.lsmr.checkpoint_interval = options.checkpoint_interval
+
+        # Placement is decided outside the enhancer and applied as a device mask, so
+        # device 0 is the first device the mask admits.
+        settings.gpu.enabled = True
+        settings.gpu.index = 0
+        settings._interpolation = InterpolationTypes.FOURIER
+
+        algorithm = VSPIFluorescenceEnhancingAlgorithm()
+
+        for enhanced_dataset, iteration in algorithm.enhance(
+            ptychozoon_dataset, ptychozoon_product, settings=settings
+        ):
+            yield FluorescenceEnhancerOutput(
+                dataset=FluorescenceDataset(
+                    _element_maps=[
+                        ElementMap(emap.name, numpy.asarray(emap.counts_per_second))
+                        for emap in enhanced_dataset.element_maps
+                    ],
+                    counts_per_second_path=dataset.counts_per_second_path,
+                    channel_names_path=dataset.channel_names_path,
+                ),
+                progress=int(iteration),
+                progress_goal=options.max_iter,
+            )

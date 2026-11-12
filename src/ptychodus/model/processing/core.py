@@ -5,7 +5,6 @@ import logging
 from ptychodus.api.plugins import PluginCatalog
 from ptychodus.api.reconstruct import (
     ReconstructorLibrary,
-    SubprocessReconstructor,
     TrainingDataFileWriter,
     prepare_reconstruct_input,
 )
@@ -156,11 +155,6 @@ class ProcessingCore:
                         name, reconstructor.name, reconstructor.get_default_options(), branches
                     )
 
-                # Placement is ptychodus's to decide, so it is attached here
-                # rather than passed through every backend's factory.
-                if isinstance(reconstructor, SubprocessReconstructor):
-                    reconstructor.device_environment = self.device_selection.environment
-
         self.processing_api = ProcessingAPI(
             task_manager,
             product_api,
@@ -170,6 +164,7 @@ class ProcessingCore:
             self._task_monitor,
             self.parameter_store,
             training_data_file_writers,
+            self.device_selection,
         )
 
     def library_names(self) -> Sequence[str]:

@@ -1,5 +1,8 @@
 from __future__ import annotations
+from collections.abc import Callable, Mapping
+from contextlib import closing
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 import logging
 import time
@@ -13,6 +16,7 @@ from ptychodus.api.fluorescence import (
     FluorescenceFileWriter,
 )
 from ptychodus.api.product import Product
+from ptychodus.api.spawn import iterate_in_subprocess
 
 from ..task_monitor import TaskProgressMonitor
 from .repository import FluorescenceItemState, FluorescenceRepositoryItem
@@ -72,6 +76,13 @@ class FluorescenceTaskMonitor(TaskProgressMonitor):
 
 @dataclass(frozen=True)
 class EnhanceFluorescenceBackgroundTask:
+    """Run one enhancement in a spawned child restricted to the selected devices.
+
+    Every enhancer runs this way, whatever it computes with: one that holds a GPU
+    context releases it when the child exits, and a stop ends any of them at once.
+    ``device_environment`` is asked when the run starts.
+    """
+
     task_monitor: FluorescenceTaskMonitor
     enhancer: FluorescenceEnhancer
     options: BaseModel
@@ -80,6 +91,7 @@ class EnhanceFluorescenceBackgroundTask:
     item: FluorescenceRepositoryItem
     output_file_path: Path | None
     output_file_writer: FluorescenceFileWriter | None
+    device_environment: Callable[[], Mapping[str, str]]
 
     def __call__(self) -> None:
         try:
@@ -90,13 +102,19 @@ class EnhanceFluorescenceBackgroundTask:
                 last_dataset: FluorescenceDataset | None = None
                 input_ = FluorescenceEnhancerInput(dataset=self.dataset, product=self.product)
 
-                for output in self.enhancer.enhance(input_, options=self.options):
-                    monitor.update_progress(output.progress, output.progress_goal)
-                    monitor.update_enhanced(self.item, output.dataset)
-                    last_dataset = output.dataset
+                work = partial(self.enhancer.enhance, input_, options=self.options)
+                outputs = iterate_in_subprocess(work, environment=self.device_environment())
 
-                    if monitor.is_stopping:
-                        break
+                # Closed on the way out, so a stop tears the child down here rather
+                # than whenever the abandoned iterator is collected.
+                with closing(outputs):
+                    for output in outputs:
+                        monitor.update_progress(output.progress, output.progress_goal)
+                        monitor.update_enhanced(self.item, output.dataset)
+                        last_dataset = output.dataset
+
+                        if monitor.is_stopping:
+                            break
 
                 toc = time.perf_counter()
                 logger.info(f'Enhancement time {toc - tic:.4f} seconds.')

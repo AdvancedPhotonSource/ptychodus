@@ -96,25 +96,25 @@ def _build_ptycho_fm_configs() -> list[Any]:
     return configs
 
 
-def _build_cdtools_payloads() -> list[Any]:
+def _build_cdtools_inputs() -> list[Any]:
     from cdtools_fixtures import make_input
     from ptychodus.plugins.cdtools.options import CDToolsOptimizer, default_options
-    from ptychodus.plugins.cdtools.reconstructor import build_reconstructor
+    from ptychodus.plugins.cdtools.reconstructor import CDToolsReconstructor
 
-    # Every optimizer, since each selects a different set of fields the child reads.
-    payloads: list[Any] = []
-    reconstructor = build_reconstructor()
+    # What crosses to the child is the reconstructor, its input and its options --
+    # every optimizer, since each selects a different set of fields it reads.
+    inputs: list[Any] = []
 
     for optimizer in CDToolsOptimizer:
         options = default_options()
         options.optimizer.optimizer = optimizer
-        payloads.append(reconstructor._dump_reconstruct_options(make_input(), options))
+        inputs.append((CDToolsReconstructor(), make_input(), options))
 
-    return payloads
+    return inputs
 
 
 _BUILDERS = {
-    'cdtools': _build_cdtools_payloads,
+    'cdtools': _build_cdtools_inputs,
     'ptychopinn': _build_ptychopinn_settings,
     'ptycho_fm': _build_ptycho_fm_configs,
 }

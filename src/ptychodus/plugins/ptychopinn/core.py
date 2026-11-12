@@ -14,6 +14,6 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
 
     def _build(self) -> list[TrainableReconstructor]:
         # Imported lazily so this module's own import cost stays small.
-        from .reconstructor import build_reconstructor
+        from .reconstructor import PtychoPINNReconstructor
 
-        return [build_reconstructor(mode) for mode in ('Unsupervised', 'Supervised')]
+        return [PtychoPINNReconstructor(mode) for mode in ('Unsupervised', 'Supervised')]

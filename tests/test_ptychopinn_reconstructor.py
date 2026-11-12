@@ -1,14 +1,16 @@
-"""Child-side contract for the PtychoPINN backend.
+"""What the PtychoPINN reconstructor hands its backend.
 
-The parent translates settings into plain values and the child turns them into
-backend calls. These tests pin the shape of those calls against a stubbed
+The reconstructor translates declared options into plain values and the backend
+turns them into calls. These tests pin the shape of those calls against a stubbed
 backend, because the real one needs lightning and a GPU.
 """
 
 from __future__ import annotations
 
 import sys
+from dataclasses import dataclass
 from pathlib import Path
+from types import ModuleType, SimpleNamespace
 from typing import Any
 
 import numpy
@@ -20,15 +22,18 @@ from ptychodus.api.preprocess.diffraction import inpaint_bad_pixels
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.reconstruct import ReconstructInput, SubprocessReconstructor
-from ptychodus.api.spawn import ChildError
-from ptychodus.plugins.ptychopinn._subprocess import _build_arrays, _read_epoch_losses
-
-_TESTS_DIR = str(Path(__file__).parent)
-if _TESTS_DIR not in sys.path:
-    sys.path.insert(0, _TESTS_DIR)
-
-FIXTURES_MODULE = 'subprocess_child_fixtures'
+from ptychodus.api.reconstruct import ReconstructInput, TrainOutput
+from ptychodus.plugins.ptychopinn.options import (
+    Accelerator,
+    PatchWeighting,
+    PtychoPINNOptions,
+    default_options,
+)
+from ptychodus.plugins.ptychopinn.reconstructor import (
+    PtychoPINNReconstructor,
+    _build_arrays,
+    _read_epoch_losses,
+)
 
 NUM_POSITIONS = 4
 DETECTOR_PX = 16
@@ -78,16 +83,105 @@ def _make_reconstruct_input() -> ReconstructInput:
     return ReconstructInput(patterns, bad_pixels, product)
 
 
-def _captured(excinfo: pytest.ExceptionInfo[ChildError]) -> dict[str, Any]:
-    error = excinfo.value
-    assert error.child_exception_type == 'ChildCallCapturedError'
-    assert error.child_exception is not None
-    captured = error.child_exception.args[0]
-    assert isinstance(captured, dict)
-    return captured
+# ----------------------------- stubbed backend -----------------------------
 
 
-# ----------------------------- spawned child -----------------------------
+def _fake_module(name: str, **attrs: Any) -> ModuleType:
+    """A stand-in module carrying `attrs`, for faking an absent optional package."""
+    module = ModuleType(name)
+
+    # Via setattr because a ModuleType has no declared attributes.
+    for attr, value in attrs.items():
+        setattr(module, attr, value)
+
+    return module
+
+
+def _install_fake_backend(monkeypatch: pytest.MonkeyPatch, **modules: dict[str, Any]) -> None:
+    """Put a minimal fake ``ptycho_torch`` (and ``torch``) on ``sys.modules`` for one test.
+
+    ``modules`` maps a dotted submodule name, with dots spelled ``_DOT_``, to the
+    attributes that submodule should carry.
+    """
+    stand_ins = {
+        'ptycho_torch': _fake_module('ptycho_torch', __path__=[]),
+        'ptycho_torch.workflows': _fake_module('ptycho_torch.workflows', __path__=[]),
+        # _resolve_device asks torch whether a device is present; say no, so the
+        # call resolves to CPU without a real runtime.
+        'torch': _fake_module('torch', cuda=SimpleNamespace(is_available=lambda: False)),
+    }
+
+    for dotted, attrs in modules.items():
+        name = dotted.replace('_DOT_', '.')
+        stand_ins[name] = _fake_module(name, **attrs)
+
+    for name, module in stand_ins.items():
+        monkeypatch.setitem(sys.modules, name, module)
+
+
+class _FakeExecutionRequest:
+    def __init__(self, values: Any, explicit_fields: Any) -> None:
+        self.values = dict(values)
+        self.explicit_fields = set(explicit_fields)
+
+
+class _TrainingDoor:
+    """Stands in for ``ptycho_torch.train.train``, recording what it was handed."""
+
+    def __init__(self) -> None:
+        self.captured: dict[str, Any] = {}
+
+    def __call__(self, dataset: Path, output_dir: Path, settings: Any, **kwargs: Any) -> Path:
+        execution_config = kwargs['execution_config']
+
+        with numpy.load(dataset, allow_pickle=False) as archive:
+            dataset_keys = sorted(archive.files)
+            num_frames = len(archive['xcoords'])
+            object_indexes = (
+                sorted({int(i) for i in archive['object_index']})
+                if 'object_index' in archive.files
+                else None
+            )
+
+        self.captured = {
+            'dataset_name': str(dataset.name),
+            'dataset_parent': str(dataset.parent),
+            'dataset_keys': dataset_keys,
+            'num_frames': num_frames,
+            'object_indexes': object_indexes,
+            'settings_is_mapping': isinstance(settings, dict),
+            'has_nphotons': 'nphotons' in settings,
+            'mode': settings.get('mode'),
+            'execution_values': execution_config.values,
+            'explicit_fields': sorted(execution_config.explicit_fields),
+        }
+        return output_dir / 'bundle'
+
+
+def _train(
+    monkeypatch: pytest.MonkeyPatch,
+    options: PtychoPINNOptions,
+    input_directory: Path,
+    output_directory: Path,
+) -> tuple[dict[str, Any], list[TrainOutput]]:
+    """What training hands the stubbed door, and what it yields, given these options."""
+    door = _TrainingDoor()
+    _install_fake_backend(
+        monkeypatch,
+        ptycho_torch_DOT_execution_request={'ExecutionRequest': _FakeExecutionRequest},
+        ptycho_torch_DOT_train={'train': door},
+    )
+    reconstructor = PtychoPINNReconstructor('Unsupervised')
+    outputs = list(reconstructor.train(input_directory, output_directory, options=options))
+    return door.captured, outputs
+
+
+def _unsupervised_options(accelerator: Accelerator, num_workers: int) -> PtychoPINNOptions:
+    options = default_options()
+    options.training.epochs = 3
+    options.training.accelerator = accelerator
+    options.training.num_dataloader_workers = num_workers
+    return options
 
 
 def _write_training_archive(file_path: Path, num_frames: int) -> None:
@@ -99,42 +193,6 @@ def _write_training_archive(file_path: Path, num_frames: int) -> None:
         probeGuess=numpy.ones((DETECTOR_PX, DETECTOR_PX), dtype=complex),
         objectGuess=numpy.ones((32, 32), dtype=complex),
     )
-
-
-def _train_error(
-    options: dict[str, Any], input_directory: Path, output_directory: Path
-) -> pytest.ExceptionInfo[ChildError]:
-    """The error the child ends a training session with, given these dumped options."""
-    adapter = SubprocessReconstructor(
-        name='PtychoPINN train probe',
-        child_module=FIXTURES_MODULE,
-        reconstruct_function='capture_ptychopinn_train_call',
-        dump_reconstruct_options=lambda _parameters, _options: options,
-        is_trainable=True,
-        train_function='capture_ptychopinn_train_call',
-        dump_train_options=lambda _options: options,
-    )
-
-    with pytest.raises(ChildError) as excinfo:
-        list(
-            adapter.train(input_directory, output_directory, options=adapter.get_default_options())
-        )
-
-    return excinfo
-
-
-def _capture_train_call(
-    options: dict[str, Any], input_directory: Path, output_directory: Path
-) -> dict[str, Any]:
-    """What the child hands the stubbed training door, given these dumped options."""
-    return _captured(_train_error(options, input_directory, output_directory))
-
-
-_UNSUPERVISED_OPTIONS: dict[str, Any] = {
-    'settings': {'mode': 'Unsupervised', 'epochs': 3},
-    'accelerator': 'cpu',
-    'num_workers': 2,
-}
 
 
 @pytest.fixture
@@ -150,7 +208,9 @@ def test_train_hands_the_public_door_a_settings_mapping(
 ) -> None:
     """Training goes through the dataset-to-bundle door, not a config object."""
     monkeypatch.delenv('LOCAL_WORLD_SIZE', raising=False)
-    captured = _capture_train_call(_UNSUPERVISED_OPTIONS, one_archive, tmp_path / 'output')
+    captured, _ = _train(
+        monkeypatch, _unsupervised_options(Accelerator.CPU, 2), one_archive, tmp_path / 'output'
+    )
     # A lone archive is handed over as it is, whatever its name.
     assert captured['dataset_name'] == 'train_data.npz'
     assert captured['dataset_parent'] == str(one_archive)
@@ -166,20 +226,39 @@ def test_train_hands_the_public_door_a_settings_mapping(
     assert captured['explicit_fields'] == sorted(captured['execution_values'])
 
 
+def test_train_names_the_bundle_and_leaves_loading_to_the_caller(
+    monkeypatch: pytest.MonkeyPatch, one_archive: Path, tmp_path: Path
+) -> None:
+    monkeypatch.delenv('LOCAL_WORLD_SIZE', raising=False)
+    output_directory = tmp_path / 'output'
+    reconstructor = PtychoPINNReconstructor('Unsupervised')
+    door = _TrainingDoor()
+    _install_fake_backend(
+        monkeypatch,
+        ptycho_torch_DOT_execution_request={'ExecutionRequest': _FakeExecutionRequest},
+        ptycho_torch_DOT_train={'train': door},
+    )
+
+    outputs = list(
+        reconstructor.train(
+            one_archive, output_directory, options=_unsupervised_options(Accelerator.CPU, 0)
+        )
+    )
+
+    assert [output.trained_model for output in outputs] == [output_directory / 'bundle']
+    # The log could not be read, so the epoch count stands in for the progress.
+    assert outputs[-1].progress == outputs[-1].progress_goal == 3
+    assert not reconstructor.is_model_loaded()
+
+
 def test_train_under_a_distributed_launcher_claims_one_device_per_local_rank(
     monkeypatch: pytest.MonkeyPatch, one_archive: Path, tmp_path: Path
 ) -> None:
     """Lightning's TorchElastic environment rejects a device count other than its own."""
-    # Inherited by the spawned child, as a launcher's variables are.
+    # As a launcher's variables are.
     monkeypatch.setenv('LOCAL_WORLD_SIZE', '2')
-    captured = _capture_train_call(
-        {
-            'settings': {'mode': 'Unsupervised', 'epochs': 3},
-            'accelerator': 'gpu',
-            'num_workers': 0,
-        },
-        one_archive,
-        tmp_path / 'output',
+    captured, _ = _train(
+        monkeypatch, _unsupervised_options(Accelerator.GPU, 0), one_archive, tmp_path / 'output'
     )
 
     assert captured['execution_values']['devices'] == 2
@@ -197,7 +276,9 @@ def test_train_merges_several_archives_into_one_object_bank(
     (input_directory / 'notes.npz').write_bytes(b'not an archive')
     output_directory = tmp_path / 'output'
 
-    captured = _capture_train_call(_UNSUPERVISED_OPTIONS, input_directory, output_directory)
+    captured, _ = _train(
+        monkeypatch, _unsupervised_options(Accelerator.CPU, 2), input_directory, output_directory
+    )
 
     assert captured['num_frames'] == 8
     assert captured['object_indexes'] == [0, 1]
@@ -209,36 +290,85 @@ def test_train_merges_several_archives_into_one_object_bank(
     assert list(output_directory.iterdir()) == []
 
 
-def test_train_refuses_a_directory_without_archives(tmp_path: Path) -> None:
+def test_train_refuses_a_directory_without_archives(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     input_directory = tmp_path / 'input'
     input_directory.mkdir()
 
-    excinfo = _train_error(_UNSUPERVISED_OPTIONS, input_directory, tmp_path / 'output')
+    with pytest.raises(FileNotFoundError):
+        _train(
+            monkeypatch,
+            _unsupervised_options(Accelerator.CPU, 2),
+            input_directory,
+            tmp_path / 'output',
+        )
 
-    assert excinfo.value.child_exception_type == 'FileNotFoundError'
+
+@dataclass
+class _FakeInferenceConfig:
+    patch_weighting: str = 'probe'
+    batch_size: int = 1
 
 
-def test_reconstruct_stages_declared_arrays_through_the_embedder_seam() -> None:
-    options = {
-        'patch_weighting': 'uniform',
-        'inference_batch_size': 64,
-        'accelerator': 'auto',
-        'num_workers': 3,
-    }
-    # Named as the backend names it: the child compares the loaded bundle's
-    # mode against the reconstructor the payload came from.
-    adapter = SubprocessReconstructor(
-        name='Unsupervised',
-        child_module=FIXTURES_MODULE,
-        reconstruct_function='capture_ptychopinn_reconstruct_call',
-        dump_reconstruct_options=lambda _parameters, _options: options,
+class _InferenceDoor:
+    """Stands in for ``reconstruct_from_arrays``, recording what it was handed."""
+
+    def __init__(self) -> None:
+        self.captured: dict[str, Any] = {}
+
+    def __call__(self, model: Any, arrays: Any, **kwargs: Any) -> Any:
+        runtime_params = kwargs['runtime_params']
+        self.captured = {
+            'array_keys': sorted(arrays),
+            'device': kwargs['device'],
+            'num_workers': kwargs['num_workers'],
+            'patch_weighting': runtime_params.inference_config.patch_weighting,
+            'batch_size': runtime_params.inference_config.batch_size,
+        }
+        return SimpleNamespace(complex_canvas=numpy.ones((1, 32, 32), dtype=complex))
+
+
+def test_reconstruct_refuses_without_a_loaded_model() -> None:
+    reconstructor = PtychoPINNReconstructor('Unsupervised')
+
+    with pytest.raises(RuntimeError, match='no PtychoPINN model has been loaded'):
+        list(reconstructor.reconstruct(_make_reconstruct_input(), options=default_options()))
+
+
+def test_reconstruct_stages_declared_arrays_through_the_embedder_seam(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    loaded_model = SimpleNamespace(
+        model_config=SimpleNamespace(mode='Unsupervised'),
+        inference_config=_FakeInferenceConfig(),
+        data_config=object(),
+        training_config=object(),
     )
-    adapter.load_model(Path('/unused'))
+    door = _InferenceDoor()
+    _install_fake_backend(
+        monkeypatch,
+        ptycho_torch_DOT_inference={
+            'ReconstructionRuntimeParams': SimpleNamespace,
+            'reconstruct_from_arrays': door,
+        },
+        ptycho_torch_DOT_workflows_DOT_bundle_io={
+            'load_inference_bundle_torch': lambda _dir: (loaded_model, {}),
+        },
+    )
+    options = default_options()
+    options.inference.patch_weighting_method = PatchWeighting.UNIFORM
+    options.inference.batch_size = 64
+    options.training.accelerator = Accelerator.AUTO
+    options.training.num_dataloader_workers = 3
+    # Named as the backend names it: the loaded bundle's mode is compared against it.
+    reconstructor = PtychoPINNReconstructor('Unsupervised')
+    reconstructor.load_model(tmp_path)
 
-    with pytest.raises(ChildError) as excinfo:
-        list(adapter.reconstruct(_make_reconstruct_input(), options=adapter.get_default_options()))
+    outputs = list(reconstructor.reconstruct(_make_reconstruct_input(), options=options))
 
-    captured = _captured(excinfo)
+    assert len(outputs) == 1
+    captured = door.captured
     assert captured['array_keys'] == sorted(
         [
             'diff3d',

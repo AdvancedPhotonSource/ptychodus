@@ -2,7 +2,7 @@
 
 The keys and defaults are checked against the golden settings fixture, because
 a missing key orphans a saved setting silently and a slipped default changes
-what a run computes while every key still matches. And the config the child
+what a run computes while every key still matches. And the config the backend
 receives is checked against the dict ``_build_config`` hands it today.
 
 That second one is the property specific to this backend: upstream resolves
@@ -243,20 +243,7 @@ def test_the_frozen_fields_hold_the_values_declared_for_them() -> None:
         assert getattr(restored.data, name) == value, name
 
 
-def _dumps(name: str) -> tuple[Any, Any]:
-    """The two payload builders one reconstructor was built with.
-
-    Reached through the reconstructor rather than called directly, because what
-    each operation sends is the thing worth pinning and the builders are
-    closures over the mode.
-    """
-    from ptychodus.plugins.ptycho_fm.reconstructor import build_reconstructor
-
-    built = build_reconstructor(name)
-    return built._dump_reconstruct_options, built._dump_train_options
-
-
-def test_the_config_the_child_receives_is_what_the_declaration_sets() -> None:
+def test_the_config_the_backend_receives_is_what_the_declaration_sets() -> None:
     """Only the surfaced fields, plus the two that are not settings at all.
 
     The hand-built dict this once compared against went with the settings
@@ -265,8 +252,9 @@ def test_the_config_the_child_receives_is_what_the_declaration_sets() -> None:
     from a field having no value, so a key appearing here that nobody chose
     would silently override one of those.
     """
-    _, dump_train = _dumps('Unsupervised')
-    config = dump_train(_restored_config())
+    from ptychodus.plugins.ptycho_fm.reconstructor import build_train_config
+
+    config = build_train_config('Unsupervised', _restored_config())
     declared = _restored_config().model_dump(exclude_unset=True)
 
     # Neither is a setting: the objective follows from which reconstructor was
@@ -277,24 +265,33 @@ def test_the_config_the_child_receives_is_what_the_declaration_sets() -> None:
 
 
 def test_each_operation_is_sent_only_the_branches_it_reads() -> None:
-    """Training values do not travel to an inference run, nor the reverse.
+    """Training values do not reach an inference run, nor the reverse.
 
-    Narrowing here is hygiene rather than a fix -- the child ignored what it
-    did not read either way -- but a payload that changed when an unrelated
+    Narrowing here is hygiene rather than a fix -- the backend ignored what it
+    did not read either way -- but a config that changed when an unrelated
     setting was edited is one nobody can diff.
     """
-    dump_reconstruct, dump_train = _dumps('Unsupervised')
+    from ptychodus.plugins.ptycho_fm.reconstructor import (
+        build_reconstruct_config,
+        build_train_config,
+    )
+
     options = _restored_config()
 
-    assert set(dump_reconstruct(None, options)) == {'data', 'inference', 'model'}
-    assert set(dump_train(options)) == {'data', 'model', 'training'}
+    assert set(build_reconstruct_config('Unsupervised', options)) == {
+        'data',
+        'inference',
+        'model',
+    }
+    assert set(build_train_config('Unsupervised', options)) == {'data', 'model', 'training'}
 
 
 def test_a_surviving_branch_is_spelled_exactly_as_it_would_be_whole() -> None:
     """Narrowing intersects with `exclude_unset` rather than overriding it."""
-    dump_reconstruct, _ = _dumps('Unsupervised')
+    from ptychodus.plugins.ptycho_fm.reconstructor import build_reconstruct_config
+
     options = _restored_config()
-    narrowed = dump_reconstruct(None, options)
+    narrowed = build_reconstruct_config('Unsupervised', options)
     declared = options.model_dump(exclude_unset=True)
 
     assert narrowed['data'] == declared['data']
@@ -302,8 +299,10 @@ def test_a_surviving_branch_is_spelled_exactly_as_it_would_be_whole() -> None:
 
 
 def test_the_objective_is_the_only_thing_the_mode_changes() -> None:
-    supervised = _dumps('Supervised')[1](_restored_config())
-    unsupervised = _dumps('Unsupervised')[1](_restored_config())
+    from ptychodus.plugins.ptycho_fm.reconstructor import build_train_config
+
+    supervised = build_train_config('Supervised', _restored_config())
+    unsupervised = build_train_config('Unsupervised', _restored_config())
 
     assert supervised['training'].pop('mode') == 'supervised'
     assert unsupervised['training'].pop('mode') == 'unsupervised'
