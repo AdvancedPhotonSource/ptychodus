@@ -40,8 +40,8 @@ from ptychi.api import BHOptions, LSQMLOptions
 from ptychi.api.options.task import PtychographyTaskOptions
 
 from ptychodus.api.accumulate import (
+    AssemblyMomentAccumulator,
     IncidentBeamEstimate,
-    compute_diffraction_moments,
     estimate_incident_beam,
 )
 from ptychodus.api.assemble import (
@@ -770,23 +770,25 @@ def estimate_incident_beam_from_assembled_data(
     assembled_data: AssembledDiffractionData,
     positions: ProbePositionSequence,
     *,
+    assembly_moments: AssemblyMomentAccumulator | None = None,
     i0_photons_per_count: float = 0.0,
 ) -> IncidentBeamEstimate:
     """The incident photon count and mean transmission the assembled patterns imply.
 
-    One pass accumulates their moments, and :func:`estimate_incident_beam` judges them
-    with the I0 the positions carry, calibrated by *i0_photons_per_count* when positive.
+    :func:`estimate_incident_beam` judges the moments of the patterns with the I0 the
+    positions carry, calibrated by *i0_photons_per_count* when positive. The moments
+    come from *assembly_moments* when it was passed as the assembly's
+    ``on_array_assembled`` callback, so they were taken while the arrays were read; a
+    filter that dropped patterns since is fine. Without it, or where it cannot serve,
+    one pass over the assembled patterns takes them.
 
     Raises:
         ValueError: if no patterns were assembled.
     """
-    moments = compute_diffraction_moments(
-        assembled_data.get_indexes(),
-        assembled_data.get_patterns(),
-        bad_pixels=assembled_data.get_bad_pixels(),
-        background=assembled_data.get_background(),
-        flat_field=assembled_data.get_flat_field(),
-    )
+    if assembly_moments is None:
+        assembly_moments = AssemblyMomentAccumulator()
+
+    moments = assembly_moments.get_moments(assembled_data)
 
     if moments is None:
         raise ValueError('No diffraction patterns were assembled to estimate the beam from.')

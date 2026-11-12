@@ -75,6 +75,7 @@ from ptychi.api import (
     PositionCorrectionTypes,
 )
 
+from ptychodus.api.accumulate import AssemblyMomentAccumulator
 from ptychodus.api.assemble import assemble_dataset
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import CropRegion
@@ -826,6 +827,8 @@ def main() -> ExitCode:
     lower_counts, upper_counts = _total_counts_bounds(params, num_pixels)
 
     logger.info('Assembling diffraction patterns')
+    # Accumulated as the arrays land, so the beam estimate below costs no second pass.
+    assembly_moments = AssemblyMomentAccumulator()
     assembled_data = assemble_dataset(
         raw_dataset,
         _prep_pipeline(params),
@@ -833,6 +836,7 @@ def main() -> ExitCode:
         read_region=read_region,
         total_counts_lower_bound=lower_counts,
         total_counts_upper_bound=upper_counts,
+        on_array_assembled=assembly_moments.add_assembled,
     )
     num_patterns = assembled_data.get_num_patterns()
 
@@ -933,7 +937,9 @@ def main() -> ExitCode:
         num_positions=len(positions),
     )
 
-    incident_beam = estimate_incident_beam_from_assembled_data(assembled_data, positions)
+    incident_beam = estimate_incident_beam_from_assembled_data(
+        assembled_data, positions, assembly_moments=assembly_moments
+    )
 
     # --- initial object ---
     number_of_slices = max(1, params.number_of_slices)

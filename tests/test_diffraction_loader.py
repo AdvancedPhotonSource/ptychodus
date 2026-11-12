@@ -10,12 +10,14 @@ live in tests/test_assemble.py.
 from __future__ import annotations
 
 from collections.abc import Sequence
+import logging
 from typing import cast
 
 import numpy
+import pytest
 
 from ptychodus.model.task_manager import BackgroundTask, ForegroundTask, TaskManager
-from ptychodus.api.accumulate import compute_diffraction_moments
+from ptychodus.api.accumulate import DiffractionMomentAccumulator, compute_diffraction_moments
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.diffraction import (
     DiffractionArray,
@@ -318,6 +320,84 @@ def test_a_load_accumulates_the_moments_of_what_it_assembled() -> None:
     assert dataset._moments is not None
     assert observer.num_moments_changed == 1
     _assert_moments_of(dataset)
+
+
+def _assert_sorted_moments_of(dataset: AssembledDiffractionDataset) -> None:
+    data = dataset.get_assembled_data()
+    expected = compute_diffraction_moments(
+        data.get_indexes(), data.get_patterns(), bad_pixels=data.get_bad_pixels()
+    )
+    moments = dataset.get_diffraction_moments()
+
+    assert expected is not None and moments is not None
+    expected = expected.sort_by_index()
+    numpy.testing.assert_array_equal(moments.bad_pixels, expected.bad_pixels)
+    numpy.testing.assert_array_equal(moments.indexes, expected.indexes)
+    numpy.testing.assert_allclose(moments.total_counts, expected.total_counts, rtol=1e-12)
+    numpy.testing.assert_allclose(
+        moments.center_of_mass_x_px, expected.center_of_mass_x_px, atol=1e-12
+    )
+    numpy.testing.assert_allclose(moments.mean_frame, expected.mean_frame, rtol=1e-12)
+
+
+def test_moments_accumulated_during_a_load_come_sorted_by_index(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    arrays = [_saturated_array('late', 3, 4), _saturated_array('early', 4, 0)]
+    dataset = make_dataset(arrays=arrays)
+    raw_bad = numpy.zeros((40, 60), dtype=bool)
+    raw_bad[18, 30] = True
+    dataset.set_bad_pixels(raw_bad)
+
+    with caplog.at_level(logging.INFO):
+        dataset.load_all_arrays(process_patterns=True, block=True)
+
+    numpy.testing.assert_array_equal(
+        dataset.get_assembled_data().get_indexes(), [4, 5, 6, 0, 1, 2, 3]
+    )
+    _assert_sorted_moments_of(dataset)
+    assert 'accumulated during assembly' in caplog.text
+
+
+def test_a_non_finite_pixel_recomputes_the_moments_under_the_wider_mask(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Only the second array holds the NaN, so the first was reduced under a narrower mask.
+    patterns = numpy.ones((4, 40, 60), dtype=numpy.float32)
+    patterns[:, 20, 30] = 50.0
+    patterns[3, 18, 30] = numpy.nan  # crop [y=14..26, x=22..38] puts this at (4, 8)
+    arrays = [
+        SimpleDiffractionArray('clean', numpy.arange(2, dtype=numpy.intp), patterns[:2]),
+        SimpleDiffractionArray('nan', numpy.arange(2, 4, dtype=numpy.intp), patterns[2:]),
+    ]
+    dataset = make_dataset(arrays=arrays, pattern_dtype=numpy.float32)
+
+    with caplog.at_level(logging.INFO):
+        dataset.load_all_arrays(process_patterns=True, block=True)
+
+    moments = dataset.get_diffraction_moments()
+    assert moments is not None and moments.bad_pixels[4, 8]
+    _assert_sorted_moments_of(dataset)
+    assert 'accumulated during assembly' not in caplog.text
+
+
+def test_a_failure_to_accumulate_leaves_the_load_clean(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    def fail(*args: object) -> None:
+        raise RuntimeError('accumulation failed')
+
+    monkeypatch.setattr(DiffractionMomentAccumulator, 'add', fail)
+    dataset = make_dataset(arrays=[_saturated_array('a', 3), _saturated_array('b', 2, 3)])
+
+    with caplog.at_level(logging.INFO):
+        dataset.load_all_arrays(process_patterns=True, block=True)
+
+    assert dataset.get_last_load_error() is None
+    assert len(dataset) == 2
+    monkeypatch.undo()
+    _assert_sorted_moments_of(dataset)
+    assert 'Failed to accumulate the diffraction moments of' in caplog.text
 
 
 def test_a_reload_discards_the_moments() -> None:

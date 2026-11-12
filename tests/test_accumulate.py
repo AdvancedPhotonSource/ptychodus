@@ -7,7 +7,11 @@ Behaviors verified:
     interleaving or merge, including a merge from a pickled snapshot
   - snapshots are unaffected by later additions, and an empty accumulator gives None
   - the inpainted mean equals the mean of the inpainted frames
-  - select, normalize_by_i0 and estimate_incident_photon_count on snapshots
+  - select, sort_by_index, normalize_by_i0 and estimate_incident_photon_count on snapshots
+  - an accumulator from assembled data applies its mask and carried maps
+  - moments accumulated during assemble_dataset equal one pass over what it assembled,
+    also after a filter drops patterns; a non-finite pixel in one array, or a failure
+    to accumulate, falls back to that pass, and no patterns gives None
   - compute_diffraction_moments applies carried detector corrections first, and is the last
     snapshot of iterate_diffraction_moments, whose earlier snapshots are of the prefixes
   - estimate_incident_beam: calibrated I0, uncalibrated I0 and no I0, each judged as
@@ -25,7 +29,9 @@ import numpy
 import numpy.testing
 import pytest
 
+from diffraction_dataset_fixtures import make_dataset
 from ptychodus.api.accumulate import (
+    AssemblyMomentAccumulator,
     DiffractionMomentAccumulator,
     DiffractionMoments,
     compute_diffraction_moments,
@@ -33,8 +39,19 @@ from ptychodus.api.accumulate import (
     estimate_incident_beam,
     iterate_diffraction_moments,
 )
-from ptychodus.api.assemble import DetectorCorrections, estimate_incident_photon_count
-from ptychodus.api.diffraction import BadPixels
+from ptychodus.api.assemble import (
+    AssembledDiffractionData,
+    DetectorCorrections,
+    assemble_dataset,
+    estimate_incident_photon_count,
+)
+from ptychodus.api.diffraction import (
+    BadPixels,
+    DiffractionDatasetLayoutNode,
+    SimpleDiffractionArray,
+    SimpleDiffractionDataset,
+)
+from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.moments import FrameStatistics, compute_intensity_moments
 from ptychodus.api.preprocess.diffraction import BinningStep, inpaint_bad_pixels
 
@@ -191,6 +208,30 @@ def test_chunking_does_not_change_the_result(chunk_size: int, step: int) -> None
     actual = _accumulate(indexes, patterns, chunk_size=chunk_size, step=step)
 
     _assert_same_moments(actual, expected)
+
+
+def test_a_large_addition_is_reduced_a_chunk_at_a_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    sizes: list[int] = []
+    reduce = DiffractionMomentAccumulator._reduce
+
+    def spy(
+        self: DiffractionMomentAccumulator, indexes: numpy.ndarray, patterns: numpy.ndarray
+    ) -> None:
+        sizes.append(patterns.shape[0])
+        reduce(self, indexes, patterns)
+
+    monkeypatch.setattr(DiffractionMomentAccumulator, '_reduce', spy)
+    accumulator = DiffractionMomentAccumulator(*_SHAPE, bad_pixels=_bad_pixels(), chunk_size=4)
+
+    accumulator.add(numpy.arange(3), _patterns(3))
+    accumulator.add(numpy.arange(3, 3), _patterns(1)[:0])
+    accumulator.add(numpy.arange(3, 13), _patterns(10, seed=1))
+    assert sizes == [4, 4, 4]
+
+    moments = accumulator.get_moments()
+    assert sizes == [4, 4, 4, 1]
+    assert moments is not None
+    numpy.testing.assert_array_equal(numpy.sort(moments.indexes), numpy.arange(13))
 
 
 def test_order_and_threads_do_not_change_the_result() -> None:
@@ -380,6 +421,26 @@ def test_select_keeps_the_rows_and_the_frames() -> None:
     numpy.testing.assert_array_equal(selected.mean_frame, moments.mean_frame)
 
 
+def test_sorting_by_index_moves_every_row_and_keeps_the_frames() -> None:
+    indexes = numpy.array([5, 2, 9, 2, 0])
+    moments = _accumulate(indexes, _patterns(5), chunk_size=2, step=5)
+
+    ordered = moments.sort_by_index()
+
+    order = [4, 1, 3, 0, 2]  # stable: the first 2 stays ahead of the second
+    numpy.testing.assert_array_equal(ordered.indexes, [0, 2, 2, 5, 9])
+    numpy.testing.assert_array_equal(ordered.total_counts, moments.total_counts[order])
+    numpy.testing.assert_array_equal(
+        ordered.center_of_mass_x_px, moments.center_of_mass_x_px[order]
+    )
+    numpy.testing.assert_array_equal(
+        ordered.center_of_mass_y_px, moments.center_of_mass_y_px[order]
+    )
+    assert ordered.binned_patterns is not None and moments.binned_patterns is not None
+    numpy.testing.assert_array_equal(ordered.binned_patterns, moments.binned_patterns[order])
+    numpy.testing.assert_array_equal(ordered.mean_frame, moments.mean_frame)
+
+
 def test_i0_removes_a_beam_decay(caplog: pytest.LogCaptureFixture) -> None:
     patterns = _patterns(10)
     decay = numpy.linspace(1.0, 0.5, 10)
@@ -473,6 +534,164 @@ def test_carried_corrections_are_applied_first() -> None:
     numpy.testing.assert_allclose(
         moments.center_of_mass_x_px, expected.center_of_mass_x_px, atol=1e-9
     )
+
+
+def test_an_accumulator_from_assembled_data_applies_its_mask_and_maps() -> None:
+    patterns = _patterns(6).astype(numpy.float64)
+    background = numpy.full(_SHAPE, 3.0)
+    flat_field = numpy.full(_SHAPE, 2.0)
+    raw = patterns * flat_field + background
+    data = AssembledDiffractionData(
+        numpy.arange(6),
+        raw,
+        PixelGeometry(width_m=1e-6, height_m=1e-6),
+        _bad_pixels(),
+        background=background,
+        flat_field=flat_field,
+    )
+
+    accumulator = DiffractionMomentAccumulator.from_assembled_data(data, chunk_size=4)
+    accumulator.add(data.get_indexes(), data.get_patterns())
+    moments = accumulator.get_moments()
+    expected = compute_diffraction_moments(
+        numpy.arange(6), raw, bad_pixels=_bad_pixels(), background=background, flat_field=flat_field
+    )
+
+    assert moments is not None and expected is not None
+    _assert_same_moments(moments, expected)
+
+
+def _assembly_dataset(*, nan_at: int | None = None) -> SimpleDiffractionDataset:
+    """Nine patterns in three arrays, listed out of index order, with both maps carried."""
+    patterns = _patterns(9).astype(numpy.float32)
+
+    if nan_at is not None:
+        patterns[nan_at, 3, 4] = numpy.nan
+
+    arrays = [
+        SimpleDiffractionArray(
+            label, numpy.arange(first, first + count), patterns[first : first + count]
+        )
+        for label, first, count in (('c', 6, 3), ('a', 0, 4), ('b', 4, 2))
+    ]
+    return SimpleDiffractionDataset(
+        make_dataset(arrays, _SHAPE).get_metadata(),
+        DiffractionDatasetLayoutNode.create_root(),
+        arrays,
+        _bad_pixels(),
+        background=numpy.full(_SHAPE, 1.0),
+        flat_field=numpy.full(_SHAPE, 2.0),
+    )
+
+
+def _assemble_with(
+    dataset: SimpleDiffractionDataset, assembly_moments: AssemblyMomentAccumulator
+) -> AssembledDiffractionData:
+    return assemble_dataset(
+        dataset, on_array_assembled=assembly_moments.add_assembled, max_workers=3
+    )
+
+
+def _one_pass(data: AssembledDiffractionData) -> DiffractionMoments:
+    moments = compute_diffraction_moments(
+        data.get_indexes(),
+        data.get_patterns(),
+        bad_pixels=data.get_bad_pixels(),
+        background=data.get_background(),
+        flat_field=data.get_flat_field(),
+    )
+    assert moments is not None
+    return moments.sort_by_index()
+
+
+def test_moments_accumulated_during_assembly_equal_one_pass(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    assembly_moments = AssemblyMomentAccumulator(chunk_size=4)
+    data = _assemble_with(_assembly_dataset(), assembly_moments)
+
+    with caplog.at_level(logging.INFO):
+        moments = assembly_moments.get_moments(data)
+
+    assert moments is not None
+    assert 'accumulated during assembly' in caplog.text
+    numpy.testing.assert_array_equal(moments.indexes, numpy.arange(9))
+    _assert_same_moments(moments, _one_pass(data))
+
+
+def test_accumulated_moments_serve_a_selection_of_the_assembled_patterns() -> None:
+    assembly_moments = AssemblyMomentAccumulator()
+    data = _assemble_with(_assembly_dataset(), assembly_moments)
+    keep = numpy.isin(data.get_indexes(), [1, 2, 5, 7])
+    selected = AssembledDiffractionData(
+        data.get_indexes()[keep],
+        data.get_patterns()[keep],
+        data.get_pixel_geometry(),
+        data.get_bad_pixels(),
+        background=data.get_background(),
+        flat_field=data.get_flat_field(),
+    )
+
+    moments = assembly_moments.get_moments(selected)
+
+    expected = _one_pass(selected)
+    assert moments is not None
+    assert moments.num_patterns == 9  # the frames are of every pattern assembled
+    numpy.testing.assert_array_equal(moments.indexes, [1, 2, 5, 7])
+    numpy.testing.assert_allclose(moments.total_counts, expected.total_counts, rtol=1e-12)
+    numpy.testing.assert_allclose(
+        moments.center_of_mass_y_px, expected.center_of_mass_y_px, atol=1e-12
+    )
+
+
+def test_a_non_finite_pixel_in_one_array_falls_back_to_one_pass(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    assembly_moments = AssemblyMomentAccumulator()
+    data = _assemble_with(_assembly_dataset(nan_at=7), assembly_moments)
+
+    with caplog.at_level(logging.INFO):
+        moments = assembly_moments.get_moments(data)
+
+    assert moments is not None and moments.bad_pixels[3, 4]
+    assert 'accumulated during assembly' not in caplog.text
+    _assert_same_moments(moments, _one_pass(data))
+
+
+def test_a_failure_to_accumulate_falls_back_to_one_pass(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    def fail(*args: object) -> None:
+        raise RuntimeError('accumulation failed')
+
+    monkeypatch.setattr(DiffractionMomentAccumulator, 'add', fail)
+    assembly_moments = AssemblyMomentAccumulator()
+
+    with caplog.at_level(logging.INFO):
+        data = _assemble_with(_assembly_dataset(), assembly_moments)
+        monkeypatch.undo()
+        moments = assembly_moments.get_moments(data)
+
+    assert moments is not None
+    assert 'Failed to accumulate the diffraction moments of' in caplog.text
+    assert 'accumulated during assembly' not in caplog.text
+    _assert_same_moments(moments, _one_pass(data))
+
+
+def test_without_accumulation_the_moments_take_one_pass_and_none_for_no_patterns() -> None:
+    data = assemble_dataset(_assembly_dataset())
+    empty = AssembledDiffractionData(
+        numpy.full(2, -1, dtype=numpy.intp),
+        numpy.zeros((2, *_SHAPE)),
+        PixelGeometry(width_m=1e-6, height_m=1e-6),
+        _bad_pixels(),
+    )
+
+    moments = AssemblyMomentAccumulator().get_moments(data)
+
+    assert moments is not None
+    _assert_same_moments(moments, _one_pass(data))
+    assert AssemblyMomentAccumulator().get_moments(empty) is None
 
 
 def test_an_empty_stack_has_no_moments() -> None:

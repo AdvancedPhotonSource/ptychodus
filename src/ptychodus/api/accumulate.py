@@ -18,7 +18,11 @@ from typing import cast
 
 import numpy
 
-from .assemble import DetectorCorrections, estimate_incident_photon_count
+from .assemble import (
+    AssembledDiffractionData,
+    DetectorCorrections,
+    estimate_incident_photon_count,
+)
 from .diffraction import (
     BadPixels,
     DetectorBackground,
@@ -28,11 +32,13 @@ from .diffraction import (
     FlatField,
 )
 from .geometry import ImageExtent
+from .inpaint import BiharmonicInpainter
 from .moments import FrameStatistics, compute_intensity_moments
 from .preprocess.diffraction import BinningStep, inpaint_bad_pixels
 from .typing import IntegerArrayType, RealArrayType
 
 __all__ = [
+    'AssemblyMomentAccumulator',
     'DiffractionMomentAccumulator',
     'DiffractionMoments',
     'IncidentBeamEstimate',
@@ -99,6 +105,22 @@ class DiffractionMoments:
             binned_patterns=None if self.binned_patterns is None else self.binned_patterns[keep],
         )
 
+    def sort_by_index(self) -> DiffractionMoments:
+        """Put the per-pattern rows in ascending order of their scan indexes.
+
+        The sort is stable, so rows sharing an index keep their stored order. The frames
+        are unchanged.
+        """
+        order = numpy.argsort(self.indexes, kind='stable')
+        return replace(
+            self,
+            indexes=self.indexes[order],
+            total_counts=self.total_counts[order],
+            center_of_mass_x_px=self.center_of_mass_x_px[order],
+            center_of_mass_y_px=self.center_of_mass_y_px[order],
+            binned_patterns=None if self.binned_patterns is None else self.binned_patterns[order],
+        )
+
     def normalize_by_i0(
         self, i0_indexes: IntegerArrayType, i0_counts: RealArrayType
     ) -> DiffractionMoments:
@@ -134,8 +156,10 @@ class DiffractionMomentAccumulator:
     Patterns are added in chunks of any size and from any number of threads. With
     *corrections*, each is corrected as it is reduced, and *bad_pixels* is widened by
     the pixels the corrections make unusable; without, patterns are added already
-    corrected. They are buffered into chunks of *chunk_size* so the biharmonic fill of
-    the bad pixels is solved once per chunk rather than once per frame.
+    corrected. They are reduced in chunks of *chunk_size*, buffered across additions
+    and cut out of large ones, so the float64 working copies scale with the chunk
+    rather than with what one call adds. The biharmonic fill of the bad pixels is
+    factorized once and solved once per chunk.
 
     Each full chunk is reduced outside the lock, and its frame statistics and per-pattern
     rows are folded in together under it, so a snapshot taken at any moment describes
@@ -186,6 +210,10 @@ class DiffractionMomentAccumulator:
             else corrections.apply_to_bad_pixels(initial_bad_pixels)
         )
 
+        # The mask is fixed, so its biharmonic system is factorized once for every chunk.
+        self._inpainter = (
+            BiharmonicInpainter(self._bad_pixels) if numpy.any(self._bad_pixels) else None
+        )
         self._chunk_size = chunk_size
         self._binning = binning
         self._binned_bad_pixels = None if binning is None else binning.apply(self._bad_pixels)
@@ -201,6 +229,30 @@ class DiffractionMomentAccumulator:
         self._center_of_mass_y_px: list[RealArrayType] = []
         self._binned_patterns: list[RealArrayType] = []
 
+    @classmethod
+    def from_assembled_data(
+        cls,
+        data: AssembledDiffractionData,
+        *,
+        chunk_size: int = 256,
+        binning: BinningStep | None = None,
+    ) -> DiffractionMomentAccumulator:
+        """An empty accumulator for patterns assembled into *data*.
+
+        It takes the frame shape and bad pixels of *data* as they stand, and applies the
+        background and flat field the patterns still carry, as
+        :func:`iterate_diffraction_moments` does. No pattern is added.
+        """
+        _, height, width = data.get_patterns_shape()
+        return cls(
+            height,
+            width,
+            bad_pixels=data.get_bad_pixels(),
+            corrections=_carried_corrections(data.get_background(), data.get_flat_field()),
+            chunk_size=chunk_size,
+            binning=binning,
+        )
+
     def add(self, indexes: DiffractionIndexes, patterns: DiffractionPatterns) -> None:
         """Buffer patterns, keyed by their scan indexes, and reduce every chunk that fills."""
         if patterns.shape[-2:] != self._shape:
@@ -211,13 +263,19 @@ class DiffractionMomentAccumulator:
         if indexes.shape[0] != patterns.shape[0]:
             raise ValueError('Expected one index per pattern!')
 
+        if patterns.shape[0] == 0:
+            return
+
         with self._lock:
             self._pending_indexes.append(numpy.asarray(indexes))
             self._pending_patterns.append(patterns)
             self._num_pending += patterns.shape[0]
-            chunk = self._take_pending() if self._num_pending >= self._chunk_size else None
+            chunks = []
 
-        if chunk is not None:
+            while self._num_pending >= self._chunk_size:
+                chunks.append(self._take_pending(self._chunk_size))
+
+        for chunk in chunks:
             self._reduce(*chunk)
 
     def merge(self, other: DiffractionMomentAccumulator | DiffractionMoments) -> None:
@@ -253,7 +311,7 @@ class DiffractionMomentAccumulator:
         Accumulation may continue afterwards; the snapshot does not change with it.
         """
         with self._lock:
-            chunk = self._take_pending() if self._num_pending > 0 else None
+            chunk = self._take_pending(self._num_pending) if self._num_pending > 0 else None
 
         if chunk is not None:
             self._reduce(*chunk)
@@ -287,14 +345,35 @@ class DiffractionMomentAccumulator:
             binned_patterns=None if self._binning is None else numpy.concatenate(binned_patterns),
         )
 
-    def _take_pending(self) -> tuple[IntegerArrayType, DiffractionPatterns]:
-        # Called with the lock held.
-        indexes = numpy.concatenate(self._pending_indexes)
-        patterns = numpy.concatenate(self._pending_patterns)
-        self._pending_indexes.clear()
-        self._pending_patterns.clear()
-        self._num_pending = 0
-        return indexes, patterns
+    def _take_pending(self, count: int) -> tuple[IntegerArrayType, DiffractionPatterns]:
+        # Called with the lock held. Takes the first `count` pending patterns as views,
+        # copying only to join pieces from separate additions.
+        index_pieces: list[IntegerArrayType] = []
+        pattern_pieces: list[DiffractionPatterns] = []
+        remaining = count
+
+        while remaining > 0:
+            indexes = self._pending_indexes[0]
+            patterns = self._pending_patterns[0]
+            num_taken = min(remaining, indexes.shape[0])
+            index_pieces.append(indexes[:num_taken])
+            pattern_pieces.append(patterns[:num_taken])
+
+            if num_taken == indexes.shape[0]:
+                del self._pending_indexes[0]
+                del self._pending_patterns[0]
+            else:
+                self._pending_indexes[0] = indexes[num_taken:]
+                self._pending_patterns[0] = patterns[num_taken:]
+
+            remaining -= num_taken
+
+        self._num_pending -= count
+
+        if len(pattern_pieces) == 1:
+            return index_pieces[0], pattern_pieces[0]
+
+        return numpy.concatenate(index_pieces), numpy.concatenate(pattern_pieces)
 
     def _reduce(self, indexes: IntegerArrayType, patterns: DiffractionPatterns) -> None:
         if self._corrections is not None:
@@ -303,15 +382,20 @@ class DiffractionMomentAccumulator:
         height, width = self._shape
         chunk_statistics = FrameStatistics(height, width)
         chunk_statistics.add(patterns)
-        repaired = inpaint_bad_pixels(patterns.astype(numpy.float64), self._bad_pixels)
-        moments = compute_intensity_moments(repaired)
+        weights = patterns.astype(numpy.float64, order='C')
         binned_patterns: RealArrayType | None = None
 
         if self._binning is not None and self._binned_bad_pixels is not None:
-            zeroed = numpy.where(self._bad_pixels, 0.0, patterns.astype(numpy.float64))
+            zeroed = numpy.where(self._bad_pixels, 0.0, weights)
             binned_patterns = numpy.where(
                 self._binned_bad_pixels, numpy.nan, self._binning.apply(zeroed)
             )
+
+        # Binned first: the fill below overwrites the weights in place.
+        repaired = (
+            weights if self._inpainter is None else self._inpainter(weights, overwrite_input=True)
+        )
+        moments = compute_intensity_moments(repaired)
 
         self._fold(
             chunk_statistics,
@@ -346,6 +430,143 @@ class DiffractionMomentAccumulator:
                 self._binned_patterns.append(numpy.asarray(binned_patterns, dtype=numpy.float32))
 
 
+class AssemblyMomentAccumulator:
+    """Accumulates diffraction moments while a dataset assembles, so the pass overlaps the reads.
+
+    :meth:`add_assembled` has the signature of the ``on_array_assembled`` callback of
+    :func:`~ptychodus.api.assemble.assemble_dataset`, and may be passed as it or called
+    from one; it runs on the assembly workers, as each array lands. The first array
+    fixes the bad pixels and carried maps of the accumulation.
+    :meth:`get_moments` then gives the moments of the assembled data, taking the
+    accumulated ones wherever they are exactly what a pass over that data would give.
+
+    A failure to accumulate is logged and never raised, because the array did
+    assemble; the moments then come from one pass at the end instead.
+
+    Patterns still buffered toward a chunk when the last array lands are reduced in
+    :meth:`get_moments`, after the reads. The default *chunk_size* keeps that remainder
+    small, which costs nothing, because the factorized fill makes a chunk of a few dozen
+    patterns as cheap per pattern as a chunk of hundreds.
+    """
+
+    def __init__(self, *, chunk_size: int = 32) -> None:
+        self._chunk_size = chunk_size
+        self._lock = threading.Lock()
+        self._accumulator: DiffractionMomentAccumulator | None = None
+        # The first array assembled, whose mask and maps the accumulation was set up with.
+        self._first_view: AssembledDiffractionData | None = None
+        self._is_usable = True
+
+    def add_assembled(self, array_index: int, label: str, view: AssembledDiffractionData) -> None:
+        """Fold one assembled array into the moments; thread-safe."""
+        try:
+            with self._lock:
+                if not self._is_usable:
+                    return
+
+                if self._accumulator is None or self._first_view is None:
+                    accumulator = DiffractionMomentAccumulator.from_assembled_data(
+                        view, chunk_size=self._chunk_size
+                    )
+                    self._accumulator = accumulator
+                    self._first_view = view
+                elif _same_corrections(view, self._first_view):
+                    accumulator = self._accumulator
+                else:
+                    # This array masked pixels the others did not -- values found non-finite
+                    # -- so no one mask describes what was accumulated.
+                    self._is_usable = False
+                    return
+
+            accumulator.add(view.get_indexes(), view.get_patterns())
+        except Exception:
+            logger.exception(
+                f'Failed to accumulate the diffraction moments of "{label}"; '
+                'they will be computed once assembly finishes.'
+            )
+            self._is_usable = False
+
+    def get_moments(self, data: AssembledDiffractionData) -> DiffractionMoments | None:
+        """The moments of the patterns *data* holds, rows sorted by scan index.
+
+        *data* is what assembly produced, or a selection of its patterns, as a filter
+        applied afterwards leaves. The accumulated moments, narrowed to the indexes of
+        *data*, serve when they were taken under its bad pixels and carried maps and
+        cover exactly its patterns; their frames are then those of every pattern
+        assembled. Otherwise, as when a pixel found non-finite widened the mask after
+        arrays were accumulated, the moments come from one pass over *data*, as
+        :func:`compute_diffraction_moments` takes them. Returns None when *data* holds
+        no patterns.
+        """
+        if data.get_num_patterns() == 0:
+            return None
+
+        with self._lock:
+            accumulator = (
+                self._accumulator
+                if self._is_usable
+                and self._first_view is not None
+                and _same_corrections(data, self._first_view)
+                else None
+            )
+
+        indexes = data.get_indexes()
+
+        if accumulator is not None:
+            try:
+                moments = accumulator.get_moments()
+            except Exception:
+                logger.exception('Failed to reduce the accumulated diffraction moments!')
+                moments = None
+
+            if moments is not None:
+                moments = moments.select(indexes)
+
+                if moments.indexes.size == indexes.size:
+                    logger.info('Using the diffraction moments accumulated during assembly.')
+                    return moments.sort_by_index()
+
+        logger.info('Accumulating diffraction moments...')
+        moments = compute_diffraction_moments(
+            indexes,
+            data.get_patterns(),
+            bad_pixels=data.get_bad_pixels(),
+            background=data.get_background(),
+            flat_field=data.get_flat_field(),
+            chunk_size=self._chunk_size,
+        )
+        return None if moments is None else moments.sort_by_index()
+
+
+def _same_map(map_a: RealArrayType | None, map_b: RealArrayType | None) -> bool:
+    """Whether two optional per-pixel maps are both absent or equal."""
+    if map_a is None or map_b is None:
+        return map_a is None and map_b is None
+
+    return numpy.array_equal(map_a, map_b)
+
+
+def _same_corrections(data_a: AssembledDiffractionData, data_b: AssembledDiffractionData) -> bool:
+    """Whether two assembled datasets share their bad pixels and carried maps."""
+    return (
+        numpy.array_equal(data_a.get_bad_pixels(), data_b.get_bad_pixels())
+        and _same_map(data_a.get_background(), data_b.get_background())
+        and _same_map(data_a.get_flat_field(), data_b.get_flat_field())
+    )
+
+
+def _carried_corrections(
+    background: DetectorBackground | None, flat_field: FlatField | None
+) -> DetectorCorrections:
+    """Corrections applying a background and flat field the patterns still carry."""
+    return DetectorCorrections(
+        background=background,
+        flat_field=flat_field,
+        subtract_background=True,
+        divide_flat_field=True,
+    )
+
+
 def iterate_diffraction_moments(
     indexes: DiffractionIndexes,
     patterns: DiffractionPatterns,
@@ -374,12 +595,7 @@ def iterate_diffraction_moments(
     if num_snapshots < 1:
         raise ValueError('At least one snapshot must be taken!')
 
-    corrections = DetectorCorrections(
-        background=background,
-        flat_field=flat_field,
-        subtract_background=True,
-        divide_flat_field=True,
-    )
+    corrections = _carried_corrections(background, flat_field)
     num_patterns = patterns.shape[0]
     height, width = patterns.shape[-2:]
     accumulator = DiffractionMomentAccumulator(

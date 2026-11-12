@@ -33,6 +33,7 @@ import numpy
 from ptychi.api.options.task import PtychographyTaskOptions
 
 from ptychodus.api.affine import AffineTransform, transform_probe_positions
+from ptychodus.api.accumulate import AssemblyMomentAccumulator
 from ptychodus.api.assemble import (
     AssembledDiffractionData,
     DetectorCorrections,
@@ -1037,6 +1038,8 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         )
 
     logger.info('Assembling diffraction patterns')
+    # Accumulated as the arrays land, so the beam estimate below costs no second pass.
+    assembly_moments = AssemblyMomentAccumulator()
 
     if profile.conditions_patterns:
         assembled_data = assemble_dataset(
@@ -1048,9 +1051,14 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             corrections=corrections,
             total_counts_lower_bound=lower_counts,
             total_counts_upper_bound=upper_counts,
+            on_array_assembled=assembly_moments.add_assembled,
         )
     else:
-        assembled_data = assemble_dataset(raw_dataset, raw_pixel_geometry=raw_pixel_geometry)
+        assembled_data = assemble_dataset(
+            raw_dataset,
+            raw_pixel_geometry=raw_pixel_geometry,
+            on_array_assembled=assembly_moments.add_assembled,
+        )
 
     num_patterns = assembled_data.get_num_patterns()
 
@@ -1116,7 +1124,10 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
 
     # Resolved before the probe is built, because a generated probe is normalized to it.
     incident_beam = estimate_incident_beam_from_assembled_data(
-        assembled_data, positions, i0_photons_per_count=args.i0_photons_per_count
+        assembled_data,
+        positions,
+        assembly_moments=assembly_moments,
+        i0_photons_per_count=args.i0_photons_per_count,
     )
     probe_photon_count_override = getattr(args, 'probe_photon_count', None)
     probe_photon_count = (

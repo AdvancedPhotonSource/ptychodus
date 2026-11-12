@@ -5,6 +5,8 @@ Behaviors verified:
     covariance of known distributions (a point, a uniform disk, a tilted Gaussian)
   - it works over a leading batch axis, and a masked pixel carries no weight
   - an empty image has a zero total and NaN moments rather than raising
+  - the marginal sums agree with direct pixel sums over an integer stack with bad pixels,
+    an off-centre distribution and an empty frame
   - subtract_noise_floor removes a pedestal and keeps the full height of the signal above it
   - with keep_filtered=False the measured heights survive, only the mask is filtered
   - estimate_beam_center ignores a hot pixel once it is masked
@@ -114,6 +116,55 @@ def test_an_empty_image_has_nan_moments() -> None:
     assert float(moments.total) == 0.0
     assert numpy.isnan(moments.centroid_x_px)
     assert numpy.isnan(moments.covariance_xx_px2)
+
+
+def _direct_moments(
+    image: numpy.ndarray, bad_pixels: BadPixels
+) -> tuple[float, float, float, float, float, float]:
+    y, x = _centered_grid(*image.shape)
+    weights = numpy.where(bad_pixels, 0.0, image.astype(numpy.float64))
+    total = weights.sum()
+    cx = (weights * x).sum() / total
+    cy = (weights * y).sum() / total
+    xx = (weights * (x - cx) ** 2).sum() / total
+    xy = (weights * (x - cx) * (y - cy)).sum() / total
+    yy = (weights * (y - cy) ** 2).sum() / total
+    return total, cx, cy, xx, xy, yy
+
+
+def test_marginal_sums_agree_with_direct_pixel_sums() -> None:
+    rng = numpy.random.default_rng(1)
+    y, x = _centered_grid(30, 44)
+    stack = numpy.stack(
+        [
+            rng.poisson(
+                900.0 * numpy.exp(-((x - sx) ** 2 + 2 * (y - sy) ** 2 - (x - sx) * (y - sy)) / 40.0)
+            )
+            for sx, sy in [(0.0, 0.0), (15.0, -9.0), (-18.0, 11.0)]
+        ]
+        + [numpy.zeros((30, 44))]
+    ).astype(numpy.uint32)
+    bad_pixels: BadPixels = numpy.zeros((30, 44), dtype=bool)
+    bad_pixels[4:6, 7] = True
+    bad_pixels[:, 40] = True
+    stack[:, bad_pixels] = 4_000_000_000
+
+    moments = compute_intensity_moments(stack, bad_pixels=bad_pixels)
+
+    for index in range(3):
+        expected = _direct_moments(stack[index], bad_pixels)
+        actual = (
+            moments.total[index],
+            moments.centroid_x_px[index],
+            moments.centroid_y_px[index],
+            moments.covariance_xx_px2[index],
+            moments.covariance_xy_px2[index],
+            moments.covariance_yy_px2[index],
+        )
+        numpy.testing.assert_allclose(actual, expected, rtol=1e-12, atol=1e-10)
+
+    assert moments.total[3] == 0.0
+    assert numpy.isnan(moments.covariance_xy_px2[3])
 
 
 def test_subtracting_the_floor_removes_a_pedestal_and_keeps_the_signal() -> None:

@@ -26,8 +26,6 @@ from typing import Annotated, Literal, TypeAlias, TypeVar, cast, overload
 
 import numpy
 from pydantic import BaseModel, ConfigDict, Field
-from scipy import ndimage
-from skimage.restoration import inpaint_biharmonic
 
 from ..diffraction import (
     BadPixels,
@@ -41,6 +39,7 @@ from ..diffraction import (
     SimpleDiffractionArray,
 )
 from ..geometry import ImageExtent, PixelGeometry
+from ..inpaint import BiharmonicInpainter
 from ..moments import compute_intensity_moments
 from ..typing import AnyArrayType, RealArrayType
 from .noise import RobustStatistics, estimate_filtered_noise_floor, subtract_noise_floor
@@ -394,10 +393,12 @@ def inpaint_bad_pixels(
     because filling it would extrapolate beyond every measured pixel rather than
     interpolate between them.
 
-    Returns the input unchanged when `bad_pixels` is None or all-False so the
-    (expensive) skimage call is skipped. A stack shares one mask across all its
-    frames, so the biharmonic system is solved once for the whole stack rather
-    than once per frame; the result is identical either way.
+    Returns the input unchanged when `bad_pixels` is None or all-False. Otherwise
+    the result is a new array, from a :class:`~ptychodus.api.inpaint.BiharmonicInpainter`
+    built for this one call; one built once serves many calls under the same mask. A
+    stack shares the mask across all its frames, so the biharmonic system is solved
+    once for the whole stack rather than once per frame; the result is identical
+    either way.
 
     Integer values are rounded rather than truncated, which would bias every
     filled pixel low.
@@ -405,41 +406,7 @@ def inpaint_bad_pixels(
     if bad_pixels is None or not numpy.any(bad_pixels):
         return data
 
-    if data.ndim not in (2, 3):
-        raise ValueError('Diffraction data must be 2- or 3-dimensional ndarray.')
-
-    labels, _ = ndimage.label(bad_pixels)
-    border_labels = numpy.unique(
-        numpy.concatenate((labels[0, :], labels[-1, :], labels[:, 0], labels[:, -1]))
-    )
-    edge_pixels = numpy.isin(labels, border_labels[border_labels != 0])
-    interior_pixels = numpy.logical_and(bad_pixels, numpy.logical_not(edge_pixels))
-
-    if not numpy.any(interior_pixels):
-        filled = data.astype(numpy.float64)
-    elif data.ndim == 2:
-        filled = inpaint_biharmonic(data.astype(numpy.float64), interior_pixels)
-    else:
-        stacked = inpaint_biharmonic(
-            numpy.moveaxis(data, 0, -1).astype(numpy.float64),
-            interior_pixels,
-            channel_axis=-1,
-        )
-        filled = numpy.moveaxis(stacked, -1, 0)
-
-    filled[..., edge_pixels] = 0.0
-
-    dtype = data.dtype
-
-    if numpy.issubdtype(dtype, numpy.integer):
-        # Fills are already confined to the range of each frame's good pixels, so
-        # they are representable; the clip costs one pass and keeps the cast from
-        # wrapping silently if that ever stops being true.
-        # issubdtype does not narrow the pattern dtype union for the checker.
-        iinfo = numpy.iinfo(cast(numpy.dtype[numpy.integer], dtype))
-        filled = numpy.clip(numpy.rint(filled), iinfo.min, iinfo.max)
-
-    return filled.astype(dtype)
+    return BiharmonicInpainter(bad_pixels)(data)
 
 
 def estimate_beam_center(

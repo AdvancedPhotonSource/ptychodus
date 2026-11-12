@@ -3,7 +3,7 @@ from collections.abc import Callable
 import logging
 import threading
 
-from ptychodus.api.accumulate import DiffractionMoments, compute_diffraction_moments
+from ptychodus.api.accumulate import AssemblyMomentAccumulator, DiffractionMoments
 from ptychodus.api.assemble import AssembledDiffractionData, DetectorCorrections, assemble_dataset
 from ptychodus.api.diffraction import BadPixels, CropRegion, DiffractionDataset
 from ptychodus.api.geometry import PixelGeometry
@@ -23,9 +23,12 @@ class LoadDiffractionDataset:
     :class:`TaskProgressMonitor` protocol to the callback parameters and records
     the first per-array failure for :meth:`get_error`.
 
-    A load that completes is followed by one pass accumulating the diffraction moments
-    of what was assembled, handed to `on_moments_computed` before the finished event is
-    set, so a caller blocking on the load finds them in place.
+    The diffraction moments of what was assembled are accumulated on the assembly
+    workers as each array lands, so they overlap the reads of the arrays still to
+    come; see :class:`AssemblyMomentAccumulator` for when they come from one pass over
+    the buffer instead. They are handed to `on_moments_computed`, rows sorted by scan
+    index, before the finished event is set, so a caller blocking on the load finds
+    them in place.
     """
 
     def __init__(
@@ -61,6 +64,7 @@ class LoadDiffractionDataset:
         self._task_monitor = task_monitor
         self._finished_event = threading.Event()
         self._error: BaseException | None = None
+        self._moments = AssemblyMomentAccumulator()
 
     def get_finished_event(self) -> threading.Event:
         return self._finished_event
@@ -72,6 +76,16 @@ class LoadDiffractionDataset:
     def _handle_array_error(self, array_index: int, label: str, error: Exception) -> None:
         if self._error is None:
             self._error = error
+
+    def _accumulate_array(
+        self, array_index: int, label: str, view: AssembledDiffractionData
+    ) -> None:
+        """Fold one assembled array into the moments, then publish it.
+
+        Called from an assembly worker thread.
+        """
+        self._moments.add_assembled(array_index, label, view)
+        self._on_array_assembled(array_index, label, view)
 
     def __call__(self) -> None:
         try:
@@ -86,7 +100,7 @@ class LoadDiffractionDataset:
                     total_counts_upper_bound=self._total_counts_upper_bound,
                     read_region=self._read_region,
                     corrections=self._corrections,
-                    on_array_assembled=self._on_array_assembled,
+                    on_array_assembled=self._accumulate_array,
                     on_nonfinite_pixels=self._on_nonfinite_pixels,
                     on_progress=monitor.update_progress,
                     on_array_error=self._handle_array_error,
@@ -101,20 +115,9 @@ class LoadDiffractionDataset:
             self._finished_event.set()
 
     def _compute_moments(self) -> None:
-        # The assembled data's own mask already holds any pixel found non-finite here,
-        # and its maps are those the patterns still carry.
         # A failure here leaves the dataset loaded; the moments are computed on demand.
-        logger.info('Accumulating diffraction moments...')
-        out = self._out
-
         try:
-            moments = compute_diffraction_moments(
-                out.get_indexes(),
-                out.get_patterns(),
-                bad_pixels=out.get_bad_pixels(),
-                background=out.get_background(),
-                flat_field=out.get_flat_field(),
-            )
+            moments = self._moments.get_moments(self._out)
         except Exception:
             logger.exception('Failed to accumulate the diffraction moments!')
             return

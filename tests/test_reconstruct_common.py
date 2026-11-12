@@ -26,7 +26,19 @@ import pytest
 
 pytest.importorskip('ptychi')
 
-from ptychodus.api.assemble import AssembledDiffractionData, CropSuggestion, DetectorCorrections
+from ptychodus.api.accumulate import AssemblyMomentAccumulator
+from ptychodus.api.assemble import (
+    AssembledDiffractionData,
+    CropSuggestion,
+    DetectorCorrections,
+    assemble_dataset,
+)
+from ptychodus.api.diffraction import (
+    DiffractionDatasetLayoutNode,
+    DiffractionMetadata,
+    SimpleDiffractionArray,
+    SimpleDiffractionDataset,
+)
 from ptychodus.api.diffraction import BeamCenter, CropRegion
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.preprocess.diffraction import FilterValuesStep, SignalRadius
@@ -44,6 +56,7 @@ from ptychodus.cli import _reconstruct_common  # noqa: E402
 from ptychodus.cli._reconstruct_common import resolve_crop_region  # noqa: E402
 from ptychodus.cli._reconstruct_common import (  # noqa: E402
     CancellationToken,
+    estimate_incident_beam_from_assembled_data,
     install_signal_handlers,
     is_main_process,
     load_ptychi_options,
@@ -1115,3 +1128,50 @@ class TestOptionsFallbackFollowsTheRegime:
 
     def test_near_field_falls_back_to_bh(self) -> None:
         assert type(load_ptychi_options(None, far_field=False)).__name__ == 'BHOptions'
+
+
+def test_the_beam_estimate_takes_the_moments_accumulated_during_assembly(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The estimate agrees with one pass, also after a filter drops a pattern."""
+    rng = numpy.random.default_rng(3)
+    patterns = rng.poisson(50.0, size=(6, 16, 16)).astype(numpy.uint32)
+    arrays = [
+        SimpleDiffractionArray('a', numpy.arange(3), patterns[:3]),
+        SimpleDiffractionArray('b', numpy.arange(3, 6), patterns[3:]),
+    ]
+    metadata = DiffractionMetadata(
+        num_patterns_per_array=[3, 3],
+        pattern_dtype=numpy.dtype(numpy.uint32),
+        detector_extent=ImageExtent(width_px=16, height_px=16),
+        detector_pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=PIXEL_M),
+    )
+    dataset = SimpleDiffractionDataset(metadata, DiffractionDatasetLayoutNode.create_root(), arrays)
+    positions = ProbePositionSequence(
+        [ProbePosition(index=i, x_m=0.0, y_m=0.0, probe_photon_count=100.0 - i) for i in range(6)]
+    )
+    assembly_moments = AssemblyMomentAccumulator()
+    assembled = assemble_dataset(dataset, on_array_assembled=assembly_moments.add_assembled)
+    keep = assembled.get_indexes() != 4
+    filtered = AssembledDiffractionData(
+        assembled.get_indexes()[keep],
+        assembled.get_patterns()[keep],
+        assembled.get_pixel_geometry(),
+        assembled.get_bad_pixels(),
+    )
+
+    with caplog.at_level(logging.INFO):
+        accumulated = estimate_incident_beam_from_assembled_data(
+            filtered, positions, assembly_moments=assembly_moments, i0_photons_per_count=0.6
+        )
+
+    one_pass = estimate_incident_beam_from_assembled_data(
+        filtered, positions, i0_photons_per_count=0.6
+    )
+
+    assert 'accumulated during assembly' in caplog.text
+    assert accumulated.incident_photon_count == pytest.approx(one_pass.incident_photon_count)
+    assert accumulated.mean_amplitude_transmission == pytest.approx(
+        one_pass.mean_amplitude_transmission
+    )
+    numpy.testing.assert_array_equal(accumulated.moments.indexes, [0, 1, 2, 3, 5])

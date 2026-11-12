@@ -108,6 +108,15 @@
    :show-inheritance:
 ```
 
+## Inpaint
+
+```{eval-rst}
+.. automodule:: ptychodus.api.inpaint
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Input/Output (I/O)
 
 ```{eval-rst}

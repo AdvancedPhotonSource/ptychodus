@@ -21,6 +21,7 @@ import numpy
 import yaml
 
 from ptychodus.api.affine import AffineFitResult, estimate_affine_transform
+from ptychodus.api.accumulate import AssemblyMomentAccumulator
 from ptychodus.api.assemble import assemble_dataset
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import BadPixels, CropRegion
@@ -366,6 +367,8 @@ def reconstruct_one_scan(
         )
     )
 
+    # Accumulated as the arrays land, so the beam estimate below costs no second pass.
+    assembly_moments = AssemblyMomentAccumulator()
     assembled_data = assemble_dataset(
         raw_dataset,
         pipeline,
@@ -373,6 +376,7 @@ def reconstruct_one_scan(
         raw_pixel_geometry=raw_pixel_geometry,
         read_region=read_region,
         total_counts_lower_bound=settings.diffraction.min_total_counts,
+        on_array_assembled=assembly_moments.add_assembled,
     )
     num_patterns = assembled_data.get_num_patterns()
     num_raw_patterns = sum(metadata.num_patterns_per_array)
@@ -431,7 +435,9 @@ def reconstruct_one_scan(
         far_field=far_field,
         focus_object_distance_m=focus_object_distance_m,
     )
-    incident_beam = estimate_incident_beam_from_assembled_data(assembled_data, positions)
+    incident_beam = estimate_incident_beam_from_assembled_data(
+        assembled_data, positions, assembly_moments=assembly_moments
+    )
     object_ = _build_initial_object(
         settings,
         registry,

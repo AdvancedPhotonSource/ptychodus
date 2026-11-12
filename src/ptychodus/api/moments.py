@@ -50,29 +50,36 @@ def compute_intensity_moments(
     flagged in *bad_pixels*, shape ``(height, width)``, carry no weight.
 
     Each moment is a sum about the array midpoint rather than about pixel zero, so a
-    centred distribution does not rely on cancellation between large terms.
+    centred distribution does not rely on cancellation between large terms, and each
+    second moment sums squared deviations from the centroid rather than subtracting its
+    square from a raw moment. The sums run over the row and column marginals, with one
+    batched matrix-vector product for the cross term, so no image-sized temporary is
+    formed beyond the float64 weights.
     """
     height, width = intensity.shape[-2:]
-    weights = intensity.astype(numpy.float64)
+    weights = numpy.asarray(intensity, dtype=numpy.float64)
 
     if bad_pixels is not None:
         weights = numpy.where(bad_pixels, 0.0, weights)
 
     x_px = numpy.arange(width, dtype=numpy.float64) - (width - 1) / 2
-    y_px = (numpy.arange(height, dtype=numpy.float64) - (height - 1) / 2).reshape(-1, 1)
+    y_px = numpy.arange(height, dtype=numpy.float64) - (height - 1) / 2
 
-    total = numpy.sum(weights, axis=(-2, -1))
+    row_sums = numpy.sum(weights, axis=-1)
+    column_sums = numpy.sum(weights, axis=-2)
+    total = numpy.sum(row_sums, axis=-1)
     positive = total > 0.0
     safe_total = numpy.where(positive, total, 1.0)
 
-    centroid_x_px = numpy.sum(weights * x_px, axis=(-2, -1)) / safe_total
-    centroid_y_px = numpy.sum(weights * y_px, axis=(-2, -1)) / safe_total
-    deviation_x_px = x_px - centroid_x_px[..., numpy.newaxis, numpy.newaxis]
-    deviation_y_px = y_px - centroid_y_px[..., numpy.newaxis, numpy.newaxis]
+    centroid_x_px = (column_sums @ x_px) / safe_total
+    centroid_y_px = (row_sums @ y_px) / safe_total
+    deviation_x_px = x_px - centroid_x_px[..., numpy.newaxis]
+    deviation_y_px = y_px - centroid_y_px[..., numpy.newaxis]
 
-    covariance_xx_px2 = numpy.sum(weights * numpy.square(deviation_x_px), axis=(-2, -1))
-    covariance_xy_px2 = numpy.sum(weights * deviation_x_px * deviation_y_px, axis=(-2, -1))
-    covariance_yy_px2 = numpy.sum(weights * numpy.square(deviation_y_px), axis=(-2, -1))
+    covariance_xx_px2 = numpy.sum(column_sums * numpy.square(deviation_x_px), axis=-1)
+    covariance_yy_px2 = numpy.sum(row_sums * numpy.square(deviation_y_px), axis=-1)
+    row_moments_x = numpy.matmul(weights, deviation_x_px[..., numpy.newaxis])[..., 0]
+    covariance_xy_px2 = numpy.sum(row_moments_x * deviation_y_px, axis=-1)
 
     return IntensityMoments(
         total=total,
