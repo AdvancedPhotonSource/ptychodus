@@ -56,7 +56,7 @@ Every probe builder reads the defocus from the product's focus, and the product 
 
 In near field a builder works in the equivalent parallel-beam frame described [below](#why-z-is-not-z_d), the one the reconstruction runs in. The cone beam's spherical wave is what the magnification accounts for, so it is not left on the probe as well:
 
-- `fresnel_zone_plate` and `kb_mirror` simulate the optic at the defocus, which sets the footprint, then divide out the spherical wave of the focus. The Fresnel transform returns point samples of the field, so the division is exact even where that curvature would alias on the probe grid. A KB pair's astigmatism stays in the probe.
+- `fresnel_zone_plate` and `kb_mirror` simulate the optic at the defocus, which sets the footprint, then divide out the spherical wave of the focus with {py:func}`ptychodus.api.simulate.probe.remove_defocus_phase`, centred on the beam axis, pixel `N // 2`, where the Fresnel transform puts the focus. A KB pair's astigmatism stays in the probe.
 - `disk`, `rectangular` and `super_gaussian` stay flat-phased.
 - `average_pattern` back-propagates the hologram over `z_d / M`, which already lands it in the equivalent object plane.
 
@@ -90,7 +90,7 @@ Far field only cares about `z_d`. The magnification cancels there — the equiva
 
 The propagator is selected from the geometry. Ptychodus exposes no switch, and a near-field geometry lands on the angular spectrum in every realistic case, which is exact at every Fresnel number and preserves pitch. That is *why* the object pixel equals the detector pixel in the parallel-beam case, rather than it being a separate convention.
 
-Two selections exist for two purposes, and conflating them is the easy mistake. Ptychodus chooses a propagator for probe simulation and the propagation-analysis panel; a reconstruction backend chooses its own, internally. The crossover is the same in both — exactly so since pty-chi 2.2.0, which brought its threshold into line with the one `choose_propagator` already applied — and the threshold is small enough that near field stays clear of it. [Reconstructing With pty-chi](#reconstructing-with-pty-chi) gives the measured numbers for that backend.
+Two selections exist for two purposes, and conflating them is the easy mistake. Ptychodus chooses a propagator for probe simulation and the propagation-analysis panel; a reconstruction backend chooses its own, internally. The crossover is the same in both, the threshold `choose_propagator` applies, and it is small enough that near field stays clear of it. [Reconstructing With pty-chi](#reconstructing-with-pty-chi) gives the measured numbers for that backend.
 
 ## Setting It Up In The GUI
 

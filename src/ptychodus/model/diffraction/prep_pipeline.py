@@ -137,6 +137,20 @@ class PrepPipelineBuilder:
                         f' block; discarding {dropped_x} column(s) and {dropped_y} row(s)'
                         ' at the far edge.'
                     )
+            if read_region is not None:
+                shifted = _center_on_binned_dc(read_region, bin_x, bin_y)
+
+                if detector_extent is not None:
+                    shifted = shifted.clamp_to_detector_extent(detector_extent)
+
+                read_region = shifted
+
+            if bin_x % 2 == 0 or bin_y % 2 == 0:
+                logger.info(
+                    f'Binning by ({bin_x}, {bin_y}): an even factor has no middle pixel, so the'
+                    ' beam lands half a raw pixel from the center of the binned DC pixel.'
+                )
+
             steps.append(BinningStep(bin_size_x=bin_x, bin_size_y=bin_y))
 
         # Padding / flips / transpose: no clamping needed.
@@ -153,3 +167,24 @@ class PrepPipelineBuilder:
             read_region=read_region,
             pipeline=DiffractionPrepPipeline(steps=tuple(steps)),
         )
+
+
+def _center_on_binned_dc(region: CropRegion, bin_x: int, bin_y: int) -> CropRegion:
+    """*region* moved so the beam it is centered on falls in the middle of the binned DC pixel.
+
+    The crop puts the beam on pixel ``N // 2`` of the region. Binned by ``b``, the DC pixel
+    ``Nb // 2`` of the ``Nb = N // b`` bins covers raw pixels from ``b * (Nb // 2)``, whose
+    middle is ``(b - 1) / 2`` further: a raw pixel for an odd factor, and between two for an
+    even one, where the beam takes the nearer pixel toward the origin.
+    """
+    x_shift = region.width_px // 2 - _binned_dc_center_px(region.width_px, bin_x)
+    y_shift = region.height_px // 2 - _binned_dc_center_px(region.height_px, bin_y)
+    return CropRegion(
+        x_range=(region.x_range[0] + x_shift, region.x_range[1] + x_shift),
+        y_range=(region.y_range[0] + y_shift, region.y_range[1] + y_shift),
+    )
+
+
+def _binned_dc_center_px(size_px: int, bin_size: int) -> int:
+    """The raw pixel at the middle of the binned DC pixel, toward the origin if between two."""
+    return bin_size * ((size_px // bin_size) // 2) + (bin_size - 1) // 2

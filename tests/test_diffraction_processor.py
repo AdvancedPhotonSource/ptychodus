@@ -250,18 +250,34 @@ def test_pipeline_transpose_swaps_spatial_axes() -> None:
     assert _pipeline(TransposeStep())(array).get_patterns().shape == (1, 5, 3)
 
 
-def test_pipeline_hflip_flips_last_axis() -> None:
+def test_pipeline_hflip_reflects_an_odd_last_axis_about_its_middle() -> None:
     patterns = numpy.arange(6, dtype=numpy.uint16).reshape(1, 2, 3)
     array = SimpleDiffractionArray('a', numpy.zeros(1, dtype=int), patterns)
     out = _pipeline(HorizontalFlipStep())(array).get_patterns()
     assert numpy.array_equal(out[0], numpy.flip(patterns[0], axis=-1))
 
 
-def test_pipeline_vflip_flips_second_to_last_axis() -> None:
-    patterns = numpy.arange(6, dtype=numpy.uint16).reshape(1, 2, 3)
+def test_pipeline_hflip_reflects_an_even_last_axis_about_its_dc_pixel() -> None:
+    """Pixel i goes to N - i: the DC pixel N // 2 and pixel 0 stay where they are."""
+    patterns = numpy.arange(4, dtype=numpy.uint16).reshape(1, 1, 4)
+    array = SimpleDiffractionArray('a', numpy.zeros(1, dtype=int), patterns)
+    out = _pipeline(HorizontalFlipStep())(array).get_patterns()
+    assert out[0].tolist() == [[0, 3, 2, 1]]
+
+
+def test_pipeline_vflip_reflects_the_second_to_last_axis_about_its_dc_pixel() -> None:
+    patterns = numpy.arange(12, dtype=numpy.uint16).reshape(1, 4, 3)
     array = SimpleDiffractionArray('a', numpy.zeros(1, dtype=int), patterns)
     out = _pipeline(VerticalFlipStep())(array).get_patterns()
-    assert numpy.array_equal(out[0], numpy.flip(patterns[0], axis=-2))
+    assert numpy.array_equal(out[0], patterns[0][[0, 3, 2, 1]])
+
+
+def test_a_flip_keeps_a_beam_on_the_dc_pixel() -> None:
+    patterns = numpy.zeros((1, 8, 9), dtype=numpy.uint16)
+    patterns[0, 4, 4] = 7
+    array = SimpleDiffractionArray('a', numpy.zeros(1, dtype=int), patterns)
+    out = _pipeline(HorizontalFlipStep(), VerticalFlipStep())(array).get_patterns()
+    assert numpy.array_equal(out[0], patterns[0])
 
 
 # ---------- Pipeline.apply_to_mask (B2) ----------
@@ -743,11 +759,45 @@ def test_pixel_map_follows_flips_and_transposes() -> None:
     pixel_map = numpy.arange(6, dtype=float).reshape(2, 3)
     pipeline = _pipeline(HorizontalFlipStep(), VerticalFlipStep(), TransposeStep())
 
+    # The odd last axis reflects about its middle; the even first one about its DC
+    # row, which on two rows leaves both where they are.
     numpy.testing.assert_array_equal(
-        pipeline.apply_to_pixel_map(pixel_map), numpy.flip(pixel_map).T
+        pipeline.apply_to_pixel_map(pixel_map), numpy.flip(pixel_map, axis=-1).T
     )
 
 
 def test_pixel_map_must_be_2d() -> None:
     with pytest.raises(ValueError, match='pixel map'):
         _pipeline().apply_to_pixel_map(numpy.zeros((1, 2, 2)))
+
+
+@pytest.mark.parametrize(
+    ('crop_px', 'bin_size', 'expected_beam_px'),
+    [
+        (12, 3, 7),  # binned DC pixel 2 covers raw 6..8, centered on 7
+        (9, 3, 4),  # binned DC pixel 1 covers raw 3..5, centered on 4: no shift
+        (16, 1, 8),  # no binning: the beam stays on the crop's DC pixel
+        (16, 2, 8),  # binned DC pixel 4 covers raw 8..9; the beam takes the nearer, 8
+    ],
+)
+def test_the_crop_puts_the_beam_on_the_binned_dc_pixel(
+    settings: tuple[DiffractionSettings, DetectorSettings],
+    crop_px: int,
+    bin_size: int,
+    expected_beam_px: int,
+) -> None:
+    diff, _ = settings
+    diff.crop_enabled.set_value(True)
+    diff.crop_width_px.set_value(crop_px)
+    diff.crop_height_px.set_value(crop_px)
+    diff.beam_center_x_px.set_value(40)
+    diff.beam_center_y_px.set_value(40)
+    diff.binning_enabled.set_value(True)
+    diff.bin_size_x.set_value(bin_size)
+    diff.bin_size_y.set_value(bin_size)
+
+    plan = PrepPipelineBuilder(diff).get_plan(ImageExtent(width_px=96, height_px=96))
+
+    assert plan.read_region is not None
+    assert 40 - plan.read_region.x_range[0] == expected_beam_px
+    assert 40 - plan.read_region.y_range[0] == expected_beam_px

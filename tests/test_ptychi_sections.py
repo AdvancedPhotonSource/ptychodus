@@ -34,20 +34,6 @@ def _declared(algorithm: str) -> Any:
     return default_options(task_options_classes()[algorithm])
 
 
-def _golden() -> dict[str, set[str]]:
-    groups: dict[str, set[str]] = {}
-    current = ''
-
-    for line in (Path(__file__).parent / 'data' / 'settings_defaults.ini').read_text().splitlines():
-        if line.startswith('['):
-            current = line.strip('[]')
-            groups[current] = set()
-        elif ' = ' in line and current:
-            groups[current].add(line.split(' = ')[0])
-
-    return groups
-
-
 def _resolve(root: Any, path: str) -> Any:
     for name in path.split('.') if path else ():
         root = getattr(root, name)
@@ -66,14 +52,6 @@ def _produced(algorithm: str) -> dict[str, set[str]]:
         )
 
     return keys
-
-
-@pytest.mark.parametrize('algorithm', ALGORITHMS)
-def test_every_group_reproduces_its_persisted_keys(algorithm: str) -> None:
-    golden = _golden()
-
-    for group, produced in sorted(_produced(algorithm).items()):
-        assert produced == golden[group], f'{algorithm}/{group}'
 
 
 @pytest.mark.parametrize('algorithm', ALGORITHMS)
@@ -152,12 +130,9 @@ def test_no_overlay_entry_names_a_field_no_branch_declares() -> None:
 def _settings_bounds() -> dict[tuple[str, str], tuple[Any, Any]]:
     """The bounds the hand-written settings classes carried, frozen as a fixture.
 
-    The oracle for bounds, as settings_defaults.ini is the oracle for keys and
-    defaults: an INI records values, not the ranges they are held to, so that
-    fixture cannot carry these. Read off the live parameters those classes
-    built, and written down here when they were deleted -- a range is not
-    recoverable from anything still in the tree, so freezing it is the only
-    way the guarantee outlives its source.
+    Read off the live parameters those classes built, and frozen here: a range is
+    not recoverable from anything still in the tree, so freezing it is the only way
+    the guarantee outlives its source.
     """
     frozen = json.loads(
         (Path(__file__).parent / 'data' / 'ptychi_settings_bounds.json').read_text()

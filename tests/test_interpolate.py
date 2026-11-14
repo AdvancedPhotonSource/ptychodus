@@ -29,8 +29,8 @@ def test_barycentric_get_patch_matches_analytic_bilinear_on_plane() -> None:
     # The patch samples correspond to integer pixel positions relative to the
     # top-left of the (whole) support slice. Reconstruct the expected values
     # analytically by knowing where each pixel lands in world coordinates.
-    x_lower = 6.3 - 1.5  # center_x - (width - 1) / 2
-    y_lower = 5.7 - 1.5
+    x_lower = 6.3 - 2  # center_x - width // 2: the window's axis pixel lands on the center
+    y_lower = 5.7 - 2
     # The gather is over an (n+1)x(n+1) support and produces an nxn patch
     # whose samples are at whole indices x_lower_wh + xmin_fr + i for i in 0..n-1.
     # For a plane, sampling at fractional (x_lower + i, y_lower + j) is exact.
@@ -100,7 +100,7 @@ def test_get_patch_raises_when_the_window_runs_off_the_high_edge() -> None:
     interp = BarycentricArrayInterpolator(numpy.zeros((20, 20)))
 
     with pytest.raises(ValueError, match='window centered at'):
-        interp.get_patch(center_x=17.0, center_y=10.0, width=6, height=6)
+        interp.get_patch(center_x=17.5, center_y=10.0, width=6, height=6)
 
 
 def test_get_patch_does_not_wrap_a_negative_lower_bound() -> None:
@@ -119,13 +119,13 @@ def test_zero_offset_at_the_high_edge_returns_a_full_size_patch() -> None:
     array = numpy.arange(20 * 20, dtype=float).reshape(20, 20)
     interp = BarycentricArrayInterpolator(array)
 
-    patch = interp.get_patch(center_x=16.5, center_y=16.5, width=6, height=6)
+    patch = interp.get_patch(center_x=17.0, center_y=17.0, width=6, height=6)
 
     assert patch.shape == (6, 6)
     numpy.testing.assert_array_equal(patch, array[14:20, 14:20])
 
 
-@pytest.mark.parametrize('center', [2.5 - 1.0e-15, 2.5 + 1.0e-15])
+@pytest.mark.parametrize('center', [3.0 - 1.0e-15, 3.0 + 1.0e-15])
 def test_near_integer_offset_is_snapped_at_the_low_edge(center: float) -> None:
     """An exactly-integer coordinate reaches the interpolator a few ULP away from
     one. Flush against an edge, keeping that residue would demand a sample outside
@@ -142,7 +142,7 @@ def test_near_integer_offset_is_snapped_at_the_high_edge() -> None:
     array = numpy.arange(20 * 20, dtype=float).reshape(20, 20)
     interp = BarycentricArrayInterpolator(array)
 
-    patch = interp.get_patch(center_x=16.5 + 1.0e-15, center_y=16.5, width=6, height=6)
+    patch = interp.get_patch(center_x=17.0 + 1.0e-15, center_y=17.0, width=6, height=6)
 
     numpy.testing.assert_allclose(patch, array[14:20, 14:20], atol=1e-9)
 
@@ -154,7 +154,7 @@ def test_add_patch_is_transpose_of_get_patch_at_a_zero_offset() -> None:
     b = rng.standard_normal((5, 6))
 
     # width 6 and height 5 put both offsets at zero for these centers.
-    center_x, center_y = 9.5, 8.0
+    center_x, center_y = 9.0, 8.0
 
     forward = BarycentricArrayInterpolator(a)
     lhs = float(numpy.sum(forward.get_patch(center_x, center_y, b.shape[-1], b.shape[-2]) * b))

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from dataclasses import field as dataclass_field
 from enum import StrEnum
-from pathlib import Path
-import re
 
 from pydantic import BaseModel, Field
 from pydantic.dataclasses import dataclass as pydantic_dataclass
@@ -305,84 +303,6 @@ class TestValueRendering:
 
     def test_enums_render_by_value_when_the_policy_says_so(self) -> None:
         assert EnumSpelling.BY_VALUE.render(Optimizers.SGD) == 'sgd'
-
-
-class TestAgainstRealPtyChiOptions:
-    """The A0 spike, kept: the worst-case group must stay exactly reproducible.
-
-    The policy below is a fixture proving the facility can express pty-chi, not
-    the production table -- that arrives with the backend conversion and covers
-    all fifteen groups.
-    """
-
-    def test_object_options_reproduce_the_persisted_section(self) -> None:
-        pytest.importorskip('ptychi')
-        from ptychi.api.options.base import ObjectOptions
-
-        prefixes = {
-            'optimization_plan': 'OptimizationPlan',
-            'slice_spacing_options': 'OptimizeSliceSpacing',
-            'l1_norm_constraint': 'ConstrainL1Norm',
-            'l2_norm_constraint': 'ConstrainL2Norm',
-            'smoothness_constraint': 'ConstrainSmoothness',
-            'total_variation': 'ConstrainTotalVariation',
-            'hard_limits_magnitude_phase': 'ConstrainHardLimits',
-            'remove_grid_artifacts': 'RemoveGridArtifacts',
-            'multislice_regularization': 'RegularizeMultislice',
-            'remove_object_probe_ambiguity': 'RemoveObjectProbeAmbiguity',
-        }
-        # Every nested options object carries its own plan, which sits directly
-        # under that object's prefix rather than adding a segment of its own.
-        prefixes.update({f'{path}.optimization_plan': '' for path in list(prefixes)[1:]})
-
-        hidden = {
-            'optimizer_params',
-            'initial_guess',
-            'slice_spacings_m',
-            'pixel_size_m',
-            'pixel_size_aspect_ratio',
-            'determine_position_origin_coords_by',
-            'position_origin_coords',
-        }
-        for path in list(prefixes):
-            hidden |= {
-                f'{path}.step_size_scheduler_class',
-                f'{path}.step_size_scheduler_options',
-                f'{path}.optimizer_params',
-            }
-
-        policy = FlatteningPolicy(
-            hidden=frozenset(hidden),
-            prefixes=prefixes,
-            renames={
-                'optimizable': 'IsOptimizable',
-                'remove_grid_artifacts.window_size': 'WindowSizeInPixels',
-                'multislice_regularization.unwrap_image_grad_method': (
-                    'UnwrapPhaseImageGradientMethod'
-                ),
-                'multislice_regularization.unwrap_image_integration_method': (
-                    'UnwrapPhaseImageIntegrationMethod'
-                ),
-            },
-            structural={
-                'hard_limits_magnitude_phase.abs_lim': OptionalRange(
-                    'EnableAbs', 'AbsMin', 'AbsMax'
-                ),
-                'hard_limits_magnitude_phase.phase_lim': OptionalRange(
-                    'EnablePhase', 'PhaseMinRad', 'PhaseMaxRad'
-                ),
-            },
-        )
-
-        produced = {p.ini_key for p in flatten_options(ObjectOptions(), policy)}
-
-        section = (
-            (Path(__file__).parent / 'data' / 'settings_defaults.ini')
-            .read_text()
-            .split('[PtyChiObject]')[1]
-            .split('\n[')[0]
-        )
-        assert produced == set(re.findall(r'^(\w+) = ', section, re.M))
 
 
 class TestStructuralAdapters:

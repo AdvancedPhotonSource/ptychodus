@@ -209,7 +209,7 @@ def estimate_defocus_from_parallax(
        until it pulls every shift toward zero.
     4. The shifts are fitted by least squares to ``s_b = a - lambda * z * q_b``. The
        offset ``a``, shared by every bin, absorbs both a common shift and wherever the
-       beam centre lies, so ``q_b`` is measured from the frame midpoint.
+       beam centre lies, so ``q_b`` is measured from the DC pixel ``N // 2``.
     5. The depth of focus is :func:`estimate_probe_extent`'s, from the mean pattern.
 
     A featureless sample gives shifts that are noise about zero, and a probe within the
@@ -272,7 +272,8 @@ class DetectorOrientation:
 
     They are applied as the prep pipeline applies its steps: the horizontal flip, then
     the vertical flip, then the transpose. `matrix` is what they do to a detector
-    coordinate ``(x, y)`` measured from the frame midpoint, x along columns.
+    coordinate ``(x, y)`` measured from the DC pixel ``N // 2``, about which the flips
+    reflect, x along columns.
     """
 
     hflip: bool = False
@@ -551,7 +552,7 @@ def _measure_bin_shifts(
     """Each bright-field bin's spatial frequency and image shift, ``(x, y)`` per row.
 
     Steps 1 to 3 of :func:`estimate_defocus_from_parallax`; ``q`` is measured from the
-    frame midpoint. None when too few bins or positions remain.
+    DC pixel ``N // 2``. None when too few bins or positions remain.
     """
     if max_bins < minimum_bins:
         raise ValueError(f'max_bins ({max_bins}) is below minimum_bins ({minimum_bins})!')
@@ -604,8 +605,9 @@ def _measure_bin_shifts(
     shifts_yx_px = _register_images(images, upsample_factor)
 
     rows, columns = numpy.nonzero(bright_field)
-    bin_center_y_px = (rows + 0.5) * binning.bin_size_y - 0.5 - (probe_geometry.height_px - 1) / 2
-    bin_center_x_px = (columns + 0.5) * binning.bin_size_x - 0.5 - (probe_geometry.width_px - 1) / 2
+    # Measured from the DC pixel N // 2; the fitted offset absorbs any constant origin.
+    bin_center_y_px = (rows + 0.5) * binning.bin_size_y - 0.5 - probe_geometry.height_px // 2
+    bin_center_x_px = (columns + 0.5) * binning.bin_size_x - 0.5 - probe_geometry.width_px // 2
     dq_y_per_m = 1.0 / (probe_geometry.height_px * probe_geometry.pixel_height_m)
     dq_x_per_m = 1.0 / (probe_geometry.width_px * probe_geometry.pixel_width_m)
     q_per_m = numpy.column_stack((bin_center_x_px * dq_x_per_m, bin_center_y_px * dq_y_per_m))

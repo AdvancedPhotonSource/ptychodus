@@ -161,13 +161,15 @@ class TestVerifyProduct:
         with pytest.raises(ValueError, match='Resample'):
             verify_product(replace(product, probes=probes))
 
+    # The even probe's axis, pixel N // 2, lies half a pixel past its midpoint, so a
+    # flush window's position is half a pixel further along than its midpoint would be.
     @pytest.mark.parametrize(
         ('dx_px', 'dy_px'),
         [
             pytest.param(-(OBJECT_WIDTH_PX - PROBE_WIDTH_PX) / 2 - 0.4, 0.0, id='left'),
-            pytest.param((OBJECT_WIDTH_PX - PROBE_WIDTH_PX) / 2 + 1.0, 0.0, id='right'),
+            pytest.param((OBJECT_WIDTH_PX - PROBE_WIDTH_PX) / 2 + 1.5, 0.0, id='right'),
             pytest.param(0.0, -(OBJECT_HEIGHT_PX - PROBE_HEIGHT_PX) / 2 - 0.4, id='top'),
-            pytest.param(0.0, (OBJECT_HEIGHT_PX - PROBE_HEIGHT_PX) / 2 + 1.0, id='bottom'),
+            pytest.param(0.0, (OBJECT_HEIGHT_PX - PROBE_HEIGHT_PX) / 2 + 1.5, id='bottom'),
         ],
     )
     def test_a_window_off_the_canvas_is_refused_naming_its_scan_index(
@@ -191,9 +193,10 @@ class TestVerifyProduct:
         sub-pixel remainder is a shift of the probe within it."""
         product = make_product()
         center = product.object_.get_center()
+        # Right edge with a sub-pixel remainder, top edge exactly flush.
         edge = ProbePosition(
             index=5,
-            x_m=center.x_m + ((OBJECT_WIDTH_PX - PROBE_WIDTH_PX) / 2 + 0.6) * PIXEL_WIDTH_M,
-            y_m=center.y_m - (OBJECT_HEIGHT_PX - PROBE_HEIGHT_PX) / 2 * PIXEL_HEIGHT_M,
+            x_m=center.x_m + ((OBJECT_WIDTH_PX - PROBE_WIDTH_PX) / 2 + 1.1) * PIXEL_WIDTH_M,
+            y_m=center.y_m - ((OBJECT_HEIGHT_PX - PROBE_HEIGHT_PX) / 2 - 0.5) * PIXEL_HEIGHT_M,
         )
         verify_product(replace(product, probe_positions=ProbePositionSequence([edge])))

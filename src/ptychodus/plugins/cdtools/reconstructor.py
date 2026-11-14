@@ -107,14 +107,14 @@ def _object_transmission(
 
 
 def _probe_support(height_px: int, width_px: int, radius_px: float) -> Any:
-    """A centered disk of *radius_px*, or None for no support at all."""
+    """A disk of *radius_px* about the beam axis, pixel ``N // 2``, or None for no support."""
     import torch
 
     if radius_px <= 0.0:
         return None
 
     yy, xx = numpy.mgrid[:height_px, :width_px]
-    rr = numpy.hypot(yy - (height_px - 1) / 2, xx - (width_px - 1) / 2)
+    rr = numpy.hypot(yy - height_px // 2, xx - width_px // 2)
     return torch.as_tensor(rr < radius_px)
 
 
@@ -153,11 +153,20 @@ def _build_model(
     if refinement.use_flat_field and input_.flat_field is not None:
         qe_mask = torch.as_tensor(input_.flat_field, dtype=torch.float32)
 
+    probe_guess = torch.as_tensor(probe_array, dtype=torch.complex64)
+
+    # FancyPtycho holds a Fourier-space probe in this mode but takes the guess as given;
+    # only its own from_dataset converts one.
+    if options.model.fourier_probe:
+        from cdtools.tools.propagators import far_field
+
+        probe_guess = far_field(probe_guess)
+
     model = FancyPtycho(
         wavelength=frame.wavelength_m,
         detector_geometry=frame.get_detector_geometry(),
         obj_basis=frame.obj_basis,
-        probe_guess=torch.as_tensor(probe_array, dtype=torch.complex64),
+        probe_guess=probe_guess,
         obj_guess=torch.as_tensor(
             _object_guess(product.object_.get_layers_flattened(), options),
             dtype=torch.complex64,
@@ -254,7 +263,14 @@ def _read_product(
 ) -> Product:
     """The model's current state, carried back into ptychodus's conventions."""
     product_in = input_.product
-    probe_array = (model.probe.detach() * model.probe_norm).cpu().numpy() / gauge.to_cdtools
+    probe = model.probe.detach()
+
+    if bool(model.fourier_probe):
+        from cdtools.tools.propagators import inverse_far_field
+
+        probe = inverse_far_field(probe)
+
+    probe_array = (probe * model.probe_norm).cpu().numpy() / gauge.to_cdtools
     object_array = _object_transmission(model.obj.detach().cpu().numpy(), options)
     object_in = product_in.object_
     positions = product_in.probe_positions

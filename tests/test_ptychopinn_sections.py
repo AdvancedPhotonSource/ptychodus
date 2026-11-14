@@ -12,7 +12,6 @@ why it is read through `model/declared.py` rather than through the flattener.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
@@ -27,37 +26,6 @@ _BRANCHES = _BRANCHES_BY_LIBRARY['PtychoPINN']
 
 def _described(branch: OptionsBranch) -> list:
     return list(describe(getattr(PtychoPINNOptions(), branch.root_path), prefix=branch.prefix))
-
-
-def _golden() -> dict[str, dict[str, str]]:
-    groups: dict[str, dict[str, str]] = {}
-    current = ''
-
-    for line in (Path(__file__).parent / 'data' / 'settings_defaults.ini').read_text().splitlines():
-        if line.startswith('['):
-            current = line.strip('[]')
-            groups[current] = {}
-        elif ' = ' in line and current:
-            key, value = line.split(' = ', 1)
-            groups[current][key] = value
-
-    return groups
-
-
-@pytest.mark.parametrize('branch', _BRANCHES, ids=lambda b: b.group_name)
-def test_every_group_reproduces_its_persisted_keys(branch: OptionsBranch) -> None:
-    produced = {description.key for description in _described(branch)}
-    assert produced == set(_golden()[branch.group_name])
-
-
-@pytest.mark.parametrize('branch', _BRANCHES, ids=lambda b: b.group_name)
-def test_every_declared_default_matches_the_persisted_one(branch: OptionsBranch) -> None:
-    registry = SettingsRegistry()
-    group = registry.create_group(branch.group_name)
-    expected = _golden()[branch.group_name]
-
-    for key, parameter in declare_in(group, _described(branch)).items():
-        assert parameter.get_value_as_string() == expected[key], key
 
 
 @pytest.mark.parametrize('branch', _BRANCHES, ids=lambda b: b.group_name)

@@ -347,8 +347,8 @@ def estimate_probe_size(
     pixel_width_m = pixel_geometry.width_m
     pixel_height_m = pixel_geometry.height_m
     y_idx, x_idx = numpy.mgrid[:height_px, :width_px]  # noqa: N806
-    dx = (x_idx - (width_px - 1) / 2.0 - moments.centroid_x_px) * pixel_width_m
-    dy = (y_idx - (height_px - 1) / 2.0 - moments.centroid_y_px) * pixel_height_m
+    dx = (x_idx - width_px // 2 - moments.centroid_x_px) * pixel_width_m
+    dy = (y_idx - height_px // 2 - moments.centroid_y_px) * pixel_height_m
 
     mxx = moments.covariance_xx_px2 * pixel_width_m**2
     myy = moments.covariance_yy_px2 * pixel_height_m**2
@@ -869,6 +869,25 @@ class ProbeTransverseCoordinates:
         return numpy.arctan2(self.y_m, self.x_m)
 
 
+def _axis_offset_px(size_px: int) -> float:
+    """How far pixel ``size_px // 2`` lies past the midpoint ``(size_px - 1) / 2``."""
+    return size_px // 2 - (size_px - 1) / 2
+
+
+def _split_patch_corner(lower: float, snap_tolerance_px: float) -> tuple[int, float]:
+    """The floored corner and its residual in ``[0, 1)``, snapped near a whole pixel."""
+    whole = math.floor(lower)
+    frac = lower - whole
+
+    if frac > 1.0 - snap_tolerance_px:
+        return whole + 1, 0.0
+
+    if frac < snap_tolerance_px:
+        return whole, 0.0
+
+    return whole, frac
+
+
 @dataclass(frozen=True)
 class PatchBounds:
     """Indexing bounds and sub-pixel offset for a probe-sized patch anchored at a float object-pixel center.
@@ -950,36 +969,50 @@ class ProbeGeometry:
             height_m=self.pixel_height_m,
         )
 
+    @property
+    def axis_offset_x_px(self) -> float:
+        """How far the beam axis, pixel ``width_px // 2``, lies from the array midpoint.
+
+        0.5 on an even axis and 0 on an odd one, where the two coincide. The axis sits on
+        the FFT bin convention's origin, the same index as a detector's DC pixel, so a
+        flat-phase pupil transforms to a probe centered on it with no phase ramp.
+        """
+        return _axis_offset_px(self.width_px)
+
+    @property
+    def axis_offset_y_px(self) -> float:
+        """See :attr:`axis_offset_x_px`; along the rows."""
+        return _axis_offset_px(self.height_px)
+
     def get_transverse_coordinates(self) -> ProbeTransverseCoordinates:
+        """Coordinates of every pixel, measured from the beam axis at pixel ``N // 2``."""
         Y, X = numpy.mgrid[: self.height_px, : self.width_px]  # noqa: N806
-        x_px = X - (self.width_px - 1) / 2
-        y_px = Y - (self.height_px - 1) / 2
+        x_px = X - self.width_px // 2
+        y_px = Y - self.height_px // 2
         return ProbeTransverseCoordinates(
             x_m=x_px * self.pixel_width_m, y_m=y_px * self.pixel_height_m
         )
 
-    def resolve_patch_bounds(self, cx: float, cy: float) -> PatchBounds:
-        """Locate a ``height_px x width_px`` patch anchored at object-pixel center ``(cx, cy)``.
+    def resolve_patch_bounds(
+        self, cx: float, cy: float, *, snap_tolerance_px: float = 1.0e-9
+    ) -> PatchBounds:
+        """Locate a ``height_px x width_px`` patch whose beam axis falls at ``(cx, cy)``.
 
-        Under the (N-1)/2 centered-pixel convention shared with
-        ``get_transverse_coordinates``, returns the numpy slices for the
-        integer lower-left corner and the residual sub-pixel offset that a
-        Fourier shift must apply.
-
-        The integer split uses Python ``int()`` (truncate toward zero), which
-        equals ``math.floor`` when ``cx - (width_px - 1) / 2`` and
-        ``cy - (height_px - 1) / 2`` are non-negative — the standard case for
-        object-canvas coordinates. Behavior differs for negative arguments.
+        The probe's axis, pixel ``N // 2`` of each axis as in
+        ``get_transverse_coordinates``, is placed on the object-pixel center. Returns the
+        numpy slices for the floored lower-left corner and the residual sub-pixel offset
+        in ``[0, 1)`` that a Fourier shift must apply. A residual within
+        *snap_tolerance_px* of a whole pixel is taken as that pixel, so round-off in the
+        coordinate does not turn an aligned placement into a near-full-pixel Fourier
+        shift that wraps an edge of the probe.
         """
-        rx_px = (self.width_px - 1) / 2
-        ry_px = (self.height_px - 1) / 2
-        x_lower = int(cx - rx_px)
-        y_lower = int(cy - ry_px)
+        x_lower, dx = _split_patch_corner(cx - self.width_px // 2, snap_tolerance_px)
+        y_lower, dy = _split_patch_corner(cy - self.height_px // 2, snap_tolerance_px)
         return PatchBounds(
             x_slice=slice(x_lower, x_lower + self.width_px),
             y_slice=slice(y_lower, y_lower + self.height_px),
-            dx=cx - (x_lower + rx_px),
-            dy=cy - (y_lower + ry_px),
+            dx=dx,
+            dy=dy,
         )
 
     def __str__(self) -> str:
@@ -1388,6 +1421,16 @@ class ProbeEnsemble:
         return self._array.shape[3]
 
     @property
+    def axis_offset_x_px(self) -> float:
+        """See :attr:`ProbeGeometry.axis_offset_x_px`; needs no pixel geometry."""
+        return _axis_offset_px(self.width_px)
+
+    @property
+    def axis_offset_y_px(self) -> float:
+        """See :attr:`ProbeGeometry.axis_offset_y_px`; needs no pixel geometry."""
+        return _axis_offset_px(self.height_px)
+
+    @property
     def num_opr_positions(self) -> int | None:
         """Probe positions the OPR weights describe.
 
@@ -1750,13 +1793,13 @@ def compute_opr_mode_series(
 def _centered_grid_indexes(
     source_pixel_m: float, source_px: int, target_pixel_m: float, target_px: int
 ) -> RealArrayType:
-    """Fractional source indexes sampled by each target pixel of a co-centered grid.
+    """Fractional source indexes sampled by each target pixel of a grid sharing its axis.
 
-    Centered-pixel convention: the center of a grid sits at index ``(N - 1) / 2``, so the
-    two grids share a center and differ only in pitch and extent.
+    A probe grid's beam axis sits at index ``N // 2``, so the two grids share an axis and
+    differ only in pitch and extent.
     """
-    offsets_px = numpy.arange(target_px) - (target_px - 1) / 2
-    return offsets_px * (target_pixel_m / source_pixel_m) + (source_px - 1) / 2
+    offsets_px = numpy.arange(target_px) - target_px // 2
+    return offsets_px * (target_pixel_m / source_pixel_m) + source_px // 2
 
 
 def resample_probe_ensemble(

@@ -1324,6 +1324,11 @@ def compute_object_geometry(
 ) -> ObjectGeometry:
     """Size an object canvas covering the scan bounding box plus a probe-extent border on each side, with optional additional padding in pixels.
 
+    The canvas is centered on the scan. A probe's beam axis sits at pixel ``N // 2``
+    (:meth:`ProbeGeometry.get_transverse_coordinates`), so on an even axis the probe
+    reaches half a pixel further before its axis than after it; each such axis gets one
+    more pixel, twice that offset, so the patch at either edge of the scan fits.
+
     Raises :class:`ValueError` when ``positions`` is empty. Pass a re-iterable
     sequence: :func:`calculate_scan_geometry` iterates twice.
     """
@@ -1334,9 +1339,11 @@ def compute_object_geometry(
 
     core_width_px = math.ceil(
         (scan.width_m + probe_geometry.width_m) / probe_geometry.pixel_width_m
+        + 2 * probe_geometry.axis_offset_x_px
     )
     core_height_px = math.ceil(
         (scan.height_m + probe_geometry.height_m) / probe_geometry.pixel_height_m
+        + 2 * probe_geometry.axis_offset_y_px
     )
 
     return ObjectGeometry(

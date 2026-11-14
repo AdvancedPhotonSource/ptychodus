@@ -532,10 +532,11 @@ class TestComputeObjectGeometry:
 
         geometry = compute_object_geometry(positions, probe)
 
-        # A single scan point has zero bounding-box extent, so the object is exactly
-        # the probe canvas centered on that point (rounded up by math.ceil).
-        assert geometry.width_px == 32
-        assert geometry.height_px == 32
+        # A single scan point has zero bounding-box extent, so the object is the probe
+        # canvas centered on that point, plus one pixel per even axis: the probe's axis,
+        # pixel N // 2, leaves it half a pixel longer before the axis than after.
+        assert geometry.width_px == 33
+        assert geometry.height_px == 33
         numpy.testing.assert_allclose(geometry.center_x_m, 5.0e-7)
         numpy.testing.assert_allclose(geometry.center_y_m, -3.0e-7)
         numpy.testing.assert_allclose(geometry.pixel_width_m, 1.0e-8)
@@ -551,12 +552,19 @@ class TestComputeObjectGeometry:
 
         geometry = compute_object_geometry(positions, probe)
 
-        # width_m = scan_span + probe_width = 2e-7 + 32 * 1e-8 = 5.2e-7 -> 52 px
-        # height_m = scan_span + probe_height = 1e-7 + 32 * 1e-8 = 4.2e-7 -> 42 px
-        assert geometry.width_px == 52
-        assert geometry.height_px == 42
+        # width_m = scan_span + probe_width = 2e-7 + 32 * 1e-8 = 5.2e-7 -> 52 px, + 1
+        # height_m = scan_span + probe_height = 1e-7 + 32 * 1e-8 = 4.2e-7 -> 42 px, + 1
+        assert geometry.width_px == 53
+        assert geometry.height_px == 43
         numpy.testing.assert_allclose(geometry.center_x_m, 1.0e-7)
         numpy.testing.assert_allclose(geometry.center_y_m, 5.0e-8)
+
+    def test_an_odd_probe_needs_no_extra_pixel(self) -> None:
+        probe = _make_probe_geometry(width_px=31, pixel_m=1.0e-8)
+
+        geometry = compute_object_geometry(_make_positions((0.0, 0.0)), probe)
+
+        assert geometry.width_px == 31
 
     def test_padding_widens_the_canvas_on_both_sides(self) -> None:
         probe = _make_probe_geometry(width_px=32, pixel_m=1.0e-8)

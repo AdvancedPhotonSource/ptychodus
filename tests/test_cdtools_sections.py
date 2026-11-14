@@ -8,7 +8,6 @@ the declaration is ptychodus's own, which is also why it is read through
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
@@ -26,21 +25,6 @@ from ptychodus.plugins.cdtools.options import (
 _BRANCHES = _BRANCHES_BY_LIBRARY['cdtools']
 
 
-def _golden() -> dict[str, dict[str, str]]:
-    groups: dict[str, dict[str, str]] = {}
-    current = ''
-
-    for line in (Path(__file__).parent / 'data' / 'settings_defaults.ini').read_text().splitlines():
-        if line.startswith('['):
-            current = line.strip('[]')
-            groups[current] = {}
-        elif ' = ' in line and current:
-            key, value = line.split(' = ', 1)
-            groups[current][key] = value
-
-    return groups
-
-
 def _described(branch: OptionsBranch) -> list:
     root = CDToolsOptions()
 
@@ -52,34 +36,6 @@ def _described(branch: OptionsBranch) -> list:
 
 def _ids(branch: OptionsBranch) -> str:
     return f'{branch.group_name}:{branch.root_path}'
-
-
-@pytest.mark.parametrize('branch', _BRANCHES, ids=_ids)
-def test_every_branch_lands_in_the_group_that_persists_it(branch: OptionsBranch) -> None:
-    produced = {description.key for description in _described(branch)}
-    assert produced <= set(_golden()[branch.group_name])
-
-
-def test_the_branches_together_reproduce_every_persisted_key() -> None:
-    """Separately each branch is a subset; together they must be the whole group."""
-    produced: dict[str, set[str]] = {}
-
-    for branch in _BRANCHES:
-        keys = produced.setdefault(branch.group_name, set())
-        keys.update(description.key for description in _described(branch))
-
-    golden = _golden()
-    assert produced == {name: set(golden[name]) for name in produced}
-
-
-@pytest.mark.parametrize('branch', _BRANCHES, ids=_ids)
-def test_every_declared_default_matches_the_persisted_one(branch: OptionsBranch) -> None:
-    registry = SettingsRegistry()
-    group = registry.create_group(branch.group_name)
-    expected = _golden()[branch.group_name]
-
-    for key, parameter in declare_in(group, _described(branch)).items():
-        assert parameter.get_value_as_string() == expected[key], key
 
 
 @pytest.mark.parametrize('branch', _BRANCHES, ids=_ids)

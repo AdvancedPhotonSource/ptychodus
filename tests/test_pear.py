@@ -125,13 +125,15 @@ class TestPEARProductFileReader:
 
         product = reader.read(path)
 
-        assert product.probe_positions[0].y_m == pytest.approx(2.0 * OBJECT_PIXEL_SIZE_M)
-        assert product.probe_positions[0].x_m == pytest.approx(7.0 * OBJECT_PIXEL_SIZE_M)
+        # Each also carries the half pixel the even probe's axis lies past its midpoint.
+        assert product.probe_positions[0].y_m == pytest.approx(2.5 * OBJECT_PIXEL_SIZE_M)
+        assert product.probe_positions[0].x_m == pytest.approx(7.5 * OBJECT_PIXEL_SIZE_M)
 
     def test_an_even_axis_needs_no_origin_shift(
         self, reader: PEARProductFileReader, tmp_path: Path
     ) -> None:
-        # round(N / 2) and N / 2 agree, so pty-chi's origin is ptychodus's.
+        # ceil(N / 2) and N / 2 agree, so pty-chi's origin is ptychodus's; what remains
+        # is the half pixel from the even probe's midpoint to its axis.
         positions = numpy.array([[0.0, 0.0]], dtype=numpy.float32)
         path = _write(
             tmp_path / 'recon_Niter100.h5',
@@ -142,26 +144,29 @@ class TestPEARProductFileReader:
 
         product = reader.read(path)
 
-        assert product.probe_positions[0].x_m == pytest.approx(0.0)
-        assert product.probe_positions[0].y_m == pytest.approx(0.0)
+        assert product.probe_positions[0].x_m == pytest.approx(0.5 * OBJECT_PIXEL_SIZE_M)
+        assert product.probe_positions[0].y_m == pytest.approx(0.5 * OBJECT_PIXEL_SIZE_M)
 
+    @pytest.mark.parametrize('object_width', [101, 103])
     def test_an_odd_axis_shifts_by_half_a_pixel(
-        self, reader: PEARProductFileReader, tmp_path: Path
+        self, reader: PEARProductFileReader, tmp_path: Path, object_width: int
     ) -> None:
-        # pty-chi puts the origin at round(N / 2) - 0.5 and ptychodus at (N - 1) / 2,
-        # which part company by half a pixel once the dimension is odd.
+        # pty-chi puts the origin at ceil(N / 2) - 0.5 and ptychodus at (N - 1) / 2,
+        # which part company by half a pixel once the dimension is odd -- in the same
+        # direction whether N / 2 rounds up or down to even, as it would for 101.
         positions = numpy.array([[0.0, 0.0]], dtype=numpy.float32)
         path = _write(
             tmp_path / 'recon_Niter100.h5',
             object_height=32,
-            object_width=103,
+            object_width=object_width,
             positions_px=positions,
         )
 
         product = reader.read(path)
 
-        assert product.probe_positions[0].x_m == pytest.approx(0.5 * OBJECT_PIXEL_SIZE_M)
-        assert product.probe_positions[0].y_m == pytest.approx(0.0)
+        # Plus the even probe's half pixel from midpoint to axis on both axes.
+        assert product.probe_positions[0].x_m == pytest.approx(1.0 * OBJECT_PIXEL_SIZE_M)
+        assert product.probe_positions[0].y_m == pytest.approx(0.5 * OBJECT_PIXEL_SIZE_M)
 
     def test_the_slice_spacings_are_already_gaps(
         self, reader: PEARProductFileReader, tmp_path: Path

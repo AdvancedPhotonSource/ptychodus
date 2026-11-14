@@ -54,13 +54,21 @@ def _make_product(
     probe_array: numpy.ndarray,
     positions: list[ProbePosition],
     pixel_size_m: float = 1.0e-7,
-    object_center: tuple[float, float] = (0.0, 0.0),
+    object_center: tuple[float, float] | None = None,
     metadata: ProductMetadata | None = None,
     opr_weights: numpy.ndarray | None = None,
 ) -> Product:
     """Build a minimal Product. ``probe_array`` may be 2D (single mode) or
     3D (multi-mode); supply ``opr_weights`` of shape (N, num_coherent_modes)
-    when iterating over multiple positions."""
+    when iterating over multiple positions.
+
+    The default object center sits half a pixel before the world origin, so the origin
+    falls on an object pixel of the even canvases used here, and an even probe's axis,
+    pixel N // 2, lands exactly on it: a position at whole pixels needs no subpixel shift.
+    """
+    if object_center is None:
+        object_center = (-0.5 * pixel_size_m, -0.5 * pixel_size_m)
+
     pixel_geometry = PixelGeometry(width_m=pixel_size_m, height_m=pixel_size_m)
     obj = Object(
         array=object_array.astype(complex),

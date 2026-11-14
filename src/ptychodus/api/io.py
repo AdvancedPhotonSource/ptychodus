@@ -1711,9 +1711,10 @@ def _write_cxi_diffraction(
             data=basis.T if variant == CXIVariant.CDTOOLS else basis,
         )
         # The outer corner of pixel (0, 0), which the default basis puts at +x and +y of
-        # the beam; the beam center is a pixel-center coordinate.
-        beam_center_x = (width_px - 1) / 2
-        beam_center_y = (height_px - 1) / 2
+        # the beam; the beam center is a pixel-center coordinate, by default the DC pixel
+        # N // 2 that a crop centers the beam on.
+        beam_center_x = width_px // 2
+        beam_center_y = height_px // 2
 
         if metadata.beam_center is not None:
             beam_center_x = metadata.beam_center.x_px

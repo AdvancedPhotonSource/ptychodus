@@ -74,6 +74,7 @@ from ptychodus.api.simulate.probe import (
     generate_fresnel_zone_plate_probe,
     generate_incoherent_probe_modes,
     rescale_probe_intensity,
+    to_reconstruction_frame,
 )
 from ptychodus.cli import (
     DirectoryType,
@@ -871,15 +872,17 @@ def _build_initial_probe(
         logger.info('Simulating the initial probe from zone plate preset "%s"', args.fzp_preset)
         zone_plate = registry.fresnel_zone_plates.get_strategy_by_name(args.fzp_preset)
         zone_plate_probe = rescale_probe_intensity(
-            generate_fresnel_zone_plate_probe(
-                probe_geometry,
-                zone_plate,
+            to_reconstruction_frame(
+                generate_fresnel_zone_plate_probe(
+                    probe_geometry,
+                    zone_plate,
+                    photon_wavelength_m=photon_wavelength_m,
+                    # The displacement the product states, in the probe's frame.
+                    defocus_distance_m=-focus_object_distance_m,
+                ),
+                far_field=far_field,
                 photon_wavelength_m=photon_wavelength_m,
-                # The displacement the product states, in the probe's frame. In near field
-                # the probe goes in the equivalent parallel-beam frame the magnification
-                # places it in.
                 defocus_distance_m=-focus_object_distance_m,
-                remove_focus_curvature=not far_field,
             ),
             probe_photon_count,
         )

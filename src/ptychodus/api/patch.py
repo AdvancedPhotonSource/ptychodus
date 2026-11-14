@@ -19,10 +19,10 @@ exact transpose of its gather. The cost is that bilinear resampling is a low-pas
 filter: it is not invertible, and it damps the phase excursions of a transmission
 function that a Fourier shift carries exactly.
 
-Both share the ``(N - 1) / 2`` centered-pixel convention of
-:meth:`ptychodus.api.object.ObjectGeometry.map_coordinates_probe_to_object`, and
-both refuse a window that leaves the canvas rather than returning a truncated or
-wrapped one.
+Both place the probe's beam axis, pixel ``N // 2``, on the scan position, as
+:meth:`ptychodus.api.probe.ProbeGeometry.resolve_patch_bounds` does, and both
+refuse a window that leaves the canvas rather than returning a truncated or wrapped
+one.
 """
 
 from __future__ import annotations

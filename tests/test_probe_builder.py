@@ -63,6 +63,7 @@ from ptychodus.api.simulate.probe import (
     generate_super_gaussian_probe,
     propagate_probe,
     rescale_probe_intensity,
+    to_reconstruction_frame,
 )
 from ptychodus.model.product.probe.builder_factory import ProbeBuilderFactory
 from ptychodus.model.product.probe.plugin import PluginProbeBuilder
@@ -934,12 +935,16 @@ class TestProductDefocus:
             outermost_zone_width_m=parameters['outermost_zone_width_m'].get_value(),
             central_beamstop_diameter_m=parameters['central_beamstop_diameter_m'].get_value(),
         )
-        expected = generate_fresnel_zone_plate_probe(
-            provider.get_probe_geometry(),
-            zone_plate,
+        expected = to_reconstruction_frame(
+            generate_fresnel_zone_plate_probe(
+                provider.get_probe_geometry(),
+                zone_plate,
+                photon_wavelength_m=provider.photon_wavelength_m,
+                defocus_distance_m=defocus_m,
+            ),
+            far_field=far_field,
             photon_wavelength_m=provider.photon_wavelength_m,
             defocus_distance_m=defocus_m,
-            remove_focus_curvature=not far_field,
         )
 
         probe = builder.build(provider)

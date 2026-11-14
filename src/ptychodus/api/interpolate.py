@@ -289,9 +289,8 @@ def match_at_indexes(
 def _calculate_support_frac(x: float, n: int, extent: int) -> tuple[slice, float]:
     """Return the integer support slice and sub-pixel offset for a width-``n`` window centered at ``x`` on an axis of ``extent`` samples.
 
-    The centered-pixel convention places the window's array-center pixel at
-    ``(n - 1) / 2``, matching
-    :meth:`ptychodus.api.object.ObjectGeometry.map_coordinates_probe_to_object`.
+    The window's axis pixel ``n // 2`` falls on ``x``, as
+    :meth:`ptychodus.api.probe.ProbeGeometry.resolve_patch_bounds` places a probe.
     Bilinear interpolation across the window reads one sample past its far edge, so
     the support spans ``n + 1`` samples -- except at a zero offset, where that sample
     carries zero weight and the support is exactly ``n`` wide. An offset within
@@ -304,7 +303,7 @@ def _calculate_support_frac(x: float, n: int, extent: int) -> tuple[slice, float
             and a negative lower bound is a valid Python slice that wraps around to
             the far end of the axis.
     """
-    lower = x - (n - 1) / 2
+    lower = x - n // 2
     whole = math.floor(lower)
     frac = lower - whole
 

@@ -11,6 +11,7 @@ the two values needed to place the object in space are supplied at registration.
 from __future__ import annotations
 
 from pathlib import Path
+import math
 from typing import Final
 
 import h5py
@@ -38,18 +39,27 @@ _OPR_MODE_WEIGHTS = 'opr_mode_weights'
 
 
 def _read_positions(
-    positions_px: RealArrayType, object_extent_px: tuple[int, int], pixel_size_m: float
+    positions_px: RealArrayType,
+    object_extent_px: tuple[int, int],
+    probe_extent_px: tuple[int, int],
+    pixel_size_m: float,
 ) -> ProbePositionSequence:
     """Convert the stored scan into the object frame ptychodus measures positions in.
 
     The table is row-major -- y in the first column -- and in object pixels about an
-    origin pty-chi puts at ``round(N / 2) - 0.5``. ptychodus puts the center of the
-    array at ``(N - 1) / 2``, so the two differ by ``round(N / 2) - N / 2``: nothing
-    for an even dimension and half a pixel for an odd one.
+    origin pty-chi puts at ``ceil(N / 2) - 0.5``; ptychodus's object center is pixel
+    ``(N - 1) / 2``, half a pixel apart on an odd dimension. And pty-chi registers each
+    position to the probe's midpoint, where ptychodus registers the beam axis, pixel
+    ``N // 2``, which lies half a pixel further on an even probe dimension.
     """
-    height_px, width_px = object_extent_px
-    offset_y_px = numpy.round(height_px / 2.0) - height_px / 2.0
-    offset_x_px = numpy.round(width_px / 2.0) - width_px / 2.0
+    object_height_px, object_width_px = object_extent_px
+    probe_height_px, probe_width_px = probe_extent_px
+    offset_y_px = (
+        math.ceil(object_height_px / 2) - object_height_px / 2 + _axis_offset_px(probe_height_px)
+    )
+    offset_x_px = (
+        math.ceil(object_width_px / 2) - object_width_px / 2 + _axis_offset_px(probe_width_px)
+    )
 
     return ProbePositionSequence(
         [
@@ -61,6 +71,11 @@ def _read_positions(
             for index, position in enumerate(positions_px)
         ]
     )
+
+
+def _axis_offset_px(size_px: int) -> float:
+    """How far the beam axis, pixel ``size_px // 2``, lies past the probe's midpoint."""
+    return size_px // 2 - (size_px - 1) / 2
 
 
 class PEARProductFileReader(ProductFileReader):
@@ -120,7 +135,10 @@ class PEARProductFileReader(ProductFileReader):
             pixel_size_m = float(h5_file[_OBJECT_PIXEL_SIZE][()])
 
             positions = _read_positions(
-                h5_file[_POSITIONS_PX][()], object_array.shape[-2:], pixel_size_m
+                h5_file[_POSITIONS_PX][()],
+                object_array.shape[-2:],
+                probe_array.shape[-2:],
+                pixel_size_m,
             )
 
             spacings_dataset = h5_file.get(_SLICE_SPACINGS)

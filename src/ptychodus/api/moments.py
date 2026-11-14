@@ -20,9 +20,9 @@ __all__ = [
 class IntensityMoments:
     """The zeroth, first and central second moments of intensity over the last two axes.
 
-    Coordinates are pixels measured from the array midpoint ``(N - 1) / 2`` along each
-    axis, x along columns and y along rows, so a distribution symmetric about the middle
-    of the array has a zero centroid. Every field has the shape of the leading axes the
+    Coordinates are pixels measured from the FFT origin ``N // 2`` along each axis -- a
+    probe's beam axis and a detector frame's DC pixel -- x along columns and y along
+    rows, so a distribution symmetric about that pixel has a zero centroid. Every field has the shape of the leading axes the
     moments were taken over, which is ``()`` for a single image. Where the total is not
     positive, the centroid and covariance are NaN, since neither is defined there.
     """
@@ -62,8 +62,8 @@ def compute_intensity_moments(
     if bad_pixels is not None:
         weights = numpy.where(bad_pixels, 0.0, weights)
 
-    x_px = numpy.arange(width, dtype=numpy.float64) - (width - 1) / 2
-    y_px = numpy.arange(height, dtype=numpy.float64) - (height - 1) / 2
+    x_px = numpy.arange(width, dtype=numpy.float64) - width // 2
+    y_px = numpy.arange(height, dtype=numpy.float64) - height // 2
 
     row_sums = numpy.sum(weights, axis=-1)
     column_sums = numpy.sum(weights, axis=-2)

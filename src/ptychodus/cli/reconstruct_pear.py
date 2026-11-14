@@ -118,6 +118,7 @@ from ptychodus.api.simulate.probe import (
     generate_coherent_probe_modes,
     generate_fresnel_zone_plate_probe,
     propagate_probe,
+    to_reconstruction_frame,
 )
 from ptychodus.cli._reconstruct_common import (
     estimate_dataset_beam_center,
@@ -958,14 +959,17 @@ def main() -> ExitCode:
         preset = params.fzp_preset
         logger.info('Simulating the initial probe from zone plate preset %r', preset)
         zone_plate = registry.fresnel_zone_plates.get_strategy_by_name(preset)
-        probe_array = generate_fresnel_zone_plate_probe(
-            probe_geometry,
-            zone_plate,
+        probe_array = to_reconstruction_frame(
+            generate_fresnel_zone_plate_probe(
+                probe_geometry,
+                zone_plate,
+                photon_wavelength_m=wavelength_m,
+                # The product's focus in the probe's frame.
+                defocus_distance_m=-focus_object_distance_m,
+            ),
+            far_field=not params.near_field_ptycho,
             photon_wavelength_m=wavelength_m,
-            # The product's focus in the probe's frame. Near field reconstructs in the
-            # equivalent parallel-beam frame.
             defocus_distance_m=-focus_object_distance_m,
-            remove_focus_curvature=params.near_field_ptycho,
         ).get_array()
     else:
         logger.info('Reading the initial probe from %s', probe_file)

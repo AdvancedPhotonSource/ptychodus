@@ -153,6 +153,6 @@ See the comment above `[project.optional-dependencies]` for a backend published 
 - `uv sync --extra <backend>` — install the backend.
 - `uv run ptychodus` — the backend appears in the reconstructor list with a generated panel. `--log-level 10` shows the version or the "not found" line.
 - Without the extra, the GUI still opens, the backend offers nothing, and no other reconstructor is affected.
-- `uv run pytest tests/test_settings_defaults.py` — the golden INI gains the new groups; regenerate the fixture deliberately and review the diff.
+- `uv run pytest tests/test_settings_tables.py` — the backend's name in the section table matches the name it registers under.
 - Reconstruct, save the product, then warm-start a *different* backend from it: probe power and positions must come through comparable, which is the mixing invariant.
 - `pre-push` — full CI gate green.

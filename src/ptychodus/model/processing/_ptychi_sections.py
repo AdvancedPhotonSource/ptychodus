@@ -560,6 +560,42 @@ def _opr_policy(extras: set[str]) -> FlatteningPolicy:
     )
 
 
+_DETECTOR_RESPONSE_OVERLAYS: Mapping[str, Overlay] = {
+    'optimizable': Overlay(
+        'Detector Response',
+        'Refine the detector gain and offset maps. The maps start from the flat field '
+        'and background carried with the patterns, or from identity without them.',
+    ),
+    'optimizer': Overlay('Optimizer:'),
+    'step_size': Overlay(
+        'Step Size:', 'Optimizer step size (learning rate).', minimum=_STRICTLY_POSITIVE
+    ),
+    'optimize_gain': Overlay(
+        'Optimize Gain',
+        'Refine the gain, normalizing its mean over valid pixels to one after each update.',
+    ),
+    'optimize_offset': Overlay('Optimize Offset', 'Refine the offset, in measured counts.'),
+    'gain_floor': Overlay(
+        'Gain Floor:',
+        'Positive floor applied to the refined gain before normalization.',
+        minimum=_STRICTLY_POSITIVE,
+    ),
+    'offset_nonnegative': Overlay(
+        'Nonnegative Offset', 'Constrain the refined offset to be nonnegative.'
+    ),
+}
+
+
+def _detector_response_policy() -> FlatteningPolicy:
+    return FlatteningPolicy(
+        hidden=frozenset(_plan_noise() | _optimizer_noise()),
+        prefixes={_PLAN: 'OptimizationPlan'},
+        renames={'optimizable': 'IsOptimizable'},
+        overlays=_DETECTOR_RESPONSE_OVERLAYS,
+        structural=_stops(),
+    )
+
+
 _RECONSTRUCTOR_OVERLAYS: Mapping[str, Overlay] = {
     'num_epochs': Overlay('Number of Epochs:', 'Number of epochs to run'),
     'batch_size': Overlay('Batch Size:', 'Number of data to process in each minibatch'),
@@ -759,6 +795,8 @@ def _reconstructor_policy(extras: set[str], *, ignores_batching: bool = False) -
                 'default_device',
                 'random_seed',
                 'displayed_loss_function',
+                # Its own section, beside the other optimizable branches.
+                'forward_model_options.detector_response_options',
             }
             | extras
         ),
@@ -887,6 +925,12 @@ def sections_for(algorithm: str, options: Any) -> Sequence[OptionsSection]:
             'PtyChiOPR',
             root_path=f'{_TASK}.opr_mode_weight_options',
             policy=_opr_policy(_extras(task.opr_mode_weight_options, OPRModeWeightsOptions)),
+        ),
+        OptionsSection(
+            'PtyChiDetectorResponse',
+            root_path=f'{_TASK}.reconstructor_options.forward_model_options.'
+            'detector_response_options',
+            policy=_detector_response_policy(),
         ),
         *_algorithm_sections(algorithm, task),
     ]

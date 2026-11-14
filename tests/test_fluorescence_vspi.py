@@ -73,9 +73,9 @@ def _make_product(positions_px: list[tuple[float, float]]) -> Product:
     )
 
 
-# A patch carries zero sub-pixel offset when ``center - (extent - 1) / 2`` is whole,
-# so for an even extent the zero-offset centers are the half-integers.
-_INTEGER_POSITIONS = [(8.5, 8.5), (11.5, 11.5), (14.5, 14.5)]
+# A patch carries zero sub-pixel offset when ``center - extent // 2`` is whole: the
+# probe's axis pixel lands on the center, so the zero-offset centers are the integers.
+_INTEGER_POSITIONS = [(9.0, 9.0), (12.0, 12.0), (15.0, 15.0)]
 _SUBPIXEL_POSITIONS = [(8.3, 9.7), (11.5, 11.5), (14.2, 13.8)]
 
 
@@ -95,12 +95,12 @@ def test_matvec_matches_hand_computed_psf_weighted_sum() -> None:
 
     probe_intensity = product.probes.get_probe(0).get_intensity()
     psf = probe_intensity / probe_intensity.sum()
-    half = (_PROBE_PX - 1) / 2
+    axis = _PROBE_PX // 2
 
     expected = []
     for x_px, y_px in _INTEGER_POSITIONS:
-        y_lower = int(y_px - half)
-        x_lower = int(x_px - half)
+        y_lower = int(y_px - axis)
+        x_lower = int(x_px - axis)
         patch = canvas[y_lower : y_lower + _PROBE_PX, x_lower : x_lower + _PROBE_PX]
         expected.append(numpy.sum(psf * patch))
 
@@ -146,8 +146,10 @@ def test_lsmr_recovers_a_scaled_object() -> None:
 # change in how the interpolation window is resolved, so these values are what
 # establish that such a change left in-bounds results untouched. A window change
 # moves them in the second or third digit; the tolerance only absorbs the last-ulp
-# differences between numpy builds, which reorder the same sums.
-_MIXED_OFFSET_POSITIONS = [(x, y) for y in (9.4, 11.5, 13.7) for x in (9.1, 11.5, 13.2)]
+# differences between numpy builds, which reorder the same sums. The positions carry
+# the half pixel the even probe's axis, pixel N // 2, lies past its midpoint, so the
+# operator gathers the same pixels the recording did.
+_MIXED_OFFSET_POSITIONS = [(x, y) for y in (9.9, 12.0, 14.2) for x in (9.6, 12.0, 13.7)]
 _RECORDED_MATVEC = [
     0.05467424994413332,
     -0.2195539520463686,

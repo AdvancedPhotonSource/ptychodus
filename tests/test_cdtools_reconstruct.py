@@ -37,6 +37,7 @@ from ptychodus.plugins.cdtools.reconstructor import (  # noqa: E402
     _far_field_intensity,
     _object_guess,
     _object_transmission,
+    _read_product,
 )
 from ptychodus.plugins.cdtools.gauge import ProbeGauge  # noqa: E402
 from ptychodus.plugins.cdtools.geometry import build_frame  # noqa: E402
@@ -115,6 +116,32 @@ def test_the_model_predicts_the_patterns_ptychodus_simulated() -> None:
     predicted = _predict(parameters, CDToolsOptions())
     expected = parameters.diffraction_patterns
     numpy.testing.assert_allclose(predicted, expected, atol=1e-5 * expected.max())
+
+
+def test_a_fourier_space_probe_predicts_the_same_patterns() -> None:
+    """FancyPtycho holds the probe in Fourier space in this mode, so the guess has to be
+    converted on the way in, or the model reads a real-space probe as a pupil."""
+    parameters = make_input()
+    options = CDToolsOptions()
+    options.model.fourier_probe = True
+    predicted = _predict(parameters, options)
+    expected = parameters.diffraction_patterns
+    numpy.testing.assert_allclose(predicted, expected, atol=1e-5 * expected.max())
+
+
+def test_a_fourier_space_probe_comes_back_in_real_space() -> None:
+    parameters = make_input()
+    options = CDToolsOptions()
+    options.model.fourier_probe = True
+    model = _build_model(parameters, build_frame(parameters.product), _UNIT_GAUGE, options)
+
+    product = _read_product(model, parameters, _UNIT_GAUGE, options)
+
+    numpy.testing.assert_allclose(
+        product.probes.get_array(),
+        parameters.product.probes.get_array(),
+        atol=1e-5 * numpy.abs(parameters.product.probes.get_array()).max(),
+    )
 
 
 def test_the_model_adds_the_background_and_applies_the_flat_field() -> None:

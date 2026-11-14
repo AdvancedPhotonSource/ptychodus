@@ -1,7 +1,7 @@
 """Unit tests for the intensity-moment primitive and the shared noise-floor front end.
 
 Behaviors verified:
-  - compute_intensity_moments measures centroids from the array midpoint and the central
+  - compute_intensity_moments measures centroids from the FFT origin N // 2 and the central
     covariance of known distributions (a point, a uniform disk, a tilted Gaussian)
   - it works over a leading batch axis, and a masked pixel carries no weight
   - an empty image has a zero total and NaN moments rather than raising
@@ -25,20 +25,21 @@ from ptychodus.api.preprocess.noise import (
 
 
 def _centered_grid(height: int, width: int) -> tuple[numpy.ndarray, numpy.ndarray]:
-    y = numpy.arange(height, dtype=numpy.float64).reshape(-1, 1) - (height - 1) / 2
-    x = numpy.arange(width, dtype=numpy.float64).reshape(1, -1) - (width - 1) / 2
+    """Pixel coordinates measured from the FFT origin, pixel ``N // 2`` of each axis."""
+    y = numpy.arange(height, dtype=numpy.float64).reshape(-1, 1) - height // 2
+    x = numpy.arange(width, dtype=numpy.float64).reshape(1, -1) - width // 2
     return y, x
 
 
-def test_a_single_pixel_sits_at_its_offset_from_the_midpoint() -> None:
+def test_a_single_pixel_sits_at_its_offset_from_the_origin() -> None:
     image = numpy.zeros((9, 12))
     image[2, 10] = 3.0
 
     moments = compute_intensity_moments(image)
 
     assert float(moments.total) == 3.0
-    assert float(moments.centroid_x_px) == pytest.approx(10 - 5.5)
-    assert float(moments.centroid_y_px) == pytest.approx(2 - 4.0)
+    assert float(moments.centroid_x_px) == pytest.approx(10 - 6)
+    assert float(moments.centroid_y_px) == pytest.approx(2 - 4)
     assert float(moments.covariance_xx_px2) == pytest.approx(0.0, abs=1e-12)
     assert float(moments.covariance_yy_px2) == pytest.approx(0.0, abs=1e-12)
 
@@ -220,3 +221,15 @@ def test_beam_center_ignores_a_masked_hot_pixel() -> None:
     center = estimate_beam_center(pattern, bad_pixels=bad_pixels)
 
     assert (center.x_px, center.y_px) == (round(47.5 + 6.0), round(47.5 - 4.0))
+
+
+@pytest.mark.parametrize('size', [8, 10, 12, 14])
+def test_a_beam_between_two_pixels_lands_on_the_dc_pixel(size: int) -> None:
+    """Half up rather than to even, so N // 2 whatever the parity of N / 2."""
+    coordinates = numpy.arange(size, dtype=numpy.float64) - (size - 1) / 2
+    y, x = coordinates.reshape(-1, 1), coordinates.reshape(1, -1)
+    pattern = 1000.0 * numpy.exp(-(x**2 + y**2) / 2.0)
+
+    center = estimate_beam_center(pattern)
+
+    assert (center.x_px, center.y_px) == (size // 2, size // 2)

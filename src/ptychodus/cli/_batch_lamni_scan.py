@@ -48,6 +48,7 @@ from ptychodus.api.simulate.probe import (
     generate_coherent_probe_modes,
     generate_fresnel_zone_plate_probe,
     generate_incoherent_probe_modes,
+    to_reconstruction_frame,
 )
 from ptychodus.cli._batch_lamni_settings import BatchSettings
 from ptychodus.plugins.aps31id_lamni.diffraction_file import LamNIDiffractionFileReader
@@ -176,15 +177,17 @@ def _build_initial_probe(
         logger.info('Simulating the initial probe from zone plate preset "%s"', preset)
         zone_plate = registry.fresnel_zone_plates.get_strategy_by_name(preset)
         probes = ProbeEnsemble(
-            array=generate_fresnel_zone_plate_probe(
-                probe_geometry,
-                zone_plate,
+            array=to_reconstruction_frame(
+                generate_fresnel_zone_plate_probe(
+                    probe_geometry,
+                    zone_plate,
+                    photon_wavelength_m=photon_wavelength_m,
+                    # The displacement the product states, in the probe's frame.
+                    defocus_distance_m=-focus_object_distance_m,
+                ),
+                far_field=far_field,
                 photon_wavelength_m=photon_wavelength_m,
-                # The displacement the product states, in the probe's frame. In near field
-                # the probe goes in the equivalent parallel-beam frame the magnification
-                # places it in.
                 defocus_distance_m=-focus_object_distance_m,
-                remove_focus_curvature=not far_field,
             ).get_array(),
             opr_weights=None,
             pixel_geometry=probe_geometry.get_pixel_geometry(),

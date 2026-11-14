@@ -59,8 +59,8 @@ class DiffractionMoments:
     and flat field, before bad pixels were filled; `bad_pixels` is the mask the
     accumulator inpainted with. Per-pattern rows
     pair with probe positions by `indexes`, never by order. Totals sum the whole frame
-    with its bad pixels inpainted. Centroids are in detector pixels about the frame
-    midpoint ``(N - 1) / 2``, x along columns and y along rows; a frame with no signal
+    with its bad pixels inpainted. Centroids are in detector pixels about the DC pixel
+    ``N // 2``, x along columns and y along rows; a frame with no signal
     has a NaN centroid.
 
     With a `binning` step, `binned_patterns` holds every pattern binned by it, as float32

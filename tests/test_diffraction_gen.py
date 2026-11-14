@@ -109,8 +109,12 @@ def _make_product(
 
 
 def _center_pos(index: int = 0) -> ProbePosition:
-    """Probe at the object center, which maps to an exact integer object pixel (dx=dy=0)."""
-    return ProbePosition(index=index, x_m=0.0, y_m=0.0)
+    """Probe axis on an exact integer object pixel (dx=dy=0).
+
+    The even object's center sits between its two middle pixels, and the even probe's
+    axis on pixel N // 2, so half a pixel past the center puts the axis on a pixel.
+    """
+    return ProbePosition(index=index, x_m=0.5 * _PIXEL_SIZE_M, y_m=0.5 * _PIXEL_SIZE_M)
 
 
 def _far_field_intensity(probe_mode: numpy.ndarray, product: Product) -> numpy.ndarray:

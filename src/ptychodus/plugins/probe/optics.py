@@ -19,6 +19,7 @@ from ptychodus.api.simulate.probe import (
     ProbeGenerator,
     generate_fresnel_zone_plate_probe,
     generate_kb_mirror_probe,
+    to_reconstruction_frame,
 )
 
 from ._options import expect_options
@@ -43,12 +44,17 @@ class FresnelZonePlateProbeGenerator(ProbeGenerator):
             outermost_zone_width_m=optic.outermost_zone_width_m,
             central_beamstop_diameter_m=optic.central_beamstop_diameter_m,
         )
-        return generate_fresnel_zone_plate_probe(
+        probe = generate_fresnel_zone_plate_probe(
             geometry=geometry_provider.get_probe_geometry(),
             zone_plate=zone_plate,
             photon_wavelength_m=geometry_provider.photon_wavelength_m,
             defocus_distance_m=geometry_provider.defocus_distance_m,
-            remove_focus_curvature=not geometry_provider.far_field,
+        )
+        return to_reconstruction_frame(
+            probe,
+            far_field=geometry_provider.far_field,
+            photon_wavelength_m=geometry_provider.photon_wavelength_m,
+            defocus_distance_m=geometry_provider.defocus_distance_m,
         )
 
 
@@ -104,11 +110,16 @@ class KBMirrorProbeGenerator(ProbeGenerator):
                 focus_distance_m=optic.vertical_focus_distance_m,
             ),
         )
-        return generate_kb_mirror_probe(
+        probe = generate_kb_mirror_probe(
             geometry_provider.get_probe_geometry(),
             mirrors,
             photon_wavelength_m=geometry_provider.photon_wavelength_m,
             defocus_distance_m=geometry_provider.defocus_distance_m,
             astigmatism_m=optic.astigmatism_m,
-            remove_focus_curvature=not geometry_provider.far_field,
+        )
+        return to_reconstruction_frame(
+            probe,
+            far_field=geometry_provider.far_field,
+            photon_wavelength_m=geometry_provider.photon_wavelength_m,
+            defocus_distance_m=geometry_provider.defocus_distance_m,
         )

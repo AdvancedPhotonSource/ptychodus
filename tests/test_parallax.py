@@ -259,13 +259,19 @@ def test_a_half_turn_is_negation_and_an_involution(orientation: DetectorOrientat
     assert turned.rotated_by_half_turn() == orientation
 
 
+def _reflect(frames: numpy.ndarray, axis: int) -> numpy.ndarray:
+    """A detector reflected about the beam, which a crop centers on the DC pixel N // 2."""
+    size = frames.shape[axis]
+    return numpy.roll(numpy.flip(frames, axis), 2 * (size // 2) - (size - 1), axis)
+
+
 _RAW_FRAMES: dict[str, Callable[[numpy.ndarray], numpy.ndarray]] = {
     'identity': lambda frames: frames,
-    'hflip': lambda frames: numpy.flip(frames, -1),
-    'vflip': lambda frames: numpy.flip(frames, -2),
+    'hflip': lambda frames: _reflect(frames, -1),
+    'vflip': lambda frames: _reflect(frames, -2),
     'transpose': lambda frames: numpy.swapaxes(frames, -1, -2),
-    'hflip_then_transpose': lambda frames: numpy.swapaxes(numpy.flip(frames, -1), -1, -2),
-    'half_turn': lambda frames: numpy.flip(frames, (-2, -1)),
+    'hflip_then_transpose': lambda frames: numpy.swapaxes(_reflect(frames, -1), -1, -2),
+    'half_turn': lambda frames: _reflect(_reflect(frames, -1), -2),
 }
 _REFLECTIONS = {'hflip', 'vflip', 'transpose'}
 

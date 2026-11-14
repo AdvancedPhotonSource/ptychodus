@@ -314,8 +314,9 @@ class _FakeInferenceConfig:
 class _InferenceDoor:
     """Stands in for ``reconstruct_from_arrays``, recording what it was handed."""
 
-    def __init__(self) -> None:
+    def __init__(self, scan_com: tuple[float, float] = (10.0, 12.0)) -> None:
         self.captured: dict[str, Any] = {}
+        self.scan_com = scan_com
 
     def __call__(self, model: Any, arrays: Any, **kwargs: Any) -> Any:
         runtime_params = kwargs['runtime_params']
@@ -326,7 +327,10 @@ class _InferenceDoor:
             'patch_weighting': runtime_params.inference_config.patch_weighting,
             'batch_size': runtime_params.inference_config.batch_size,
         }
-        return SimpleNamespace(complex_canvas=numpy.ones((1, 32, 32), dtype=complex))
+        return SimpleNamespace(
+            complex_canvas=numpy.ones((1, 32, 32), dtype=complex),
+            canvas_anchor={'scan_com': self.scan_com, 'canvas_shape': (32, 32)},
+        )
 
 
 def test_reconstruct_refuses_without_a_loaded_model() -> None:
@@ -389,6 +393,39 @@ def test_reconstruct_stages_declared_arrays_through_the_embedder_seam(
     # 'auto' with no CUDA device present resolves to the CPU.
     assert captured['device'] == 'cpu'
     assert captured['num_workers'] == 3
+
+
+def test_the_returned_canvas_is_centered_where_ptychopinn_anchors_it(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Pixel canvas_size // 2 of the canvas sits on the scan's center of mass, measured
+    in the input object's pixels; the returned center is the canvas's (N - 1) / 2."""
+    loaded_model = SimpleNamespace(
+        model_config=SimpleNamespace(mode='Unsupervised'),
+        inference_config=_FakeInferenceConfig(),
+        data_config=object(),
+        training_config=object(),
+    )
+    _install_fake_backend(
+        monkeypatch,
+        ptycho_torch_DOT_inference={
+            'ReconstructionRuntimeParams': SimpleNamespace,
+            'reconstruct_from_arrays': _InferenceDoor(scan_com=(10.0, 12.0)),
+        },
+        ptycho_torch_DOT_workflows_DOT_bundle_io={
+            'load_inference_bundle_torch': lambda _dir: (loaded_model, {}),
+        },
+    )
+    reconstructor = PtychoPINNReconstructor('Unsupervised')
+    reconstructor.load_model(tmp_path)
+
+    (output,) = reconstructor.reconstruct(_make_reconstruct_input(), options=default_options())
+
+    # The 32 x 32 input object is centered at the origin, so input pixel i is at
+    # (i - 15.5) pixels; the canvas center, pixel 15.5, sits at com - 0.5.
+    center = output.product.object_.get_center()
+    assert center.x_m == pytest.approx((10.0 - 0.5 - 15.5) * 1.0e-8)
+    assert center.y_m == pytest.approx((12.0 - 0.5 - 15.5) * 1.0e-8)
 
 
 # ------------------------------ _build_arrays ------------------------------

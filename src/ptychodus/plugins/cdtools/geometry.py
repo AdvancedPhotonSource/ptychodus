@@ -7,8 +7,9 @@ reads, ``translations_to_pixel(obj_basis, t) - min_translation`` in ``(row, colu
 pixels, cutting the window at the floor of that corner and Fourier-shifting the probe by
 the fractional remainder. :meth:`ptychodus.api.probe.ProbeGeometry.resolve_patch_bounds`
 places a patch the same way -- an integer lower corner, then a positive sub-pixel shift
-of the probe -- from a corner at ``center - (N - 1) / 2``, so a corner computed here
-puts every probe exactly where :func:`ptychodus.api.patch.iter_probe_patches` does.
+of the probe -- from a corner at ``center - N // 2``, which puts the probe's beam axis,
+pixel ``N // 2``, on the position. A corner computed here puts every probe exactly where
+:func:`ptychodus.api.patch.iter_probe_patches` does.
 
 Translations are passed relative to the object's center. cdtools holds them in single
 precision, and an absolute stage coordinate of a few millimetres would cost a visible
@@ -102,8 +103,8 @@ def _verify_windows_fit(product: Product) -> None:
     probe_geometry = product.probes.get_geometry()
     x_px = object_geometry.map_probe_positions_to_object_x_px(product.probe_positions)
     y_px = object_geometry.map_probe_positions_to_object_y_px(product.probe_positions)
-    x_lower = numpy.floor(x_px - (probe_geometry.width_px - 1) / 2)
-    y_lower = numpy.floor(y_px - (probe_geometry.height_px - 1) / 2)
+    x_lower = numpy.floor(x_px - probe_geometry.width_px // 2)
+    y_lower = numpy.floor(y_px - probe_geometry.height_px // 2)
     outside = (
         (x_lower < 0)
         | (y_lower < 0)
@@ -145,11 +146,11 @@ def build_frame(product: Product) -> CDToolsFrame:
     translations = numpy.stack([x_m, y_m, numpy.zeros_like(x_m)], axis=1)
 
     # translations_to_pixel(obj_basis, (x, y, 0)) is (y / dy, x / dx); subtracting this
-    # leaves center_px - (N - 1) / 2, the corner resolve_patch_bounds anchors.
+    # leaves center_px - N // 2, the corner resolve_patch_bounds anchors.
     min_translation = numpy.array(
         [
-            -(object_geometry.height_px - 1) / 2 + (probe_geometry.height_px - 1) / 2,
-            -(object_geometry.width_px - 1) / 2 + (probe_geometry.width_px - 1) / 2,
+            -(object_geometry.height_px - 1) / 2 + probe_geometry.height_px // 2,
+            -(object_geometry.width_px - 1) / 2 + probe_geometry.width_px // 2,
         ]
     )
 

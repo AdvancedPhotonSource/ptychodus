@@ -23,6 +23,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Annotated, Literal, TypeAlias, TypeVar, cast, overload
+import math
 
 import numpy
 from pydantic import BaseModel, ConfigDict, Field
@@ -216,22 +217,33 @@ class PaddingStep(DiffractionPrepStep):
         )
 
 
+def _reflect_about_dc(data: _PrepT, axis: int) -> _PrepT:
+    """Reflect *data* along *axis* about its DC pixel, ``N // 2``.
+
+    Pixel ``i`` goes to ``2 (N // 2) - i``, modulo ``N``: a plain flip on an odd axis,
+    whose DC pixel is its middle one, and a flip followed by a roll of one on an even
+    axis, which keeps the DC pixel and pixel 0 in place.
+    """
+    size = data.shape[axis]
+    return cast(_PrepT, numpy.roll(numpy.flip(data, axis=axis), 2 * (size // 2) - (size - 1), axis))
+
+
 class HorizontalFlipStep(DiffractionPrepStep):
-    """Flip the last axis."""
+    """Reflect the last axis about its DC pixel, ``N // 2``, where the crop puts the beam."""
 
     type: Literal['hflip'] = 'hflip'
 
     def apply(self, data: _PrepT) -> _PrepT:
-        return numpy.flip(data, axis=-1)
+        return _reflect_about_dc(data, -1)
 
 
 class VerticalFlipStep(DiffractionPrepStep):
-    """Flip the second-to-last axis."""
+    """Reflect the second-to-last axis about its DC pixel; see :class:`HorizontalFlipStep`."""
 
     type: Literal['vflip'] = 'vflip'
 
     def apply(self, data: _PrepT) -> _PrepT:
-        return numpy.flip(data, axis=-2)
+        return _reflect_about_dc(data, -2)
 
 
 class TransposeStep(DiffractionPrepStep):
@@ -444,10 +456,10 @@ def estimate_beam_center(
     if not coarse.total > 0.0:
         return geometric_center
 
-    midpoint_y = (height - 1) / 2.0
-    midpoint_x = (width - 1) / 2.0
-    coarse_center_y = midpoint_y + float(coarse.centroid_y_px)
-    coarse_center_x = midpoint_x + float(coarse.centroid_x_px)
+    origin_y = height // 2
+    origin_x = width // 2
+    coarse_center_y = origin_y + float(coarse.centroid_y_px)
+    coarse_center_x = origin_x + float(coarse.centroid_x_px)
 
     # Pass 2: re-centroid inside a square window around the pass-1 estimate.
     half_window_size = min(height, width) // 4
@@ -459,15 +471,17 @@ def estimate_beam_center(
     refined = compute_intensity_moments(centroid_weights * in_central_window, bad_pixels=bad_pixels)
 
     if refined.total > 0.0:
-        refined_center_y = midpoint_y + float(refined.centroid_y_px)
-        refined_center_x = midpoint_x + float(refined.centroid_x_px)
+        refined_center_y = origin_y + float(refined.centroid_y_px)
+        refined_center_x = origin_x + float(refined.centroid_x_px)
     else:
         refined_center_y = coarse_center_y
         refined_center_x = coarse_center_x
 
+    # Half up rather than to even, so a beam centered between two pixels lands on the
+    # upper one, the DC pixel of a crop centered on it.
     return BeamCenter(
-        x_px=int(round(refined_center_x)),
-        y_px=int(round(refined_center_y)),
+        x_px=math.floor(refined_center_x + 0.5),
+        y_px=math.floor(refined_center_y + 0.5),
     )
 
 

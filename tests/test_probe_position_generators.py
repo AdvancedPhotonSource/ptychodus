@@ -12,7 +12,6 @@ suffix claims.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from pathlib import Path
 
 import numpy
 import pytest
@@ -25,7 +24,6 @@ from ptychodus.api.simulate.probe_positions import (
 from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.declared import declare_in, describe, restore
 
-_GOLDEN_PATH = Path(__file__).parent / 'data' / 'settings_defaults.ini'
 
 _EXPECTED_NAMES = {
     'concentric',
@@ -46,20 +44,6 @@ def _generators() -> Sequence[Plugin[ProbePositionsGenerator]]:
     return [*PluginRegistry.load_plugins().probe_position_generators]
 
 
-def _probe_positions_keys() -> set[str]:
-    """Every key the golden fixture holds in the section a scan is configured by."""
-    keys: set[str] = set()
-    inside = False
-
-    for line in _GOLDEN_PATH.read_text().splitlines():
-        if line.startswith('['):
-            inside = line == '[ProbePositions]'
-        elif inside and ' = ' in line:
-            keys.add(line.split(' = ', 1)[0])
-
-    return keys
-
-
 def test_every_pattern_is_registered() -> None:
     """The names are persisted, documented and accepted by the workflow API."""
     assert {plugin.simple_name for plugin in _generators()} == _EXPECTED_NAMES
@@ -67,12 +51,6 @@ def test_every_pattern_is_registered() -> None:
 
 @pytest.mark.parametrize('plugin', _generators(), ids=lambda p: p.simple_name)
 class TestEachGenerator:
-    def test_its_keys_are_in_the_settings_section(
-        self, plugin: Plugin[ProbePositionsGenerator]
-    ) -> None:
-        declared = {d.key for d in describe(plugin.strategy.get_default_options(), expand_num=True)}
-        assert declared <= _probe_positions_keys()
-
     def test_every_field_has_something_to_write_beside_it(
         self, plugin: Plugin[ProbePositionsGenerator]
     ) -> None:

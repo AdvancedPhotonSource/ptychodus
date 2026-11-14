@@ -7,6 +7,7 @@ so each test states exactly which fields a file holds.
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 import re
 
@@ -373,6 +374,27 @@ def test_the_corner_position_follows_the_beam_center(tmp_path: Path) -> None:
         corner = h5_file['entry_1'][CXIFileKeys.DETECTOR_CORNER_POSITION][()]
 
     numpy.testing.assert_allclose(corner, [(3 + 0.5) * 55e-6, (2 + 0.5) * 75e-6, DISTANCE_M])
+
+
+def test_without_a_beam_center_the_corner_puts_the_beam_on_the_dc_pixel(tmp_path: Path) -> None:
+    """The 8 x 6 frame's DC pixel is (4, 3), the pixel a crop centers the beam on."""
+    dataset = _diffraction_dataset()
+    metadata = replace(dataset.get_metadata(), beam_center=None)
+    path = tmp_path / 'data.cxi'
+    save_cxi_diffraction(
+        path,
+        SimpleDiffractionDataset(
+            metadata,
+            DiffractionDatasetLayoutNode.create_root(),
+            list(dataset),
+            dataset.get_bad_pixels(),
+        ),
+    )
+
+    with h5py.File(path, 'r') as h5_file:
+        corner = h5_file['entry_1'][CXIFileKeys.DETECTOR_CORNER_POSITION][()]
+
+    numpy.testing.assert_allclose(corner, [(4 + 0.5) * 55e-6, (3 + 0.5) * 75e-6, DISTANCE_M])
 
 
 # ---------- foreign layouts ----------

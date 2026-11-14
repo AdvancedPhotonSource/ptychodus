@@ -240,7 +240,8 @@ def test_hard_limits_are_serialized_as_lists() -> None:
     assert isinstance(hard_limits.phase_lim, list)
     # Other serializable-array object fields must also be plain lists/tuples.
     assert isinstance(options.object_options.position_origin_coords, (list, tuple))
-    assert list(options.object_options.position_origin_coords) == [0.0, 0.0]
+    # The test probe is even on both axes, so its axis lies half a pixel past its midpoint.
+    assert list(options.object_options.position_origin_coords) == [0.5, 0.5]
     assert (
         options.object_options.determine_position_origin_coords_by
         is ObjectPosOriginCoordsMethods.SPECIFIED
@@ -686,7 +687,8 @@ _PRODUCT_DERIVED_FIELDS = [
         'object_options.determine_position_origin_coords_by',
         ObjectPosOriginCoordsMethods.SPECIFIED,
     ),
-    ('object_options.position_origin_coords', [0.0, 0.0]),
+    # The axis offset of the test's even probe, (y, x): see `_to_ptychi_positions_px`.
+    ('object_options.position_origin_coords', [0.5, 0.5]),
     ('data_options.wavelength_m', _make_reconstruct_input().product.metadata.photon_wavelength_m),
     ('data_options.free_space_propagation_distance_m', numpy.inf),
     # True for this far-field product; a near-field one clears it.
@@ -1217,10 +1219,13 @@ def _gauge_input(
     probe_array *= numpy.sqrt(_GAUGE_PHOTONS / numpy.sum(numpy.abs(probe_array) ** 2))
     probe_array *= probe_factor
 
+    # Half a pixel before the origin, so the positions at the origin put the even
+    # probe's axis, pixel N // 2, exactly on an object pixel and the patterns below need
+    # no subpixel shift to match.
     obj = Object(
         array=numpy.full((1, OBJ_HEIGHT_PX, OBJ_WIDTH_PX), object_amplitude, dtype=complex),
         pixel_geometry=PixelGeometry(width_m=pixel_m, height_m=pixel_m),
-        center=ObjectCenter(x_m=0.0, y_m=0.0),
+        center=ObjectCenter(x_m=-0.5 * pixel_m, y_m=-0.5 * pixel_m),
         layer_spacing_m=[],
     )
     probes = ProbeEnsemble(

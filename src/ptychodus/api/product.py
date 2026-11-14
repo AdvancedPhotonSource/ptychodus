@@ -19,7 +19,7 @@ from .probe import Probe, ProbeEnsemble, ProbeGeometry
 from .probe_positions import ProbePosition, ProbePositionSequence
 from .propagate import compute_magnification
 from .scattering.geometry import ScatteringGeometry
-from .typing import ComplexArrayType
+from .typing import ComplexArrayType, RealArrayType
 
 __all__ = [
     'LossValue',
@@ -281,6 +281,12 @@ def _resample_object(
         source_geometry.height_px - 1
     ) / 2
 
+    # 'constant' returns zero for a coordinate a hair outside the array, so round-off in
+    # the round trip through physical coordinates must not push an edge pixel out.
+    edge_tolerance_px = 1.0e-9
+    column = _snap_to_edges(column, source_geometry.width_px, edge_tolerance_px)
+    row = _snap_to_edges(row, source_geometry.height_px, edge_tolerance_px)
+
     resampled = numpy.empty(
         (array.shape[0], target_geometry.height_px, target_geometry.width_px), dtype=array.dtype
     )
@@ -293,6 +299,13 @@ def _resample_object(
         )
 
     return resampled
+
+
+def _snap_to_edges(index: RealArrayType, size_px: int, tolerance_px: float) -> RealArrayType:
+    """*index* with values within *tolerance_px* outside ``[0, size_px - 1]`` moved onto it."""
+    snapped = numpy.where((index < 0.0) & (index > -tolerance_px), 0.0, index)
+    upper = size_px - 1
+    return numpy.where((snapped > upper) & (snapped < upper + tolerance_px), upper, snapped)
 
 
 def transform_product(

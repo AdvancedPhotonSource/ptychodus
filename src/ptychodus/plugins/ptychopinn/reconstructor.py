@@ -24,7 +24,7 @@ import os
 import shutil
 import tempfile
 import zipfile
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Final
@@ -32,7 +32,7 @@ from typing import Any, Final
 import numpy
 from pydantic import BaseModel
 
-from ptychodus.api.object import Object
+from ptychodus.api.object import Object, ObjectCenter, ObjectGeometry, ObjectPosition
 from ptychodus.api.preprocess.diffraction import inpaint_bad_pixels
 from ptychodus.api.product import LossValue, Product
 from ptychodus.api.reconstruct import (
@@ -298,6 +298,28 @@ def _resolve_device(accelerator: str) -> str:
     return 'cpu'
 
 
+def _canvas_center(
+    object_geometry: ObjectGeometry, canvas_anchor: Mapping[str, Any], canvas_shape: Any
+) -> ObjectCenter:
+    """World position of the returned canvas's center pixel, ``(N - 1) / 2``.
+
+    PtychoPINN anchors pixel ``canvas_size // 2`` of its canvas on the scan's center of
+    mass, ``scan_com``, which it measures in the input object's pixel coordinates -- the
+    coordinates :func:`_build_arrays` hands it. Canvas pixel ``i`` therefore sits at input
+    pixel ``scan_com + i - canvas_size // 2``, whatever size the canvas came back.
+    """
+    com_x_px, com_y_px = (float(value) for value in numpy.asarray(canvas_anchor['scan_com'])[:2])
+    height_px, width_px = (int(size) for size in canvas_shape)
+    center = object_geometry.map_coordinates_object_to_probe(
+        ObjectPosition(
+            index=-1,
+            x_px=com_x_px + (width_px - 1) / 2 - width_px // 2,
+            y_px=com_y_px + (height_px - 1) / 2 - height_px // 2,
+        )
+    )
+    return ObjectCenter(x_m=center.x_m, y_m=center.y_m)
+
+
 def _build_arrays(parameters: Any) -> dict[str, Any]:
     """Convert a ReconstructInput into the backend's flat-acquisition mapping.
 
@@ -527,13 +549,16 @@ class PtychoPINNReconstructor(TrainableReconstructor):
             )
             # Snapshot before the workspace unlinks its memory-mapped backing.
             object_out_array = numpy.squeeze(numpy.asarray(result.complex_canvas))
+            canvas_anchor = dict(result.canvas_anchor)
 
         object_in = input_.product.object_
         object_out = Object(
             array=object_out_array,
             layer_spacing_m=object_in.layer_spacing_m,
             pixel_geometry=object_in.get_pixel_geometry(),
-            center=object_in.get_center(),
+            center=_canvas_center(
+                object_in.get_geometry(), canvas_anchor, object_out_array.shape[-2:]
+            ),
         )
 
         losses: Sequence[LossValue] = []

@@ -158,8 +158,8 @@ def transform_probe_to_exit_frame(
     probe_geometry = probes.get_geometry()
     coordinates = probe_geometry.get_transverse_coordinates()
     points_m = geometry.project_onto_surface(coordinates.x_m, coordinates.y_m)
-    column = points_m[..., 0] / probe_geometry.pixel_width_m + (probe_geometry.width_px - 1) / 2
-    row = points_m[..., 1] / probe_geometry.pixel_height_m + (probe_geometry.height_px - 1) / 2
+    column = points_m[..., 0] / probe_geometry.pixel_width_m + probe_geometry.width_px // 2
+    row = points_m[..., 1] / probe_geometry.pixel_height_m + probe_geometry.height_px // 2
 
     array = probes.get_array()
     exit_array = numpy.empty_like(array)

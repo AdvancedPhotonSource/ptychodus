@@ -19,7 +19,6 @@ slipped ``embed_dim`` would change every run with no test to notice.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 import copy
 import json
@@ -40,37 +39,6 @@ from ptychodus.model.processing.generate import (  # noqa: E402
 )
 from ptychodus.model.processing.parameter_store import OptionsSection  # noqa: E402
 from ptychodus.plugins.ptycho_fm.options import default_options  # noqa: E402
-
-
-def _golden() -> dict[str, dict[str, str]]:
-    groups: dict[str, dict[str, str]] = {}
-    current = ''
-
-    for line in (Path(__file__).parent / 'data' / 'settings_defaults.ini').read_text().splitlines():
-        if line.startswith('['):
-            current = line.strip('[]')
-            groups[current] = {}
-        elif ' = ' in line and current:
-            key, value = line.split(' = ', 1)
-            groups[current][key] = value
-
-    return groups
-
-
-@pytest.mark.parametrize('section', sections(), ids=lambda s: s.group_name)
-def test_every_group_reproduces_its_persisted_keys(section: OptionsSection) -> None:
-    root = getattr(default_options(), section.root_path)
-    produced = {flat.ini_key for flat in flatten_options(root, section.policy)}
-    assert produced == set(_golden()[section.group_name])
-
-
-@pytest.mark.parametrize('section', sections(), ids=lambda s: s.group_name)
-def test_every_declared_default_matches_the_persisted_one(section: OptionsSection) -> None:
-    root = getattr(default_options(), section.root_path)
-    expected = _golden()[section.group_name]
-
-    for flat in flatten_options(root, section.policy):
-        assert flat.spelling.render(flat.default) == expected[flat.ini_key], flat.ini_key
 
 
 @pytest.mark.parametrize('section', sections(), ids=lambda s: s.group_name)

@@ -11,7 +11,14 @@ from pydantic import ValidationError
 from ptychodus.api.accumulate import compute_diffraction_moments
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.diffraction import DetectorBackground
-from ptychodus.api.geometry import HermiteMode, ImageExtent, LegendreMode, PixelGeometry
+from ptychodus.api.geometry import (
+    HermiteMode,
+    ImageExtent,
+    LegendreMode,
+    PixelGeometry,
+    ZernikeMode,
+)
+from ptychodus.api.moments import compute_intensity_moments
 from ptychodus.api.probe import Probe, ProbeGeometry
 from ptychodus.api.simulate.probe import (
     apply_defocus_phase,
@@ -36,6 +43,10 @@ from ptychodus.api.simulate.probe import (
     RandomPhaseRampStrategy,
     generate_incoherent_probe_modes,
     generate_rectangular_probe,
+    generate_zernike_probe,
+    generate_super_gaussian_probe,
+    remove_defocus_phase,
+    to_reconstruction_frame,
 )
 from ptychodus.api.propagate import (
     AngularSpectrumPropagator,
@@ -1235,15 +1246,16 @@ class TestApplyDefocusPhase:
             flat, photon_wavelength_m=_DEFOCUS_WAVELENGTH_M, defocus_distance_m=1.0e-3
         ).get_array()[0]
 
-        x_m = (numpy.arange(width_px) - (width_px - 1) / 2) * pixel_width_m
-        y_m = (numpy.arange(height_px) - (height_px - 1) / 2) * pixel_height_m
+        x_m = (numpy.arange(width_px) - width_px // 2) * pixel_width_m
+        y_m = (numpy.arange(height_px) - height_px // 2) * pixel_height_m
         r2_m2 = numpy.square(x_m[numpy.newaxis, :]) + numpy.square(y_m[:, numpy.newaxis])
         expected = numpy.exp(1j * PI * r2_m2 / (_DEFOCUS_WAVELENGTH_M * 1.0e-3))
         numpy.testing.assert_allclose(defocused, expected, atol=1e-12)
 
-    def test_centers_the_curvature_between_the_middle_pixels(self) -> None:
-        """Centered anywhere but (N - 1) / 2, the curvature would add a tilt and lose
-        the point symmetry of the grid."""
+    def test_centers_the_curvature_on_the_beam_axis(self) -> None:
+        """Centered on pixel N // 2, the curvature is point-symmetric about that pixel:
+        a reflection about it, which leaves the first row and column in place, leaves
+        the phase unchanged. Centered anywhere else it would add a tilt."""
         flat = Probe(
             array=numpy.ones((16, 20), dtype=complex),
             pixel_geometry=PixelGeometry(width_m=1.0e-8, height_m=1.5e-8),
@@ -1252,8 +1264,9 @@ class TestApplyDefocusPhase:
         defocused = apply_defocus_phase(
             flat, photon_wavelength_m=_DEFOCUS_WAVELENGTH_M, defocus_distance_m=1.0e-3
         ).get_array()
+        reflected = numpy.roll(defocused[..., ::-1, ::-1], shift=(1, 1), axis=(-2, -1))
 
-        numpy.testing.assert_allclose(defocused, defocused[..., ::-1, ::-1], rtol=1e-12)
+        numpy.testing.assert_allclose(defocused, reflected, rtol=1e-12)
 
     @staticmethod
     def _defocus_rectangle(
@@ -1835,23 +1848,33 @@ _EQUIVALENT_FRAME_DEFOCUS_M = 100e-6
 _EQUIVALENT_FRAME_DETECTOR_DISTANCE_M = 1.0
 
 
-def _fzp_probe_at_defocus(*, remove_focus_curvature: bool) -> Probe:
-    return generate_fresnel_zone_plate_probe(
+def _fzp_probe_at_defocus(*, equivalent: bool) -> Probe:
+    probe = generate_fresnel_zone_plate_probe(
         _fzp_probe_geometry(),
         _FZP_ZONE_PLATE,
         photon_wavelength_m=_FZP_WAVELENGTH_M,
         defocus_distance_m=_EQUIVALENT_FRAME_DEFOCUS_M,
-        remove_focus_curvature=remove_focus_curvature,
+    )
+    return to_reconstruction_frame(
+        probe,
+        far_field=not equivalent,
+        photon_wavelength_m=_FZP_WAVELENGTH_M,
+        defocus_distance_m=_EQUIVALENT_FRAME_DEFOCUS_M,
     )
 
 
-def _kb_probe_at_defocus(*, remove_focus_curvature: bool) -> Probe:
-    return generate_kb_mirror_probe(
+def _kb_probe_at_defocus(*, equivalent: bool) -> Probe:
+    probe = generate_kb_mirror_probe(
         _kb_probe_geometry(),
         _kb_mirrors(),
         photon_wavelength_m=_KB_WAVELENGTH_M,
         defocus_distance_m=_EQUIVALENT_FRAME_DEFOCUS_M,
-        remove_focus_curvature=remove_focus_curvature,
+    )
+    return to_reconstruction_frame(
+        probe,
+        far_field=not equivalent,
+        photon_wavelength_m=_KB_WAVELENGTH_M,
+        defocus_distance_m=_EQUIVALENT_FRAME_DEFOCUS_M,
     )
 
 
@@ -1893,12 +1916,12 @@ class TestEquivalentFrame:
         self, generate: Any, wavelength_m: float
     ) -> None:
         lab = _detector_intensity(
-            generate(remove_focus_curvature=False),
+            generate(equivalent=False),
             wavelength_m=wavelength_m,
             distance_m=_EQUIVALENT_FRAME_DETECTOR_DISTANCE_M,
         )
         equivalent = _detector_intensity(
-            generate(remove_focus_curvature=True),
+            generate(equivalent=True),
             wavelength_m=wavelength_m,
             distance_m=_EQUIVALENT_FRAME_DETECTOR_DISTANCE_M / self._MAGNIFICATION,
         )
@@ -1908,8 +1931,8 @@ class TestEquivalentFrame:
     def test_the_curvature_removed_is_centred_where_the_propagator_centres_its_grid(
         self,
     ) -> None:
-        curved = _fzp_probe_at_defocus(remove_focus_curvature=False).get_array()[0]
-        flat = _fzp_probe_at_defocus(remove_focus_curvature=True).get_array()[0]
+        curved = _fzp_probe_at_defocus(equivalent=False).get_array()[0]
+        flat = _fzp_probe_at_defocus(equivalent=True).get_array()[0]
         x_m = _FZP_PROBE_PITCH_M * (numpy.arange(_FZP_NUM_PX) - _FZP_NUM_PX // 2)
         radius2_m2 = numpy.square(x_m)[:, numpy.newaxis] + numpy.square(x_m)[numpy.newaxis, :]
         sphere = numpy.exp(1j * PI * radius2_m2 / (_FZP_WAVELENGTH_M * _EQUIVALENT_FRAME_DEFOCUS_M))
@@ -1917,16 +1940,47 @@ class TestEquivalentFrame:
         numpy.testing.assert_allclose(flat * sphere, curved, rtol=1e-12, atol=1e-12)
 
     def test_at_the_focus_there_is_nothing_to_remove(self) -> None:
-        def at_focus(remove_focus_curvature: bool) -> numpy.ndarray:
-            return generate_fresnel_zone_plate_probe(
-                _fzp_probe_geometry(),
-                _FZP_ZONE_PLATE,
-                photon_wavelength_m=_FZP_WAVELENGTH_M,
-                defocus_distance_m=0.0,
-                remove_focus_curvature=remove_focus_curvature,
-            ).get_array()
+        probe = generate_fresnel_zone_plate_probe(
+            _fzp_probe_geometry(),
+            _FZP_ZONE_PLATE,
+            photon_wavelength_m=_FZP_WAVELENGTH_M,
+            defocus_distance_m=0.0,
+        )
 
-        numpy.testing.assert_array_equal(at_focus(True), at_focus(False))
+        removed = remove_defocus_phase(
+            probe, photon_wavelength_m=_FZP_WAVELENGTH_M, defocus_distance_m=0.0
+        )
+
+        assert removed is probe
+
+    @pytest.mark.parametrize('defocus_m', [1.0e-4, -3.0e-5])
+    def test_removing_inverts_applying(self, defocus_m: float) -> None:
+        rng = numpy.random.default_rng(3)
+        probe = Probe(
+            array=rng.standard_normal((2, 16, 20)) + 1j * rng.standard_normal((2, 16, 20)),
+            pixel_geometry=PixelGeometry(width_m=1.0e-8, height_m=1.5e-8),
+        )
+
+        round_trip = remove_defocus_phase(
+            apply_defocus_phase(
+                probe, photon_wavelength_m=_FZP_WAVELENGTH_M, defocus_distance_m=defocus_m
+            ),
+            photon_wavelength_m=_FZP_WAVELENGTH_M,
+            defocus_distance_m=defocus_m,
+        )
+
+        numpy.testing.assert_allclose(round_trip.get_array(), probe.get_array(), atol=1e-12)
+
+    def test_far_field_keeps_the_physical_probe(self) -> None:
+        probe = _fzp_probe_at_defocus(equivalent=False)
+        unchanged = to_reconstruction_frame(
+            probe,
+            far_field=True,
+            photon_wavelength_m=_FZP_WAVELENGTH_M,
+            defocus_distance_m=_EQUIVALENT_FRAME_DEFOCUS_M,
+        )
+
+        assert unchanged is probe
 
 
 class TestGenerateMirrorFigureError:
@@ -2538,3 +2592,54 @@ class TestGramSchmidt:
 
         assert numpy.linalg.norm(result[3]) == 0.0
         assert numpy.count_nonzero(numpy.linalg.norm(result, axis=1)) == 3
+
+
+def _axis_test_geometry(size_px: int) -> ProbeGeometry:
+    return ProbeGeometry(
+        width_px=size_px, height_px=size_px, pixel_width_m=1.0e-8, pixel_height_m=1.0e-8
+    )
+
+
+_SYMMETRIC_GENERATORS: dict[str, Any] = {
+    'disk': lambda g: generate_disk_probe(g, radius_m=3.0e-8),
+    'rectangular': lambda g: generate_rectangular_probe(g, width_m=5.0e-8, height_m=3.0e-8),
+    'super_gaussian': lambda g: generate_super_gaussian_probe(
+        g, annular_radius_m=0.0, fwhm_m=4.0e-8, order_parameter=2.0
+    ),
+    'zernike': lambda g: generate_zernike_probe(g, [ZernikeMode(1.0, 0, 0)], radius_m=4.0e-8),
+    'hermite_gauss': lambda g: generate_hermite_gauss_probe(
+        g, [HermiteMode(1.0, 0, 0)], beam_waist_x_m=3.0e-8, beam_waist_y_m=3.0e-8
+    ),
+}
+
+
+@pytest.mark.parametrize('size_px', [16, 17])
+@pytest.mark.parametrize('name', list(_SYMMETRIC_GENERATORS))
+def test_every_generated_probe_is_centered_on_the_beam_axis(name: str, size_px: int) -> None:
+    """Pixel N // 2, the FFT origin, on even and odd grids alike.
+
+    An even grid holds one more pixel before the axis than after it, so the tail a
+    Gaussian truncates there pulls its centroid by about 1e-6 px; a compact aperture
+    fits inside and is exact.
+    """
+    probe = _SYMMETRIC_GENERATORS[name](_axis_test_geometry(size_px))
+
+    moments = compute_intensity_moments(numpy.abs(probe.get_array()[0]) ** 2)
+
+    assert float(moments.centroid_x_px) == pytest.approx(0.0, abs=1e-5)
+    assert float(moments.centroid_y_px) == pytest.approx(0.0, abs=1e-5)
+
+
+def test_the_zone_plate_focus_is_on_the_beam_axis() -> None:
+    """The focal peak, which side lobes reaching the window's edge cannot move."""
+    probe = generate_fresnel_zone_plate_probe(
+        _fzp_probe_geometry(),
+        _FZP_ZONE_PLATE,
+        photon_wavelength_m=_FZP_WAVELENGTH_M,
+        defocus_distance_m=0.0,
+    )
+    intensity = numpy.abs(probe.get_array()[0]) ** 2
+
+    peak = numpy.unravel_index(numpy.argmax(intensity), intensity.shape)
+
+    assert peak == (_FZP_NUM_PX // 2, _FZP_NUM_PX // 2)

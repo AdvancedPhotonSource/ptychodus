@@ -159,9 +159,9 @@ def apply_defocus_phase(
     The propagators here use ``exp(+ikz)``, so a probe sampled a signed distance *z*
     past its focus carries ``exp(+i pi (x^2 + y^2) / (lambda z))``: *z* > 0 lies
     downstream of the focus and the wave diverges, *z* < 0 lies upstream and it
-    converges. ``x`` and ``y`` are measured in meters from the pixel ``(N - 1) / 2``,
-    the center the amplitude generators use, so the curvature adds no tilt; each axis
-    keeps its own pixel size. The factor is a pure phase, so the power is unchanged,
+    converges. ``x`` and ``y`` are measured in meters from the beam axis, pixel
+    ``N // 2`` (:meth:`ProbeGeometry.get_transverse_coordinates`), the center every
+    generator uses, so the curvature adds no tilt; each axis keeps its own pixel size. The factor is a pure phase, so the power is unchanged,
     and *z* = 0 returns *probe* itself.
 
     Two sampling checks run over the pixels whose combined amplitude is at least
@@ -176,8 +176,9 @@ def apply_defocus_phase(
         return probe
 
     coords = _probe_geometry(probe).get_transverse_coordinates()
-    phase = PI * (numpy.square(coords.x_m) + numpy.square(coords.y_m))
-    phase /= photon_wavelength_m * defocus_distance_m
+    phase = _defocus_phase_rad(
+        coords, photon_wavelength_m=photon_wavelength_m, defocus_distance_m=defocus_distance_m
+    )
     array = probe.get_array()
     pixel_geometry = probe.get_pixel_geometry()
 
@@ -191,6 +192,65 @@ def apply_defocus_phase(
     )
 
     return Probe(array=array * numpy.exp(1j * phase), pixel_geometry=pixel_geometry)
+
+
+def remove_defocus_phase(
+    probe: Probe,
+    *,
+    photon_wavelength_m: float,
+    defocus_distance_m: float,
+) -> Probe:
+    """Divide the curvature of a beam sampled past its focus out of every incoherent mode.
+
+    The exact inverse of :func:`apply_defocus_phase`, about the same axis. It turns a
+    field sampled *defocus_distance_m* past an ideal focus into its Fresnel-scaled
+    equivalent: the field the equivalent parallel-beam geometry of a cone beam
+    propagates. The sampling checks are not run, since they judge a curvature being
+    applied, not one that cancels a curvature already present. Zero defocus returns
+    *probe* itself.
+    """
+    if defocus_distance_m == 0.0:
+        return probe
+
+    phase = _defocus_phase_rad(
+        _probe_geometry(probe).get_transverse_coordinates(),
+        photon_wavelength_m=photon_wavelength_m,
+        defocus_distance_m=defocus_distance_m,
+    )
+    return Probe(
+        array=probe.get_array() * numpy.exp(-1j * phase),
+        pixel_geometry=probe.get_pixel_geometry(),
+    )
+
+
+def to_reconstruction_frame(
+    probe: Probe,
+    *,
+    far_field: bool,
+    photon_wavelength_m: float,
+    defocus_distance_m: float,
+) -> Probe:
+    """Return a physical probe in the frame a reconstruction in this regime uses.
+
+    Far field reconstructs the probe as the optic forms it, curvature and all. Near
+    field reconstructs in the equivalent parallel-beam geometry of the cone beam, whose
+    magnification already accounts for the spherical wave of the focus, so
+    :func:`remove_defocus_phase` divides it out.
+    """
+    if far_field:
+        return probe
+
+    return remove_defocus_phase(
+        probe, photon_wavelength_m=photon_wavelength_m, defocus_distance_m=defocus_distance_m
+    )
+
+
+def _defocus_phase_rad(
+    coords: ProbeTransverseCoordinates, *, photon_wavelength_m: float, defocus_distance_m: float
+) -> RealArrayType:
+    """The phase ``pi (x^2 + y^2) / (lambda z)`` of a beam sampled *z* past its focus."""
+    phase = PI * (numpy.square(coords.x_m) + numpy.square(coords.y_m))
+    return phase / (photon_wavelength_m * defocus_distance_m)
 
 
 def _warn_about_defocus_sampling(
@@ -504,15 +564,13 @@ def generate_fresnel_zone_plate_probe(
     *,
     photon_wavelength_m: float,
     defocus_distance_m: float,
-    remove_focus_curvature: bool = False,
 ) -> Probe:
     """Simulate the probe formed by a Fresnel zone plate propagated to a given defocus distance.
 
-    With *remove_focus_curvature*, the probe is returned in the Fresnel-scaled equivalent
-    parallel-beam frame: the spherical wave the ideal focus emits, which a cone-beam
-    geometry's magnification already accounts for, is divided out. The transform returns
-    exact point samples of the field, so this is exact even where that curvature would
-    alias on the probe grid.
+    The zone plate's axis, and so the focus, lies on pixel ``N // 2`` of the probe grid, the
+    origin of the Fresnel transform. The transform returns exact point samples of the
+    field, so :func:`remove_defocus_phase` maps it to the equivalent parallel-beam frame
+    exactly, even where the curvature would alias on the probe grid.
     """
     focal_length_m = zone_plate.get_focal_length_m(photon_wavelength_m)
     propagation_distance_m = focal_length_m + defocus_distance_m
@@ -565,48 +623,11 @@ def generate_fresnel_zone_plate_probe(
         propagation_distance_m=propagation_distance_m,
     )
     propagator = FresnelTransformPropagator(propagator_parameters)
-    array = propagator.propagate(fzp_transmission_function)
 
-    if remove_focus_curvature:
-        array = _remove_focus_curvature(
-            array,
-            probe_pixel_geometry,
-            photon_wavelength_m=photon_wavelength_m,
-            defocus_distance_m=defocus_distance_m,
-        )
-
-    return Probe(array=array, pixel_geometry=probe_pixel_geometry)
-
-
-def _remove_focus_curvature(
-    array: ComplexArrayType,
-    pixel_geometry: PixelGeometry,
-    *,
-    photon_wavelength_m: float,
-    defocus_distance_m: float,
-) -> ComplexArrayType:
-    """Divide the spherical wave of an ideal focus out of a field sampled past it.
-
-    A field sampled *defocus_distance_m* past its focus carries
-    ``exp(+i pi (x^2 + y^2) / (lambda z))``, the convention of
-    :func:`apply_defocus_phase`. Multiplying by its conjugate leaves the field the
-    Fresnel scaling theorem pairs with the equivalent parallel-beam geometry. The
-    single-step Fresnel transform returns exact point samples of the field, so the
-    pointwise product is exact even where the curvature itself would alias.
-
-    ``x`` and ``y`` are measured from the pixel ``N // 2``, the center of the Fresnel
-    transform's output grid. The ``(N - 1) / 2`` center of :func:`apply_defocus_phase`
-    would leave a linear phase, a tilt, on an even grid. Zero defocus returns *array*.
-    """
-    if defocus_distance_m == 0.0:
-        return array
-
-    height_px, width_px = array.shape[-2:]
-    x_m = pixel_geometry.width_m * (numpy.arange(width_px) - width_px // 2)
-    y_m = pixel_geometry.height_m * (numpy.arange(height_px) - height_px // 2)
-    radius2_m2 = numpy.square(y_m)[:, numpy.newaxis] + numpy.square(x_m)[numpy.newaxis, :]
-    phase = -PI * radius2_m2 / (photon_wavelength_m * defocus_distance_m)
-    return array * numpy.exp(1j * phase)
+    return Probe(
+        array=propagator.propagate(fzp_transmission_function),
+        pixel_geometry=probe_pixel_geometry,
+    )
 
 
 # The figure-error and focus-sampling warnings below pull in opposite directions: a
@@ -829,7 +850,6 @@ def generate_kb_mirror_probe(
     figure_error_y: Iterable[LegendreMode] = (),
     min_pupil_px_for_figure_error: float = 16.0,
     min_px_per_focus_fwhm: float = 2.0,
-    remove_focus_curvature: bool = False,
 ) -> Probe:
     """Simulate the probe a Kirkpatrick-Baez mirror pair forms at a given defocus distance.
 
@@ -855,10 +875,10 @@ def generate_kb_mirror_probe(
     pupil footprint while a coarser one undersamples the focus -- and both scale with the
     array size, so a grid too small satisfies neither. Only logging depends on them.
 
-    With *remove_focus_curvature*, the probe is returned in the Fresnel-scaled equivalent
-    parallel-beam frame, as :func:`generate_fresnel_zone_plate_probe` describes. One sphere
-    is divided out, at *defocus_distance_m* past the reference plane; the phase
-    *astigmatism_m* adds about it stays in the probe, since one magnification describes the
+    The pupil's axis, and so the focus, lies on pixel ``N // 2``, as for
+    :func:`generate_fresnel_zone_plate_probe`. In the equivalent parallel-beam frame
+    (:func:`remove_defocus_phase` at *defocus_distance_m*) the phase *astigmatism_m* adds
+    about that one sphere stays in the probe, since one magnification describes the
     equivalent geometry.
 
     Raises ValueError when the propagation distance vanishes, when either focus plane
@@ -993,17 +1013,11 @@ def generate_kb_mirror_probe(
         propagation_distance_m=propagation_distance_m,
     )
     propagator = FresnelTransformPropagator(propagator_parameters)
-    array = propagator.propagate(kb_transmission_function)
 
-    if remove_focus_curvature:
-        array = _remove_focus_curvature(
-            array,
-            probe_pixel_geometry,
-            photon_wavelength_m=photon_wavelength_m,
-            defocus_distance_m=defocus_distance_m,
-        )
-
-    return Probe(array=array, pixel_geometry=probe_pixel_geometry)
+    return Probe(
+        array=propagator.propagate(kb_transmission_function),
+        pixel_geometry=probe_pixel_geometry,
+    )
 
 
 def _warn_about_kb_sampling(

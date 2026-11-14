@@ -43,7 +43,7 @@ def _metadata() -> ProductMetadata:
 
 
 def _probe_array(num_modes: int = 1) -> numpy.ndarray:
-    yy, xx = numpy.mgrid[:_PROBE_PX, :_PROBE_PX] - (_PROBE_PX - 1) / 2
+    yy, xx = numpy.mgrid[:_PROBE_PX, :_PROBE_PX] - _PROBE_PX // 2
     base = numpy.exp(-(yy**2 + xx**2) / 4.0).astype(complex)
     return numpy.stack([base / (mode + 1) for mode in range(num_modes)])
 
@@ -83,9 +83,9 @@ def _make_product(
     )
 
 
-# A zero sub-pixel offset needs ``center - (extent - 1) / 2`` whole, so for an even
-# extent the zero-offset centers are the half-integers.
-_ZERO_OFFSET = [(8.5, 8.5), (11.5, 11.5), (14.5, 14.5)]
+# A zero sub-pixel offset needs ``center - extent // 2`` whole: the probe's axis pixel
+# lands on the center, so the zero-offset centers are the integers.
+_ZERO_OFFSET = [(8.0, 8.0), (11.0, 11.0), (14.0, 14.0)]
 _SUBPIXEL = [(8.3, 9.7), (11.5, 11.5), (14.2, 13.8)]
 
 
@@ -103,11 +103,11 @@ def test_patch_intensity_matches_a_hand_computed_fourier_shift() -> None:
     product = _make_product(_SUBPIXEL, num_modes=3)
 
     for patch, (x_px, y_px) in zip(iter_probe_patches(product), _SUBPIXEL):
-        half = (_PROBE_PX - 1) / 2
+        axis = _PROBE_PX // 2
         expected_modes = fourier_shift_2d(
             _probe_array(3),
-            dx=x_px - (int(x_px - half) + half),
-            dy=y_px - (int(y_px - half) + half),
+            dx=x_px - (int(x_px - axis) + axis),
+            dy=y_px - (int(y_px - axis) + axis),
         )
         expected = numpy.sum(numpy.abs(expected_modes) ** 2, axis=0)
         numpy.testing.assert_allclose(patch.get_intensity(), expected, atol=1e-12)
@@ -171,7 +171,7 @@ def test_canonical_canvas_admits_every_position() -> None:
 
 def test_both_conventions_select_the_same_pixels_at_a_zero_offset() -> None:
     """With no sub-pixel offset the integer slice and the bilinear resample agree,
-    which is what pins the two mechanisms to one centered-pixel convention."""
+    which is what pins the two mechanisms to one axis convention."""
     product = _make_product(_ZERO_OFFSET)
     object_array = product.object_.get_layers_flattened()
     geometry = product.object_.get_geometry()

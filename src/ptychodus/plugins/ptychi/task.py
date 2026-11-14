@@ -64,7 +64,7 @@ from ptychodus.api.reconstruct import (
     ReconstructOutput,
     warn_if_propagation_regime_disagrees,
 )
-from ptychodus.api.typing import ComplexArrayType, RealArrayType
+from ptychodus.api.typing import BooleanArrayType, ComplexArrayType, RealArrayType
 
 logger = logging.getLogger(__name__)
 
@@ -349,9 +349,11 @@ def _propagate_intensity(propagator: Any, wavefield: numpy.ndarray) -> numpy.nda
     """Detector-plane intensity of `wavefield` under a pty-chi propagator."""
     import torch
 
+    # On the host whatever device is torch's default: pty-chi sets that default when a
+    # task is built and leaves it there.
     with torch.no_grad():
         propagated = propagator.propagate_forward(torch.as_tensor(numpy.asarray(wavefield)))
-        return numpy.asarray(torch.abs(propagated).square().numpy())
+        return numpy.asarray(torch.abs(propagated).square().cpu().numpy())
 
 
 def _measure_propagator_energy_ratio(propagator: Any, probe: ProbeEnsemble) -> float:
@@ -372,6 +374,8 @@ def _measure_predicted_intensity(
     product: Product,
     good_pixels: numpy.ndarray,
     num_sample_positions: int,
+    *,
+    gain: RealArrayType | None = None,
 ) -> tuple[float, int]:
     """Mean detector total pty-chi's forward model would predict, over sampled positions.
 
@@ -406,6 +410,11 @@ def _measure_predicted_intensity(
         if propagator.is_coordinate_shifted:
             intensity = numpy.fft.fftshift(intensity, axes=(-2, -1))
 
+        # The detector's response multiplies what reaches it; the background is
+        # subtracted from the measured side instead.
+        if gain is not None:
+            intensity = intensity * gain
+
         total += float(numpy.sum(intensity[good_pixels]))
         sampled += 1
 
@@ -434,11 +443,72 @@ def _measure_detector_intensity(parameters: ReconstructInput, good_pixels: numpy
     return measured
 
 
+def _detector_response(
+    parameters: ReconstructInput, *, flat_field_floor: float
+) -> tuple[tuple[RealArrayType, RealArrayType] | None, BooleanArrayType]:
+    """pty-chi's detector response map for *parameters*, and its valid-pixel mask.
+
+    pty-chi models ``intensity * gain + offset``, which is ptychodus's own model of an
+    uncorrected pattern: the gain is the flat field and the offset the background, each
+    ones or zeros when the patterns carry none, and no map at all when they carry
+    neither. Both are on the pattern grid in the centered order ptychodus stores, which
+    pty-chi shifts itself when it shifts the patterns. pty-chi requires a positive gain,
+    so a flat-field pixel at or below *flat_field_floor* -- the one detector corrections
+    mark bad when dividing -- takes a gain of one and leaves the valid-pixel mask, which
+    otherwise excludes the bad pixels.
+    """
+    valid_pixel_mask = numpy.logical_not(parameters.bad_pixels)
+
+    if parameters.flat_field is None and parameters.background is None:
+        return None, valid_pixel_mask
+
+    shape = valid_pixel_mask.shape
+
+    if parameters.flat_field is None:
+        gain = numpy.ones(shape)
+    else:
+        flat_field = numpy.nan_to_num(numpy.asarray(parameters.flat_field, dtype=float))
+        responsive = flat_field > flat_field_floor
+        gain = numpy.where(responsive, flat_field, 1.0)
+        valid_pixel_mask = numpy.logical_and(valid_pixel_mask, responsive)
+
+    if parameters.background is None:
+        offset = numpy.zeros(shape)
+    else:
+        offset = numpy.nan_to_num(numpy.asarray(parameters.background, dtype=float))
+
+    return (gain, offset), valid_pixel_mask
+
+
+def _to_ptychi_positions_px(
+    x_px: RealArrayType, y_px: RealArrayType, probes: ProbeEnsemble
+) -> tuple[RealArrayType, RealArrayType]:
+    """Object-pixel positions of the beam axis, in the frame pty-chi places probes in.
+
+    ptychodus puts the probe's beam axis, pixel ``N // 2``, on a position; pty-chi puts
+    the probe's midpoint ``(N - 1) / 2`` there, and the axis lies ``axis_offset`` past
+    it. pty-chi's absolute centre is ``positions + position_origin_coords``, and the
+    options carry the offset as that origin, so the positions handed over are the axis
+    less twice the offset: the absolute centre is then the midpoint, the axis lands on
+    the position, and pty-chi's integer snap, ``positions.round() + origin``, cuts the
+    patch at the corner ``axis - N // 2`` whatever the position's parity.
+    """
+    return x_px - 2 * probes.axis_offset_x_px, y_px - 2 * probes.axis_offset_y_px
+
+
+def _from_ptychi_positions_px(
+    x_px: RealArrayType, y_px: RealArrayType, probes: ProbeEnsemble
+) -> tuple[RealArrayType, RealArrayType]:
+    """The inverse of :func:`_to_ptychi_positions_px`."""
+    return x_px + 2 * probes.axis_offset_x_px, y_px + 2 * probes.axis_offset_y_px
+
+
 def align_probe_gauge_with_ptychi(
     task_options: PtychographyTaskOptions,
     parameters: ReconstructInput,
     *,
     num_sample_positions: int = 32,
+    valid_pixel_mask: BooleanArrayType | None = None,
 ) -> ProbeGauge:
     """Measure the factor that carries this product's probe into pty-chi's gauge.
 
@@ -461,7 +531,9 @@ def align_probe_gauge_with_ptychi(
     energy_ratio = _measure_propagator_energy_ratio(propagator, parameters.product.probes)
     expected_factor = 1.0 / math.sqrt(energy_ratio) if energy_ratio > 0.0 else 1.0
 
-    good_pixels = numpy.logical_not(parameters.bad_pixels)
+    good_pixels = (
+        numpy.logical_not(parameters.bad_pixels) if valid_pixel_mask is None else valid_pixel_mask
+    )
     measured = _measure_detector_intensity(parameters, good_pixels)
 
     try:
@@ -470,6 +542,7 @@ def align_probe_gauge_with_ptychi(
             parameters.product,
             good_pixels,
             num_sample_positions,
+            gain=parameters.flat_field,
         )
     except ValueError as exc:
         logger.warning(
@@ -602,17 +675,20 @@ def align_task_options_with_product(
         [float(spacing) for spacing in slice_spacings_m] if len(slice_spacings_m) > 0 else None,
     )
 
-    # ptychodus hands pty-chi probe positions already mapped to 0-based object
-    # pixel indices (see `map_coordinates_probe_to_object` below), and pty-chi
-    # computes `positions_pxind = positions + position_origin_coords`. A zero
-    # origin is what makes those two agree; the default of SUPPORT would add
-    # half the object shape to every position.
+    # ptychodus hands pty-chi probe positions already mapped to 0-based object pixel
+    # indices, and pty-chi computes `positions_pxind = positions + position_origin_coords`
+    # -- the default of SUPPORT would add half the object shape to every position. The
+    # origin carries the probe's axis offset instead; see `_to_ptychi_positions_px`.
     _overwrite(
         object_options,
         'determine_position_origin_coords_by',
         ObjectPosOriginCoordsMethods.SPECIFIED,
     )
-    _overwrite(object_options, 'position_origin_coords', [0.0, 0.0])
+    _overwrite(
+        object_options,
+        'position_origin_coords',
+        [product.probes.axis_offset_y_px, product.probes.axis_offset_x_px],
+    )
 
     _overwrite(aligned.data_options, 'wavelength_m', metadata.photon_wavelength_m)
 
@@ -682,10 +758,16 @@ def reconstruct_with_ptychi(
     parameters: ReconstructInput,
     task_options: PtychographyTaskOptions,
     num_sync_epochs: int,
+    *,
+    flat_field_floor: float = 1.0e-3,
 ) -> Iterator[ReconstructOutput]:
     """Instantiate ``PtychographyTask`` and yield a ``ReconstructOutput`` every
     ``num_sync_epochs`` epochs. The ``PtychographyTask`` import is deferred to
-    call time so importing this module does not acquire a GPU context."""
+    call time so importing this module does not acquire a GPU context.
+
+    A background and flat field the patterns carry uncorrected become pty-chi's detector
+    response, ``intensity * gain + offset``; see :func:`_detector_response`, which
+    *flat_field_floor* is passed to."""
     from ptychi.api.task import PtychographyTask
 
     # A hand-built options object that skipped alignment. pty-chi neither validates
@@ -707,13 +789,21 @@ def reconstruct_with_ptychi(
     # ptychodus stores stays in its own gauge whatever ran. Only the probe is scaled:
     # the object rides through untouched, which leaves the product the data constrains
     # unchanged, and with it the loss history.
-    gauge = align_probe_gauge_with_ptychi(task_options, parameters)
+    response_map, valid_pixel_mask = _detector_response(
+        parameters, flat_field_floor=flat_field_floor
+    )
+    gauge = align_probe_gauge_with_ptychi(
+        task_options, parameters, valid_pixel_mask=valid_pixel_mask
+    )
     task_options = apply_probe_gauge_to_options(task_options, gauge)
 
     # pty-chi stores probe positions in object pixel units; ptychodus stores
     # them in meters. The output path below applies the inverse mapping.
-    position_x_px = object_geometry.map_probe_positions_to_object_x_px(product_in.probe_positions)
-    position_y_px = object_geometry.map_probe_positions_to_object_y_px(product_in.probe_positions)
+    position_x_px, position_y_px = _to_ptychi_positions_px(
+        object_geometry.map_probe_positions_to_object_x_px(product_in.probe_positions),
+        object_geometry.map_probe_positions_to_object_y_px(product_in.probe_positions),
+        product_in.probes,
+    )
 
     # Task data goes in as keyword arguments; passing it through the *Options
     # objects still works but is deprecated and warns per field.
@@ -725,7 +815,8 @@ def reconstruct_with_ptychi(
         probe_position_x_px=position_x_px,
         probe_position_y_px=position_y_px,
         opr_mode_weights_data=_initial_opr_mode_weights(product_in.probes),
-        valid_pixel_mask=numpy.logical_not(parameters.bad_pixels),
+        valid_pixel_mask=valid_pixel_mask,
+        detector_response_map=response_map,
     )
 
     with task:
@@ -766,8 +857,11 @@ def reconstruct_with_ptychi(
                 pixel_geometry=product_in.probes.get_pixel_geometry(),
             )
 
-            corrected_position_x_px = task.get_probe_positions_x(as_numpy=True)
-            corrected_position_y_px = task.get_probe_positions_y(as_numpy=True)
+            corrected_position_x_px, corrected_position_y_px = _from_ptychi_positions_px(
+                numpy.asarray(task.get_probe_positions_x(as_numpy=True), dtype=numpy.float64),
+                numpy.asarray(task.get_probe_positions_y(as_numpy=True), dtype=numpy.float64),
+                product_in.probes,
+            )
             corrected_scan_points: list[ProbePosition] = list()
 
             for uncorrected_point, pos_x_px, pos_y_px in zip(
