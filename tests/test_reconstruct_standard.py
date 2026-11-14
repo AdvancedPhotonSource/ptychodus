@@ -72,17 +72,17 @@ def test_every_profile_builds_a_parser() -> None:
         ), name
 
 
-def test_every_profile_can_print_ptychi_option_defaults() -> None:
+def test_every_profile_can_print_option_defaults() -> None:
     """All ten beamline commands must offer the flag, and offer it without any input.
 
-    It is how a user obtains the file ``--ptychi-options`` takes, so a driver missing it
+    It is how a user obtains the document ``--options`` takes, so a driver missing it
     leaves no way to start one but finishing a reconstruction first.
     """
     for name, profile in _profiles().items():
         parser = rs.build_standard_parser(profile)
 
         with pytest.raises(SystemExit) as caught:
-            parser.parse_args(['--print-ptychi-options'])
+            parser.parse_args(['--print-options'])
 
         assert caught.value.code == 0, name
 
@@ -565,6 +565,7 @@ class TestScatteringGeometry:
             probe_position_file_readers=SimpleNamespace(
                 get_strategy_by_name=lambda name: reader(lab_positions)
             ),
+            reconstructor_libraries=rs.PluginRegistry.load_plugins().reconstructor_libraries,
         )
         monkeypatch.setattr(rs.PluginRegistry, 'load_plugins', lambda: registry)
         output = tmp_path / 'prepared'

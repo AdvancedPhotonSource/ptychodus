@@ -30,28 +30,6 @@ __all__ = ['reconstruct_scan']
 _RANK_ENVIRONMENT_VARIABLES = ('RANK', 'LOCAL_RANK', 'SLURM_PROCID', 'SLURM_LOCALID')
 
 
-def _redirect_console(output_directory: Any) -> None:
-    """Point this process's stdout and stderr at the scan's own log file.
-
-    At the file-descriptor level, not by reassigning ``sys.stdout``: pty-chi's progress
-    bars and torch's chatter come out of C extensions writing to fd 1 and fd 2 directly,
-    which a Python-level reassignment never sees. Both descriptors go to one file so that
-    a crash's stderr lands in order against the stdout that preceded it.
-    """
-    import sys
-
-    from ptychodus.api.io import StandardFileLayout
-
-    output_directory.mkdir(parents=True, exist_ok=True)
-
-    with open(StandardFileLayout.LOG.path(output_directory), 'w') as handle:
-        os.dup2(handle.fileno(), 1)
-        os.dup2(handle.fileno(), 2)
-
-    sys.stdout = os.fdopen(os.dup(1), 'w', buffering=1)
-    sys.stderr = os.fdopen(os.dup(2), 'w', buffering=1)
-
-
 def reconstruct_scan(payload: dict[str, Any], queue: SimpleQueue[Any]) -> None:
     """Reconstruct the one scan this child was spawned for.
 
@@ -73,13 +51,24 @@ def reconstruct_scan(payload: dict[str, Any], queue: SimpleQueue[Any]) -> None:
         WorkerMessage,
         load_batch_settings_from_text,
     )
-    from ptychodus.cli._reconstruct_common import install_signal_handlers, load_ptychi_options
+    from ptychodus.api.io import StandardFileLayout
+    from ptychodus.cli import open_action_log
+    from ptychodus.cli._reconstruct_common import (
+        default_reconstruction,
+        install_signal_handlers,
+        parse_reconstruction,
+        require_ptychi_options,
+    )
 
     settings = load_batch_settings_from_text(payload['settings_text'])
     scan = payload['scan']
     output_directory = settings.output_directory(scan['scan_no'])
 
-    _redirect_console(output_directory)
+    # At the file-descriptor level: pty-chi's progress bars and torch's chatter come out of
+    # C extensions writing to fd 1 and fd 2 directly, which a reassignment of sys.stdout
+    # never sees. Both go to one file, so a crash's stderr lands in order against the stdout
+    # that preceded it.
+    open_action_log(output_directory, StandardFileLayout.RECONSTRUCT_LOG, capture_descriptors=True)
 
     # The forwarder to the parent is already on the root logger; this adds the same
     # records to the redirected stderr, so the scan's directory explains itself without
@@ -115,14 +104,18 @@ def reconstruct_scan(payload: dict[str, Any], queue: SimpleQueue[Any]) -> None:
 
     # `far_field` is three-valued in the settings; only an explicit False selects the
     # near-field fallback, so a batch that says nothing stays on LSQML.
-    options = load_ptychi_options(
-        None, far_field=settings.metadata_overrides.far_field is not False
+    libraries = registry.reconstructor_libraries
+    resolved = (
+        default_reconstruction(
+            libraries, far_field=settings.metadata_overrides.far_field is not False
+        )
+        if payload['options_document'] is None
+        else parse_reconstruction(
+            libraries, payload['options_document'], source='the batch options'
+        )
     )
-
-    if payload['ptychi_options_json'] is not None:
-        from ptychodus.plugins.ptychi.task import load_task_options
-
-        options = load_task_options(payload['ptychi_options_json'])
+    # The settings file is where a batch states its sync interval.
+    require_ptychi_options(resolved).num_sync_epochs = settings.misc.num_sync_epochs
 
     completed = reconstruct_one_scan(
         settings,
@@ -134,7 +127,7 @@ def reconstruct_scan(payload: dict[str, Any], queue: SimpleQueue[Any]) -> None:
             encoder_angle_deg=scan['encoder_angle_deg'],
             text=scan['text'],
         ),
-        options,
+        resolved,
         read_region=read_region,
         bad_pixels=bad_pixels,
         cancellation=cancellation,

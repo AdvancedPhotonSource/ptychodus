@@ -6,15 +6,19 @@ bare install, so this module must not reach anything behind an optional extra.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING, Literal, cast
 import argparse
 import logging
+import os
+import shlex
 import sys
 from pathlib import Path
 
 if TYPE_CHECKING:
     from ptychodus.api.assemble import DetectorCorrections
     from ptychodus.api.diffraction import DiffractionDataset
+    from ptychodus.api.io import StandardFileLayout
     from ptychodus.api.plugins import PluginRegistry
 
 __all__ = [
@@ -23,10 +27,14 @@ __all__ = [
     'add_log_level_argument',
     'configure_logging',
     'crop_extent_px',
+    'open_action_log',
     'positive_int',
     'read_detector_corrections',
     'verify_all_arguments_parsed',
 ]
+
+
+_LOG_FORMAT = '%(asctime)s %(levelname)s %(name)s: %(message)s'
 
 
 class DirectoryType:
@@ -87,11 +95,50 @@ def configure_logging(args: argparse.Namespace) -> None:
     standard streams has to do so before this runs: ``basicConfig`` captures `sys.stderr`
     by value, and a handler bound to the pre-redirect stream writes to the wrong place.
     """
-    logging.basicConfig(
-        level=args.log_level,
-        stream=sys.stderr,
-        format='%(asctime)s %(levelname)s %(name)s: %(message)s',
-    )
+    logging.basicConfig(level=args.log_level, stream=sys.stderr, format=_LOG_FORMAT)
+
+
+def open_action_log(
+    output_directory: Path,
+    log: StandardFileLayout,
+    *,
+    rank: int = 0,
+    capture_descriptors: bool = False,
+) -> Path:
+    """Append this run to the action's log in `output_directory`, and return the file.
+
+    `log` is the action's ``StandardFileLayout`` log member; a process of rank `rank` above
+    zero writes its own suffixed file, so ranks never share one. The run opens with a line
+    naming the time and the command, since a log is appended to rather than replaced.
+
+    With `capture_descriptors`, file descriptors 1 and 2 are pointed at the file, which
+    captures what C extensions write as well as the log records -- for a process whose
+    console no person reads. Call it before :func:`configure_logging`, which binds the
+    stream it finds. Otherwise the console stays as it is and the root logger gains a
+    handler writing its records to the file too; call it after :func:`configure_logging`.
+    """
+    output_directory.mkdir(parents=True, exist_ok=True)
+    log_file = log.rank_path(output_directory, rank)
+    command = shlex.join([Path(sys.argv[0]).name, *sys.argv[1:]])
+
+    with open(log_file, 'a') as handle:
+        handle.write(f'# {datetime.now().isoformat(timespec="seconds")} {command}\n')
+
+        if capture_descriptors:
+            sys.stdout.flush()
+            sys.stderr.flush()
+            os.dup2(handle.fileno(), 1)
+            os.dup2(handle.fileno(), 2)
+
+    if capture_descriptors:
+        sys.stdout = os.fdopen(os.dup(1), 'w', buffering=1)
+        sys.stderr = os.fdopen(os.dup(2), 'w', buffering=1)
+    else:
+        handler = logging.FileHandler(log_file)
+        handler.setFormatter(logging.Formatter(_LOG_FORMAT))
+        logging.getLogger().addHandler(handler)
+
+    return log_file
 
 
 def add_detector_map_arguments(parser: argparse.ArgumentParser) -> None:

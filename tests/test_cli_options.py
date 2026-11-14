@@ -14,12 +14,14 @@ from pydantic import BaseModel, Field
 import pytest
 import yaml
 
-from ptychodus.cli._options import (
+from ptychodus.api.options import (
     OptionsError,
     apply_options_document,
-    format_options_document,
+    dump_options_document,
+    parse_options_document,
     read_options_document,
 )
+from ptychodus.cli._options import format_options_document
 
 
 class _Training(BaseModel):
@@ -140,3 +142,37 @@ def test_a_malformed_document_is_refused(tmp_path: Path, text: str, message: str
 
     with pytest.raises(OptionsError, match=message):
         read_options_document(options_file, ('algorithm',))
+
+
+def test_the_canonical_document_holds_only_what_is_set() -> None:
+    text = dump_options_document({'library': 'lib', 'algorithm': 'fake'}, _defaults())
+    document = yaml.safe_load(text)
+
+    assert document['library'] == 'lib'
+    assert document['algorithm'] == 'fake'
+    # batch_size was never set, so a backend that resolves it at runtime still can.
+    assert 'batch_size' not in document['options']['training']
+
+
+def test_the_canonical_document_reproduces_the_options_and_their_set_ness() -> None:
+    defaults = _defaults()
+    edited = apply_options_document(defaults, {'learning_rate': 0.5}, subject='fake')
+    document = yaml.safe_load(dump_options_document({'algorithm': 'fake'}, edited))
+
+    restored = apply_options_document(defaults, document['options'], subject='fake')
+
+    assert restored == edited
+    assert restored.model_fields_set == edited.model_fields_set
+    assert restored.training.model_fields_set == edited.training.model_fields_set  # type: ignore[attr-defined]
+
+
+def test_a_document_is_parsed_from_text_and_named_in_errors() -> None:
+    selectors, fields = parse_options_document(
+        'algorithm: fake\noptions:\n  learning_rate: 0.5\n', ('algorithm',), source='inline'
+    )
+
+    assert selectors == {'algorithm': 'fake'}
+    assert fields == {'learning_rate': 0.5}
+
+    with pytest.raises(OptionsError, match='inline'):
+        parse_options_document('- not a mapping\n', ('algorithm',), source='inline')

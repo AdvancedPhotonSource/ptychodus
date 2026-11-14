@@ -27,6 +27,13 @@ def _console_scripts() -> list[tuple[str, str, str]]:
     return sorted(entries)
 
 
+# Reconstruct with whichever backend an options document names, so they must load on an
+# install that has none.
+_ANY_BACKEND_MODULES = frozenset(
+    {'ptychodus.cli.reconstruct_prepared', 'ptychodus.cli.reconstruct_subprocess'}
+)
+
+
 @pytest.mark.parametrize(('command', 'module', 'function'), _console_scripts())
 def test_entry_point_imports_and_exposes_its_callable(
     command: str, module: str, function: str
@@ -34,7 +41,7 @@ def test_entry_point_imports_and_exposes_its_callable(
     if module.startswith('ptychodus.webapp'):
         pytest.importorskip('fastapi')
 
-    if module.startswith('ptychodus.cli.reconstruct_'):
+    if module.startswith('ptychodus.cli.reconstruct_') and module not in _ANY_BACKEND_MODULES:
         pytest.importorskip('ptychi')
 
     if module == 'ptychodus.cli.stream':
@@ -51,7 +58,7 @@ def test_entry_point_prints_help_and_exits_zero(
     if module.startswith('ptychodus.webapp'):
         pytest.importorskip('fastapi')
 
-    if module.startswith('ptychodus.cli.reconstruct_'):
+    if module.startswith('ptychodus.cli.reconstruct_') and module not in _ANY_BACKEND_MODULES:
         pytest.importorskip('ptychi')
 
     if module == 'ptychodus.cli.stream':

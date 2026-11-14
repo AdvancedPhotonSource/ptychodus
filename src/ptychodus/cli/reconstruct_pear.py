@@ -14,7 +14,7 @@ Scope and limitations
   names the destination through ``recon_dir_base``, or through the per-instrument
   convention derived from ``data_directory``, and an argument could only override it.
 - That directory is filled in the ptychodus standard layout -- ``diffraction.h5``,
-  ``ptychi_options.yaml``, per-epoch ``product.NNNNNN.h5`` checkpoints, and the final
+  ``reconstruct_options.yaml``, ``reconstruct.log``, ``product.NNNNNN.h5`` checkpoints, and the final
   ``product.h5``. The per-iteration TIFF stacks and plots of the original workflow are
   still not written.
 - One reconstruction only: no batch queue, no multi-scan shared-object mode, no
@@ -40,7 +40,7 @@ Scope and limitations
 - ``init_layer_append_mode`` of ``avg`` inserts the geometric-mean layer, the slab whose
   repetition reproduces the object. PEAR inserted the arithmetic mean of the layers,
   which lets opposing phases cancel and can turn transparent material absorbing.
-- There is deliberately no ``--ptychi-options``, which the other drivers accept. The
+- There is deliberately no ``--options``, which the other drivers accept. The
   options here are a translation of the parameter file -- near-field propagation, slice
   count, regularization weights and the rest -- so a supplied file would have to either
   lose to those fields or silently discard them, and the parameter file is the input this
@@ -120,16 +120,21 @@ from ptychodus.api.simulate.probe import (
     propagate_probe,
     to_reconstruction_frame,
 )
+from ptychodus.cli import add_log_level_argument, configure_logging, open_action_log
+from ptychodus.cli._options import resolve_reconstructor
 from ptychodus.cli._reconstruct_common import (
+    ResolvedReconstruction,
     estimate_dataset_beam_center,
     estimate_focus_object_distance_m,
     estimate_incident_beam_from_assembled_data,
     install_signal_handlers,
     invalid_count_threshold,
+    process_rank,
     require_near_field_focus_object_distance_m,
     run_reconstruction,
     save_assembled_diffraction,
 )
+from ptychodus.plugins.ptychi.options import options_class_for
 from ptychodus.plugins.aps31id_lamni.diffraction_file import LamNIDiffractionFileReader
 from ptychodus.plugins.aps31id_lamni.scan_directory import locate_scan_directory
 
@@ -763,14 +768,9 @@ def main() -> ExitCode:
         action='store_true',
         help='Build everything and report the resolved configuration without reconstructing.',
     )
-    parser.add_argument('--log-level', default=logging.INFO, type=int, help='Python logging level.')
+    add_log_level_argument(parser)
     args = parser.parse_args()
-
-    logging.basicConfig(
-        level=args.log_level,
-        stream=sys.stderr,
-        format='%(asctime)s %(levelname)s %(name)s: %(message)s',
-    )
+    configure_logging(args)
 
     # Installed before the first long operation, so a cancel during the file reads is
     # already honored. Nothing earlier than this is interruptible.
@@ -1111,55 +1111,56 @@ def main() -> ExitCode:
         losses=[],
     )
 
-    options = _build_lsqml_options(params, num_patterns)
+    task_options = _build_lsqml_options(params, num_patterns)
+    plugin, reconstructor = resolve_reconstructor(
+        registry.reconstructor_libraries, 'PtyChi', 'LSQML'
+    )
+    resolved = ResolvedReconstruction(
+        plugin.simple_name,
+        reconstructor,
+        options_class_for(LSQMLOptions)(
+            task=task_options,
+            num_sync_epochs=args.num_sync_epochs or params.save_freq_iterations,
+        ),
+    )
 
     # The parameter file already names where a run belongs -- `recon_dir_base`, or the
     # per-instrument convention derived from `data_directory` -- so there is no output
     # argument to supersede it. That directory becomes the standard-layout root.
-    output_directory = _output_directory(params, options, probe_ensemble, image_extent.width_px)
+    output_directory = _output_directory(
+        params, task_options, probe_ensemble, image_extent.width_px
+    )
     diffraction_file = StandardFileLayout.DIFFRACTION.path(output_directory)
-    options_file = StandardFileLayout.PTYCHI_OPTIONS.path(output_directory)
     product_file = StandardFileLayout.PRODUCT.path(output_directory)
-    num_sync_epochs = args.num_sync_epochs or params.save_freq_iterations
 
     if args.dry_run:
         logger.info('Resolved output directory: %s', output_directory)
         logger.info('Would write %s', product_file)
-        logger.info(
-            'Would write checkpoints like %s',
-            StandardFileLayout.PRODUCT.checkpoint_path(output_directory, num_sync_epochs),
-        )
 
         if not args.no_save_diffraction:
             logger.info('Would write %s', diffraction_file)
 
-        # The options file records the ALIGNED options, which only exist past the call
-        # this dry run stops before, so it is the one artifact a dry run cannot preview.
-        logger.info('Would write %s once the options are aligned', options_file)
+        logger.info('Would write %s', StandardFileLayout.RECONSTRUCT_OPTIONS.path(output_directory))
         logger.info(
             'Resolved options: %d epochs, batch %d (%s), %s noise, probe %s, object %s',
-            options.reconstructor_options.num_epochs,
-            options.reconstructor_options.batch_size,
-            options.reconstructor_options.batching_mode.name,
-            options.reconstructor_options.noise_model.name,
+            task_options.reconstructor_options.num_epochs,
+            task_options.reconstructor_options.batch_size,
+            task_options.reconstructor_options.batching_mode.name,
+            task_options.reconstructor_options.noise_model.name,
             probe_ensemble.get_array().shape,
             object_.get_array().shape,
         )
         logger.info('Nothing written: stopping before the reconstruction.')
         return ExitCode.SUCCESS
 
+    open_action_log(output_directory, StandardFileLayout.RECONSTRUCT_LOG, rank=process_rank())
     save_assembled_diffraction(
         logger, output_directory, assembled_data, skip=args.no_save_diffraction
     )
 
     reconstruct_input = prepare_reconstruct_input(assembled_data, product)
     run_reconstruction(
-        logger,
-        reconstruct_input,
-        options,
-        output_directory,
-        num_sync_epochs=num_sync_epochs,
-        cancellation=cancellation,
+        logger, resolved, reconstruct_input, output_directory, cancellation=cancellation
     )
     return ExitCode.CANCELLED if cancellation.is_cancelled else ExitCode.SUCCESS
 

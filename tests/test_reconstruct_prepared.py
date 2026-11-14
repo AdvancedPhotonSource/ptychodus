@@ -19,10 +19,9 @@ import pytest
 
 pytest.importorskip('ptychi')
 
-from ptychi.api import LSQMLOptions  # noqa: E402
-
 from ptychodus.api.assemble import AssembledDiffractionData  # noqa: E402
 from ptychodus.api.exit_codes import ExitCode  # noqa: E402
+from ptychodus.api.plugins import PluginRegistry  # noqa: E402
 from ptychodus.api.geometry import PixelGeometry  # noqa: E402
 from ptychodus.api.object import Object, ObjectCenter  # noqa: E402
 from ptychodus.api.probe import ProbeEnsemble  # noqa: E402
@@ -36,7 +35,11 @@ from ptychodus.api.storage import (  # noqa: E402
     save_product_resource,
 )
 from ptychodus.cli import _reconstruct_standard, reconstruct_prepared  # noqa: E402
-from ptychodus.cli._reconstruct_common import CancellationToken  # noqa: E402
+from ptychodus.cli._reconstruct_common import (  # noqa: E402
+    CancellationToken,
+    ResolvedReconstruction,
+    default_reconstruction,
+)
 
 PIXEL_M = 1.0e-9
 NUM_PATTERNS = 4
@@ -55,6 +58,7 @@ def _no_process_side_effects(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep ``main()`` from claiming the test process's signals and root logger."""
     monkeypatch.setattr(reconstruct_prepared, 'install_signal_handlers', CancellationToken)
     monkeypatch.setattr(reconstruct_prepared, 'configure_logging', lambda args: None)
+    monkeypatch.setattr(reconstruct_prepared, 'open_action_log', lambda *args, **kwargs: None)
 
 
 def _assembled_data() -> AssembledDiffractionData:
@@ -101,18 +105,19 @@ def _product(*, far_field: bool = True) -> Product:
 
 
 def _prepare(directory: Path, *, far_field: bool = True, write_options: bool = True) -> None:
-    options = LSQMLOptions()
-    options.reconstructor_options.num_epochs = 6
+    libraries = PluginRegistry.load_plugins().reconstructor_libraries
+    resolved = default_reconstruction(libraries, far_field=far_field)
+    resolved.options.task.reconstructor_options.num_epochs = 6  # type: ignore[attr-defined]
     _reconstruct_standard._write_prepared_directory(
         logging.getLogger('test'),
         directory,
         _assembled_data(),
         _product(far_field=far_field),
-        options,
+        resolved,
     )
 
     if not write_options:
-        (directory / 'ptychi_options.yaml').unlink()
+        (directory / 'reconstruct_options.yaml').unlink()
 
 
 def _main(monkeypatch: pytest.MonkeyPatch, *argv: str) -> ExitCode:
@@ -125,14 +130,15 @@ def _capture_run(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
     def fake_run(
         logger: logging.Logger,
+        resolved: ResolvedReconstruction,
         reconstruct_input: ReconstructInput,
-        options: object,
         output_directory: Path,
         **kwargs: object,
     ) -> None:
         captured.update(
+            resolved=resolved,
             reconstruct_input=reconstruct_input,
-            options=options,
+            task=getattr(resolved.options, 'task', None),
             output_directory=output_directory,
             **kwargs,
         )
@@ -147,7 +153,7 @@ def test_preparing_writes_exactly_the_three_inputs(tmp_path: Path) -> None:
     assert sorted(path.name for path in (tmp_path / 'prepared').iterdir()) == [
         'diffraction.h5',
         'product.h5',
-        'ptychi_options.yaml',
+        'reconstruct_options.yaml',
     ]
 
 
@@ -171,13 +177,12 @@ def test_a_prepared_directory_reconstructs_with_its_staged_options(
     before = {path.name: path.stat().st_mtime_ns for path in prepared.iterdir()}
     captured = _capture_run(monkeypatch)
 
-    code = _main(monkeypatch, '-i', str(prepared), '-o', str(result), '--num-sync-epochs', '3')
+    code = _main(monkeypatch, '-i', str(prepared), '-o', str(result))
 
     assert code is ExitCode.SUCCESS
     assert captured['reconstruct_input'].diffraction_patterns.shape[0] == NUM_PATTERNS
-    assert captured['options'].reconstructor_options.num_epochs == 6
+    assert captured['task'].reconstructor_options.num_epochs == 6
     assert captured['output_directory'] == result
-    assert captured['num_sync_epochs'] == 3
     assert result.is_dir()
     # The prepared directory is an input and stays one.
     assert {path.name: path.stat().st_mtime_ns for path in prepared.iterdir()} == before
@@ -193,7 +198,7 @@ def test_a_near_field_product_without_options_falls_back_to_bh(
     code = _main(monkeypatch, '-i', str(prepared), '-o', str(tmp_path / 'result'))
 
     assert code is ExitCode.SUCCESS
-    assert type(captured['options']).__name__ == 'BHOptions'
+    assert type(captured['task']).__name__ == 'BHOptions'
 
 
 def test_a_dry_run_writes_nothing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -259,7 +264,7 @@ def test_a_stored_product_reconstructs_by_uuid(
 
     assert code is ExitCode.SUCCESS
     assert captured['reconstruct_input'].diffraction_patterns.shape[0] == NUM_PATTERNS
-    assert type(captured['options']).__name__ == 'LSQMLOptions'
+    assert type(captured['task']).__name__ == 'LSQMLOptions'
 
 
 def test_the_storage_root_defaults_to_the_environment(

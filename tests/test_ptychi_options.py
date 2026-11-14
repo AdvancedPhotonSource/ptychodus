@@ -21,7 +21,6 @@ import logging
 import argparse
 import math
 import operator
-from pathlib import Path
 
 import numpy
 import pytest
@@ -62,12 +61,13 @@ from ptychodus.plugins.ptychi.options import apply_to_task  # noqa: E402
 
 # The name pty-chi registers itself under, which is how the store files it.
 _LIBRARY = 'pty-chi'
+from ptychodus.api.plugins import PluginRegistry  # noqa: E402
 from ptychodus.cli._reconstruct_common import (  # noqa: E402
-    _DATA_DERIVED_OPTION_FIELDS,
-    add_print_ptychi_options_argument,
-    format_ptychi_options_defaults,
-    load_ptychi_options,
+    add_print_options_argument,
+    default_reconstruction,
+    parse_reconstruction,
 )
+from ptychodus.plugins.ptychi.options import _DATA_DERIVED_TASK_FIELDS  # noqa: E402
 from ptychodus.plugins.ptychi.algorithms import task_options_classes  # noqa: E402
 from ptychodus.plugins.ptychi.task import (  # noqa: E402
     _build_ptychi_propagator,
@@ -512,65 +512,55 @@ def test_yaml_options_preserve_pty_chi_field_order() -> None:
     assert list(yaml.safe_load(text)) == list(json.loads(dump_task_options(options)))
 
 
-def test_load_ptychi_options_reads_yaml_and_json_alike(tmp_path: Path) -> None:
-    """Both encodings of one options object load to the same thing."""
-    options = LSQMLOptions()
-
-    yaml_file = tmp_path / 'options.yaml'
-    yaml_file.write_text(dump_task_options_yaml(options))
-    json_file = tmp_path / 'options.json'
-    json_file.write_text(dump_task_options(options))
-
-    from_yaml = load_ptychi_options(yaml_file)
-    from_json = load_ptychi_options(json_file)
-
-    assert type(from_yaml) is type(from_json) is LSQMLOptions
-    assert json.loads(dump_task_options(from_yaml)) == json.loads(dump_task_options(from_json))
+# --- --print-options ---------------------------------------------------------------------
 
 
-# --- --print-ptychi-options --------------------------------------------------------
+def _print_options(capsys: pytest.CaptureFixture[str], *argv: str) -> str:
+    parser = argparse.ArgumentParser()
+    add_print_options_argument(parser, library='PtyChi')
+
+    with pytest.raises(SystemExit) as caught:
+        parser.parse_args(['--print-options', *argv])
+
+    assert caught.value.code == 0
+    return capsys.readouterr().out
 
 
 def test_printed_defaults_name_the_same_data_derived_fields_as_alignment() -> None:
-    """The printed header's warning list must be the fields alignment actually writes.
+    """The printed warning list must be the fields alignment actually writes.
 
-    The header tells a reader which values are pointless to edit. That list is written
-    out by hand -- a reader of the file cannot introspect anything -- so this is what
-    keeps it honest against ``_PRODUCT_DERIVED_FIELDS``, which the test above proves is
-    what alignment really sets.
+    The task's description tells a reader which values are pointless to edit. That list is
+    written out by hand -- a reader of the file cannot introspect anything -- so this is
+    what keeps it honest against ``_PRODUCT_DERIVED_FIELDS``, which the test above proves
+    is what alignment really sets.
     """
-    assert set(_DATA_DERIVED_OPTION_FIELDS) == {path for path, _ in _PRODUCT_DERIVED_FIELDS}
+    assert set(_DATA_DERIVED_TASK_FIELDS) == {path for path, _ in _PRODUCT_DERIVED_FIELDS}
 
 
 @pytest.mark.parametrize('algorithm', list(task_options_classes()))
-def test_printed_defaults_round_trip_to_that_algorithm(algorithm: str) -> None:
-    """Printing then loading must give back the algorithm that was asked for.
+def test_printed_defaults_round_trip_to_that_algorithm(
+    capsys: pytest.CaptureFixture[str], algorithm: str
+) -> None:
+    """Printing then reading must give back the algorithm that was asked for.
 
     This is the loop the flag exists for, and it covers the ``options_class_name``
     stamp: PIE, ePIE and rPIE serialize identical field sets, so only the stamp keeps
     them apart.
     """
-    loaded = load_task_options_from_mapping(
-        yaml.safe_load(format_ptychi_options_defaults(algorithm))
+    printed = _print_options(capsys, algorithm)
+    resolved = parse_reconstruction(
+        PluginRegistry.load_plugins().reconstructor_libraries, printed, source='printed'
     )
 
-    assert type(loaded) is task_options_classes()[algorithm]
+    assert resolved.selectors() == {'library': 'PtyChi', 'algorithm': algorithm}
+    assert type(resolved.options.task) is task_options_classes()[algorithm]  # type: ignore[attr-defined]
 
 
-@pytest.mark.parametrize('algorithm', list(task_options_classes()))
-def test_the_printed_header_is_transparent_to_loading(algorithm: str) -> None:
-    """Comments must not change what the file means, or redirecting it would not work."""
-    options = task_options_classes()[algorithm]()
+def test_the_printed_header_is_only_comments(capsys: pytest.CaptureFixture[str]) -> None:
+    printed = _print_options(capsys, 'LSQML')
+    header = printed.split('library:', 1)[0]
 
-    assert yaml.safe_load(format_ptychi_options_defaults(algorithm)) == yaml.safe_load(
-        dump_task_options_yaml(options)
-    )
-
-
-def test_the_printed_header_is_only_comments() -> None:
-    header = format_ptychi_options_defaults('LSQML').split('\n\n', 1)[0]
-
-    assert all(line.startswith('#') for line in header.splitlines())
+    assert header and all(line.startswith('#') for line in header.splitlines())
 
 
 def test_printing_defaults_needs_no_other_argument() -> None:
@@ -582,52 +572,49 @@ def test_printing_defaults_needs_no_other_argument() -> None:
     """
     parser = argparse.ArgumentParser(exit_on_error=False)
     parser.add_argument('--diffraction-file', required=True)
-    add_print_ptychi_options_argument(parser)
+    add_print_options_argument(parser, library='PtyChi')
 
     with pytest.raises(SystemExit) as caught:
-        parser.parse_args(['--print-ptychi-options'])
+        parser.parse_args(['--print-options'])
 
     assert caught.value.code == 0
 
 
 def test_printing_defaults_writes_to_stdout(capsys: pytest.CaptureFixture[str]) -> None:
-    """Not stderr: the flag is useless if ``cmd --print-ptychi-options > file`` is empty.
-
-    ``parser.exit(message=...)`` would write to stderr, so this pins the stream rather
-    than merely that something was printed.
-    """
+    """Not stderr: the flag is useless if ``cmd --print-options > file`` is empty."""
     parser = argparse.ArgumentParser()
-    add_print_ptychi_options_argument(parser)
+    add_print_options_argument(parser, library='PtyChi')
 
     with pytest.raises(SystemExit):
-        parser.parse_args(['--print-ptychi-options', 'DM'])
+        parser.parse_args(['--print-options', 'DM'])
 
     captured = capsys.readouterr()
 
     assert captured.err == ''
-    assert yaml.safe_load(captured.out)['options_class_name'] == 'DMOptions'
+    assert yaml.safe_load(captured.out)['options']['task']['options_class_name'] == 'DMOptions'
 
 
 def test_printing_defaults_rejects_an_unknown_algorithm(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     parser = argparse.ArgumentParser()
-    add_print_ptychi_options_argument(parser)
+    add_print_options_argument(parser, library='PtyChi')
 
     with pytest.raises(SystemExit) as caught:
-        parser.parse_args(['--print-ptychi-options', 'NotAnAlgorithm'])
+        parser.parse_args(['--print-options', 'NotAnAlgorithm'])
 
     assert caught.value.code != 0
     assert 'LSQML' in capsys.readouterr().err
 
 
-def test_the_default_printed_algorithm_is_the_driver_fallback() -> None:
+def test_the_default_printed_algorithm_is_the_driver_fallback(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """Printing with no argument must describe the run you get with no options file."""
-    printed = load_task_options_from_mapping(
-        yaml.safe_load(format_ptychi_options_defaults('LSQML'))
-    )
+    libraries = PluginRegistry.load_plugins().reconstructor_libraries
+    printed = parse_reconstruction(libraries, _print_options(capsys), source='printed')
 
-    assert type(printed) is type(load_ptychi_options(None))
+    assert printed.selectors() == default_reconstruction(libraries, far_field=True).selectors()
 
 
 def test_load_task_options_rejects_a_non_object_payload() -> None:
@@ -1549,3 +1536,29 @@ def test_applying_the_gauge_leaves_the_original_options_alone() -> None:
     apply_probe_gauge_to_options(aligned, gauge)
 
     assert aligned.probe_options.power_constraint.probe_power == _GAUGE_PHOTONS
+
+
+# --- device -----------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ('requested', 'visible', 'resolved'),
+    [('gpu', True, 'gpu'), ('gpu', False, 'cpu'), ('cpu', True, 'cpu'), ('cpu', False, 'cpu')],
+)
+def test_the_device_falls_back_but_is_never_promoted(
+    monkeypatch: pytest.MonkeyPatch, requested: str, visible: bool, resolved: str
+) -> None:
+    """An explicit CPU stays the CPU; a GPU falls back only when none is visible."""
+    import torch
+    from ptychi.api.enums import Devices
+
+    from ptychodus.plugins.ptychi.algorithms import _resolve_default_device
+
+    monkeypatch.setattr(torch.cuda, 'is_available', lambda: visible)
+    monkeypatch.setattr(torch, 'xpu', None, raising=False)
+    options = LSQMLOptions()
+    options.reconstructor_options.default_device = Devices(requested)
+
+    _resolve_default_device(options)
+
+    assert options.reconstructor_options.default_device == Devices(resolved)

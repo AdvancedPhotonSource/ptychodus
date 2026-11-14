@@ -3,9 +3,9 @@
 Its contract with a launcher is the event stream and the exit code, and both are produced
 by small helpers around the shared reconstruction tail rather than by the tail itself. These
 tests pin down the stream's framing (strict JSON, one object per line, silent on a rank that
-has no launcher listening), where the per-rank log lands, and which exit code each ending
-produces. How the options file is resolved is shared with ptychodus-reconstruct and pinned
-in test_reconstruct_common.py. ``main()`` is never called:
+has no launcher listening) and which exit code each ending produces. How the options
+document is resolved is shared with ptychodus-reconstruct and pinned in
+test_reconstruct_common.py, and where the per-rank log lands in test_cli_logging.py. ``main()`` is never called:
 it redirects file descriptors and installs signal handlers, neither of which a test process
 can give back.
 """
@@ -30,7 +30,6 @@ from ptychodus.cli.reconstruct_subprocess import (  # noqa: E402
     EventStream,
     ExitCode,
     _finite_loss,
-    log_file,
 )
 
 
@@ -105,23 +104,12 @@ def test_a_finite_loss_is_reported() -> None:
     assert _finite_loss(_output(1, 0.25)) == pytest.approx(0.25)
 
 
-def test_the_main_rank_logs_to_the_plain_name(tmp_path: Path) -> None:
-    assert log_file(tmp_path, 0).name == 'ptychodus.log'
-
-
-def test_a_secondary_rank_logs_to_its_own_file(tmp_path: Path) -> None:
-    # Every rank logs, and one shared name would have them truncating each other's.
-    assert log_file(tmp_path, 1).name == 'ptychodus.rank01.log'
-    assert log_file(tmp_path, 12).name == 'ptychodus.rank12.log'
-
-
 def _args(tmp_path: Path) -> argparse.Namespace:
     return argparse.Namespace(
         input_directory=tmp_path,
         output_directory=tmp_path / 'out',
-        ptychi_options=None,
+        options=None,
         index_filter='all',
-        num_sync_epochs=1,
         mmap_file=None,
     )
 
@@ -131,7 +119,7 @@ def test_unreadable_options_are_a_usage_error(
 ) -> None:
     # Distinguished from a reconstruction failure so a launcher can tell "you gave me
     # nonsense" from "the reconstruction broke".
-    (tmp_path / 'ptychi_options.yaml').write_text('not json')
+    (tmp_path / 'reconstruct_options.yaml').write_text('not: [a, document')
     buffer = io.StringIO()
     stream = EventStream(buffer)
 
@@ -147,12 +135,7 @@ def _stub_reconstruction(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, product: object | None
 ) -> io.StringIO:
     """Replace everything between the options and the product with the minimum that runs."""
-    options = reconstruct_subprocess.load_ptychi_options(None)
-    options.reconstructor_options.num_epochs = 2
-
-    monkeypatch.setattr(
-        reconstruct_subprocess, 'load_ptychi_options', lambda path, far_field=True: options
-    )
+    monkeypatch.setattr(reconstruct_subprocess, 'load_trained_model', lambda *args: None)
     monkeypatch.setattr(
         reconstruct_subprocess, 'load_diffraction_data', lambda path, mmap_file=None: object()
     )

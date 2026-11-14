@@ -68,7 +68,11 @@ from pydantic import BaseModel
 from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput, Reconstructor
 
 from .options import PtyChiOptions, apply_to_task, default_options
-from .task import align_task_options_with_product, reconstruct_with_ptychi
+from .task import (
+    align_task_options_with_product,
+    dump_task_options_yaml,
+    reconstruct_with_ptychi,
+)
 
 __all__ = [
     'PtyChiAlgorithm',
@@ -239,24 +243,28 @@ def _declared(options: BaseModel) -> PtyChiOptions:
 
 
 def _resolve_default_device(task_options: PtychographyTaskOptions) -> None:
-    """Point the options at a GPU if one is visible here, and at the CPU if not.
+    """Keep the device the options name, unless they name a GPU and none is visible here.
 
     Settled where the reconstruction runs, because that is the process whose
     devices count. ptychodus restricts that process to the devices a run
-    selected, so asking torch what is visible is the same question as asking
-    what the user chose -- and a selection naming only the CPU leaves nothing
-    for ``Devices.GPU`` to mean.
+    selected, so a selection naming only the CPU leaves no GPU visible and the
+    options fall back to the CPU. An explicit CPU is never promoted to a GPU.
     """
     import torch
 
     from ptychi.api.enums import Devices
 
-    visible = (
-        torch.cuda.is_available()
-        or getattr(torch, 'xpu', None) is not None
-        and (torch.xpu.is_available())
-    )
-    device = Devices.GPU if visible else Devices.CPU
+    device = task_options.reconstructor_options.default_device
+
+    if device != Devices.CPU:
+        visible = torch.cuda.is_available() or (
+            getattr(torch, 'xpu', None) is not None and torch.xpu.is_available()
+        )
+
+        if not visible:
+            logger.info('No GPU is visible; falling back to the CPU.')
+            device = Devices.CPU
+
     task_options.reconstructor_options.default_device = device
     logger.info(f'Reconstructing on the {device.name}.')
 
@@ -284,6 +292,8 @@ class PtyChiReconstructor(Reconstructor):
         # wherever it happens to be needed.
         task_options = align_task_options_with_product(apply_to_task(declared), input_.product)
         _resolve_default_device(task_options)
+        task_options.check()
+        logger.info('Aligned pty-chi task options:\n%s', dump_task_options_yaml(task_options))
         yield from reconstruct_with_ptychi(input_, task_options, declared.num_sync_epochs)
 
 

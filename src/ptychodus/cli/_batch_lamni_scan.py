@@ -61,6 +61,7 @@ from ptychodus.cli._reconstruct_common import (
     require_near_field_focus_object_distance_m,
     resolve_stated_focus_object_distance_m,
     resolve_quantity,
+    ResolvedReconstruction,
     run_reconstruction,
     save_assembled_diffraction,
 )
@@ -289,7 +290,7 @@ def reconstruct_one_scan(
     settings_text: str,
     registry: PluginRegistry,
     request: ScanRequest,
-    options: object,
+    resolved: ResolvedReconstruction,
     *,
     read_region: CropRegion | None,
     bad_pixels: BadPixels | None,
@@ -513,12 +514,7 @@ def reconstruct_one_scan(
     settings_file.write_text(settings_text)
 
     final_product = run_reconstruction(
-        logger,
-        reconstruct_input,
-        options,  # type: ignore[arg-type]
-        output_directory,
-        num_sync_epochs=settings.misc.num_sync_epochs,
-        cancellation=cancellation,
+        logger, resolved, reconstruct_input, output_directory, cancellation=cancellation
     )
 
     if final_product is None:

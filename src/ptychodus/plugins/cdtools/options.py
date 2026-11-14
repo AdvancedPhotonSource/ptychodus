@@ -57,7 +57,7 @@ class CDToolsDevice(StrEnum):
 class OptimizerOptions(BaseModel):
     """Which optimizer runs every stage, and the hyperparameters a stage does not vary."""
 
-    model_config = ConfigDict(validate_assignment=True)
+    model_config = ConfigDict(extra='forbid', validate_assignment=True)
 
     optimizer: CDToolsOptimizer = Field(
         CDToolsOptimizer.ADAM,
@@ -135,7 +135,7 @@ class OptimizerOptions(BaseModel):
 class StageOptions(BaseModel):
     """One stage of the schedule."""
 
-    model_config = ConfigDict(validate_assignment=True)
+    model_config = ConfigDict(extra='forbid', validate_assignment=True)
 
     epochs: int = Field(
         0,
@@ -166,7 +166,7 @@ class ScheduleOptions(BaseModel):
     to find the structure, then larger batches at lower rates to refine it.
     """
 
-    model_config = ConfigDict(validate_assignment=True)
+    model_config = ConfigDict(extra='forbid', validate_assignment=True)
 
     stage1: StageOptions = Field(
         default_factory=lambda: StageOptions(epochs=20, learning_rate=0.005, batch_size=10),
@@ -189,7 +189,7 @@ class ScheduleOptions(BaseModel):
 class RefinementOptions(BaseModel):
     """What the optimizer may change, and which measured detector maps the model uses."""
 
-    model_config = ConfigDict(validate_assignment=True)
+    model_config = ConfigDict(extra='forbid', validate_assignment=True)
 
     refine_probe: bool = Field(True, title='Refine Probe')
     refine_object: bool = Field(True, title='Refine Object')
@@ -229,7 +229,7 @@ class RefinementOptions(BaseModel):
 class FancyPtychoModelOptions(BaseModel):
     """How the FancyPtycho forward model is built."""
 
-    model_config = ConfigDict(validate_assignment=True)
+    model_config = ConfigDict(extra='forbid', validate_assignment=True)
 
     loss: CDToolsLoss = Field(
         CDToolsLoss.AMPLITUDE_MSE,
@@ -267,7 +267,7 @@ class FancyPtychoModelOptions(BaseModel):
 class CDToolsOptions(BaseModel):
     """Everything ptychodus exposes for a cdtools FancyPtycho reconstruction."""
 
-    model_config = ConfigDict(validate_assignment=True)
+    model_config = ConfigDict(extra='forbid', validate_assignment=True)
 
     optimizer: OptimizerOptions = Field(default_factory=OptimizerOptions)
     schedule: ScheduleOptions = Field(default_factory=ScheduleOptions)

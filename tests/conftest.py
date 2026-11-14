@@ -1,13 +1,16 @@
 """Skip optional-extra test packages when their dependencies are absent.
 
-Also hosts the shared ``qapp`` fixture. It imports PyQt5 inside the fixture body rather
+Also hosts the shared ``qapp`` fixture, and an autouse fixture that gives back any handler
+a command's ``main()`` adds to the root logger. It imports PyQt5 inside the fixture body rather
 than at module scope so this conftest stays importable on a bare install, where the
 ``tests/view/`` and ``tests/controller/`` subtrees that use it are dropped anyway.
 """
 
 from __future__ import annotations
 
+import logging
 import os
+from collections.abc import Iterator
 from importlib.util import find_spec
 
 import pytest
@@ -67,3 +70,20 @@ def qapp():
         app = QApplication([])
 
     return app
+
+
+@pytest.fixture(autouse=True)
+def _restore_root_log_handlers() -> Iterator[None]:
+    """Close and drop root-logger handlers a test added, such as a command's action log.
+
+    A command's ``main()`` attaches a file handler for its log, which would otherwise
+    outlive the test and its temporary directory, and write every later test's records.
+    """
+    root = logging.getLogger()
+    before = list(root.handlers)
+    yield
+
+    for handler in root.handlers[:]:
+        if handler not in before:
+            root.removeHandler(handler)
+            handler.close()

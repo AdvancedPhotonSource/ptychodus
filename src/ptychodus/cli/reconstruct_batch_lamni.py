@@ -13,10 +13,10 @@ how that scan was reconstructed. The command line carries only the two file name
 log, and whether to stop after planning.
 
 Each scan lands in its own standard-layout directory under
-``<output_products_folder>/S<NNNNN>/``: the assembled patterns, the resolved pty-chi
-options, the settings, per-epoch ``product.NNNNNN.h5`` checkpoints, the final
-``product.h5``, a log of everything the scan wrote to its console, and an affine fit of its
-own positions. Every product carries its own ``tomography_angle_deg``, taken from the
+``<output_products_folder>/S<NNNNN>/``: the assembled patterns, the pty-chi options
+document (``reconstruct_options.yaml``), the settings, per-epoch ``product.NNNNNN.h5``
+checkpoints, the final ``product.h5``, ``reconstruct.log`` holding everything the scan wrote
+to its console, and an affine fit of its own positions. Every product carries its own ``tomography_angle_deg``, taken from the
 encoder column of the scan table, which is what lets the resulting stack be fed to a
 tomographic solver.
 
@@ -30,7 +30,8 @@ Driving it from Python
 ----------------------
 
 :func:`main` is a shim over :func:`reconstruct_batch_lamni`, which takes the settings and
-the pty-chi options as objects. A caller that already holds a :class:`BatchSettings` --
+the pty-chi options as objects -- a ``PtyChiOptions``, such as
+``ptychodus.plugins.ptychi.options.default_options(LSQMLOptions)`` returns, edited as needed. A caller that already holds a :class:`BatchSettings` --
 built in a script, or loaded from a file and modified -- runs a batch without going through
 a file and a subprocess, and reads what became of each scan off the returned
 :class:`BatchResult` rather than off an exit code. :func:`plan_batch_lamni` resolves the
@@ -77,7 +78,6 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ptychi.api.options.task import PtychographyTaskOptions
 
 from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.geometry import ImageExtent
@@ -107,16 +107,19 @@ from ptychodus.cli._batch_lamni_settings import (
 )
 from ptychodus.cli._reconstruct_common import (
     CancellationToken,
-    add_print_ptychi_options_argument,
-    add_ptychi_options_argument,
+    add_options_argument,
+    add_print_options_argument,
+    default_reconstruction,
     install_signal_handlers,
     invalid_count_threshold,
-    load_ptychi_options,
+    ptychi_reconstruction,
+    read_reconstruction,
+    require_ptychi_options,
     resolve_crop_region,
 )
 from ptychodus.api.devices import CPU, Device, probe_devices, visibility_environment
 from ptychodus.api.spawn import ChildError, run_subprocess
-from ptychodus.plugins.ptychi.task import dump_task_options
+from ptychodus.plugins.ptychi.options import PtyChiOptions
 from ptychodus.plugins.aps31id_lamni.diffraction_file import LamNIDiffractionFileReader
 from ptychodus.plugins.aps31id_lamni.scan_table import (
     APS31IDEScanRecord,
@@ -212,7 +215,7 @@ def _worker_loop(
     environment: Mapping[str, str],
     *,
     settings_text: str,
-    options_json: str | None,
+    options_document: str | None,
     read_region: dict[str, tuple[int, int]] | None,
     num_selected: int,
     tally: _Tally,
@@ -239,7 +242,7 @@ def _worker_loop(
         device_name = ', '.join(f'{k}={v}' for k, v in environment.items()) or 'inherited'
         payload: dict[str, object] = {
             'settings_text': settings_text,
-            'ptychi_options_json': options_json,
+            'options_document': options_document,
             'scan': record_payload(record),
             'read_region': read_region,
         }
@@ -300,8 +303,8 @@ def _build_parser() -> argparse.ArgumentParser:
         required=True,
         help='YAML settings file: the paths, the scans, and every tuning value.',
     )
-    add_ptychi_options_argument(parser)
-    add_print_ptychi_options_argument(parser)
+    add_options_argument(parser)
+    add_print_options_argument(parser, library='PtyChi')
     parser.add_argument(
         '--dry-run',
         action='store_true',
@@ -389,7 +392,7 @@ def _queue_pending_scans(
 
 def reconstruct_batch_lamni(
     settings: BatchSettings,
-    options: PtychographyTaskOptions | None = None,
+    options: PtyChiOptions | None = None,
     *,
     settings_text: str | None = None,
     cancellation: CancellationToken | None = None,
@@ -407,8 +410,9 @@ def reconstruct_batch_lamni(
     instead, since it describes every scan equally.
 
     `options` defaults to stock LSQML, resolved in each worker rather than here, which is
-    what ``--ptychi-options`` does when it is not given. An options object is serialized
-    once and rebuilt in every worker, so per-scan edits cannot leak between scans.
+    what ``--options`` does when it is not given. Options are serialized once as a document
+    and rebuilt in every worker, so per-scan edits cannot leak between scans. The settings'
+    ``misc.num_sync_epochs`` overrides theirs.
 
     `settings_text` is the YAML copied into each scan's output directory and rebuilt from
     in each worker. It defaults to a rendering of `settings`; a caller that loaded a file
@@ -421,13 +425,17 @@ def reconstruct_batch_lamni(
     owns the process.
     """
     selected = plan_batch_lamni(settings)
-    resolved_options = (
-        load_ptychi_options(None, far_field=settings.metadata_overrides.far_field is not False)
+    registry = PluginRegistry.load_plugins()
+    libraries = registry.reconstructor_libraries
+    resolved = (
+        default_reconstruction(
+            libraries, far_field=settings.metadata_overrides.far_field is not False
+        )
         if options is None
-        else options
+        else ptychi_reconstruction(libraries, options)
     )
 
-    if not resolved_options.probe_position_options.optimizable:
+    if not require_ptychi_options(resolved).task.probe_position_options.optimizable:
         logger.info(
             'pty-chi position correction is disabled, so no scan will have refined '
             'positions to fit a transform from, and none will write affine_fit.yaml.'
@@ -439,7 +447,6 @@ def reconstruct_batch_lamni(
     if settings_text is None:
         settings_text = dump_batch_settings(settings)
 
-    registry = PluginRegistry.load_plugins()
     bad_pixels = None
 
     if settings.diffraction.bad_pixels_file is not None:
@@ -535,7 +542,7 @@ def reconstruct_batch_lamni(
         # not see is not found by the child either.
         environments = [{}]
 
-    options_json = None if options is None else dump_task_options(options)
+    options_document = None if options is None else resolved.dump()
     futures: list[Future[None]] = list()
 
     with ThreadPoolExecutor(max_workers=len(environments)) as pool:
@@ -547,7 +554,7 @@ def reconstruct_batch_lamni(
                     work,
                     device,
                     settings_text=settings_text,
-                    options_json=options_json,
+                    options_document=options_document,
                     read_region=read_region,
                     num_selected=len(selected),
                     tally=tally,
@@ -629,11 +636,18 @@ def main() -> ExitCode:
         logger.info('Dry run: %d scan(s) planned. Nothing read, nothing written.', len(selected))
         return ExitCode.SUCCESS
 
-    # None rather than the stock options this would build from None: the workers resolve
-    # that default themselves, so nothing is serialized for a run that asked for nothing.
-    options = None if args.ptychi_options is None else load_ptychi_options(args.ptychi_options)
-
     try:
+        # None rather than the stock options: the workers resolve that default themselves,
+        # so nothing is serialized for a run that asked for nothing.
+        options = (
+            None
+            if args.options is None
+            else require_ptychi_options(
+                read_reconstruction(
+                    PluginRegistry.load_plugins().reconstructor_libraries, args.options
+                )
+            )
+        )
         result = reconstruct_batch_lamni(
             settings,
             options,

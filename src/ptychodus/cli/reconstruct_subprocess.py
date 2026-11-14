@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Run one pty-chi reconstruction as a self-contained child process.
+"""Run one reconstruction, with any installed reconstructor, as a self-contained child process.
 
 Reads a standard-layout input directory, streams progress back to the launching process as
 newline-delimited JSON, and stops cleanly when it is asked to. No settings registry, no
@@ -14,22 +14,22 @@ Protocol
 --------
 
 stdin
-    Nothing, unless ``--ptychi-options -`` asks for the pty-chi options to be read from
-    it, as YAML or JSON. The ``options_class_name`` the payload carries is the
-    algorithm identity, so PIE/ePIE/rPIE cannot silently swap for each other on the
-    way through.
+    Nothing, unless ``--options -`` asks for the options document to be read from it. The
+    document names the library and algorithm beside the backend's own options.
 
 events
-    One JSON object per line: ``started``, ``epoch``, ``checkpoint``, ``cancelling``,
-    ``finished``, ``error``. They go to stdout by default, and fds 1 and 2 are redirected
-    into a log file in the output directory first, so pty-chi progress bars and torch
-    chatter cannot corrupt the stream. ``--event-file`` sends them to a file instead and
+    One JSON object per line: ``started`` (with the ``library`` and ``algorithm``),
+    ``epoch`` (each output the reconstructor yields, with its ``num_epochs`` goal),
+    ``checkpoint``, ``cancelling``, ``finished``, ``error``. They go to stdout by default,
+    and fds 1 and 2 are redirected into ``reconstruct.log`` in the output directory first,
+    so progress bars and torch chatter cannot corrupt the stream. ``--event-file`` sends them to a file instead and
     leaves stdout and stderr alone, which is what a launcher that owns stdout itself needs.
 
 Cancellation
-    SIGTERM or SIGINT sets a flag that is checked between sync chunks. pty-chi's
-    ``task.run()`` has no interruption point, so a cancel takes effect up to
-    ``--num-sync-epochs`` epochs later; the partially converged product is still written.
+    SIGTERM or SIGINT sets a flag that is checked at each output the reconstructor yields.
+    A backend has no interruption point between them, so a cancel takes effect at the next
+    one -- every ``num_sync_epochs`` epochs for pty-chi; the partially converged product is
+    still written.
     A second signal exits immediately.
 
 Exit codes
@@ -39,7 +39,7 @@ Exit codes
 Scope and limitations
 ---------------------
 
-- One scan, one algorithm, taken from the options file. There is no queue and no retry.
+- One scan, one algorithm, taken from the options document. There is no queue and no retry.
 - Inputs and outputs are the ptychodus standard layout; there are no per-file overrides.
   Point ``-i`` at a directory another driver wrote, or at one staged for this purpose.
 - A signal that arrives before the handlers are installed -- during the torch import, the
@@ -69,25 +69,23 @@ import ptychodus
 from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.io import StandardFileLayout, load_diffraction_data, load_product
 from ptychodus.api.reconstruct import PositionIndexFilter, ReconstructOutput
-from ptychodus.cli import DirectoryType, positive_int
+from ptychodus.api.plugins import PluginRegistry
+from ptychodus.cli import DirectoryType, add_log_level_argument, configure_logging, open_action_log
 from ptychodus.cli._reconstruct_common import (
     CancellationToken,
-    add_print_ptychi_options_argument,
-    add_ptychi_options_argument,
+    add_options_argument,
+    add_print_options_argument,
+    default_reconstruction,
+    find_options_document,
     install_signal_handlers,
-    load_ptychi_options,
+    load_trained_model,
     pair_patterns_with_positions,
     process_rank,
-    resolve_ptychi_options_file,
+    read_reconstruction,
     run_reconstruction,
 )
 
 logger = logging.getLogger('reconstruct_subprocess')
-
-# Stem of StandardFileLayout.LOG, for the per-rank variant below. The shared enum
-# carries the rank-0 name because every activity writing a workflow directory leaves
-# one; the suffixed form belongs here, where a multi-rank launch is possible.
-_LOG_STEM = Path(StandardFileLayout.LOG.value).stem
 
 
 class EventStream:
@@ -130,18 +128,6 @@ class EventStream:
         )
 
 
-def log_file(output_directory: Path, rank: int) -> Path:
-    """Where this process writes its human-readable log.
-
-    Every rank of a multi-process launch logs, and a single name would have them all
-    truncating one file, so only the main process gets the plain one.
-    """
-    if rank == 0:
-        return StandardFileLayout.LOG.path(output_directory)
-
-    return output_directory / f'{_LOG_STEM}.rank{rank:02d}.log'
-
-
 def _finite_loss(output: ReconstructOutput) -> float | None:
     """The last loss as strict JSON can carry it: a number, or null."""
     losses = output.product.losses
@@ -153,6 +139,27 @@ def _finite_loss(output: ReconstructOutput) -> float | None:
     return loss if math.isfinite(loss) else None
 
 
+class _SyncReporter:
+    """Emit an ``epoch`` event, and a ``checkpoint`` one where a file was written, per output."""
+
+    def __init__(self, stream: EventStream) -> None:
+        self._stream = stream
+        self.last_progress = 0
+
+    def __call__(self, output: ReconstructOutput, checkpoint_file: Path | None) -> None:
+        self.last_progress = output.progress
+        self._stream.emit(
+            'epoch',
+            epoch=output.progress,
+            num_epochs=output.progress_goal,
+            loss=_finite_loss(output),
+            elapsed_s=self._stream.elapsed_s(),
+        )
+
+        if checkpoint_file is not None:
+            self._stream.emit('checkpoint', epoch=output.progress, path=str(checkpoint_file))
+
+
 def _reconstruct(
     stream: EventStream,
     cancellation: CancellationToken,
@@ -162,14 +169,16 @@ def _reconstruct(
     input_directory: Path = args.input_directory
     output_directory: Path = args.output_directory
 
-    # A named or staged file is decoded before anything else is read, so that options which
-    # do not parse are a usage error however much data sits beside them.
+    # A named or staged document is read before anything else is, so that options which do
+    # not parse are a usage error however much data sits beside them.
+    libraries = PluginRegistry.load_plugins().reconstructor_libraries
+
     try:
-        options_file = resolve_ptychi_options_file(logger, args.ptychi_options, input_directory)
-        task_options = None if options_file is None else load_ptychi_options(options_file)
-    except (OSError, TypeError, ValueError) as exc:
+        options_file = find_options_document(args.options, input_directory)
+        resolved = None if options_file is None else read_reconstruction(libraries, options_file)
+    except (OSError, ValueError) as exc:
         stream.emit_exception(exc)
-        logger.exception('Failed to read the pty-chi options.')
+        logger.exception('Failed to read the options.')
         return ExitCode.USAGE
 
     assembled_data = load_diffraction_data(
@@ -177,9 +186,14 @@ def _reconstruct(
     )
     product = load_product(StandardFileLayout.PRODUCT.path(input_directory))
 
-    if task_options is None:
+    if resolved is None:
         # The stock algorithm follows the propagation regime, which only the product states.
-        task_options = load_ptychi_options(None, far_field=product.metadata.far_field)
+        try:
+            resolved = default_reconstruction(libraries, far_field=product.metadata.far_field)
+        except ValueError as exc:
+            stream.emit_exception(exc)
+            logger.exception('No options, and no default to fall back to.')
+            return ExitCode.USAGE
 
     reconstruct_input = pair_patterns_with_positions(
         logger,
@@ -187,49 +201,29 @@ def _reconstruct(
         product,
         index_filter=PositionIndexFilter[args.index_filter.upper()],
     )
-
-    num_epochs = int(task_options.reconstructor_options.num_epochs)
+    load_trained_model(logger, resolved.reconstructor, input_directory)
     product_file = StandardFileLayout.PRODUCT.path(output_directory)
 
     stream.emit(
         'started',
         pid=os.getpid(),
-        reconstructor=task_options.reconstructor_options.get_reconstructor_type().value,
-        options_class=type(task_options).__name__,
-        num_epochs=num_epochs,
-        num_sync_epochs=args.num_sync_epochs,
+        library=resolved.library,
+        algorithm=resolved.reconstructor.name,
         num_patterns=int(reconstruct_input.diffraction_patterns.shape[0]),
         product_output=str(product_file),
         log=None if log_path is None else str(log_path),
     )
 
-    # The sync callback is the only place the epoch number is visible: run_reconstruction
+    # The sync callback is the only place the progress is visible: run_reconstruction
     # returns the product alone, and losses are not written by every reconstructor.
-    last_epoch = 0
-
-    def on_sync(output: ReconstructOutput, checkpoint_file: Path | None) -> None:
-        nonlocal last_epoch
-        last_epoch = output.progress
-
-        stream.emit(
-            'epoch',
-            epoch=output.progress,
-            num_epochs=num_epochs,
-            loss=_finite_loss(output),
-            elapsed_s=stream.elapsed_s(),
-        )
-
-        if checkpoint_file is not None:
-            stream.emit('checkpoint', epoch=output.progress, path=str(checkpoint_file))
-
+    reporter = _SyncReporter(stream)
     final_product = run_reconstruction(
         logger,
+        resolved,
         reconstruct_input,
-        task_options,
         output_directory,
-        num_sync_epochs=args.num_sync_epochs,
         cancellation=cancellation,
-        on_sync=on_sync,
+        on_sync=reporter,
     )
 
     if final_product is None:
@@ -239,7 +233,7 @@ def _reconstruct(
     is_cancelled = cancellation.is_cancelled
     stream.emit(
         'finished',
-        epoch=last_epoch,
+        epoch=reporter.last_progress,
         cancelled=is_cancelled,
         path=str(product_file),
         elapsed_s=stream.elapsed_s(),
@@ -249,7 +243,7 @@ def _reconstruct(
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description='Run one pty-chi reconstruction over a standard-layout directory.',
+        description='Run one reconstruction over a standard-layout directory.',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -258,7 +252,8 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar='INPUT_DIR',
         required=True,
         type=DirectoryType(must_exist=True),
-        help='Directory holding diffraction.h5, product.h5 and optionally ptychi_options.yaml.',
+        help='Directory holding diffraction.h5, product.h5 and optionally '
+        'reconstruct_options.yaml and a trained model.',
     )
     parser.add_argument(
         '-o',
@@ -268,28 +263,23 @@ def _build_parser() -> argparse.ArgumentParser:
         type=DirectoryType(must_exist=False),
         help=(
             'Destination directory, written in the ptychodus standard layout: '
-            'ptychi_options.yaml, per-epoch product.NNNNNN.h5 checkpoints, the final '
-            'product.h5, and the log.'
+            'reconstruct_options.yaml, product.NNNNNN.h5 checkpoints, the final '
+            'product.h5, and reconstruct.log.'
         ),
     )
-    add_ptychi_options_argument(
+    add_options_argument(
         parser,
         default_note=(
-            'Defaults to the one in INPUT_DIR, else to stock LSQML, or BH for a near-field product.'
+            'Defaults to the one in INPUT_DIR, else to stock pty-chi LSQML, or BH for a '
+            'near-field product.'
         ),
     )
-    add_print_ptychi_options_argument(parser)
+    add_print_options_argument(parser)
     parser.add_argument(
         '--index-filter',
         choices=tuple(member.name.lower() for member in PositionIndexFilter),
         default=PositionIndexFilter.ALL.name.lower(),
         help='Scan index subset to reconstruct.',
-    )
-    parser.add_argument(
-        '--num-sync-epochs',
-        default=1,
-        type=positive_int,
-        help='Epochs between progress events, checkpoints, and cancellation checks.',
     )
     parser.add_argument(
         '--mmap-file',
@@ -306,12 +296,7 @@ def _build_parser() -> argparse.ArgumentParser:
             'events go to stdout and the rest of the output is redirected into the log.'
         ),
     )
-    parser.add_argument(
-        '--log-level',
-        default=logging.INFO,
-        help='Python logging level.',
-        type=int,
-    )
+    add_log_level_argument(parser)
     parser.add_argument(
         '-v',
         '--version',
@@ -349,21 +334,17 @@ def main() -> ExitCode:
 
     if args.event_file is None:
         # Taking stdout over for the events means everything else has to go somewhere, and
-        # a per-rank name keeps the ranks from truncating each other's.
-        log_path = log_file(output_directory, rank)
-
-        with open(log_path, 'w') as handle:
-            os.dup2(handle.fileno(), 1)
-            os.dup2(handle.fileno(), 2)
-
-        sys.stdout = os.fdopen(os.dup(1), 'w', buffering=1)
-        sys.stderr = os.fdopen(os.dup(2), 'w', buffering=1)
-
-    logging.basicConfig(
-        level=args.log_level,
-        stream=sys.stderr,
-        format='%(asctime)s %(levelname)s %(name)s: %(message)s',
-    )
+        # a per-rank name keeps the ranks from writing each other's.
+        log_path = open_action_log(
+            output_directory,
+            StandardFileLayout.RECONSTRUCT_LOG,
+            rank=rank,
+            capture_descriptors=True,
+        )
+        configure_logging(args)
+    else:
+        configure_logging(args)
+        log_path = open_action_log(output_directory, StandardFileLayout.RECONSTRUCT_LOG, rank=rank)
 
     stream = EventStream(events)
     cancellation = install_signal_handlers(

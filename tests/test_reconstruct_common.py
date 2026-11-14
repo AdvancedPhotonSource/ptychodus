@@ -16,6 +16,7 @@ or build a real process group; both are stubbed at the one function that reports
 from __future__ import annotations
 
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any, Iterator
 
 import logging
@@ -48,8 +49,14 @@ from ptychodus.api.parallax import ParallaxEstimate
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.reconstruct import PositionIndexFilter, ReconstructInput, ReconstructOutput
-from ptychi.api import LSQMLOptions
+from ptychodus.api.plugins import PluginRegistry
+from ptychodus.api.reconstruct import (
+    PositionIndexFilter,
+    ReconstructInput,
+    ReconstructOutput,
+    Reconstructor,
+)
+from pydantic import BaseModel
 
 # Deliberately imported at module scope: this file already does
 # ``pytest.importorskip('ptychi')`` above.
@@ -57,24 +64,21 @@ from ptychodus.cli import _reconstruct_common  # noqa: E402
 from ptychodus.cli._reconstruct_common import resolve_crop_region  # noqa: E402
 from ptychodus.cli._reconstruct_common import (  # noqa: E402
     CancellationToken,
+    default_reconstruction,
+    estimate_focus_object_distance_m,
     estimate_incident_beam_from_assembled_data,
+    find_options_document,
     install_signal_handlers,
     invalid_count_threshold,
     is_main_process,
-    load_ptychi_options,
     pair_patterns_with_positions,
-    estimate_focus_object_distance_m,
+    read_reconstruction,
     require_near_field_focus_object_distance_m,
     resolve_flag,
-    resolve_ptychi_options_file,
     resolve_stated_focus_object_distance_m,
+    ResolvedReconstruction,
     run_reconstruction,
     save_assembled_diffraction,
-    save_ptychi_options,
-)
-from ptychodus.plugins.ptychi.task import (  # noqa: E402
-    dump_task_options,
-    dump_task_options_yaml,
 )
 
 
@@ -97,6 +101,52 @@ PROBE_WIDTH_PX = 8
 NUM_PATTERNS = 3
 NUM_EPOCHS = 4
 NUM_SYNC_EPOCHS = 2
+
+
+class _FakeOptions(BaseModel):
+    num_epochs: int = NUM_EPOCHS
+    num_sync_epochs: int = NUM_SYNC_EPOCHS
+
+
+class _FakeReconstructor(Reconstructor):
+    """Yields every `num_sync_epochs` epochs, calling `on_epoch` first, as a backend would."""
+
+    def __init__(
+        self, *, on_epoch: Callable[[int], None] | None = None, empty: bool = False
+    ) -> None:
+        self._on_epoch = on_epoch
+        self._empty = empty
+        self.sync_points: list[int] = []
+
+    @property
+    def name(self) -> str:
+        return 'Fake'
+
+    def get_default_options(self) -> BaseModel:
+        return _FakeOptions()
+
+    def reconstruct(
+        self, input_: ReconstructInput, *, options: BaseModel
+    ) -> Iterator[ReconstructOutput]:
+        assert isinstance(options, _FakeOptions)
+
+        if self._empty:
+            return
+
+        for epoch in range(
+            options.num_sync_epochs, options.num_epochs + 1, options.num_sync_epochs
+        ):
+            if self._on_epoch is not None:
+                self._on_epoch(epoch)
+
+            self.sync_points.append(epoch)
+            yield ReconstructOutput(
+                product=input_.product, progress=epoch, progress_goal=options.num_epochs
+            )
+
+
+def _resolved(reconstructor: _FakeReconstructor) -> ResolvedReconstruction:
+    return ResolvedReconstruction('Fake', reconstructor, _FakeOptions())
 
 
 def _make_reconstruct_input() -> ReconstructInput:
@@ -156,11 +206,10 @@ def _set_rank(
     a plain `srun` job is ever in. Without it the group answers instead.
     """
     if rank_variable is None:
-        # Resolved by a function-local import at call time, so patching the source works.
-        monkeypatch.setattr('ptychi.parallel.get_rank', lambda: rank)
+        monkeypatch.setattr(_reconstruct_common, '_group_rank', lambda: rank)
     else:
-        # No process group, so pty-chi reports 0 for every process.
-        monkeypatch.setattr('ptychi.parallel.get_rank', lambda: 0)
+        # No process group, so the group reports 0 for every process.
+        monkeypatch.setattr(_reconstruct_common, '_group_rank', lambda: 0)
         monkeypatch.setenv(rank_variable, str(rank))
 
 
@@ -171,36 +220,15 @@ def _run(
     *,
     rank_variable: str | None = None,
 ) -> Product:
-    """Run the tail with pty-chi stubbed out, as if on `rank`."""
-    reconstruct_input = _make_reconstruct_input()
-    sync_points: list[int] = []
-
-    def fake_reconstruct(
-        parameters: ReconstructInput,
-        task_options: object,
-        num_sync_epochs: int,
-    ) -> Iterator[ReconstructOutput]:
-        # Mirror the real generator's cadence so the checkpoint count is realistic.
-        for epoch in range(num_sync_epochs, NUM_EPOCHS + 1, num_sync_epochs):
-            sync_points.append(epoch)
-            yield ReconstructOutput(product=parameters.product, progress=epoch)
-
-    monkeypatch.setattr(_reconstruct_common, 'reconstruct_with_ptychi', fake_reconstruct)
+    """Run the tail with a stub reconstructor, as if on `rank`."""
+    reconstructor = _FakeReconstructor()
     _set_rank(monkeypatch, rank, rank_variable=rank_variable)
 
-    options = LSQMLOptions()
-    options.reconstructor_options.num_epochs = NUM_EPOCHS
-    options.object_options.pixel_size_m = PIXEL_M
-
     product = run_reconstruction(
-        logging.getLogger('test'),
-        reconstruct_input,
-        options,
-        tmp_path,
-        num_sync_epochs=NUM_SYNC_EPOCHS,
+        logging.getLogger('test'), _resolved(reconstructor), _make_reconstruct_input(), tmp_path
     )
 
-    assert sync_points, 'the reconstruction generator was never iterated'
+    assert reconstructor.sync_points, 'the reconstruction generator was never iterated'
     assert product is not None
     return product
 
@@ -210,7 +238,7 @@ def test_main_process_writes_every_artifact(
 ) -> None:
     _run(monkeypatch, tmp_path, rank=0)
 
-    assert (tmp_path / 'ptychi_options.yaml').is_file()
+    assert (tmp_path / 'reconstruct_options.yaml').is_file()
     assert (tmp_path / 'product.h5').is_file()
     # One checkpoint per sync point: epochs 2 and 4 at a stride of 2.
     assert sorted(p.name for p in tmp_path.glob('product.0*.h5')) == [
@@ -253,7 +281,7 @@ def test_main_process_writes_when_rank_comes_from_the_environment(
 ) -> None:
     _run(monkeypatch, tmp_path, rank=0, rank_variable='RANK')
 
-    assert (tmp_path / 'ptychi_options.yaml').is_file()
+    assert (tmp_path / 'reconstruct_options.yaml').is_file()
     assert (tmp_path / 'product.h5').is_file()
 
 
@@ -273,7 +301,7 @@ def test_srun_main_task_writes_every_artifact(
 ) -> None:
     _run(monkeypatch, tmp_path, rank=0, rank_variable='SLURM_PROCID')
 
-    assert (tmp_path / 'ptychi_options.yaml').is_file()
+    assert (tmp_path / 'reconstruct_options.yaml').is_file()
     assert (tmp_path / 'product.h5').is_file()
 
 
@@ -284,7 +312,7 @@ def test_an_unreadable_rank_variable_still_writes(
 ) -> None:
     # Something in the environment claims a rank it cannot state. Refusing to write the
     # run's output is the worse of the two readings, so it is ignored.
-    monkeypatch.setattr('ptychi.parallel.get_rank', lambda: 0)
+    monkeypatch.setattr(_reconstruct_common, '_group_rank', lambda: 0)
     monkeypatch.setenv(rank_variable, value)
 
     assert is_main_process()
@@ -295,7 +323,7 @@ def test_rank_is_taken_from_the_first_variable_that_parses(
 ) -> None:
     # A job launched through srun under torchrun sets both. RANK is the one that tracks
     # the process group pty-chi will build, so it wins.
-    monkeypatch.setattr('ptychi.parallel.get_rank', lambda: 0)
+    monkeypatch.setattr(_reconstruct_common, '_group_rank', lambda: 0)
     monkeypatch.setenv('RANK', '0')
     monkeypatch.setenv('SLURM_PROCID', '1')
 
@@ -395,32 +423,18 @@ def _run_with_cancellation(
     if cancel_before_start:
         cancellation.cancel('TEST')
 
-    def fake_reconstruct(
-        parameters: ReconstructInput,
-        task_options: object,
-        num_sync_epochs: int,
-    ) -> Iterator[ReconstructOutput]:
-        for epoch in range(num_sync_epochs, NUM_EPOCHS + 1, num_sync_epochs):
-            if epoch == cancel_at_epoch:
-                # As a signal arriving mid-chunk would: the flag is already up by the
-                # time this epoch's output reaches the loop.
-                cancellation.cancel('SIGTERM')
+    def cancel_on(epoch: int) -> None:
+        if epoch == cancel_at_epoch:
+            # As a signal arriving mid-chunk would: the flag is already up by the time this
+            # epoch's output reaches the loop.
+            cancellation.cancel('SIGTERM')
 
-            yield ReconstructOutput(product=parameters.product, progress=epoch)
-
-    monkeypatch.setattr(_reconstruct_common, 'reconstruct_with_ptychi', fake_reconstruct)
     _set_rank(monkeypatch, 0, rank_variable=None)
-
-    options = LSQMLOptions()
-    options.reconstructor_options.num_epochs = NUM_EPOCHS
-    options.object_options.pixel_size_m = PIXEL_M
-
     product = run_reconstruction(
         logging.getLogger('test'),
+        _resolved(_FakeReconstructor(on_epoch=cancel_on)),
         reconstruct_input,
-        options,
         tmp_path,
-        num_sync_epochs=NUM_SYNC_EPOCHS,
         cancellation=cancellation,
         on_sync=lambda output, checkpoint: syncs.append((output.progress, checkpoint)),
     )
@@ -464,26 +478,14 @@ def test_an_uncancelled_run_that_produces_nothing_still_raises(
 ) -> None:
     # The cancelled empty run is expected; the uncancelled one is a reconstructor fault and
     # must stay loud.
-    def fake_reconstruct(
-        parameters: ReconstructInput,
-        task_options: object,
-        num_sync_epochs: int,
-    ) -> Iterator[ReconstructOutput]:
-        return iter(())
-
-    monkeypatch.setattr(_reconstruct_common, 'reconstruct_with_ptychi', fake_reconstruct)
     _set_rank(monkeypatch, 0, rank_variable=None)
-
-    options = LSQMLOptions()
-    options.object_options.pixel_size_m = PIXEL_M
 
     with pytest.raises(RuntimeError):
         run_reconstruction(
             logging.getLogger('test'),
+            _resolved(_FakeReconstructor(empty=True)),
             _make_reconstruct_input(),
-            options,
             tmp_path,
-            num_sync_epochs=NUM_SYNC_EPOCHS,
         )
 
 
@@ -503,32 +505,18 @@ def test_the_sync_hook_reports_no_checkpoint_on_a_secondary_rank(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     # A rank that writes nothing must say so rather than name a path it did not create.
-    reconstruct_input = _make_reconstruct_input()
     syncs: list[tuple[int, Path | None]] = []
-
-    def fake_reconstruct(
-        parameters: ReconstructInput,
-        task_options: object,
-        num_sync_epochs: int,
-    ) -> Iterator[ReconstructOutput]:
-        yield ReconstructOutput(product=parameters.product, progress=num_sync_epochs)
-
-    monkeypatch.setattr(_reconstruct_common, 'reconstruct_with_ptychi', fake_reconstruct)
     _set_rank(monkeypatch, 1, rank_variable=None)
-
-    options = LSQMLOptions()
-    options.object_options.pixel_size_m = PIXEL_M
 
     run_reconstruction(
         logging.getLogger('test'),
-        reconstruct_input,
-        options,
+        _resolved(_FakeReconstructor()),
+        _make_reconstruct_input(),
         tmp_path,
-        num_sync_epochs=NUM_SYNC_EPOCHS,
         on_sync=lambda output, checkpoint: syncs.append((output.progress, checkpoint)),
     )
 
-    assert syncs == [(NUM_SYNC_EPOCHS, None)]
+    assert [checkpoint for _, checkpoint in syncs] == [None, None]
 
 
 def test_a_run_with_no_token_never_touches_the_collective(
@@ -625,81 +613,32 @@ def test_the_cancel_callback_runs_once(monkeypatch: pytest.MonkeyPatch) -> None:
     assert token.reason == 'SIGTERM'
 
 
-def test_load_ptychi_options_builds_a_fresh_object_each_time() -> None:
-    # The per-scan loop edits the options it is handed, and a shared object would carry
-    # one projection's edits into the next.
-    first = load_ptychi_options(None)
-    first.reconstructor_options.num_epochs = 11
-
-    assert load_ptychi_options(None).reconstructor_options.num_epochs != 11
-
-
-@pytest.mark.parametrize('suffix', ['.yaml', '.yml', '.json'])
-def test_load_ptychi_options_round_trips_a_file(tmp_path: Path, suffix: str) -> None:
-    """The encoding follows the suffix, and either one survives the round trip."""
-    options = LSQMLOptions()
-    options.reconstructor_options.num_epochs = 7
-    options_file = (tmp_path / 'ptychi_options').with_suffix(suffix)
-    dump = dump_task_options if suffix == '.json' else dump_task_options_yaml
-    options_file.write_text(dump(options))
-
-    assert load_ptychi_options(options_file).reconstructor_options.num_epochs == 7
-
-
-def test_load_ptychi_options_reads_an_unsuffixed_file_as_json(tmp_path: Path) -> None:
-    """A name carrying no suffix is the JSON the drivers have always accepted."""
-    options = LSQMLOptions()
-    options.reconstructor_options.num_epochs = 3
-    options_file = tmp_path / 'options'
-    options_file.write_text(dump_task_options(options))
-
-    assert load_ptychi_options(options_file).reconstructor_options.num_epochs == 3
-
-
-@pytest.mark.parametrize('dump', [dump_task_options, dump_task_options_yaml])
-def test_load_ptychi_options_reads_stdin_for_a_dash(
-    monkeypatch: pytest.MonkeyPatch, dump: object
-) -> None:
-    """Stdin has no suffix to go by, so both encodings have to be accepted."""
-    import io
-
-    options = LSQMLOptions()
-    options.reconstructor_options.num_epochs = 5
-    monkeypatch.setattr('sys.stdin', io.StringIO(dump(options)))  # type: ignore[operator]
-
-    loaded = load_ptychi_options(_reconstruct_common._STDIN_ARGUMENT)
-
-    assert loaded.reconstructor_options.num_epochs == 5
-
-
-# --- prepared directories ----------------------------------------------------------------
+# --- options documents --------------------------------------------------------------------
 #
 # A prepared directory is read by both ptychodus-reconstruct and the subprocess driver, so
-# how its options file is chosen, how its options are written, and what pairing reports are
-# pinned here once.
+# how its options document is chosen, read and written is pinned here once.
 
 
 def test_an_explicit_options_file_wins(tmp_path: Path) -> None:
-    (tmp_path / 'ptychi_options.yaml').write_text('{}')
-    chosen = tmp_path / 'elsewhere.json'
+    (tmp_path / 'reconstruct_options.yaml').write_text('{}')
+    chosen = tmp_path / 'elsewhere.yaml'
 
-    assert resolve_ptychi_options_file(logging.getLogger('test'), chosen, tmp_path) == chosen
+    assert find_options_document(chosen, tmp_path) == chosen
 
 
 def test_the_stdin_sentinel_is_passed_through(tmp_path: Path) -> None:
     # ``-`` is not a path to probe for; resolving it against the input directory would
     # turn an in-memory handoff into a missing file.
-    (tmp_path / 'ptychi_options.yaml').write_text('{}')
-    stdin = _reconstruct_common._STDIN_ARGUMENT
+    (tmp_path / 'reconstruct_options.yaml').write_text('{}')
 
-    assert resolve_ptychi_options_file(logging.getLogger('test'), stdin, tmp_path) == stdin
+    assert find_options_document(Path('-'), tmp_path) == Path('-')
 
 
 def test_the_staged_options_are_used_when_present(tmp_path: Path) -> None:
-    staged = tmp_path / 'ptychi_options.yaml'
+    staged = tmp_path / 'reconstruct_options.yaml'
     staged.write_text('{}')
 
-    assert resolve_ptychi_options_file(logging.getLogger('test'), None, tmp_path) == staged
+    assert find_options_document(None, tmp_path) == staged
 
 
 def test_a_missing_staged_options_file_falls_back_rather_than_failing(
@@ -707,46 +646,69 @@ def test_a_missing_staged_options_file_falls_back_rather_than_failing(
 ) -> None:
     # A directory staged by hand carries no options, and an error would make that ordinary
     # invocation the failing one.
-    with caplog.at_level('WARNING', logger='test'):
-        assert resolve_ptychi_options_file(logging.getLogger('test'), None, tmp_path) is None
+    with caplog.at_level('WARNING'):
+        assert find_options_document(None, tmp_path) is None
 
     assert any('stock options' in record.getMessage() for record in caplog.records)
 
 
 def test_the_stock_fallback_follows_the_propagation_regime() -> None:
-    assert type(load_ptychi_options(None, far_field=True)).__name__ == 'LSQMLOptions'
-    assert type(load_ptychi_options(None, far_field=False)).__name__ == 'BHOptions'
+    libraries = PluginRegistry.load_plugins().reconstructor_libraries
+
+    far = default_reconstruction(libraries, far_field=True)
+    near = default_reconstruction(libraries, far_field=False)
+
+    assert far.selectors() == {'library': 'PtyChi', 'algorithm': 'LSQML'}
+    assert near.selectors() == {'library': 'PtyChi', 'algorithm': 'BH'}
 
 
-def test_saved_options_are_aligned_and_read_back(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    _set_rank(monkeypatch, 0, rank_variable=None)
-    options = LSQMLOptions()
-    options.reconstructor_options.num_epochs = 9
+def test_the_default_is_a_fresh_object_each_time() -> None:
+    # The per-scan loop edits the options it is handed, and a shared object would carry
+    # one projection's edits into the next.
+    libraries = PluginRegistry.load_plugins().reconstructor_libraries
+    first = default_reconstruction(libraries, far_field=True).options
+    first.task.reconstructor_options.num_epochs = 11  # type: ignore[attr-defined]
 
-    aligned = save_ptychi_options(
-        logging.getLogger('test'), options, _make_reconstruct_input().product, tmp_path
-    )
-    loaded = load_ptychi_options(tmp_path / 'ptychi_options.yaml')
-
-    # The pixel size comes from the product, not from the options handed in.
-    assert aligned.object_options.pixel_size_m == pytest.approx(PIXEL_M)
-    assert loaded.object_options.pixel_size_m == pytest.approx(PIXEL_M)
-    assert loaded.reconstructor_options.num_epochs == 9
+    second = default_reconstruction(libraries, far_field=True).options
+    assert second.task.reconstructor_options.num_epochs != 11  # type: ignore[attr-defined]
 
 
-def test_saved_options_are_aligned_but_not_written_on_a_secondary_rank(
+def test_a_written_document_reads_back_as_the_same_run(tmp_path: Path) -> None:
+    libraries = PluginRegistry.load_plugins().reconstructor_libraries
+    resolved = default_reconstruction(libraries, far_field=False)
+    resolved.options.task.reconstructor_options.num_epochs = 9  # type: ignore[attr-defined]
+    options_file = tmp_path / 'reconstruct_options.yaml'
+    options_file.write_text(resolved.dump())
+
+    loaded = read_reconstruction(libraries, options_file)
+
+    assert loaded.selectors() == resolved.selectors()
+    assert type(loaded.options) is type(resolved.options)
+    assert loaded.options.task.reconstructor_options.num_epochs == 9  # type: ignore[attr-defined]
+
+
+def test_a_document_naming_an_unknown_library_is_refused(tmp_path: Path) -> None:
+    options_file = tmp_path / 'options.yaml'
+    options_file.write_text('library: NoSuchLibrary\nalgorithm: X\n')
+
+    with pytest.raises(ValueError, match='NoSuchLibrary'):
+        read_reconstruction(PluginRegistry.load_plugins().reconstructor_libraries, options_file)
+
+
+def test_the_options_are_written_once_on_the_main_process(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     _set_rank(monkeypatch, 1, rank_variable=None)
-
-    aligned = save_ptychi_options(
-        logging.getLogger('test'), LSQMLOptions(), _make_reconstruct_input().product, tmp_path
+    _reconstruct_common.save_reconstruct_options(
+        logging.getLogger('test'), _resolved(_FakeReconstructor()), tmp_path
     )
+    assert not (tmp_path / 'reconstruct_options.yaml').exists()
 
-    assert aligned.object_options.pixel_size_m == pytest.approx(PIXEL_M)
-    assert not (tmp_path / 'ptychi_options.yaml').exists()
+    _set_rank(monkeypatch, 0, rank_variable=None)
+    _reconstruct_common.save_reconstruct_options(
+        logging.getLogger('test'), _resolved(_FakeReconstructor()), tmp_path
+    )
+    assert (tmp_path / 'reconstruct_options.yaml').read_text().startswith('library: Fake\n')
 
 
 def _product_with_positions(num_positions: int) -> Product:
@@ -1293,14 +1255,6 @@ class TestEstimateFocusObjectDistance:
         assert '--focus-object-distance-m' in caplog.text
 
 
-class TestOptionsFallbackFollowsTheRegime:
-    def test_far_field_falls_back_to_lsqml(self) -> None:
-        assert type(load_ptychi_options(None)).__name__ == 'LSQMLOptions'
-
-    def test_near_field_falls_back_to_bh(self) -> None:
-        assert type(load_ptychi_options(None, far_field=False)).__name__ == 'BHOptions'
-
-
 def test_the_beam_estimate_takes_the_moments_accumulated_during_assembly(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -1364,3 +1318,47 @@ class TestInvalidCountThreshold:
 
     def test_float_data_has_no_marker(self) -> None:
         assert invalid_count_threshold(numpy.dtype('float32')) is None
+
+
+def test_printing_another_librarys_options_takes_its_only_algorithm(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # pty-chi's LSQML is the fallback only for pty-chi; naming another library alone must
+    # not ask it for an algorithm it does not have.
+    pytest.importorskip('cdtools')
+    import argparse
+
+    import yaml
+
+    parser = argparse.ArgumentParser()
+    _reconstruct_common.add_print_options_argument(parser)
+
+    with pytest.raises(SystemExit) as caught:
+        parser.parse_args(['--print-options', 'cdtools'])
+
+    assert caught.value.code == 0
+    document = yaml.safe_load(capsys.readouterr().out)
+    assert (document['library'], document['algorithm']) == ('cdtools', 'FancyPtycho')
+
+
+def test_an_nccl_flag_lives_on_the_ranks_default_device(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A backend puts each rank on its own GPU through torch's default device, while the
+    # current device stays cuda:0 everywhere. A flag there would have every rank but the
+    # first build a second communicator its peers never join, hanging the run.
+    import torch
+
+    devices: list[object] = []
+    real_tensor = torch.tensor
+
+    def recording_tensor(data: object, **kwargs: Any) -> torch.Tensor:
+        devices.append(kwargs.pop('device', None))
+        return real_tensor(data, **kwargs)
+
+    monkeypatch.setattr('torch.distributed.is_initialized', lambda: True)
+    monkeypatch.setattr('torch.distributed.get_backend', lambda: 'nccl')
+    monkeypatch.setattr('torch.distributed.all_reduce', lambda tensor, op=None: None)
+    monkeypatch.setattr(torch, 'get_default_device', lambda: torch.device('cuda', 1))
+    monkeypatch.setattr(torch, 'tensor', recording_tensor)
+
+    assert not _reconstruct_common._agree_on_cancellation(CancellationToken())
+    assert devices == [torch.device('cuda', 1)]

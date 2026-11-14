@@ -57,7 +57,7 @@ class InferenceOptions(BaseModel):
     Being ptychodus's, it states its bounds and display text inline.
     """
 
-    model_config = ConfigDict(validate_assignment=True)
+    model_config = ConfigDict(extra='forbid', validate_assignment=True)
 
     central_crop: int = Field(
         64,
@@ -74,11 +74,14 @@ class PtychoFMOptions(PtychoFMConfig):
 
     A subclass rather than a wrapper, so the object stays a ``PtychoFMConfig``
     and dumps to the same nested shape the backend already reads. Upstream allows
-    extra keys, so the added branch rides along as a top-level section.
+    extra keys, so the added branch rides along as a top-level section; this subclass forbids
+    any other, so a misspelled field is refused rather than carried.
 
     ``model`` is redeclared only to mark it frozen, pydantic's own statement that
     the architecture is not a user's to vary; see the module docstring.
     """
+
+    model_config = ConfigDict(extra='forbid')
 
     model: ModelConfig = Field(default_factory=ModelConfig, frozen=True)
     inference: InferenceOptions = Field(default_factory=InferenceOptions)

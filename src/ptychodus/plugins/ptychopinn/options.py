@@ -96,7 +96,7 @@ class Accelerator(StrEnum):
 
 class _Options(BaseModel):
     # Several fields are named model_*, which pydantic otherwise reserves.
-    model_config = ConfigDict(protected_namespaces=(), validate_assignment=True)
+    model_config = ConfigDict(extra='forbid', protected_namespaces=(), validate_assignment=True)
 
 
 class DataOptions(_Options):

@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 import logging
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from scipy.sparse.linalg import lsmr
 
 from ptychodus.api.fluorescence import (
@@ -27,6 +27,8 @@ __all__ = [
 
 
 class VSPIOptions(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
     damping_factor: float = Field(
         0.0,
         ge=0.0,

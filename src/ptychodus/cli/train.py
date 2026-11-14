@@ -5,8 +5,9 @@ The training data are in the backend's own format -- for PtychoPINN, every ``*.n
 archive in the directory -- as the GUI or ``ptychodus-generate-training-data`` writes them,
 and are only read. The backend writes what it trains into the output
 directory, and the main process adds the trained model there as ``model`` with the backend's
-extension, the name a later run reads it under. It reads no settings file and builds no
-application model.
+extension, the name a later run reads it under, beside ``train_options.yaml`` (the options
+it trained with, as a document ``--options`` takes back) and ``train.log``. It reads no
+settings file and builds no application model.
 
 A backend's options come from a YAML document naming the library, the algorithm and their
 fields. ``--print-options`` writes one at its defaults, to edit and pass back with
@@ -44,71 +45,21 @@ from ptychodus.api.reconstruct import (
     TrainableReconstructor,
     TrainOutput,
 )
-from ptychodus.cli import DirectoryType, add_log_level_argument, configure_logging
+from ptychodus.cli import DirectoryType, add_log_level_argument, configure_logging, open_action_log
 from ptychodus.cli._launch import (
     environment_node_count,
     environment_rank,
     environment_world_size,
 )
-from ptychodus.cli._options import (
+from ptychodus.api.options import (
     OptionsError,
     apply_options_document,
-    format_options_document,
+    dump_options_document,
     read_options_document,
 )
+from ptychodus.cli._options import format_options_document, resolve_trainer
 
 logger = logging.getLogger('train')
-
-
-def _trainers(library: ReconstructorLibrary) -> list[TrainableReconstructor]:
-    """The algorithms `library` offers that can train, in the order it offers them."""
-    return [
-        reconstructor
-        for reconstructor in library
-        if isinstance(reconstructor, TrainableReconstructor)
-    ]
-
-
-def _resolve(
-    libraries: PluginCatalog[ReconstructorLibrary], library_name: str, algorithm_name: str | None
-) -> tuple[Plugin[ReconstructorLibrary], TrainableReconstructor]:
-    """The library and trainable algorithm named, or the library's only one when unnamed.
-
-    Raises:
-        OptionsError: if no library or no trainable algorithm answers to the names, or the
-            algorithm is left unnamed and the library trains more than one.
-    """
-    plugin = libraries.find_plugin(library_name)
-
-    if plugin is None:
-        raise OptionsError(
-            f'No library named "{library_name}"; registered are '
-            f'{libraries.stringify_plugin_names()}.'
-        )
-
-    trainers = _trainers(plugin.strategy)
-
-    if not trainers:
-        if plugin.strategy.is_available():
-            raise OptionsError(f'{plugin.display_name} has nothing that trains.')
-
-        raise OptionsError(f'{plugin.display_name} is not installed.')
-
-    names = [trainer.name for trainer in trainers]
-
-    if algorithm_name is None:
-        if len(trainers) == 1:
-            return plugin, trainers[0]
-
-        raise OptionsError(f'{plugin.display_name} trains {names}; name one with --algorithm.')
-
-    for trainer in trainers:
-        if trainer.name.casefold() == algorithm_name.casefold():
-            return plugin, trainer
-
-    raise OptionsError(
-        f'{plugin.display_name} has no trainable algorithm "{algorithm_name}"; it trains {names}.'
-    )
 
 
 def format_training_options(
@@ -150,7 +101,7 @@ class _PrintOptionsAction(argparse.Action):
         library_name, _, algorithm_name = str(values).partition('/')
 
         try:
-            plugin, trainer = _resolve(self._libraries, library_name, algorithm_name or None)
+            plugin, trainer = resolve_trainer(self._libraries, library_name, algorithm_name or None)
         except OptionsError as exc:
             parser.error(str(exc))
 
@@ -287,7 +238,9 @@ def main() -> ExitCode:
         if library_name is None:
             raise OptionsError('Name a library with --library or an --options file.')
 
-        plugin, trainer = _resolve(registry.reconstructor_libraries, library_name, algorithm_name)
+        plugin, trainer = resolve_trainer(
+            registry.reconstructor_libraries, library_name, algorithm_name
+        )
         subject = f'{plugin.display_name} {trainer.name}'
         options = apply_options_document(trainer.get_default_options(), fields, subject=subject)
     except (OptionsError, OSError) as exc:
@@ -330,7 +283,16 @@ def main() -> ExitCode:
 
         return ExitCode.SUCCESS
 
-    output_directory.mkdir(parents=True, exist_ok=True)
+    open_action_log(output_directory, StandardFileLayout.TRAIN_LOG, rank=rank)
+
+    if is_main_process:
+        options_file = StandardFileLayout.TRAIN_OPTIONS.path(output_directory)
+        logger.info('Writing %s', options_file)
+        options_file.write_text(
+            dump_options_document(
+                {'library': plugin.simple_name, 'algorithm': trainer.name}, options
+            )
+        )
 
     # A scheduler or launcher ends a job with SIGTERM. Raised as an interrupt it unwinds
     # through the backend, so whatever it holds open is released rather than abandoned.

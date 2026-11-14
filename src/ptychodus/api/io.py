@@ -121,22 +121,24 @@ class StandardFileLayout(StrEnum):
 
     DIFFRACTION = 'diffraction.h5'
     FLUORESCENCE = 'fluorescence.h5'
-    # Console capture: whatever the run wrote to its standard output and standard
-    # error, including the output of C extensions that a sys.stdout reassignment
-    # would not reach. Named for the application rather than for reconstruction, so
-    # that any activity writing into a workflow directory uses the one name.
-    LOG = 'ptychodus.log'
     # Stem only; the per-backend extension comes from
     # TrainableReconstructor.get_model_file_extension(). The full path is
     # f'{input_directory}/{MODEL_BASENAME}{ext}'.
     MODEL_BASENAME = 'model'
     PRODUCT = 'product.h5'
-    # Serialized reconstructor options: the resolved task a run was launched with,
-    # after every value the product supplies has been folded in. Distinct from
-    # SETTINGS, which holds the application's own configuration rather than what the
-    # reconstruction backend received.
-    PTYCHI_OPTIONS = 'ptychi_options.yaml'
     SETTINGS = 'settings.ini'
+    # One options document and one log per action, each named after the action, so a
+    # directory reconstructed and then enhanced keeps both runs' files without a clash,
+    # and a tool finds them by the action it performs without knowing the backend. An
+    # options document names what it configures (library and algorithm, or enhancer)
+    # beside the backend's own options, as ptychodus.api.options reads and writes it.
+    # A log holds a run's records, appended to rather than replaced.
+    RECONSTRUCT_OPTIONS = 'reconstruct_options.yaml'
+    RECONSTRUCT_LOG = 'reconstruct.log'
+    TRAIN_OPTIONS = 'train_options.yaml'
+    TRAIN_LOG = 'train.log'
+    ENHANCE_XRF_OPTIONS = 'enhance_xrf_options.yaml'
+    ENHANCE_XRF_LOG = 'enhance_xrf.log'
 
     def path(self, directory: Path) -> Path:
         return directory / self.value
@@ -146,6 +148,15 @@ class StandardFileLayout(StrEnum):
         # that publishes intermediate results.
         p = Path(self.value)
         return directory / f'{p.stem}.{epoch:06d}{p.suffix}'
+
+    def rank_path(self, directory: Path, rank: int) -> Path:
+        # One file per process of a multi-process launch, so ranks never share one; the
+        # main process (rank 0) keeps the plain name.
+        if rank == 0:
+            return self.path(directory)
+
+        p = Path(self.value)
+        return directory / f'{p.stem}.rank{rank:02d}{p.suffix}'
 
 
 class DiffractionFileKeys(StrEnum):

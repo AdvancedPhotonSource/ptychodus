@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 """Reference launcher for the ``ptychodus-reconstruct-subprocess`` command.
 
-Shows the whole contract in one place: build a pty-chi options object from
-ptychodus settings exactly as the GUI would, serialize it, and hand the blob to
-the child on stdin. The ``options_class_name`` that pty-chi stamps into the
-serialized dict carries the algorithm identity, so nothing algorithm-specific
-rides on argv.
+Shows the whole contract in one place: build pty-chi options from ptychodus
+settings exactly as the GUI would, write them as an options document naming the
+library and algorithm, and hand it to the child on stdin, so nothing
+algorithm-specific rides on argv. The child aligns the options against the
+product, as every reconstruction does.
 Optionally cancels the run part-way to exercise the signal path.
 
     python scripts/ptychodus_reconstruct_parent_demo.py \\
@@ -28,14 +28,13 @@ import threading
 import time
 from pathlib import Path
 
-from ptychodus.api.io import StandardFileLayout, load_product
+from ptychodus.api.options import dump_options_document
 from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.processing import ProcessingParameterStore
 from ptychodus.model.processing._ptychi_sections import sections_for
 from ptychodus.model.processing.settings import ProcessingSettings
 from ptychodus.plugins.ptychi.core import PtyChiReconstructorLibrary
-from ptychodus.plugins.ptychi.options import apply_to_task
-from ptychodus.plugins.ptychi.task import align_task_options_with_product, dump_task_options
+from ptychodus.plugins.ptychi.options import PtyChiOptions
 
 COMMAND_NAME = 'ptychodus-reconstruct-subprocess'
 
@@ -129,13 +128,12 @@ def main() -> int:
     except KeyError:
         raise SystemExit(f'Unknown {LIBRARY_NAME} algorithm "{selected}".') from None
 
-    product_file = StandardFileLayout.PRODUCT.path(args.input_directory)
-    task_options = align_task_options_with_product(
-        apply_to_task(store.get_options(LIBRARY_NAME, algorithm)), load_product(product_file)
-    )
+    options = store.get_options(LIBRARY_NAME, algorithm)
+    assert isinstance(options, PtyChiOptions)
+    options.num_sync_epochs = args.num_sync_epochs
 
     if args.num_epochs is not None:
-        task_options.reconstructor_options.num_epochs = args.num_epochs
+        options.task.reconstructor_options.num_epochs = args.num_epochs
 
     command = [
         *_child_command(),
@@ -145,10 +143,8 @@ def main() -> int:
         str(args.output_directory),
         # The options were built in memory here, so there is no file to point at. Saying
         # so explicitly keeps the handoff visible rather than implied by an empty flag.
-        '--ptychi-options',
+        '--options',
         '-',
-        '--num-sync-epochs',
-        str(args.num_sync_epochs),
     ]
 
     process = subprocess.Popen(
@@ -161,7 +157,9 @@ def main() -> int:
     assert process.stdin is not None
     assert process.stdout is not None
 
-    process.stdin.write(dump_task_options(task_options))
+    process.stdin.write(
+        dump_options_document({'library': LIBRARY_NAME, 'algorithm': algorithm}, options)
+    )
     process.stdin.close()
 
     started_s = time.monotonic()

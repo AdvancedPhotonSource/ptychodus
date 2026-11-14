@@ -1,42 +1,44 @@
-"""Shared reconstruction tail for the ``cli/reconstruct_*.py`` drivers.
+"""Shared reconstruction tail for the ``cli/reconstruct_*.py`` commands.
 
 Every driver assembles diffraction data and builds an initial
-:class:`~ptychodus.api.product.Product` -- that part differs per instrument. From there on, every
-driver resolves its pty-chi options, saves ``diffraction.h5``, aligns those options against the
-product, runs the reconstruction to convergence, and writes the standard-layout outputs
-identically. :func:`load_ptychi_options`, :func:`save_assembled_diffraction` and
-:func:`run_reconstruction` are that common tail, extracted so it is written and tested once
-rather than duplicated in eleven files.
+:class:`~ptychodus.api.product.Product` -- that part differs per instrument. From there on,
+every command resolves its options, saves ``diffraction.h5``, runs the reconstruction to
+convergence, and writes the standard-layout outputs identically. :func:`read_reconstruction`,
+:func:`save_assembled_diffraction` and :func:`run_reconstruction` are that common tail,
+extracted so it is written and tested once rather than duplicated in eleven files.
+
+A run is any registered reconstructor, named by an options document (library, algorithm and
+the backend's own options; see :mod:`ptychodus.api.options`) and run in this process through
+its plugin. Nothing here imports a backend, so a command built on it works with whichever
+backends are installed; pty-chi is only the fallback when no options are given.
 
 Both writers write under :func:`is_main_process`, so a multi-process launch produces one copy of
 each artifact instead of having every rank truncate the same paths concurrently.
 
 Cancellation lives here for the same reason. A reconstruction has no interruption point inside
-pty-chi, so a signal cannot stop it where it lands; :func:`install_signal_handlers` instead
-raises a flag that :func:`run_reconstruction` reads at each sync point, which costs at most
-``num_sync_epochs`` epochs and leaves a partially converged ``product.h5`` behind. Under a
-multi-process launch that flag is agreed across ranks before it is acted on, because a rank that
-left the loop alone would hang its peers at their next collective.
+the backend, so a signal cannot stop it where it lands; :func:`install_signal_handlers` instead
+raises a flag that :func:`run_reconstruction` reads at each output, and a partially converged
+``product.h5`` is left behind. Under a multi-process launch that flag is agreed across ranks
+before it is acted on, because a rank that left the loop alone would hang its peers at their
+next collective.
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import os
 import signal
 import sys
 import threading
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from types import FrameType
-from typing import Any, cast, Final, Literal
+from typing import TYPE_CHECKING, Any, cast, Final, Literal
 
 import numpy
-import yaml
-from ptychi.api import BHOptions, LSQMLOptions
-from ptychi.api.options.task import PtychographyTaskOptions
+from pydantic import BaseModel
 
 from ptychodus.api.accumulate import (
     AssemblyMomentAccumulator,
@@ -61,7 +63,14 @@ from ptychodus.api.diffraction import (
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.io import StandardFileLayout, save_diffraction_data, save_product
 from ptychodus.api.object import ObjectGeometry
+from ptychodus.api.options import (
+    OptionsError,
+    apply_options_document,
+    dump_options_document,
+    parse_options_document,
+)
 from ptychodus.api.parallax import estimate_defocus_from_assembled_data
+from ptychodus.api.plugins import PluginCatalog
 from ptychodus.api.preprocess.diffraction import FilterValuesStep, estimate_beam_center
 from ptychodus.api.probe import ProbeGeometry
 from ptychodus.api.probe_positions import ProbePositionSequence
@@ -70,63 +79,73 @@ from ptychodus.api.reconstruct import (
     PositionIndexFilter,
     ReconstructInput,
     ReconstructOutput,
+    Reconstructor,
+    ReconstructorLibrary,
+    TrainableReconstructor,
     prepare_reconstruct_input,
 )
 from ptychodus.cli._launch import environment_rank
-from ptychodus.plugins.ptychi.algorithms import task_options_classes
-from ptychodus.plugins.ptychi.task import (
-    align_task_options_with_product,
-    dump_task_options_yaml,
-    load_task_options,
-    load_task_options_from_mapping,
-    reconstruct_with_ptychi,
-)
+from ptychodus.cli._options import format_options_document, resolve_reconstructor
+
+if TYPE_CHECKING:
+    from ptychodus.plugins.ptychi.options import PtyChiOptions
 
 __all__ = [
     'CancellationToken',
-    'estimate_incident_beam_from_assembled_data',
-    'add_print_ptychi_options_argument',
-    'add_ptychi_options_argument',
+    'ResolvedReconstruction',
+    'add_options_argument',
+    'add_print_options_argument',
+    'check_ptychi_options',
+    'default_reconstruction',
     'estimate_dataset_beam_center',
-    'format_ptychi_options_defaults',
+    'estimate_incident_beam_from_assembled_data',
+    'find_options_document',
     'install_signal_handlers',
     'invalid_count_threshold',
     'is_main_process',
-    'load_ptychi_options',
+    'load_trained_model',
     'pair_patterns_with_positions',
+    'parse_reconstruction',
     'process_rank',
+    'ptychi_reconstruction',
+    'read_reconstruction',
+    'require_ptychi_options',
     'resolve_crop_region',
-    'resolve_ptychi_options_file',
+    'resolve_ptychi_reconstruction',
     'resolve_quantity',
     'run_reconstruction',
     'save_assembled_diffraction',
-    'save_ptychi_options',
+    'save_reconstruct_options',
 ]
 
 logger = logging.getLogger(__name__)
 
-# The conventional "read it from stdin instead" filename, as argparse hands it over once a
-# bare ``-`` has been through ``type=Path``.
-_STDIN_ARGUMENT = Path('-')
+
+def _group_rank() -> int:
+    """This process's rank in the torch process group, or 0 where there is none.
+
+    Read off torch only if something has imported it: a backend that runs ranks brings
+    ``torch.distributed`` in, and a run that never imports torch has no process group.
+    """
+    dist = sys.modules.get('torch.distributed')
+
+    if dist is None or not dist.is_available() or not dist.is_initialized():
+        return 0
+
+    return int(dist.get_rank())
 
 
 def process_rank() -> int:
     """This process's rank, as either the process group or the launcher reports it.
 
     Two independent sources are consulted because neither alone covers the whole run. The
-    torch process group does not exist until the reconstruction task is built, so until
-    then every process reports rank 0 and only the environment tells them apart; a group
-    created programmatically rather than by a launcher, in turn, exports nothing. A run
-    under neither -- an ordinary single-process invocation -- is rank 0 by both, which is
-    what makes this invisible outside a multi-process launch.
+    torch process group does not exist until the backend builds it, so until then every
+    process reports rank 0 and only the environment tells them apart; a group created
+    programmatically rather than by a launcher, in turn, exports nothing. A run under
+    neither -- an ordinary single-process invocation -- is rank 0 by both, which is what
+    makes this invisible outside a multi-process launch.
     """
-    # Resolved at call time because ``ptychi.parallel`` cannot be the first ptychi module
-    # a process imports: it reaches ``ptychi.io_handles``, which imports back from it. The
-    # module-scope ``ptychi.api.options.task`` import above is what breaks that cycle, so
-    # by the time this runs the name is already in sys.modules.
-    from ptychi.parallel import get_rank
-
-    return get_rank() or environment_rank()
+    return _group_rank() or environment_rank()
 
 
 def is_main_process() -> bool:
@@ -212,29 +231,35 @@ def _agree_on_cancellation(token: CancellationToken | None) -> bool:
     it. Reducing the flag with MAX makes one rank's request everyone's.
 
     The reduction is itself a collective, so it is only correct because every rank reaches
-    this point the same number of times: ``reconstruct_with_ptychi`` yields in lockstep. With
-    no process group -- an ordinary single-process run, and every rank before the task is
-    built -- there is nobody to agree with and the local flag stands.
+    this point the same number of times: a backend that runs ranks yields in lockstep. With
+    no process group -- an ordinary single-process run, and every rank before the backend
+    creates one -- there is nobody to agree with and the local flag stands.
     """
     if token is None:
         return False
 
     is_cancelled = token.is_cancelled
+    dist = sys.modules.get('torch.distributed')
 
-    # Imported here rather than at module scope, as everywhere else in this package that
-    # touches torch: the import is cheap only because ptychi has already pulled it in.
-    import torch
-    import torch.distributed as dist
-
-    if not dist.is_initialized():
+    if dist is None or not dist.is_available() or not dist.is_initialized():
         return is_cancelled
 
+    # Present in sys.modules, so importing it is a lookup rather than a load.
+    import torch
+
     # NCCL reduces on the GPU and raises on a CPU tensor, so the device follows the backend.
-    device = (
-        torch.device('cuda', torch.cuda.current_device())
-        if dist.get_backend() == 'nccl'
-        else torch.device('cpu')
-    )
+    # On the GPU it must be the one this rank's communicator was built on, which is the
+    # default device a backend sets per rank rather than torch's current device: that stays
+    # cuda:0 on every rank, and a flag there would have one rank build a second communicator
+    # its peers never join, hanging both.
+    device = torch.device('cpu')
+
+    if dist.get_backend() == 'nccl':
+        device = torch.get_default_device()
+
+        if device.type != 'cuda':
+            device = torch.device('cuda', torch.cuda.current_device())
+
     flag = torch.tensor([int(is_cancelled)], dtype=torch.int32, device=device)
     dist.all_reduce(flag, op=dist.ReduceOp.MAX)
     return bool(flag[0])
@@ -626,106 +651,72 @@ def invalid_count_threshold(
     return None
 
 
-_PTYCHI_OPTIONS_HELP = (
-    f'pty-chi options, as written to {StandardFileLayout.PTYCHI_OPTIONS} by any ptychodus '
-    'run. YAML or JSON, chosen by the suffix; its algorithm stamp selects the '
-    'reconstructor. "-" reads from stdin. Hand-written YAML must spell scientific '
-    'notation 1.0e-3 rather than 1e-3, which YAML reads as a string.'
+_OPTIONS_HELP = (
+    f'Options document, as {StandardFileLayout.RECONSTRUCT_OPTIONS} holds one and '
+    '--print-options writes one: "library", "algorithm" and the backend\'s "options". '
+    'Fields it omits keep their defaults. "-" reads from stdin. Hand-written YAML must '
+    'spell scientific notation 1.0e-3 rather than 1e-3, which YAML reads as a string.'
 )
 
+# The library a run falls back to when given no options, and its algorithm by regime: BH
+# for near field, which reconstructs a hologram better than stock LSQML does.
+_DEFAULT_LIBRARY: Final = 'PtyChi'
+_DEFAULT_FAR_FIELD_ALGORITHM: Final = 'LSQML'
+_DEFAULT_NEAR_FIELD_ALGORITHM: Final = 'BH'
 
-def add_ptychi_options_argument(
+
+@dataclass(frozen=True)
+class ResolvedReconstruction:
+    """The library, algorithm and options a run reconstructs with."""
+
+    library: str
+    reconstructor: Reconstructor
+    options: BaseModel
+
+    def selectors(self) -> dict[str, str]:
+        """What an options document names, beside the options it gives."""
+        return {'library': self.library, 'algorithm': self.reconstructor.name}
+
+    def dump(self) -> str:
+        """These options as the canonical document, which :func:`read_reconstruction` reads."""
+        return dump_options_document(self.selectors(), self.options)
+
+
+def add_options_argument(
     parser: argparse.ArgumentParser,
     *,
-    default_note: str = 'Defaults to stock LSQML, or BH for a near-field reconstruction.',
+    default_note: str = 'Defaults to stock pty-chi LSQML, or BH for a near-field run.',
 ) -> None:
-    """Add ``--ptychi-options``, so its help text is written once rather than ten times.
-
-    `default_note` completes the help for a driver that resolves a different fallback than
-    the stock options :func:`load_ptychi_options` builds from ``None``.
-    """
+    """Add ``--options``, so its help text is written once rather than ten times."""
     parser.add_argument(
-        '--ptychi-options',
+        '--options',
+        metavar='OPTIONS_FILE',
         type=Path,
         default=None,
-        help=f'{_PTYCHI_OPTIONS_HELP} {default_note}',
+        help=f'{_OPTIONS_HELP} {default_note}',
     )
 
 
-# Written from the data by ``align_task_options_with_product`` at run time, whatever a
-# supplied options file says. Spelled out rather than derived from that function: this
-# exists to warn a person away from tuning a value that will be discarded, and a reader
-# of the printed file cannot introspect anything. A test holds the two in agreement.
-_DATA_DERIVED_OPTION_FIELDS: Final = (
-    'data_options.wavelength_m',
-    'data_options.free_space_propagation_distance_m',
-    'data_options.fft_shift',
-    'object_options.pixel_size_m',
-    'object_options.pixel_size_aspect_ratio',
-    'object_options.slice_spacings_m',
-    'object_options.determine_position_origin_coords_by',
-    'object_options.position_origin_coords',
-    'probe_options.pixel_size_m',
-    'probe_options.pixel_size_aspect_ratio',
-    'probe_options.power_constraint.probe_power',
-)
-
-_DEFAULT_PRINTED_ALGORITHM: Final = 'LSQML'
-
-
-def format_ptychi_options_defaults(algorithm: str) -> str:
-    """One algorithm's default options as a commented YAML document.
-
-    The body is exactly what a run writes to its options file, so the result can be
-    saved and passed straight back to ``--ptychi-options``. The header is YAML comments,
-    which :func:`yaml.safe_load` discards, so saving it changes nothing on load.
-    """
-    options_cls = task_options_classes()[algorithm]
-    fields = '\n'.join(f'#   {name}' for name in _DATA_DERIVED_OPTION_FIELDS)
-    header = f"""\
-# pty-chi {algorithm} options, at their defaults. Save this, edit it, and pass it back
-# with --ptychi-options.
-#
-# "options_class_name" is the algorithm identity that selects the reconstructor on the
-# way back in. Re-run --print-ptychi-options with a different algorithm rather than
-# editing those stamps by hand.
-#
-# These are written from the data when a reconstruction starts, whatever this file says,
-# so editing them here changes nothing but adds a warning to the log:
-{fields}
-#
-# Defaults are pty-chi's own, for the version installed here. This is a correct skeleton
-# to edit, not a tuned configuration.
-"""
-    return header + '\n' + dump_task_options_yaml(options_cls())
-
-
-class _PrintPtyChiOptionsAction(argparse.Action):
+class _PrintOptionsAction(argparse.Action):
     """Print one algorithm's default options and exit, during parsing.
 
-    An action rather than a flag the driver checks, for two reasons. Every driver
+    An action rather than a flag the command checks, for two reasons. Every command
     carrying this marks its real input required, and argparse rejects a missing required
-    argument before any driver code runs -- so a flag would make the command unusable on
-    its own, which is the only way anyone would call it. And one driver redirects its
-    standard output into a log file before it does anything, so a print from inside it
-    would land in the log rather than the terminal. Parsing happens before both.
+    argument before any command code runs -- so a flag would make the command unusable on
+    its own, which is the only way anyone would call it. And a command that redirects its
+    standard output into a log file would print into the log. Parsing happens before both.
     """
 
     def __init__(
         self,
         option_strings: Sequence[str],
         dest: str,
+        *,
+        library: str | None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(
-            option_strings,
-            dest,
-            nargs='?',
-            const=_DEFAULT_PRINTED_ALGORITHM,
-            default=argparse.SUPPRESS,
-            choices=tuple(task_options_classes()),
-            **kwargs,
-        )
+        self._library = library
+        super().__init__(option_strings, dest, nargs='?', default=argparse.SUPPRESS, **kwargs)
 
     def __call__(
         self,
@@ -734,105 +725,255 @@ class _PrintPtyChiOptionsAction(argparse.Action):
         values: str | Sequence[Any] | None,
         option_string: str | None = None,
     ) -> None:
-        algorithm = _DEFAULT_PRINTED_ALGORITHM if values is None else str(values)
+        from ptychodus.api.plugins import PluginRegistry
 
+        text = '' if values is None else str(values)
+        library_name, _, algorithm_name = text.partition('/')
+
+        if self._library is None:
+            library_name = library_name or _DEFAULT_LIBRARY
+        else:
+            # A command bound to one library takes the algorithm alone.
+            library_name, algorithm_name = self._library, text
+
+        libraries = PluginRegistry.load_plugins().reconstructor_libraries
+        named = libraries.find_plugin(library_name)
+
+        # Unnamed, pty-chi's algorithm is the fallback a run makes; another library's is
+        # its only one, which resolving with no name picks or asks for.
+        if not algorithm_name and named is not None and named.simple_name == _DEFAULT_LIBRARY:
+            algorithm_name = _DEFAULT_FAR_FIELD_ALGORITHM
+
+        try:
+            plugin, reconstructor = resolve_reconstructor(
+                libraries, library_name, algorithm_name or None
+            )
+        except OptionsError as exc:
+            parser.error(str(exc))
+
+        document = format_options_document(
+            f'{plugin.display_name} {reconstructor.name} options',
+            {'library': plugin.simple_name, 'algorithm': reconstructor.name},
+            reconstructor.get_default_options(),
+        )
         # Explicitly stdout. ``parser.exit(message=...)`` writes to stderr, which would
-        # leave ``--print-ptychi-options > options.yaml`` -- the whole point of the flag
-        # -- producing an empty file. The stock ``version`` action writes to stdout the
-        # same way, for the same reason.
-        parser._print_message(format_ptychi_options_defaults(algorithm), sys.stdout)
+        # leave ``--print-options > options.yaml`` -- the whole point of the flag --
+        # producing an empty file.
+        parser._print_message(document, sys.stdout)
         parser.exit()
 
 
-def add_print_ptychi_options_argument(parser: argparse.ArgumentParser) -> None:
-    """Add ``--print-ptychi-options``, the way to obtain a file for ``--ptychi-options``.
+def add_print_options_argument(
+    parser: argparse.ArgumentParser, *, library: str | None = None
+) -> None:
+    """Add ``--print-options``, the way to obtain a file for ``--options``.
 
-    Bare, it prints the algorithm a driver falls back to when given no options file, so
-    the printed file reproduces the default run rather than describing some other one.
+    Bare, it prints the options a run falls back to when given none, so the printed file
+    reproduces the default run. With `library`, the command runs only that library and the
+    argument names an algorithm alone.
     """
+    if library is None:
+        metavar = 'LIBRARY[/ALGORITHM]'
+        what = (
+            f"a library's algorithm (default {_DEFAULT_LIBRARY}/{_DEFAULT_FAR_FIELD_ALGORITHM}"
+            f'; {_DEFAULT_LIBRARY}/{_DEFAULT_NEAR_FIELD_ALGORITHM} is the near-field fallback)'
+        )
+    else:
+        metavar = 'ALGORITHM'
+        what = (
+            f'an algorithm (default {_DEFAULT_FAR_FIELD_ALGORITHM}; '
+            f'{_DEFAULT_NEAR_FIELD_ALGORITHM} is the near-field fallback)'
+        )
+
     parser.add_argument(
-        '--print-ptychi-options',
-        action=_PrintPtyChiOptionsAction,
-        metavar='ALGORITHM',
+        '--print-options',
+        action=_PrintOptionsAction,
+        library=library,
+        metavar=metavar,
         help=(
-            "Print this algorithm's default pty-chi options as YAML, then exit. "
-            f'Defaults to {_DEFAULT_PRINTED_ALGORITHM}; pass BH for the algorithm a '
-            'near-field run falls back to. Redirect to a file, edit it, and pass it '
-            'back with --ptychi-options.'
+            f"Print {what}'s default options as a YAML document, then exit. Redirect to a "
+            'file, edit it, and pass it back with --options.'
         ),
     )
 
 
-_YAML_SUFFIXES = frozenset({'.yaml', '.yml'})
+def read_reconstruction(
+    libraries: PluginCatalog[ReconstructorLibrary], options_file: Path
+) -> ResolvedReconstruction:
+    """The run an options document describes, its options merged onto the defaults.
 
+    `options_file` named ``-`` reads stdin.
 
-def _decode_ptychi_options(text: str, options_file: Path) -> PtychographyTaskOptions:
-    """Decode an options payload, picking the encoding from the file name.
-
-    Stdin carries no suffix, so it is tried as JSON and then as YAML. The order only
-    decides which error surfaces, since YAML parses JSON too.
+    Raises:
+        OptionsError: if the document is malformed, names no installed library or
+            algorithm, or gives options its backend does not accept.
+        OSError: if `options_file` cannot be read.
     """
-    if options_file.suffix.lower() in _YAML_SUFFIXES:
-        return load_task_options_from_mapping(yaml.safe_load(text))
-
-    if options_file == _STDIN_ARGUMENT:
-        try:
-            return load_task_options_from_mapping(json.loads(text))
-        except json.JSONDecodeError:
-            return load_task_options_from_mapping(yaml.safe_load(text))
-
-    return load_task_options(text)
+    text = sys.stdin.read() if options_file == Path('-') else options_file.read_text()
+    return parse_reconstruction(libraries, text, source=str(options_file))
 
 
-def load_ptychi_options(
-    options_file: Path | None, *, far_field: bool = True
-) -> PtychographyTaskOptions:
-    """Build a fresh options object, so per-scan edits never leak into the next scan.
+def parse_reconstruction(
+    libraries: PluginCatalog[ReconstructorLibrary], text: str, *, source: str
+) -> ResolvedReconstruction:
+    """As :func:`read_reconstruction`, from the document's text; `source` names it in errors."""
+    selectors, fields = parse_options_document(text, ('library', 'algorithm'), source=source)
+    plugin, reconstructor = resolve_reconstructor(
+        libraries, selectors['library'], selectors['algorithm']
+    )
+    options = apply_options_document(
+        reconstructor.get_default_options(),
+        fields,
+        subject=f'{plugin.display_name} {reconstructor.name}',
+    )
+    return ResolvedReconstruction(plugin.simple_name, reconstructor, options)
 
-    With no file the algorithm follows the propagation regime: BH for near field,
-    which reconstructs a hologram better than stock LSQML does, and LSQML otherwise.
-    This is a fallback, never an override -- an options file names its own algorithm
-    and always wins, because which algorithm to run is the user's choice.
+
+def default_reconstruction(
+    libraries: PluginCatalog[ReconstructorLibrary], *, far_field: bool
+) -> ResolvedReconstruction:
+    """The run made when no options are given: stock pty-chi, its algorithm by regime.
+
+    Raises:
+        OptionsError: if pty-chi is not installed, since only an options document can then
+            say what to run.
     """
-    if options_file is None:
-        if far_field:
-            return LSQMLOptions()
+    algorithm = _DEFAULT_FAR_FIELD_ALGORITHM if far_field else _DEFAULT_NEAR_FIELD_ALGORITHM
 
-        logger.info('No pty-chi options given; using BH for a near-field reconstruction.')
-        return BHOptions()
+    try:
+        plugin, reconstructor = resolve_reconstructor(libraries, _DEFAULT_LIBRARY, algorithm)
+    except OptionsError as exc:
+        raise OptionsError(f'{exc} Pass --options to name a library that is.') from exc
 
-    if options_file == _STDIN_ARGUMENT:
-        return _decode_ptychi_options(sys.stdin.read(), options_file)
+    if not far_field:
+        logger.info('No options given; using %s for a near-field reconstruction.', algorithm)
 
-    return _decode_ptychi_options(options_file.read_text(), options_file)
+    return ResolvedReconstruction(
+        plugin.simple_name, reconstructor, reconstructor.get_default_options()
+    )
 
 
-def resolve_ptychi_options_file(
-    logger: logging.Logger, options_file: Path | None, input_directory: Path
-) -> Path | None:
-    """Pick the options file for a prepared directory, or `None` to fall back to stock options.
+def find_options_document(options_file: Path | None, input_directory: Path) -> Path | None:
+    """The options document for a prepared directory, or `None` to fall back to the default.
 
     An explicit argument always wins, including the ``-`` that means stdin. Otherwise the
-    options staged in `input_directory` are used when they are there. A directory staged
-    by hand, or by a tool that chooses no algorithm, carries none, so their absence is
-    warned about rather than treated as an error.
+    options staged in `input_directory` are used when they are there. A directory staged by
+    hand, or by a tool that chooses no algorithm, carries none, so their absence is warned
+    about rather than treated as an error.
     """
     if options_file is not None:
         return options_file
 
-    staged_file = StandardFileLayout.PTYCHI_OPTIONS.path(input_directory)
+    staged_file = StandardFileLayout.RECONSTRUCT_OPTIONS.path(input_directory)
 
     if staged_file.is_file():
-        logger.info('Using the pty-chi options staged in %s', staged_file)
+        logger.info('Using the options staged in %s', staged_file)
         return staged_file
 
     logger.warning(
-        'No %s in %s; reconstructing with stock options. '
-        'Pass --ptychi-options to choose another algorithm.',
-        StandardFileLayout.PTYCHI_OPTIONS.value,
+        'No %s in %s; reconstructing with stock options. Pass --options to choose another.',
+        StandardFileLayout.RECONSTRUCT_OPTIONS.value,
         input_directory,
     )
     return None
+
+
+def ptychi_reconstruction(
+    libraries: PluginCatalog[ReconstructorLibrary], options: PtyChiOptions
+) -> ResolvedReconstruction:
+    """The pty-chi run `options` describe: the algorithm whose options they are.
+
+    Raises:
+        OptionsError: if pty-chi is not installed or offers no algorithm taking `options`.
+    """
+    plugin, _ = resolve_reconstructor(libraries, _DEFAULT_LIBRARY, _DEFAULT_FAR_FIELD_ALGORITHM)
+
+    for reconstructor in plugin.strategy:
+        if type(reconstructor.get_default_options()) is type(options):
+            return ResolvedReconstruction(plugin.simple_name, reconstructor, options)
+
+    raise OptionsError(f'{plugin.display_name} has no algorithm taking {type(options).__name__}.')
+
+
+def require_ptychi_options(resolved: ResolvedReconstruction) -> PtyChiOptions:
+    """The pty-chi options a pty-chi driver runs, refusing any other library's.
+
+    Raises:
+        OptionsError: if `resolved` names another library.
+    """
+    # Deferred, so that importing this module needs no pty-chi.
+    from ptychodus.plugins.ptychi.options import PtyChiOptions
+
+    if not isinstance(resolved.options, PtyChiOptions):
+        raise OptionsError(
+            f'This command reconstructs with {_DEFAULT_LIBRARY}; the options name '
+            f'{resolved.library}. Use ptychodus-reconstruct for other libraries.'
+        )
+
+    return resolved.options
+
+
+def resolve_ptychi_reconstruction(
+    libraries: PluginCatalog[ReconstructorLibrary],
+    options_file: Path | None,
+    *,
+    far_field: bool,
+    num_sync_epochs: int | None = None,
+) -> ResolvedReconstruction:
+    """The pty-chi run a pty-chi driver makes: from `options_file`, else the default.
+
+    A fresh object each call, so per-scan edits never leak into the next scan.
+    `num_sync_epochs`, when given, overrides the document's.
+
+    Raises:
+        OptionsError: if the document is unusable or names another library.
+    """
+    resolved = (
+        default_reconstruction(libraries, far_field=far_field)
+        if options_file is None
+        else read_reconstruction(libraries, options_file)
+    )
+    options = require_ptychi_options(resolved)
+
+    if num_sync_epochs is not None:
+        options.num_sync_epochs = num_sync_epochs
+
+    return resolved
+
+
+def check_ptychi_options(resolved: ResolvedReconstruction, product: Product) -> None:
+    """Refuse now options pty-chi would refuse when the reconstruction starts.
+
+    Aligns a copy against `product` as the reconstruction will and runs pty-chi's own
+    check, so a prepared directory a queued job would reject is rejected while preparing.
+
+    Raises:
+        ValueError: if pty-chi rejects the aligned options.
+    """
+    # Deferred, so that importing this module needs no pty-chi.
+    from ptychodus.plugins.ptychi.options import apply_to_task
+    from ptychodus.plugins.ptychi.task import align_task_options_with_product
+
+    options = require_ptychi_options(resolved).model_copy(deep=True)
+    align_task_options_with_product(apply_to_task(options), product).check()
+
+
+def load_trained_model(
+    logger: logging.Logger, reconstructor: Reconstructor, input_directory: Path
+) -> None:
+    """Load the model a trainable `reconstructor` finds in `input_directory`, if there is one."""
+    if not isinstance(reconstructor, TrainableReconstructor):
+        return
+
+    model_file = input_directory / (
+        f'{StandardFileLayout.MODEL_BASENAME}{reconstructor.get_model_file_extension()}'
+    )
+
+    if model_file.is_file():
+        logger.info('Loading the model in %s', model_file)
+        reconstructor.load_model(model_file)
+    else:
+        logger.info('No model at %s; %s runs without one.', model_file, reconstructor.name)
 
 
 def save_assembled_diffraction(
@@ -927,90 +1068,68 @@ def pair_patterns_with_positions(
     return reconstruct_input
 
 
-def save_ptychi_options(
-    logger: logging.Logger,
-    options: PtychographyTaskOptions,
-    product: Product,
-    output_directory: Path,
-) -> PtychographyTaskOptions:
-    """Align `options` against `product`, check them, and write them to ``ptychi_options.yaml``.
-
-    Returns the aligned options. Those are the ones a reconstruction runs: they carry the
-    object pixel size, the wavelength and the slice spacings the product supplied, which
-    the unaligned object does not. The write is confined to the main process; every rank
-    aligns, since every rank runs with the result.
-    """
-    task_options = align_task_options_with_product(options, product)
-    task_options.check()
-
+def save_reconstruct_options(
+    logger: logging.Logger, resolved: ResolvedReconstruction, output_directory: Path
+) -> None:
+    """Write `resolved` to ``reconstruct_options.yaml``, from the main process only."""
     if is_main_process():
-        options_file = StandardFileLayout.PTYCHI_OPTIONS.path(output_directory)
+        options_file = StandardFileLayout.RECONSTRUCT_OPTIONS.path(output_directory)
         logger.info('Writing %s', options_file)
-        options_file.write_text(dump_task_options_yaml(task_options))
-
-    return task_options
+        options_file.write_text(resolved.dump())
 
 
 def run_reconstruction(
     logger: logging.Logger,
+    resolved: ResolvedReconstruction,
     reconstruct_input: ReconstructInput,
-    options: PtychographyTaskOptions,
     output_directory: Path,
     *,
-    num_sync_epochs: int,
     cancellation: CancellationToken | None = None,
     on_sync: Callable[[ReconstructOutput, Path | None], None] | None = None,
 ) -> Product | None:
-    """Align `options` against the product, run pty-chi to completion, and write the outputs.
+    """Run `resolved` to completion in this process, and write the outputs.
 
     Assumes `output_directory` already exists, and does not touch `diffraction.h5`: that
     artifact depends on the assembled dataset rather than on the reconstruction, so it is
-    written by :func:`save_assembled_diffraction` before this runs. Aligns
-    `options` against `reconstruct_input.product`, writes the aligned options to
-    `ptychi_options.yaml`, runs `reconstruct_with_ptychi` to completion writing a
-    `product.NNNNNN.h5` checkpoint at every sync point, then writes the final `product.h5`.
-    Returns the final reconstructed product.
+    written by :func:`save_assembled_diffraction` before this runs. Writes the options to
+    ``reconstruct_options.yaml``, a ``product.NNNNNN.h5`` checkpoint at every output the
+    reconstructor yields, then the final ``product.h5``. Returns the final product.
 
     Output files are written once, by the main process. Only the filesystem writes are
-    gated: every rank runs the reconstruction to completion and returns the same product,
-    because the reconstructed parameters are broadcast from rank 0 at each epoch boundary.
+    gated: every rank runs the reconstruction to completion and returns the same product.
 
-    With a `cancellation` token, the loop stops at the first sync point after the request
-    and still writes `product.h5` from the epochs that did run -- a partially converged
-    product is the whole reason to stop politely rather than kill the process. The return is
-    then `None` only when the request arrived before any epoch completed, since there is no
-    product in that case; an *uncancelled* run that produces nothing is still an error.
+    With a `cancellation` token, the loop stops at the first output after the request and
+    still writes ``product.h5`` from what did run -- a partially converged product is the
+    whole reason to stop politely rather than kill the process. The return is then `None`
+    only when the request arrived before any output, since there is no product in that
+    case; an *uncancelled* run that produces nothing is still an error.
 
-    `on_sync` is called at each sync point with the output and the checkpoint path that was
-    written for it, which is `None` on a rank that writes nothing. It is how a caller
-    reports progress without reimplementing this loop.
+    `on_sync` is called at each output with it and the checkpoint path written for it,
+    which is `None` on a rank that writes nothing. It is how a caller reports progress
+    without reimplementing this loop.
     """
     main_process = is_main_process()
     product_file = StandardFileLayout.PRODUCT.path(output_directory)
-    task_options = save_ptychi_options(logger, options, reconstruct_input.product, output_directory)
+    save_reconstruct_options(logger, resolved, output_directory)
 
-    num_epochs = int(task_options.reconstructor_options.num_epochs)
     logger.info(
-        'Starting reconstruction: %d patterns, %d epochs total, sync every %d',
+        'Starting reconstruction: %s %s on %d patterns',
+        resolved.library,
+        resolved.reconstructor.name,
         reconstruct_input.diffraction_patterns.shape[0],
-        num_epochs,
-        num_sync_epochs,
     )
 
     if _agree_on_cancellation(cancellation):
-        # Asked to stop while the options were being aligned. The first chunk of epochs
-        # would otherwise run to completion before the loop below could look at the flag.
-        logger.warning('Cancelled before the first epoch; nothing was reconstructed.')
+        # Asked to stop while the inputs were being prepared, before the first output.
+        logger.warning('Cancelled before the first iteration; nothing was reconstructed.')
         return None
 
     final_output = None
 
-    for output in reconstruct_with_ptychi(
-        reconstruct_input, task_options, num_sync_epochs=num_sync_epochs
-    ):
+    for output in resolved.reconstructor.reconstruct(reconstruct_input, options=resolved.options):
         losses = output.product.losses
         last_loss = losses[-1].value if losses else float('nan')
-        logger.info('Epoch %d/%d: loss=%.6g', output.progress, num_epochs, last_loss)
+        logger.info('Iteration %d/%d: loss=%.6g', output.progress, output.progress_goal, last_loss)
 
         checkpoint_file: Path | None = None
 
@@ -1026,7 +1145,9 @@ def run_reconstruction(
         final_output = output
 
         if _agree_on_cancellation(cancellation):
-            logger.warning('Cancelled after epoch %d of %d.', output.progress, num_epochs)
+            logger.warning(
+                'Cancelled after iteration %d of %d.', output.progress, output.progress_goal
+            )
             break
 
     if final_output is None:

@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 import logging
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ptychodus.api.fluorescence import (
     ElementMap,
@@ -27,6 +27,8 @@ __all__ = [
 
 
 class TwoStepOptions(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
     upscaling_method: UpscalingMethod = Field(
         UpscalingMethod.LINEAR,
         title='Upscaling Method:',

@@ -8,8 +8,10 @@ It reads no settings file and builds no application model, so it runs anywhere t
 and the dataset can be read.
 
 The enhanced dataset is written in the format the measured one was read in, to a file that
-must not be either input. Nothing is written unless the enhancer runs to completion: an
-interrupted run leaves no output rather than a dataset with only some maps enhanced.
+must not be either input. No dataset is written unless the enhancer runs to completion: an
+interrupted run leaves no output rather than a dataset with only some maps enhanced. Beside
+the output go ``enhance_xrf_options.yaml``, the options the run used as a document
+``--options`` takes back, and ``enhance_xrf.log``.
 
 An enhancer's options come from a YAML document naming the enhancer and its fields.
 ``--print-options`` writes one at its defaults, to edit and pass back with ``--options``.
@@ -34,15 +36,16 @@ from ptychodus.api.fluorescence import (
     FluorescenceEnhancer,
     FluorescenceEnhancerInput,
 )
-from ptychodus.api.io import load_product
+from ptychodus.api.io import StandardFileLayout, load_product
 from ptychodus.api.plugins import Plugin, PluginCatalog, PluginRegistry
-from ptychodus.cli import add_log_level_argument, configure_logging
-from ptychodus.cli._options import (
+from ptychodus.cli import add_log_level_argument, configure_logging, open_action_log
+from ptychodus.api.options import (
     OptionsError,
     apply_options_document,
-    format_options_document,
+    dump_options_document,
     read_options_document,
 )
+from ptychodus.cli._options import format_options_document
 
 logger = logging.getLogger('enhance_xrf')
 
@@ -292,6 +295,14 @@ def main() -> ExitCode:
     if output_file.exists():
         logger.warning('%s will be overwritten.', output_file)
 
+    # Beside the output, named for the action: a later run into the same directory
+    # replaces the options document and appends to the log.
+    output_directory = output_file.parent
+    open_action_log(output_directory, StandardFileLayout.ENHANCE_XRF_LOG)
+    options_file = StandardFileLayout.ENHANCE_XRF_OPTIONS.path(output_directory)
+    logger.info('Writing %s', options_file)
+    options_file.write_text(dump_options_document({'algorithm': plugin.simple_name}, options))
+
     # A scheduler ends a job with SIGTERM. Raised as an interrupt it unwinds through the
     # enhancer, so whatever it holds open is released rather than abandoned.
     signal.signal(signal.SIGTERM, signal.default_int_handler)
@@ -316,7 +327,6 @@ def main() -> ExitCode:
         logger.error('Enhancer %s produced no dataset; nothing written.', plugin.simple_name)
         return ExitCode.FAILURE
 
-    output_file.parent.mkdir(parents=True, exist_ok=True)
     writer.write(output_file, enhanced)
     logger.info('Wrote %s', output_file)
     return ExitCode.SUCCESS

@@ -65,12 +65,8 @@ from ptychodus.api.storage import (
     resolve_storage_inputs,
 )
 from ptychodus.cli import DirectoryType, add_log_level_argument, configure_logging, positive_int
-from ptychodus.cli._options import (
-    OptionsError,
-    apply_options_document,
-    format_options_document,
-    read_options_document,
-)
+from ptychodus.api.options import OptionsError, apply_options_document, read_options_document
+from ptychodus.cli._options import format_options_document
 
 logger = logging.getLogger('generate_training_data')
 

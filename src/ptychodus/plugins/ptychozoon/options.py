@@ -6,7 +6,7 @@ each maps onto the ptychozoon setting of the same name.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
     'PtychozoonOptions',
@@ -14,6 +14,8 @@ __all__ = [
 
 
 class PtychozoonOptions(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
     damping_factor: float = Field(
         0.0,
         ge=0.0,

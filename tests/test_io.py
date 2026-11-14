@@ -155,18 +155,24 @@ class TestStandardFileLayout:
     def test_model_basename(self) -> None:
         assert StandardFileLayout.MODEL_BASENAME == 'model'
 
-    def test_ptychi_options_filename(self) -> None:
-        assert StandardFileLayout.PTYCHI_OPTIONS == 'ptychi_options.yaml'
-
-    def test_log_filename(self) -> None:
-        assert StandardFileLayout.LOG == 'ptychodus.log'
+    def test_per_action_filenames(self) -> None:
+        assert StandardFileLayout.RECONSTRUCT_OPTIONS == 'reconstruct_options.yaml'
+        assert StandardFileLayout.RECONSTRUCT_LOG == 'reconstruct.log'
+        assert StandardFileLayout.TRAIN_OPTIONS == 'train_options.yaml'
+        assert StandardFileLayout.TRAIN_LOG == 'train.log'
+        assert StandardFileLayout.ENHANCE_XRF_OPTIONS == 'enhance_xrf_options.yaml'
+        assert StandardFileLayout.ENHANCE_XRF_LOG == 'enhance_xrf.log'
 
     def test_path_builds_under_directory(self) -> None:
         assert StandardFileLayout.PRODUCT.path(Path('/x')) == Path('/x/product.h5')
         assert StandardFileLayout.FLUORESCENCE.path(Path('/x')) == Path('/x/fluorescence.h5')
         assert StandardFileLayout.SETTINGS.path(Path('/x')) == Path('/x/settings.ini')
-        assert StandardFileLayout.PTYCHI_OPTIONS.path(Path('/x')) == Path('/x/ptychi_options.yaml')
-        assert StandardFileLayout.LOG.path(Path('/x')) == Path('/x/ptychodus.log')
+        assert StandardFileLayout.RECONSTRUCT_LOG.path(Path('/x')) == Path('/x/reconstruct.log')
+
+    def test_rank_path_suffixes_all_but_the_main_process(self) -> None:
+        log = StandardFileLayout.TRAIN_LOG
+        assert log.rank_path(Path('/x'), 0) == Path('/x/train.log')
+        assert log.rank_path(Path('/x'), 3) == Path('/x/train.rank03.log')
 
     def test_checkpoint_path_inserts_zero_padded_epoch(self) -> None:
         assert StandardFileLayout.PRODUCT.checkpoint_path(Path('/x'), 42) == Path(
