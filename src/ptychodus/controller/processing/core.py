@@ -364,7 +364,9 @@ class ProcessingController(Observer):
             self._product_view_controller.get_widget().setCurrentIndex(output_product_index_odd)
 
     def _load_model(self) -> None:
-        name_filter = self._processing_api.get_model_file_filter()
+        description = self._processing_api.get_model_file_description()
+        extensions = self._processing_api.get_model_file_extensions()
+        name_filter = f'{description} ({" ".join(f"*{ext}" for ext in extensions)})'
         file_path, _ = self._file_dialog_factory.get_open_file_path(
             self._view, 'Load Model', name_filters=[name_filter], selected_name_filter=name_filter
         )

@@ -479,11 +479,11 @@ class PtychoPINNReconstructor(TrainableReconstructor):
     def is_model_loaded(self) -> bool:
         return self._model_path is not None
 
-    def get_model_file_filter(self) -> str:
-        return 'Zipped Archive (*.zip)'
+    def get_model_file_description(self) -> str:
+        return 'Zipped Archive'
 
-    def get_model_file_extension(self) -> str:
-        return '.zip'
+    def get_model_file_extensions(self) -> tuple[str, ...]:
+        return ('.zip',)
 
     def load_model(self, file_path: Path) -> None:
         self._bundle_dir = _extract_bundle_dir(file_path)

@@ -965,15 +965,21 @@ def load_trained_model(
     if not isinstance(reconstructor, TrainableReconstructor):
         return
 
-    model_file = input_directory / (
-        f'{StandardFileLayout.MODEL_BASENAME}{reconstructor.get_model_file_extension()}'
-    )
+    model_files = [
+        input_directory / f'{StandardFileLayout.MODEL_BASENAME}{extension}'
+        for extension in reconstructor.get_model_file_extensions()
+    ]
+    model_file = next((path for path in model_files if path.is_file()), None)
 
-    if model_file.is_file():
+    if model_file is None:
+        logger.info(
+            'No model at %s; %s runs without one.',
+            ', '.join(str(path) for path in model_files),
+            reconstructor.name,
+        )
+    else:
         logger.info('Loading the model in %s', model_file)
         reconstructor.load_model(model_file)
-    else:
-        logger.info('No model at %s; %s runs without one.', model_file, reconstructor.name)
 
 
 def save_assembled_diffraction(

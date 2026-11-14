@@ -495,7 +495,7 @@ class ProcessingAPI:
 
         if isinstance(reconstructor, TrainableReconstructor):
             model_file = directory / (
-                f'{StandardFileLayout.MODEL_BASENAME}{reconstructor.get_model_file_extension()}'
+                f'{StandardFileLayout.MODEL_BASENAME}{reconstructor.get_model_file_extensions()[0]}'
             )
             reconstructor.save_model(model_file)
 
@@ -579,31 +579,31 @@ class ProcessingAPI:
         plugin = self._training_data_file_writers.find_plugin(library) if library else None
         return 'CXI' if plugin is None else plugin.simple_name
 
-    def get_model_file_filter(
+    def get_model_file_description(
         self, *, library: str | None = None, algorithm: str | None = None
     ) -> str:
         self.set_reconstructor_if_provided(library=library, algorithm=algorithm)
         trainer = self._algorithm_parameter.get_current_reconstructor()
 
         if isinstance(trainer, TrainableReconstructor):
-            return trainer.get_model_file_filter()
+            return trainer.get_model_file_description()
         else:
             logger.warning('Algorithm is not trainable!')
 
         return ''
 
-    def get_model_file_extension(
+    def get_model_file_extensions(
         self, *, library: str | None = None, algorithm: str | None = None
-    ) -> str:
+    ) -> tuple[str, ...]:
         self.set_reconstructor_if_provided(library=library, algorithm=algorithm)
         trainer = self._algorithm_parameter.get_current_reconstructor()
 
         if isinstance(trainer, TrainableReconstructor):
-            return trainer.get_model_file_extension()
+            return trainer.get_model_file_extensions()
         else:
             logger.warning('Algorithm is not trainable!')
 
-        return ''
+        return ()
 
     def available_libraries(self) -> Iterator[str]:
         """Yield every reconstructor backend in play, as each is named."""

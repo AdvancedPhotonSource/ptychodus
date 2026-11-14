@@ -110,14 +110,14 @@ class FakeTrainableReconstructor(TrainableReconstructor):
     def is_model_loaded(self) -> bool:
         return self.loaded_model is not None
 
-    def get_model_file_filter(self) -> str:
-        return 'Fake Model (*.fake)'
+    def get_model_file_description(self) -> str:
+        return 'Fake Model'
 
     def load_model(self, file_path: Path) -> None:
         self.loaded_model = file_path
 
-    def get_model_file_extension(self) -> str:
-        return '.fake'
+    def get_model_file_extensions(self) -> tuple[str, ...]:
+        return ('.fake',)
 
     def save_model(self, file_path: Path) -> None:
         if self.loaded_model is None:

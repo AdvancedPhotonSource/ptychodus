@@ -720,11 +720,11 @@ class PtychoFMReconstructor(TrainableReconstructor):
     def is_model_loaded(self) -> bool:
         return self._model_path is not None
 
-    def get_model_file_filter(self) -> str:
-        return 'PyTorch Checkpoint (*.pth *.pt)'
+    def get_model_file_description(self) -> str:
+        return 'PyTorch Checkpoint'
 
-    def get_model_file_extension(self) -> str:
-        return '.pth'
+    def get_model_file_extensions(self) -> tuple[str, ...]:
+        return ('.pth', '.pt')
 
     def load_model(self, file_path: Path) -> None:
         self._model_path = file_path

@@ -121,9 +121,9 @@ class StandardFileLayout(StrEnum):
 
     DIFFRACTION = 'diffraction.h5'
     FLUORESCENCE = 'fluorescence.h5'
-    # Stem only; the per-backend extension comes from
-    # TrainableReconstructor.get_model_file_extension(). The full path is
-    # f'{input_directory}/{MODEL_BASENAME}{ext}'.
+    # Stem only; the per-backend extensions come from
+    # TrainableReconstructor.get_model_file_extensions(). A model is saved as
+    # f'{directory}/{MODEL_BASENAME}{extensions[0]}' and read from any of them.
     MODEL_BASENAME = 'model'
     PRODUCT = 'product.h5'
     # One options document and one log per action, each named after the action, so a

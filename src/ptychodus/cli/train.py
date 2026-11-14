@@ -264,7 +264,7 @@ def main() -> ExitCode:
     configure_logging(args)
     is_main_process = rank == 0
     model_file = output_directory / (
-        f'{StandardFileLayout.MODEL_BASENAME}{trainer.get_model_file_extension()}'
+        f'{StandardFileLayout.MODEL_BASENAME}{trainer.get_model_file_extensions()[0]}'
     )
 
     if is_main_process:

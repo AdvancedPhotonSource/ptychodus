@@ -170,16 +170,20 @@ class TrainableReconstructor(Reconstructor):
         pass
 
     @abstractmethod
-    def get_model_file_filter(self) -> str:
+    def get_model_file_description(self) -> str:
+        """Return the human-readable model format name, without extensions."""
+        pass
+
+    @abstractmethod
+    def get_model_file_extensions(self) -> tuple[str, ...]:
+        """Return the model file extensions, each with a leading dot.
+
+        A model is read from any of them and saved under the first.
+        """
         pass
 
     @abstractmethod
     def load_model(self, file_path: Path) -> None:
-        pass
-
-    @abstractmethod
-    def get_model_file_extension(self) -> str:
-        """Return the file extension (with leading dot) used when saving the model."""
         pass
 
     @abstractmethod
