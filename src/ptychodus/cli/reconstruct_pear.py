@@ -54,7 +54,8 @@ import json
 import logging
 import math
 import sys
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final, Literal
 
@@ -120,12 +121,15 @@ from ptychodus.api.simulate.probe import (
 )
 from ptychodus.cli._reconstruct_common import (
     estimate_dataset_beam_center,
+    estimate_focus_object_distance_m,
     estimate_incident_beam_from_assembled_data,
     install_signal_handlers,
     invalid_count_threshold,
+    require_near_field_focus_object_distance_m,
     run_reconstruction,
     save_assembled_diffraction,
 )
+from ptychodus.plugins.aps31id_lamni.diffraction_file import LamNIDiffractionFileReader
 from ptychodus.plugins.aps31id_lamni.scan_directory import locate_scan_directory
 
 logger = logging.getLogger('reconstruct_pear')
@@ -133,10 +137,12 @@ logger = logging.getLogger('reconstruct_pear')
 
 @dataclass(frozen=True)
 class _Readers:
-    """Reader plugin names for one instrument."""
+    """Reader plugin names for one instrument, and its detector's invalid-pixel markers."""
 
     diffraction: str
     positions: str
+    # By stored dtype name, where the marker is not the dtype maximum.
+    invalid_counts: Mapping[str, int] = field(default_factory=dict)
 
 
 # Keyed by the parameter file's `instrument` value, lowercased.
@@ -148,8 +154,8 @@ _INSTRUMENT_READERS: Final[dict[str, _Readers]] = {
     'bionanoprobe': _Readers('APS_BNP', 'APS_BNP'),
     '12idc': _Readers('APS_PtychoSAXS', 'APS_PtychoSAXS'),
     'isn': _Readers('APS_ISN', 'APS_ISN'),
-    'lynx': _Readers('APS_LamNI', 'APS_LamNI'),
-    'lynx_v2': _Readers('APS_LamNI', 'APS_LamNI'),
+    'lynx': _Readers('APS_LamNI', 'APS_LamNI', LamNIDiffractionFileReader.INVALID_COUNTS),
+    'lynx_v2': _Readers('APS_LamNI', 'APS_LamNI', LamNIDiffractionFileReader.INVALID_COUNTS),
     'velo': _Readers('APS_Velociprobe', 'APS_Velociprobe_PE'),
     'velociprobe': _Readers('APS_Velociprobe', 'APS_Velociprobe_PE'),
     'simu': _Readers('fold_slice', 'fold_slice'),
@@ -194,7 +200,8 @@ class PearParameters(BaseModel):
     beam_source: Literal['xray'] = 'xray'
     beam_energy_kev: float = 0.0
     det_sample_dist_m: float = 0.0
-    focal_sample_dist_m: float = 0.0
+    # Near field only, and required there: the data cannot estimate it. 0 is a parallel beam.
+    focal_sample_dist_m: float | None = None
     near_field_ptycho: bool = False
 
     # --- diffraction preprocessing ---
@@ -215,7 +222,9 @@ class PearParameters(BaseModel):
     # --- probe ---
     use_model_FZP_probe: bool = False  # noqa: N815
     fzp_preset: str = 'APS 33-ID-C VelociProbe'
-    fzp_defocus_m: float = 0.0
+    # Far field only, in the probe's frame; unset estimates it from the data. Near field
+    # states the focus as focal_sample_dist_m.
+    fzp_defocus_m: float | None = None
     path_to_init_probe: Path | None = None
     init_probe_file_type: str = 'NPY'
     number_probe_modes: int = 1
@@ -272,6 +281,13 @@ class PearParameters(BaseModel):
             raise ValueError(f'{file} does not contain a JSON object.')
 
         parameters = cls.model_validate(raw)
+
+        if parameters.near_field_ptycho:
+            # Checked before any data is read, rather than once the patterns are in memory.
+            require_near_field_focus_object_distance_m(
+                parameters.focal_sample_dist_m, source='focal_sample_dist_m'
+            )
+
         ignored = sorted(set(raw) - set(cls.model_fields))
 
         if ignored:
@@ -347,7 +363,7 @@ def _output_directory(
 
     name += '_poisson' if params.noise_model == 'poisson' else '_gaussian'
 
-    if params.near_field_ptycho:
+    if params.near_field_ptycho and params.focal_sample_dist_m is not None:
         name += f'_nf_fsd{params.focal_sample_dist_m / 1e-3:.2f}mm'
 
     name += f'_p{probe.num_incoherent_modes}'
@@ -815,9 +831,11 @@ def main() -> ExitCode:
             center_source = 'the diffraction file'
         else:
             logger.info('Summarizing the dataset to estimate the beam center')
-            # Cut only for the estimate: invalid-pixel markers at the dtype maximum would
-            # otherwise dominate the mean and drag the estimate to the midpoint.
-            max_valid_count = invalid_count_threshold(raw_metadata.pattern_dtype)
+            # Cut only for the estimate: invalid-pixel markers would otherwise dominate the
+            # mean and drag the estimate to the midpoint.
+            max_valid_count = invalid_count_threshold(
+                raw_metadata.pattern_dtype, readers.invalid_counts
+            )
             center, _ = estimate_dataset_beam_center(
                 raw_dataset,
                 bad_pixels=None,
@@ -876,7 +894,13 @@ def main() -> ExitCode:
     # --- geometry ---
     wavelength_m = energy_eV_to_wavelength_m(params.beam_energy_kev * 1.0e3)
     detector_distance_m = params.det_sample_dist_m
-    focus_object_distance_m = params.focal_sample_dist_m if params.near_field_ptycho else 0.0
+    focus_object_distance_m = (
+        require_near_field_focus_object_distance_m(
+            params.focal_sample_dist_m, source='focal_sample_dist_m'
+        )
+        if params.near_field_ptycho
+        else 0.0
+    )
     magnification = compute_magnification(detector_distance_m, focus_object_distance_m)
     image_extent = assembled_data.get_image_extent()
 
@@ -904,6 +928,27 @@ def main() -> ExitCode:
     if params.burst_ptycho:
         positions = _cluster_burst_positions(positions, probe_geometry.pixel_width_m)
 
+    padding_px = round(params.obj_pad_size_m / probe_geometry.pixel_width_m)
+    object_geometry = compute_object_geometry(positions, probe_geometry, padding_px=padding_px)
+
+    # Far field states the focus as the negated fzp_defocus_m, else measures it.
+    if not params.near_field_ptycho:
+        if params.fzp_defocus_m is None:
+            focus_object_distance_m = estimate_focus_object_distance_m(
+                logger,
+                assembled_data,
+                positions,
+                object_geometry,
+                probe_geometry,
+                photon_wavelength_m=wavelength_m,
+                source='fzp_defocus_m',
+            )
+        else:
+            focus_object_distance_m = -params.fzp_defocus_m
+            logger.info(
+                'Focus-object distance (m): %g (from fzp_defocus_m)', focus_object_distance_m
+            )
+
     # --- initial probe ---
     rng = numpy.random.default_rng(params.seed)
     probe_file = params.path_to_init_probe
@@ -917,7 +962,10 @@ def main() -> ExitCode:
             probe_geometry,
             zone_plate,
             photon_wavelength_m=wavelength_m,
-            defocus_distance_m=params.fzp_defocus_m,
+            # The product's focus in the probe's frame. Near field reconstructs in the
+            # equivalent parallel-beam frame.
+            defocus_distance_m=-focus_object_distance_m,
+            remove_focus_curvature=params.near_field_ptycho,
         ).get_array()
     else:
         logger.info('Reading the initial probe from %s', probe_file)
@@ -957,8 +1005,6 @@ def main() -> ExitCode:
     # --- initial object ---
     number_of_slices = max(1, params.number_of_slices)
     layer_spacing_m = compute_uniform_layer_spacing_m(params.object_thickness_m, number_of_slices)
-    padding_px = round(params.obj_pad_size_m / probe_geometry.pixel_width_m)
-    object_geometry = compute_object_geometry(positions, probe_geometry, padding_px=padding_px)
     object_file = params.path_to_init_object
 
     if object_file is None:

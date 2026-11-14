@@ -31,6 +31,7 @@ from ptychodus.api.propagate import compute_magnification
 from ptychodus.api.object import (
     LayerFillMode,
     Object,
+    ObjectGeometry,
     compute_object_geometry,
     compute_uniform_layer_spacing_m,
     resample_object_to_pixel_size,
@@ -40,7 +41,7 @@ from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import DiffractionPrepPipeline, FilterValuesStep
 from ptychodus.api.probe import ProbeGeometry, ProbeEnsemble, resample_probe_ensemble
 from ptychodus.api.probe_positions import ProbePositionSequence
-from ptychodus.api.product import Product, ProductMetadata, reconcile_defocus_distance_m
+from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import prepare_reconstruct_input
 from ptychodus.api.simulate.object import generate_uniform_object
 from ptychodus.api.simulate.probe import (
@@ -49,12 +50,15 @@ from ptychodus.api.simulate.probe import (
     generate_incoherent_probe_modes,
 )
 from ptychodus.cli._batch_lamni_settings import BatchSettings
+from ptychodus.plugins.aps31id_lamni.diffraction_file import LamNIDiffractionFileReader
 from ptychodus.cli._reconstruct_common import (
     estimate_incident_beam_from_assembled_data,
     CancellationToken,
     invalid_count_threshold,
     resolve_flag,
-    resolve_focus_object_distance_m,
+    estimate_focus_object_distance_m,
+    require_near_field_focus_object_distance_m,
+    resolve_stated_focus_object_distance_m,
     resolve_quantity,
     run_reconstruction,
     save_assembled_diffraction,
@@ -176,11 +180,11 @@ def _build_initial_probe(
                 probe_geometry,
                 zone_plate,
                 photon_wavelength_m=photon_wavelength_m,
-                # The same displacement the product states, in the probe's frame. In far
-                # field the resolver leaves the focus at zero, so this is fzp_defocus_m.
-                defocus_distance_m=reconcile_defocus_distance_m(
-                    focus_object_distance_m, initial.simulated_probe.fzp_defocus_m
-                ),
+                # The displacement the product states, in the probe's frame. In near field
+                # the probe goes in the equivalent parallel-beam frame the magnification
+                # places it in.
+                defocus_distance_m=-focus_object_distance_m,
+                remove_focus_curvature=not far_field,
             ).get_array(),
             opr_weights=None,
             pixel_geometry=probe_geometry.get_pixel_geometry(),
@@ -215,8 +219,7 @@ def _build_initial_probe(
 def _build_initial_object(
     settings: BatchSettings,
     registry: PluginRegistry,
-    positions: ProbePositionSequence,
-    probe_geometry: ProbeGeometry,
+    object_geometry: ObjectGeometry,
     mean_amplitude_transmission: float,
 ) -> Object:
     """The starting object: uniformly absorbing, or one file shared by every scan."""
@@ -224,9 +227,6 @@ def _build_initial_object(
     num_slices = initial.num_slices
     thickness_m = initial.object_thickness_m or 0.0
     layer_spacing_m = compute_uniform_layer_spacing_m(thickness_m, num_slices)
-    object_geometry = compute_object_geometry(
-        positions, probe_geometry, padding_px=initial.object_padding_px
-    )
 
     if initial.object_source == 'simulated':
         # Uniform and zero phase: a guess that asserts no structure, but carries the
@@ -333,17 +333,24 @@ def reconstruct_one_scan(
         'metadata_overrides.far_field',
         level=logging.DEBUG,
     )
-    focus_object_distance_m = (
-        0.0
-        if far_field
-        else resolve_focus_object_distance_m(
-            logger,
-            overrides.focus_object_distance_m,
-            metadata.focus_object_distance_m,
-            settings.initial_probe.simulated_probe.fzp_defocus_m,
-            level=logging.DEBUG,
-        )
+    # The one statement of the defocus. Near field needs it now, for the probe geometry;
+    # far field estimates an unstated one per scan, so a drifting defocus is followed.
+    focus_source = 'metadata_overrides.focus_object_distance_m'
+    stated_focus_object_distance_m = resolve_stated_focus_object_distance_m(
+        logger,
+        overrides.focus_object_distance_m,
+        metadata.focus_object_distance_m,
+        source=focus_source,
+        level=logging.DEBUG,
     )
+    focus_object_distance_m = 0.0
+
+    if not far_field:
+        focus_object_distance_m = require_near_field_focus_object_distance_m(
+            stated_focus_object_distance_m, source=focus_source
+        )
+    elif stated_focus_object_distance_m is not None:
+        focus_object_distance_m = stated_focus_object_distance_m
 
     if metadata.detector_pixel_geometry is None:
         raise ValueError('The diffraction file records no detector pixel size!')
@@ -355,7 +362,7 @@ def reconstruct_one_scan(
     )
 
     max_valid_count = (
-        invalid_count_threshold(metadata.pattern_dtype)
+        invalid_count_threshold(metadata.pattern_dtype, LamNIDiffractionFileReader.INVALID_COUNTS)
         if settings.diffraction.max_valid_count is None
         else settings.diffraction.max_valid_count
     )
@@ -424,6 +431,21 @@ def reconstruct_one_scan(
             magnification=magnification,
         )
 
+    object_geometry = compute_object_geometry(
+        positions, probe_geometry, padding_px=settings.initial_object.object_padding_px
+    )
+
+    if far_field and stated_focus_object_distance_m is None:
+        focus_object_distance_m = estimate_focus_object_distance_m(
+            logger,
+            assembled_data,
+            positions,
+            object_geometry,
+            probe_geometry,
+            photon_wavelength_m=photon_wavelength_m,
+            source=focus_source,
+        )
+
     rng = numpy.random.default_rng(settings.misc.seed)
     probe_ensemble = _build_initial_probe(
         settings,
@@ -441,8 +463,7 @@ def reconstruct_one_scan(
     object_ = _build_initial_object(
         settings,
         registry,
-        positions,
-        probe_geometry,
+        object_geometry,
         incident_beam.mean_amplitude_transmission,
     )
     logger.info('Object geometry: %d layer(s)', object_.num_layers)

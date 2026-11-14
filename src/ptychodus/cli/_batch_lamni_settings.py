@@ -84,7 +84,19 @@ class ProbeFromFile(_Section):
 
 class SimulatedProbe(_Section):
     fzp_preset: str = 'APS 31-ID-E LamNI'
-    fzp_defocus_m: float = 800.0e-6
+
+    @model_validator(mode='before')
+    @classmethod
+    def _refuse_defocus(cls, data: Any) -> Any:
+        # The defocus is the product's focus, stated or estimated; name where it is set.
+        if isinstance(data, dict) and 'fzp_defocus_m' in data:
+            raise ValueError(
+                'initial_probe.simulated_probe takes no defocus; set '
+                'metadata_overrides.focus_object_distance_m to its negation, or leave it unset '
+                'to estimate it from far-field data.'
+            )
+
+        return data
 
 
 class InitialProbe(_Section):
@@ -164,8 +176,9 @@ class MetadataOverrides(_Section):
     tomography_angle_deg: float | None = None
     # Near field is opt-in: None leaves every existing batch far field, as it was.
     far_field: bool | None = None
-    # Signed, origin at the object, so a focus upstream is negative. Near field only;
-    # defaults to the negated simulated_probe.fzp_defocus_m.
+    # Signed, origin at the object, so a focus upstream is negative: the one statement of
+    # the defocus, which the simulated probe is built at the negation of. Unset, it is read
+    # from the file, else estimated per scan in far field; near field requires it.
     focus_object_distance_m: float | None = None
 
 

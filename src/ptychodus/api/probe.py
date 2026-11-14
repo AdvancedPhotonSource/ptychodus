@@ -1019,6 +1019,16 @@ class ProbeGeometryProvider(ABC):
         """
 
     @property
+    def defocus_distance_m(self) -> float:
+        """How far past its focus the probe is sampled, the negated `focus_object_distance_m`.
+
+        Positive downstream of the focus, where the beam diverges, and negative upstream of
+        it. This is the one statement of that displacement, restated in the probe's frame;
+        zero means no focusing optic.
+        """
+        return -self.focus_object_distance_m
+
+    @property
     @abstractmethod
     def probe_photon_count(self) -> float:
         pass

@@ -15,7 +15,6 @@ from ptychodus.api.simulate.probe import (
     generate_coherent_probe_modes,
     generate_incoherent_probe_modes,
     rescale_probe_intensity,
-    resolve_defocus_distance_m,
 )
 from ptychodus.api.probe import (
     OPRWeightPolicy,
@@ -145,12 +144,10 @@ class ProbeEnsembleBuilder(ParameterGroup):
         """
         return False
 
-    def _estimate_extent(
-        self, geometry_provider: ProbeGeometryProvider, defocus_distance_m: float
-    ) -> ProbeExtent | None:
+    def _estimate_extent(self, geometry_provider: ProbeGeometryProvider) -> ProbeExtent | None:
         """The probe extent the product's mean pattern implies, or None where it cannot say.
 
-        The defocus is resolved against the product's focus, as the build resolves it.
+        Measured at the product's defocus, the one the probe is built at.
         """
         moments = geometry_provider.get_diffraction_moments()
 
@@ -172,9 +169,7 @@ class ProbeEnsembleBuilder(ParameterGroup):
                 moments.mean_frame,
                 geometry_provider.get_probe_geometry(),
                 photon_wavelength_m=geometry_provider.photon_wavelength_m,
-                defocus_distance_m=resolve_defocus_distance_m(
-                    geometry_provider, defocus_distance_m
-                ),
+                defocus_distance_m=geometry_provider.defocus_distance_m,
                 bad_pixels=moments.bad_pixels,
             )
         except ValueError as exc:

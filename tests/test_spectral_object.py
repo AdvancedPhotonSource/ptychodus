@@ -610,7 +610,7 @@ class _Provider(ObjectGeometryProvider):
         return 1.0
 
     @property
-    def object_plane_propagation_distance_m(self) -> float:
+    def exit_wave_propagation_distance_m(self) -> float:
         return _FAR_FIELD_DISTANCE_M
 
     @property

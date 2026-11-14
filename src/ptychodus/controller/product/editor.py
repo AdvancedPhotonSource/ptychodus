@@ -73,6 +73,7 @@ class _Row(Enum):
     OBJECT_PLANE_PROPAGATION_DISTANCE_MM = ('Object-Plane Propagation Distance [mm]', False)
     DIFFRACTION_DATASET = ('Diffraction Dataset', True)
     FOCUS_OBJECT_DISTANCE_MM = ('Focus-Object Distance [mm]', True)
+    DEFOCUS_DISTANCE_MM = ('Defocus Distance [mm]', True)
     FAR_FIELD = ('Far Field', True)
     TWO_THETA_DEG = ('Two Theta [deg]', True)
     DETECTOR_GAMMA_DEG = ('Detector Gamma [deg]', True)
@@ -213,6 +214,11 @@ class ProductPropertyTableModel(QAbstractTableModel):
                             case _Row.FOCUS_OBJECT_DISTANCE_MM:
                                 distance_m = metadata_item.focus_object_distance_m.get_value()
                                 return f'{LengthUnit.MILLIMETER.convert(distance_m):.4g}'
+                            case _Row.DEFOCUS_DISTANCE_MM:
+                                # The focus position restated in the probe's frame; adding
+                                # zero keeps no optic from reading as -0.
+                                distance_m = -metadata_item.focus_object_distance_m.get_value()
+                                return f'{LengthUnit.MILLIMETER.convert(distance_m) + 0.0:.4g}'
                             case _Row.FAR_FIELD:
                                 return FAR_FIELD_CHOICES[metadata_item.far_field.get_value()]
                             case _Row.TWO_THETA_DEG:
@@ -326,6 +332,17 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
                     metadata_item.focus_object_distance_m.set_value(
                         LengthUnit.MILLIMETER.to_meters(distance_mm)
+                    )
+                    return True
+                case _Row.DEFOCUS_DISTANCE_MM:
+                    # Positive places the object downstream of the focus, in a diverging beam.
+                    try:
+                        distance_mm = float(value)
+                    except ValueError:
+                        return False
+
+                    metadata_item.focus_object_distance_m.set_value(
+                        -LengthUnit.MILLIMETER.to_meters(distance_mm)
                     )
                     return True
                 case _Row.FAR_FIELD:

@@ -51,7 +51,7 @@ class _Provider(ObjectGeometryProvider):
         return self._mean_amplitude_transmission
 
     @property
-    def object_plane_propagation_distance_m(self) -> float:
+    def exit_wave_propagation_distance_m(self) -> float:
         return 1.0
 
     @property

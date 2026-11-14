@@ -27,51 +27,10 @@ __all__ = [
     'ProductFileReader',
     'ProductFileWriter',
     'ProductMetadata',
-    'reconcile_defocus_distance_m',
     'transform_product',
 ]
 
 logger = logging.getLogger(__name__)
-
-
-def reconcile_defocus_distance_m(
-    focus_object_distance_m: float,
-    defocus_distance_m: float,
-    *,
-    rel_tol: float = 1.0e-6,
-) -> float:
-    """How far past its focus a probe is sampled, given the two frames that state it.
-
-    The same displacement is stated twice, in opposite frames: as a product's signed
-    focus position *focus_object_distance_m*, and as a probe's own defocus
-    *defocus_distance_m*. The defocus is the negated focus position, so a focus upstream
-    of the object is a probe sampled downstream of it. The product wins wherever it
-    names a focus, because the product is what the reconstruction geometry is computed
-    from -- a probe built against a different focus than the geometry would disagree
-    with the object pixel size it is reconstructed on.
-
-    A focus position of zero means no focusing optic, which cannot describe a focused
-    probe, so *defocus_distance_m* is returned unchanged. A disagreement beyond
-    *rel_tol* is reported rather than silently resolved; widen it only where the two are
-    expected to differ in their last digits.
-    """
-    if focus_object_distance_m == 0.0:
-        return defocus_distance_m
-
-    from_product_m = -focus_object_distance_m
-
-    if defocus_distance_m != 0.0 and not math.isclose(
-        defocus_distance_m, from_product_m, rel_tol=rel_tol
-    ):
-        logger.warning(
-            'Probe defocus %g m disagrees with the focus-object distance %g m the product '
-            'declares, which implies %g m; using the product.',
-            defocus_distance_m,
-            focus_object_distance_m,
-            from_product_m,
-        )
-
-    return from_product_m
 
 
 @dataclass(frozen=True)
@@ -130,8 +89,8 @@ class ProductMetadata:
     def defocus_distance_m(self) -> float:
         """How far past the focus the object sits, the negated `focus_object_distance_m`.
 
-        Zero when the product declares no focusing optic. See
-        :func:`reconcile_defocus_distance_m` for combining it with a probe's own defocus.
+        Zero when the product declares no focusing optic. The same quantity as
+        :attr:`ptychodus.api.probe.ProbeGeometryProvider.defocus_distance_m`.
         """
         return -self.focus_object_distance_m
 
@@ -208,7 +167,6 @@ def _calibrate_detector_distance(
     detector_distance_m: float,
     scale: float,
     *,
-    focus_object_distance_m: float = 0.0,
     far_field: bool = True,
 ) -> float:
     """Return the detector distance implied by a fitted isotropic position scale.
@@ -218,35 +176,23 @@ def _calibrate_detector_distance(
     :func:`ptychodus.api.propagate.compute_far_field_pixel_geometry` with respect to the distance.
     A fit that had to spread the probe positions out by ``scale`` means the assumed object pixel
     was too large by that same factor, and the distance that reproduces the correct pixel is
-    ``detector_distance_m / scale``.
+    ``detector_distance_m / scale``. A focusing optic does not change that: by the Fresnel scaling
+    theorem the magnification scales pixel and distance alike, so it cancels from the far-field
+    pixel, which is why the lab-frame distance is the one calibrated.
 
-    Both near-field geometries break that proportionality, for different reasons, so each is
-    refused rather than calibrated. The regime has to be tested as well as the focus position:
-    a parallel beam declares no focusing optic, so testing the focus alone would admit it.
+    Near field breaks the proportionality and is refused.
 
     Args:
         detector_distance_m: Sample-to-detector distance the positions were reconstructed with.
         scale: Isotropic scale from :meth:`AffineTransform.decompose`.
-        focus_object_distance_m: Focus-to-object distance of the product. A nonzero value selects
-            cone-beam geometry, where the object pixel is set by
-            :func:`ptychodus.api.propagate.compute_magnification` rather than by the detector
-            distance alone and this relation does not hold.
         far_field: Declared propagation regime. Near field back-projects the detector pixel
             onto the object, so the object pixel does not depend on the detector distance at
             all and no position scale can report one.
 
     Raises:
         ValueError: If ``scale`` is not positive and finite, if ``detector_distance_m`` is not
-            finite, if ``focus_object_distance_m`` is nonzero, or if the product declares
-            near-field propagation.
+            finite, or if the product declares near-field propagation.
     """
-    if focus_object_distance_m != 0.0:
-        raise ValueError(
-            'Detector-distance calibration from a position scale is defined for far-field '
-            'geometry only; this product has a nonzero focus-object distance '
-            f'({focus_object_distance_m} m), where the object pixel follows the magnification.'
-        )
-
     if not far_field:
         raise ValueError(
             'Detector-distance calibration from a position scale is defined for far-field '
@@ -395,7 +341,6 @@ def transform_product(
     detector_distance_m = _calibrate_detector_distance(
         metadata.detector_distance_m,
         components.scale,
-        focus_object_distance_m=metadata.focus_object_distance_m,
         far_field=metadata.far_field,
     )
     scale_free = AffineTransform.from_components(replace(components, scale=1.0))

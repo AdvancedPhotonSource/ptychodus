@@ -9,14 +9,12 @@ from ptychodus.api.probe import Probe, ProbeGeometryProvider
 from ptychodus.api.simulate.probe import (
     ProbeGenerator,
     generate_average_pattern_probe,
-    resolve_defocus_distance_m,
 )
 
-from ._options import defocus_distance_field, expect_options, propagation_distance_field
+from ._options import expect_options, propagation_distance_field
 
 
 class AveragePatternOptions(BaseModel):
-    defocus_distance_m: float = defocus_distance_field()
     propagation_distance_m: float = propagation_distance_field()
     bright_field_threshold: bool = Field(
         False,
@@ -46,15 +44,17 @@ class AveragePatternProbeGenerator(ProbeGenerator):
             # Not yet bound, or the moments are still being computed.
             raise GeometryNotDefinedError('No diffraction moments to estimate the probe from.')
 
-        # A flat-phase square root back-propagates to the beam at its waist. The defocus
-        # carries it to the object, deferring to the product's focus as the focusing
-        # generators do; the propagation distance then refines the plane without moving
-        # the object pixel size, which editing the geometry would. Both act on the same
-        # field, so they add.
-        distance_m = (
-            resolve_defocus_distance_m(geometry_provider, estimate.defocus_distance_m)
-            + estimate.propagation_distance_m
+        # In far field a flat-phase square root back-propagates to the beam at its waist,
+        # and the product's defocus carries it to the object. In near field the hologram is
+        # back-propagated over the equivalent distance, which already lands it in the
+        # object plane of the equivalent parallel-beam geometry, so the defocus is not
+        # applied again. The propagation distance then refines the plane without moving
+        # the object pixel size, which editing the geometry would; acting on the same
+        # field, it adds.
+        defocus_distance_m = (
+            geometry_provider.defocus_distance_m if geometry_provider.far_field else 0.0
         )
+        distance_m = defocus_distance_m + estimate.propagation_distance_m
         # The moments' mean frame is already corrected for the background and flat field,
         # and their mask includes the pixels those maps leave unusable.
         return generate_average_pattern_probe(

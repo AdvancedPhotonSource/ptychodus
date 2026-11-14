@@ -61,7 +61,7 @@ from ptychodus.api.preprocess.diffraction import (
 from ptychodus.api.preprocess.noise import compute_robust_statistics
 from ptychodus.api.probe import Probe, ProbeGeometry, ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePositionSequence
-from ptychodus.api.product import Product, ProductMetadata, reconcile_defocus_distance_m
+from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.scattering.frame import (
     resolve_exit_frame_transform,
     transform_probe_to_exit_frame,
@@ -95,7 +95,9 @@ from ptychodus.cli._reconstruct_common import (
     pair_patterns_with_positions,
     resolve_crop_region,
     resolve_flag,
-    resolve_focus_object_distance_m,
+    estimate_focus_object_distance_m,
+    require_near_field_focus_object_distance_m,
+    resolve_stated_focus_object_distance_m,
     resolve_quantity,
     run_reconstruction,
     save_assembled_diffraction,
@@ -130,8 +132,10 @@ class InstrumentProfile:
     default_far_field: bool = True
 
     default_fzp_preset: str = ''
-    default_fzp_defocus_m: float = 0.0
     default_bad_pixels_reader: str = 'NPY_Bad_Pixels'
+    # The detector's invalid-pixel marker by stored dtype name, where it is not the dtype
+    # maximum; the default for --max-valid-count.
+    default_invalid_counts: Mapping[str, int] = field(default_factory=dict)
 
     # False drops the crop, beam-center, value-filter and bad-pixel options along with the
     # stages that read them, for a reader that hands over patterns already prepared.
@@ -257,8 +261,9 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
             type=int,
             default=None,
             help=(
-                'Zero pixels at or above this count. Defaults to the pattern dtype maximum, '
-                'which is how Dectris detectors mark invalid pixels.'
+                "Zero pixels at or above this count. Defaults to the instrument's invalid "
+                "marker for the pattern dtype, else the dtype's maximum, which is how Dectris "
+                'detectors mark invalid pixels.'
             ),
         )
         parser.add_argument(
@@ -294,12 +299,6 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
         help=profile.fzp_preset_help,
     )
     parser.add_argument(
-        '--fzp-defocus-m',
-        type=float,
-        default=profile.default_fzp_defocus_m,
-        help='Defocus from the zone-plate focal plane. Ignored without --fzp-preset.',
-    )
-    parser.add_argument(
         '--near-field',
         action='store_true',
         # None, not False: the file may declare the regime, and "unset" has to stay
@@ -316,8 +315,10 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
         default=None,
         help=(
             'Signed position of the beam focus with the origin at the object, so a focus '
-            'upstream is negative. Near field only; defaults to the negated '
-            '--fzp-defocus-m, which states the same displacement in the opposite frame. '
+            'upstream is negative. Its negation is the defocus every model probe is built '
+            'at, and in near field it sets the magnification besides. Unset, it is read '
+            'from the diffraction file, else estimated from far-field data; near field '
+            'requires it (0 for a parallel beam). '
             'Attach a negative value with "=" -- argparse reads a bare -9e-4 as an '
             'option name, though -0.0009 is fine.'
         ),
@@ -328,8 +329,8 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
         default=0.0,
         help=(
             'Propagate the data-derived initial probe this far after back-propagating it, '
-            'to refine where the probe plane sits. Ignored with --fzp-preset or '
-            '--probe-file.'
+            'to refine where the probe plane sits; in far field it adds to the defocus. '
+            'Ignored with --fzp-preset or --probe-file.'
         ),
     )
     parser.add_argument(
@@ -383,6 +384,8 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
     if profile.offers_scattering_geometry:
         _add_scattering_geometry_arguments(parser)
 
+    _add_defocus_estimate_arguments(parser)
+
     add_ptychi_options_argument(parser)
     add_print_ptychi_options_argument(parser)
     mode = parser.add_mutually_exclusive_group()
@@ -431,6 +434,34 @@ def _add_scattering_geometry_arguments(parser: argparse.ArgumentParser) -> None:
         default=None,
         help='Angle between the incident beam and the sample surface, turning in the sense '
         'of two-theta; 90 is normal incidence.',
+    )
+
+
+def _add_defocus_estimate_arguments(parser: argparse.ArgumentParser) -> None:
+    group = parser.add_argument_group(
+        'defocus estimate',
+        'In far field, when neither --focus-object-distance-m nor the diffraction file states '
+        'the focus, the defocus is measured from the parallax between bright-field images, '
+        'in one binned pass over the patterns, and the focus set from it; an unresolved '
+        "estimate leaves the focus at zero. The defaults match the GUI's Products settings.",
+    )
+    group.add_argument(
+        '--parallax-bin-size-px',
+        type=positive_int,
+        default=4,
+        help='Detector pixels per bin, a side. Larger bins leave fewer inside the bright field.',
+    )
+    group.add_argument(
+        '--parallax-min-significance',
+        type=_non_negative_float,
+        default=3.0,
+        help='Standard errors the defocus must reach to be applied.',
+    )
+    group.add_argument(
+        '--parallax-min-defocus-dof',
+        type=_non_negative_float,
+        default=1.0,
+        help='Depths of focus the defocus must reach to be applied.',
     )
 
 
@@ -761,9 +792,13 @@ def _warn_unused_probe_propagation(
     if args.probe_propagation_distance_m == 0.0:
         return
 
-    # A zone-plate probe has its own way to move; a file-supplied one has none, so
-    # offering --fzp-defocus-m there would be advice the user cannot take.
-    remedy = ' Use --fzp-defocus-m to move a zone-plate probe.' if source == '--fzp-preset' else ''
+    # A zone-plate probe moves with the focus; a file-supplied one has no way to move, so
+    # offering the focus there would be advice the user cannot take.
+    remedy = (
+        ' Use --focus-object-distance-m to move a zone-plate probe.'
+        if source == '--fzp-preset'
+        else ''
+    )
     logger.warning(
         '--probe-propagation-distance-m %g is ignored: the initial probe came from %s.%s',
         args.probe_propagation_distance_m,
@@ -840,12 +875,11 @@ def _build_initial_probe(
                 probe_geometry,
                 zone_plate,
                 photon_wavelength_m=photon_wavelength_m,
-                # The same displacement the product states, in the probe's frame. In far
-                # field the resolver leaves the focus at zero, so this is --fzp-defocus-m
-                # unchanged.
-                defocus_distance_m=reconcile_defocus_distance_m(
-                    focus_object_distance_m, args.fzp_defocus_m
-                ),
+                # The displacement the product states, in the probe's frame. In near field
+                # the probe goes in the equivalent parallel-beam frame the magnification
+                # places it in.
+                defocus_distance_m=-focus_object_distance_m,
+                remove_focus_curvature=not far_field,
             ),
             probe_photon_count,
         )
@@ -868,7 +902,12 @@ def _build_initial_probe(
         photon_wavelength_m=photon_wavelength_m,
         detector_distance_m=detector_distance_m,
         far_field=far_field,
-        defocus_distance_m=args.probe_propagation_distance_m,
+        # In far field the estimate is the beam at its waist, carried to the object by the
+        # defocus. In near field the back-propagation already lands it in the object plane
+        # of the equivalent geometry.
+        defocus_distance_m=(
+            (-focus_object_distance_m if far_field else 0.0) + args.probe_propagation_distance_m
+        ),
     )
 
     # The mean pattern carries the mean transmitted photons, which is less than the
@@ -993,18 +1032,23 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         profile.default_far_field,
         '--near-field',
     )
-    # Only meaningful in the near field, where it sets the magnification. In far field
-    # the sampling does not depend on it, so deriving one would be noise.
-    focus_object_distance_m = (
-        0.0
-        if far_field
-        else resolve_focus_object_distance_m(
-            logger,
-            args.focus_object_distance_m,
-            metadata.focus_object_distance_m,
-            args.fzp_defocus_m,
-        )
+    # The one statement of the defocus every model probe is built at, and in near field
+    # the magnification besides. Near field needs it now, for the probe geometry; far
+    # field estimates an unstated one once the object geometry exists.
+    stated_focus_object_distance_m = resolve_stated_focus_object_distance_m(
+        logger, args.focus_object_distance_m, metadata.focus_object_distance_m
     )
+    focus_object_distance_m = 0.0
+
+    if not far_field:
+        try:
+            focus_object_distance_m = require_near_field_focus_object_distance_m(
+                stated_focus_object_distance_m, source='--focus-object-distance-m'
+            )
+        except ValueError as exc:
+            parser.error(str(exc))
+    elif stated_focus_object_distance_m is not None:
+        focus_object_distance_m = stated_focus_object_distance_m
     detector_pixel_size_m = _resolve_detector_pixel_size(logger, args, metadata, profile)
     raw_pixel_geometry = PixelGeometry(
         width_m=detector_pixel_size_m, height_m=detector_pixel_size_m
@@ -1018,18 +1062,27 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
     upper_counts: int | None = None
 
     if profile.conditions_patterns:
-        max_valid_count = (
-            invalid_count_threshold(metadata.pattern_dtype)
-            if args.max_valid_count is None
-            else args.max_valid_count
-        )
+        if args.max_valid_count is not None:
+            max_valid_count: int | None = args.max_valid_count
+            invalid_source = '--max-valid-count'
+        else:
+            max_valid_count = invalid_count_threshold(
+                metadata.pattern_dtype, profile.default_invalid_counts
+            )
+            invalid_source = (
+                f"the instrument's {metadata.pattern_dtype} marker"
+                if str(metadata.pattern_dtype) in profile.default_invalid_counts
+                else f'the {metadata.pattern_dtype} maximum'
+            )
 
         # One step, two consumers: the assembled patterns below and the mean frame the beam
         # center is estimated from. Sharing the object is what keeps those two cuts identical.
         value_filter: FilterValuesStep | None = None
 
         if max_valid_count is not None:
-            logger.info('Zeroing pixels at or above %d as invalid', max_valid_count)
+            logger.info(
+                'Zeroing pixels at or above %d as invalid (%s)', max_valid_count, invalid_source
+            )
             value_filter = FilterValuesStep(lower_bound=0, upper_bound=max_valid_count)
 
         pipeline = None if value_filter is None else DiffractionPrepPipeline(steps=(value_filter,))
@@ -1158,6 +1211,26 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         else float(probe_photon_count_override)
     )
 
+    object_geometry = compute_object_geometry(
+        positions, probe_geometry, padding_px=args.object_padding_px
+    )
+    logger.info('Object geometry: %s', object_geometry)
+
+    if far_field and stated_focus_object_distance_m is None:
+        focus_object_distance_m = estimate_focus_object_distance_m(
+            logger,
+            assembled_data,
+            positions,
+            object_geometry,
+            probe_geometry,
+            photon_wavelength_m=photon_wavelength_m,
+            source='--focus-object-distance-m',
+            i0_photons_per_count=args.i0_photons_per_count,
+            bin_size_px=args.parallax_bin_size_px,
+            minimum_significance=args.parallax_min_significance,
+            minimum_defocus_dof=args.parallax_min_defocus_dof,
+        )
+
     rng = numpy.random.default_rng(args.seed)
     probe = _build_initial_probe(
         logger,
@@ -1184,11 +1257,6 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         num_positions=len(positions),
     )
     logger.info('Probe: %s', probe_ensemble.get_array().shape)
-
-    object_geometry = compute_object_geometry(
-        positions, probe_geometry, padding_px=args.object_padding_px
-    )
-    logger.info('Object geometry: %s', object_geometry)
 
     # Uniform, but not transparent: scaled to the mean transmission the patterns imply,
     # so the exit wave predicts the totals the detector recorded instead of the

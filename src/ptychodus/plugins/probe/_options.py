@@ -9,27 +9,11 @@ from pydantic import BaseModel, Field
 OptionsT = TypeVar('OptionsT', bound=BaseModel)
 
 
-def defocus_distance_field() -> Any:
-    """The object plane's position past the focus.
-
-    Every generator declaring it persists it under one key, so all of them must declare
-    it identically; declaring it once here is what makes them.
-    """
-    return Field(
-        0.0,
-        title='Defocus Distance:',
-        description=(
-            'How far past its focus the object sits: positive downstream (diverging), '
-            "negative upstream (converging). The product's focus wins when it states one."
-        ),
-        json_schema_extra={'display_unit': 'MICROMETER'},
-    )
-
-
 def propagation_distance_field() -> Any:
     """How far an already formed field is carried, independent of the defocus.
 
-    Shared by key for the same reason as :func:`defocus_distance_field`.
+    Every generator declaring it persists it under one key, so all of them must declare
+    it identically; declaring it once here is what makes them.
     """
     return Field(
         0.0,

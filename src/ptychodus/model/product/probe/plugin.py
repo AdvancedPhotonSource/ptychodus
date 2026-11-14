@@ -29,13 +29,12 @@ PresetT = TypeVar('PresetT', bound=BaseModel)
 def _read_size_fields(described: Sequence[ParameterDescription]) -> Mapping[str, str]:
     """Map each declared size field to the :class:`ProbeExtent` quantity it says it is.
 
-    A field opts in with ``json_schema_extra={'probe_extent': <ProbeExtent property>}``,
-    and the extent is measured at the field named ``defocus_distance_m``, so a
-    declaration with any size field must also declare that one.
+    A field opts in with ``json_schema_extra={'probe_extent': <ProbeExtent property>}``.
+    The extent is measured at the product's defocus, which no declaration carries.
 
     Raises:
-        ValueError: for a quantity :class:`ProbeExtent` does not have, or size fields
-            without a defocus to measure them at. Both are faults in the declaration.
+        ValueError: for a quantity :class:`ProbeExtent` does not have, a fault in the
+            declaration.
     """
     size_fields: dict[str, str] = {}
 
@@ -49,9 +48,6 @@ def _read_size_fields(described: Sequence[ParameterDescription]) -> Mapping[str,
             raise ValueError(f'"{description.name}" names no ProbeExtent quantity {quantity!r}.')
 
         size_fields[description.name] = quantity
-
-    if size_fields and not any(d.name == 'defocus_distance_m' for d in described):
-        raise ValueError('Size fields are measured at a defocus, but none is declared.')
 
     return size_fields
 
@@ -137,8 +133,7 @@ class PluginProbeBuilder(ProbeEnsembleBuilder):
         if not self.estimates_size:
             return False
 
-        defocus_distance_m = self.parameters()['defocus_distance_m'].get_value()
-        extent = self._estimate_extent(geometry_provider, defocus_distance_m)
+        extent = self._estimate_extent(geometry_provider)
 
         if extent is None:
             return False

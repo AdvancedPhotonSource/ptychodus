@@ -1831,6 +1831,104 @@ class TestGenerateKbMirrorProbe:
         assert measured == pytest.approx(expected, rel=0.02)
 
 
+_EQUIVALENT_FRAME_DEFOCUS_M = 100e-6
+_EQUIVALENT_FRAME_DETECTOR_DISTANCE_M = 1.0
+
+
+def _fzp_probe_at_defocus(*, remove_focus_curvature: bool) -> Probe:
+    return generate_fresnel_zone_plate_probe(
+        _fzp_probe_geometry(),
+        _FZP_ZONE_PLATE,
+        photon_wavelength_m=_FZP_WAVELENGTH_M,
+        defocus_distance_m=_EQUIVALENT_FRAME_DEFOCUS_M,
+        remove_focus_curvature=remove_focus_curvature,
+    )
+
+
+def _kb_probe_at_defocus(*, remove_focus_curvature: bool) -> Probe:
+    return generate_kb_mirror_probe(
+        _kb_probe_geometry(),
+        _kb_mirrors(),
+        photon_wavelength_m=_KB_WAVELENGTH_M,
+        defocus_distance_m=_EQUIVALENT_FRAME_DEFOCUS_M,
+        remove_focus_curvature=remove_focus_curvature,
+    )
+
+
+def _detector_intensity(probe: Probe, *, wavelength_m: float, distance_m: float) -> numpy.ndarray:
+    """The intensity a single-step Fresnel transform carries *probe* to over *distance_m*."""
+    pixel_geometry = probe.get_pixel_geometry()
+    parameters = PropagatorParameters(
+        wavelength_m=wavelength_m,
+        width_px=probe.width_px,
+        height_px=probe.height_px,
+        pixel_width_m=pixel_geometry.width_m,
+        pixel_height_m=pixel_geometry.height_m,
+        propagation_distance_m=distance_m,
+    )
+    return intensity(FresnelTransformPropagator(parameters).propagate(probe.get_array()[0]))
+
+
+class TestEquivalentFrame:
+    """A focused probe with its focus curvature removed obeys the Fresnel scaling theorem.
+
+    The detector `z_d` past an object sampled `z` past the focus records, at pitch
+    `lambda z_d / (N dx)`, the same intensity the equivalent probe carried over
+    `z_d / M` records at a pitch M times finer, where `M = (z + z_d) / z`. Those are
+    index for index the same grid, so the two intensities agree pixel for pixel. A wrong
+    sign, or a curvature centred anywhere but where the propagator centres its grid,
+    breaks the agreement.
+    """
+
+    _MAGNIFICATION = (
+        _EQUIVALENT_FRAME_DEFOCUS_M + _EQUIVALENT_FRAME_DETECTOR_DISTANCE_M
+    ) / _EQUIVALENT_FRAME_DEFOCUS_M
+
+    @pytest.mark.parametrize(
+        ('generate', 'wavelength_m'),
+        [(_fzp_probe_at_defocus, _FZP_WAVELENGTH_M), (_kb_probe_at_defocus, _KB_WAVELENGTH_M)],
+        ids=['zone_plate', 'kb_mirrors'],
+    )
+    def test_the_cone_beam_and_its_equivalent_record_the_same_hologram(
+        self, generate: Any, wavelength_m: float
+    ) -> None:
+        lab = _detector_intensity(
+            generate(remove_focus_curvature=False),
+            wavelength_m=wavelength_m,
+            distance_m=_EQUIVALENT_FRAME_DETECTOR_DISTANCE_M,
+        )
+        equivalent = _detector_intensity(
+            generate(remove_focus_curvature=True),
+            wavelength_m=wavelength_m,
+            distance_m=_EQUIVALENT_FRAME_DETECTOR_DISTANCE_M / self._MAGNIFICATION,
+        )
+
+        numpy.testing.assert_allclose(equivalent, lab, rtol=0.0, atol=1e-9 * lab.max())
+
+    def test_the_curvature_removed_is_centred_where_the_propagator_centres_its_grid(
+        self,
+    ) -> None:
+        curved = _fzp_probe_at_defocus(remove_focus_curvature=False).get_array()[0]
+        flat = _fzp_probe_at_defocus(remove_focus_curvature=True).get_array()[0]
+        x_m = _FZP_PROBE_PITCH_M * (numpy.arange(_FZP_NUM_PX) - _FZP_NUM_PX // 2)
+        radius2_m2 = numpy.square(x_m)[:, numpy.newaxis] + numpy.square(x_m)[numpy.newaxis, :]
+        sphere = numpy.exp(1j * PI * radius2_m2 / (_FZP_WAVELENGTH_M * _EQUIVALENT_FRAME_DEFOCUS_M))
+
+        numpy.testing.assert_allclose(flat * sphere, curved, rtol=1e-12, atol=1e-12)
+
+    def test_at_the_focus_there_is_nothing_to_remove(self) -> None:
+        def at_focus(remove_focus_curvature: bool) -> numpy.ndarray:
+            return generate_fresnel_zone_plate_probe(
+                _fzp_probe_geometry(),
+                _FZP_ZONE_PLATE,
+                photon_wavelength_m=_FZP_WAVELENGTH_M,
+                defocus_distance_m=0.0,
+                remove_focus_curvature=remove_focus_curvature,
+            ).get_array()
+
+        numpy.testing.assert_array_equal(at_focus(True), at_focus(False))
+
+
 class TestGenerateMirrorFigureError:
     def test_realized_rms_slope_matches_the_request(self) -> None:
         """Legendre derivatives are not orthogonal, so the whole series is rescaled at once.

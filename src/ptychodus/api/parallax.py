@@ -38,11 +38,13 @@ import numpy
 from scipy.ndimage import binary_erosion
 from skimage.registration import phase_cross_correlation
 
-from .accumulate import DiffractionMoments
+from .accumulate import DiffractionMoments, compute_diffraction_moments, estimate_incident_beam
 from .affine import AffineTransform, AffineTransformComponents
 from .fourier import fourier_shift_2d
 from .object import ObjectGeometry
+from .assemble import AssembledDiffractionData
 from .preprocess.diffraction import (
+    BinningStep,
     DiffractionPrepStep,
     HorizontalFlipStep,
     TransposeStep,
@@ -61,6 +63,7 @@ __all__ = [
     'ParallaxEstimate',
     'ParallaxTransform',
     'compute_geometry_mismatch',
+    'estimate_defocus_from_assembled_data',
     'estimate_defocus_from_parallax',
     'estimate_parallax_transform',
 ]
@@ -114,6 +117,61 @@ class ParallaxEstimate:
         )
 
 
+def estimate_defocus_from_assembled_data(
+    data: AssembledDiffractionData,
+    probe_positions: ProbePositionSequence,
+    object_geometry: ObjectGeometry,
+    probe_geometry: ProbeGeometry,
+    *,
+    photon_wavelength_m: float,
+    i0_photons_per_count: float = 0.0,
+    bin_size_px: int = 4,
+    max_bins: int = 64,
+    chunk_bins: int = 8,
+) -> ParallaxEstimate | None:
+    """Estimate the defocus from assembled far-field patterns, in one binned pass.
+
+    The patterns are binned *bin_size_px* detector pixels a side as their moments are
+    accumulated, with the data's own bad pixels, background and flat field; the totals are
+    corrected for beam decay by the I0 the positions carry, converted at
+    *i0_photons_per_count* (see :func:`estimate_incident_beam`); and the corrected moments
+    go to :func:`estimate_defocus_from_parallax`, which keeps at most *max_bins* of the
+    bright-field bins and maps them *chunk_bins* at a time. Larger bins cost less memory
+    but leave fewer inside the bright field.
+
+    Returns None when there are no patterns or the parallax gives no estimate.
+
+    Raises:
+        ValueError: where :func:`estimate_defocus_from_parallax` refuses the inputs.
+    """
+    moments = compute_diffraction_moments(
+        data.get_indexes(),
+        data.get_patterns(),
+        bad_pixels=data.get_bad_pixels(),
+        background=data.get_background(),
+        flat_field=data.get_flat_field(),
+        binning=BinningStep(bin_size_x=bin_size_px, bin_size_y=bin_size_px),
+    )
+
+    if moments is None:
+        return None
+
+    corrected = estimate_incident_beam(
+        moments,
+        probe_positions.get_probe_photon_counts_by_index(),
+        i0_photons_per_count=i0_photons_per_count,
+    ).moments
+    return estimate_defocus_from_parallax(
+        corrected,
+        probe_positions,
+        object_geometry,
+        probe_geometry,
+        photon_wavelength_m=photon_wavelength_m,
+        max_bins=max_bins,
+        chunk_bins=chunk_bins,
+    )
+
+
 def estimate_defocus_from_parallax(
     moments: DiffractionMoments,
     probe_positions: ProbePositionSequence,
@@ -124,6 +182,8 @@ def estimate_defocus_from_parallax(
     bright_field_fraction: float = 0.5,
     upsample_factor: int = 20,
     minimum_bins: int = 4,
+    max_bins: int = 64,
+    chunk_bins: int = 8,
 ) -> ParallaxEstimate | None:
     """Estimate the probe's defocus from the shifts between its bright-field images.
 
@@ -135,10 +195,14 @@ def estimate_defocus_from_parallax(
 
     1. The bright field is every bin whose mean reaches *bright_field_fraction* of the
        brightest, less the bins on its edge, whose images mix the disk with the dark
-       field.
-    2. Each remaining bin's values are mapped onto *object_geometry* by
+       field. Past *max_bins*, an evenly spread subset on a coarser lattice is kept,
+       which bounds the memory the images take: fewer bins scatter the slope more and
+       cost less.
+    2. Each kept bin's values are mapped onto *object_geometry* by
        :func:`interpolate_scan_values`, pairing patterns with *probe_positions* by
-       index, and cropped to the scan's hull.
+       index, *chunk_bins* bins at a time, and cropped to the scan's hull before the
+       next chunk is mapped; a smaller chunk lowers the peak memory at no cost in the
+       result.
     3. Each image is registered against their mean to ``1 / upsample_factor`` of a
        pixel, and again against the mean of the images so aligned. The cross-correlation
        is not normalized to its phase: whitening amplifies the interpolation's noise
@@ -156,8 +220,8 @@ def estimate_defocus_from_parallax(
     three positions pair with a pattern.
 
     Raises:
-        ValueError: if *moments* holds no binned patterns or its frames do not match
-            *probe_geometry*.
+        ValueError: if *moments* holds no binned patterns, its frames do not match
+            *probe_geometry*, or *max_bins* is below *minimum_bins*.
     """
     measured = _measure_bin_shifts(
         moments,
@@ -167,6 +231,8 @@ def estimate_defocus_from_parallax(
         bright_field_fraction=bright_field_fraction,
         upsample_factor=upsample_factor,
         minimum_bins=minimum_bins,
+        max_bins=max_bins,
+        chunk_bins=chunk_bins,
     )
 
     if measured is None:
@@ -352,6 +418,8 @@ def estimate_parallax_transform(
     bright_field_fraction: float = 0.5,
     upsample_factor: int = 20,
     minimum_bins: int = 4,
+    max_bins: int = 64,
+    chunk_bins: int = 8,
 ) -> ParallaxTransform | None:
     """Fit a full matrix to the shifts between the bright-field images, ``s = a + M q``.
 
@@ -361,14 +429,16 @@ def estimate_parallax_transform(
     *minimum_bins* must be at least four, so each axis's three unknowns leave a residual.
 
     The patterns need not be oriented: the orientation is what the result tells. Judge
-    it by :attr:`ParallaxTransform.fresnel_number`, as for the scalar fit.
+    it by :attr:`ParallaxTransform.fresnel_number`, as for the scalar fit. *max_bins* and
+    *chunk_bins* bound the memory as they do there.
 
     Returns None when fewer than *minimum_bins* bright-field bins remain or fewer than
     three positions pair with a pattern.
 
     Raises:
         ValueError: if *moments* holds no binned patterns, its frames do not match
-            *probe_geometry*, or *minimum_bins* is below four.
+            *probe_geometry*, *minimum_bins* is below four, or *max_bins* is below
+            *minimum_bins*.
     """
     if minimum_bins < 4:
         raise ValueError('A matrix fit needs at least four bins!')
@@ -381,6 +451,8 @@ def estimate_parallax_transform(
         bright_field_fraction=bright_field_fraction,
         upsample_factor=upsample_factor,
         minimum_bins=minimum_bins,
+        max_bins=max_bins,
+        chunk_bins=chunk_bins,
     )
 
     if measured is None:
@@ -473,12 +545,17 @@ def _measure_bin_shifts(
     bright_field_fraction: float,
     upsample_factor: int,
     minimum_bins: int,
+    max_bins: int,
+    chunk_bins: int,
 ) -> tuple[RealArrayType, RealArrayType] | None:
     """Each bright-field bin's spatial frequency and image shift, ``(x, y)`` per row.
 
     Steps 1 to 3 of :func:`estimate_defocus_from_parallax`; ``q`` is measured from the
     frame midpoint. None when too few bins or positions remain.
     """
+    if max_bins < minimum_bins:
+        raise ValueError(f'max_bins ({max_bins}) is below minimum_bins ({minimum_bins})!')
+
     binned_patterns = moments.binned_patterns
     binning = moments.binning
 
@@ -491,9 +568,12 @@ def _measure_bin_shifts(
             f'{probe_geometry.height_px} x {probe_geometry.width_px} probe!'
         )
 
-    bright_field = binary_erosion(
-        _find_bright_bins(binned_patterns, bright_field_fraction),
-        structure=numpy.ones((3, 3), dtype=bool),
+    bright_field = _thin_bins(
+        binary_erosion(
+            _find_bright_bins(binned_patterns, bright_field_fraction),
+            structure=numpy.ones((3, 3), dtype=bool),
+        ),
+        max_bins,
     )
     num_bins = int(numpy.count_nonzero(bright_field))
 
@@ -511,8 +591,17 @@ def _measure_bin_shifts(
         return None
 
     values = binned_patterns[paired][:, bright_field].astype(numpy.float64)
-    grids, supported = interpolate_scan_values(object_geometry, positions, values)
-    shifts_yx_px = _register_images(_crop_to_contrast(grids, supported), upsample_factor)
+    images = numpy.concatenate(
+        [
+            _crop_to_contrast(
+                *interpolate_scan_values(
+                    object_geometry, positions, values[:, start : start + chunk_bins]
+                )
+            )
+            for start in range(0, num_bins, chunk_bins)
+        ]
+    )
+    shifts_yx_px = _register_images(images, upsample_factor)
 
     rows, columns = numpy.nonzero(bright_field)
     bin_center_y_px = (rows + 0.5) * binning.bin_size_y - 0.5 - (probe_geometry.height_px - 1) / 2
@@ -527,6 +616,51 @@ def _measure_bin_shifts(
         )
     )
     return q_per_m, shifts_m
+
+
+def _thin_bins(bright_field: BooleanArrayType, max_bins: int) -> BooleanArrayType:
+    """At most *max_bins* of the bright-field bins, evenly spread over it.
+
+    The kept bins lie on a square lattice, coarsened until few enough remain; of the
+    lattice's offsets, the one keeping the most bins wins, the one through the bright
+    field's centroid on a tie, so the spatial frequencies stay balanced about the beam.
+    """
+    num_bins = int(numpy.count_nonzero(bright_field))
+
+    if num_bins <= max_bins:
+        return bright_field
+
+    rows, columns = numpy.nonzero(bright_field)
+    center_row = int(round(float(numpy.mean(rows))))
+    center_column = int(round(float(numpy.mean(columns))))
+    stride = math.ceil(math.sqrt(num_bins / max_bins))
+
+    while True:
+        best: tuple[int, int, int] | None = None
+
+        for row_offset in range(stride):
+            for column_offset in range(stride):
+                count = int(
+                    numpy.count_nonzero(
+                        ((rows - center_row - row_offset) % stride == 0)
+                        & ((columns - center_column - column_offset) % stride == 0)
+                    )
+                )
+
+                if count <= max_bins and (best is None or count > best[0]):
+                    best = (count, row_offset, column_offset)
+
+        if best is not None:
+            count, row_offset, column_offset = best
+            kept = ((rows - center_row - row_offset) % stride == 0) & (
+                (columns - center_column - column_offset) % stride == 0
+            )
+            thinned = numpy.zeros_like(bright_field)
+            thinned[rows[kept], columns[kept]] = True
+            logger.debug(f'Keeping {count} of {num_bins} bright-field bins, every {stride} a side.')
+            return thinned
+
+        stride += 1
 
 
 def _find_bright_bins(

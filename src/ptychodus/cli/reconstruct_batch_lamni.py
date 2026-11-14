@@ -117,6 +117,7 @@ from ptychodus.cli._reconstruct_common import (
 from ptychodus.api.devices import CPU, Device, probe_devices, visibility_environment
 from ptychodus.api.spawn import ChildError, run_subprocess
 from ptychodus.plugins.ptychi.task import dump_task_options
+from ptychodus.plugins.aps31id_lamni.diffraction_file import LamNIDiffractionFileReader
 from ptychodus.plugins.aps31id_lamni.scan_table import (
     APS31IDEScanRecord,
     read_aps31ide_scan_table,
@@ -474,7 +475,9 @@ def reconstruct_batch_lamni(
     )
     first_metadata = first_dataset.get_metadata()
     max_valid_count = (
-        invalid_count_threshold(first_metadata.pattern_dtype)
+        invalid_count_threshold(
+            first_metadata.pattern_dtype, LamNIDiffractionFileReader.INVALID_COUNTS
+        )
         if settings.diffraction.max_valid_count is None
         else settings.diffraction.max_valid_count
     )

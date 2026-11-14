@@ -58,7 +58,10 @@ The remaining arguments fall into four groups.
 `--min-total-counts`, `--max-valid-count`, `--bad-pixels-file`
 : Drop patterns whose total counts fall below a floor, zero pixels at or above a ceiling, and
   apply a bad-pixel mask covering the full uncropped detector. The ceiling defaults to the
-  pattern dtype's maximum, which is how Dectris detectors mark an invalid pixel.
+  detector's invalid-pixel marker: the pattern dtype's maximum, which is how Dectris
+  detectors mark an invalid pixel, except where the instrument names a lower one for the
+  dtype. `ptychodus-reconstruct-lamni` stores 12-bit Eiger frames as uint16 and marks them
+  with 4095.
 
 `--background-file`, `--flat-field-file`, `--subtract-background`, `--divide-flat-field`
 : Supply a measured detector background and flat-field response covering the full detector,
@@ -66,9 +69,23 @@ The remaining arguments fall into four groups.
   or carry them alongside. `--background-file-type` and `--flat-field-file-type` name the
   readers. See [Detector Background and Flat Field](readers.md#detector-background-and-flat-field).
 
-`--num-probe-modes`, `--num-opr-modes`, `--fzp-preset`, `--fzp-defocus-m`, `--object-padding-px`, `--seed`
-: Shape the initial guesses. The zone-plate preset and defocus describe the optic that formed
-  the probe.
+`--num-probe-modes`, `--num-opr-modes`, `--fzp-preset`, `--object-padding-px`, `--seed`
+: Shape the initial guesses. The zone-plate preset describes the optic that formed the probe.
+
+`--focus-object-distance-m`
+: The signed focus position, negative upstream of the object. Its negation is the defocus
+  every model probe is built at, the average-pattern cold start included, and in near field it
+  sets the magnification besides. Unset, it is read from the data
+  file; failing that, far field estimates it from the data (below) and near field stops with an
+  error, since nothing measures it there (0 states a parallel beam).
+
+`--parallax-bin-size-px`, `--parallax-min-significance`, `--parallax-min-defocus-dof`
+: When far-field data states no focus, the defocus is measured from the parallax between
+  bright-field images, as the GUI's **Estimate Defocus** does (see
+  [Measuring the Defocus](initial_guesses.md#measuring-the-defocus)), at the cost of one binned
+  pass over the patterns. It is applied only when resolved by the significance and
+  depth-of-focus thresholds; otherwise the focus is zero and a warning says so. Stating
+  `--focus-object-distance-m`, 0 included, skips the measurement.
 
 Four more control the run itself: `--ptychi-options` chooses the reconstruction algorithm and
 its settings, `--dry-run` reports the resolved configuration without reconstructing,

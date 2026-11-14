@@ -184,13 +184,14 @@ class ObjectGeometryProvider(ABC):
 
     @property
     @abstractmethod
-    def object_plane_propagation_distance_m(self) -> float:
-        """Propagation distance of the equivalent parallel-beam geometry, ``z_d / M``.
+    def exit_wave_propagation_distance_m(self) -> float:
+        """Distance an object-plane builder propagates the exit wave to the detector.
 
-        The distance an object-plane builder should propagate over; it reduces to the
-        detector distance without a focusing optic. Declared here so that a builder
-        reads the experiment's own value rather than carrying a duplicate setting that
-        nothing keeps in step.
+        The lab-frame detector distance in far field, where the probe carries its own
+        curvature and the magnification cancels from the sampling; ``z_d / M``, the
+        equivalent parallel-beam distance, in near field. The two agree without a focusing
+        optic. Declared here so that a builder reads the experiment's own value rather than
+        carrying a duplicate setting that nothing keeps in step.
         """
 
     @property

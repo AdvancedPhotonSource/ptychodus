@@ -1,7 +1,8 @@
 """Focusing optics: a Fresnel zone plate and a Kirkpatrick-Baez mirror pair.
 
-Each simulates the optic and carries its field to an object sampled its defocus past the
-focus, deferring to the product's focus when it states one.
+Each simulates the optic and carries its field to an object sampled the product's defocus
+past the focus. In near field the focus curvature is then divided out, leaving the probe in
+the Fresnel-scaled equivalent parallel-beam frame the magnification places it in.
 """
 
 from __future__ import annotations
@@ -18,17 +19,15 @@ from ptychodus.api.simulate.probe import (
     ProbeGenerator,
     generate_fresnel_zone_plate_probe,
     generate_kb_mirror_probe,
-    resolve_defocus_distance_m,
 )
 
-from ._options import defocus_distance_field, expect_options
+from ._options import expect_options
 
 
 class FresnelZonePlateOptions(BaseModel):
     zone_plate_diameter_m: float = Field(180e-6, ge=0.0, title='Zone Plate Diameter:')
     outermost_zone_width_m: float = Field(50e-9, ge=0.0, title='Outermost Zone Width:')
     central_beamstop_diameter_m: float = Field(60e-6, ge=0.0, title='Central Beamstop Diameter:')
-    defocus_distance_m: float = defocus_distance_field()
 
 
 class FresnelZonePlateProbeGenerator(ProbeGenerator):
@@ -48,9 +47,8 @@ class FresnelZonePlateProbeGenerator(ProbeGenerator):
             geometry=geometry_provider.get_probe_geometry(),
             zone_plate=zone_plate,
             photon_wavelength_m=geometry_provider.photon_wavelength_m,
-            defocus_distance_m=resolve_defocus_distance_m(
-                geometry_provider, optic.defocus_distance_m
-            ),
+            defocus_distance_m=geometry_provider.defocus_distance_m,
+            remove_focus_curvature=not geometry_provider.far_field,
         )
 
 
@@ -80,7 +78,6 @@ class KBMirrorOptions(BaseModel):
         description='Separation of the two axis foci along the beam; zero is an aligned pair.',
         json_schema_extra={'display_unit': 'MICROMETER'},
     )
-    defocus_distance_m: float = defocus_distance_field()
 
 
 class KBMirrorProbeGenerator(ProbeGenerator):
@@ -111,8 +108,7 @@ class KBMirrorProbeGenerator(ProbeGenerator):
             geometry_provider.get_probe_geometry(),
             mirrors,
             photon_wavelength_m=geometry_provider.photon_wavelength_m,
-            defocus_distance_m=resolve_defocus_distance_m(
-                geometry_provider, optic.defocus_distance_m
-            ),
+            defocus_distance_m=geometry_provider.defocus_distance_m,
             astigmatism_m=optic.astigmatism_m,
+            remove_focus_curvature=not geometry_provider.far_field,
         )

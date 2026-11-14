@@ -101,7 +101,10 @@ class _CanvasGeometryProvider(ObjectGeometryProvider):
         return 1.0
 
     @property
-    def object_plane_propagation_distance_m(self) -> float:
+    def exit_wave_propagation_distance_m(self) -> float:
+        if self._metadata.far_field:
+            return self._metadata.detector_distance_m
+
         geometry = compute_product_geometry(
             photon_energy_eV=self._metadata.photon_energy_eV,
             probe_photon_count=self._metadata.probe_photon_count,

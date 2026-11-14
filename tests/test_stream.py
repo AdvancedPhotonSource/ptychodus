@@ -6,6 +6,7 @@ streamed scan must give exactly what the same patterns give in one batch pass.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from functools import cache
 from pathlib import Path
 import json
@@ -755,3 +756,66 @@ def test_positions_before_the_first_frame_are_kept_and_index_anomalies_counted()
     assert counters['num_frames_paired'] == 5
     assert counters['num_frames_duplicated'] == 1
     assert counters['num_frames_regressed'] == 1
+
+
+def test_a_probe_option_for_the_defocus_points_at_the_focus() -> None:
+    """The defocus is the product's, so a generator option for it is refused with a remedy."""
+    with pytest.raises(ValueError, match='focus_object_distance_m'):
+        _setup(probe_options={'defocus_distance_m': 1.0e-3})
+
+
+def test_the_parallax_is_not_measured_in_near_field(monkeypatch: pytest.MonkeyPatch) -> None:
+    # STXM-DPC, the default object, is far field only too.
+    setup = _setup(object_generator='random')
+    session = _streamed_session(setup)
+    metadata = setup.configuration.create_metadata('scan', tomography_angle_deg=0.0)
+    snapshot = session.snapshot(replace(metadata, far_field=False))
+    assert snapshot is not None
+
+    def fail(*args: object) -> None:
+        raise AssertionError('The parallax answers in far field only.')
+
+    monkeypatch.setattr('ptychodus.cli._stream._estimate_parallax', fail)
+
+    product = estimate_product(snapshot, setup, numpy.random.default_rng(0))
+
+    assert product.metadata.focus_object_distance_m == 0.0
+
+
+def test_an_explicit_zero_focus_skips_the_parallax(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Zero stated is a statement; only an unset focus is measured."""
+    setup = _setup(focus_object_distance_m=0.0)
+    session = _streamed_session(setup)
+    snapshot = session.snapshot(
+        setup.configuration.create_metadata('scan', tomography_angle_deg=0.0)
+    )
+    assert snapshot is not None
+
+    def fail(*args: object) -> None:
+        raise AssertionError('A stated focus is not measured.')
+
+    monkeypatch.setattr('ptychodus.cli._stream._estimate_parallax', fail)
+
+    product = estimate_product(snapshot, setup, numpy.random.default_rng(0))
+
+    assert product.metadata.focus_object_distance_m == 0.0
+
+
+def test_an_unset_focus_is_measured(monkeypatch: pytest.MonkeyPatch) -> None:
+    setup = _setup()
+    assert setup.configuration.focus_object_distance_m is None
+    session = _streamed_session(setup)
+    snapshot = session.snapshot(
+        setup.configuration.create_metadata('scan', tomography_angle_deg=0.0)
+    )
+    assert snapshot is not None
+    calls: list[object] = []
+
+    def record(*args: object) -> None:
+        calls.append(args)
+
+    monkeypatch.setattr('ptychodus.cli._stream._estimate_parallax', record)
+
+    estimate_product(snapshot, setup, numpy.random.default_rng(0))
+
+    assert len(calls) == 1

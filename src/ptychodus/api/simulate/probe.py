@@ -29,7 +29,6 @@ from ..probe import (
     ProbeGeometryProvider,
     ProbeTransverseCoordinates,
 )
-from ..product import reconcile_defocus_distance_m
 from ..propagate import (
     AngularSpectrumPropagator,
     FresnelTransformPropagator,
@@ -97,22 +96,6 @@ class ProbeGenerator(ABC):
         geometry, which the geometry alone does not announce.
         """
         return False
-
-
-def resolve_defocus_distance_m(
-    geometry_provider: ProbeGeometryProvider,
-    defocus_distance_m: float,
-    *,
-    rel_tol: float = 1.0e-6,
-) -> float:
-    """How far past its focus a probe is sampled, deferring to the product.
-
-    See :func:`ptychodus.api.product.reconcile_defocus_distance_m`, which this applies
-    to the provider's focus-object distance and the probe's own *defocus_distance_m*.
-    """
-    return reconcile_defocus_distance_m(
-        geometry_provider.focus_object_distance_m, defocus_distance_m, rel_tol=rel_tol
-    )
 
 
 def rescale_probe_intensity(probe: Probe, new_intensity: float) -> Probe:
@@ -521,8 +504,16 @@ def generate_fresnel_zone_plate_probe(
     *,
     photon_wavelength_m: float,
     defocus_distance_m: float,
+    remove_focus_curvature: bool = False,
 ) -> Probe:
-    """Simulate the probe formed by a Fresnel zone plate propagated to a given defocus distance."""
+    """Simulate the probe formed by a Fresnel zone plate propagated to a given defocus distance.
+
+    With *remove_focus_curvature*, the probe is returned in the Fresnel-scaled equivalent
+    parallel-beam frame: the spherical wave the ideal focus emits, which a cone-beam
+    geometry's magnification already accounts for, is divided out. The transform returns
+    exact point samples of the field, so this is exact even where that curvature would
+    alias on the probe grid.
+    """
     focal_length_m = zone_plate.get_focal_length_m(photon_wavelength_m)
     propagation_distance_m = focal_length_m + defocus_distance_m
 
@@ -574,11 +565,48 @@ def generate_fresnel_zone_plate_probe(
         propagation_distance_m=propagation_distance_m,
     )
     propagator = FresnelTransformPropagator(propagator_parameters)
+    array = propagator.propagate(fzp_transmission_function)
 
-    return Probe(
-        array=propagator.propagate(fzp_transmission_function),
-        pixel_geometry=probe_pixel_geometry,
-    )
+    if remove_focus_curvature:
+        array = _remove_focus_curvature(
+            array,
+            probe_pixel_geometry,
+            photon_wavelength_m=photon_wavelength_m,
+            defocus_distance_m=defocus_distance_m,
+        )
+
+    return Probe(array=array, pixel_geometry=probe_pixel_geometry)
+
+
+def _remove_focus_curvature(
+    array: ComplexArrayType,
+    pixel_geometry: PixelGeometry,
+    *,
+    photon_wavelength_m: float,
+    defocus_distance_m: float,
+) -> ComplexArrayType:
+    """Divide the spherical wave of an ideal focus out of a field sampled past it.
+
+    A field sampled *defocus_distance_m* past its focus carries
+    ``exp(+i pi (x^2 + y^2) / (lambda z))``, the convention of
+    :func:`apply_defocus_phase`. Multiplying by its conjugate leaves the field the
+    Fresnel scaling theorem pairs with the equivalent parallel-beam geometry. The
+    single-step Fresnel transform returns exact point samples of the field, so the
+    pointwise product is exact even where the curvature itself would alias.
+
+    ``x`` and ``y`` are measured from the pixel ``N // 2``, the center of the Fresnel
+    transform's output grid. The ``(N - 1) / 2`` center of :func:`apply_defocus_phase`
+    would leave a linear phase, a tilt, on an even grid. Zero defocus returns *array*.
+    """
+    if defocus_distance_m == 0.0:
+        return array
+
+    height_px, width_px = array.shape[-2:]
+    x_m = pixel_geometry.width_m * (numpy.arange(width_px) - width_px // 2)
+    y_m = pixel_geometry.height_m * (numpy.arange(height_px) - height_px // 2)
+    radius2_m2 = numpy.square(y_m)[:, numpy.newaxis] + numpy.square(x_m)[numpy.newaxis, :]
+    phase = -PI * radius2_m2 / (photon_wavelength_m * defocus_distance_m)
+    return array * numpy.exp(1j * phase)
 
 
 # The figure-error and focus-sampling warnings below pull in opposite directions: a
@@ -801,6 +829,7 @@ def generate_kb_mirror_probe(
     figure_error_y: Iterable[LegendreMode] = (),
     min_pupil_px_for_figure_error: float = 16.0,
     min_px_per_focus_fwhm: float = 2.0,
+    remove_focus_curvature: bool = False,
 ) -> Probe:
     """Simulate the probe a Kirkpatrick-Baez mirror pair forms at a given defocus distance.
 
@@ -825,6 +854,12 @@ def generate_kb_mirror_probe(
     across the focus. They pull in opposite directions -- a finer probe pitch shrinks the
     pupil footprint while a coarser one undersamples the focus -- and both scale with the
     array size, so a grid too small satisfies neither. Only logging depends on them.
+
+    With *remove_focus_curvature*, the probe is returned in the Fresnel-scaled equivalent
+    parallel-beam frame, as :func:`generate_fresnel_zone_plate_probe` describes. One sphere
+    is divided out, at *defocus_distance_m* past the reference plane; the phase
+    *astigmatism_m* adds about it stays in the probe, since one magnification describes the
+    equivalent geometry.
 
     Raises ValueError when the propagation distance vanishes, when either focus plane
     coincides with the pupil, or when a projected aperture does not fit inside the pupil
@@ -958,11 +993,17 @@ def generate_kb_mirror_probe(
         propagation_distance_m=propagation_distance_m,
     )
     propagator = FresnelTransformPropagator(propagator_parameters)
+    array = propagator.propagate(kb_transmission_function)
 
-    return Probe(
-        array=propagator.propagate(kb_transmission_function),
-        pixel_geometry=probe_pixel_geometry,
-    )
+    if remove_focus_curvature:
+        array = _remove_focus_curvature(
+            array,
+            probe_pixel_geometry,
+            photon_wavelength_m=photon_wavelength_m,
+            defocus_distance_m=defocus_distance_m,
+        )
+
+    return Probe(array=array, pixel_geometry=probe_pixel_geometry)
 
 
 def _warn_about_kb_sampling(

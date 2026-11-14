@@ -1262,9 +1262,22 @@ def test_transform_product_does_not_mutate_its_input() -> None:
     numpy.testing.assert_array_equal(product.object_.get_array(), array)
 
 
-def test_transform_product_rejects_cone_beam() -> None:
-    """With a focusing optic the object pixel follows the magnification, not the distance."""
-    product = _make_product(_grid_scan(4, 1.0e-6, (0.0, 0.0)), focus_object_distance_m=-0.01)
+def test_a_focused_far_field_product_calibrates_like_an_unfocused_one() -> None:
+    """The magnification cancels from the far-field pixel, so a focus changes nothing."""
+    positions = _grid_scan(4, 1.0e-6, (0.0, 0.0))
+    transform = AffineTransform.from_components(_CALIBRATION_COMPONENTS)
+
+    unfocused = transform_product(_make_product(positions), transform)
+    focused = transform_product(_make_product(positions, focus_object_distance_m=-0.01), transform)
+
+    assert focused.metadata.detector_distance_m == unfocused.metadata.detector_distance_m
+    assert focused.metadata.focus_object_distance_m == -0.01
+
+
+def test_transform_product_rejects_cone_beam_near_field() -> None:
+    """With a focusing optic in near field the object pixel follows the magnification."""
+    base = _make_product(_grid_scan(4, 1.0e-6, (0.0, 0.0)), focus_object_distance_m=-0.01)
+    product = replace(base, metadata=replace(base.metadata, far_field=False))
 
     with pytest.raises(ValueError, match='far-field'):
         transform_product(product, AffineTransform.from_components(_CALIBRATION_COMPONENTS))
@@ -1274,8 +1287,8 @@ def test_transform_product_rejects_parallel_beam_near_field() -> None:
     """A parallel beam declares no focusing optic, so the focus alone does not identify it.
 
     Its object pixel is the detector pixel back-projected, which carries no detector
-    distance for a position scale to recover -- the same reason the cone beam is refused,
-    reached by a geometry whose focus-object distance is the far-field default of zero.
+    distance for a position scale to recover -- the same reason the near-field cone beam is
+    refused, reached by a geometry whose focus-object distance is the default of zero.
     """
     base = _make_product(_grid_scan(4, 1.0e-6, (0.0, 0.0)))
     product = replace(base, metadata=replace(base.metadata, far_field=False))

@@ -6,7 +6,8 @@ Behaviors verified:
   - near-field data is refused without making an estimate
   - replacing a stated focus reports a disagreement in sign or beyond ParallaxRtol
   - the settings-driven estimate runs on insert only where EstimateDefocusFromParallax
-    is set and the product states no focus of its own
+    is set, as it is by default, and the product states no focus of its own
+  - it runs on newly created products only, never on a copied, loaded or reconstructed one
   - WorkflowAPI.estimate_defocus blocks, so a probe generated next sees the focus
   - inserting a product reaches the settings-driven estimate at all
 """
@@ -237,5 +238,29 @@ def test_inserting_a_product_reaches_the_settings_driven_estimate() -> None:
 
     with patch.object(ProductAPI, '_maybe_estimate_defocus') as maybe:
         index = api.insert_new_product('test')
+
+    maybe.assert_called_once_with(index, block=True)
+
+
+def test_the_settings_driven_estimate_is_on_by_default() -> None:
+    """The defocus is a guess no instrument knows in advance, so it is measured unasked."""
+    assert ProductSettings(SettingsRegistry()).estimate_defocus_from_parallax.get_value()
+
+
+def test_a_copied_loaded_or_reconstructed_product_keeps_its_focus() -> None:
+    """Only a newly created product is measured; insert_product carries one as it is."""
+    api, _item = _api(2.0e-3)
+
+    with patch.object(ProductAPI, '_maybe_estimate_defocus') as maybe:
+        api.insert_product(MagicMock())
+
+    maybe.assert_not_called()
+
+
+def test_a_product_from_settings_is_measured() -> None:
+    api, _item = _api(2.0e-3)
+
+    with patch.object(ProductAPI, '_maybe_estimate_defocus') as maybe:
+        index = api.insert_product_from_settings()
 
     maybe.assert_called_once_with(index, block=True)

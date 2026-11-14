@@ -44,19 +44,25 @@ Both signed cases reduce to `M = abs((z_d - z_f) / z_f)`.
 
 The **Magnification** and **Object-Plane Propagation Distance** rows of the product editor sit directly below **Focus-Object Distance**, so a wrong sign is visible as a magnification you did not expect rather than only as a pixel size three orders of magnitude from anything familiar.
 
-### The Focus Is Stated Twice
+### The Focus And The Defocus
 
-A focusing probe builder states the same displacement in the opposite frame. `fresnel_zone_plate` and `kb_mirror` propagate `focal_length_m + defocus_distance_m` to reach the object plane, so their `defocus_distance_m` is how far *past* the focus the sample sits:
+A probe sampled past its focus states the same displacement in the opposite frame, its defocus:
 
 ```text
 defocus_distance_m == -focus_object_distance_m
 ```
 
-A product that declares a focus wins over the builder's own value, and a disagreement is reported rather than resolved silently. A product that leaves the focus at zero declares no focusing optic, which cannot describe a focused probe, so the builder's value is used.
+Every probe builder reads the defocus from the product's focus, and the product editor shows the one value both ways, as **Focus-Object Distance** and **Defocus Distance**; editing either row sets it.
 
-The aperture builders have no focus at all. `disk`, `rectangular` and `average_pattern` read `propagation_distance_m`, a free propagation distance applied after the field is formed.
+In near field a builder works in the equivalent parallel-beam frame described [below](#why-z-is-not-z_d), the one the reconstruction runs in. The cone beam's spherical wave is what the magnification accounts for, so it is not left on the probe as well:
 
-On the command line the same identity is a default: `--near-field` alone derives the focus distance from `--fzp-defocus-m`, so an instrument whose users already enter the defocus need not enter it twice in two conventions.
+- `fresnel_zone_plate` and `kb_mirror` simulate the optic at the defocus, which sets the footprint, then divide out the spherical wave of the focus. The Fresnel transform returns point samples of the field, so the division is exact even where that curvature would alias on the probe grid. A KB pair's astigmatism stays in the probe.
+- `disk`, `rectangular` and `super_gaussian` stay flat-phased.
+- `average_pattern` back-propagates the hologram over `z_d / M`, which already lands it in the equivalent object plane.
+
+`propagation_distance_m`, offered by the aperture builders and `average_pattern`, propagates the formed field by that distance with the angular-spectrum propagator, after any defocus curvature, and leaves the product's focus and the object pixel size as they are.
+
+Near field needs the focus stated, because nothing in the data measures it there: the parallax estimate is far field only. A driver given near-field data and no focus, on the command line or in the file, stops with an error; state 0 for a parallel beam.
 
 ```{note}
 Attach a negative value with `=`. `--focus-object-distance-m=-1e-3` works and so does `--focus-object-distance-m -0.001`, but argparse reads a bare `-1e-3` as an option name rather than a number.
@@ -116,16 +122,16 @@ Processing
 Every beamline driver takes the regime as a flag:
 
 ```sh
-ptychodus-reconstruct-lamni --near-field \
+ptychodus-reconstruct-lamni --near-field --focus-object-distance-m=-1e-3 \
   --diffraction-file scan.h5 --position-file scan.dat --output-directory out/
 ```
 
-With no `--focus-object-distance-m`, the focus is derived from the driver's zone-plate defocus, which states the same displacement in the opposite frame. The batch drivers take the same two values in a settings file:
+`--focus-object-distance-m` is required in near field unless the diffraction file records the focus. The batch drivers take the same two values in a settings file:
 
 ```yaml
 metadata_overrides:
   far_field: false
-  focus_object_distance_m: -0.001  # optional; defaults to the negated fzp_defocus_m
+  focus_object_distance_m: -0.001  # required in near field unless the file records it
 ```
 
 ## Reconstructing With pty-chi
@@ -146,7 +152,7 @@ Nothing below is configured by hand. A near-field product resolves it all on the
 
 Two consequences worth knowing before reading a near-field result. Periodic shifting wraps — a feature crossing one edge of the object reappears at the opposite edge — and full-object sampling **ignores Pad For Shift:**, so the margin the table above raises to `50` stops applying. `DM` and `RAAR` keep normalized-adjoint object updates under it, which are approximate for fractional shifts, so their convergence can differ from patch sampling under cropped or non-uniform illumination.
 
-Set **Shift Operator:** to `PATCH` to sample patches whatever the geometry, which is what every near-field run did before pty-chi 2.3.0.
+Set **Shift Operator:** to `PATCH` to cut a patch from the object under each probe position whatever the geometry, which keeps **Pad For Shift:** in effect and does not wrap.
 
 ### Algorithm
 
@@ -181,8 +187,8 @@ The **Forward Model:** combo in the Autodiff panel is not a propagator selector.
 Multi-distance holo-ptychography is not supported
 : `detector_distance_m` is a scalar on the product, and the backends carry a single propagation distance to match. One distance per reconstruction; combining several detector planes would need a forward model that accepts more than one.
 
-Affine position correction rejects a cone beam
-: `transform_product` raises for a product whose magnification is not one.
+Affine position correction rejects near field
+: `transform_product` raises for a near-field product, whose object pixel carries no detector distance for a position scale to calibrate. A focused far-field product is calibrated like any other, since the magnification cancels from the far-field pixel.
 
 Near-field *simulation* is exact only at `M == 1`
 : The forward model does not normalize amplitudes by `1 / M**2`, so simulated counts scale with the magnified area, and `layer_spacing_m` is taken in the object frame rather than rescaled into the equivalent parallel-beam geometry.

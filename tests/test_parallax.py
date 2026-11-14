@@ -49,6 +49,7 @@ from ptychodus.api.parallax import (
     ParallaxEstimate,
     ParallaxTransform,
     compute_geometry_mismatch,
+    estimate_defocus_from_assembled_data,
     estimate_defocus_from_parallax,
     estimate_parallax_transform,
 )
@@ -83,6 +84,70 @@ def test_a_defocus_is_recovered_with_its_sign(defocus_m: float) -> None:
     # Measured within 4% at +-2 mm on this scan.
     assert estimate.defocus_distance_m == pytest.approx(defocus_m, rel=0.06)
     assert estimate.is_resolved()
+
+
+def test_the_assembled_data_estimate_is_the_binned_moments_estimate() -> None:
+    """One pass from the assembled patterns measures what their binned moments do."""
+    defocus_m = 2.0e-3
+    expected = _estimate(accumulate_scan(defocus_m, bin_size_px=2))
+
+    estimate = estimate_defocus_from_assembled_data(
+        simulate_scan(defocus_m),
+        ProbePositionSequence(make_positions()),
+        OBJECT_GEOMETRY,
+        PROBE_GEOMETRY,
+        photon_wavelength_m=WAVELENGTH_M,
+        bin_size_px=2,
+    )
+
+    assert estimate is not None and expected is not None
+    assert estimate.defocus_distance_m == pytest.approx(expected.defocus_distance_m)
+    assert estimate.standard_error_m == pytest.approx(expected.standard_error_m)
+
+
+def _estimate_capped(defocus_m: float, **kwargs: int) -> ParallaxEstimate | None:
+    return estimate_defocus_from_parallax(
+        accumulate_scan(defocus_m),
+        ProbePositionSequence(make_positions()),
+        OBJECT_GEOMETRY,
+        PROBE_GEOMETRY,
+        photon_wavelength_m=WAVELENGTH_M,
+        **kwargs,
+    )
+
+
+@pytest.mark.parametrize('defocus_m', [2.0e-3, -2.0e-3])
+def test_capping_the_bins_still_recovers_the_defocus_with_its_sign(defocus_m: float) -> None:
+    """The fixture's bright field holds 20 bins; a cap of 12 keeps an even subset."""
+    estimate = _estimate_capped(defocus_m, max_bins=12)
+
+    assert estimate is not None
+    assert estimate.num_bins <= 12
+    assert estimate.defocus_distance_m == pytest.approx(defocus_m, rel=0.06)
+    assert estimate.is_resolved()
+
+
+def test_a_cap_above_the_bright_field_changes_nothing() -> None:
+    uncapped = _estimate_capped(2.0e-3, max_bins=1000)
+    default = _estimate_capped(2.0e-3)
+
+    assert uncapped is not None and default is not None
+    assert default.num_bins == uncapped.num_bins
+    assert default.defocus_distance_m == uncapped.defocus_distance_m
+
+
+def test_mapping_one_bin_at_a_time_changes_nothing() -> None:
+    one_at_a_time = _estimate_capped(2.0e-3, chunk_bins=1)
+    default = _estimate_capped(2.0e-3)
+
+    assert one_at_a_time is not None and default is not None
+    assert one_at_a_time.defocus_distance_m == default.defocus_distance_m
+    assert one_at_a_time.standard_error_m == default.standard_error_m
+
+
+def test_a_cap_below_the_minimum_is_refused() -> None:
+    with pytest.raises(ValueError, match='max_bins'):
+        _estimate_capped(2.0e-3, max_bins=3)
 
 
 def test_the_depth_of_focus_is_that_of_the_disk() -> None:

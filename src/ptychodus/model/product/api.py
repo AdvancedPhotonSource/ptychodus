@@ -5,10 +5,8 @@ import logging
 import math
 import threading
 
-from ptychodus.api.accumulate import compute_diffraction_moments, estimate_incident_beam
 from ptychodus.api.diffraction import Polarization
-from ptychodus.api.parallax import ParallaxEstimate, estimate_defocus_from_parallax
-from ptychodus.api.preprocess.diffraction import BinningStep
+from ptychodus.api.parallax import ParallaxEstimate, estimate_defocus_from_assembled_data
 from ptychodus.api.probe import OPRWeightPolicy
 from ptychodus.api.scattering.geometry import ScatteringGeometry
 from ptychodus.api.product import (
@@ -444,14 +442,22 @@ class ProductAPI:
         *,
         block: bool,
         stub_name: str,
+        estimate_defocus: bool,
     ) -> int:
         """If dataset is None or already loaded, run build() synchronously and insert.
         Otherwise, insert a pending stub, then enqueue construction to run after the
-        dataset's load task finishes (via the shared FIFO background worker)."""
+        dataset's load task finishes (via the shared FIFO background worker).
+
+        With *estimate_defocus*, a product that states no focus has it measured where the
+        settings ask; without, the product keeps the focus it was built with.
+        """
         if dataset is None or not dataset.is_load_in_progress():
             item = build()
             index = self._repository.insert_product(item)
-            self._maybe_estimate_defocus(index, block=True)
+
+            if estimate_defocus:
+                self._maybe_estimate_defocus(index, block=True)
+
             return index
 
         finished_event = dataset.get_last_load_finished_event()
@@ -466,7 +472,10 @@ class ProductAPI:
                 raise RuntimeError('Diffraction dataset failed to load') from error
             item = build()
             index = self._repository.insert_product(item)
-            self._maybe_estimate_defocus(index, block=True)
+
+            if estimate_defocus:
+                self._maybe_estimate_defocus(index, block=True)
+
             return index
 
         stub = self._item_factory.create_pending_stub(name=stub_name)
@@ -505,7 +514,9 @@ class ProductAPI:
 
                     stub.copy_contents_from(real)
                     stub.set_state(ProductState.READY)
-                    self._maybe_estimate_defocus(index, block=False)
+
+                    if estimate_defocus:
+                        self._maybe_estimate_defocus(index, block=False)
                 finally:
                     self._end_queued_product()
 
@@ -554,7 +565,11 @@ class ProductAPI:
             )
 
         return self._insert_via_queue(
-            dataset, build, block=block, stub_name=resolve_product_name(name, dataset)
+            dataset,
+            build,
+            block=block,
+            stub_name=resolve_product_name(name, dataset),
+            estimate_defocus=True,
         )
 
     def insert_product(
@@ -580,6 +595,8 @@ class ProductAPI:
             build,
             block=block,
             stub_name=product.metadata.name if name is None else name,
+            # A copy, a loaded file or a result keeps the focus it carries.
+            estimate_defocus=False,
         )
 
     def insert_product_from_settings(
@@ -592,7 +609,11 @@ class ProductAPI:
             return self._item_factory.create_from_settings(dataset=dataset)
 
         return self._insert_via_queue(
-            dataset, build, block=block, stub_name=resolve_product_name('', dataset)
+            dataset,
+            build,
+            block=block,
+            stub_name=resolve_product_name('', dataset),
+            estimate_defocus=True,
         )
 
     def get_item(self, product_index: int) -> ProductRepositoryItem:
@@ -611,7 +632,7 @@ class ProductAPI:
         """Measure the defocus from the parallax between bright-field images.
 
         One pass over the bound patterns, binned *bin_size_px* detector pixels a side and
-        corrected for beam decay by I0, gives :func:`estimate_defocus_from_parallax`'s
+        corrected for beam decay by I0, gives :func:`estimate_defocus_from_assembled_data`'s
         estimate. When :meth:`ParallaxEstimate.is_resolved` holds for the thresholds, the
         product's focus position is set to the negated defocus; a focus the product
         already stated is replaced, and a disagreement reported. Every threshold defaults
@@ -661,28 +682,15 @@ class ProductAPI:
             estimate: ParallaxEstimate | None = None
 
             try:
-                moments = compute_diffraction_moments(
-                    data.get_indexes(),
-                    data.get_patterns(),
-                    bad_pixels=data.get_bad_pixels(),
-                    background=data.get_background(),
-                    flat_field=data.get_flat_field(),
-                    binning=BinningStep(bin_size_x=bins, bin_size_y=bins),
+                estimate = estimate_defocus_from_assembled_data(
+                    data,
+                    positions,
+                    object_geometry,
+                    probe_geometry,
+                    photon_wavelength_m=metadata.photon_wavelength_m,
+                    i0_photons_per_count=metadata.i0_photons_per_count,
+                    bin_size_px=bins,
                 )
-
-                if moments is not None:
-                    moments = estimate_incident_beam(
-                        moments,
-                        positions.get_probe_photon_counts_by_index(),
-                        i0_photons_per_count=metadata.i0_photons_per_count,
-                    ).moments
-                    estimate = estimate_defocus_from_parallax(
-                        moments,
-                        positions,
-                        object_geometry,
-                        probe_geometry,
-                        photon_wavelength_m=metadata.photon_wavelength_m,
-                    )
             except Exception:
                 logger.exception('Failed to estimate the defocus from the parallax!')
 
@@ -742,7 +750,7 @@ class ProductAPI:
             )
 
     def _maybe_estimate_defocus(self, product_index: int, *, block: bool) -> None:
-        """Measure the defocus of a freshly inserted product, where the settings ask.
+        """Measure the defocus of a newly created product, where the settings ask.
 
         Only while the product states no focus of its own: a stated one is a measurement
         or a design value the user supplied, and nothing about creating a product is a

@@ -44,6 +44,7 @@ from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.preprocess.diffraction import FilterValuesStep, SignalRadius
 from ptychodus.api.preprocess.noise import RobustStatistics
 from ptychodus.api.object import Object, ObjectCenter
+from ptychodus.api.parallax import ParallaxEstimate
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
@@ -58,12 +59,15 @@ from ptychodus.cli._reconstruct_common import (  # noqa: E402
     CancellationToken,
     estimate_incident_beam_from_assembled_data,
     install_signal_handlers,
+    invalid_count_threshold,
     is_main_process,
     load_ptychi_options,
     pair_patterns_with_positions,
+    estimate_focus_object_distance_m,
+    require_near_field_focus_object_distance_m,
     resolve_flag,
-    resolve_focus_object_distance_m,
     resolve_ptychi_options_file,
+    resolve_stated_focus_object_distance_m,
     run_reconstruction,
     save_assembled_diffraction,
     save_ptychi_options,
@@ -1185,46 +1189,108 @@ class TestResolveFlag:
         assert 'built-in default' in caplog.text
 
 
-class TestResolveFocusObjectDistance:
-    """The focus is stated in two frames; the resolver reconciles them."""
+class TestResolveStatedFocusObjectDistance:
+    """The focus is stated explicitly or recorded by the file; nothing presets it."""
 
-    def test_derives_the_negated_defocus(self) -> None:
-        # A probe sampled 800 um past its focus puts the focus 800 um upstream.
-        resolved = resolve_focus_object_distance_m(logging.getLogger(), None, None, 800.0e-6)
+    def test_an_explicit_value_beats_the_file(self) -> None:
+        resolved = resolve_stated_focus_object_distance_m(logging.getLogger(), -9.0e-4, -21.873e-3)
 
-        assert resolved == pytest.approx(-800.0e-6)
+        assert resolved == pytest.approx(-9.0e-4)
 
-    def test_a_zero_defocus_derives_the_no_optic_sentinel(self) -> None:
-        assert resolve_focus_object_distance_m(logging.getLogger(), None, None, 0.0) == 0.0
-
-    def test_the_file_beats_the_derivation(self) -> None:
-        resolved = resolve_focus_object_distance_m(logging.getLogger(), None, -21.873e-3, 800.0e-6)
+    def test_the_file_states_it_otherwise(self) -> None:
+        resolved = resolve_stated_focus_object_distance_m(logging.getLogger(), None, -21.873e-3)
 
         assert resolved == pytest.approx(-21.873e-3)
 
-    def test_an_explicit_value_beats_both(self) -> None:
-        resolved = resolve_focus_object_distance_m(
-            logging.getLogger(), -9.0e-4, -21.873e-3, 800.0e-6
+    def test_an_explicit_zero_is_a_statement(self) -> None:
+        assert resolve_stated_focus_object_distance_m(logging.getLogger(), 0.0, -21.873e-3) == 0.0
+
+    def test_with_neither_nothing_is_stated(self) -> None:
+        assert resolve_stated_focus_object_distance_m(logging.getLogger(), None, None) is None
+
+    def test_the_log_names_the_source(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.INFO):
+            resolve_stated_focus_object_distance_m(
+                logging.getLogger(), -9.0e-4, None, source='metadata_overrides.focus'
+            )
+
+        assert 'metadata_overrides.focus' in caplog.text
+
+
+class TestRequireNearFieldFocusObjectDistance:
+    """Near field has no estimate, so its focus must be stated."""
+
+    @pytest.mark.parametrize('stated', [-9.0e-4, 0.0])
+    def test_a_stated_focus_passes(self, stated: float) -> None:
+        assert require_near_field_focus_object_distance_m(stated, source='--x') == stated
+
+    def test_an_unstated_focus_is_refused_naming_where_to_state_it(self) -> None:
+        with pytest.raises(ValueError, match='--focus-object-distance-m'):
+            require_near_field_focus_object_distance_m(None, source='--focus-object-distance-m')
+
+
+# The estimate is patched below, so its inputs are never read.
+_UNREAD: Any = None
+
+
+def _estimate_with(
+    monkeypatch: pytest.MonkeyPatch, estimate: ParallaxEstimate | None | Exception
+) -> float:
+    def fake(*args: object, **kwargs: object) -> ParallaxEstimate | None:
+        if isinstance(estimate, Exception):
+            raise estimate
+
+        return estimate
+
+    monkeypatch.setattr(_reconstruct_common, 'estimate_defocus_from_assembled_data', fake)
+    return estimate_focus_object_distance_m(
+        logging.getLogger(),
+        _UNREAD,
+        _UNREAD,
+        _UNREAD,
+        _UNREAD,
+        photon_wavelength_m=1.0e-10,
+        source='--focus-object-distance-m',
+    )
+
+
+class TestEstimateFocusObjectDistance:
+    """A resolved parallax sets the focus; anything less leaves it at zero, and says so."""
+
+    def test_a_resolved_defocus_sets_the_negated_focus(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        estimate = ParallaxEstimate(
+            defocus_distance_m=2.0e-3, standard_error_m=1.0e-5, depth_of_focus_m=1.0e-4, num_bins=9
         )
 
-        assert resolved == pytest.approx(-9.0e-4)
+        assert _estimate_with(monkeypatch, estimate) == pytest.approx(-2.0e-3)
 
-    def test_an_explicit_value_agreeing_with_the_defocus_is_quiet(
-        self, caplog: pytest.LogCaptureFixture
+    @pytest.mark.parametrize(
+        'estimate',
+        [
+            # Half a depth of focus: indistinguishable from the focus.
+            ParallaxEstimate(
+                defocus_distance_m=5.0e-5,
+                standard_error_m=1.0e-6,
+                depth_of_focus_m=1.0e-4,
+                num_bins=9,
+            ),
+            None,
+            ValueError('too few bright-field bins'),
+        ],
+        ids=['unresolved', 'none', 'refused'],
+    )
+    def test_anything_less_is_zero_with_a_remedy(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+        estimate: ParallaxEstimate | None | Exception,
     ) -> None:
         with caplog.at_level(logging.WARNING):
-            resolve_focus_object_distance_m(logging.getLogger(), -800.0e-6, None, 800.0e-6)
+            assert _estimate_with(monkeypatch, estimate) == 0.0
 
-        assert not caplog.records
-
-    def test_an_explicit_value_disagreeing_warns_but_is_honored(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        with caplog.at_level(logging.WARNING):
-            resolved = resolve_focus_object_distance_m(logging.getLogger(), -9.0e-4, None, 800.0e-6)
-
-        assert resolved == pytest.approx(-9.0e-4)
-        assert len(caplog.records) == 1
+        assert '--focus-object-distance-m' in caplog.text
 
 
 class TestOptionsFallbackFollowsTheRegime:
@@ -1280,3 +1346,21 @@ def test_the_beam_estimate_takes_the_moments_accumulated_during_assembly(
         one_pass.mean_amplitude_transmission
     )
     numpy.testing.assert_array_equal(accumulated.moments.indexes, [0, 1, 2, 3, 5])
+
+
+class TestInvalidCountThreshold:
+    """The invalid-pixel marker: the instrument's for a named dtype, else the dtype maximum."""
+
+    def test_an_instrument_marker_wins_for_its_dtype(self) -> None:
+        assert invalid_count_threshold(numpy.dtype('uint16'), {'uint16': 4095}) == 4095
+
+    def test_other_dtypes_keep_their_maximum(self) -> None:
+        threshold = invalid_count_threshold(numpy.dtype('uint32'), {'uint16': 4095})
+
+        assert threshold == numpy.iinfo(numpy.uint32).max
+
+    def test_without_a_marker_it_is_the_dtype_maximum(self) -> None:
+        assert invalid_count_threshold(numpy.dtype('uint16')) == 65535
+
+    def test_float_data_has_no_marker(self) -> None:
+        assert invalid_count_threshold(numpy.dtype('float32')) is None

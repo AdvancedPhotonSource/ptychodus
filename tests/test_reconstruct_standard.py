@@ -25,7 +25,9 @@ from ptychodus.api.diffraction import (  # noqa: E402
 from ptychodus.api.geometry import PixelGeometry  # noqa: E402
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence  # noqa: E402
 from ptychodus.cli import _reconstruct_standard as rs  # noqa: E402
+from ptychodus.cli._reconstruct_common import invalid_count_threshold  # noqa: E402
 from ptychodus.cli._reconstruct_standard import InstrumentProfile
+from ptychodus.plugins.aps31id_lamni.diffraction_file import LamNIDiffractionFileReader
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.probe import ProbeGeometry
 from ptychodus.api.propagate import compute_magnification
@@ -93,10 +95,6 @@ def test_instrument_defaults_are_carried_from_the_profile() -> None:
     assert profiles['bnp'].default_detector_distance_m == 2.06
     assert profiles['isn'].default_detector_distance_m == 6.16
 
-    # lamni is the one instrument with a non-zero zone-plate defocus.
-    assert _defaults(profiles['lamni']).fzp_defocus_m == 800e-6
-    assert _defaults(profiles['12ide']).fzp_defocus_m == 0.0
-
     # 34-ID-E is the one instrument with its own bad-pixel reader and a pixel-size fallback.
     assert _defaults(profiles['34ide']).bad_pixels_file_type == 'APS_34IDE_Bad_Pixels'
     assert _defaults(profiles['12ide']).bad_pixels_file_type == 'NPY_Bad_Pixels'
@@ -105,6 +103,53 @@ def test_instrument_defaults_are_carried_from_the_profile() -> None:
     # velociprobe is the one instrument whose two readers differ.
     assert profiles['velociprobe'].diffraction_reader == 'APS_Velociprobe'
     assert profiles['velociprobe'].position_reader == 'APS_Velociprobe_PE'
+
+
+def test_no_profile_presets_a_defocus() -> None:
+    """The focus is stated or estimated, so every profile leaves it unset."""
+    for name, profile in _profiles().items():
+        args = _defaults(profile)
+
+        assert args.focus_object_distance_m is None, name
+        assert not hasattr(args, 'fzp_defocus_m'), name
+        assert not hasattr(profile, 'default_fzp_defocus_m'), name
+        assert (
+            args.parallax_bin_size_px,
+            args.parallax_min_significance,
+            args.parallax_min_defocus_dof,
+        ) == (4, 3.0, 1.0), name
+
+
+@pytest.mark.parametrize('flag', ['--fzp-defocus-m', '--estimate-defocus'])
+def test_the_retired_defocus_flags_are_refused(flag: str) -> None:
+    parser = rs.build_standard_parser(_profiles()['lamni'])
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            ['--diffraction-file', 'd', '--position-file', 'p', '--output-directory', 'o', flag]
+            + ([] if flag == '--estimate-defocus' else ['8e-4'])
+        )
+
+
+def test_lamni_marks_invalid_uint16_pixels_with_its_12_bit_maximum() -> None:
+    """Its fly scans store 12-bit Eiger frames as uint16; uint32 frames count past 4095."""
+    invalid_counts = _profiles()['lamni'].default_invalid_counts
+
+    assert invalid_count_threshold(numpy.dtype('uint16'), invalid_counts) == 4095
+    assert invalid_count_threshold(numpy.dtype('uint32'), invalid_counts) == (
+        numpy.iinfo(numpy.uint32).max
+    )
+
+
+def test_every_lamni_path_reads_one_preset() -> None:
+    """The batch drivers and PEAR's lynx entries pass the reader's constant, as this does."""
+    assert _profiles()['lamni'].default_invalid_counts is LamNIDiffractionFileReader.INVALID_COUNTS
+
+
+def test_other_profiles_mark_invalid_pixels_with_the_dtype_maximum() -> None:
+    for name, profile in _profiles().items():
+        if name != 'lamni':
+            assert not profile.default_invalid_counts, name
 
 
 def test_the_crop_extent_is_left_unset_by_default_and_accepts_full() -> None:

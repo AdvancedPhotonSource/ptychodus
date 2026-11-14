@@ -150,7 +150,7 @@ output_directory: /path/to/storage
 campaign_label: fly001 demo
 ```
 
-The other keys keep their defaults: maps (`bad_pixels_file`, `background_file`, `flat_field_file`, each `{file_path, file_type}`), `pipeline` steps, total-count bounds, `index_offset`, `i0_name` and `i0_photons_per_count`, the models (`probe_generator`, `object_generator` and their `*_options`), parallax thresholds, `unpaired_retention_s`, `num_frames_per_block`, `consumer_queue_size` and `queue_warning_frames`.
+The other keys keep their defaults: maps (`bad_pixels_file`, `background_file`, `flat_field_file`, each `{file_path, file_type}`), `pipeline` steps, total-count bounds, `index_offset`, `i0_name` and `i0_photons_per_count`, the models (`probe_generator`, `object_generator` and their `*_options`; the probe takes no defocus option, since its defocus is the negated `focus_object_distance_m`, which each scan's parallax measures while it is unset and an explicit value, 0 included, skips), parallax thresholds, `unpaired_retention_s`, `num_frames_per_block`, `consumer_queue_size` and `queue_warning_frames`.
 
 ### Run
 

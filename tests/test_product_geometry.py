@@ -197,6 +197,19 @@ class TestConeBeamGeometry:
             == _DETECTOR_DISTANCE_M
         )
 
+    def test_far_field_exit_waves_propagate_over_the_detector_distance(self) -> None:
+        """The probe carries its own curvature there, so the magnification cancels."""
+        geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M)
+
+        assert geometry.exit_wave_propagation_distance_m == _DETECTOR_DISTANCE_M
+
+    def test_near_field_exit_waves_propagate_over_the_equivalent_distance(self) -> None:
+        geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M, far_field=False)
+
+        assert geometry.exit_wave_propagation_distance_m == pytest.approx(
+            _DETECTOR_DISTANCE_M / self._CONVERGING_MAGNIFICATION
+        )
+
     def test_fresnel_number_uses_the_equivalent_parallel_beam_distance(self) -> None:
         geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M, far_field=False)
         magnification = self._CONVERGING_MAGNIFICATION

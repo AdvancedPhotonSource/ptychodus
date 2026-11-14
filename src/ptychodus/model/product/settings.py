@@ -57,12 +57,12 @@ class ProductSettings(Observable, Observer):
             'IncidenceAngleInDegrees', 90.0, minimum=-180.0, maximum=180.0
         )
 
-        # Measure the defocus from the parallax between bright-field images when a
-        # product is created, which sets focus_object_distance_m above and so reaches
-        # every probe builder through resolve_defocus_distance_m. Off by default: it
-        # costs one binned pass over the patterns, and it only answers in far field.
+        # Measure the defocus from the parallax between bright-field images when a new
+        # far-field product states no focus, which sets focus_object_distance_m above, the
+        # one statement of the defocus. On by default, because the defocus is a guess no
+        # instrument knows in advance; it costs one binned pass over the patterns.
         self.estimate_defocus_from_parallax = self._group.create_boolean_parameter(
-            'EstimateDefocusFromParallax', False
+            'EstimateDefocusFromParallax', True
         )
         self.parallax_bin_size_px = self._group.create_integer_parameter(
             'ParallaxBinSizeInPixels', 4, minimum=1

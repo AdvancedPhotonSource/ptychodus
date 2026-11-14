@@ -128,7 +128,9 @@ class StreamConfiguration(BaseModel):
     photon_energy_eV: float = Field(gt=0.0)  # noqa: N815
     detector_distance_m: float = Field(gt=0.0)
     detector_pixel_size_m: float = Field(gt=0.0)
-    focus_object_distance_m: float = 0.0
+    # The one statement of the defocus, its negation; unset, each scan's parallax measures
+    # it, and an explicit 0 keeps the probe at focus without measuring.
+    focus_object_distance_m: float | None = None
     exposure_time_s: float = Field(0.0, ge=0.0)
     i0_photons_per_count: float = Field(0.0, ge=0.0)
     tomography_angle_deg: float = 0.0
@@ -229,7 +231,9 @@ class StreamConfiguration(BaseModel):
             exposure_time_s=self.exposure_time_s,
             mass_attenuation_m2_per_kg=0.0,
             tomography_angle_deg=tomography_angle_deg,
-            focus_object_distance_m=self.focus_object_distance_m,
+            focus_object_distance_m=(
+                0.0 if self.focus_object_distance_m is None else self.focus_object_distance_m
+            ),
             i0_photons_per_count=self.i0_photons_per_count,
         )
 
@@ -238,7 +242,14 @@ def _validated_options(defaults: BaseModel, overrides: Mapping[str, Any], name: 
     unknown = sorted(set(overrides) - set(type(defaults).model_fields))
 
     if unknown:
-        raise ValueError(f'{name} accepts no option {", ".join(unknown)}.')
+        # Options a generator once declared and the configuration now states elsewhere.
+        hints = {
+            'defocus_distance_m': (
+                'the defocus is the negated focus_object_distance_m, set on the configuration'
+            ),
+        }
+        remedies = ''.join(f' For {key}: {hints[key]}.' for key in unknown if key in hints)
+        raise ValueError(f'{name} accepts no option {", ".join(unknown)}.{remedies}')
 
     return type(defaults).model_validate({**defaults.model_dump(), **overrides})
 
@@ -746,7 +757,10 @@ class ScanSnapshot(ProbeGeometryProvider, ObjectGeometryProvider):
         return self._mean_amplitude_transmission
 
     @property
-    def object_plane_propagation_distance_m(self) -> float:
+    def exit_wave_propagation_distance_m(self) -> float:
+        if self.metadata.far_field:
+            return self.metadata.detector_distance_m
+
         return self._derived().object_plane_propagation_distance_m
 
     def get_detector_pixel_geometry(self) -> PixelGeometry:
@@ -1077,8 +1091,9 @@ def estimate_product(
 
     1. The incident beam -- photon count and mean transmission -- from the totals,
        corrected for beam decay by the positions' I0.
-    2. When no focus is stated and the moments were binned, the parallax defocus; a
-       resolved estimate sets the focus.
+    2. When the configuration states no focus, the patterns are far field and the moments
+       were binned, the parallax defocus; a resolved estimate sets the focus, and an
+       unresolved one leaves it at zero.
     3. The probe from its generator, scaled to the incident photon count.
     4. The object from its generator, with that probe.
     """
@@ -1096,7 +1111,11 @@ def estimate_product(
         metadata, mean_amplitude_transmission=beam.mean_amplitude_transmission
     )
 
-    if metadata.focus_object_distance_m == 0.0 and moments.binning is not None:
+    if (
+        metadata.far_field
+        and configuration.focus_object_distance_m is None
+        and moments.binning is not None
+    ):
         parallax = _estimate_parallax(snapshot, beam.moments)
 
         if parallax is not None and parallax.is_resolved(
@@ -1106,6 +1125,11 @@ def estimate_product(
             metadata = replace(metadata, focus_object_distance_m=-parallax.defocus_distance_m)
             snapshot = snapshot.with_metadata(
                 metadata, mean_amplitude_transmission=beam.mean_amplitude_transmission
+            )
+        else:
+            logger.warning(
+                'No resolved parallax defocus; the focus is zero. Set focus_object_distance_m '
+                'to state the focus.'
             )
 
     probe = rescale_probe_intensity(

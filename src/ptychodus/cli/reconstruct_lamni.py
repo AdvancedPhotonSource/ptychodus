@@ -26,6 +26,7 @@ from __future__ import annotations
 import sys
 
 from ptychodus.api.exit_codes import ExitCode
+from ptychodus.plugins.aps31id_lamni.diffraction_file import LamNIDiffractionFileReader
 from ptychodus.cli._reconstruct_standard import (
     InstrumentProfile,
     run_standard_reconstruction,
@@ -41,10 +42,10 @@ PROFILE = InstrumentProfile(
     position_file_help='LamNI probe-position .dat file (Orchestra or softGlueZynq).',
     fzp_preset_help=(
         'FresnelZonePlate plugin preset for the model probe. Defaults to the LamNI zone '
-        'plate, the defocus matching the LYNX config. Ignored with --probe-file.'
+        'plate. Ignored with --probe-file.'
     ),
     default_fzp_preset='APS 31-ID-E LamNI',
-    default_fzp_defocus_m=800e-6,
+    default_invalid_counts=LamNIDiffractionFileReader.INVALID_COUNTS,
 )
 
 

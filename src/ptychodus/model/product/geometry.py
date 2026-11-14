@@ -163,7 +163,10 @@ class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Obs
         return geometry
 
     @property
-    def object_plane_propagation_distance_m(self) -> float:
+    def exit_wave_propagation_distance_m(self) -> float:
+        if self.far_field:
+            return self.detector_distance_m
+
         return self.get_derived_values().object_plane_propagation_distance_m
 
     def get_object_plane_pixel_geometry(self) -> PixelGeometry:

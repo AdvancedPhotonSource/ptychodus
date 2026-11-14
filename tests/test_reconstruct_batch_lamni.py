@@ -547,15 +547,23 @@ metadata_overrides:
         assert settings.metadata_overrides.far_field is False
         assert settings.metadata_overrides.focus_object_distance_m == pytest.approx(-8.0e-4)
 
-    def test_declaring_near_field_alone_leaves_the_distance_to_the_defocus(self) -> None:
-        """The zone-plate defocus already states it, so a batch need not repeat it."""
+    def test_no_defocus_is_preset(self) -> None:
+        """Unset, the focus is estimated per scan in far field and required in near field."""
         settings = _settings("""
 metadata_overrides:
   far_field: false
 """)
 
         assert settings.metadata_overrides.focus_object_distance_m is None
-        assert settings.initial_probe.simulated_probe.fzp_defocus_m == pytest.approx(800.0e-6)
+        assert 'fzp_defocus_m' not in type(settings.initial_probe.simulated_probe).model_fields
+
+    def test_a_simulated_probe_defocus_is_refused_with_its_replacement(self) -> None:
+        with pytest.raises(ValueError, match='metadata_overrides.focus_object_distance_m'):
+            _settings("""
+initial_probe:
+  simulated_probe:
+    fzp_defocus_m: 0.0008
+""")
 
     def test_an_unknown_regime_key_is_still_rejected(self) -> None:
         with pytest.raises(ValueError):

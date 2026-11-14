@@ -25,7 +25,6 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
-import logging
 import math
 
 import numpy
@@ -55,13 +54,15 @@ from ptychodus.model.product.probe.builder import (
 )
 from ptychodus.model.product.probe import INCOHERENT_MODE_STRATEGY_NAMES
 from ptychodus.api.simulate.probe import (
+    FresnelZonePlate,
+    apply_defocus_phase,
     generate_average_pattern_probe,
     generate_disk_probe,
+    generate_fresnel_zone_plate_probe,
     generate_rectangular_probe,
     generate_super_gaussian_probe,
     propagate_probe,
     rescale_probe_intensity,
-    resolve_defocus_distance_m,
 )
 from ptychodus.model.product.probe.builder_factory import ProbeBuilderFactory
 from ptychodus.model.product.probe.plugin import PluginProbeBuilder
@@ -139,11 +140,13 @@ class _StubProbeGeometryProvider(ProbeGeometryProvider):
         probe_photon_count: float = PROBE_PHOTON_COUNT,
         pixel_size_m: float = PIXEL_SIZE_M,
         focus_object_distance_m: float = 0.0,
+        far_field: bool = True,
         assembled_data: AssembledDiffractionData | None = None,
     ) -> None:
         self._probe_photon_count = probe_photon_count
         self._pixel_size_m = pixel_size_m
         self._focus_object_distance_m = focus_object_distance_m
+        self._far_field = far_field
         self._assembled_data = assembled_data
 
     def get_assembled_data(self) -> AssembledDiffractionData | None:
@@ -169,7 +172,7 @@ class _StubProbeGeometryProvider(ProbeGeometryProvider):
 
     @property
     def far_field(self) -> bool:
-        return True
+        return self._far_field
 
     @property
     def focus_object_distance_m(self) -> float:
@@ -896,51 +899,56 @@ def test_from_memory_builder_is_untouched_when_the_counts_agree() -> None:
         numpy.testing.assert_array_equal(probe_seq.get_array(), in_memory.get_array())
 
 
-class TestFocusDistanceResolution:
-    """Which of the two frames the focus is stated in wins, and when.
+class TestProductDefocus:
+    """The product's focus position is the one statement of the defocus.
 
-    A focusing builder's defocus and the product's focus-object distance are the
-    same displacement with opposite signs. The product owns the geometry the
-    reconstruction runs on, so it owns this too -- except where it declares no
-    focusing optic, which cannot describe a focused probe.
+    A probe sampled past its focus states the same displacement as the product's
+    focus-object distance, with the opposite sign, so no builder declares a second one.
     """
 
-    def test_a_silent_product_leaves_the_builder_value_alone(self) -> None:
-        # Zero means no focusing optic, which is every far-field configuration
-        # written before the product carried this at all.
-        assert resolve_defocus_distance_m(_StubProbeGeometryProvider(), 8.0e-4) == 8.0e-4
-
-    def test_the_product_wins_when_it_declares_a_focus(self) -> None:
-        provider = _StubProbeGeometryProvider(focus_object_distance_m=-8.0e-4)
-
-        assert resolve_defocus_distance_m(provider, 0.0) == pytest.approx(8.0e-4)
-
-    def test_the_sign_flips_between_the_two_frames(self) -> None:
-        """A focus upstream of the object is a probe sampled downstream of the focus."""
+    def test_the_defocus_is_the_negated_focus_position(self) -> None:
         upstream = _StubProbeGeometryProvider(focus_object_distance_m=-8.0e-4)
         downstream = _StubProbeGeometryProvider(focus_object_distance_m=+8.0e-4)
 
-        assert resolve_defocus_distance_m(upstream, 0.0) > 0.0
-        assert resolve_defocus_distance_m(downstream, 0.0) < 0.0
+        assert upstream.defocus_distance_m == pytest.approx(8.0e-4)
+        assert downstream.defocus_distance_m == pytest.approx(-8.0e-4)
 
-    def test_agreement_is_quiet(self, caplog: pytest.LogCaptureFixture) -> None:
-        provider = _StubProbeGeometryProvider(focus_object_distance_m=-8.0e-4)
+    def test_no_focusing_optic_is_no_defocus(self) -> None:
+        assert _StubProbeGeometryProvider().defocus_distance_m == 0.0
 
-        with caplog.at_level(logging.WARNING, logger='ptychodus.model.product.probe.builder'):
-            resolve_defocus_distance_m(provider, 8.0e-4)
+    def test_no_builder_declares_a_defocus(self) -> None:
+        for builder in _every_builder(_make_settings()):
+            assert 'defocus_distance_m' not in builder.parameters(), builder.get_name()
 
-        assert not caplog.records
+    @pytest.mark.parametrize('far_field', [True, False])
+    def test_a_zone_plate_is_built_at_the_product_defocus(self, far_field: bool) -> None:
+        """Near field removes the focus curvature, for the equivalent parallel-beam frame."""
+        defocus_m = 1.0e-3
+        provider = _StubProbeGeometryProvider(
+            focus_object_distance_m=-defocus_m, far_field=far_field
+        )
+        builder = _make_builder('fresnel_zone_plate', _make_settings())
+        parameters = builder.parameters()
+        zone_plate = FresnelZonePlate(
+            zone_plate_diameter_m=parameters['zone_plate_diameter_m'].get_value(),
+            outermost_zone_width_m=parameters['outermost_zone_width_m'].get_value(),
+            central_beamstop_diameter_m=parameters['central_beamstop_diameter_m'].get_value(),
+        )
+        expected = generate_fresnel_zone_plate_probe(
+            provider.get_probe_geometry(),
+            zone_plate,
+            photon_wavelength_m=provider.photon_wavelength_m,
+            defocus_distance_m=defocus_m,
+            remove_focus_curvature=not far_field,
+        )
 
-    def test_disagreement_warns_and_the_product_still_wins(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        provider = _StubProbeGeometryProvider(focus_object_distance_m=-8.0e-4)
+        probe = builder.build(provider)
 
-        with caplog.at_level(logging.WARNING, logger='ptychodus.model.product.probe.builder'):
-            resolved = resolve_defocus_distance_m(provider, 9.0e-4)
-
-        assert resolved == pytest.approx(8.0e-4)
-        assert len(caplog.records) == 1
+        numpy.testing.assert_allclose(
+            probe.get_array()[0],
+            rescale_probe_intensity(expected, PROBE_PHOTON_COUNT).get_array(),
+            atol=1e-9,
+        )
 
 
 def _every_builder(settings: ProbeSettings) -> list[ProbeEnsembleBuilder]:
@@ -950,49 +958,27 @@ def _every_builder(settings: ProbeSettings) -> list[ProbeEnsembleBuilder]:
 
 
 class TestPropagationDistanceIsSeparateFromDefocus:
-    """Defocus and propagation are two settings that never stand in for each other.
+    """Propagation moves the plane of a field already formed, never the defocus.
 
-    Defocus is the curvature of the beam a builder models; propagation moves the
-    plane of a field already formed. Sharing one key once let editing a disk probe's
-    propagation move a zone-plate probe's focus, so every builder reads each key on
-    its own, whichever of the two it offers.
+    The defocus is the product's; the propagation distance is a builder setting shared
+    by key across the builders that offer it, which the focusing optics do not.
     """
 
-    def test_every_builder_offers_at_least_one_of_the_two(self) -> None:
-        builders = _every_builder(_make_settings())
-
-        assert any('defocus_distance_m' in builder.parameters() for builder in builders)
-        assert any('propagation_distance_m' in builder.parameters() for builder in builders)
-
-    def test_setting_the_propagation_never_moves_a_defocus(self) -> None:
+    def test_setting_the_propagation_moves_every_builder_that_offers_it(self) -> None:
         settings = _make_settings()
         _settings_parameters(settings)['PropagationDistanceInMeters'].set_value(5.0e-5)
+        offering = [
+            builder
+            for builder in _every_builder(settings)
+            if 'propagation_distance_m' in builder.parameters()
+        ]
 
-        for builder in _every_builder(settings):
-            parameters = builder.parameters()
+        assert offering
 
-            if 'defocus_distance_m' in parameters:
-                assert parameters['defocus_distance_m'].get_value() == 0.0, builder.get_name()
-
-            if 'propagation_distance_m' in parameters:
-                assert parameters['propagation_distance_m'].get_value() == pytest.approx(5.0e-5), (
-                    builder.get_name()
-                )
-
-    def test_setting_the_defocus_never_moves_a_propagation(self) -> None:
-        settings = _make_settings()
-        _settings_parameters(settings)['DefocusDistanceInMeters'].set_value(5.0e-5)
-
-        for builder in _every_builder(settings):
-            parameters = builder.parameters()
-
-            if 'propagation_distance_m' in parameters:
-                assert parameters['propagation_distance_m'].get_value() == 0.0, builder.get_name()
-
-            if 'defocus_distance_m' in parameters:
-                assert parameters['defocus_distance_m'].get_value() == pytest.approx(5.0e-5), (
-                    builder.get_name()
-                )
+        for builder in offering:
+            assert builder.parameters()['propagation_distance_m'].get_value() == pytest.approx(
+                5.0e-5
+            ), builder.get_name()
 
     def test_the_focusing_builders_ignore_the_propagation_key(self) -> None:
         settings = _make_settings()
@@ -1000,7 +986,6 @@ class TestPropagationDistanceIsSeparateFromDefocus:
 
         builder = _make_builder('kb_mirror', settings)
 
-        assert builder.parameters()['defocus_distance_m'].get_value() == 0.0
         assert 'propagation_distance_m' not in builder.parameters()
 
 
@@ -1100,46 +1085,45 @@ class TestParametricProbeDefocus:
         numpy.testing.assert_allclose(probe.get_array()[0], expected.get_array(), atol=1e-9)
 
     @pytest.mark.parametrize('name', _PARAMETRIC_BUILDER_NAMES)
-    def test_the_builder_defocus_curves_the_probe(self, name: str) -> None:
-        flat = _make_parametric_builder(name, _make_settings()).build(_StubProbeGeometryProvider())
+    def test_the_product_defocus_curves_the_probe(self, name: str) -> None:
         builder = _make_parametric_builder(name, _make_settings())
-        builder.parameters()['defocus_distance_m'].set_value(_PARAMETRIC_DEFOCUS_M)
+        flat = builder.build(_StubProbeGeometryProvider())
 
-        curved = builder.build(_StubProbeGeometryProvider())
+        curved = builder.build(
+            _StubProbeGeometryProvider(focus_object_distance_m=-_PARAMETRIC_DEFOCUS_M)
+        )
 
         assert not numpy.allclose(curved.get_array(), flat.get_array())
         numpy.testing.assert_allclose(numpy.abs(curved.get_array()), numpy.abs(flat.get_array()))
 
     @pytest.mark.parametrize('name', _PARAMETRIC_BUILDER_NAMES)
-    def test_a_declared_focus_stands_in_for_the_builder_defocus(self, name: str) -> None:
+    def test_the_curvature_is_that_of_the_product_defocus(self, name: str) -> None:
         builder = _make_parametric_builder(name, _make_settings())
-        builder.parameters()['defocus_distance_m'].set_value(_PARAMETRIC_DEFOCUS_M)
-        from_builder = builder.build(_StubProbeGeometryProvider())
+        provider = _StubProbeGeometryProvider()
+        expected = apply_defocus_phase(
+            rescale_probe_intensity(_flat_amplitude(builder), PROBE_PHOTON_COUNT),
+            photon_wavelength_m=provider.photon_wavelength_m,
+            defocus_distance_m=_PARAMETRIC_DEFOCUS_M,
+        )
 
-        builder.parameters()['defocus_distance_m'].set_value(0.0)
-        from_product = builder.build(
+        probe = builder.build(
             _StubProbeGeometryProvider(focus_object_distance_m=-_PARAMETRIC_DEFOCUS_M)
         )
 
-        numpy.testing.assert_allclose(from_product.get_array(), from_builder.get_array())
+        numpy.testing.assert_allclose(probe.get_array()[0], expected.get_array(), atol=1e-9)
 
     @pytest.mark.parametrize('name', _PARAMETRIC_BUILDER_NAMES)
-    def test_the_declared_focus_wins_a_disagreement(
-        self, name: str, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        expected_builder = _make_parametric_builder(name, _make_settings())
-        expected_builder.parameters()['defocus_distance_m'].set_value(_PARAMETRIC_DEFOCUS_M)
-        expected = expected_builder.build(_StubProbeGeometryProvider())
+    def test_near_field_keeps_the_flat_phase_of_the_equivalent_frame(self, name: str) -> None:
         builder = _make_parametric_builder(name, _make_settings())
-        builder.parameters()['defocus_distance_m'].set_value(1.5e-3)
+        expected = rescale_probe_intensity(_flat_amplitude(builder), PROBE_PHOTON_COUNT)
 
-        with caplog.at_level(logging.WARNING, logger='ptychodus.model.product.probe.builder'):
-            probe = builder.build(
-                _StubProbeGeometryProvider(focus_object_distance_m=-_PARAMETRIC_DEFOCUS_M)
+        probe = builder.build(
+            _StubProbeGeometryProvider(
+                focus_object_distance_m=-_PARAMETRIC_DEFOCUS_M, far_field=False
             )
+        )
 
-        numpy.testing.assert_allclose(probe.get_array(), expected.get_array())
-        assert 'disagrees' in caplog.text
+        numpy.testing.assert_array_equal(probe.get_array()[0], expected.get_array())
 
 
 # ---------------------------------------------------------------------------
@@ -1168,6 +1152,11 @@ def _provider_with(mean_pattern: numpy.ndarray, **kwargs: Any) -> _StubProbeGeom
     return _StubProbeGeometryProvider(assembled_data=_stub_data(mean_pattern), **kwargs)
 
 
+def _defocused_provider_with(mean_pattern: numpy.ndarray) -> _StubProbeGeometryProvider:
+    """A provider whose product places the object `_ESTIMATE_DEFOCUS_M` past the focus."""
+    return _provider_with(mean_pattern, focus_object_distance_m=-_ESTIMATE_DEFOCUS_M)
+
+
 def _frequency_grid() -> tuple[numpy.ndarray, numpy.ndarray]:
     q = (numpy.arange(PROBE_EXTENT_PX) - PROBE_EXTENT_PX // 2) * _DQ
     return q.reshape(1, -1), q.reshape(-1, 1)
@@ -1186,7 +1175,6 @@ def _make_estimating_builder(name: str) -> PluginProbeBuilder:
         case _:
             raise ValueError(name)
 
-    builder.parameters()['defocus_distance_m'].set_value(_ESTIMATE_DEFOCUS_M)
     return builder
 
 
@@ -1198,7 +1186,7 @@ class TestSizeEstimateFromDiffraction:
         mean_pattern = 100.0 * (numpy.hypot(qx, qy) <= 8.0 * _DQ)
         builder = _make_estimating_builder('disk')
 
-        assert builder.estimate_size_from_diffraction(_provider_with(mean_pattern))
+        assert builder.estimate_size_from_diffraction(_defocused_provider_with(mean_pattern))
 
         expected_m = 2.0 * 1.0e-10 * _ESTIMATE_DEFOCUS_M * 8.0 * _DQ
         assert builder.parameters()['diameter_m'].get_value() == pytest.approx(expected_m, rel=0.05)
@@ -1208,7 +1196,7 @@ class TestSizeEstimateFromDiffraction:
         mean_pattern = 100.0 * ((numpy.abs(qx) <= 8.0 * _DQ) & (numpy.abs(qy) <= 4.0 * _DQ))
         builder = _make_estimating_builder('rectangular')
 
-        assert builder.estimate_size_from_diffraction(_provider_with(mean_pattern))
+        assert builder.estimate_size_from_diffraction(_defocused_provider_with(mean_pattern))
 
         # The aperture spans 2 * half + 1 pixels of the frequency grid.
         scale_m = 1.0e-10 * _ESTIMATE_DEFOCUS_M * _DQ
@@ -1225,7 +1213,7 @@ class TestSizeEstimateFromDiffraction:
         mean_pattern = 100.0 * numpy.exp(-(qx**2 + qy**2) / (2.0 * sigma_q**2))
         builder = _make_estimating_builder('super_gaussian')
 
-        assert builder.estimate_size_from_diffraction(_provider_with(mean_pattern))
+        assert builder.estimate_size_from_diffraction(_defocused_provider_with(mean_pattern))
 
         sigma_m = math.hypot(1.0 / (4.0 * PI * sigma_q), 1.0e-10 * _ESTIMATE_DEFOCUS_M * sigma_q)
         assert builder.parameters()['full_width_at_half_maximum_m'].get_value() == pytest.approx(
@@ -1249,10 +1237,10 @@ class TestSizeEstimateFromDiffraction:
         narrow = 100.0 * numpy.exp(-(qx**2 + qy**2) / (2.0 * (2.0 * _DQ) ** 2))
         wide = 100.0 * numpy.exp(-(qx**2 + qy**2) / (2.0 * (4.0 * _DQ) ** 2))
         original = _make_estimating_builder(name)
-        original.estimate_size_from_diffraction(_provider_with(narrow))
+        original.estimate_size_from_diffraction(_defocused_provider_with(narrow))
         copy = original.copy()
 
-        assert copy.estimate_size_from_diffraction(_provider_with(wide))
+        assert copy.estimate_size_from_diffraction(_defocused_provider_with(wide))
         assert any(
             copy.parameters()[key].get_value() != value.get_value()
             for key, value in original.parameters().items()
@@ -1272,7 +1260,7 @@ class TestSizeEstimateFromDiffraction:
 
 
 class TestAveragePatternOptions:
-    """The average-pattern builder's defocus, propagation and bright-field threshold."""
+    """The average-pattern builder's product defocus, propagation and bright-field threshold."""
 
     def _mean_pattern(self) -> numpy.ndarray:
         qx, qy = _frequency_grid()
@@ -1295,22 +1283,28 @@ class TestAveragePatternOptions:
     def _builder(self) -> PluginProbeBuilder:
         return _make_builder('average_pattern', _make_settings())
 
-    def test_defocus_and_propagation_add(self) -> None:
+    def test_the_product_defocus_and_propagation_add(self) -> None:
         builder = self._builder()
-        builder.parameters()['defocus_distance_m'].set_value(2.0e-6)
         builder.parameters()['propagation_distance_m'].set_value(1.0e-6)
-
-        built = builder.build(_provider_with(self._mean_pattern())).get_mean_probe().get_array()
-
-        numpy.testing.assert_allclose(built, self._expected(defocus_distance_m=3.0e-6), atol=1e-9)
-
-    def test_a_declared_focus_stands_in_for_the_builder_defocus(self) -> None:
-        builder = self._builder()
         provider = _provider_with(self._mean_pattern(), focus_object_distance_m=-2.0e-6)
 
         built = builder.build(provider).get_mean_probe().get_array()
 
-        numpy.testing.assert_allclose(built, self._expected(defocus_distance_m=2.0e-6), atol=1e-9)
+        numpy.testing.assert_allclose(built, self._expected(defocus_distance_m=3.0e-6), atol=1e-9)
+
+    def test_near_field_applies_only_the_propagation(self) -> None:
+        """The near-field back-propagation already lands in the equivalent object plane."""
+        builder = self._builder()
+        builder.parameters()['propagation_distance_m'].set_value(1.0e-6)
+        provider = _provider_with(
+            self._mean_pattern(), focus_object_distance_m=-2.0e-6, far_field=False
+        )
+
+        built = builder.build(provider).get_mean_probe().get_array()
+
+        numpy.testing.assert_allclose(
+            built, self._expected(far_field=False, defocus_distance_m=1.0e-6), atol=1e-9
+        )
 
     def test_the_bright_field_threshold_is_off_by_default_and_passes_through(self) -> None:
         builder = self._builder()

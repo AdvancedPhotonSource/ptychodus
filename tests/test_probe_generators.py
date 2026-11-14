@@ -184,9 +184,8 @@ def test_keys_shared_by_several_generators_agree(registry: PluginRegistry) -> No
 
     shared = {key: entries for key, entries in by_key.items() if len(entries) > 1}
 
-    assert {'DefocusDistanceInMeters', 'PropagationDistanceInMeters', 'DiameterInMeters'} <= set(
-        shared
-    )
+    assert {'PropagationDistanceInMeters', 'DiameterInMeters'} <= set(shared)
+    assert 'DefocusDistanceInMeters' not in by_key
 
     for key, entries in shared.items():
         signatures = {
@@ -229,10 +228,9 @@ def test_only_the_average_pattern_reads_diffraction_data(registry: PluginRegistr
 
 class _BadExtentOptions(BaseModel):
     size_m: float = Field(1e-6, json_schema_extra={'probe_extent': 'no_such_quantity'})
-    defocus_distance_m: float = 0.0
 
 
-class _NoDefocusOptions(BaseModel):
+class _SizeOnlyOptions(BaseModel):
     size_m: float = Field(1e-6, json_schema_extra={'probe_extent': 'disk_diameter_m'})
 
 
@@ -247,17 +245,10 @@ class _StubGenerator(ProbeGenerator):
         raise NotImplementedError
 
 
-@pytest.mark.parametrize(
-    ('options', 'message'),
-    [
-        (_BadExtentOptions(), 'names no ProbeExtent quantity'),
-        (_NoDefocusOptions(), 'none is declared'),
-    ],
-)
-def test_a_faulty_size_declaration_is_refused(options: BaseModel, message: str) -> None:
+def _make_stub_factory(options: BaseModel) -> ProbeBuilderFactory:
     generators = PluginList[ProbeGenerator]()
     generators.register_plugin(_StubGenerator(options), simple_name='stub', display_name='stub')
-    factory = ProbeBuilderFactory(
+    return ProbeBuilderFactory(
         numpy.random.default_rng(42),
         ProbeSettings(SettingsRegistry()),
         generators,
@@ -267,8 +258,20 @@ def test_a_faulty_size_declaration_is_refused(options: BaseModel, message: str) 
         PluginChooser(PluginList()),
     )
 
-    with pytest.raises(ValueError, match=message):
+
+def test_a_faulty_size_declaration_is_refused() -> None:
+    factory = _make_stub_factory(_BadExtentOptions())
+
+    with pytest.raises(ValueError, match='names no ProbeExtent quantity'):
         factory.create('stub')
+
+
+def test_a_size_needs_no_declared_defocus() -> None:
+    """A size is measured at the product's defocus, which no declaration carries."""
+    builder = _make_stub_factory(_SizeOnlyOptions()).create('stub')
+
+    assert isinstance(builder, PluginProbeBuilder)
+    assert builder.estimates_size
 
 
 def test_the_coefficient_list_is_the_mode_list(registry: PluginRegistry) -> None:
@@ -341,9 +344,8 @@ def test_every_zone_plate_goes_by_one_name(registry: PluginRegistry) -> None:
         assert plugin.simple_name == plugin.display_name
 
 
-def test_a_zone_plate_preset_fills_its_fields_and_nothing_else(registry: PluginRegistry) -> None:
+def test_a_zone_plate_preset_fills_its_fields(registry: PluginRegistry) -> None:
     builder = _make_builder(registry, 'fresnel_zone_plate')
-    builder.parameters()['defocus_distance_m'].set_value(1.0e-4)
     counter = _NotificationCounter(builder)
     label = 'APS 31-ID-E LamNI'
 
@@ -359,7 +361,6 @@ def test_a_zone_plate_preset_fills_its_fields_and_nothing_else(registry: PluginR
         parameters['central_beamstop_diameter_m'].get_value()
         == zone_plate.central_beamstop_diameter_m
     )
-    assert parameters['defocus_distance_m'].get_value() == 1.0e-4
     assert counter.count == 1
 
 

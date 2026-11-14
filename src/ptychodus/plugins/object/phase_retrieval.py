@@ -192,7 +192,7 @@ class PaganinObjectGenerator(ObjectGenerator):
             geometry_provider.get_probe_positions(),
             probe=probe,
             photon_wavelength_m=geometry_provider.photon_wavelength_m,
-            propagation_distance_m=geometry_provider.object_plane_propagation_distance_m,
+            propagation_distance_m=geometry_provider.exit_wave_propagation_distance_m,
             delta_over_beta=paganin.delta_over_beta,
         )
 
@@ -300,7 +300,7 @@ class SpectralObjectGenerator(ObjectGenerator):
             geometry_provider.get_probe_positions(),
             probe=probe,
             photon_wavelength_m=geometry_provider.photon_wavelength_m,
-            propagation_distance_m=geometry_provider.object_plane_propagation_distance_m,
+            propagation_distance_m=geometry_provider.exit_wave_propagation_distance_m,
             far_field=geometry_provider.far_field,
             preprocessing=spectral.preprocessing,
             lower_bound=spectral.preprocessing_lower_bound,

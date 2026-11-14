@@ -24,12 +24,11 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import math
 import os
 import signal
 import sys
 import threading
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from types import FrameType
 from typing import Any, cast, Final, Literal
@@ -61,7 +60,10 @@ from ptychodus.api.diffraction import (
 )
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.io import StandardFileLayout, save_diffraction_data, save_product
+from ptychodus.api.object import ObjectGeometry
+from ptychodus.api.parallax import estimate_defocus_from_assembled_data
 from ptychodus.api.preprocess.diffraction import FilterValuesStep, estimate_beam_center
+from ptychodus.api.probe import ProbeGeometry
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import (
@@ -313,67 +315,117 @@ def resolve_flag(
     return fallback
 
 
-def resolve_focus_object_distance_m(
+def resolve_stated_focus_object_distance_m(
     logger: logging.Logger,
     override: float | None,
     from_file: float | None,
-    defocus_distance_m: float,
     *,
-    rel_tol: float = 1.0e-6,
+    source: str = '--focus-object-distance-m',
     level: int = logging.INFO,
-) -> float:
-    """The signed focus position, which a focusing probe states in the opposite frame.
+) -> float | None:
+    """The signed focus position the user or the data file states, or None.
 
-    A probe built from a focusing optic is sampled `defocus_distance_m` past its
-    focus, so the focus sits that far upstream of the object: the same displacement,
-    negated. Deriving one from the other is what lets a user who already enters the
-    defocus -- which every zone-plate instrument does -- declare near field without
-    entering the distance twice in two sign conventions.
-
-    Precedence is the command line, then the file, then the derivation. An explicit
-    value disagreeing with the defocus beyond `rel_tol` is honored and reported: a
-    caller may be modelling a probe that deliberately does not match the geometry.
-
-    Call this only for a near-field run. In far field the focus position does not
-    enter the sampling, and deriving one would put a nonzero focus on every
-    far-field product built from a focusing optic for no reason.
+    The focus is the one statement of the defocus every model probe is built at, its
+    negation, and in near field it sets the magnification besides. No instrument
+    presets one: the explicit *override*, named *source* in the log, wins over the
+    file's record, and with neither the caller estimates it or asks for it.
     """
-    derived_m = -defocus_distance_m
-
     if override is not None:
-        if defocus_distance_m != 0.0 and not math.isclose(override, derived_m, rel_tol=rel_tol):
-            logger.warning(
-                'Focus-object distance (m): %g from --focus-object-distance-m, but the '
-                'probe defocus %g implies %g. Using the value given.',
-                override,
-                defocus_distance_m,
-                derived_m,
-            )
-        else:
-            logger.log(
-                level,
-                'Focus-object distance (m): %g (from --focus-object-distance-m)',
-                override,
-            )
-
+        logger.log(level, 'Focus-object distance (m): %g (from %s)', override, source)
         return override
 
     if from_file is not None:
-        logger.log(
-            level,
-            'Focus-object distance (m): %g (from the diffraction file)',
-            from_file,
-        )
+        logger.log(level, 'Focus-object distance (m): %g (from the diffraction file)', from_file)
         return from_file
 
-    logger.log(
-        level,
-        'Focus-object distance (m): %g (from the probe defocus %g). Pass '
-        '--focus-object-distance-m to set it directly.',
-        derived_m,
-        defocus_distance_m,
+    return None
+
+
+def require_near_field_focus_object_distance_m(stated: float | None, *, source: str) -> float:
+    """The stated focus position, which near field cannot do without.
+
+    The magnification follows from it and no parallax estimate answers in near field,
+    so a missing one is an error rather than a parallel beam assumed for the user.
+
+    Raises:
+        ValueError: if *stated* is None; the message names *source*.
+    """
+    if stated is None:
+        raise ValueError(
+            'Near field needs the focus position, which the data cannot estimate; set '
+            f'{source} (0 for a parallel beam).'
+        )
+
+    return stated
+
+
+def estimate_focus_object_distance_m(
+    logger: logging.Logger,
+    assembled_data: AssembledDiffractionData,
+    positions: ProbePositionSequence,
+    object_geometry: ObjectGeometry,
+    probe_geometry: ProbeGeometry,
+    *,
+    photon_wavelength_m: float,
+    source: str,
+    i0_photons_per_count: float = 0.0,
+    bin_size_px: int = 4,
+    minimum_significance: float = 3.0,
+    minimum_defocus_dof: float = 1.0,
+) -> float:
+    """The focus position the far-field parallax measures, or zero when it resolves none.
+
+    One binned pass over the patterns (see
+    :func:`ptychodus.api.parallax.estimate_defocus_from_assembled_data`). The estimate is
+    applied only when it reaches *minimum_significance* standard errors and
+    *minimum_defocus_dof* depths of focus; otherwise the focus is zero -- indistinguishable
+    from the focus at those thresholds -- and a warning names *source*, where a value can
+    be stated instead.
+    """
+    remedy = f'Set {source} to state the focus.'
+
+    try:
+        estimate = estimate_defocus_from_assembled_data(
+            assembled_data,
+            positions,
+            object_geometry,
+            probe_geometry,
+            photon_wavelength_m=photon_wavelength_m,
+            i0_photons_per_count=i0_photons_per_count,
+            bin_size_px=bin_size_px,
+        )
+    except ValueError as exc:
+        logger.warning('No parallax defocus estimate (%s); the focus is zero. %s', exc, remedy)
+        return 0.0
+
+    if estimate is None:
+        logger.warning('The parallax gives no defocus estimate; the focus is zero. %s', remedy)
+        return 0.0
+
+    logger.info(
+        'Parallax defocus (m): %g +/- %g, Fresnel number %.3g',
+        estimate.defocus_distance_m,
+        estimate.standard_error_m,
+        estimate.fresnel_number,
     )
-    return derived_m
+
+    if estimate.is_resolved(
+        minimum_significance=minimum_significance, minimum_defocus_dof=minimum_defocus_dof
+    ):
+        focus_object_distance_m = -estimate.defocus_distance_m
+        logger.info(
+            'Focus-object distance (m): %g (from the parallax estimate)', focus_object_distance_m
+        )
+        return focus_object_distance_m
+
+    logger.warning(
+        'The parallax defocus is not resolved at %g standard errors and %g depths of focus; '
+        'the focus is zero. %s',
+        minimum_significance,
+        minimum_defocus_dof,
+        remedy,
+    )
+    return 0.0
 
 
 def _estimate_crop_region(
@@ -551,14 +603,22 @@ def resolve_crop_region(
     return region
 
 
-def invalid_count_threshold(dtype: DiffractionPatternDType) -> int | None:
+def invalid_count_threshold(
+    dtype: DiffractionPatternDType, invalid_counts: Mapping[str, int] | None = None
+) -> int | None:
     """Count at and above which a pixel is invalid rather than merely bright.
 
-    Dectris detectors flag dead, masked and saturated pixels with the maximum value the
-    pattern dtype can hold -- 4294967295 on a uint32 Eiger. Left in place those markers
-    dominate every statistic computed from the frame: the beam-center estimator rejects
-    the real beam as noise and silently returns the detector midpoint instead.
+    Dectris detectors flag dead, masked and saturated pixels with the maximum value their
+    counter holds. That is usually the maximum of the pattern dtype -- 4294967295 on a
+    uint32 Eiger -- but an instrument storing a shallower counter in a wider dtype marks
+    them lower, as a 12-bit Eiger written as uint16 does with 4095; *invalid_counts* names
+    such a marker by dtype name. Left in place those markers dominate every statistic
+    computed from the frame: the beam-center estimator rejects the real beam as noise and
+    silently returns the detector midpoint instead.
     """
+    if invalid_counts is not None and str(dtype) in invalid_counts:
+        return invalid_counts[str(dtype)]
+
     if numpy.issubdtype(dtype, numpy.integer):
         # issubdtype does not narrow the pattern dtype union for the checker.
         return int(numpy.iinfo(cast(numpy.dtype[numpy.integer], dtype)).max)

@@ -1,4 +1,6 @@
+from collections.abc import Mapping
 from pathlib import Path
+from types import MappingProxyType
 from typing import Final
 import logging
 
@@ -111,6 +113,10 @@ class LamNIDiffractionFileReader(DiffractionFileReader):
 
     # Stands in for Pixel_size when a file omits it; the Eiger pitch at this instrument.
     DETECTOR_PIXEL_SIZE_M: Final[float] = 75e-6
+    # The Eiger's invalid-pixel marker by stored dtype. Fly scans write its 12-bit frames
+    # as uint16 and mark gap and invalid pixels with 4095, the 12-bit counter's maximum;
+    # 32-bit frames written as uint32 use the dtype maximum, and count well past 4095.
+    INVALID_COUNTS: Final[Mapping[str, int]] = MappingProxyType({'uint16': 4095})
 
     def __init__(self) -> None:
         self._tree_builder = H5DiffractionFileTreeBuilder()
