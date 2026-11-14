@@ -28,18 +28,28 @@ stream
 
 ## Python API Example
 
+Reconstruct a prepared directory, as a driver's `--prepare-only` writes one, with any installed reconstructor:
+
 ```python
 from pathlib import Path
-from ptychodus.model import ModelCore
 
+from ptychodus.api.io import load_diffraction_data, load_product, save_product
+from ptychodus.api.plugins import PluginRegistry
+from ptychodus.api.reconstruct import prepare_reconstruct_input
 
-def main() -> int:
-    settings_file = Path('path/to/settings.ini')
+registry = PluginRegistry.load_plugins()
+library = registry.reconstructor_libraries.get_strategy_by_name('PtyChi')
+reconstructor = next(r for r in library if r.name == 'LSQML')
+options = reconstructor.get_default_options()
 
-    with ModelCore(settings_file) as model:
-        input_product_api = model.workflow_api.create_product('new_product_name')
-        output_product_api = input_product_api.reconstruct_local()
-        output_product_api.save_product('/path/to/file.h5', file_type='HDF5')
+assembled_data = load_diffraction_data(Path('prepared/diffraction.h5'))
+product = load_product(Path('prepared/product.h5'))
+reconstruct_input = prepare_reconstruct_input(assembled_data, product)
+
+for output in reconstructor.reconstruct(reconstruct_input, options=options):
+    print(f'{output.progress}/{output.progress_goal}')
+
+save_product(Path('product.h5'), output.product)
 ```
 
 ## Indices and tables

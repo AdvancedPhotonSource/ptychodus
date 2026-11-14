@@ -28,11 +28,9 @@ class ProbePositionsRepositoryItemFactory:
         """Note that conditioning settings do not apply to in-memory positions.
 
         Positions supplied in memory come from reconstruction output or a product
-        loaded from file, so they are already conditioned. Batch mode reads
-        product.h5 through this path, where a user who sets a trim in
-        settings.ini would otherwise see it silently do nothing. Trim at ingest
-        instead -- ptychodus-bdp reads raw probe positions through the from-file
-        builder, which does condition them.
+        loaded from file, so they are already conditioned, and a trim set in the
+        settings would otherwise silently do nothing. Trim at ingest instead --
+        the from-file builder reads raw probe positions and does condition them.
         """
         settings = self._settings
         is_conditioning_requested = (

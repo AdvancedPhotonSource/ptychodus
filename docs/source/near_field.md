@@ -156,7 +156,7 @@ Set **Shift Operator:** to `PATCH` to cut a patch from the object under each pro
 
 ### Algorithm
 
-Pick **BH**, which reconstructs a hologram better than stock LSQML. The GUI default is **LSQML**, so selecting BH is a manual step. The beamline drivers reconstruct with pty-chi and fall back to BH on their own for a near-field run given no `--ptychi-options` file.
+Pick **BH**, which reconstructs a hologram better than stock LSQML. The GUI default is **LSQML**, so selecting BH is a manual step. The beamline drivers reconstruct with pty-chi and fall back to BH on their own for a near-field run given no `--options` document.
 
 Near-field scans are often few enough frames to run as a single batch, where **BH Method:** `CG` converges faster than the default `GD`.
 
@@ -180,7 +180,7 @@ The **Forward Model:** combo in the Autodiff panel is not a propagator selector.
 
 ### Supplying Your Own Options
 
-`--print-ptychi-options` names the fields ptychodus always derives from the data, which an options file must leave alone. `fft_shift` is among them: it states where the detector plane keeps its DC component, which the regime settles in both directions. `pad_for_shift` is not, because it is derived only for a near-field product; set it for a far-field run as you like.
+`--print-options` names, in the comment above `task`, the fields ptychodus always derives from the data, which an options document must leave alone. `fft_shift` is among them: it states where the detector plane keeps its DC component, which the regime settles in both directions. `pad_for_shift` is not, because it is derived only for a near-field product; set it for a far-field run as you like.
 
 ## Known Limitations
 

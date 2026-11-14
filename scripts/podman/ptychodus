@@ -4,6 +4,11 @@
 # bind-mounts $HOME / $PWD / beamline data roots, and runs rootless so files
 # written to the host are owned by the invoking user.
 #
+# With no command it starts the GUI. A first argument naming a console script
+# runs that command headless instead, given whole or without its prefix:
+#   ptychodus ptychodus-reconstruct -i prep -o out
+#   ptychodus reconstruct-2ide --diffraction-file ... --output-directory out
+#
 # Lint with: shellcheck scripts/podman/ptychodus
 #
 # Env-var overrides:
@@ -140,14 +145,13 @@ add_x11_flags() {
     fi
 }
 
-# --- Pre-scan argv for batch mode (no argv mutation) -------------------------
+# --- Command: a ptychodus-* console script, or the GUI -----------------------
 
-is_batch=0
-for arg in "$@"; do
-    case "$arg" in
-        -b|--batch|--batch=*) is_batch=1 ;;
-    esac
-done
+command=()
+case "${1:-}" in
+    ptychodus-*) command=( "$1" ); shift ;;
+    [a-z]*) command=( "ptychodus-$1" ); shift ;;
+esac
 
 # --- Prerequisite checks -----------------------------------------------------
 
@@ -443,10 +447,14 @@ done
 
 add_gpu_flags args "$family"
 
-if (( is_batch == 0 )) && [[ -n "${DISPLAY:-}" ]]; then
+if (( ${#command[@]} == 0 )) && [[ -n "${DISPLAY:-}" ]]; then
     add_x11_flags args
 fi
 
 # --- Launch ------------------------------------------------------------------
 
-exec podman "${args[@]}" "$IMAGE" python3 -m ptychodus "$@"
+if (( ${#command[@]} == 0 )); then
+    command=( python3 -m ptychodus )
+fi
+
+exec podman "${args[@]}" "$IMAGE" "${command[@]}" "$@"

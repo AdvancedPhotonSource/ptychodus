@@ -1,11 +1,10 @@
 from pathlib import Path
 import logging
 
-from ptychodus.api.io import StandardFileLayout, sanitize_path_component
+from ptychodus.api.io import sanitize_path_component
 
 from ..product import ProductAPI
 from ..processing import ProcessingAPI
-from ..settings import SettingsRegistry
 from .client import GlobusClient, GlobusJob
 from .settings import GlobusSettings
 
@@ -16,31 +15,23 @@ class GlobusExecutor:
     def __init__(
         self,
         settings: GlobusSettings,
-        settings_registry: SettingsRegistry,
         product_api: ProductAPI,
         processing_api: ProcessingAPI,
         client: GlobusClient,
     ) -> None:
         super().__init__()
         self._settings = settings
-        self._settings_registry = settings_registry
         self._product_api = product_api
         self._processing_api = processing_api
         self._client = client
 
-    def populate_input_directory(self, input_product_index: int) -> Path:
+    def populate_input_directory(self, input_product_index: int, action: str) -> Path:
+        """Stage `action`'s inputs for the product under ``<name>/input/``; return ``<name>``."""
         try:
             product_item = self._product_api.get_item(input_product_index)
         except IndexError:
             logger.exception(f'Failed access product for flow ({input_product_index=})!')
             raise
-
-        dataset = product_item.get_dataset()
-
-        if dataset is None:
-            raise RuntimeError(
-                f'Product "{product_item.get_name()}" has no associated diffraction dataset.'
-            )
 
         base_directory = self._settings.input_collection_posix_path.get_value() / (
             sanitize_path_component(product_item.get_name())
@@ -53,13 +44,14 @@ class GlobusExecutor:
             logger.exception('Input data POSIX path must be a directory!')
             raise
 
-        self._settings_registry.save_settings(input_directory / StandardFileLayout.SETTINGS)
-        dataset.export_assembled_patterns(input_directory / StandardFileLayout.DIFFRACTION)
-        self._product_api.save_product(
-            input_product_index,
-            input_directory / StandardFileLayout.PRODUCT,
-            file_type='HDF5',
-        )
+        if action == 'train':
+            self._processing_api.stage_train_inputs(
+                input_directory, product_index=input_product_index
+            )
+        else:
+            self._processing_api.stage_reconstruct_inputs(
+                input_directory, product_index=input_product_index
+            )
 
         return base_directory
 
@@ -130,11 +122,7 @@ class GlobusExecutor:
         algorithm: str | None = None,
     ) -> None:
         self._processing_api.set_reconstructor_if_provided(library=library, algorithm=algorithm)
-        base_directory = self.populate_input_directory(input_product_index)
-
-        if self._processing_api.is_reconstructor_trainable():
-            pass  # TODO get model from mlflow
-
+        base_directory = self.populate_input_directory(input_product_index, 'reconstruct')
         self._run_flow('reconstruct', base_directory.name)
 
     def train(
@@ -145,6 +133,5 @@ class GlobusExecutor:
         algorithm: str | None = None,
     ) -> None:
         self._processing_api.set_reconstructor_if_provided(library=library, algorithm=algorithm)
-        base_directory = self.populate_input_directory(input_product_index)
+        base_directory = self.populate_input_directory(input_product_index, 'train')
         self._run_flow('train', base_directory.name)
-        # TODO customize input/output directories; put model to mlflow

@@ -277,15 +277,6 @@ class ViewCore(QMainWindow):
             right=self.genesis_status_view,
         )
 
-        self.automation_view = QWidget()
-        self.automation_widget = QWidget()
-        self.automation_action = self.navigation.add_panel(
-            QIcon(':/icons/automate'),
-            'Automation',
-            left=self.automation_view,
-            right=self.automation_widget,
-        )
-
         self.fluorescence_view = FluorescenceView()
         self.fluorescence_image_view = ImageView()
         self.fluorescence_action = self.navigation.add_panel(
@@ -325,7 +316,7 @@ class ViewCore(QMainWindow):
         )
         # Children of Processing.
         self.navigation.add_subview_group(
-            child_actions=(self.globus_action, self.genesis_action, self.automation_action),
+            child_actions=(self.globus_action, self.genesis_action),
             insert_before=self.fluorescence_action,
             child_icon_size=QSize(24, 24),
         )

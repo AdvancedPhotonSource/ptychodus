@@ -28,11 +28,9 @@ class ProbeRepositoryItemFactory:
 
         A probe supplied in memory comes from reconstruction output or a product
         loaded from file, so its mode structure is already what the reconstructor
-        solved for. Batch mode reads product.h5 through this path, where a user
-        who sets a mode count in settings.ini would otherwise see it silently do
-        nothing. Set the mode counts on the run that produces the probe instead --
-        ptychodus-bdp reads probes through the from-file builder, which does
-        condition them.
+        solved for, and a mode count set in the settings would otherwise silently
+        do nothing. Set the mode counts on the run that produces the probe instead
+        -- the from-file builder does condition them.
         """
         settings = self._settings
         # The decay parameters and the orthogonalization flag are inert at a

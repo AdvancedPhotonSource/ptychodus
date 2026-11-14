@@ -1,7 +1,6 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
     <qresource prefix="icons">
-        <file alias="automate">../webapp/ui/icons/robot.svg</file>
         <file alias="autoscale">../webapp/ui/icons/arrows-left-right-to-line.svg</file>
         <file alias="fluorescence">../webapp/ui/icons/atom.svg</file>
         <file alias="fourier">../webapp/ui/icons/f.svg</file>

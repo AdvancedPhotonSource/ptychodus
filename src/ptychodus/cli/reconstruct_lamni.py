@@ -10,7 +10,7 @@ estimated from the patterns only when neither gives one.
 Scope and limitations
 ---------------------
 
-- One scan, stock LSQML unless ``--ptychi-options`` names something else.
+- One scan, stock LSQML unless ``--options`` names something else.
 - Output is a ptychodus product HDF5. Feeding it back as ``--probe-file`` on the next
   scan is the intended warm start.
 - No GPU selection or thread-count side effects. Choose a device with

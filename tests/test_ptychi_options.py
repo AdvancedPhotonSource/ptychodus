@@ -825,7 +825,7 @@ def test_align_writes_the_near_field_distance_from_the_product() -> None:
 
 
 def test_align_overwrites_a_contradicting_caller_distance_and_warns(caplog) -> None:
-    """A ptychi_options.yaml that hard-codes a distance disagreeing with the product
+    """An options document that hard-codes a distance disagreeing with the product
     is corrected, loudly -- the product owns the field outright."""
     parameters = _make_reconstruct_input()
     options = LSQMLOptions()

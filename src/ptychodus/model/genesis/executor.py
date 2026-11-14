@@ -10,7 +10,6 @@ from ptychodus.api.io import StandardFileLayout, sanitize_path_component
 from ..plugins import PluginChooser
 from ..processing import ProcessingAPI
 from ..product import ProductAPI
-from ..settings import SettingsRegistry
 from ..task_manager import BackgroundTaskManager
 from .facility_adapters import IRIFacilityAdapter
 from .settings import GenesisSettings
@@ -57,7 +56,6 @@ class GenesisExecutor:
     def __init__(
         self,
         task_manager: BackgroundTaskManager,
-        settings_registry: SettingsRegistry,
         product_api: ProductAPI,
         processing_api: ProcessingAPI,
         settings: GenesisSettings,
@@ -69,7 +67,6 @@ class GenesisExecutor:
         super().__init__()
         self._task_manager = task_manager
         self._settings = settings
-        self._settings_registry = settings_registry
         self._product_api = product_api
         self._processing_api = processing_api
         self._facility_chooser = facility_chooser
@@ -77,19 +74,15 @@ class GenesisExecutor:
         self._status_q = status_q
         self._stop_event = stop_event
 
-    def populate_input_directory(self, input_product_index: int) -> WorkflowDirectoryStructure:
+    def populate_input_directory(
+        self, input_product_index: int, action: str
+    ) -> WorkflowDirectoryStructure:
+        """Stage `action`'s inputs for the product under ``<name>/input/``."""
         try:
             product_item = self._product_api.get_item(input_product_index)
         except IndexError:
             logger.exception(f'Failed access product for flow ({input_product_index=})!')
             raise
-
-        dataset = product_item.get_dataset()
-
-        if dataset is None:
-            raise RuntimeError(
-                f'Product "{product_item.get_name()}" has no associated diffraction dataset.'
-            )
 
         local_dir_struct = WorkflowDirectoryStructure(
             self._settings.local_collection_posix_path.get_value()
@@ -102,17 +95,14 @@ class GenesisExecutor:
             logger.exception('Input data POSIX path must be a directory!')
             raise
 
-        self._settings_registry.save_settings(
-            local_dir_struct.input_directory / StandardFileLayout.SETTINGS
-        )
-        dataset.export_assembled_patterns(
-            local_dir_struct.input_directory / StandardFileLayout.DIFFRACTION
-        )
-        self._product_api.save_product(
-            input_product_index,
-            local_dir_struct.input_directory / StandardFileLayout.PRODUCT,
-            file_type='HDF5',
-        )
+        if action == 'train':
+            self._processing_api.stage_train_inputs(
+                local_dir_struct.input_directory, product_index=input_product_index
+            )
+        else:
+            self._processing_api.stage_reconstruct_inputs(
+                local_dir_struct.input_directory, product_index=input_product_index
+            )
 
         return local_dir_struct
 
@@ -197,13 +187,7 @@ class GenesisExecutor:
         algorithm: str | None = None,
     ) -> None:
         self._processing_api.set_reconstructor_if_provided(library=library, algorithm=algorithm)
-        dir_structure = self.populate_input_directory(input_product_index)
-
-        if self._processing_api.is_reconstructor_trainable():
-            ext = self._processing_api.get_model_file_extension()
-            model_path = dir_structure.input_directory / f'{StandardFileLayout.MODEL_BASENAME}{ext}'
-            self._processing_api.save_model(model_path)
-
+        dir_structure = self.populate_input_directory(input_product_index, 'reconstruct')
         self._run_flow('reconstruct', dir_structure)
 
     def train(
@@ -214,6 +198,5 @@ class GenesisExecutor:
         algorithm: str | None = None,
     ) -> None:
         self._processing_api.set_reconstructor_if_provided(library=library, algorithm=algorithm)
-        dir_structure = self.populate_input_directory(input_product_index)
+        dir_structure = self.populate_input_directory(input_product_index, 'train')
         self._run_flow('train', dir_structure)
-        # TODO customize input/output directories; put model to mlflow

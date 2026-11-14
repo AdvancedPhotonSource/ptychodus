@@ -76,7 +76,6 @@ _CATALOGS: dict[str, tuple[str, ...]] = {
         'flat_field_file_readers',
     ),
     # calls into the model
-    'save_product.file_type': ('product_file_writers',),
 }
 
 

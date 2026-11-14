@@ -216,7 +216,6 @@ class GenesisCore:
         self.status_repository = GenesisStatusRepository(status_q)
         self.executor = GenesisExecutor(
             task_manager,
-            settings_registry,
             product_api,
             processing_api,
             self.settings,

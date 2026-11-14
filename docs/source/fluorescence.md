@@ -11,7 +11,7 @@ $ ptychodus-enhance-xrf --product out/product.h5 --fluorescence 2xfm_0123.mda.h5
     --algorithm vspi -o out/fluorescence.h5
 ```
 
-The enhanced dataset is written in the format the measured one was read in (`--file-type`, `XRF-Maps` by default), and the output must differ from both inputs. Nothing is written unless the enhancer runs to completion, so an interrupted run leaves no partially enhanced file. `--dry-run` reads and checks the inputs and options without enhancing.
+The enhanced dataset is written in the format the measured one was read in (`--file-type`, `XRF-Maps` by default), and the output must differ from both inputs. No dataset is written unless the enhancer runs to completion, so an interrupted run leaves no partially enhanced file. Beside the output go `enhance_xrf_options.yaml`, the options the run used, which `--options` takes back, and `enhance_xrf.log`, appended to by each run. `--dry-run` reads and checks the inputs and options without enhancing.
 
 An enhancer runs at its default options unless an options file is given. `--print-options` writes one, naming the enhancer and its fields by their declared names:
 

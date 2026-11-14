@@ -15,14 +15,10 @@ except ModuleNotFoundError:
 import h5py
 import numpy
 
-from ptychodus.api.exit_codes import ExitCode
-from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.workflow import WorkflowAPI
 
 from .agent import AgentCore
 from .analysis import AnalysisCore
-from .automation import AutomationCore
 from .diffraction import DiffractionCore
 from .fluorescence import FluorescenceCore
 from .genesis import GenesisCore
@@ -33,7 +29,6 @@ from .processing import ProcessingCore
 from .product import ProductCore
 from .settings import SettingsRegistry
 from .task_manager import TaskManager
-from .workflow import ConcreteWorkflowAPI
 
 logger = logging.getLogger(__name__)
 
@@ -135,24 +130,6 @@ class ModelCore:
             self.product_core.product_api,
             self.processing_core.processing_api,
         )
-        self.workflow_api: WorkflowAPI = ConcreteWorkflowAPI(
-            self.settings_registry,
-            self.diffraction_core.diffraction_api,
-            self.product_core.product_api,
-            self.product_core.probe_positions_api,
-            self.product_core.probe_api,
-            self.product_core.object_api,
-            self.processing_core.processing_api,
-            self.fluorescence_core.fluorescence_api,
-            self.globus_core.executor,
-            self.genesis_core.executor,
-        )
-        self.automation_core = AutomationCore(
-            self._task_manager,
-            self.settings_registry,
-            self.workflow_api,
-            PluginChooser(self.plugin_registry.file_based_workflows),
-        )
         self.agent_core = AgentCore(
             self.settings_registry,
             PluginChooser(self.plugin_registry.language_model_providers),
@@ -165,7 +142,6 @@ class ModelCore:
         self._task_manager.start()
         self.genesis_core.start()
         self.globus_core.start()
-        self.automation_core.start()
         return self
 
     @overload
@@ -185,7 +161,6 @@ class ModelCore:
         exception_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        self.automation_core.stop()
         self.globus_core.stop()
         self.genesis_core.stop()
         self._task_manager.stop(await_finish=False)
@@ -194,142 +169,6 @@ class ModelCore:
         self._task_manager.run_foreground_tasks()
         self.globus_core.run_foreground_tasks()
         self.genesis_core.run_foreground_tasks()
-
-    def _batch_mode_reconstruct(self, input_directory: Path, output_directory: Path) -> ExitCode:
-        diffraction_path = input_directory / StandardFileLayout.DIFFRACTION
-
-        if diffraction_path.is_file():
-            diffraction_handle = self.workflow_api.load_assembled_diffraction_data(diffraction_path)
-        else:
-            logger.error('Diffraction data is not a file!')
-            return ExitCode.USAGE
-
-        processing_api = self.processing_core.processing_api
-
-        if processing_api.is_reconstructor_trainable():
-            ext = processing_api.get_model_file_extension()
-            model_path = input_directory / f'{StandardFileLayout.MODEL_BASENAME}{ext}'
-
-            if model_path.is_file():
-                processing_api.load_model(model_path)
-            else:
-                logger.info(
-                    f'No model file found at {model_path}; '
-                    'reconstructor will run without a preloaded model.'
-                )
-
-        input_product_path = input_directory / StandardFileLayout.PRODUCT
-
-        if input_product_path.is_file():
-            output_product_path = output_directory / StandardFileLayout.PRODUCT
-
-            if output_product_path.is_file():
-                logger.warning('Output product file will be overwritten!')
-
-            input_product_api = self.workflow_api.load_product(
-                input_product_path, diffraction=diffraction_handle
-            )
-            try:
-                output_product_api = input_product_api.reconstruct_local(
-                    output_product_file=output_product_path,
-                    block=True,
-                )
-            except Exception as exc:
-                logger.error(f'Reconstruction failed: {type(exc).__name__}: {exc}')
-                return ExitCode.FAILURE
-
-            if not output_product_path.is_file():
-                # Nothing raised and nothing was written, which is a failure
-                # even though no step reported one: an empty output directory
-                # is not a reconstruction, and a batch queue branches on the
-                # exit code rather than reading the log.
-                logger.error(f'Reconstruction wrote no product to {output_product_path}!')
-                return ExitCode.FAILURE
-        else:
-            logger.error('Input product is not a file!')
-            return ExitCode.USAGE
-
-        input_fluorescence_path = input_directory / StandardFileLayout.FLUORESCENCE
-
-        if input_fluorescence_path.is_file():
-            output_fluorescence_path = output_directory / StandardFileLayout.FLUORESCENCE
-
-            if output_fluorescence_path.is_file():
-                logger.warning('Output fluorescence file will be overwritten!')
-
-            logger.warning(
-                'Batch-mode fluorescence enhancement is deprecated and will be removed. '
-                'Reconstruct with ptychodus-reconstruct, then enhance with ptychodus-enhance-xrf.'
-            )
-            logger.info('Enhancing fluorescence...')
-
-            output_product_api.enhance_fluorescence_local(
-                input_fluorescence_path,
-                output_fluorescence_path,
-                block=True,
-            )
-        else:
-            logger.info('No fluorescence data to enhance.')
-
-        return ExitCode.SUCCESS
-
-    def _batch_mode_train(self, input_directory: Path, output_directory: Path) -> ExitCode:
-        diffraction_path = input_directory / StandardFileLayout.DIFFRACTION
-
-        if diffraction_path.is_file():
-            diffraction_handle = self.workflow_api.load_assembled_diffraction_data(diffraction_path)
-        else:
-            logger.error('Diffraction data is not a file!')
-            return ExitCode.USAGE
-
-        input_product_path = input_directory / StandardFileLayout.PRODUCT
-
-        if not self.processing_core.processing_api.is_reconstructor_trainable():
-            # Refused here so the status says so. A request to train something
-            # that cannot is a usage error, and a batch queue branches on the
-            # exit code rather than reading the log.
-            logger.error('The selected algorithm cannot train!')
-            return ExitCode.USAGE
-
-        if input_product_path.is_file():
-            input_product_api = self.workflow_api.load_product(
-                input_product_path, diffraction=diffraction_handle
-            )
-            try:
-                input_product_api.train_reconstructor_local(
-                    input_directory, output_directory, block=True
-                )
-            except Exception as exc:
-                logger.error(f'Training failed: {type(exc).__name__}: {exc}')
-                return ExitCode.FAILURE
-            return ExitCode.SUCCESS
-        else:
-            logger.error('Input product is not a file!')
-            return ExitCode.USAGE
-
-    def batch_mode_execute(
-        self, action: str, input_directory: Path, output_directory: Path
-    ) -> ExitCode:
-        if not input_directory.is_dir():
-            raise ValueError('Input path is not a directory!')
-
-        output_directory.mkdir(parents=True, exist_ok=True)
-
-        settings_path = input_directory / StandardFileLayout.SETTINGS
-
-        if settings_path.is_file():
-            self.settings_registry.open_settings(settings_path)
-        else:
-            logger.warning('Settings file not found! Proceeding with defaults.')
-
-        match action.lower():
-            case 'reconstruct':
-                return self._batch_mode_reconstruct(input_directory, output_directory)
-            case 'train':
-                return self._batch_mode_train(input_directory, output_directory)
-
-        logger.error(f'Unknown batch mode action "{action}"!')
-        return ExitCode.USAGE
 
     @property
     def is_developer_mode_enabled(self) -> bool:

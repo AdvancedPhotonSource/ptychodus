@@ -22,7 +22,7 @@ Some desktop details are absent because the files cannot supply them:
 
 Others are absent by choice: the image tools (pan and zoom, save, ruler, rectangle histogram, line cut, Fourier) and the Measured/Enhanced fluorescence toggle, since enhancing is computation. The web viewer adds what the desktop lacks: a **clip** option, a caption with the physical pixel size, and an About menu on the rail.
 
-Panels with no web counterpart are the ones that write or dispatch: Settings, Processing, Globus, Genesis, Automation and Agent, along with every analysis dialog. Those remain desktop-only (`uv run ptychodus`). Campaigns and lineage are the reverse — a store-only grouping with no desktop counterpart, served over REST and MCP for agents and scripts but not browsed. Any writes to the storage root happen out of band: the desktop app, batch runs (`uv run ptychodus -b reconstruct ...`), or the streaming processor.
+Panels with no web counterpart are the ones that write or dispatch: Settings, Processing, Globus, Genesis and Agent, along with every analysis dialog. Those remain desktop-only (`uv run ptychodus`). Campaigns and lineage are the reverse — a store-only grouping with no desktop counterpart, served over REST and MCP for agents and scripts but not browsed. Any writes to the storage root happen out of band: the desktop app, the reconstruct commands (`uv run ptychodus-reconstruct ...`), or the streaming processor.
 
 ## Install
 

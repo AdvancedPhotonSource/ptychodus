@@ -12,7 +12,6 @@ from ptychodus.model.product.core import _DatasetOrphanObserver
 from ptychodus.model.product.item import ProductRepositoryItem
 from ptychodus.model.product.repository import ProductRepository
 from ptychodus.model.product.item import ProductRepositoryObserver
-from ptychodus.model.workflow import ConcreteWorkflowAPI
 
 
 class _RecordingObserver(ProductRepositoryObserver):
@@ -91,54 +90,6 @@ def test_orphan_observer_clears_only_matching_products() -> None:
 
     matching.unbind_dataset.assert_called_once_with()
     unrelated.unbind_dataset.assert_not_called()
-
-
-def _make_workflow_api(diffraction_repository: MagicMock) -> ConcreteWorkflowAPI:
-    diffraction_api = MagicMock()
-    diffraction_api.get_repository.return_value = diffraction_repository
-    return ConcreteWorkflowAPI(
-        MagicMock(),  # settings_registry
-        diffraction_api,
-        MagicMock(),  # product_api
-        MagicMock(),  # probe_positions_api
-        MagicMock(),  # probe_api
-        MagicMock(),  # object_api
-        MagicMock(),  # processing_api
-        MagicMock(),  # fluorescence_api
-        MagicMock(),  # globus_executor
-        MagicMock(),  # genesis_executor
-    )
-
-
-def test_fetch_dataset_resolves_object_by_index() -> None:
-    dataset = MagicMock()
-    diffraction_repository = MagicMock()
-    diffraction_repository.__len__.return_value = 3
-    diffraction_repository.__getitem__.return_value = dataset
-
-    api = _make_workflow_api(diffraction_repository)
-    handle = MagicMock()
-    handle.get_dataset_index.return_value = 1
-
-    assert api._fetch_dataset(handle) is dataset
-    diffraction_repository.__getitem__.assert_called_once_with(1)
-
-
-def test_fetch_dataset_clears_on_out_of_range() -> None:
-    diffraction_repository = MagicMock()
-    diffraction_repository.__len__.return_value = 2
-
-    api = _make_workflow_api(diffraction_repository)
-    handle = MagicMock()
-    handle.get_dataset_index.return_value = 5
-
-    assert api._fetch_dataset(handle) is None
-
-
-def test_fetch_dataset_returns_none_without_handle() -> None:
-    api = _make_workflow_api(MagicMock())
-
-    assert api._fetch_dataset(None) is None
 
 
 def _make_processing_api(item: MagicMock) -> ProcessingAPI:

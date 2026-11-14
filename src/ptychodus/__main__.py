@@ -6,59 +6,26 @@ import logging
 import sys
 
 from ptychodus.api.exit_codes import ExitCode
-from ptychodus.model.observer import Observable, Observer
-from ptychodus.cli import DirectoryType, verify_all_arguments_parsed
+from ptychodus.cli import verify_all_arguments_parsed
 from ptychodus.model import ModelCore
-from ptychodus.model.diffraction import DiffractionTaskMonitor
 import ptychodus
 
 logger = logging.getLogger(__name__)
 
 
-class _DiffractionProgressLogger(Observer):
-    def __init__(self, monitor: DiffractionTaskMonitor) -> None:
-        super().__init__()
-        self._monitor = monitor
-        monitor.add_observer(self)
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._monitor:
-            goal = self._monitor.get_progress_goal()
-
-            if goal > 0:
-                logger.info(f'Loaded {self._monitor.get_progress()}/{goal} arrays')
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog=ptychodus.__name__.lower(),
-        description=f'{ptychodus.__name__} is a ptychography data pipeline application',
-    )
-    parser.add_argument(
-        '-b',
-        '--batch',
-        choices=('reconstruct', 'train'),
-        help='Run action non-interactively',
-    )
-    parser.add_argument(
-        '-i',
-        '--input-directory',
-        metavar='INPUT_DIR',
-        type=DirectoryType(must_exist=True),
-        help='Path to the input data directory (batch mode only)',
+        description=(
+            f'{ptychodus.__name__} is a ptychography data pipeline application. This command '
+            'starts the GUI; the ptychodus-* commands run headless.'
+        ),
     )
     parser.add_argument(
         '--log-level',
         type=int,
         default=logging.INFO,
         help='Set Python logging level.',
-    )
-    parser.add_argument(
-        '-o',
-        '--output-directory',
-        metavar='OUTPUT_DIR',
-        type=DirectoryType(must_exist=False),
-        help='Path to the output data directory (batch mode only)',
     )
     parser.add_argument(
         '-s',
@@ -77,25 +44,17 @@ def main() -> int:
     parsed_args, unparsed_args = parser.parse_known_args()
     settings_file = Path(parsed_args.settings.name) if parsed_args.settings else None
 
+    try:
+        from PyQt5.QtWidgets import QApplication
+    except ModuleNotFoundError:
+        logging.basicConfig(level=parsed_args.log_level, stream=sys.stderr)
+        logger.error(
+            'The GUI needs PyQt5, from the "gui" extra. Headless work runs through the '
+            'ptychodus-* commands, such as ptychodus-reconstruct.'
+        )
+        return ExitCode.FAILURE
+
     with ModelCore(settings_file, log_level=parsed_args.log_level) as model:
-        if parsed_args.batch is not None:
-            verify_all_arguments_parsed(parser, unparsed_args)
-
-            if parsed_args.input_directory is None or parsed_args.output_directory is None:
-                parser.error('Batch mode requires input and output arguments!')
-                return ExitCode.USAGE
-
-            _DiffractionProgressLogger(model.diffraction_core.task_monitor)
-            return model.batch_mode_execute(
-                parsed_args.batch, parsed_args.input_directory, parsed_args.output_directory
-            )
-
-        try:
-            from PyQt5.QtWidgets import QApplication
-        except ModuleNotFoundError:
-            logger.warning('PyQt5 not found.')
-            return ExitCode.FAILURE
-
         # QApplication expects the first argument to be the program name
         app = QApplication(sys.argv[:1] + unparsed_args)
         verify_all_arguments_parsed(parser, app.arguments()[1:])

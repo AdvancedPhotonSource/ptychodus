@@ -38,7 +38,6 @@ class GlobusCore:
         self.status_repository = GlobusStatusRepository(self.settings, self._client, status_q)
         self.executor = GlobusExecutor(
             self.settings,
-            settings_registry,
             product_api,
             processing_api,
             self._client,

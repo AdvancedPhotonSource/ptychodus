@@ -22,7 +22,6 @@ import pytest
 
 from ptychodus.api.diffraction import DiffractionMetadata, Polarization
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.workflow import WorkflowAPI
 from ptychodus.model.product import item_factory as item_factory_module
 from ptychodus.model.product.api import ProductAPI
 from ptychodus.model.product.item_factory import (
@@ -131,7 +130,6 @@ class TestConstructionChainSignatures:
         [
             ('create_from_values', ProductRepositoryItemFactory.create_from_values),
             ('insert_new_product', ProductAPI.insert_new_product),
-            ('create_product', WorkflowAPI.create_product),
         ],
     )
     def test_accepts_every_metadata_field(self, label: str, function: Any) -> None:

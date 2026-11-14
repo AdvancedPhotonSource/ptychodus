@@ -6,9 +6,8 @@ path as both and leaving every backend's checkpoints beside the data it learned
 from. This asks for the two separately.
 
 The pair is remembered for the session rather than persisted. They are
-arguments to one run, not configuration: a settings key for either would stand
-beside the directories batch mode is given on the command line, with nothing to
-say which of the two a run should believe.
+arguments to one run, not configuration, as they are on the ptychodus-train
+command line.
 """
 
 from __future__ import annotations

@@ -117,7 +117,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument(
-        '--ptychi-options', type=Path, help='Passed to ptychodus-reconstruct; stock LSQML if unset.'
+        '--options', type=Path, help='Passed to ptychodus-reconstruct; stock LSQML if unset.'
     )
     parser.add_argument('--log-level', type=int, default=logging.INFO)
     return parser
@@ -287,8 +287,8 @@ def _reconstruct(args: argparse.Namespace, prepared: Path, output: Path) -> Prod
         str(output),
     ]
 
-    if args.ptychi_options is not None:
-        command += ['--ptychi-options', str(args.ptychi_options)]
+    if args.options is not None:
+        command += ['--options', str(args.options)]
 
     logger.info('Running %s', ' '.join(command))
     subprocess.run(command, check=True)

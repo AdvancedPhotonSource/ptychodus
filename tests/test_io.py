@@ -146,9 +146,6 @@ class TestStandardFileLayout:
     def test_product_filename(self) -> None:
         assert StandardFileLayout.PRODUCT == 'product.h5'
 
-    def test_settings_filename(self) -> None:
-        assert StandardFileLayout.SETTINGS == 'settings.ini'
-
     def test_fluorescence_filename(self) -> None:
         assert StandardFileLayout.FLUORESCENCE == 'fluorescence.h5'
 
@@ -166,7 +163,6 @@ class TestStandardFileLayout:
     def test_path_builds_under_directory(self) -> None:
         assert StandardFileLayout.PRODUCT.path(Path('/x')) == Path('/x/product.h5')
         assert StandardFileLayout.FLUORESCENCE.path(Path('/x')) == Path('/x/fluorescence.h5')
-        assert StandardFileLayout.SETTINGS.path(Path('/x')) == Path('/x/settings.ini')
         assert StandardFileLayout.RECONSTRUCT_LOG.path(Path('/x')) == Path('/x/reconstruct.log')
 
     def test_rank_path_suffixes_all_but_the_main_process(self) -> None:

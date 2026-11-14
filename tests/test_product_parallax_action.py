@@ -8,7 +8,6 @@ Behaviors verified:
   - the settings-driven estimate runs on insert only where EstimateDefocusFromParallax
     is set, as it is by default, and the product states no focus of its own
   - it runs on newly created products only, never on a copied, loaded or reconstructed one
-  - WorkflowAPI.estimate_defocus blocks, so a probe generated next sees the focus
   - inserting a product reaches the settings-driven estimate at all
 """
 
@@ -26,7 +25,6 @@ from ptychodus.api.product import ProductMetadata
 from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.product import ProductAPI
 from ptychodus.model.product.settings import ProductSettings
-from ptychodus.model.workflow import ConcreteProductWorkflowAPI
 from ptychodus.model.task_manager import BackgroundTask, ForegroundTask, TaskManager
 
 from parallax_scan_fixtures import (
@@ -211,25 +209,6 @@ def test_the_setting_measures_a_product_that_states_no_focus() -> None:
 )
 def test_the_setting_measures_nothing_where_it_should_not(kwargs: dict, reason: str) -> None:
     assert not _maybe_estimate(**kwargs).called, reason
-
-
-def test_the_workflow_api_blocks_so_a_probe_built_next_sees_the_focus() -> None:
-    product_api = MagicMock()
-    workflow_api = ConcreteProductWorkflowAPI(
-        product_api,
-        MagicMock(),
-        MagicMock(),
-        MagicMock(),
-        MagicMock(),
-        MagicMock(),
-        MagicMock(),
-        MagicMock(),
-        7,
-    )
-
-    workflow_api.estimate_defocus()
-
-    product_api.estimate_defocus_from_parallax.assert_called_once_with(7, block=True)
 
 
 def test_inserting_a_product_reaches_the_settings_driven_estimate() -> None:

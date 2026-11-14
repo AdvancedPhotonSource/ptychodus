@@ -10,7 +10,7 @@ zone-plate piezo encoders the MDA records as detector channels in every era.
 Scope and limitations
 ---------------------
 
-- One scan, stock LSQML unless ``--ptychi-options`` names something else.
+- One scan, stock LSQML unless ``--options`` names something else.
 - The initial probe is the back-propagated mean pattern unless ``--fzp-preset`` names a
   zone plate or ``--probe-file`` a warm start; ``--probe-propagation-distance-m`` moves
   it off focus. The zone plate's defocus is recorded in no file, so the data-derived

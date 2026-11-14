@@ -115,6 +115,9 @@ class PluginChooserParameter(Parameter[str], Observer, Generic[T]):
         for plugin in self._chooser:
             yield plugin.display_name
 
+    def get_plugin(self) -> Plugin[T]:
+        return self._chooser.get_current_plugin()
+
     def get_strategy(self) -> T:
         return self._chooser.get_current_plugin().strategy
 

@@ -141,7 +141,7 @@ done
 grep -nEi '\b(tike|ptycho_fm|install\.sh)\b' CLAUDE.md
 ```
 
-`settings.ini` as a `StandardFileLayout` member is an I/O contract, not a repo-root file — not a finding.
+`reconstruct_options.yaml` and the other `StandardFileLayout` members are an I/O contract, not repo-root files — not a finding.
 
 ### 10. Contradictions
 

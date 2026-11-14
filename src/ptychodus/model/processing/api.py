@@ -5,6 +5,8 @@ import time
 
 from pydantic import BaseModel
 
+from ptychodus.api.io import StandardFileLayout
+from ptychodus.api.options import dump_options_document
 from ptychodus.api.plugins import PluginCatalog
 from ptychodus.api.reconstruct import (
     PositionIndexFilter,
@@ -455,6 +457,71 @@ class ProcessingAPI:
         writer.write(file_path, reconstruct_input)
         toc = time.perf_counter()
         logger.info(f'Export time {toc - tic:.4f} seconds.')
+
+    def _options_document(self, reconstructor: Reconstructor) -> str:
+        """The selected options for `reconstructor`, as the document a headless run reads."""
+        selectors = {
+            'library': self._library_parameter.get_plugin().simple_name,
+            'algorithm': reconstructor.name,
+        }
+        return dump_options_document(selectors, self._options_for(reconstructor))
+
+    def stage_reconstruct_inputs(self, directory: Path, *, product_index: int) -> None:
+        """Write what ``ptychodus-reconstruct -i directory`` reconstructs, as now selected.
+
+        The assembled patterns, the product, the selected options as
+        ``reconstruct_options.yaml``, and for a trainable reconstructor its model.
+
+        Raises:
+            ValueError: when no reconstructor is selected or the product has no dataset.
+        """
+        reconstructor = self._algorithm_parameter.get_current_reconstructor()
+
+        if reconstructor is None:
+            raise ValueError('No reconstructor is selected.')
+
+        dataset = self._product_api.get_item(product_index).get_dataset()
+
+        if dataset is None:
+            raise ValueError('The product has no diffraction dataset.')
+
+        dataset.export_assembled_patterns(StandardFileLayout.DIFFRACTION.path(directory))
+        self._product_api.save_product(
+            product_index, StandardFileLayout.PRODUCT.path(directory), file_type='HDF5'
+        )
+        StandardFileLayout.RECONSTRUCT_OPTIONS.path(directory).write_text(
+            self._options_document(reconstructor)
+        )
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            model_file = directory / (
+                f'{StandardFileLayout.MODEL_BASENAME}{reconstructor.get_model_file_extension()}'
+            )
+            reconstructor.save_model(model_file)
+
+    def stage_train_inputs(self, directory: Path, *, product_index: int) -> None:
+        """Write what ``ptychodus-train -i directory`` trains on, as now selected.
+
+        The product's training data in the selected backend's format, and the selected
+        options as ``train_options.yaml``.
+
+        Raises:
+            ValueError: when the selected reconstructor cannot train.
+        """
+        reconstructor = self._algorithm_parameter.get_current_reconstructor()
+
+        if not isinstance(reconstructor, TrainableReconstructor):
+            raise ValueError('The selected algorithm cannot train.')
+
+        file_type = self.get_default_training_data_file_type()
+        writer = self._training_data_file_writers.get_strategy_by_name(file_type)
+        extension = min(writer.get_file_extensions())
+        self.export_training_data(
+            directory / f'training_data{extension}', product_index=product_index
+        )
+        StandardFileLayout.TRAIN_OPTIONS.path(directory).write_text(
+            self._options_document(reconstructor)
+        )
 
     def train(
         self,

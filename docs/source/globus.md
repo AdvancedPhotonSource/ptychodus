@@ -32,7 +32,7 @@ Perform steps 1-3 on the local and remote computers.
 
 6. For data transfer, use a [guest collection](https://docs.globus.org/how-to/guest-collection-share-and-access) on a Globus Connect Server or use a [Globus Connect Personal endpoint](https://www.globus.org/globus-connect-personal) on your local computer.
 
-7. On the local computer, launch the reconstruction tasks from the "Workflow" view.
+7. On the local computer, launch the reconstruction tasks from the Globus panel.
 
 8. On the remote computer, watch the queue (use qstat on Polaris) and Globus compute endpoint logs
 
@@ -45,6 +45,15 @@ Perform steps 1-3 on the local and remote computers.
    ```sh
    $ globus-compute-endpoint stop
    ```
+
+## What a submission runs
+
+A submission stages a directory for the selected product, transfers it to the compute collection, runs one command over it on the endpoint, and transfers the results back.
+
+- A reconstruction stages `diffraction.h5`, `product.h5` and `reconstruct_options.yaml` — the selected library, algorithm and options — plus the trained model for a learned reconstructor, and runs `ptychodus-reconstruct` over them.
+- Training stages the product's training data in the selected backend's format and `train_options.yaml`, and runs `ptychodus-train`.
+
+Each writes its outputs, its options and its log into the output directory, with the command's standard output and error in `stdout.log` and `stderr.log`. Any library installed in the endpoint's environment can reconstruct.
 
 ## Example Globus Compute Endpoint Configuration
 

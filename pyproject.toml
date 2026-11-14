@@ -32,13 +32,11 @@ dependencies = [
     "scikit-learn",
     "scipy",
     "tifffile",
-    "watchdog",
 ]
 dynamic = ["version"]
 
 [project.scripts]
 ptychodus = "ptychodus.__main__:main"
-ptychodus-bdp = "ptychodus.cli.bdp:main"
 ptychodus-enhance-xrf = "ptychodus.cli.enhance_xrf:main"
 ptychodus-generate-training-data = "ptychodus.cli.generate_training_data:main"
 ptychodus-reconstruct = "ptychodus.cli.reconstruct_prepared:main"
@@ -95,6 +93,7 @@ webapp = [
     "pillow>=13.0.0",
     "pydantic-settings>=2.14.2",
     "python-multipart>=0.0.31",
+    "watchdog",
     "xraydb>=4.5",
 ]
 

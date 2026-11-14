@@ -7,7 +7,6 @@ from PyQt5.QtWidgets import QAction
 from ..model import ModelCore
 from ..view import ViewCore
 from .agent import AgentChatController, AgentController
-from .automation import AutomationController
 from .data import FileDialogFactory
 from .diffraction.core import DiffractionController
 from .fluorescence import FluorescenceController
@@ -180,13 +179,6 @@ class ControllerCore:
             model.genesis_core.status_repository,
             view.genesis_view,
             view.genesis_status_view,
-            self._file_dialog_factory,
-        )
-        self._automation_controller = AutomationController(
-            model.automation_core.settings,
-            model.automation_core.repository,
-            model.automation_core.presenter,
-            view.automation_view,
             self._file_dialog_factory,
         )
         self._agent_controller = AgentController(

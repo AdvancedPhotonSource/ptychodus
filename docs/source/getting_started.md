@@ -235,13 +235,14 @@ stderr will show a one-line notice such as `ptychodus: using image localhost/pty
 ```sh
 $ ptychodus                                          # GUI, auto-detect GPU
 $ ptychodus -s settings.ini                          # GUI with settings
-$ ptychodus -b reconstruct -i ./input -o ./output    # headless batch
+$ ptychodus reconstruct -i ./prepared -o ./output    # headless ptychodus-reconstruct
+$ ptychodus reconstruct-2ide --diffraction-file ...  # any ptychodus-* command, prefix optional
 $ PTYCHODUS_VERSION=1.8.0 ptychodus                  # pin the version, keep GPU detection
 $ PTYCHODUS_IMAGE=ptychodus:1.8.0-cpu ptychodus      # force a specific image
 $ PTYCHODUS_QUIET=1 ptychodus -v                     # silent, version only
 ```
 
-On AMD and Intel hosts the wrapper selects the ROCm or XPU image, which has no GUI, so only `-b` batch invocations work there.
+A first argument naming a `ptychodus-*` console script, whole or without its `ptychodus-` prefix, runs that command headless instead of the GUI. On AMD and Intel hosts the wrapper selects the ROCm or XPU image, which has no GUI, so only those commands work there.
 
 File paths passed via `-i`, `-o`, `-s`, or as positional arguments resolve naturally as long as they live under `$HOME`, the current directory, or one of the auto-mounted beamline roots (`/local`, `/gdata`).
 

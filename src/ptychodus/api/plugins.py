@@ -44,7 +44,6 @@ from .probe_positions import (
 )
 from .product import ProductFileReader, ProductFileWriter
 from .reconstruct import ReconstructorLibrary, TrainingDataFileWriter
-from .workflow import FileBasedWorkflow
 
 __all__ = [
     'Plugin',
@@ -255,7 +254,6 @@ class PluginRegistry:
         self.object_file_writers = PluginList[ObjectFileWriter]()
         self.product_file_readers = PluginList[ProductFileReader]()
         self.product_file_writers = PluginList[ProductFileWriter]()
-        self.file_based_workflows = PluginList[FileBasedWorkflow]()
         self.fluorescence_file_readers = PluginList[FluorescenceFileReader]()
         self.fluorescence_file_writers = PluginList[FluorescenceFileWriter]()
         self.training_data_file_writers = PluginList[TrainingDataFileWriter]()

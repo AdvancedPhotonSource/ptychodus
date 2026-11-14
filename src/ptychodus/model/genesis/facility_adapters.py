@@ -8,6 +8,8 @@ import json
 import logging
 import shlex
 
+from ptychodus.api.io import StandardFileLayout
+
 from .iri import IRIClient, JobAttributes, JobSpecification, ResourceSpecification, ResourceType
 from .settings import GenesisSettings
 
@@ -131,15 +133,29 @@ class IRIFacilityAdapter(ABC):
         pass
 
 
+def ptychodus_arguments(action: str, input_directory: Path, output_directory: Path) -> list[str]:
+    """The command running `action` over a staged directory, as an argument list.
+
+    A reconstruction reads the options staged beside its inputs; training is pointed at its
+    options document explicitly, since its input directory holds training data alone.
+    """
+    match action:
+        case 'reconstruct':
+            command = ['ptychodus-reconstruct']
+        case 'train':
+            options_file = StandardFileLayout.TRAIN_OPTIONS.path(input_directory)
+            command = ['ptychodus-train', '--options', str(options_file)]
+        case _:
+            raise ValueError(f'Unknown remote action "{action}"!')
+
+    return [*command, '-i', str(input_directory), '-o', str(output_directory)]
+
+
 def run_ptychodus_command(action: str, input_directory: Path, output_directory: Path) -> str:
     # Every interpolated value is shell-quoted: directories are derived from product names read
-    # out of user-supplied files and from settings that batch mode loads from its input
-    # directory, so an unquoted interpolation here is remote command execution on the facility.
-    return (
-        f'ptychodus -b {shlex.quote(action)}'
-        f' -i {shlex.quote(str(input_directory))}'
-        f' -o {shlex.quote(str(output_directory))}'
-    )
+    # out of user-supplied files, so an unquoted interpolation here is remote command
+    # execution on the facility.
+    return shlex.join(ptychodus_arguments(action, input_directory, output_directory))
 
 
 def join_commands(command_seq: Sequence[str]) -> str:
@@ -212,9 +228,10 @@ class NERSCFacilityAdapter(IRIFacilityAdapter):
     def create_job_specification(
         self, action: str, input_directory: Path, output_directory: Path
     ) -> JobSpecification:
+        arguments = ptychodus_arguments(action, input_directory, output_directory)
         return JobSpecification(
-            executable='ptychodus',
-            arguments=['-b', action, '-i', str(input_directory), '-o', str(output_directory)],
+            executable=arguments[0],
+            arguments=arguments[1:],
             name=f'ptychodus-{action}',
             directory=str(output_directory),
             stdout_path=str(output_directory / 'stdout%j.log'),
@@ -259,9 +276,10 @@ class OLCFFacilityAdapter(IRIFacilityAdapter):
     ) -> JobSpecification:
         account = self._settings.account.get_value()
         conda_env = f'/ccsopen/proj/{account}/ptychodus-env'
+        arguments = ptychodus_arguments(action, input_directory, output_directory)
         return JobSpecification(
-            executable='ptychodus',
-            arguments=['-b', action, '-i', str(input_directory), '-o', str(output_directory)],
+            executable=arguments[0],
+            arguments=arguments[1:],
             name=f'ptychodus-{action}',
             directory=str(output_directory),
             stdout_path=str(output_directory / 'stdout%j.log'),

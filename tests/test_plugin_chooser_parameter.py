@@ -115,7 +115,7 @@ def test_notify_false_still_persists() -> None:
 
 
 def test_external_chooser_change_notifies() -> None:
-    """A selection made elsewhere (e.g. batch mode) must reach GUI observers."""
+    """A selection made elsewhere (e.g. a remote submission) must reach GUI observers."""
     chooser_parameter, _ = _build()
     counter = _Counter()
     chooser_parameter.add_observer(counter)

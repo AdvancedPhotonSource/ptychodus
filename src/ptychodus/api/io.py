@@ -126,7 +126,6 @@ class StandardFileLayout(StrEnum):
     # f'{input_directory}/{MODEL_BASENAME}{ext}'.
     MODEL_BASENAME = 'model'
     PRODUCT = 'product.h5'
-    SETTINGS = 'settings.ini'
     # One options document and one log per action, each named after the action, so a
     # directory reconstructed and then enhanced keeps both runs' files without a clash,
     # and a tool finds them by the action it performs without knowing the backend. An

@@ -1,52 +1,57 @@
 # Initial Guess Generation
 
-Ptychodus can create initial data products from existing files or from generator routines. The easiest public entry point is the workflow API:
+Ptychodus can create initial data products from existing files or from generator routines. A product is plain data from the stateless `ptychodus.api`, so one can be assembled directly from the routines the generators are built on:
 
 ```python
 from pathlib import Path
 
-from ptychodus.model import ModelCore
+import numpy
 
-with ModelCore(Path('settings.ini')) as model:
-    product_api = model.workflow_api.create_product(
-        'initial_guess',
-        detector_distance_m=1.0,
-        photon_energy_eV=10_000.0,
-        probe_photon_count=1.0e6,
-    )
+from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.io import save_product
+from ptychodus.api.object import Object, ObjectCenter
+from ptychodus.api.probe import ProbeEnsemble, ProbeGeometry
+from ptychodus.api.probe_positions import ProbePositionSequence
+from ptychodus.api.product import Product, ProductMetadata
+from ptychodus.api.simulate.probe import generate_disk_probe, rescale_probe_intensity
+from ptychodus.api.simulate.probe_positions import generate_cartesian_probe_positions
 
-    product_api.generate_probe_positions(
-        'rectangular_raster',
-        {
-            'num_points_x': 20,
-            'num_points_y': 20,
-            'step_size_x_m': 75e-9,
-            'step_size_y_m': 75e-9,
-        },
-    )
+rng = numpy.random.default_rng()
+metadata = ProductMetadata(
+    name='initial_guess',
+    comments='',
+    detector_distance_m=1.0,
+    photon_energy_eV=10_000.0,
+    probe_photon_count=1.0e6,
+    exposure_time_s=1.0,
+    mass_attenuation_m2_per_kg=0.0,
+    tomography_angle_deg=0.0,
+)
+positions = ProbePositionSequence(list(generate_cartesian_probe_positions(20, 20, 75e-9, 75e-9)))
 
-    product_api.generate_probe(
-        'disk',
-        {
-            'diameter_m': 1.0e-6,
-            'propagation_distance_m': 0.0,
-            'num_incoherent_modes': 1,
-            'num_coherent_modes': 1,
-        },
-    )
+pixel_m = 10e-9
+probe_geometry = ProbeGeometry(
+    width_px=128, height_px=128, pixel_width_m=pixel_m, pixel_height_m=pixel_m
+)
+probe = rescale_probe_intensity(
+    generate_disk_probe(probe_geometry, radius_m=0.5e-6), metadata.probe_photon_count
+)
 
-    product_api.generate_object(
-        'random',
-        {
-            'amplitude_mean': 1.0,
-            'amplitude_deviation': 0.0,
-            'phase_deviation_rad': 0.6,
-            'blur_deviation_px': 0.0,
-        },
-    )
+phase_rad = rng.normal(scale=0.6, size=(512, 512))
+object_ = Object(
+    array=numpy.exp(1j * phase_rad),
+    pixel_geometry=PixelGeometry(width_m=pixel_m, height_m=pixel_m),
+    center=ObjectCenter(x_m=0.0, y_m=0.0),
+)
 
-    product = product_api.get_product()
-    product_api.save_product(Path('initial_guess.h5'), file_type='HDF5')
+product = Product(
+    metadata=metadata,
+    probe_positions=positions,
+    probes=ProbeEnsemble.from_probe(probe),
+    object_=object_,
+    losses=[],
+)
+save_product(Path('initial_guess.h5'), product)
 ```
 
 The product contains four main pieces of initial data:
@@ -56,7 +61,7 @@ The product contains four main pieces of initial data:
 - probe: a {py:class}`ptychodus.api.probe.ProbeEnsemble`;
 - object: a {py:class}`ptychodus.api.object.Object`.
 
-The workflow methods select generator builders by name. Passing no name uses the current settings. Passing a name plus a parameter mapping creates a builder for that product and immediately rebuilds the corresponding data.
+Each generator below is also a plugin, found by name in the plugin registry — `PluginRegistry.load_plugins()`, under `probe_position_generators`, `probe_generators` and `object_generators` — with its parameters declared by `get_default_options()`. The GUI and the settings file select them by that name, and the drivers and `ptychodus-stream` take them by name too.
 
 ## Data Shapes
 
@@ -90,8 +95,6 @@ This reconciliation only ever fires for a file format that records its pixel siz
 A product opened from a product file does carry its pixel size, and that path behaves differently on purpose. Such a product is a finished record rather than an initial guess, and the same path also carries live reconstruction output, so a disagreement is reported as a warning naming both samplings and the array is left alone. The disagreement arises when a product is rebound to another dataset, or when its photon energy or detector distance is edited after loading.
 
 ## Probe Position Generators
-
-Use `WorkflowProductAPI.generate_probe_positions(name, parameters)`.
 
 Each pattern is a plugin that states the parameters it accepts, so the names below are what it registered under and the parameter names are the ones it declares. A pattern added to `ptychodus.plugins` appears here, in the settings file and in the editor dialog without any of them being told about it.
 
@@ -153,9 +156,9 @@ The other patterns use:
 
 ## Probe Generators
 
-Use `WorkflowProductAPI.generate_probe(name, parameters)`. All generated probe builders first create a base complex probe, rescale its total intensity to the product metadata field `probe_photon_count`, then expand it into incoherent and OPR/coherent modes according to the mode settings described below.
+All generated probe builders first create a base complex probe, rescale its total intensity to the product metadata field `probe_photon_count`, then expand it into incoherent and OPR/coherent modes according to the mode settings described below.
 
-Each probe model is a plugin that states the parameters it accepts, so the names below are what it registered under and the parameter names are the ones it declares. A model added to `ptychodus.plugins` appears here, in the settings file and in the editor dialog without any of them being told about it. A plugin knows nothing about where its values come from: the settings file, a workflow call, a preset and a size measured from the data are all just sources of the same declared parameters. Parameters with the same name share one settings key and one value across models — `propagation_distance_m`, and the `diameter_m` that `disk` and `zernike` both take as the diameter of a circular pupil — so switching models keeps them.
+Each probe model is a plugin that states the parameters it accepts, so the names below are what it registered under and the parameter names are the ones it declares. A model added to `ptychodus.plugins` appears here, in the settings file and in the editor dialog without any of them being told about it. A plugin knows nothing about where its values come from: the settings file, a command-line option, a preset and a size measured from the data are all just sources of the same declared parameters. Parameters with the same name share one settings key and one value across models — `propagation_distance_m`, and the `diameter_m` that `disk` and `zernike` both take as the diameter of a circular pupil — so switching models keeps them.
 
 Every model is built at the product's defocus, how far past the focus the object sits: the negated product metadata field `focus_object_distance_m`, positive downstream (diverging) and negative upstream (converging), shown in the product editor as both **Focus-Object Distance** and **Defocus Distance**. In far field a model carries the curvature of a beam sampled that far past its focus. In near field it is built in the equivalent parallel-beam frame the magnification already places it in (see [Near-Field Ptychography](near_field.md)): an aperture model stays flat-phased, and an optic is simulated at the defocus and has the spherical wave of its focus divided out by {py:func}`ptychodus.api.simulate.probe.remove_defocus_phase`. Every model centres its beam axis on pixel `N // 2` of each axis, the FFT origin and the middle pixel of an odd axis, and that pixel is the one placed on each scan position.
 
@@ -181,7 +184,7 @@ Every model is built at the product's defocus, how far past the focus the object
 : Generates a probe as a superposition of Hermite–Gauss modes. `beam_waist_x_m` and `beam_waist_y_m` are the radii at which the intensity of mode `(0, 0)` falls to `1/e²` of its peak; the Gaussian envelope gives every mode a finite extent, about `sqrt(2m + 1)` waists along its axis, so the scale of the polynomials and the size of the probe are one width. `hermite_gauss_coefficients` is a list of complex amplitudes in total-degree order, `(0, 0), (1, 0), (0, 1), (2, 0), (1, 1), (0, 2), ...`, whose length is the number of modes. Each mode is normalized to unit power, so a coefficient is that mode's amplitude relative to the others.
 
 `zernike`
-: Generates a probe as a superposition of Zernike polynomial modes inside a disk with parameter `diameter_m`. `zernike_coefficients` is a list of complex amplitudes in OSA/ANSI order, `(0, 0), (1, -1), (1, 1), (2, -2), (2, 0), (2, 2), ...`, whose length is the number of modes. A coefficient list is a parameter like any other, so a workflow call sets it directly, as complex values or as strings such as `"0.5-0.25j"`; the settings file stores it the same way, as a JSON array of those strings.
+: Generates a probe as a superposition of Zernike polynomial modes inside a disk with parameter `diameter_m`. `zernike_coefficients` is a list of complex amplitudes in OSA/ANSI order, `(0, 0), (1, -1), (1, 1), (2, -2), (2, 0), (2, 2), ...`, whose length is the number of modes. A coefficient list is a parameter like any other, so options set it directly, as complex values or as strings such as `"0.5-0.25j"`; the settings file stores it the same way, as a JSON array of those strings.
 
 **Estimate from Diffraction** fills the parameters a model declares as sizes, measured at the product's defocus; today that is `disk`, `rectangular` and `super_gaussian`. A size written into a shared parameter is the value every model sharing it starts from, so estimating a disk's diameter also sets the diameter `zernike` uses.
 
@@ -201,11 +204,11 @@ Ptychodus registers Fresnel zone plate presets as plugins, each under the one na
 - `APS 33-ID-C PtychoProbe`: `180e-6` m diameter, `15e-9` m outermost zone width, `15e-6` m central beamstop.
 - `APS 33-ID-C VelociProbe`: `180e-6` m diameter, `50e-9` m outermost zone width, `60e-6` m central beamstop.
 
-The GUI builder exposes these as presets. Programmatic workflow use can pass the physical values directly.
+The GUI builder exposes these as presets. Programmatic use can pass the physical values directly.
 
 ### Measuring the Defocus
 
-Every probe model is built at the product's defocus, the negated `focus_object_distance_m`, and the parallax between bright-field images measures it from the data. The defocus is a guess until stated or measured. **Estimate Defocus** in the product editor runs the measurement on the bound diffraction data. `EstimateDefocusFromParallax`, on by default, runs it on every newly created far-field product that states no focus, which is how a batch or workflow run reaches it; an opened product file or a reconstruction result keeps the focus it carries. The reconstruction drivers measure it whenever far-field data states no focus (see [Reconstruction Drivers](reconstruction_drivers.md)). Far-field data only.
+Every probe model is built at the product's defocus, the negated `focus_object_distance_m`, and the parallax between bright-field images measures it from the data. The defocus is a guess until stated or measured. **Estimate Defocus** in the product editor runs the measurement on the bound diffraction data. `EstimateDefocusFromParallax`, on by default, runs it on every newly created far-field product that states no focus; an opened product file or a reconstruction result keeps the focus it carries. The reconstruction drivers measure it whenever far-field data states no focus (see [Reconstruction Drivers](reconstruction_drivers.md)). Far-field data only.
 
 A defocused probe lights each point of its bright field through a different point of the sample, so the image one bright-field detector pixel records as the probe scans is the sample shifted by `-lambda * z * q`. The measurement bins every pattern into bins of `ParallaxBinSizeInPixels` detector pixels a side, maps each bright-field bin's values onto the object grid, registers the images against their mean, and fits the shifts to that line, which gives the defocus with its sign ({py:func}`ptychodus.api.parallax.estimate_defocus_from_parallax`). Larger bins cost less memory but leave fewer bins inside the bright field; at least four must remain away from its edge. At most 64 bright-field bins are mapped, an evenly spread subset when the bright field holds more, so the images' memory stays bounded however large the detector's bright field.
 
@@ -331,113 +334,83 @@ In the GUI this is **Analyze → Coherent (OPR) Modes...** on the probe panel. T
 
 #### Generate a multimode probe from scratch
 
-This example generates only the probe component of a product: a defocused Fresnel zone plate probe with three incoherent modes and two OPR/coherent modes. The product's current scan length is still used internally to size the OPR weights, but no object or explicit scan-position setup is needed for this probe-only example.
+This example generates only the probe: a defocused Fresnel zone plate probe with three incoherent modes and two OPR/coherent modes. The OPR weights hold one row per scan position, so the number of positions is all the scan it needs.
 
 ```python
-from pathlib import Path
+import numpy
 
-from ptychodus.model import ModelCore
+from ptychodus.api.probe import ProbeGeometry
+from ptychodus.api.simulate.probe import (
+    FresnelZonePlate,
+    generate_coherent_probe_modes,
+    generate_fresnel_zone_plate_probe,
+    generate_incoherent_probe_modes,
+    rescale_probe_intensity,
+)
+from ptychodus.api.constants import energy_eV_to_wavelength_m
 
-with ModelCore(Path('settings.ini')) as model:
-    product_api = model.workflow_api.create_product(
-        'generated_multimode_probe',
-        detector_distance_m=1.0,
-        # The object 10 um downstream of the focus: the probe's defocus, negated.
-        focus_object_distance_m=-10e-6,
-        photon_energy_eV=10_000.0,
-        probe_photon_count=1.0e6,
-    )
+num_positions = 400
+pixel_m = 10e-9
+probe_geometry = ProbeGeometry(
+    width_px=128, height_px=128, pixel_width_m=pixel_m, pixel_height_m=pixel_m
+)
+zone_plate = FresnelZonePlate(
+    zone_plate_diameter_m=180e-6,
+    outermost_zone_width_m=50e-9,
+    central_beamstop_diameter_m=60e-6,
+)
+probe = generate_fresnel_zone_plate_probe(
+    probe_geometry,
+    zone_plate,
+    photon_wavelength_m=energy_eV_to_wavelength_m(10_000.0),
+    defocus_distance_m=10e-6,  # the object 10 um downstream of the focus
+)
+probe = rescale_probe_intensity(probe, 1.0e6)
+probe = generate_incoherent_probe_modes(probe, 3, orthogonalize=True)
+probes = generate_coherent_probe_modes(
+    numpy.random.default_rng(), probe, num_cmodes=2, num_positions=num_positions
+)
 
-    product_api.generate_probe(
-        'fresnel_zone_plate',
-        {
-            'zone_plate_diameter_m': 180e-6,
-            'outermost_zone_width_m': 50e-9,
-            'central_beamstop_diameter_m': 60e-6,
-            'num_incoherent_modes': 3,
-            'orthogonalize_incoherent_modes': True,
-            'incoherent_mode_decay_type': 'polynomial',
-            'incoherent_mode_decay_ratio': 0.25,
-            'num_coherent_modes': 2,
-        },
-    )
-
-    product = product_api.get_product()
-    probe_array = product.probes.get_array()
-    opr_weights = product.probes.get_opr_weights()
-
-    assert probe_array.shape[:2] == (2, 3)
-    assert opr_weights.shape == (len(product.probe_positions), 2)
-
-    product_api.save_product(Path('generated_multimode_probe.h5'), file_type='HDF5')
+assert probes.get_array().shape[:2] == (2, 3)
+assert probes.get_opr_weights().shape == (num_positions, 2)
 ```
 
 The same mode parameters work with other generated probe types such as `disk`, `rectangular`, `super_gaussian`, and `zernike`.
 
 #### Add incoherent and OPR modes to an existing single-mode probe
 
-The workflow API can load an existing probe with `load_probe()`, but the current high-level `generate_probe()` call replaces the probe with a named generator rather than augmenting the loaded probe in place. To augment an already loaded single-mode probe, use the low-level mode-expansion routines on the loaded `ProbeEnsemble` and then register the updated product back with the workflow API.
+The same mode-expansion routines augment a probe loaded from a file rather than replacing it with a generated one.
 
 ```python
 from pathlib import Path
 
-from ptychodus.api.product import Product
+import numpy
+
+from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.probe import Probe
 from ptychodus.api.simulate.probe import (
     generate_coherent_probe_modes,
     generate_incoherent_probe_modes,
 )
-from ptychodus.model import ModelCore
 
-with ModelCore(Path('settings.ini')) as model:
-    product_api = model.workflow_api.create_product(
-        'loaded_single_mode_probe',
-        detector_distance_m=1.0,
-        photon_energy_eV=10_000.0,
-        probe_photon_count=1.0e6,
-    )
+# An NPY file is a bare array, so the run's own pixel size is stated alongside it.
+base_probe = Probe(
+    array=numpy.load(Path('single_mode_probe.npy')),
+    pixel_geometry=PixelGeometry(width_m=10e-9, height_m=10e-9),
+)
+probe = generate_incoherent_probe_modes(base_probe, 3, orthogonalize=True)
+probes = generate_coherent_probe_modes(
+    numpy.random.default_rng(), probe, num_cmodes=2, num_positions=400
+)
 
-    product_api.load_probe(Path('single_mode_probe.npy'), file_type='NPY')
-
-    product = product_api.get_product()
-
-    # Collapse any OPR handling in the loaded ProbeEnsemble and start from
-    # the first coherent/OPR mode as a regular Probe.
-    base_probe = product.probes.get_mean_probe()
-
-    probe_with_incoherent_modes = generate_incoherent_probe_modes(
-        base_probe,
-        3,
-        orthogonalize=True,
-    )
-
-    expanded_probe_ensemble = generate_coherent_probe_modes(
-        model.rng,
-        probe_with_incoherent_modes,
-        num_cmodes=2,
-        num_positions=len(product.probe_positions),
-    )
-
-    expanded_product = Product(
-        metadata=product.metadata,
-        probe_positions=product.probe_positions,
-        probes=expanded_probe_ensemble,
-        object_=product.object_,
-        losses=product.losses,
-    )
-
-    expanded_product_api = model.workflow_api.register_product(expanded_product)
-    expanded_product_api.rename_product('loaded_probe_with_added_modes')
-    expanded_product_api.save_product(
-        Path('loaded_probe_with_added_modes.h5'),
-        file_type='HDF5',
-    )
+assert probes.get_array().shape[:2] == (2, 3)
 ```
 
-This replaces the probe with a new `ProbeEnsemble` whose shape is `(2, 3, height, width)` and whose OPR weights have shape `(n_scan_points, 2)`.
+The result is a `ProbeEnsemble` whose shape is `(2, 3, height, width)` and whose OPR weights have shape `(n_scan_points, 2)`.
 
 ## Object Generators
 
-Use `WorkflowProductAPI.generate_object(name, parameters)`. Each object model is a plugin, registered under the name passed here, and its parameters are the fields it declares; the settings file holds each under the same name in PascalCase with its unit in words (`phase_deviation_rad` is `PhaseDeviationInRadians` in `[Object]`). Phases are in radians throughout, as the `_rad` suffix says, so an object is `amplitude * exp(1j * phase_rad)`.
+Each object model is a plugin, registered under the name below, and its parameters are the fields it declares; the settings file holds each under the same name in PascalCase with its unit in words (`phase_deviation_rad` is `PhaseDeviationInRadians` in `[Object]`). Phases are in radians throughout, as the `_rad` suffix says, so an object is `amplitude * exp(1j * phase_rad)`.
 
 Object geometry is derived from the current probe geometry and scan bounding box. The generated object is then widened by `extra_padding_x` and `extra_padding_y` and scaled to the sample's measured mean transmission (see below); both apply to every generated object and to no file-supplied one.
 
@@ -516,7 +489,7 @@ The **cdtools** reconstructor library (the `cdtools` extra) offers **FancyPtycho
 
 ## Low-Level Generator API
 
-The workflow API is usually simpler, but the low-level functions can be used directly when the caller already has geometry objects and wants arrays without registering a product.
+The low-level functions return arrays directly, for a caller that already has geometry objects, as the example at the top of this page does.
 
 Typical low-level imports are:
 
@@ -699,4 +672,4 @@ Pty-Chi still accepts this data through the corresponding `*_options` fields —
 - The generated probe pixel size is derived from detector geometry, detector distance, and probe energy through the product geometry. For physically meaningful generated probes, create or load the diffraction metadata before generating the product.
 - `average_pattern`, `stxm_dpc`, `paganin` and `spectral` depend on assembled diffraction data. Analytic generators such as `disk`, `super_gaussian`, `fresnel_zone_plate`, `random`, `gaussian_random_field`, `fractal_noise`, `dead_leaves`, and `siemens_star` do not require measured patterns.
 - `super_gaussian` is the closest built-in Gaussian-like probe. Ptychodus does not currently register a separate builder literally named `gaussian`.
-- In workflow parameter mappings, use the builder parameter names, not the settings-file names. For example use `full_width_at_half_maximum_m` rather than `FullWidthAtHalfMaximumInMeters`.
+- In options and options documents, use the builder parameter names, not the settings-file names. For example use `full_width_at_half_maximum_m` rather than `FullWidthAtHalfMaximumInMeters`.

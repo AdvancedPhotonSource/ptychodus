@@ -162,6 +162,15 @@
    :show-inheritance:
 ```
 
+## Options
+
+```{eval-rst}
+.. automodule:: ptychodus.api.options
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Parallax
 
 ```{eval-rst}
@@ -343,15 +352,6 @@
 
 ```{eval-rst}
 .. automodule:: ptychodus.api.visualize
-   :members:
-   :undoc-members:
-   :show-inheritance:
-```
-
-## Workflow
-
-```{eval-rst}
-.. automodule:: ptychodus.api.workflow
    :members:
    :undoc-members:
    :show-inheritance:

@@ -87,8 +87,8 @@ The remaining arguments fall into four groups.
   depth-of-focus thresholds; otherwise the focus is zero and a warning says so. Stating
   `--focus-object-distance-m`, 0 included, skips the measurement.
 
-Four more control the run itself: `--ptychi-options` chooses the reconstruction algorithm and
-its settings, `--dry-run` reports the resolved configuration without reconstructing,
+Five more control the run itself: `--options` chooses the reconstruction algorithm and its
+settings, `--num-sync-epochs` overrides how often the run checkpoints and reports progress, `--dry-run` reports the resolved configuration without reconstructing,
 `--prepare-only` writes a prepared directory and stops (see
 [Preparing and reconstructing separately](#preparing-and-reconstructing-separately)), and
 `--log-level` takes a Python logging level as an integer (`10` for DEBUG, `20` for INFO).
@@ -108,9 +108,9 @@ Every driver writes one directory in the same layout, whatever instrument it rea
 fly054/
   diffraction.h5         # the assembled patterns, as reconstructed
   product.h5             # the final object, probe and positions
-  product.000100.h5      # a snapshot every --num-sync-epochs epochs
-  ptychi_options.yaml    # the options that actually ran
-  ptychodus.log          # everything the run wrote to its console
+  product.000100.h5      # a snapshot every num_sync_epochs epochs
+  reconstruct_options.yaml  # the options the run was given
+  reconstruct.log        # every log record the run wrote
 ```
 
 `product.h5` is the result: it carries the object, the probe, the refined probe positions, and
@@ -118,9 +118,12 @@ the metadata the reconstruction used. It opens in the GUI and reads back through
 API. `ptychodus-enhance-xrf` takes it with a fluorescence dataset from the same scan, as
 {doc}`fluorescence` describes.
 
-`ptychi_options.yaml` records the options *after* the product's own values were folded in, so
-it describes the run exactly rather than describing what was asked for. It can be passed
-straight back to `--ptychi-options` to repeat the run.
+`reconstruct_options.yaml` records the options the run was given, as a document naming the
+library and algorithm, and can be passed straight back to `--options` to repeat the run. The
+values pty-chi derives from the product are folded in when the reconstruction starts, and the
+options it actually ran with are written to `reconstruct.log`. A log is appended to rather than
+replaced, and each process of a multi-process launch writes its own, `reconstruct.rank01.log`
+and so on.
 
 `diffraction.h5` is written before the reconstruction starts, so an interrupted run still
 leaves the one artifact that cannot be rebuilt without the raw files. It can run to several
@@ -140,19 +143,20 @@ reconstruction starts from rather than what it produced:
 fly054-prepared/
   diffraction.h5         # the assembled patterns
   product.h5             # the initial object, probe and positions
-  ptychi_options.yaml    # the options the reconstruction will run with
+  reconstruct_options.yaml  # the options the reconstruction will run with
+  reconstruct.log        # every log record the preparation wrote
 ```
 
 ## Choosing the algorithm
 
-With no `--ptychi-options`, a driver runs stock LSQML. To run anything else, or to change any
-reconstruction setting, pass a pty-chi options file.
+With no `--options`, a driver runs stock LSQML, or BH for a near-field product. To run anything
+else, or to change any reconstruction setting, pass an options document.
 
 Obtain one by asking a driver to print the defaults:
 
 ```sh
-$ ptychodus-reconstruct-2ide --print-ptychi-options > lsqml.yaml    # LSQML, the default
-$ ptychodus-reconstruct-2ide --print-ptychi-options DM > dm.yaml    # a different algorithm
+$ ptychodus-reconstruct-2ide --print-options > lsqml.yaml    # LSQML, the default
+$ ptychodus-reconstruct-2ide --print-options DM > dm.yaml    # a different algorithm
 ```
 
 The algorithm may be `DM`, `RAAR`, `PIE`, `ePIE`, `rPIE`, `LSQML`, `Autodiff` or `BH`. The flag
@@ -165,26 +169,28 @@ $ ptychodus-reconstruct-2ide \
     --diffraction-file /data/2ide/ptycho/fly054_data_001.h5 \
     --position-file /data/2ide/mda/2xfm_0054.mda \
     --output-directory ./fly054 \
-    --ptychi-options ./lsqml.yaml
+    --options ./lsqml.yaml
 ```
 
-The file names its own algorithm, in an `options_class_name` field that appears throughout it.
-That is what selects the reconstructor on the way back in, so change the algorithm by printing
-a fresh file rather than by editing those names.
+The document names its library and algorithm at the top, beside the options themselves: the
+pty-chi task options under `task`, and ptychodus's own `num_sync_epochs` and
+`compact_mode_update_clustering`. Fields the document omits keep their defaults, and a field the
+algorithm does not declare is refused. The task also carries pty-chi's `options_class_name`
+stamps, which must agree with the algorithm, so change the algorithm by printing a fresh
+document rather than by editing those names.
 
 ```{note}
 Values describing the data — the wavelength, the object and probe pixel sizes, the slice
 spacings, the propagation distance and the probe power — are written from the product when the
-reconstruction starts, whatever the file says. The printed defaults list them. Editing them
-changes nothing except to add a warning to the log.
+reconstruction starts, whatever the document says. The comment above `task` in a printed
+document lists them. Editing them changes nothing except to add a warning to the log.
 
 A hand-written file must also spell scientific notation `1.0e-3` rather than `1e-3`: YAML
-reads the shorter form as a string. Files produced by `--print-ptychi-options` are already
+reads the shorter form as a string. Documents produced by `--print-options` are already
 correct.
 ```
 
-JSON is accepted as well as YAML, chosen by the file suffix, and `-` reads the options from
-standard input.
+`-` reads the document from standard input.
 
 ## Reconstructing a whole tomogram
 
@@ -214,7 +220,7 @@ The experiment folder holds `dat-files`, `scan_positions` and `eiger_4` either u
 
 ```sh
 $ ptychodus-reconstruct-batch-lamni --batch-settings batch.yaml --dry-run
-$ ptychodus-reconstruct-batch-lamni --batch-settings batch.yaml --ptychi-options lsqml.yaml
+$ ptychodus-reconstruct-batch-lamni --batch-settings batch.yaml --options lsqml.yaml
 ```
 
 Start with `--dry-run`: it resolves the scan table and reports every scan it would reconstruct,
@@ -227,7 +233,8 @@ is skipped, which is how an interrupted run resumes — re-run the same command.
 ### Driving it from Python
 
 The command is a shim over a function that takes the same two things as objects: a
-`BatchSettings` and a pty-chi `PtychographyTaskOptions`. A script that already holds those — one
+`BatchSettings` and pty-chi options, a `PtyChiOptions` such as `default_options` returns. A
+script that already holds those — one
 sweeping a reconstruction parameter over a projection range, or building the settings from an
 experiment database rather than a YAML file — calls it directly instead of writing a temporary
 file and launching a subprocess.
@@ -235,6 +242,7 @@ file and launching a subprocess.
 ```python
 from ptychi.api import LSQMLOptions
 
+from ptychodus.plugins.ptychi.options import default_options
 from ptychodus.cli.reconstruct_batch_lamni import (
     Batch,
     BatchSettings,
@@ -256,8 +264,8 @@ settings = BatchSettings(
 for record in plan_batch_lamni(settings):  # the dry run, in code: no data is read
     print(record.scan_no, record.encoder_angle_deg)
 
-options = LSQMLOptions()
-options.reconstructor_options.num_epochs = 200
+options = default_options(LSQMLOptions)
+options.task.reconstructor_options.num_epochs = 200
 
 result = reconstruct_batch_lamni(settings, options)
 print(result.succeeded, result.skipped, result.failed)
@@ -327,34 +335,31 @@ The split lets the preparation run where the raw data are, on a beamline worksta
 reconstruction run where the GPUs are. It also lets one scan be reconstructed several times
 with different options without assembling the raw data again, which for a large scan is most
 of the wall-clock time. Every argument that shapes the data or the initial guesses — cropping,
-filtering, geometry, `--seed`, the probe options and `--ptychi-options` — takes effect at
-preparation. `--num-sync-epochs` belongs to the reconstruction.
+filtering, geometry, `--seed`, the probe options, `--options` and `--num-sync-epochs` — takes
+effect at preparation, and the options are carried into the prepared directory.
 
 `ptychodus-reconstruct` reads no raw beamline files and knows nothing about any instrument. It
-takes its options from the prepared directory's `ptychi_options.yaml` unless `--ptychi-options`
-names another file, and falls back to stock LSQML, or BH for a near-field product, when there
-is neither. The input directory is never modified, and the output must be a different directory,
+takes its options from the prepared directory's `reconstruct_options.yaml` unless `--options`
+names another document, and falls back to stock pty-chi LSQML, or BH for a near-field product,
+when there is neither. The document names the library, so the same prepared directory
+reconstructs with any installed backend — `--print-options cdtools` writes cdtools' defaults,
+for one — and a trainable backend loads the `model` file the directory holds. The input directory is never modified, and the output must be a different directory,
 since the final `product.h5` would otherwise overwrite the initial one. `--dry-run` loads and
 pairs the inputs and reports what would run.
 
 `ptychodus-reconstruct-subprocess` reconstructs the same input for a launching process. It
-reports progress as newline-delimited JSON — one object per line, `started`, `epoch`,
-`checkpoint`, `finished` — which makes it usable as a child process of a launcher that wants to
+reports progress as newline-delimited JSON — one object per line: `started`, naming the
+`library` and `algorithm`; `epoch`, for each output with its `num_epochs` goal; `checkpoint`;
+`finished` — which makes it usable as a child process of a launcher that wants to
 follow a reconstruction. Use `--event-file` to send that stream to a file and leave standard
 output alone.
-
-```{note}
-`ptychodus-bdp` is deprecated and will be removed. Its prepared directory can still be
-reconstructed with `ptychodus-reconstruct`; new pipelines should prepare data with
-`--prepare-only` instead, which applies the instrument's own conditioning.
-```
 
 ## Reconstructing from a PEAR parameter file
 
 `ptychodus-reconstruct-pear` reads the flat JSON parameter file that PEAR's batch loop writes,
 and reconstructs the single scan it describes. The parameter file names the instrument, the
 input paths and every reconstruction setting, so the command takes almost no arguments of its
-own and has no `--ptychi-options`: the algorithm settings come from the parameter file too.
+own and has no `--options`: the algorithm settings come from the parameter file too.
 
 ```sh
 $ ptychodus-reconstruct-pear --params ./scan0054_params.json --dry-run
@@ -374,7 +379,7 @@ $ ptychodus-train --print-options PtychoPINN/Unsupervised > pinn.yaml
 $ ptychodus-train -i ./training-data -o ./trained --options pinn.yaml
 ```
 
-The backend writes what it trains into the output directory, and the command adds the trained model there as `model` with the backend's extension, such as `model.zip` for PtychoPINN. `--dry-run` checks the inputs, options and launch without training.
+The backend writes what it trains into the output directory, and the command adds the trained model there as `model` with the backend's extension, such as `model.zip` for PtychoPINN, beside `train_options.yaml`, the options it trained with, and `train.log`. `--dry-run` checks the inputs, options and launch without training.
 
 To train on several GPUs of one node, launch it with `torchrun`:
 
