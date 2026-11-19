@@ -19,7 +19,7 @@ File readers are implemented using a Python namespace plugin system. We would be
 - [European Synchrotron Radiation Facility (ESRF)](https://www.esrf.fr/UsersAndScience/Experiments/Beamlines)
   - [ID16A Nano-imaging](https://www.esrf.fr/UsersAndScience/Experiments/XNP/ID16A) (`*.h5`, `*.hdf5`, near field)
 - [Linac Coherent Light Source (LCLS)](https://lcls.slac.stanford.edu/instruments)
-  - [Hutch 1.3 XPP: X-ray Pump Probe](https://lcls.slac.stanford.edu/instruments/xpp)
+  - [Hutch 1.3 XPP: X-ray Pump Probe](https://lcls.slac.stanford.edu/instruments/xpp) (`*.h5`, `*.hdf5`)
   - SLAC NumPy Zipped Archive (`*.npz`)
 - [MAX IV](https://www.maxiv.lu.se/beamlines-accelerators/beamlines/)
   - [NanoMAX](https://www.maxiv.lu.se/beamlines-accelerators/beamlines/nanomax/) (`*.h5`)
