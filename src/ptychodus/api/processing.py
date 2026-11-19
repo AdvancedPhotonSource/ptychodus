@@ -55,7 +55,9 @@ class RunRecord(BaseModel):
     unknown. ``options`` names the options document, in the result's folder, that the run
     was configured by; it is ``None`` for a run configured by no such document.
     ``updated_at`` is refreshed whenever the record changes, so a ``running`` record that
-    has stopped advancing can be told from one that is still at work.
+    has stopped advancing can be told from one that is still at work. ``job_id`` names the
+    job that produced the result, and ``model`` is the URI of the trained model the run
+    reconstructed with; both are ``None`` for a run that no job started.
     """
 
     model_config = ConfigDict(extra='forbid', frozen=True)
@@ -68,6 +70,8 @@ class RunRecord(BaseModel):
     ptychodus_version: str
     user: str
     options: str | None = None
+    job_id: str | None = None
+    model: str | None = None
     updated_at: datetime
 
     def revise(self, **changes: Any) -> RunRecord:

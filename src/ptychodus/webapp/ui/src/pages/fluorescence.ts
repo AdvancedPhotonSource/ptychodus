@@ -4,8 +4,9 @@ import { createImagePanel } from '../components/image_panel.js';
 import { createTree, type TreeNode } from '../components/tree.js';
 import { MISSING, fmt, fmtBytes, ingestRowState, infoText, withRunBadge } from '../format.js';
 import { buildPageLayout, infoLabel } from '../layout.js';
+import { findLinked, showLink } from '../routes.js';
 
-export async function mountFluorescence(root: HTMLElement): Promise<void> {
+export async function mountFluorescence(root: HTMLElement, uuid: string | null): Promise<void> {
   const { page, left, right, setActiveTab } = buildPageLayout('fluorescence');
   root.replaceChildren(page);
 
@@ -29,6 +30,10 @@ export async function mountFluorescence(root: HTMLElement): Promise<void> {
     left.replaceChildren(errorBlock(err as Error));
     return;
   }
+
+  const found = await findLinked(items, uuid, api.getFluorescence);
+  items = found.items;
+  if (found.error !== null) image.setError(found.error);
 
   if (items.length === 0) {
     left.replaceChildren(emptyBlock('No fluorescence datasets in store.'));
@@ -57,6 +62,7 @@ export async function mountFluorescence(root: HTMLElement): Promise<void> {
           .catch((err: Error) => image.setError(err));
       };
       setActiveTab('right');
+      showLink('fluorescence', f.uuid);
       downloadHost.replaceChildren(
         createDownloadBar(api.fluorescenceFileUrl(f.uuid), `${label}.h5`)
       );
@@ -89,6 +95,8 @@ export async function mountFluorescence(root: HTMLElement): Promise<void> {
   });
   tree.setNodes(nodes);
   left.appendChild(infoLabel(infoText('Datasets', total, items.map((f) => f.nbytes))));
+
+  if (found.linked !== null) tree.activate(`flu:${found.linked.uuid}`);
 }
 
 function errorBlock(err: Error): HTMLElement {

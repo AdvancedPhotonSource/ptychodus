@@ -2,6 +2,7 @@ import { api, type ProductRead } from '../api.js';
 import { createDownloadBar } from '../components/download_bar.js';
 import { createTable } from '../components/table.js';
 import { buildPageLayout, infoLabel } from '../layout.js';
+import { findLinked, showLink } from '../routes.js';
 import {
   MISSING,
   fmt,
@@ -14,7 +15,7 @@ import {
   withRunBadge,
 } from '../format.js';
 
-export async function mountProduct(root: HTMLElement): Promise<void> {
+export async function mountProduct(root: HTMLElement, uuid: string | null): Promise<void> {
   const { page, left, right, setActiveTab } = buildPageLayout('product');
   root.replaceChildren(page);
 
@@ -34,10 +35,20 @@ export async function mountProduct(root: HTMLElement): Promise<void> {
     return;
   }
 
+  const found = await findLinked(items, uuid, api.getProduct);
+  items = found.items;
+  if (found.error !== null) detail.replaceChildren(errorBlock(found.error));
+
   if (items.length === 0) {
     left.replaceChildren(emptyBlock('No products in store.'));
     return;
   }
+
+  const select = (row: ProductRead): void => {
+    setActiveTab('right');
+    showDetail(detail, row);
+    showLink('product', row.uuid);
+  };
 
   const table = createTable<ProductRead>(
     [
@@ -81,14 +92,16 @@ export async function mountProduct(root: HTMLElement): Promise<void> {
         numeric: true,
       },
     ],
-    (row) => {
-      setActiveTab('right');
-      showDetail(detail, row);
-    },
+    select,
     { rowState: ingestRowState }
   );
   left.replaceChildren(table.el, infoLabel(infoText('Products', total, items.map(totalBytes))));
   table.setRows(items);
+
+  if (found.linked !== null) {
+    table.setSelected(items.indexOf(found.linked));
+    select(found.linked);
+  }
 }
 
 /** The run badge with its reason and command, or the missing mark for imported data. */

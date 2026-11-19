@@ -2,6 +2,7 @@ import { api, type ProductRead, type RenderParams } from '../api.js';
 import { createImagePanel } from '../components/image_panel.js';
 import { createTree, type TreeNode } from '../components/tree.js';
 import { buildPageLayout, infoLabel } from '../layout.js';
+import { findLinked, showLink } from '../routes.js';
 import { fmt, fmtBytes, fmtInt, ingestRowState, infoText, scale } from '../format.js';
 
 const COLUMNS = [
@@ -15,7 +16,7 @@ const COLUMNS = [
   'Size',
 ];
 
-export async function mountObject(root: HTMLElement): Promise<void> {
+export async function mountObject(root: HTMLElement, uuid: string | null): Promise<void> {
   const { page, left, right, setActiveTab } = buildPageLayout('object');
   root.replaceChildren(page);
 
@@ -40,6 +41,9 @@ export async function mountObject(root: HTMLElement): Promise<void> {
     return;
   }
 
+  const found = await findLinked(items, uuid, api.getProduct);
+  items = found.items;
+
   // A layer of null is the object itself: the product of its layers, as the desktop
   // shows when the object's own row is selected.
   const show = (p: ProductRead, layer: number | null) => {
@@ -56,6 +60,7 @@ export async function mountObject(root: HTMLElement): Promise<void> {
         .catch((err: Error) => image.setError(err));
     };
     setActiveTab('right');
+    showLink('object', p.uuid);
     redraw = draw;
     draw(image.params());
   };
@@ -99,6 +104,9 @@ export async function mountObject(root: HTMLElement): Promise<void> {
     })
   );
   left.appendChild(infoLabel(infoText('Objects', total, items.map((p) => p.object_nbytes))));
+
+  if (found.linked !== null) tree.activate(`object:${found.linked.uuid}`);
+  if (found.error !== null) image.setError(found.error);
 }
 
 function errorBlock(err: Error): HTMLElement {

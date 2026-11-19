@@ -35,6 +35,18 @@ def test_a_run_record_round_trips_and_forbids_undeclared_fields() -> None:
         RunRecord.model_validate({**record.model_dump(), 'epoch': 3})
 
 
+def test_a_job_s_id_and_model_are_optional_and_round_trip() -> None:
+    record = create_run_record(RunState.RUNNING, command='ptychodus-reconstruct')
+    assert (record.job_id, record.model) == (None, None)
+
+    written = record.model_dump(mode='json', exclude={'job_id', 'model'})
+    assert RunRecord.model_validate(written) == record
+
+    revised = record.revise(job_id='5f0c', model='file:///models/pinn.h5')
+    assert RunRecord.model_validate_json(revised.model_dump_json()) == revised
+    assert (revised.job_id, revised.model) == ('5f0c', 'file:///models/pinn.h5')
+
+
 def test_revising_a_record_refreshes_its_time_and_validates() -> None:
     record = create_run_record(RunState.RUNNING, command='ptychodus-enhance-xrf')
     revised = record.revise(progress=3, progress_goal=4)

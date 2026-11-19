@@ -3,6 +3,7 @@ import { createDownloadBar } from '../components/download_bar.js';
 import { createImagePanel, type ImagePanel } from '../components/image_panel.js';
 import { createTree, type TreeColumn, type TreeNode } from '../components/tree.js';
 import { buildPageLayout, infoLabel } from '../layout.js';
+import { findLinked, showLink } from '../routes.js';
 import {
   MISSING,
   dtypeItemsize,
@@ -30,7 +31,7 @@ const COLUMNS: TreeColumn[] = [
   'Size',
 ];
 
-export async function mountDiffraction(root: HTMLElement): Promise<void> {
+export async function mountDiffraction(root: HTMLElement, uuid: string | null): Promise<void> {
   const { page, left, right, setActiveTab } = buildPageLayout('diffraction');
   root.replaceChildren(page);
 
@@ -55,6 +56,10 @@ export async function mountDiffraction(root: HTMLElement): Promise<void> {
     return;
   }
 
+  const found = await findLinked(items, uuid, api.getDiffraction);
+  items = found.items;
+  if (found.error !== null) image.setError(found.error);
+
   if (items.length === 0) {
     left.replaceChildren(emptyBlock('No diffraction datasets in store.'));
     return;
@@ -64,6 +69,8 @@ export async function mountDiffraction(root: HTMLElement): Promise<void> {
     items.map((d) => datasetNode(d, image, downloadHost, setActiveTab, (fn) => (redraw = fn)))
   );
   left.appendChild(infoLabel(infoText('Datasets', total, items.map((d) => d.nbytes))));
+
+  if (found.linked !== null) tree.activate(`diff:${found.linked.uuid}`);
 }
 
 function datasetNode(
@@ -87,6 +94,7 @@ function datasetNode(
         .catch((err: Error) => image.setError(err));
     };
     setActiveTab('right');
+    showLink('diffraction', d.uuid);
     downloadHost.replaceChildren(createDownloadBar(api.diffractionFileUrl(d.uuid), `${label}.h5`));
     // A control change re-fetches whatever is on screen, not the first thing drawn.
     remember(draw);

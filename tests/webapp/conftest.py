@@ -147,6 +147,7 @@ def seed_diffraction(tmp_storage_root: Path) -> Callable[..., UUID]:
         campaign_uuid: UUID | None = None,
         derived_from: list[dict] | None = None,
         photon_energy_eV: float | None = 8000.0,  # noqa: N803
+        polarization: str | None = None,
         write_h5: bool = True,
     ) -> UUID:
         uuid = uuid or uuid4()
@@ -160,6 +161,7 @@ def seed_diffraction(tmp_storage_root: Path) -> Callable[..., UUID]:
             'uuid': str(uuid),
             'created_at': datetime.now(timezone.utc).isoformat(),
             'photon_energy_eV': photon_energy_eV,
+            'polarization': polarization,
         }
         if campaign_uuid is not None:
             manifest['campaign_uuid'] = str(campaign_uuid)
@@ -231,8 +233,24 @@ def seed_fluorescence(tmp_storage_root: Path) -> Callable[..., UUID]:
 
 
 # --------------------------------------------------------------------------------------
-# FastAPI client fixture
+# MCP server and FastAPI client fixtures
 # --------------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def bound_mcp(session_provider: SessionProvider, layout: StorageLayout):
+    from ptychodus.webapp.mcp_server import (
+        bind_layout,
+        bind_render_runner,
+        bind_session_provider,
+        create_mcp_server,
+    )
+    from ptychodus.webapp.rendering.offload import RenderRunner
+
+    bind_session_provider(session_provider)
+    bind_layout(layout)
+    bind_render_runner(RenderRunner(4))
+    return create_mcp_server()
 
 
 @pytest_asyncio.fixture

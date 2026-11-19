@@ -23,6 +23,8 @@ export interface TreeRoot {
   el: HTMLElement;
   setSelected: (id: string | null) => void;
   setNodes: (nodes: TreeNode[]) => void;
+  /** Selects the top-level node `id` as a click on it would; false if there is none. */
+  activate: (id: string) => boolean;
 }
 
 /** Rows rendered around the viewport by a windowed parent. */
@@ -82,9 +84,20 @@ export function createTree(columns: TreeColumn[] = []): TreeRoot {
     return frag;
   }
 
+  let roots: TreeNode[] = [];
+
   function render(nodes: TreeNode[]): void {
+    roots = nodes;
     list.replaceChildren();
     for (const node of nodes) list.appendChild(nodeToLi(node));
+  }
+
+  function activate(id: string): boolean {
+    const node = roots.find((root) => root.id === id);
+    if (node === undefined) return false;
+    setSelected(id);
+    node.onSelect?.();
+    return true;
   }
 
   /** A scroll-driven window over children that are too many to build eagerly. */
@@ -187,10 +200,11 @@ export function createTree(columns: TreeColumn[] = []): TreeRoot {
     if (id !== null) {
       const found = el.querySelector<HTMLElement>(`[data-node-id="${cssEscape(id)}"]`);
       found?.classList.add('selected');
+      found?.scrollIntoView({ block: 'nearest' });
     }
   }
 
-  return { el, setSelected, setNodes: render };
+  return { el, setSelected, setNodes: render, activate };
 }
 
 function makeLoading(): HTMLElement {

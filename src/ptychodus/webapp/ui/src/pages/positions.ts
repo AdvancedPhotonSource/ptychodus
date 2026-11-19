@@ -2,9 +2,10 @@ import { api, type ProductRead } from '../api.js';
 import { createImagePanel } from '../components/image_panel.js';
 import { createTable } from '../components/table.js';
 import { buildPageLayout, infoLabel } from '../layout.js';
+import { findLinked, showLink } from '../routes.js';
 import { fmtBytes, fmtFixed, fmtInt, ingestRowState, infoText } from '../format.js';
 
-export async function mountPositions(root: HTMLElement): Promise<void> {
+export async function mountPositions(root: HTMLElement, uuid: string | null): Promise<void> {
   const { page, left, right, setActiveTab } = buildPageLayout('positions');
   root.replaceChildren(page);
 
@@ -22,6 +23,9 @@ export async function mountPositions(root: HTMLElement): Promise<void> {
     left.replaceChildren(errorBlock(err as Error));
     return;
   }
+
+  const found = await findLinked(items, uuid, api.getProduct);
+  items = found.items;
 
   const plot = (checked: ProductRead[]): void => {
     if (checked.length === 0) {
@@ -54,9 +58,9 @@ export async function mountPositions(root: HTMLElement): Promise<void> {
       },
       { header: 'Size', render: (p) => fmtBytes(p.scan_nbytes), sortKey: (p) => p.scan_nbytes, numeric: true },
     ],
-    // As on the desktop, a click only selects; the Plot checkboxes choose what is
-    // drawn, in table order.
-    () => undefined,
+    // As on the desktop, a click only selects, and links to the row; the Plot checkboxes
+    // choose what is drawn, in table order.
+    (row) => showLink('positions', row.uuid),
     { checkbox: { header: 'Plot', onChange: plot, position: 1 }, rowState: ingestRowState }
   );
 
@@ -65,6 +69,13 @@ export async function mountPositions(root: HTMLElement): Promise<void> {
     infoLabel(infoText('Positions', total, items.map((p) => p.scan_nbytes)))
   );
   table.setRows(items);
+
+  // A deep link selects its scan and plots it.
+  if (found.linked !== null) {
+    table.setSelected(items.indexOf(found.linked));
+    table.setChecked([found.linked]);
+  }
+  if (found.error !== null) image.setError(found.error);
 }
 
 function labelFor(p: ProductRead): string {

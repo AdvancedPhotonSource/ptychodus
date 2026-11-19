@@ -25,6 +25,8 @@ export interface DataTable<T> {
   setRows: (rows: T[]) => void;
   setSelected: (index: number | null) => void;
   getChecked: () => T[];
+  /** Checks exactly `rows`, reporting the change as a click on their boxes would. */
+  setChecked: (rows: T[]) => void;
 }
 
 type SortState = { column: number; descending: boolean } | null;
@@ -153,7 +155,11 @@ export function createTable<T>(
   function setSelected(idx: number | null): void {
     selectedIndex = idx;
     tbody.querySelectorAll('tr.selected').forEach((n) => n.classList.remove('selected'));
-    if (idx !== null) (tbody.children[idx] as HTMLElement | undefined)?.classList.add('selected');
+    if (idx !== null) {
+      const tr = tbody.children[idx] as HTMLElement | undefined;
+      tr?.classList.add('selected');
+      tr?.scrollIntoView({ block: 'nearest' });
+    }
   }
 
   function setRows(next: T[]): void {
@@ -163,5 +169,18 @@ export function createTable<T>(
     draw();
   }
 
-  return { el, setRows, setSelected, getChecked: () => sorted().filter((r) => checked.has(r)) };
+  function setChecked(next: T[]): void {
+    checked.clear();
+    for (const row of next) if (rows.includes(row)) checked.add(row);
+    draw();
+    notifyChecked();
+  }
+
+  return {
+    el,
+    setRows,
+    setSelected,
+    getChecked: () => sorted().filter((r) => checked.has(r)),
+    setChecked,
+  };
 }

@@ -3,8 +3,8 @@
 FastAPI service that indexes on-disk ptychodus artifacts (campaigns, diffraction datasets, reconstruction products, fluorescence maps), exposes them through a REST API, an MCP server, and a minimal browser UI, and keeps a SQLite metadata cache in sync with the storage root via a filesystem watcher.
 
 - **REST**: `/api/v1/*` — list / get / render endpoints per resource kind
-- **MCP**: `/mcp` — read-only tools mirroring the REST surface
-- **Browser UI**: `/ui/` — Diffraction, Products (with Positions, Probe and Object nested beneath it) and Fluorescence, served from compiled TypeScript
+- **MCP**: `/mcp` — read-only tools taking the REST routes' parameters and refusing what they refuse; a render tool returns the PNG with its scales as structured content
+- **Browser UI**: `/ui/` — Diffraction, Products (with Positions, Probe and Object nested beneath it) and Fluorescence, served from compiled TypeScript. Deep links mirror the REST paths: `/ui/#product/<uuid>` selects a product, `/ui/#product/<uuid>/probe` (or `/object`, `/positions`) opens that view of it, and `/ui/#diffraction/<uuid>` and `/ui/#fluorescence/<uuid>` theirs; the address bar follows the selection
 - **OpenAPI**: `/openapi.json` and interactive docs at `/docs`
 
 ## Scope of the browser UI

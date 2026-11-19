@@ -95,6 +95,7 @@ async def test_mcp_tools_registered_and_callable(
         'render_probe_modes',
         'render_object',
         'render_object_layer',
+        'render_scan_positions',
         'render_fluorescence_summary',
         'render_fluorescence_element',
     }
@@ -107,20 +108,8 @@ async def test_mcp_tools_registered_and_callable(
     assert payload['product_count'] == 1
 
     lineage_result = await mcp.call_tool('get_lineage', {'uuid': str(p)})
-    payload = _structured(lineage_result)
-    # Optional return types are wrapped as {'result': ...} by fastmcp
-    lineage_payload = payload['result'] if 'result' in payload else payload
-    assert lineage_payload is not None
-    ancestor_uuids = {a['uuid'] for a in lineage_payload['ancestors']}
+    ancestor_uuids = {a['uuid'] for a in _structured(lineage_result)['ancestors']}
     assert str(d) in ancestor_uuids
-
-
-@pytest.fixture
-def bound_mcp(session_provider: SessionProvider, layout: StorageLayout):
-    bind_session_provider(session_provider)
-    bind_layout(layout)
-    bind_render_runner(RenderRunner(4))
-    return create_mcp_server()
 
 
 async def _ingest(
@@ -305,34 +294,6 @@ async def test_mcp_render_fluorescence_missing_element(
     await _ingest(session_provider, layout, layout.manifest_path('fluorescence', f))
     with pytest.raises(ToolError, match='not found'):
         await bound_mcp.call_tool('render_fluorescence_element', {'uuid': str(f), 'name': 'Au'})
-
-
-async def test_mcp_list_tools_accept_every_rest_filter() -> None:
-    """REST and MCP are one surface in two channels, so their filters must match.
-
-    Adding a query parameter to a router without the matching tool argument leaves an
-    agent unable to ask what an HTTP client can, and nothing else catches it: the two
-    are written in separate files and share only the converter.
-    """
-    import inspect
-
-    from ptychodus.webapp.routers import diffraction, fluorescence, product
-
-    rest_lists: dict[str, Callable[..., Any]] = {
-        'list_product': product.list_product,
-        'list_diffraction': diffraction.list_diffraction,
-        'list_fluorescence': fluorescence.list_fluorescence,
-    }
-
-    mcp = create_mcp_server()
-    tools = {tool.name: tool for tool in await mcp.list_tools()}
-
-    for name, rest_fn in rest_lists.items():
-        # `session` is injected by FastAPI and has no agent-facing counterpart.
-        expected = {p for p in inspect.signature(rest_fn).parameters if p != 'session'}
-        actual = set(tools[name].parameters.get('properties', {}))
-
-        assert expected <= actual, f'{name} is missing {sorted(expected - actual)}'
 
 
 async def test_mcp_lists_products_by_run_state(

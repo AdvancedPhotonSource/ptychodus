@@ -7,11 +7,12 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-class RenderedImage(BaseModel):
-    """A rendered image plus the metadata a front-end needs to draw a colorbar."""
+class RenderedImageInfo(BaseModel):
+    """What a rendered image's scales are, for a reader that has the image itself apart.
 
-    png_base64: str = Field(description='Base64-encoded PNG bytes.')
-    mime_type: Literal['image/png'] = 'image/png'
+    Everything :class:`RenderedImage` carries but the PNG and the legend's color stops.
+    """
+
     value_label: str = Field(description='LaTeX-decorated label from the underlying transform.')
     color_value_min: float = Field(
         description='Lower bound of the color axis, in transformed units.'
@@ -23,6 +24,16 @@ class RenderedImage(BaseModel):
     pixel_height_m: float = Field(description='Physical pixel height in meters.')
     shape_h_px: int = Field(description='Rendered image height in pixels.')
     shape_w_px: int = Field(description='Rendered image width in pixels.')
+    legend_cyclic: bool = Field(
+        default=False, description='True when the legend wraps around, as phase does.'
+    )
+
+
+class RenderedImage(RenderedImageInfo):
+    """A rendered image plus the metadata a front-end needs to draw a colorbar."""
+
+    png_base64: str = Field(description='Base64-encoded PNG bytes.')
+    mime_type: Literal['image/png'] = 'image/png'
     legend_rgba: list[list[float]] = Field(
         default=[],
         description=(
@@ -30,23 +41,25 @@ class RenderedImage(BaseModel):
             'to color_value_max, or once around the hue wheel when legend_cyclic.'
         ),
     )
-    legend_cyclic: bool = Field(
-        default=False, description='True when the legend wraps around, as phase does.'
-    )
 
 
-class PlotImage(BaseModel):
-    """A rendered plot.
+class PlotImageInfo(BaseModel):
+    """A rendered plot's size, for a reader that has the image itself apart.
 
-    Distinct from :class:`RenderedImage`, which describes a colormapped array: a plot
+    Distinct from :class:`RenderedImageInfo`, which describes a colormapped array: a plot
     carries its own axes, so it has neither a color axis nor a physical pixel size.
     Reporting one would invite a caption to read it as the sampling of the data.
     """
 
-    png_base64: str = Field(description='Base64-encoded PNG bytes.')
-    mime_type: Literal['image/png'] = 'image/png'
     shape_h_px: int = Field(description='Rendered image height in pixels.')
     shape_w_px: int = Field(description='Rendered image width in pixels.')
+
+
+class PlotImage(PlotImageInfo):
+    """A rendered plot."""
+
+    png_base64: str = Field(description='Base64-encoded PNG bytes.')
+    mime_type: Literal['image/png'] = 'image/png'
 
 
 class OptionsRead(BaseModel):

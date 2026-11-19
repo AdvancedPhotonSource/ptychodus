@@ -161,7 +161,9 @@ async def get_positions_image(
     runner: RenderRunnerDep,
     uuid: Annotated[
         list[UUID],
-        Query(description='Product to plot; repeat to overlay several on shared axes.'),
+        Query(
+            min_length=1, description='Product to plot; repeat to overlay several on shared axes.'
+        ),
     ],
     connect_path: bool = Query(True, description='Join successive scan points with a line.'),
     width_px: int = Query(640, ge=128, le=2048),

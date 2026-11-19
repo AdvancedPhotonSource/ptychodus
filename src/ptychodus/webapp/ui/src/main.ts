@@ -5,8 +5,10 @@ import { mountObject } from './pages/object.js';
 import { mountPositions } from './pages/positions.js';
 import { mountProbe } from './pages/probe.js';
 import { mountProduct } from './pages/product.js';
+import { parseRoute, type Route } from './routes.js';
 
-type Mount = (root: HTMLElement) => void | Promise<void>;
+/** Mounts a page, selecting the resource a deep link named, if any. */
+type Mount = (root: HTMLElement, uuid: string | null) => void | Promise<void>;
 
 const PAGES: Record<string, Mount> = {
   diffraction: mountDiffraction,
@@ -17,29 +19,29 @@ const PAGES: Record<string, Mount> = {
   fluorescence: mountFluorescence,
 };
 
-function currentRoute(): string {
-  const hash = window.location.hash.replace(/^#/, '');
-  if (hash && Object.hasOwn(PAGES, hash)) return hash;
-  return NAV[0]!.route;
+function currentRoute(): Route {
+  const route = parseRoute(window.location.hash);
+  if (route && Object.hasOwn(PAGES, route.page)) return route;
+  return { page: NAV[0]!.route, uuid: null };
 }
 
-function navigate(route: string): void {
-  if (window.location.hash !== `#${route}`) {
-    window.location.hash = `#${route}`;
+function navigate(page: string): void {
+  if (window.location.hash !== `#${page}`) {
+    window.location.hash = `#${page}`;
     return;
   }
-  render(route);
+  render({ page, uuid: null });
 }
 
-function render(route: string): void {
+function render(route: Route): void {
   const navEl = document.getElementById('nav');
   const contentEl = document.getElementById('content');
   if (!navEl || !contentEl) return;
-  renderNav(navEl, route, navigate);
+  renderNav(navEl, route.page, navigate);
   contentEl.replaceChildren();
-  const mount = PAGES[route];
+  const mount = PAGES[route.page];
   if (mount) {
-    const result = mount(contentEl);
+    const result = mount(contentEl, route.uuid);
     if (result instanceof Promise) result.catch((err: Error) => showFatalError(contentEl, err));
   }
 }
