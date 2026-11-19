@@ -7,18 +7,20 @@ Resources are named by their uuid alone; a uuid4 does not collide across kinds, 
 :meth:`StorageLayout.locate` finds any resource from its uuid, and a caller never needs
 a path.
 
-A resource folder is created in one of two ways. The chainable savers write a resource
-whole: each is handed the data, assembles the resource in ``<root>/.staging/`` and renames
-it into place in one step, so it appears complete or not at all, and returns its uuid for
-the next saver's ``derived_from`` or ``campaign``. A processing run instead creates its
-result in place with :func:`start_run`, and the folder is the run's output directory in
-the standard layout -- its options document, its log, a checkpoint per saved result and,
-at the end, the final file. :func:`commit_checkpoint` and :func:`finish_run` advance it by
-replacing the manifest atomically, so a reader always finds a manifest naming a complete
-file, and can watch a result while it is made. Either way the manifest's ``run`` records
-how a processed resource came to be (:class:`~ptychodus.api.processing.RunRecord`).
+Every resource is created the same way: its folder is made in place, its files are
+written and flushed to disk, and its manifest is written last, atomically. A folder
+without a manifest is not a resource to any reader, so a resource appears complete or not
+at all, and a process killed before its manifest leaves a folder no reader sees. The
+chainable savers publish a resource once and return its uuid for the next saver's
+``derived_from`` or ``campaign``. A processing run publishes its result at the start with
+:func:`start_run`, its folder the run's output directory in the standard layout -- its
+options document, its log, a checkpoint per saved result and, at the end, the final file
+-- and :func:`commit_checkpoint` and :func:`finish_run` advance it by replacing the
+manifest, so a reader can watch a result while it is made. Either way the manifest's
+``run`` records how a processed resource came to be
+(:class:`~ptychodus.api.processing.RunRecord`).
 
-Every write is flushed to disk before the rename that publishes it. Data files are never
+Every write is flushed to disk before the manifest that publishes it. Data files are never
 modified once a manifest names them, so a reader on another NFS client never has a file
 replaced under it; a manifest names a resource's current data in its ``files``, which
 :func:`resolve_resource_file` follows.
@@ -30,6 +32,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import StrEnum
+from functools import partial
 from pathlib import Path
 from typing import Annotated, Any, Final, Literal, Union, cast
 from uuid import UUID, uuid4
@@ -374,9 +377,6 @@ class ResourceLocation:
 class StorageLayout:
     """Resolves and validates paths within the storage root."""
 
-    STAGING_DIRECTORY: Final[str] = '.staging'
-    """Hidden folder, beside the kinds, in which the savers assemble a resource."""
-
     def __init__(self, storage_root: Path) -> None:
         self._root = storage_root.resolve()
 
@@ -575,27 +575,34 @@ def _save_resource(
     manifest: Manifest,
     save_files: Callable[[Path], None],
 ) -> UUID:
-    """Assemble a resource in staging, then rename it into place; return its uuid."""
-    target = layout.resource_folder(kind, manifest.uuid)
+    """Write a resource in place and publish it with its manifest; return its uuid.
 
-    if target.exists():
-        raise LayoutError(f'{target} already exists.')
-
-    staging = layout.root / StorageLayout.STAGING_DIRECTORY / str(manifest.uuid)
-    staging.mkdir(parents=True)
+    `save_files` writes the resource's files into its new folder, which no reader sees
+    until the manifest is written last. The folder is created exclusively, so a uuid is
+    never reused. On failure the folder is removed, unless its manifest was already
+    published.
+    """
+    folder = layout.resource_folder(kind, manifest.uuid)
+    folder.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        save_files(staging)
-        save_manifest(staging / MANIFEST_FILENAME, manifest)
-        _fsync_tree(staging)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        staging.rename(target)
+        folder.mkdir()
+    except FileExistsError as exc:
+        raise LayoutError(f'{folder} already exists.') from exc
+
+    manifest_path = folder / MANIFEST_FILENAME
+
+    try:
+        save_files(folder)
+        _fsync_tree(folder)
+        _fsync_directory(folder.parent)
+        save_manifest(manifest_path, manifest)
     except BaseException:
-        shutil.rmtree(staging, ignore_errors=True)
+        if not manifest_path.is_file():
+            shutil.rmtree(folder, ignore_errors=True)
+
         raise
 
-    _fsync_directory(target.parent)
-    _fsync_directory(staging.parent)
     return manifest.uuid
 
 
@@ -790,46 +797,58 @@ def start_run(
     references = _derived_from(layout, derived_from)
     uuid = uuid4()
     folder = layout.resource_folder(kind, uuid)
-    folder.mkdir(parents=True)
+    files = {'options': options_file_name, 'log': log_file_name}
+    data_file_name: str | None = None
 
-    try:
-        options_file = folder / options_file_name
-        options_file.write_text(options_document, encoding='utf-8')
-        _fsync_file(options_file)
-        files = {'options': options_file_name, 'log': log_file_name}
+    if initial is not None:
+        data_file_name = data_layout.checkpoint_path(folder, run.progress).name
+        files[kind] = data_file_name
 
-        if initial is not None:
-            data_file = data_layout.checkpoint_path(folder, run.progress)
+    created_at = datetime.now(timezone.utc)
+    manifest: Manifest
 
-            if isinstance(initial, Path):
-                shutil.copyfile(initial, data_file)
-            elif isinstance(initial, Product):
-                save_product(data_file, initial)
-            else:
-                save_fluorescence_data(data_file, initial)
+    if kind == ResourceKind.PRODUCT:
+        manifest = ProductManifest(
+            uuid=uuid, created_at=created_at, derived_from=references, files=files, run=run
+        )
+    else:
+        manifest = FluorescenceManifest(
+            uuid=uuid, created_at=created_at, derived_from=references, files=files, run=run
+        )
 
-            _fsync_file(data_file)
-            files[kind] = data_file.name
-
-        created_at = datetime.now(timezone.utc)
-        manifest: Manifest
-
-        if kind == ResourceKind.PRODUCT:
-            manifest = ProductManifest(
-                uuid=uuid, created_at=created_at, derived_from=references, files=files, run=run
-            )
-        else:
-            manifest = FluorescenceManifest(
-                uuid=uuid, created_at=created_at, derived_from=references, files=files, run=run
-            )
-
-        save_manifest(folder / MANIFEST_FILENAME, manifest)
-    except BaseException:
-        shutil.rmtree(folder, ignore_errors=True)
-        raise
-
-    _fsync_directory(folder.parent)
+    save_files = partial(
+        _write_run_start,
+        options_file_name=options_file_name,
+        options_document=options_document,
+        initial=initial,
+        data_file_name=data_file_name,
+    )
+    _save_resource(layout, ResourceKind(kind), manifest, save_files)
     return uuid, folder
+
+
+def _write_run_start(
+    folder: Path,
+    *,
+    options_file_name: str,
+    options_document: str,
+    initial: Path | Product | FluorescenceDataset | None,
+    data_file_name: str | None,
+) -> None:
+    """Write a run's options document and, unless `initial` is ``None``, its first checkpoint."""
+    (folder / options_file_name).write_text(options_document, encoding='utf-8')
+
+    if initial is None or data_file_name is None:
+        return
+
+    data_file = folder / data_file_name
+
+    if isinstance(initial, Path):
+        shutil.copyfile(initial, data_file)
+    elif isinstance(initial, Product):
+        save_product(data_file, initial)
+    else:
+        save_fluorescence_data(data_file, initial)
 
 
 def _commit_run(layout: StorageLayout, uuid: UUID, data_file: Path | None, run: RunRecord) -> None:

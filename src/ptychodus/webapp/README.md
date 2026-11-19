@@ -50,9 +50,9 @@ The shipped wheel already contains the compiled frontend. Rebuilding the UI in p
     fluorescence.h5
 ```
 
-Per-kind subdirectories are created on first start via `layout.ensure_kind_dirs()`. The service watches for changes to `manifest.json` files and reconciles them into the SQLite cache, ignoring hidden paths: the savers' `.staging/` and the temporary `.manifest.json.tmp` a run resource's manifest is written through. Canonical definitions live in [api/storage.py](../api/storage.py), shared with the writers.
+Per-kind subdirectories are created on first start via `layout.ensure_kind_dirs()`. The service watches for changes to `manifest.json` files and reconciles them into the SQLite cache, ignoring hidden paths such as the temporary `.manifest.json.tmp` every manifest is written through. A replaced manifest is ingested as an update. Canonical definitions live in [api/storage.py](../api/storage.py), shared with the writers.
 
-Finished data is added through that module's chainable savers — `save_campaign_resource`, `save_diffraction_resource`, `save_product_resource` and `save_fluorescence_resource` — which assemble each resource under `<storage_root>/.staging/`, `fsync` it and rename it into place, so the service sees it whole or not at all. Each returns the new uuid, which the next takes in `campaign` or `derived_from`:
+Finished data is added through that module's chainable savers — `save_campaign_resource`, `save_diffraction_resource`, `save_product_resource` and `save_fluorescence_resource` — which write each resource into its folder in place, `fsync` it, and publish it by writing its manifest last and atomically, so the service sees it whole or not at all: a folder without a manifest is not a resource. Each returns the new uuid, which the next takes in `campaign` or `derived_from`:
 
 ```python
 campaign = save_campaign_resource(layout, label='fly001 demo')
@@ -60,7 +60,7 @@ diffraction = save_diffraction_resource(layout, data, label='scan 42', campaign=
 product = save_product_resource(layout, product, derived_from=[diffraction])
 ```
 
-A processing run writes its result as a **run resource** instead, created in place so its progress can be watched: `ptychodus-reconstruct --product <uuid>` and `ptychodus-enhance-xrf` given uuids each make one through `start_run`, `commit_checkpoint` and `finish_run`. Its folder is the run's standard output directory — the options document, the log, and one immutable checkpoint per committed `progress` value beside the final file:
+A processing run writes its result as a **run resource** instead, published at the start so its progress can be watched: `ptychodus-reconstruct --product <uuid>` and `ptychodus-enhance-xrf` given uuids each make one through `start_run`, `commit_checkpoint` and `finish_run`. Its folder is the run's standard output directory — the options document, the log, and one immutable checkpoint per committed `progress` value beside the final file:
 
 ```text
 product/<uuid>/

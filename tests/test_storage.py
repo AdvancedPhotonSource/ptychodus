@@ -335,7 +335,6 @@ def test_saved_resources_chain_and_load_back(tmp_path: Path) -> None:
     numpy.testing.assert_allclose(
         load_product(inputs.product_file).probes.get_array(), _product().probes.get_array()
     )
-    assert not any((tmp_path / StorageLayout.STAGING_DIRECTORY).iterdir())
 
 
 def test_a_bad_reference_is_refused_before_anything_is_written(tmp_path: Path) -> None:
@@ -354,7 +353,6 @@ def test_a_bad_reference_is_refused_before_anything_is_written(tmp_path: Path) -
         save_product_resource(layout, _product(), derived_from=[uuid4()])
 
     assert _resource_folders(tmp_path) == before
-    assert not any((tmp_path / StorageLayout.STAGING_DIRECTORY).iterdir())
 
 
 def test_a_failed_save_leaves_nothing_behind(
@@ -375,7 +373,69 @@ def test_a_failed_save_leaves_nothing_behind(
     assert not (tmp_path / ResourceKind.PRODUCT).exists() or not any(
         (tmp_path / ResourceKind.PRODUCT).iterdir()
     )
-    assert not any((tmp_path / StorageLayout.STAGING_DIRECTORY).iterdir())
+
+
+def test_a_resource_is_invisible_until_its_manifest_is_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout = StorageLayout(tmp_path)
+    diffraction = save_diffraction_resource(layout, _data())
+    real_save_product = storage.save_product
+    seen_mid_write: list[list[Path]] = []
+
+    def observing_save_product(file_path: Path, product: Product) -> None:
+        real_save_product(file_path, product)
+        seen_mid_write.append(layout.iter_manifest_paths())
+
+        with pytest.raises(LayoutError, match='No resource'):
+            layout.locate(UUID(file_path.parent.name))
+
+    monkeypatch.setattr(storage, 'save_product', observing_save_product)
+    product = save_product_resource(layout, _product(), derived_from=[diffraction])
+
+    assert seen_mid_write == [[layout.manifest_path(ResourceKind.DIFFRACTION, diffraction)]]
+    assert layout.locate(product).kind == ResourceKind.PRODUCT
+
+
+def test_a_save_never_reuses_a_folder(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    layout = StorageLayout(tmp_path)
+    taken = uuid4()
+    folder = layout.resource_folder(ResourceKind.CAMPAIGN, taken)
+    folder.mkdir(parents=True)
+    (folder / 'note.txt').write_text('mine')
+    monkeypatch.setattr(storage, 'uuid4', lambda: taken)
+
+    with pytest.raises(LayoutError, match='already exists'):
+        save_campaign_resource(layout, label='a')
+
+    assert [path.name for path in folder.iterdir()] == ['note.txt']
+
+
+def test_an_interrupt_after_publication_keeps_the_resource(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout = StorageLayout(tmp_path)
+    real_replace = storage.os.replace
+    published: list[bool] = []
+
+    def recording_replace(source: str | Path, target: str | Path) -> None:
+        real_replace(source, target)
+        published.append(True)
+
+    def interrupting_fsync_directory(path: Path) -> None:
+        if published:
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(storage.os, 'replace', recording_replace)
+    monkeypatch.setattr(storage, '_fsync_directory', interrupting_fsync_directory)
+
+    with pytest.raises(KeyboardInterrupt):
+        save_campaign_resource(layout, label='kept')
+
+    (manifest_path,) = layout.iter_manifest_paths()
+    location = layout.parse_manifest_path(manifest_path)
+    manifest = _load(layout, ResourceKind.CAMPAIGN, location.uuid)
+    assert manifest.label == 'kept'  # type: ignore[union-attr]
 
 
 def test_two_saves_never_share_a_folder(tmp_path: Path) -> None:
@@ -441,13 +501,13 @@ def _load(layout: StorageLayout, kind: str, uuid: object) -> storage.Manifest:
     return load_manifest(location.manifest_path, expected_kind=kind, expected_uuid=location.uuid)
 
 
-def test_a_save_is_flushed_before_its_rename(
+def test_a_save_is_flushed_before_its_manifest_is_published(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     events: list[tuple[str, str]] = []
     real_fsync_file = storage._fsync_file
     real_fsync_directory = storage._fsync_directory
-    real_rename = Path.rename
+    real_replace = storage.os.replace
 
     def recording_fsync_file(path: Path) -> None:
         events.append(('fsync', path.name))
@@ -457,20 +517,18 @@ def test_a_save_is_flushed_before_its_rename(
         events.append(('fsync', path.name))
         real_fsync_directory(path)
 
-    def recording_rename(self: Path, target: Path) -> Path:
-        events.append(('rename', self.name))
-        return real_rename(self, target)
+    def recording_replace(source: str | Path, target: str | Path) -> None:
+        events.append(('replace', Path(target).name))
+        real_replace(source, target)
 
     monkeypatch.setattr(storage, '_fsync_file', recording_fsync_file)
     monkeypatch.setattr(storage, '_fsync_directory', recording_fsync_directory)
-    monkeypatch.setattr(Path, 'rename', recording_rename)
+    monkeypatch.setattr(storage.os, 'replace', recording_replace)
     uuid = save_diffraction_resource(StorageLayout(tmp_path), _data())
 
-    rename_at = events.index(('rename', str(uuid)))
-    flushed_first = {name for kind, name in events[:rename_at] if kind == 'fsync'}
-    flushed_after = {name for kind, name in events[rename_at:] if kind == 'fsync'}
-    assert {'diffraction.h5', MANIFEST_FILENAME, str(uuid)} <= flushed_first
-    assert {str(ResourceKind.DIFFRACTION), StorageLayout.STAGING_DIRECTORY} <= flushed_after
+    published_at = events.index(('replace', MANIFEST_FILENAME))
+    flushed_first = {name for kind, name in events[:published_at] if kind == 'fsync'}
+    assert {'diffraction.h5', str(uuid), str(ResourceKind.DIFFRACTION)} <= flushed_first
 
 
 def test_a_manifest_replaced_mid_write_keeps_the_old_one(
@@ -587,7 +645,6 @@ def test_a_run_starts_in_place_with_a_copy_of_its_input(tmp_path: Path) -> None:
     assert checkpoint.stat().st_ino != before[0]
     assert (input_file.stat().st_ino, input_file.read_bytes()) == before
     assert checkpoint.read_bytes() == before[1]
-    assert not any((tmp_path / StorageLayout.STAGING_DIRECTORY).iterdir())
 
 
 def test_a_run_without_initial_data_waits_for_its_first_checkpoint(tmp_path: Path) -> None:

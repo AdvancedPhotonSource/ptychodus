@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
-from threading import Lock
 
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
@@ -20,10 +19,11 @@ logger = logging.getLogger(__name__)
 class _ManifestEventHandler(FileSystemEventHandler):
     """Collapses bursts of manifest events into a single debounced ingest per path.
 
-    Paths with a hidden component below the storage root -- the savers' ``.staging/`` and
-    a manifest's temporary ``.manifest.json.tmp`` among them -- are not resources and are
-    ignored. A resource renamed in from staging, or a manifest replaced in place, arrives
-    as a manifest moving to a watched path.
+    Paths with a hidden component below the storage root -- a manifest's temporary
+    ``.manifest.json.tmp`` among them -- are not resources and are ignored. A resource
+    arrives as its manifest appearing at, or replaced onto, a watched path. The poller
+    reports a replaced manifest as a delete followed by a create, which the watcher
+    handles as an update.
     """
 
     def __init__(self, root: Path, on_upsert, on_delete, debounce_window_s: float) -> None:
@@ -32,9 +32,6 @@ class _ManifestEventHandler(FileSystemEventHandler):
         self._on_upsert = on_upsert
         self._on_delete = on_delete
         self._debounce_window_s = debounce_window_s
-        self._pending_upserts: set[Path] = set()
-        self._pending_deletes: set[Path] = set()
-        self._lock = Lock()
 
     def _is_manifest(self, src_path: str) -> bool:
         path = Path(src_path)
@@ -50,15 +47,9 @@ class _ManifestEventHandler(FileSystemEventHandler):
         return not any(part.startswith('.') for part in parts)
 
     def _schedule_upsert(self, path: Path) -> None:
-        with self._lock:
-            self._pending_upserts.add(path)
-            self._pending_deletes.discard(path)
         self._on_upsert(path, self._debounce_window_s)
 
     def _schedule_delete(self, path: Path) -> None:
-        with self._lock:
-            self._pending_deletes.add(path)
-            self._pending_upserts.discard(path)
         self._on_delete(path, self._debounce_window_s)
 
     def on_created(self, event: FileSystemEvent) -> None:
@@ -142,9 +133,11 @@ class ManifestWatcher:
         self._loop.call_soon_threadsafe(self._debounce_delete, path, debounce)
 
     def _debounce_upsert(self, path: Path, debounce: float) -> None:
-        existing = self._pending_upsert_handles.pop(path, None)
-        if existing is not None:
-            existing.cancel()
+        # The newest event about a path decides, and an upsert re-reads the manifest.
+        for pending in (self._pending_upsert_handles, self._pending_delete_handles):
+            existing = pending.pop(path, None)
+            if existing is not None:
+                existing.cancel()
         handle = self._loop.call_later(
             debounce, lambda: asyncio.ensure_future(self._run_upsert(path))
         )
@@ -170,6 +163,12 @@ class ManifestWatcher:
 
     async def _run_delete(self, path: Path) -> None:
         self._pending_delete_handles.pop(path, None)
+
+        if path.is_file():
+            # A replaced manifest: the poller saw its old file go and its new one arrive.
+            await self._run_upsert(path)
+            return
+
         try:
             async with self._session_factory() as session:
                 await delete_manifest(session, self._layout, path)
