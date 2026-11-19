@@ -20,9 +20,10 @@ logger = logging.getLogger(__name__)
 class _ManifestEventHandler(FileSystemEventHandler):
     """Collapses bursts of manifest events into a single debounced ingest per path.
 
-    Paths with a hidden component below the storage root -- the savers' ``.staging/``
-    among them -- are not resources and are ignored. A resource renamed in from staging
-    arrives as its manifest moving to a watched path.
+    Paths with a hidden component below the storage root -- the savers' ``.staging/`` and
+    a manifest's temporary ``.manifest.json.tmp`` among them -- are not resources and are
+    ignored. A resource renamed in from staging, or a manifest replaced in place, arrives
+    as a manifest moving to a watched path.
     """
 
     def __init__(self, root: Path, on_upsert, on_delete, debounce_window_s: float) -> None:

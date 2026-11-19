@@ -12,6 +12,7 @@ import {
   ingestRowState,
   infoText,
   scale,
+  withRunBadge,
 } from '../format.js';
 
 // The desktop's columns, less Counts and the physical pixel pair: diffraction.h5 holds
@@ -101,7 +102,7 @@ function datasetNode(
 
   return {
     id: `diff:${d.uuid}`,
-    label,
+    label: withRunBadge(label, d),
     state,
     cells: [
       String(total),

@@ -146,8 +146,9 @@ def install_child_log_forwarder(
     """Install a queue-forwarding handler on the child's root logger.
 
     Returns the handler so it can be removed in a ``finally`` block. The
-    formatter emits ``'name: message'`` because the parent-side dispatcher
-    already tags each record with the child's logger name.
+    formatter emits only the message: each record travels with its logger
+    name, under which the parent logs it again, so the parent's own format
+    supplies the name.
     """
     handler = SubprocessLogHandler(result_queue)
     handler.setFormatter(logging.Formatter('%(message)s'))

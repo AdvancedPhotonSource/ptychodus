@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from ptychodus.api.diffraction import Polarization
+from ptychodus.api.processing import RunState
 from ptychodus.api.scattering.geometry import ScatteringRegime
 from ptychodus.webapp.db.base import IngestState
 
@@ -26,6 +27,17 @@ class _RowBase(BaseModel):
     ingest_state: IngestState
     error_message: str | None
     created_at: datetime
+    updated_at: datetime
+
+
+class RunRead(BaseModel):
+    """How a processed resource came to be, from its manifest's run record."""
+
+    state: RunState
+    reason: str | None
+    progress: int
+    progress_goal: int = Field(description='The progress a finished run reaches; 0 if unknown.')
+    command: str
     updated_at: datetime
 
 
@@ -51,6 +63,7 @@ class DiffractionRead(_RowBase):
     comments: str
     campaign_uuid: UUID | None
     derived_from: list[DerivedFromEdge] = []
+    run: RunRead | None = None
 
     detector_distance_m: float | None
     photon_energy_eV: float | None  # noqa: N815
@@ -77,6 +90,7 @@ class DiffractionRead(_RowBase):
 
 class ProductRead(_RowBase):
     derived_from: list[DerivedFromEdge] = []
+    run: RunRead | None = None
 
     name: str | None
     comments: str | None
@@ -148,6 +162,7 @@ class FluorescenceRead(_RowBase):
     label: str
     comments: str
     derived_from: list[DerivedFromEdge] = []
+    run: RunRead | None = None
 
     element_names: list[str]
     element_counts: list[float] = []

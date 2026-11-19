@@ -10,6 +10,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ptychodus.api.processing import RunRecord, RunState
 from ptychodus.api.scattering.geometry import ScatteringGeometry
 from ptychodus.webapp.db import repositories as repo
 from ptychodus.webapp.db.base import IngestState
@@ -67,6 +68,17 @@ def _common_bookkeeping(
     }
 
 
+def _run_values(run: RunRecord | None) -> dict[str, Any]:
+    return {
+        'run_state': None if run is None else run.state.value,
+        'run_reason': None if run is None else run.reason,
+        'run_progress': None if run is None else run.progress,
+        'run_progress_goal': None if run is None else run.progress_goal,
+        'run_command': None if run is None else run.command,
+        'run_updated_at': None if run is None else run.updated_at,
+    }
+
+
 def _values_for_campaign(m: CampaignManifest, **bookkeeping: Any) -> dict[str, Any]:
     return {
         **bookkeeping,
@@ -85,6 +97,7 @@ def _values_for_diffraction(
     pattern_shape = h5.get('pattern_shape')
     return {
         **bookkeeping,
+        **_run_values(m.run),
         'label': m.label,
         'comments': m.comments,
         'campaign_uuid': m.campaign_uuid,
@@ -116,6 +129,7 @@ def _values_for_product(
     probe_shape = h5.get('probe_shape') or (None, None, None)
     return {
         **bookkeeping,
+        **_run_values(m.run),
         'name': h5.get('name'),
         'comments': h5.get('comments'),
         'detector_distance_m': h5.get('detector_distance_m'),
@@ -164,6 +178,7 @@ def _values_for_fluorescence(
     map_shape = h5.get('map_shape')
     return {
         **bookkeeping,
+        **_run_values(m.run),
         'label': m.label,
         'comments': m.comments,
         'element_names': list(h5.get('element_names') or []),
@@ -195,12 +210,17 @@ def _declared_file(folder: Path, files: dict[str, str], key: str, default: str) 
 
 
 def _introspect(
-    kind: str, folder: Path, files: dict[str, str]
+    kind: str, folder: Path, files: dict[str, str], run: RunRecord | None
 ) -> tuple[dict[str, Any] | None, IngestState, str | None]:
     """Open declared HDF5 file(s) and pull HDF5-derived metadata.
 
+    A running resource whose manifest names no data yet is awaiting it, not missing it.
+
     Returns (introspected_dict, state, error_message).
     """
+    if run is not None and run.state == RunState.RUNNING and kind not in files:
+        return None, IngestState.AWAITING_DATA, None
+
     try:
         if kind == ResourceKind.DIFFRACTION:
             target = _declared_file(folder, files, 'diffraction', 'diffraction.h5')
@@ -230,7 +250,11 @@ def _introspect(
 async def _reevaluate_orphan(session: AsyncSession, kind: str, uuid: UUID) -> None:
     """Flip VALID↔ORPHANED for one row based on whether its outgoing edges resolve."""
     row = await repo.get_row_by_kind(session, kind, uuid)
-    if row is None or row.ingest_state in (IngestState.INVALID, IngestState.MISSING_FILES):
+    if row is None or row.ingest_state in (
+        IngestState.INVALID,
+        IngestState.MISSING_FILES,
+        IngestState.AWAITING_DATA,
+    ):
         return
     edges = await repo.outgoing_edges(session, uuid)
     has_unresolved = False
@@ -278,7 +302,7 @@ async def ingest_manifest(
         return
 
     files = getattr(manifest, 'files', {}) or {}
-    h5, state, error_message = _introspect(location.kind, location.folder, files)
+    h5, state, error_message = _introspect(location.kind, location.folder, files, manifest.run)
 
     bookkeeping = _common_bookkeeping(
         uuid=location.uuid,

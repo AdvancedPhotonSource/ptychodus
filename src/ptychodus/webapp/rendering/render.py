@@ -6,7 +6,6 @@ import base64
 from io import BytesIO
 
 import numpy
-from fastapi import HTTPException
 from PIL import Image
 
 from ptychodus.api.typing import ComplexArrayType, NumberArrayType, RealArrayType
@@ -119,9 +118,10 @@ def _legend(params: RenderParams, *, is_complex: bool) -> tuple[list[list[float]
     return numpy.asarray(rgba).tolist(), is_cyclic
 
 
-def _product_to_response(
+def to_rendered_image(
     vp: VisualizationProduct, params: RenderParams, *, is_complex: bool
 ) -> RenderedImage:
+    """`vp` as the REST response: the PNG, its color axis, pixel size and legend."""
     png_bytes = product_to_png_bytes(vp)
     pixel_geometry = vp.get_pixel_geometry()
     color_range = vp.get_color_value_range()
@@ -139,30 +139,3 @@ def _product_to_response(
         legend_rgba=legend_rgba,
         legend_cyclic=legend_cyclic,
     )
-
-
-def render_real(
-    values: NumberArrayType,
-    pixel_geometry: PixelGeometry,
-    params: RenderParams,
-    value_label: str,
-) -> RenderedImage:
-    """Render a real-valued (or integer) 2D array. Rejects component / color_model (400)."""
-    try:
-        vp = build_visualization_real(values, pixel_geometry, params, value_label)
-    except RenderParamsError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return _product_to_response(vp, params, is_complex=False)
-
-
-def render_complex(
-    values: ComplexArrayType,
-    pixel_geometry: PixelGeometry,
-    params: RenderParams,
-) -> RenderedImage:
-    """Render a complex-valued 2D array. Rejects component+color_model together (400)."""
-    try:
-        vp = build_visualization_complex(values, pixel_geometry, params)
-    except RenderParamsError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return _product_to_response(vp, params, is_complex=True)

@@ -11,6 +11,7 @@ import json
 
 import pytest
 
+from ptychodus.api.processing import RunState, create_run_record
 from ptychodus.webapp.db import repositories as repo
 from ptychodus.webapp.db.base import IngestState
 from ptychodus.webapp.ingest.pipeline import delete_manifest, ingest_manifest
@@ -203,3 +204,56 @@ async def test_rewrite_manifest_shrinks_edges(
     edges = await repo.outgoing_edges(db_session, p_uuid)
     assert len(edges) == 1
     assert edges[0].target_uuid == d1
+
+
+async def test_a_running_product_without_data_awaits_it(
+    db_session: AsyncSession, layout: StorageLayout, seed_product: Callable[..., UUID]
+):
+    run = create_run_record(RunState.RUNNING, command='ptychodus-reconstruct')
+    # The parent is never ingested, which would make a valid row an orphan.
+    uuid = seed_product(
+        data_file=None,
+        run=run,
+        derived_from=[{'kind': 'diffraction', 'uuid': '00000000-0000-0000-0000-000000000001'}],
+    )
+    await ingest_manifest(db_session, layout, layout.manifest_path('product', uuid))
+    await db_session.commit()
+
+    row = await repo.get_row(db_session, Product, uuid)
+    assert row is not None
+    assert row.ingest_state == IngestState.AWAITING_DATA
+    assert row.error_message is None
+    assert row.object_height_px is None
+    assert row.run_state == 'running'
+    assert row.run_command == 'ptychodus-reconstruct'
+
+
+async def test_a_running_product_ingests_its_newest_checkpoint(
+    db_session: AsyncSession, layout: StorageLayout, seed_product: Callable[..., UUID]
+):
+    run = create_run_record(
+        RunState.RUNNING, command='ptychodus-reconstruct', progress=20, progress_goal=100
+    )
+    uuid = seed_product(data_file='product.000020.h5', run=run)
+    await ingest_manifest(db_session, layout, layout.manifest_path('product', uuid))
+    await db_session.commit()
+
+    row = await repo.get_row(db_session, Product, uuid)
+    assert row is not None
+    assert row.ingest_state == IngestState.VALID
+    assert row.object_height_px == 16
+    assert (row.run_state, row.run_progress, row.run_progress_goal) == ('running', 20, 100)
+    assert row.run_updated_at is not None
+
+
+async def test_imported_data_has_no_run(
+    db_session: AsyncSession, layout: StorageLayout, seed_product: Callable[..., UUID]
+):
+    uuid = seed_product()
+    await ingest_manifest(db_session, layout, layout.manifest_path('product', uuid))
+    await db_session.commit()
+
+    row = await repo.get_row(db_session, Product, uuid)
+    assert row is not None
+    assert row.run_state is None
+    assert row.run_command is None

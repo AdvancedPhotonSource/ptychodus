@@ -1,30 +1,30 @@
 from __future__ import annotations
 
+from pathlib import Path
 from uuid import UUID
 
-import numpy
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy import String, exists, func, select
 
-from ptychodus.api.constants import LengthUnit
-from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.io import load_fluorescence_data, load_product
+
+from ptychodus.api.processing import RunState
 
 from ptychodus.webapp.db import repositories as repo
 from ptychodus.webapp.db.base import IngestState
 from ptychodus.webapp.db.models import DerivationEdge, Fluorescence, Product
-from ptychodus.webapp.rendering import RenderedImage, render_real
+from ptychodus.webapp.rendering import RenderedImage
+from ptychodus.webapp.rendering.views import (
+    fluorescence_element_view,
+    fluorescence_summary_view,
+    view_as_rendered_image,
+)
+from ptychodus.webapp.routers._render import render_or_http_error, resource_file_or_404
 from ptychodus.webapp.rendering.params import RenderParamsDep
 from ptychodus.webapp.routers._convert import fluorescence_to_read
-from ptychodus.webapp.routers.deps import LayoutDep, SessionDep
+from ptychodus.webapp.routers.deps import LayoutDep, RenderRunnerDep, SessionDep
 from ptychodus.webapp.routers.schemas import FluorescenceRead, Page
 from ptychodus.api.storage import ResourceKind
-
-_DEFAULT_FLUORESCENCE_PIXEL_GEOMETRY = PixelGeometry(
-    width_m=LengthUnit.MICROMETER.meters_per_unit,
-    height_m=LengthUnit.MICROMETER.meters_per_unit,
-)
 
 router = APIRouter(prefix='/fluorescence', tags=['fluorescence'])
 
@@ -37,10 +37,15 @@ async def list_fluorescence(
     derived_from_uuid: UUID | None = None,
     element: str | None = None,
     ingest_state: IngestState | None = None,
+    run_state: list[RunState] | None = Query(
+        None, description='Only resources whose run is in one of these states; repeat for several.'
+    ),
 ) -> Page[FluorescenceRead]:
     where = []
     if ingest_state is not None:
         where.append(Fluorescence.ingest_state == ingest_state)
+    if run_state:
+        where.append(Fluorescence.run_state.in_([s.value for s in run_state]))
     if element is not None:
         # JSON column contains the element string — use LIKE on the serialized JSON
         where.append(func.instr(func.cast(Fluorescence.element_names, String), f'"{element}"') > 0)
@@ -68,30 +73,29 @@ async def get_fluorescence(uuid: UUID, session: SessionDep) -> FluorescenceRead:
 
 @router.get('/{uuid}/files/fluorescence')
 async def get_fluorescence_file(uuid: UUID, session: SessionDep, layout: LayoutDep) -> FileResponse:
-    row = await repo.get_row(session, Fluorescence, uuid)
-    if row is None:
-        raise HTTPException(status_code=404, detail=f'fluorescence {uuid} not found')
-    path = layout.resource_folder(ResourceKind.FLUORESCENCE, uuid) / 'fluorescence.h5'
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail='fluorescence.h5 not present on disk')
+    path = await _fluorescence_file_or_404(uuid, session, layout)
     return FileResponse(path, media_type='application/x-hdf5', filename=path.name)
 
 
-async def _resolve_product_pixel_geometry(
+async def _fluorescence_file_or_404(uuid: UUID, session: SessionDep, layout: LayoutDep) -> Path:
+    row = await repo.get_row(session, Fluorescence, uuid)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f'fluorescence {uuid} not found')
+    return resource_file_or_404(layout, ResourceKind.FLUORESCENCE, uuid)
+
+
+async def _paired_product_file(
     product_uuid: UUID | None, session: SessionDep, layout: LayoutDep
-) -> PixelGeometry:
-    """Look up a paired product's object pixel geometry; fall back to a 1 µm placeholder."""
+) -> Path | None:
+    """The paired product whose object pixel geometry a map takes, if one was named."""
     if product_uuid is None:
-        return _DEFAULT_FLUORESCENCE_PIXEL_GEOMETRY
+        return None
     row = await repo.get_row(session, Product, product_uuid)
     if row is None:
         raise HTTPException(
             status_code=404, detail=f'product {product_uuid} not found for pixel geometry'
         )
-    path = layout.resource_folder(ResourceKind.PRODUCT, product_uuid) / 'product.h5'
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail='product.h5 not present on disk')
-    return load_product(path).object_.get_pixel_geometry()
+    return resource_file_or_404(layout, ResourceKind.PRODUCT, product_uuid)
 
 
 @router.get('/{uuid}/image', response_model=RenderedImage)
@@ -99,6 +103,7 @@ async def get_fluorescence_summary_image(
     uuid: UUID,
     session: SessionDep,
     layout: LayoutDep,
+    runner: RenderRunnerDep,
     params: RenderParamsDep,
     product_uuid: UUID | None = Query(
         None,
@@ -106,20 +111,16 @@ async def get_fluorescence_summary_image(
     ),
 ) -> RenderedImage:
     """Render the elementwise sum of every element map in the dataset."""
-    row = await repo.get_row(session, Fluorescence, uuid)
-    if row is None:
-        raise HTTPException(status_code=404, detail=f'fluorescence {uuid} not found')
-    path = layout.resource_folder(ResourceKind.FLUORESCENCE, uuid) / 'fluorescence.h5'
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail='fluorescence.h5 not present on disk')
-
-    dataset = load_fluorescence_data(path)
-    if not len(dataset):
-        raise HTTPException(status_code=404, detail='fluorescence dataset has no element maps')
-
-    summary = numpy.sum([emap.counts_per_second for emap in dataset], axis=0)
-    pixel_geometry = await _resolve_product_pixel_geometry(product_uuid, session, layout)
-    return render_real(summary, pixel_geometry, params, value_label='counts/s')
+    path = await _fluorescence_file_or_404(uuid, session, layout)
+    product_path = await _paired_product_file(product_uuid, session, layout)
+    return await render_or_http_error(
+        runner,
+        view_as_rendered_image,
+        fluorescence_summary_view,
+        (path, product_path),
+        params,
+        False,
+    )
 
 
 @router.get('/{uuid}/elements/{name}/image', response_model=RenderedImage)
@@ -128,32 +129,20 @@ async def get_fluorescence_element_image(
     name: str,
     session: SessionDep,
     layout: LayoutDep,
+    runner: RenderRunnerDep,
     params: RenderParamsDep,
     product_uuid: UUID | None = Query(
         None,
         description='Optional paired product for physical pixel geometry.',
     ),
 ) -> RenderedImage:
-    row = await repo.get_row(session, Fluorescence, uuid)
-    if row is None:
-        raise HTTPException(status_code=404, detail=f'fluorescence {uuid} not found')
-    path = layout.resource_folder(ResourceKind.FLUORESCENCE, uuid) / 'fluorescence.h5'
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail='fluorescence.h5 not present on disk')
-
-    dataset = load_fluorescence_data(path)
-    matches = [emap for emap in dataset if emap.name == name]
-    if not matches:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                'error': f'element {name!r} not found',
-                'available': [emap.name for emap in dataset],
-            },
-        )
-    emap = matches[0]
-
-    pixel_geometry = await _resolve_product_pixel_geometry(product_uuid, session, layout)
-    return render_real(
-        emap.counts_per_second, pixel_geometry, params, value_label=f'{emap.name} counts/s'
+    path = await _fluorescence_file_or_404(uuid, session, layout)
+    product_path = await _paired_product_file(product_uuid, session, layout)
+    return await render_or_http_error(
+        runner,
+        view_as_rendered_image,
+        fluorescence_element_view,
+        (path, name, product_path),
+        params,
+        False,
     )

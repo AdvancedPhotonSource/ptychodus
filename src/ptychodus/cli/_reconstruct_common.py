@@ -16,7 +16,7 @@ Both writers write under :func:`is_main_process`, so a multi-process launch prod
 each artifact instead of having every rank truncate the same paths concurrently.
 
 Cancellation lives here for the same reason. A reconstruction has no interruption point inside
-the backend, so a signal cannot stop it where it lands; :func:`install_signal_handlers` instead
+the backend, so a signal cannot stop it where it lands; :func:`ptychodus.cli.install_signal_handlers` instead
 raises a flag that :func:`run_reconstruction` reads at each output, and a partially converged
 ``product.h5`` is left behind. Under a multi-process launch that flag is agreed across ranks
 before it is acted on, because a rank that left the loop alone would hang its peers at their
@@ -27,14 +27,10 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
-import signal
 import sys
-import threading
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from types import FrameType
 from typing import TYPE_CHECKING, Any, cast, Final, Literal
 
 import numpy
@@ -84,6 +80,7 @@ from ptychodus.api.reconstruct import (
     TrainableReconstructor,
     prepare_reconstruct_input,
 )
+from ptychodus.cli import CancellationToken
 from ptychodus.cli._launch import environment_rank
 from ptychodus.cli._options import format_options_document, resolve_reconstructor
 
@@ -91,7 +88,6 @@ if TYPE_CHECKING:
     from ptychodus.plugins.ptychi.options import PtyChiOptions
 
 __all__ = [
-    'CancellationToken',
     'ResolvedReconstruction',
     'add_options_argument',
     'add_print_options_argument',
@@ -100,7 +96,6 @@ __all__ = [
     'estimate_dataset_beam_center',
     'estimate_incident_beam_from_assembled_data',
     'find_options_document',
-    'install_signal_handlers',
     'invalid_count_threshold',
     'is_main_process',
     'load_trained_model',
@@ -156,69 +151,6 @@ def is_main_process() -> bool:
     of them, every write truncating.
     """
     return process_rank() == 0
-
-
-class CancellationToken:
-    """A request to stop, raised asynchronously and read at the next safe point.
-
-    The flag is a :class:`threading.Event` so that setting it from a signal handler does no
-    real work. Nothing is logged there either: the logging machinery takes a lock, and a
-    signal delivered while that lock is held would deadlock the process it was meant to stop.
-    `on_cancel` exists for a caller that must react the instant the request arrives rather
-    than at the next sync point, and runs under the same constraint.
-    """
-
-    def __init__(self, *, on_cancel: Callable[[str], None] | None = None) -> None:
-        self._event = threading.Event()
-        self._on_cancel = on_cancel
-        self._reason = ''
-
-    @property
-    def is_cancelled(self) -> bool:
-        return self._event.is_set()
-
-    @property
-    def reason(self) -> str:
-        """What asked for the cancellation, or an empty string while none has."""
-        return self._reason
-
-    def cancel(self, reason: str = '') -> None:
-        """Request cancellation. Repeat requests are ignored, so `on_cancel` runs once."""
-        if self._event.is_set():
-            return
-
-        self._reason = reason
-        self._event.set()
-
-        if self._on_cancel is not None:
-            self._on_cancel(reason)
-
-
-def install_signal_handlers(token: CancellationToken | None = None) -> CancellationToken:
-    """Make SIGINT and SIGTERM request cancellation rather than kill the process.
-
-    Returns the token they set, creating one when none is supplied. A **second** signal of
-    either kind restores the default disposition and re-raises, so a run wedged somewhere
-    without an interruption point can still be killed from the same terminal that asked it
-    to stop politely.
-
-    Signals delivered before this runs -- during imports, argument parsing, or the first
-    file reads -- are not caught and end the process outright. There is nothing computed to
-    save that early, which is why this is called once the logging is up rather than first.
-    """
-    cancellation = CancellationToken() if token is None else token
-
-    def handle_signal(signum: int, _frame: FrameType | None) -> None:
-        if cancellation.is_cancelled:
-            signal.signal(signum, signal.SIG_DFL)
-            os.kill(os.getpid(), signum)
-            return
-
-        cancellation.cancel(signal.Signals(signum).name)
-
-    signal.signal(signal.SIGINT, handle_signal)
-    signal.signal(signal.SIGTERM, handle_signal)
-    return cancellation
 
 
 def _agree_on_cancellation(token: CancellationToken | None) -> bool:

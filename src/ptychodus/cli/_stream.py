@@ -57,6 +57,7 @@ from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.propagate import ProductGeometry, compute_product_geometry
 from ptychodus.api.simulate.object import ObjectGenerator
 from ptychodus.api.simulate.probe import ProbeGenerator, rescale_probe_intensity
+from ptychodus.api.processing import RunState, create_run_record
 from ptychodus.api.typing import BooleanArrayType, IntegerArrayType, RealArrayType
 from ptychodus.api.storage import (
     StorageLayout,
@@ -1668,6 +1669,8 @@ class ScanPipeline:
             campaign = session.campaign
 
             try:
+                # Each saved scan is complete; its progress counts nothing, so stays zero.
+                run = create_run_record(RunState.SUCCEEDED, command='ptychodus-stream')
                 diffraction_uuid = save_diffraction_resource(
                     layout,
                     data,
@@ -1679,11 +1682,12 @@ class ScanPipeline:
                     tomography_angle_deg=angle_deg,
                     crop_center_x_px=configuration.crop_center_x_px,
                     crop_center_y_px=configuration.crop_center_y_px,
+                    run=run,
                 )
 
                 if product is not None:
                     product_uuid = save_product_resource(
-                        layout, product, derived_from=[diffraction_uuid]
+                        layout, product, derived_from=[diffraction_uuid], run=run
                     )
 
                 written = True

@@ -13,6 +13,7 @@ from io import BytesIO
 import pytest
 from PIL import Image
 
+from ptychodus.api.processing import RunState, create_run_record
 from ptychodus.webapp.ingest.pipeline import ingest_manifest
 
 pytestmark = pytest.mark.asyncio
@@ -438,3 +439,33 @@ async def test_fluorescence_summary_image(
     body = resp.json()
     _decode_png(body, expected_h=6, expected_w=10)
     assert body['value_label'] == 'counts/s'
+
+
+async def test_a_running_product_renders_its_newest_checkpoint(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StorageLayout,
+    seed_product: Callable[..., UUID],
+) -> None:
+    run = create_run_record(RunState.RUNNING, command='ptychodus-reconstruct', progress=20)
+    p = seed_product(data_file='product.000020.h5', run=run)
+    await _ingest(db_engine, layout, layout.manifest_path('product', p))
+
+    resp = await app_client.get(f'/api/v1/product/{p}/object/0/image')
+    assert resp.status_code == 200
+    _decode_png(resp.json(), expected_h=16, expected_w=16)
+
+
+async def test_a_running_product_without_data_has_nothing_to_render(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StorageLayout,
+    seed_product: Callable[..., UUID],
+) -> None:
+    run = create_run_record(RunState.RUNNING, command='ptychodus-reconstruct')
+    p = seed_product(data_file=None, run=run)
+    await _ingest(db_engine, layout, layout.manifest_path('product', p))
+
+    resp = await app_client.get(f'/api/v1/product/{p}/object/image')
+    assert resp.status_code == 404
+    assert 'no product data yet' in resp.json()['detail']

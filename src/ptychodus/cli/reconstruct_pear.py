@@ -120,14 +120,18 @@ from ptychodus.api.simulate.probe import (
     propagate_probe,
     to_reconstruction_frame,
 )
-from ptychodus.cli import add_log_level_argument, configure_logging, open_action_log
+from ptychodus.cli import (
+    add_log_level_argument,
+    configure_logging,
+    install_signal_handlers,
+    open_action_log,
+)
 from ptychodus.cli._options import resolve_reconstructor
 from ptychodus.cli._reconstruct_common import (
     ResolvedReconstruction,
     estimate_dataset_beam_center,
     estimate_focus_object_distance_m,
     estimate_incident_beam_from_assembled_data,
-    install_signal_handlers,
     invalid_count_threshold,
     process_rank,
     require_near_field_focus_object_distance_m,

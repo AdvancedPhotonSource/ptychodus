@@ -77,6 +77,7 @@ from ptychodus.api.simulate.probe import (
     to_reconstruction_frame,
 )
 from ptychodus.cli import (
+    install_signal_handlers,
     DirectoryType,
     add_detector_map_arguments,
     add_log_level_argument,
@@ -92,7 +93,6 @@ from ptychodus.cli._reconstruct_common import (
     add_print_options_argument,
     check_ptychi_options,
     estimate_incident_beam_from_assembled_data,
-    install_signal_handlers,
     invalid_count_threshold,
     is_main_process,
     pair_patterns_with_positions,

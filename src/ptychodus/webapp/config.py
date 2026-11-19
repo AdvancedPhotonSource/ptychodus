@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     mcp_mount_path: str = '/mcp'
     api_prefix: str = '/api/v1'
     auto_reconcile_on_startup: bool = True
+    render_concurrency: int = Field(4, ge=1)
+    """How many renders may run at once, each in a worker thread holding one resource."""
 
 
 @lru_cache(maxsize=1)

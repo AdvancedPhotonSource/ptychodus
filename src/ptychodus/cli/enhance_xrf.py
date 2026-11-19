@@ -15,6 +15,16 @@ the output go ``enhance_xrf_options.yaml``, the options the run used as a docume
 
 An enhancer's options come from a YAML document naming the enhancer and its fields.
 ``--print-options`` writes one at its defaults, to edit and pass back with ``--options``.
+
+Given resources in a storage root instead -- ``--product`` and ``--fluorescence`` as uuids --
+the enhanced dataset goes into the same root, as a new fluorescence resource derived from
+both, and that resource's folder is the run's output directory. It is created before
+enhancing starts and its uuid printed, each dataset the enhancer yields becomes its current
+result as soon as it is written, and it ends ``succeeded``, ``cancelled`` or ``failed`` with
+whatever the run produced, even if that is nothing yet.
+
+SIGINT and SIGTERM ask the enhancer to stop after the step it is on; a second signal ends
+the process at once.
 """
 
 from __future__ import annotations
@@ -22,9 +32,10 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Final
+from uuid import UUID
 import argparse
 import logging
-import signal
+import os
 import sys
 
 from pydantic import BaseModel
@@ -36,9 +47,33 @@ from ptychodus.api.fluorescence import (
     FluorescenceEnhancer,
     FluorescenceEnhancerInput,
 )
-from ptychodus.api.io import StandardFileLayout, load_product
+from ptychodus.api.io import (
+    StandardFileLayout,
+    load_fluorescence_data,
+    load_product,
+    save_fluorescence_data,
+)
 from ptychodus.api.plugins import Plugin, PluginCatalog, PluginRegistry
-from ptychodus.cli import add_log_level_argument, configure_logging, open_action_log
+from ptychodus.api.processing import RunState, create_run_record
+from ptychodus.api.storage import (
+    STORAGE_ROOT_ENVIRONMENT_VARIABLE,
+    LayoutError,
+    ManifestLoadError,
+    ResourceKind,
+    StorageLayout,
+    commit_checkpoint,
+    resolve_resource_file,
+    start_run,
+)
+from ptychodus.cli import (
+    CancellationToken,
+    add_log_level_argument,
+    configure_logging,
+    install_signal_handlers,
+    open_action_log,
+    record_run_end,
+    report_resource,
+)
 from ptychodus.api.options import (
     OptionsError,
     apply_options_document,
@@ -136,6 +171,14 @@ def _file_types(registry: PluginRegistry) -> tuple[str, ...]:
     )
 
 
+def _path_or_uuid(text: str) -> Path | UUID:
+    """A uuid when `text` parses as one, and otherwise a path."""
+    try:
+        return UUID(text)
+    except ValueError:
+        return Path(text)
+
+
 def _build_parser(registry: PluginRegistry) -> argparse.ArgumentParser:
     enhancers = registry.fluorescence_enhancers
     parser = argparse.ArgumentParser(
@@ -143,30 +186,43 @@ def _build_parser(registry: PluginRegistry) -> argparse.ArgumentParser:
     )
     parser.add_argument(
         '--product',
-        metavar='PRODUCT_FILE',
-        type=Path,
-        help='ptychodus product HDF5 file, such as the product.h5 ptychodus-reconstruct writes.',
+        metavar='PRODUCT',
+        type=_path_or_uuid,
+        help='ptychodus product HDF5 file, such as the product.h5 ptychodus-reconstruct '
+        'writes, or the uuid of a product in the storage root. Text that parses as a uuid '
+        'is taken as one.',
     )
     parser.add_argument(
         '--fluorescence',
-        metavar='FLUORESCENCE_FILE',
+        metavar='FLUORESCENCE',
+        type=_path_or_uuid,
+        help='Measured fluorescence dataset, in the format --file-type names, or the uuid of '
+        'a fluorescence resource in the storage root. Not modified. Both inputs are files or '
+        'both are uuids.',
+    )
+    parser.add_argument(
+        '--storage-root',
+        metavar='STORAGE_ROOT',
         type=Path,
-        help='Measured fluorescence dataset, in the format --file-type names. Not modified.',
+        default=os.environ.get(STORAGE_ROOT_ENVIRONMENT_VARIABLE),
+        help='Storage root holding uuid inputs, where the enhanced dataset is saved as a new '
+        f'fluorescence resource. Defaults to ${STORAGE_ROOT_ENVIRONMENT_VARIABLE}.',
     )
     parser.add_argument(
         '-o',
         '--output',
         metavar='OUTPUT_FILE',
         type=Path,
-        help='Enhanced dataset, written in the same format as FLUORESCENCE_FILE. Must differ '
-        'from both inputs; an existing file is overwritten.',
+        help='Enhanced dataset, written in the format of --fluorescence. Must differ '
+        'from both inputs; an existing file is overwritten. Not taken with uuid inputs.',
     )
     parser.add_argument(
         '--file-type',
         choices=_file_types(registry),
-        default=_DEFAULT_FILE_TYPE,
+        default=None,
         help='Format the fluorescence dataset is read and the enhanced one written in. '
-        f'Defaults to {_DEFAULT_FILE_TYPE}.',
+        f'Defaults to {_DEFAULT_FILE_TYPE}. Not taken with uuid inputs, whose resources are '
+        'native HDF5.',
     )
     parser.add_argument(
         '--algorithm',
@@ -206,6 +262,141 @@ def _build_parser(registry: PluginRegistry) -> argparse.ArgumentParser:
     return parser
 
 
+def _enhance_into_storage(
+    layout: StorageLayout,
+    plugin: Plugin[FluorescenceEnhancer],
+    options: BaseModel,
+    input_: FluorescenceEnhancerInput,
+    derived_from: Sequence[UUID],
+    cancellation: CancellationToken,
+) -> ExitCode:
+    """Enhance into a new fluorescence resource that is the run's output directory."""
+    run = create_run_record(
+        RunState.RUNNING,
+        command='ptychodus-enhance-xrf',
+        options=StandardFileLayout.ENHANCE_XRF_OPTIONS.value,
+    )
+    uuid, folder = start_run(
+        layout,
+        ResourceKind.FLUORESCENCE,
+        initial=None,
+        derived_from=derived_from,
+        options_file_name=StandardFileLayout.ENHANCE_XRF_OPTIONS.value,
+        options_document=dump_options_document({'algorithm': plugin.simple_name}, options),
+        log_file_name=StandardFileLayout.ENHANCE_XRF_LOG.value,
+        run=run,
+    )
+    report_resource(logger, ResourceKind.FLUORESCENCE, uuid, folder)
+    open_action_log(folder, StandardFileLayout.ENHANCE_XRF_LOG)
+
+    enhanced: FluorescenceDataset | None = None
+    last_checkpoint: Path | None = None
+
+    try:
+        for output in plugin.strategy.enhance(input_, options=options):
+            enhanced = output.dataset
+            run = run.revise(progress=output.progress, progress_goal=output.progress_goal)
+            checkpoint = StandardFileLayout.FLUORESCENCE.checkpoint_path(folder, output.progress)
+
+            # A checkpoint is never rewritten; a step that does not advance the progress
+            # keeps the one already published for it.
+            if not checkpoint.exists():
+                save_fluorescence_data(checkpoint, enhanced)
+                commit_checkpoint(layout, uuid, data_file=checkpoint, run=run)
+                last_checkpoint = checkpoint
+
+            if output.progress_goal > 0:
+                logger.info('Enhanced %d/%d', output.progress, output.progress_goal)
+
+            if cancellation.is_cancelled:
+                break
+    except Exception as exc:
+        logger.exception('Enhancement failed; fluorescence %s keeps its last checkpoint.', uuid)
+        record_run_end(
+            logger,
+            layout,
+            uuid,
+            data_file=last_checkpoint,
+            run=run.revise(state=RunState.FAILED, reason=type(exc).__name__),
+        )
+        return ExitCode.FAILURE
+
+    if cancellation.is_cancelled:
+        logger.warning('Enhancement cancelled; fluorescence %s keeps what it reached.', uuid)
+        state, code = RunState.CANCELLED, ExitCode.CANCELLED
+    elif enhanced is None:
+        logger.error('Enhancer %s produced no dataset.', plugin.simple_name)
+        record_run_end(
+            logger,
+            layout,
+            uuid,
+            data_file=None,
+            run=run.revise(state=RunState.FAILED, reason='no-result'),
+        )
+        return ExitCode.FAILURE
+    else:
+        state, code = RunState.SUCCEEDED, ExitCode.SUCCESS
+
+    final_file: Path | None = None
+
+    if enhanced is not None:
+        final_file = StandardFileLayout.FLUORESCENCE.path(folder)
+        save_fluorescence_data(final_file, enhanced)
+
+    if not record_run_end(logger, layout, uuid, data_file=final_file, run=run.revise(state=state)):
+        return ExitCode.FAILURE
+
+    return code
+
+
+def _enhance_to_file(
+    plugin: Plugin[FluorescenceEnhancer],
+    options: BaseModel,
+    input_: FluorescenceEnhancerInput,
+    output_file: Path,
+    file_type: str,
+    registry: PluginRegistry,
+    cancellation: CancellationToken,
+) -> ExitCode:
+    """Enhance into one output file, written only when the enhancer runs to completion."""
+    # Beside the output, named for the action: a later run into the same directory
+    # replaces the options document and appends to the log.
+    output_directory = output_file.parent
+    output_directory.mkdir(parents=True, exist_ok=True)
+    open_action_log(output_directory, StandardFileLayout.ENHANCE_XRF_LOG)
+    options_file = StandardFileLayout.ENHANCE_XRF_OPTIONS.path(output_directory)
+    logger.info('Writing %s', options_file)
+    options_file.write_text(dump_options_document({'algorithm': plugin.simple_name}, options))
+
+    enhanced: FluorescenceDataset | None = None
+
+    try:
+        for output in plugin.strategy.enhance(input_, options=options):
+            enhanced = output.dataset
+
+            if output.progress_goal > 0:
+                logger.info('Enhanced %d/%d', output.progress, output.progress_goal)
+
+            if cancellation.is_cancelled:
+                break
+    except Exception:
+        logger.exception('Enhancement failed; nothing written.')
+        return ExitCode.FAILURE
+
+    if cancellation.is_cancelled:
+        logger.warning('Enhancement cancelled; nothing written.')
+        return ExitCode.CANCELLED
+
+    if enhanced is None:
+        logger.error('Enhancer %s produced no dataset; nothing written.', plugin.simple_name)
+        return ExitCode.FAILURE
+
+    writer = registry.fluorescence_file_writers.get_strategy_by_name(file_type)
+    writer.write(output_file, enhanced)
+    logger.info('Wrote %s', output_file)
+    return ExitCode.SUCCESS
+
+
 def main() -> ExitCode:
     # Before the parser, so its choices name what is actually installed.
     registry = PluginRegistry.load_plugins()
@@ -214,32 +405,63 @@ def main() -> ExitCode:
 
     missing = [
         option
-        for option, value in (
-            ('--product', args.product),
-            ('--fluorescence', args.fluorescence),
-            ('-o/--output', args.output),
-        )
+        for option, value in (('--product', args.product), ('--fluorescence', args.fluorescence))
         if value is None
     ]
 
     if missing:
         parser.error(f'the following arguments are required: {", ".join(missing)}')
 
-    product_file: Path = args.product
-    fluorescence_file: Path = args.fluorescence
-    output_file: Path = args.output
+    product_source: Path | UUID = args.product
+    fluorescence_source: Path | UUID = args.fluorescence
+    output_file: Path | None = args.output
+    layout: StorageLayout | None = None
+    file_type = _DEFAULT_FILE_TYPE if args.file_type is None else args.file_type
 
-    for input_file in (product_file, fluorescence_file):
-        if not input_file.is_file():
-            parser.error(f'{input_file} is not a file.')
+    if isinstance(product_source, UUID) and isinstance(fluorescence_source, UUID):
+        if args.storage_root is None:
+            parser.error(
+                f'uuid inputs need --storage-root or ${STORAGE_ROOT_ENVIRONMENT_VARIABLE}.'
+            )
 
-    if output_file.exists():
-        if output_file.is_dir():
-            parser.error(f'{output_file} is a directory; name the file to write.')
+        if output_file is not None:
+            parser.error('uuid inputs write into a new fluorescence resource; drop -o.')
+
+        if args.file_type is not None:
+            parser.error('uuid inputs are native HDF5 resources; drop --file-type.')
+
+        layout = StorageLayout(Path(args.storage_root))
+
+        try:
+            product_file = resolve_resource_file(layout, product_source, ResourceKind.PRODUCT)
+            fluorescence_file = resolve_resource_file(
+                layout, fluorescence_source, ResourceKind.FLUORESCENCE
+            )
+        except (LayoutError, ManifestLoadError) as exc:
+            parser.error(str(exc))
+    elif isinstance(product_source, Path) and isinstance(fluorescence_source, Path):
+        if output_file is None:
+            parser.error('the following arguments are required: -o/--output')
+
+        product_file = product_source
+        fluorescence_file = fluorescence_source
 
         for input_file in (product_file, fluorescence_file):
-            if output_file.samefile(input_file):
-                parser.error(f'OUTPUT_FILE must differ from the input {input_file}.')
+            if not input_file.is_file():
+                parser.error(f'{input_file} is not a file.')
+
+        if output_file.exists():
+            if output_file.is_dir():
+                parser.error(f'{output_file} is a directory; name the file to write.')
+
+            for input_file in (product_file, fluorescence_file):
+                if output_file.samefile(input_file):
+                    parser.error(f'OUTPUT_FILE must differ from the input {input_file}.')
+    else:
+        parser.error(
+            '--product and --fluorescence must both be files or both be uuids: a result '
+            'derived from an input outside the storage root could not record its lineage.'
+        )
 
     algorithm: str | None = args.algorithm
     fields: Mapping[str, Any] = {}
@@ -271,14 +493,19 @@ def main() -> ExitCode:
         parser.error(str(exc))
 
     configure_logging(args)
-
-    reader = registry.fluorescence_file_readers.get_strategy_by_name(args.file_type)
-    writer = registry.fluorescence_file_writers.get_strategy_by_name(args.file_type)
+    cancellation = install_signal_handlers()
 
     logger.info('Reading %s', product_file)
     product = load_product(product_file)
-    logger.info('Reading %s as %s', fluorescence_file, args.file_type)
-    dataset = reader.read(fluorescence_file)
+
+    if layout is None:
+        logger.info('Reading %s as %s', fluorescence_file, file_type)
+        reader = registry.fluorescence_file_readers.get_strategy_by_name(file_type)
+        dataset = reader.read(fluorescence_file)
+    else:
+        logger.info('Reading %s', fluorescence_file)
+        dataset = load_fluorescence_data(fluorescence_file)
+
     logger.info('Enhancer %s, options %s', plugin.simple_name, options.model_dump(mode='json'))
 
     if args.dry_run:
@@ -289,47 +516,34 @@ def main() -> ExitCode:
             len(product.probe_positions),
             product.object_.get_array().shape,
         )
-        logger.info('Would write %s as %s', output_file, args.file_type)
+
+        if layout is None:
+            logger.info('Would write %s as %s', output_file, file_type)
+        else:
+            logger.info(
+                'Would create a fluorescence resource in %s derived from product %s and '
+                'fluorescence %s.',
+                args.storage_root,
+                product_source,
+                fluorescence_source,
+            )
+
         return ExitCode.SUCCESS
+
+    input_ = FluorescenceEnhancerInput(dataset=dataset, product=product)
+
+    if layout is not None:
+        assert isinstance(product_source, UUID) and isinstance(fluorescence_source, UUID)
+        return _enhance_into_storage(
+            layout, plugin, options, input_, [product_source, fluorescence_source], cancellation
+        )
+
+    assert output_file is not None
 
     if output_file.exists():
         logger.warning('%s will be overwritten.', output_file)
 
-    # Beside the output, named for the action: a later run into the same directory
-    # replaces the options document and appends to the log.
-    output_directory = output_file.parent
-    open_action_log(output_directory, StandardFileLayout.ENHANCE_XRF_LOG)
-    options_file = StandardFileLayout.ENHANCE_XRF_OPTIONS.path(output_directory)
-    logger.info('Writing %s', options_file)
-    options_file.write_text(dump_options_document({'algorithm': plugin.simple_name}, options))
-
-    # A scheduler ends a job with SIGTERM. Raised as an interrupt it unwinds through the
-    # enhancer, so whatever it holds open is released rather than abandoned.
-    signal.signal(signal.SIGTERM, signal.default_int_handler)
-
-    enhanced: FluorescenceDataset | None = None
-    input_ = FluorescenceEnhancerInput(dataset=dataset, product=product)
-
-    try:
-        for output in plugin.strategy.enhance(input_, options=options):
-            enhanced = output.dataset
-
-            if output.progress_goal > 0:
-                logger.info('Enhanced %d/%d', output.progress, output.progress_goal)
-    except KeyboardInterrupt:
-        logger.warning('Enhancement cancelled; nothing written.')
-        return ExitCode.CANCELLED
-    except Exception:
-        logger.exception('Enhancement failed; nothing written.')
-        return ExitCode.FAILURE
-
-    if enhanced is None:
-        logger.error('Enhancer %s produced no dataset; nothing written.', plugin.simple_name)
-        return ExitCode.FAILURE
-
-    writer.write(output_file, enhanced)
-    logger.info('Wrote %s', output_file)
-    return ExitCode.SUCCESS
+    return _enhance_to_file(plugin, options, input_, output_file, file_type, registry, cancellation)
 
 
 if __name__ == '__main__':

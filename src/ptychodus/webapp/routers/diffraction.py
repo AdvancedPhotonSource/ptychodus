@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
@@ -7,17 +8,22 @@ from fastapi.responses import FileResponse
 from sqlalchemy import exists, select
 
 from ptychodus.api.diffraction import Polarization
-from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.io import load_diffraction_data
-from ptychodus.api.assemble import AssembledDiffractionData
+
+from ptychodus.api.processing import RunState
 
 from ptychodus.webapp.db import repositories as repo
 from ptychodus.webapp.db.base import IngestState
 from ptychodus.webapp.db.models import DerivationEdge, Diffraction
-from ptychodus.webapp.rendering import RenderedImage, render_real
+from ptychodus.webapp.rendering import RenderedImage
+from ptychodus.webapp.rendering.views import (
+    diffraction_aggregate_view,
+    diffraction_pattern_view,
+    view_as_rendered_image,
+)
+from ptychodus.webapp.routers._render import render_or_http_error, resource_file_or_404
 from ptychodus.webapp.rendering.params import RenderParamsDep
 from ptychodus.webapp.routers._convert import diffraction_to_read
-from ptychodus.webapp.routers.deps import LayoutDep, SessionDep
+from ptychodus.webapp.routers.deps import LayoutDep, RenderRunnerDep, SessionDep
 from ptychodus.webapp.routers.schemas import DiffractionRead, Page
 from ptychodus.api.storage import ResourceKind
 
@@ -32,6 +38,9 @@ async def list_diffraction(
     campaign_uuid: UUID | None = None,
     derived_from_uuid: UUID | None = None,
     ingest_state: IngestState | None = None,
+    run_state: list[RunState] | None = Query(
+        None, description='Only resources whose run is in one of these states; repeat for several.'
+    ),
     photon_energy_eV_min: float | None = Query(None, alias='photon_energy_eV_min'),  # noqa: N803
     photon_energy_eV_max: float | None = Query(None, alias='photon_energy_eV_max'),  # noqa: N803
     tomography_angle_deg_min: float | None = None,
@@ -45,6 +54,8 @@ async def list_diffraction(
         where.append(Diffraction.campaign_uuid == campaign_uuid)
     if ingest_state is not None:
         where.append(Diffraction.ingest_state == ingest_state)
+    if run_state:
+        where.append(Diffraction.run_state.in_([s.value for s in run_state]))
     if photon_energy_eV_min is not None:
         where.append(Diffraction.photon_energy_eV >= photon_energy_eV_min)
     if photon_energy_eV_max is not None:
@@ -83,26 +94,15 @@ async def get_diffraction(uuid: UUID, session: SessionDep) -> DiffractionRead:
 
 @router.get('/{uuid}/files/diffraction')
 async def get_diffraction_file(uuid: UUID, session: SessionDep, layout: LayoutDep) -> FileResponse:
-    row = await repo.get_row(session, Diffraction, uuid)
-    if row is None:
-        raise HTTPException(status_code=404, detail=f'diffraction {uuid} not found')
-    path = layout.resource_folder(ResourceKind.DIFFRACTION, uuid) / 'diffraction.h5'
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail='diffraction.h5 not present on disk')
+    path = await _diffraction_file_or_404(uuid, session, layout)
     return FileResponse(path, media_type='application/x-hdf5', filename=path.name)
 
 
-async def _load_diffraction_or_404(
-    uuid: UUID, session: SessionDep, layout: LayoutDep
-) -> tuple[AssembledDiffractionData, PixelGeometry]:
+async def _diffraction_file_or_404(uuid: UUID, session: SessionDep, layout: LayoutDep) -> Path:
     row = await repo.get_row(session, Diffraction, uuid)
     if row is None:
         raise HTTPException(status_code=404, detail=f'diffraction {uuid} not found')
-    path = layout.resource_folder(ResourceKind.DIFFRACTION, uuid) / 'diffraction.h5'
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail='diffraction.h5 not present on disk')
-    data = load_diffraction_data(path)
-    return data, data.get_pixel_geometry()
+    return resource_file_or_404(layout, ResourceKind.DIFFRACTION, uuid)
 
 
 @router.get('/{uuid}/patterns/aggregate/image', response_model=RenderedImage)
@@ -110,10 +110,13 @@ async def get_diffraction_aggregate_image(
     uuid: UUID,
     session: SessionDep,
     layout: LayoutDep,
+    runner: RenderRunnerDep,
     params: RenderParamsDep,
 ) -> RenderedImage:
-    data, pixel_geometry = await _load_diffraction_or_404(uuid, session, layout)
-    return render_real(data.get_mean_pattern(), pixel_geometry, params, value_label='Mean Counts')
+    path = await _diffraction_file_or_404(uuid, session, layout)
+    return await render_or_http_error(
+        runner, view_as_rendered_image, diffraction_aggregate_view, (path,), params, False
+    )
 
 
 @router.get('/{uuid}/patterns/{index}/image', response_model=RenderedImage)
@@ -122,13 +125,10 @@ async def get_diffraction_pattern_image(
     index: int,
     session: SessionDep,
     layout: LayoutDep,
+    runner: RenderRunnerDep,
     params: RenderParamsDep,
 ) -> RenderedImage:
-    data, pixel_geometry = await _load_diffraction_or_404(uuid, session, layout)
-    num_patterns = data.get_patterns_shape()[0]
-    if not 0 <= index < num_patterns:
-        raise HTTPException(
-            status_code=404,
-            detail=f'pattern index {index} out of range [0, {num_patterns})',
-        )
-    return render_real(data.get_pattern(index), pixel_geometry, params, value_label='Counts')
+    path = await _diffraction_file_or_404(uuid, session, layout)
+    return await render_or_http_error(
+        runner, view_as_rendered_image, diffraction_pattern_view, (path, index), params, False
+    )

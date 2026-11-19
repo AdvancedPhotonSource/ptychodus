@@ -12,13 +12,14 @@ from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.propagate import compute_product_geometry
 
-from ptychodus.webapp.db.models import Diffraction, Fluorescence, Product
+from ptychodus.webapp.db.models import Diffraction, Fluorescence, Product, RunColumns
 from ptychodus.webapp.routers.schemas import (
     CampaignRead,
     DerivedFromEdge,
     DiffractionRead,
     FluorescenceRead,
     ProductRead,
+    RunRead,
 )
 
 
@@ -39,9 +40,31 @@ async def _edges_for(session: AsyncSession, uuid: UUID) -> list[DerivedFromEdge]
     return out
 
 
+def _run_for(row: RunColumns) -> RunRead | None:
+    """The row's run record, or None for imported data, which has none."""
+    if (
+        row.run_state is None
+        or row.run_progress is None
+        or row.run_progress_goal is None
+        or row.run_command is None
+        or row.run_updated_at is None
+    ):
+        return None
+
+    return RunRead(
+        state=row.run_state,
+        reason=row.run_reason,
+        progress=row.run_progress,
+        progress_goal=row.run_progress_goal,
+        command=row.run_command,
+        updated_at=row.run_updated_at,
+    )
+
+
 async def diffraction_to_read(session: AsyncSession, row: Diffraction) -> DiffractionRead:
     data = DiffractionRead.model_validate(row)
     data.derived_from = await _edges_for(session, row.uuid)
+    data.run = _run_for(row)
     return data
 
 
@@ -89,6 +112,7 @@ def _finite_or_none(value: float) -> float | None:
 async def product_to_read(session: AsyncSession, row: Product) -> ProductRead:
     data = ProductRead.model_validate(row)
     data.derived_from = await _edges_for(session, row.uuid)
+    data.run = _run_for(row)
 
     if row.object_layers is not None:
         # N layers are separated by N-1 spacings, so a single layer is zero thick.
@@ -144,6 +168,7 @@ async def product_to_read(session: AsyncSession, row: Product) -> ProductRead:
 async def fluorescence_to_read(session: AsyncSession, row: Fluorescence) -> FluorescenceRead:
     data = FluorescenceRead.model_validate(row)
     data.derived_from = await _edges_for(session, row.uuid)
+    data.run = _run_for(row)
     return data
 
 

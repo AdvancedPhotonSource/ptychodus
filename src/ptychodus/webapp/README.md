@@ -50,15 +50,31 @@ The shipped wheel already contains the compiled frontend. Rebuilding the UI in p
     fluorescence.h5
 ```
 
-Per-kind subdirectories are created on first start via `layout.ensure_kind_dirs()`. The service watches for changes to `manifest.json` files and reconciles them into the SQLite cache, ignoring hidden paths such as `.staging/`. Canonical definitions live in [api/storage.py](../api/storage.py), shared with the writers.
+Per-kind subdirectories are created on first start via `layout.ensure_kind_dirs()`. The service watches for changes to `manifest.json` files and reconciles them into the SQLite cache, ignoring hidden paths: the savers' `.staging/` and the temporary `.manifest.json.tmp` a run resource's manifest is written through. Canonical definitions live in [api/storage.py](../api/storage.py), shared with the writers.
 
-Resources are added through that module's chainable savers — `save_campaign_resource`, `save_diffraction_resource` and `save_product_resource` — which assemble each resource under `<storage_root>/.staging/` and rename it into place, so the service sees it whole or not at all. Each returns the new uuid, which the next takes in `campaign` or `derived_from`:
+Finished data is added through that module's chainable savers — `save_campaign_resource`, `save_diffraction_resource`, `save_product_resource` and `save_fluorescence_resource` — which assemble each resource under `<storage_root>/.staging/`, `fsync` it and rename it into place, so the service sees it whole or not at all. Each returns the new uuid, which the next takes in `campaign` or `derived_from`:
 
 ```python
 campaign = save_campaign_resource(layout, label='fly001 demo')
 diffraction = save_diffraction_resource(layout, data, label='scan 42', campaign=campaign)
 product = save_product_resource(layout, product, derived_from=[diffraction])
 ```
+
+A processing run writes its result as a **run resource** instead, created in place so its progress can be watched: `ptychodus-reconstruct --product <uuid>` and `ptychodus-enhance-xrf` given uuids each make one through `start_run`, `commit_checkpoint` and `finish_run`. Its folder is the run's standard output directory — the options document, the log, and one immutable checkpoint per committed `progress` value beside the final file:
+
+```text
+product/<uuid>/
+  manifest.json
+  reconstruct_options.yaml
+  reconstruct.log
+  product.000000.h5
+  product.000100.h5
+  product.h5
+```
+
+The manifest is replaced atomically after each checkpoint, its `files` entry naming the newest one, so every reader resolves a resource's data through its manifest rather than a fixed file name. Its `run` record gives the `state` — `pending`, `running`, `succeeded`, `failed` or `cancelled`, with a `reason` — the `progress` against a `progress_goal` (0 when unknown), the command, ptychodus version, user and options document, and `updated_at`; a `running` resource whose `updated_at` stops advancing belongs to a process that died. A finished or cancelled run names its final file; a failed one keeps its last checkpoint. Every resource a process produces carries a `run`, including `ptychodus-stream`'s; imported data carries none.
+
+The service exposes the record read-only: the `run` object on product, diffraction and fluorescence reads, a repeatable `run_state=` filter on their listings (REST and MCP), and a badge in the browser UI. A running resource with no checkpoint yet is ingested as `AWAITING_DATA`, and its renders answer 404 until one is committed.
 
 ## Configuration
 
@@ -76,6 +92,7 @@ All settings come from `PTYCHODUS_WEBAPP_*` environment variables (or a `.env` f
 | `PTYCHODUS_WEBAPP_POLLING_INTERVAL_S` | float | `2.0` | Watchdog observer poll interval |
 | `PTYCHODUS_WEBAPP_DEBOUNCE_WINDOW_S` | float | `1.0` | Manifest-change debounce window |
 | `PTYCHODUS_WEBAPP_AUTO_RECONCILE_ON_STARTUP` | bool | `true` | Run a full rescan at boot |
+| `PTYCHODUS_WEBAPP_RENDER_CONCURRENCY` | int | `4` | Renders run in worker threads, at most this many at once |
 
 ## Start
 
@@ -184,4 +201,5 @@ The compiled output at `src/ptychodus/webapp/ui/dist/` is git-ignored. It reache
   Put the `PTYCHODUS_WEBAPP_*` variables in `/etc/ptychodus/webapp.env`.
 - **No built-in TLS.** Front with nginx or Caddy if you're exposing beyond `127.0.0.1`. To bind all interfaces set `PTYCHODUS_WEBAPP_HOST=0.0.0.0`.
 - **Storage-root permissions.** The service user must be able to create per-kind subdirectories under `PTYCHODUS_WEBAPP_STORAGE_ROOT` on first start.
+- **Storage root on NFS.** Set `HDF5_USE_FILE_LOCKING=FALSE` for the service and for every process writing into the store. HDF5's `flock` can fail on NFS, and locking buys nothing here: a data file is immutable once a manifest names it. Expect a reader to see a new manifest only after the client's attribute-cache interval.
 - **No auth today.** The current service is unauthenticated; keep it behind a reverse proxy that enforces auth if the data warrants it.

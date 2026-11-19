@@ -52,9 +52,9 @@ from ptychodus.api.simulate.probe import (
 )
 from ptychodus.cli._batch_lamni_settings import BatchSettings
 from ptychodus.plugins.aps31id_lamni.diffraction_file import LamNIDiffractionFileReader
+from ptychodus.cli import CancellationToken
 from ptychodus.cli._reconstruct_common import (
     estimate_incident_beam_from_assembled_data,
-    CancellationToken,
     invalid_count_threshold,
     resolve_flag,
     estimate_focus_object_distance_m,

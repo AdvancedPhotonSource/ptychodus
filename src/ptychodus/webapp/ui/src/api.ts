@@ -1,7 +1,27 @@
 const API = '/api/v1';
 
 /** Mirrors IngestState in db/base.py. */
-export type IngestState = 'DISCOVERED' | 'VALID' | 'INVALID' | 'MISSING_FILES' | 'ORPHANED';
+export type IngestState =
+  | 'DISCOVERED'
+  | 'VALID'
+  | 'INVALID'
+  | 'MISSING_FILES'
+  | 'ORPHANED'
+  | 'AWAITING_DATA';
+
+/** Mirrors RunState in ptychodus.api.processing. */
+export type RunState = 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+
+/** How a processed resource came to be; see RunRead in routers/schemas.py. */
+export interface RunRead {
+  state: RunState;
+  reason: string | null;
+  progress: number;
+  /** The progress a finished run reaches; 0 if unknown. */
+  progress_goal: number;
+  command: string;
+  updated_at: string;
+}
 
 export type Polarization = 'left_circular' | 'right_circular';
 export type ScatteringRegime = 'transmission' | 'bragg' | 'laue';
@@ -72,6 +92,8 @@ export interface DiffractionRead extends RowBase {
   comments: string;
   campaign_uuid: string | null;
   derived_from: DerivedFromEdge[];
+  /** Null for imported data. */
+  run: RunRead | null;
 
   detector_distance_m: number | null;
   photon_energy_eV: number | null;
@@ -96,6 +118,8 @@ export interface DiffractionRead extends RowBase {
 
 export interface ProductRead extends RowBase {
   derived_from: DerivedFromEdge[];
+  /** Null for imported data. */
+  run: RunRead | null;
 
   name: string | null;
   comments: string | null;
@@ -162,6 +186,8 @@ export interface FluorescenceRead extends RowBase {
   label: string;
   comments: string;
   derived_from: DerivedFromEdge[];
+  /** Null for imported data. */
+  run: RunRead | null;
 
   element_names: string[];
   element_counts: number[];

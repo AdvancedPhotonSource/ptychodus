@@ -13,6 +13,15 @@ $ ptychodus-enhance-xrf --product out/product.h5 --fluorescence 2xfm_0123.mda.h5
 
 The enhanced dataset is written in the format the measured one was read in (`--file-type`, `XRF-Maps` by default), and the output must differ from both inputs. No dataset is written unless the enhancer runs to completion, so an interrupted run leaves no partially enhanced file. Beside the output go `enhance_xrf_options.yaml`, the options the run used, which `--options` takes back, and `enhance_xrf.log`, appended to by each run. `--dry-run` reads and checks the inputs and options without enhancing.
 
+Given the uuids of a product and a fluorescence resource instead, `ptychodus-enhance-xrf` reads both from the storage root (`--storage-root`, or `$PTYCHODUS_WEBAPP_STORAGE_ROOT`) and saves the result there as a new fluorescence resource derived from them, printing its uuid as it starts:
+
+```sh
+$ ptychodus-enhance-xrf --product <product_uuid> --fluorescence <fluorescence_uuid> \
+    --algorithm vspi
+```
+
+The resource exists from the start, `running` until its first result, and its folder holds the options document, the log and a checkpoint for each result the enhancer yields. It ends `succeeded`, `cancelled` (on Ctrl-C or SIGTERM, saving the last result, if any, as the final one) or `failed` (keeping its last checkpoint, if any). `-o` and `--file-type` are refused with uuids, and the inputs are both files or both uuids.
+
 An enhancer runs at its default options unless an options file is given. `--print-options` writes one, naming the enhancer and its fields by their declared names:
 
 ```sh

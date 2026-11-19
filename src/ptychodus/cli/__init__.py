@@ -6,13 +6,18 @@ bare install, so this module must not reach anything behind an optional extra.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
+from types import FrameType
 from typing import TYPE_CHECKING, Literal, cast
+from uuid import UUID
 import argparse
 import logging
 import os
 import shlex
+import signal
 import sys
+import threading
 from pathlib import Path
 
 if TYPE_CHECKING:
@@ -20,16 +25,22 @@ if TYPE_CHECKING:
     from ptychodus.api.diffraction import DiffractionDataset
     from ptychodus.api.io import StandardFileLayout
     from ptychodus.api.plugins import PluginRegistry
+    from ptychodus.api.processing import RunRecord
+    from ptychodus.api.storage import StorageLayout
 
 __all__ = [
+    'CancellationToken',
     'DirectoryType',
     'add_detector_map_arguments',
     'add_log_level_argument',
     'configure_logging',
     'crop_extent_px',
+    'install_signal_handlers',
     'open_action_log',
     'positive_int',
     'read_detector_corrections',
+    'record_run_end',
+    'report_resource',
     'verify_all_arguments_parsed',
 ]
 
@@ -139,6 +150,104 @@ def open_action_log(
         logging.getLogger().addHandler(handler)
 
     return log_file
+
+
+def report_resource(logger: logging.Logger, kind: str, uuid: UUID, folder: Path) -> None:
+    """Announce a resource a run is producing: logged, and its uuid printed on stdout.
+
+    Printed alone on its own line, so a script can capture the uuid while the run is still
+    under way and watch the resource fill in.
+    """
+    logger.info('Writing %s %s in %s', kind, uuid, folder)
+    print(uuid, flush=True)
+
+
+def record_run_end(
+    logger: logging.Logger,
+    layout: StorageLayout,
+    uuid: UUID,
+    *,
+    data_file: Path | None,
+    run: RunRecord,
+) -> bool:
+    """Record how a run producing resource `uuid` ended; whether that could be written.
+
+    A failure to write is logged rather than raised, since it leaves the resource
+    ``running`` with a stale ``updated_at`` -- which is what a reader sees of a run that
+    died -- and the command still has an exit status to give.
+    """
+    from ptychodus.api.storage import finish_run
+
+    try:
+        finish_run(layout, uuid, data_file=data_file, run=run)
+    except Exception:
+        logger.exception('Could not record the end of %s; it is left running.', uuid)
+        return False
+
+    return True
+
+
+class CancellationToken:
+    """A request to stop, raised asynchronously and read at the next safe point.
+
+    The flag is a :class:`threading.Event` so that setting it from a signal handler does no
+    real work. Nothing is logged there either: the logging machinery takes a lock, and a
+    signal delivered while that lock is held would deadlock the process it was meant to stop.
+    `on_cancel` exists for a caller that must react the instant the request arrives rather
+    than at the next safe point, and runs under the same constraint.
+    """
+
+    def __init__(self, *, on_cancel: Callable[[str], None] | None = None) -> None:
+        self._event = threading.Event()
+        self._on_cancel = on_cancel
+        self._reason = ''
+
+    @property
+    def is_cancelled(self) -> bool:
+        return self._event.is_set()
+
+    @property
+    def reason(self) -> str:
+        """What asked for the cancellation, or an empty string while none has."""
+        return self._reason
+
+    def cancel(self, reason: str = '') -> None:
+        """Request cancellation. Repeat requests are ignored, so `on_cancel` runs once."""
+        if self._event.is_set():
+            return
+
+        self._reason = reason
+        self._event.set()
+
+        if self._on_cancel is not None:
+            self._on_cancel(reason)
+
+
+def install_signal_handlers(token: CancellationToken | None = None) -> CancellationToken:
+    """Make SIGINT and SIGTERM request cancellation rather than kill the process.
+
+    Returns the token they set, creating one when none is supplied. A **second** signal of
+    either kind restores the default disposition and re-raises, so a run wedged somewhere
+    without an interruption point can still be killed from the same terminal that asked it
+    to stop politely.
+
+    Signals delivered before this runs -- during imports, argument parsing, or the first
+    file reads -- are not caught and end the process outright. There is nothing computed to
+    save that early, which is why this is called once the logging is up rather than first.
+    """
+    cancellation = CancellationToken() if token is None else token
+
+    def handle_signal(signum: int, _frame: FrameType | None) -> None:
+        if cancellation.is_cancelled:
+            signal.signal(signum, signal.SIG_DFL)
+            os.kill(os.getpid(), signum)
+            return
+
+        cancellation.cancel(signal.Signals(signum).name)
+
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+    return cancellation
 
 
 def add_detector_map_arguments(parser: argparse.ArgumentParser) -> None:

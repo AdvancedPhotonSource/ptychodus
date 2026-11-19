@@ -42,11 +42,11 @@ def test_each_event_is_one_line_of_strict_json() -> None:
     stream = EventStream(buffer)
 
     stream.emit('started', pid=7)
-    stream.emit('finished', cancelled=False, path=None)
+    stream.emit('finished', state='succeeded', path=None)
 
     assert _events(buffer) == [
         {'event': 'started', 'pid': 7},
-        {'event': 'finished', 'cancelled': False, 'path': None},
+        {'event': 'finished', 'state': 'succeeded', 'path': None},
     ]
 
 
@@ -56,7 +56,7 @@ def test_a_non_finite_value_is_refused_rather_than_written() -> None:
     stream = EventStream(io.StringIO())
 
     with pytest.raises(ValueError):
-        stream.emit('epoch', loss=float('inf'))
+        stream.emit('progress', loss=float('inf'))
 
 
 def test_a_process_with_no_stream_emits_nothing() -> None:
@@ -64,23 +64,25 @@ def test_a_process_with_no_stream_emits_nothing() -> None:
     stream = EventStream(None)
 
     stream.emit('started')
-    stream.emit_exception(RuntimeError('boom'))
+    stream.emit_failure(RuntimeError('boom'))
 
 
-def test_an_exception_event_carries_its_type_and_traceback() -> None:
+def test_a_failure_finishes_with_its_type_and_traceback() -> None:
     buffer = io.StringIO()
     stream = EventStream(buffer)
 
     try:
         raise ValueError('bad options')
     except ValueError as exc:
-        stream.emit_exception(exc)
+        stream.emit_failure(exc, path=Path('/out/product.000003.h5'), progress=3, progress_goal=9)
 
     (event,) = _events(buffer)
-    assert event['event'] == 'error'
-    assert event['type'] == 'ValueError'
-    assert event['message'] == 'bad options'
-    assert 'ValueError' in str(event['traceback'])
+    assert event['event'] == 'finished'
+    assert event['state'] == 'failed'
+    assert event['reason'] == 'ValueError'
+    assert (event['progress'], event['progress_goal']) == (3, 9)
+    assert event['path'] == '/out/product.000003.h5'
+    assert 'bad options' in str(event['detail'])
 
 
 def _output(progress: int, loss: float | None) -> ReconstructOutput:
@@ -128,7 +130,9 @@ def test_unreadable_options_are_a_usage_error(
     )
 
     assert code is ExitCode.USAGE
-    assert [event['event'] for event in _events(buffer)] == ['error']
+    events = _events(buffer)
+    assert [event['event'] for event in events] == ['finished']
+    assert events[0]['state'] == 'failed'
 
 
 def _stub_reconstruction(
@@ -172,27 +176,31 @@ def test_a_completed_run_reports_success(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert code is ExitCode.SUCCESS
     events = _events(buffer)
     assert [event['event'] for event in events] == ['started', 'finished']
-    assert events[-1]['cancelled'] is False
+    assert events[-1]['state'] == 'succeeded'
+    assert events[-1]['reason'] is None
 
 
 def test_a_run_that_produced_nothing_reports_cancelled(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    # The tail returns None only for a cancel that landed before the first epoch.
+    # The tail returns None only for a cancel that landed before the first output.
     buffer = _stub_reconstruction(monkeypatch, tmp_path, product=None)
     stream = EventStream(buffer)
+    cancellation = reconstruct_subprocess.CancellationToken()
+    cancellation.cancel('SIGTERM')
 
-    code = reconstruct_subprocess._reconstruct(
-        stream, reconstruct_subprocess.CancellationToken(), _args(tmp_path), None
-    )
+    code = reconstruct_subprocess._reconstruct(stream, cancellation, _args(tmp_path), None)
 
     assert code is ExitCode.CANCELLED
-    assert _events(buffer)[-1] == {
+    finished = _events(buffer)[-1]
+    assert finished == {
         'event': 'finished',
-        'epoch': 0,
-        'cancelled': True,
+        'state': 'cancelled',
+        'reason': 'SIGTERM',
+        'progress': 0,
+        'progress_goal': 0,
         'path': None,
-        'elapsed_s': pytest.approx(_events(buffer)[-1]['elapsed_s']),
+        'elapsed_s': pytest.approx(finished['elapsed_s']),
     }
 
 
@@ -207,4 +215,5 @@ def test_a_run_cancelled_part_way_reports_cancelled(
     code = reconstruct_subprocess._reconstruct(stream, cancellation, _args(tmp_path), None)
 
     assert code is ExitCode.CANCELLED
-    assert _events(buffer)[-1]['cancelled'] is True
+    assert _events(buffer)[-1]['state'] == 'cancelled'
+    assert _events(buffer)[-1]['reason'] == 'SIGTERM'

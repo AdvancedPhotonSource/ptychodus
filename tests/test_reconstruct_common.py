@@ -60,15 +60,14 @@ from pydantic import BaseModel
 
 # Deliberately imported at module scope: this file already does
 # ``pytest.importorskip('ptychi')`` above.
+from ptychodus.cli import CancellationToken, install_signal_handlers  # noqa: E402
 from ptychodus.cli import _reconstruct_common  # noqa: E402
 from ptychodus.cli._reconstruct_common import resolve_crop_region  # noqa: E402
 from ptychodus.cli._reconstruct_common import (  # noqa: E402
-    CancellationToken,
     default_reconstruction,
     estimate_focus_object_distance_m,
     estimate_incident_beam_from_assembled_data,
     find_options_document,
-    install_signal_handlers,
     invalid_count_threshold,
     is_main_process,
     pair_patterns_with_positions,

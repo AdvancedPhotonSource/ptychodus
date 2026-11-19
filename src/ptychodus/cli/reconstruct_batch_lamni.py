@@ -39,7 +39,7 @@ selection by itself, which is a dry run in code.
 
 Neither function configures logging or installs signal handlers: both belong to whoever
 owns the process, and a caller that wants its run interruptible passes in its own
-:class:`~ptychodus.cli._reconstruct_common.CancellationToken`. The fan-out spawns a child
+:class:`~ptychodus.cli.CancellationToken`. The fan-out spawns a child
 per scan, so the calling process must not already hold a CUDA context -- the same
 constraint that makes device enumeration happen in a throwaway child.
 
@@ -105,12 +105,11 @@ from ptychodus.cli._batch_lamni_settings import (
     select_label,
     select_records,
 )
+from ptychodus.cli import CancellationToken, install_signal_handlers
 from ptychodus.cli._reconstruct_common import (
-    CancellationToken,
     add_options_argument,
     add_print_options_argument,
     default_reconstruction,
-    install_signal_handlers,
     invalid_count_threshold,
     ptychi_reconstruction,
     read_reconstruction,

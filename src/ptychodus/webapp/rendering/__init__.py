@@ -13,8 +13,7 @@ from ptychodus.webapp.rendering.render import (
     build_visualization_complex,
     build_visualization_real,
     product_to_png_bytes,
-    render_complex,
-    render_real,
+    to_rendered_image,
 )
 from ptychodus.webapp.rendering.schemas import OptionsRead, RenderedImage
 
@@ -27,8 +26,7 @@ __all__ = [
     'build_visualization_real',
     'coerce_render_params',
     'product_to_png_bytes',
-    'render_complex',
     'render_params_dep',
-    'render_real',
+    'to_rendered_image',
     'visualization_options',
 ]

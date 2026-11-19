@@ -24,3 +24,5 @@ class IngestState(StrEnum):
     INVALID = 'INVALID'
     MISSING_FILES = 'MISSING_FILES'
     ORPHANED = 'ORPHANED'
+    AWAITING_DATA = 'AWAITING_DATA'
+    """A running resource whose manifest names no data yet; its first checkpoint ingests it."""

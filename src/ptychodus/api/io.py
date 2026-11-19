@@ -142,11 +142,11 @@ class StandardFileLayout(StrEnum):
     def path(self, directory: Path) -> Path:
         return directory / self.value
 
-    def checkpoint_path(self, directory: Path, epoch: int) -> Path:
-        # Per-epoch snapshot beside the final artifact, for a streaming reconstruction
-        # that publishes intermediate results.
+    def checkpoint_path(self, directory: Path, progress: int) -> Path:
+        # A checkpoint: the result as it stood at one progress value, written beside the
+        # final file and never modified afterwards.
         p = Path(self.value)
-        return directory / f'{p.stem}.{epoch:06d}{p.suffix}'
+        return directory / f'{p.stem}.{progress:06d}{p.suffix}'
 
     def rank_path(self, directory: Path, rank: int) -> Path:
         # One file per process of a multi-process launch, so ranks never share one; the

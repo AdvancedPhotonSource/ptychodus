@@ -1,6 +1,6 @@
 /** Shared cell formatting, so every table renders a missing value the same way. */
 
-import type { IngestState } from './api.js';
+import type { IngestState, RunRead } from './api.js';
 
 export const MISSING = '—';
 
@@ -121,7 +121,32 @@ export function ingestRowState(row: {
       return null;
     case 'DISCOVERED':
       return { className: 'row-pending', title: 'Not yet ingested' };
+    case 'AWAITING_DATA':
+      return { className: 'row-pending', title: 'Running; no result yet' };
     default:
       return { className: 'row-failed', title: row.error_message ?? row.ingest_state };
   }
+}
+
+/**
+ * A run that has not succeeded, as its badge reads: "running · 120/300", "running ·
+ * waiting for first result", "cancelled" or "failed". Empty for a succeeded run and for
+ * imported data, which has none.
+ */
+export function runBadge(row: { run: RunRead | null; ingest_state: IngestState }): string {
+  const run = row.run;
+  if (run === null || run.state === 'succeeded') return '';
+  if (run.state !== 'running') return run.state;
+  if (row.ingest_state === 'AWAITING_DATA') return 'running · waiting for first result';
+  if (run.progress_goal > 0) return `running · ${run.progress}/${run.progress_goal}`;
+  return `running · ${run.progress}`;
+}
+
+/** `label` with the row's run badge after it, where it has one. */
+export function withRunBadge(
+  label: string,
+  row: { run: RunRead | null; ingest_state: IngestState }
+): string {
+  const badge = runBadge(row);
+  return badge === '' ? label : `${label} [${badge}]`;
 }

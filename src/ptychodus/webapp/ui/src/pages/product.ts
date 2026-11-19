@@ -9,7 +9,9 @@ import {
   ingestRowState,
   infoText,
   scale,
+  runBadge,
   sumBytes,
+  withRunBadge,
 } from '../format.js';
 
 export async function mountProduct(root: HTMLElement): Promise<void> {
@@ -39,7 +41,7 @@ export async function mountProduct(root: HTMLElement): Promise<void> {
 
   const table = createTable<ProductRead>(
     [
-      { header: 'Name', render: (p) => p.name ?? p.uuid.slice(0, 8) },
+      { header: 'Name', render: (p) => withRunBadge(p.name ?? p.uuid.slice(0, 8), p) },
       { header: 'Diffraction\nDataset', render: datasetName },
       {
         header: 'Detector-Object\nDistance [m]',
@@ -89,6 +91,14 @@ export async function mountProduct(root: HTMLElement): Promise<void> {
   table.setRows(items);
 }
 
+/** The run badge with its reason and command, or the missing mark for imported data. */
+function runDetail(p: ProductRead): string {
+  if (p.run === null) return MISSING;
+  const badge = runBadge(p) || p.run.state;
+  const reason = p.run.reason === null ? '' : ` (${p.run.reason})`;
+  return `${badge}${reason} — ${p.run.command}`;
+}
+
 function showEmpty(host: HTMLElement): void {
   host.replaceChildren(emptyBlock('Select a product row.'));
 }
@@ -107,6 +117,7 @@ function showDetail(host: HTMLElement, p: ProductRead): void {
   const rows: [string, string][] = [
     ['UUID', p.uuid],
     ['State', p.ingest_state],
+    ['Run', runDetail(p)],
     ['Photon Wavelength [nm]', fmt(scale(p.photon_wavelength_m, 1e9))],
     ['Probe Wavenumber [1/nm]', fmt(scale(p.probe_wavenumber_per_m, 1e-9))],
     ['Probe Angular Wavenumber [rad/nm]', fmt(scale(p.probe_angular_wavenumber_rad_per_m, 1e-9))],

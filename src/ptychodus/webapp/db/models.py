@@ -35,6 +35,17 @@ def _updated_ts() -> Mapped[datetime]:
     )
 
 
+class RunColumns:
+    """The manifest's ``run`` record, for the kinds a process produces; all null without one."""
+
+    run_state: Mapped[str | None] = mapped_column(String, nullable=True)
+    run_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    run_progress: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    run_progress_goal: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    run_command: Mapped[str | None] = mapped_column(String, nullable=True)
+    run_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class Campaign(Base):
     __tablename__ = 'campaign'
 
@@ -63,7 +74,7 @@ class Campaign(Base):
     )
 
 
-class Diffraction(Base):
+class Diffraction(RunColumns, Base):
     __tablename__ = 'diffraction'
 
     uuid: Mapped[UUID] = mapped_column(Uuid(as_uuid=True, native_uuid=False), primary_key=True)
@@ -115,10 +126,11 @@ class Diffraction(Base):
         Index('ix_diffraction_tomography_angle_deg', 'tomography_angle_deg'),
         Index('ix_diffraction_tilt_angle_deg', 'tilt_angle_deg'),
         Index('ix_diffraction_ingest_state', 'ingest_state'),
+        Index('ix_diffraction_run_state', 'run_state'),
     )
 
 
-class Product(Base):
+class Product(RunColumns, Base):
     __tablename__ = 'product'
 
     uuid: Mapped[UUID] = mapped_column(Uuid(as_uuid=True, native_uuid=False), primary_key=True)
@@ -185,10 +197,11 @@ class Product(Base):
         Index('ix_product_photon_energy_eV', 'photon_energy_eV'),
         Index('ix_product_scattering_regime', 'scattering_regime'),
         Index('ix_product_ingest_state', 'ingest_state'),
+        Index('ix_product_run_state', 'run_state'),
     )
 
 
-class Fluorescence(Base):
+class Fluorescence(RunColumns, Base):
     __tablename__ = 'fluorescence'
 
     uuid: Mapped[UUID] = mapped_column(Uuid(as_uuid=True, native_uuid=False), primary_key=True)
@@ -216,7 +229,10 @@ class Fluorescence(Base):
     created_at: Mapped[datetime] = _ts()
     updated_at: Mapped[datetime] = _updated_ts()
 
-    __table_args__ = (Index('ix_fluorescence_ingest_state', 'ingest_state'),)
+    __table_args__ = (
+        Index('ix_fluorescence_ingest_state', 'ingest_state'),
+        Index('ix_fluorescence_run_state', 'run_state'),
+    )
 
 
 class DerivationEdge(Base):

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ptychodus.webapp.config import Settings
 from ptychodus.webapp.db.session import SessionProvider
+from ptychodus.webapp.rendering.offload import RenderRunner
 from ptychodus.api.storage import StorageLayout
 
 
@@ -19,6 +20,10 @@ def get_settings_dep(request: Request) -> Settings:
 
 def get_layout(request: Request) -> StorageLayout:
     return request.app.state.layout
+
+
+def get_render_runner(request: Request) -> RenderRunner:
+    return request.app.state.render_runner
 
 
 def get_session_provider(request: Request) -> SessionProvider:
@@ -34,4 +39,5 @@ async def get_session(
 
 SettingsDep = Annotated[Settings, Depends(get_settings_dep)]
 LayoutDep = Annotated[StorageLayout, Depends(get_layout)]
+RenderRunnerDep = Annotated[RenderRunner, Depends(get_render_runner)]
 SessionDep = Annotated[AsyncSession, Depends(get_session)]

@@ -672,8 +672,15 @@ def test_stop_finishes_and_stores_the_scan_in_progress(tmp_path: Path) -> None:
     assert product.derived_from == [
         DerivedFromRef(kind='diffraction', uuid=report.diffraction_uuid)
     ]
+
+    for manifest in (diffraction, product):
+        assert manifest.run is not None
+        assert manifest.run.command == 'ptychodus-stream'
+        assert manifest.run.state == 'succeeded'
+        assert manifest.run.options is None
+
     numpy.testing.assert_array_equal(
-        load_diffraction_data(resolve_storage_inputs(layout, report.product_uuid)[0])
+        load_diffraction_data(resolve_storage_inputs(layout, report.product_uuid).diffraction_file)
         .get_indexes()
         .size,
         100,
@@ -726,7 +733,7 @@ def test_the_trigger_takes_the_scan_number_and_angle_and_survives_a_failed_ack(
     assert pipeline.get_counters()['num_trigger_failures'] == 1
     assert report.product_uuid is not None and report.diffraction_uuid is not None
     layout = StorageLayout(tmp_path)
-    _, product_file = resolve_storage_inputs(layout, report.product_uuid)
+    product_file = resolve_storage_inputs(layout, report.product_uuid).product_file
     product = load_product(product_file)
     assert product.metadata.name == 'scan 42'
     assert product.metadata.tomography_angle_deg == 37.5

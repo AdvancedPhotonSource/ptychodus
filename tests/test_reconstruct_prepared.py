@@ -27,16 +27,22 @@ from ptychodus.api.object import Object, ObjectCenter  # noqa: E402
 from ptychodus.api.probe import ProbeEnsemble  # noqa: E402
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence  # noqa: E402
 from ptychodus.api.product import Product, ProductMetadata  # noqa: E402
-from ptychodus.api.reconstruct import ReconstructInput  # noqa: E402
+from ptychodus.api.io import load_product, save_product  # noqa: E402
+from ptychodus.api.processing import RunState  # noqa: E402
+from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput  # noqa: E402
 from ptychodus.api.storage import (  # noqa: E402
     STORAGE_ROOT_ENVIRONMENT_VARIABLE,
+    DerivedFromRef,
+    ProductManifest,
+    ResourceKind,
     StorageLayout,
+    load_manifest,
     save_diffraction_resource,
     save_product_resource,
 )
+from ptychodus.cli import CancellationToken  # noqa: E402
 from ptychodus.cli import _reconstruct_standard, reconstruct_prepared  # noqa: E402
 from ptychodus.cli._reconstruct_common import (  # noqa: E402
-    CancellationToken,
     ResolvedReconstruction,
     default_reconstruction,
 )
@@ -246,54 +252,187 @@ def _store(root: Path) -> UUID:
     return save_product_resource(layout, _product(), derived_from=[diffraction])
 
 
-def test_a_stored_product_reconstructs_by_uuid(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    product = _store(tmp_path / 'storage')
-    captured = _capture_run(monkeypatch)
+def _stored_run(monkeypatch: pytest.MonkeyPatch, mode: str) -> dict[str, Any]:
+    """Stand in for the reconstruction tail, writing what it writes and ending as `mode`.
 
-    code = _main(
-        monkeypatch,
-        '--storage-root',
-        str(tmp_path / 'storage'),
-        '--product',
-        str(product),
-        '-o',
-        str(tmp_path / 'result'),
+    Two outputs are yielded and checkpointed through ``on_sync``; then the run completes,
+    is cancelled (after its outputs, or before any), or raises.
+    """
+    captured: dict[str, Any] = {'commits': []}
+
+    def fake_run(
+        logger: logging.Logger,
+        resolved: ResolvedReconstruction,
+        reconstruct_input: ReconstructInput,
+        output_directory: Path,
+        *,
+        cancellation: CancellationToken,
+        on_sync: Any = None,
+    ) -> Product | None:
+        captured.update(reconstruct_input=reconstruct_input, output_directory=output_directory)
+
+        if mode == 'cancelled before output':
+            cancellation.cancel('SIGTERM')
+            return None
+
+        product = reconstruct_input.product
+
+        for progress in (1, 2):
+            checkpoint = output_directory / f'product.{progress:06d}.h5'
+            save_product(checkpoint, product)
+            on_sync(ReconstructOutput(product, progress=progress, progress_goal=4), checkpoint)
+            captured['commits'].append(_manifest(output_directory).files['product'])
+
+        if mode == 'failed':
+            raise FloatingPointError('loss is nan')
+
+        if mode == 'cancelled':
+            cancellation.cancel('SIGTERM')
+
+        save_product(output_directory / 'product.h5', product)
+        return product
+
+    monkeypatch.setattr(reconstruct_prepared, 'run_reconstruction', fake_run)
+    return captured
+
+
+def _manifest(folder: Path) -> ProductManifest:
+    manifest = load_manifest(
+        folder / 'manifest.json',
+        expected_kind=ResourceKind.PRODUCT,
+        expected_uuid=UUID(folder.name),
     )
+    assert isinstance(manifest, ProductManifest)
+    return manifest
 
-    assert code is ExitCode.SUCCESS
+
+def _main_stored(monkeypatch: pytest.MonkeyPatch, root: Path, product: UUID) -> ExitCode:
+    return _main(monkeypatch, '--storage-root', str(root), '--product', str(product))
+
+
+@pytest.mark.parametrize(
+    ('mode', 'code', 'state', 'result'),
+    [
+        ('succeeded', ExitCode.SUCCESS, RunState.SUCCEEDED, 'product.h5'),
+        ('cancelled', ExitCode.CANCELLED, RunState.CANCELLED, 'product.h5'),
+        ('cancelled before output', ExitCode.CANCELLED, RunState.CANCELLED, 'product.000000.h5'),
+        ('failed', ExitCode.FAILURE, RunState.FAILED, 'product.000002.h5'),
+    ],
+)
+def test_a_stored_product_reconstructs_into_a_new_resource(
+    mode: str,
+    code: ExitCode,
+    state: RunState,
+    result: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / 'storage'
+    product = _store(root)
+    layout = StorageLayout(root)
+    input_file = layout.resource_folder(ResourceKind.PRODUCT, product) / 'product.h5'
+    input_bytes = input_file.read_bytes()
+    captured = _stored_run(monkeypatch, mode)
+
+    assert _main_stored(monkeypatch, root, product) is code
+
+    folder = captured['output_directory']
+    assert folder.parent == layout.kind_dir(ResourceKind.PRODUCT)
+    assert capsys.readouterr().out.strip() == folder.name
     assert captured['reconstruct_input'].diffraction_patterns.shape[0] == NUM_PATTERNS
-    assert type(captured['task']).__name__ == 'LSQMLOptions'
+
+    manifest = _manifest(folder)
+    diffraction = _manifest_source(layout, product)
+    assert manifest.derived_from == [
+        DerivedFromRef(kind='diffraction', uuid=diffraction),
+        DerivedFromRef(kind='product', uuid=product),
+    ]
+    assert manifest.files['product'] == result
+    assert manifest.files['options'] == 'reconstruct_options.yaml'
+    assert manifest.files['log'] == 'reconstruct.log'
+    assert manifest.run is not None
+    assert manifest.run.state == state
+    assert manifest.run.command == 'ptychodus-reconstruct'
+    assert manifest.run.options == 'reconstruct_options.yaml'
+    assert manifest.run.reason == ('FloatingPointError' if mode == 'failed' else None)
+    assert (folder / 'reconstruct_options.yaml').is_file()
+    assert (folder / 'product.000000.h5').read_bytes() == input_bytes
+    assert input_file.read_bytes() == input_bytes
+    load_product(folder / result)
+
+    if mode != 'cancelled before output':
+        assert captured['commits'] == ['product.000001.h5', 'product.000002.h5']
+        assert (manifest.run.progress, manifest.run.progress_goal) == (2, 4)
+
+
+def _manifest_source(layout: StorageLayout, product: UUID) -> UUID:
+    manifest = load_manifest(
+        layout.manifest_path(ResourceKind.PRODUCT, product),
+        expected_kind=ResourceKind.PRODUCT,
+        expected_uuid=product,
+    )
+    assert isinstance(manifest, ProductManifest)
+    return manifest.derived_from[0].uuid
 
 
 def test_the_storage_root_defaults_to_the_environment(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     product = _store(tmp_path / 'storage')
-    captured = _capture_run(monkeypatch)
+    captured = _stored_run(monkeypatch, 'succeeded')
     monkeypatch.setenv(STORAGE_ROOT_ENVIRONMENT_VARIABLE, str(tmp_path / 'storage'))
 
-    code = _main(monkeypatch, '--product', str(product), '-o', str(tmp_path / 'result'))
+    code = _main(monkeypatch, '--product', str(product))
 
     assert code is ExitCode.SUCCESS
-    assert captured['reconstruct_input'].diffraction_patterns.shape[0] == NUM_PATTERNS
+    assert captured['output_directory'].parent.parent == (tmp_path / 'storage').resolve()
 
 
-@pytest.mark.parametrize('case', ['no root', 'unknown uuid', 'both inputs'])
+def test_a_stored_dry_run_creates_nothing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    root = tmp_path / 'storage'
+    product = _store(root)
+    before = sorted(path.name for path in (root / ResourceKind.PRODUCT).iterdir())
+
+    assert _main(
+        monkeypatch, '--storage-root', str(root), '--product', str(product), '--dry-run'
+    ) is (ExitCode.SUCCESS)
+    assert sorted(path.name for path in (root / ResourceKind.PRODUCT).iterdir()) == before
+
+
+@pytest.mark.parametrize(
+    'case',
+    [
+        'no root',
+        'unknown uuid',
+        'both inputs',
+        'product with -o',
+        'input without -o',
+        'multi-process',
+    ],
+)
 def test_a_bad_product_request_is_a_usage_error(
     case: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     product = _store(tmp_path / 'storage')
     _prepare(tmp_path / 'prepared')
     monkeypatch.delenv(STORAGE_ROOT_ENVIRONMENT_VARIABLE, raising=False)
+    root = ['--storage-root', str(tmp_path / 'storage')]
+    output = ['-o', str(tmp_path / 'result')]
+
+    if case == 'multi-process':
+        monkeypatch.setattr(reconstruct_prepared, 'environment_world_size', lambda: 2)
+
     argv = {
         'no root': ['--product', str(product)],
-        'unknown uuid': ['--storage-root', str(tmp_path / 'storage'), '--product', str(uuid4())],
-        'both inputs': ['-i', str(tmp_path / 'prepared'), '--product', str(product)],
+        'unknown uuid': [*root, '--product', str(uuid4())],
+        'both inputs': ['-i', str(tmp_path / 'prepared'), '--product', str(product), *output],
+        'product with -o': [*root, '--product', str(product), *output],
+        'input without -o': ['-i', str(tmp_path / 'prepared')],
+        'multi-process': [*root, '--product', str(product)],
     }[case]
 
     with pytest.raises(SystemExit) as caught:
-        _main(monkeypatch, *argv, '-o', str(tmp_path / 'result'))
+        _main(monkeypatch, *argv)
 
     assert caught.value.code == 2

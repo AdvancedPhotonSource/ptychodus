@@ -524,11 +524,12 @@ def main() -> ExitCode:
             parser.error(f'--product needs --storage-root or ${STORAGE_ROOT_ENVIRONMENT_VARIABLE}.')
 
         try:
-            diffraction_file, product_file = resolve_storage_inputs(
-                StorageLayout(Path(args.storage_root)), args.product
-            )
+            inputs = resolve_storage_inputs(StorageLayout(Path(args.storage_root)), args.product)
         except (LayoutError, ManifestLoadError) as exc:
             parser.error(str(exc))
+
+        diffraction_file = inputs.diffraction_file
+        product_file = inputs.product_file
     else:
         diffraction_file = StandardFileLayout.DIFFRACTION.path(input_directory)
         product_file = StandardFileLayout.PRODUCT.path(input_directory)

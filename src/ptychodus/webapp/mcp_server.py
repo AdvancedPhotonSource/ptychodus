@@ -3,24 +3,30 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
-from pathlib import Path
 from base64 import b64decode
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
+from functools import partial
+from pathlib import Path
+from typing import Any, TypeVar
 from uuid import UUID
 
-import numpy
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.utilities.types import Image as MCPImage
 from sqlalchemy import String, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ptychodus.api.constants import LengthUnit
 from ptychodus.api.diffraction import Polarization
-from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.io import load_diffraction_data, load_fluorescence_data, load_product
+from ptychodus.api.processing import RunState
 from ptychodus.api.scattering.geometry import ScatteringRegime
+from ptychodus.api.storage import (
+    LayoutError,
+    ManifestLoadError,
+    ResourceKind,
+    StorageLayout,
+    resolve_resource_file,
+)
 
 from ptychodus.webapp.db import repositories as repo
 from ptychodus.webapp.db.base import IngestState
@@ -30,14 +36,24 @@ from ptychodus.webapp.mcp_tools.xraydb import create_xraydb_mcp
 from ptychodus.webapp.rendering import (
     OptionsRead,
     RenderParamsError,
-    build_visualization_complex,
-    build_visualization_real,
     coerce_render_params,
-    product_to_png_bytes,
     visualization_options,
 )
+from ptychodus.webapp.rendering.offload import RenderRunner
 from ptychodus.webapp.rendering.params import InvalidRenderParamError
-from ptychodus.webapp.rendering.plot import ScanPath, render_scan_paths
+from ptychodus.webapp.rendering.views import (
+    RenderLookupError,
+    diffraction_aggregate_view,
+    diffraction_pattern_view,
+    fluorescence_element_view,
+    fluorescence_summary_view,
+    object_layer_view,
+    object_view,
+    probe_modes_view,
+    probe_view,
+    scan_paths_view,
+    view_as_png,
+)
 from ptychodus.webapp.routers._convert import (
     campaign_to_read,
     diffraction_to_read,
@@ -55,20 +71,16 @@ from ptychodus.webapp.routers.schemas import (
     ProductRead,
     StoreStats,
 )
-from ptychodus.api.storage import StorageLayout
-from ptychodus.api.storage import ResourceKind
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_FLUORESCENCE_PIXEL_GEOMETRY = PixelGeometry(
-    width_m=LengthUnit.MICROMETER.meters_per_unit,
-    height_m=LengthUnit.MICROMETER.meters_per_unit,
-)
+_T = TypeVar('_T')
 
 
 class _Ctx:
     provider: SessionProvider | None = None
     layout: StorageLayout | None = None
+    render_runner: RenderRunner | None = None
 
 
 def bind_session_provider(provider: SessionProvider) -> None:
@@ -77,6 +89,10 @@ def bind_session_provider(provider: SessionProvider) -> None:
 
 def bind_layout(layout: StorageLayout) -> None:
     _Ctx.layout = layout
+
+
+def bind_render_runner(runner: RenderRunner) -> None:
+    _Ctx.render_runner = runner
 
 
 @asynccontextmanager
@@ -93,12 +109,33 @@ def _require_layout() -> StorageLayout:
     return _Ctx.layout
 
 
-def _resolve_resource_file(kind: str, uuid: UUID, filename: str) -> Path:
-    layout = _require_layout()
-    path = layout.resource_folder(kind, uuid) / filename
+def _resolve_resource_file(kind: str, uuid: UUID) -> Path:
+    """The resource's current file, as its manifest names it; a running one's newest checkpoint."""
+    try:
+        path = resolve_resource_file(_require_layout(), uuid, kind)
+    except (LayoutError, ManifestLoadError) as exc:
+        raise ToolError(str(exc)) from exc
+
     if not path.is_file():
-        raise ToolError(f'{filename} for {kind} {uuid} not present on disk')
+        raise ToolError(f'{path.name} for {kind} {uuid} not present on disk')
+
     return path
+
+
+async def _render(func: Callable[..., _T], /, *args: Any) -> _T:
+    """Run a render in a worker thread, mapping its errors to :class:`ToolError`."""
+    if _Ctx.render_runner is None:
+        raise ToolError('RenderRunner not bound; call bind_render_runner() first')
+
+    try:
+        return await _Ctx.render_runner.run(func, *args)
+    except RenderLookupError as exc:
+        if exc.available:
+            raise ToolError(f'{exc.message}; available: [{", ".join(exc.available)}]') from exc
+
+        raise ToolError(exc.message) from exc
+    except RenderParamsError as exc:
+        raise ToolError(str(exc)) from exc
 
 
 async def _ensure_row_exists(kind: str, uuid: UUID) -> None:
@@ -179,14 +216,21 @@ def create_mcp_server() -> FastMCP:
         tilt_angle_deg_max: float | None = None,
         polarization: str | None = None,
         ingest_state: str | None = None,
+        run_state: list[RunState] | None = None,
     ) -> Page[DiffractionRead]:
-        """List diffraction datasets."""
+        """List diffraction datasets.
+
+        `run_state` keeps only resources whose run is in one of those states (pending, running,
+        succeeded, failed, cancelled); imported data has no run.
+        """
         async with _session() as session:
             where = []
             if campaign_uuid is not None:
                 where.append(Diffraction.campaign_uuid == UUID(campaign_uuid))
             if ingest_state is not None:
                 where.append(Diffraction.ingest_state == ingest_state)
+            if run_state:
+                where.append(Diffraction.run_state.in_([s.value for s in run_state]))
             if photon_energy_eV_min is not None:
                 where.append(Diffraction.photon_energy_eV >= photon_energy_eV_min)
             if photon_energy_eV_max is not None:
@@ -236,17 +280,24 @@ def create_mcp_server() -> FastMCP:
         offset: int = 0,
         derived_from_uuid: str | None = None,
         ingest_state: str | None = None,
+        run_state: list[RunState] | None = None,
         photon_energy_eV_min: float | None = None,  # noqa: N803
         photon_energy_eV_max: float | None = None,  # noqa: N803
         scattering_regime: ScatteringRegime | None = None,
     ) -> Page[ProductRead]:
-        """List reconstruction products, optionally only transmission, Bragg or Laue ones."""
+        """List reconstruction products, optionally only transmission, Bragg or Laue ones.
+
+        `run_state` keeps only resources whose run is in one of those states (pending, running,
+        succeeded, failed, cancelled); imported data has no run.
+        """
         async with _session() as session:
             where = []
             if scattering_regime is not None:
                 where.append(Product.scattering_regime == scattering_regime.value)
             if ingest_state is not None:
                 where.append(Product.ingest_state == ingest_state)
+            if run_state:
+                where.append(Product.run_state.in_([s.value for s in run_state]))
             if photon_energy_eV_min is not None:
                 where.append(Product.photon_energy_eV >= photon_energy_eV_min)
             if photon_energy_eV_max is not None:
@@ -280,12 +331,19 @@ def create_mcp_server() -> FastMCP:
         derived_from_uuid: str | None = None,
         element: str | None = None,
         ingest_state: str | None = None,
+        run_state: list[RunState] | None = None,
     ) -> Page[FluorescenceRead]:
-        """List fluorescence datasets."""
+        """List fluorescence datasets.
+
+        `run_state` keeps only resources whose run is in one of those states (pending, running,
+        succeeded, failed, cancelled); imported data has no run.
+        """
         async with _session() as session:
             where = []
             if ingest_state is not None:
                 where.append(Fluorescence.ingest_state == ingest_state)
+            if run_state:
+                where.append(Fluorescence.run_state.in_([s.value for s in run_state]))
             if derived_from_uuid is not None:
                 target = UUID(derived_from_uuid)
                 where.append(
@@ -385,21 +443,12 @@ def create_mcp_server() -> FastMCP:
         """Render a single diffraction pattern from an assembled dataset."""
         target = UUID(uuid)
         await _ensure_row_exists(ResourceKind.DIFFRACTION, target)
-        path = _resolve_resource_file(ResourceKind.DIFFRACTION, target, 'diffraction.h5')
-        data = load_diffraction_data(path)
-        num_patterns = data.get_patterns_shape()[0]
-        if not 0 <= index < num_patterns:
-            raise ToolError(f'pattern index {index} out of range [0, {num_patterns})')
+        path = _resolve_resource_file(ResourceKind.DIFFRACTION, target)
         params = _coerce_render_params_or_error(
             colormap, transform, None, None, value_min, value_max, clip
         )
-        try:
-            vp = build_visualization_real(
-                data.get_pattern(index), data.get_pixel_geometry(), params, value_label='Counts'
-            )
-        except RenderParamsError as exc:
-            raise ToolError(str(exc)) from exc
-        return MCPImage(data=product_to_png_bytes(vp), format='png')
+        png = await _render(view_as_png, diffraction_pattern_view, (path, index), params)
+        return MCPImage(data=png, format='png')
 
     @mcp.tool()
     async def render_diffraction_aggregate(
@@ -413,21 +462,12 @@ def create_mcp_server() -> FastMCP:
         """Render the mean pattern across an assembled diffraction dataset."""
         target = UUID(uuid)
         await _ensure_row_exists(ResourceKind.DIFFRACTION, target)
-        path = _resolve_resource_file(ResourceKind.DIFFRACTION, target, 'diffraction.h5')
-        data = load_diffraction_data(path)
+        path = _resolve_resource_file(ResourceKind.DIFFRACTION, target)
         params = _coerce_render_params_or_error(
             colormap, transform, None, None, value_min, value_max, clip
         )
-        try:
-            vp = build_visualization_real(
-                data.get_mean_pattern(),
-                data.get_pixel_geometry(),
-                params,
-                value_label='Mean Counts',
-            )
-        except RenderParamsError as exc:
-            raise ToolError(str(exc)) from exc
-        return MCPImage(data=product_to_png_bytes(vp), format='png')
+        png = await _render(view_as_png, diffraction_aggregate_view, (path,), params)
+        return MCPImage(data=png, format='png')
 
     @mcp.tool()
     async def render_probe(
@@ -444,25 +484,12 @@ def create_mcp_server() -> FastMCP:
         """Render a single incoherent probe mode. coherent axis is fixed at 0."""
         target = UUID(uuid)
         await _ensure_row_exists(ResourceKind.PRODUCT, target)
-        path = _resolve_resource_file(ResourceKind.PRODUCT, target, 'product.h5')
-        product = load_product(path)
-        probe = product.probes.get_mean_probe()
-        if not 0 <= incoherent < probe.num_incoherent_modes:
-            raise ToolError(
-                f'incoherent mode {incoherent} out of range [0, {probe.num_incoherent_modes})'
-            )
+        path = _resolve_resource_file(ResourceKind.PRODUCT, target)
         params = _coerce_render_params_or_error(
             colormap, transform, component, color_model, value_min, value_max, clip
         )
-        try:
-            vp = build_visualization_complex(
-                probe.get_incoherent_mode(incoherent),
-                product.probes.get_pixel_geometry(),
-                params,
-            )
-        except RenderParamsError as exc:
-            raise ToolError(str(exc)) from exc
-        return MCPImage(data=product_to_png_bytes(vp), format='png')
+        png = await _render(view_as_png, probe_view, (path, incoherent), params)
+        return MCPImage(data=png, format='png')
 
     @mcp.tool()
     async def render_probe_modes(
@@ -478,21 +505,12 @@ def create_mcp_server() -> FastMCP:
         """Render all incoherent probe modes tiled horizontally into a single image."""
         target = UUID(uuid)
         await _ensure_row_exists(ResourceKind.PRODUCT, target)
-        path = _resolve_resource_file(ResourceKind.PRODUCT, target, 'product.h5')
-        product = load_product(path)
-        probe = product.probes.get_mean_probe()
+        path = _resolve_resource_file(ResourceKind.PRODUCT, target)
         params = _coerce_render_params_or_error(
             colormap, transform, component, color_model, value_min, value_max, clip
         )
-        try:
-            vp = build_visualization_complex(
-                probe.get_incoherent_modes_flattened(),
-                product.probes.get_pixel_geometry(),
-                params,
-            )
-        except RenderParamsError as exc:
-            raise ToolError(str(exc)) from exc
-        return MCPImage(data=product_to_png_bytes(vp), format='png')
+        png = await _render(view_as_png, probe_modes_view, (path,), params)
+        return MCPImage(data=png, format='png')
 
     @mcp.tool()
     async def render_object(
@@ -508,20 +526,12 @@ def create_mcp_server() -> FastMCP:
         """Render the object as the product of its layers, the transmission of the whole stack."""
         target = UUID(uuid)
         await _ensure_row_exists(ResourceKind.PRODUCT, target)
-        path = _resolve_resource_file(ResourceKind.PRODUCT, target, 'product.h5')
-        product = load_product(path)
+        path = _resolve_resource_file(ResourceKind.PRODUCT, target)
         params = _coerce_render_params_or_error(
             colormap, transform, component, color_model, value_min, value_max, clip
         )
-        try:
-            vp = build_visualization_complex(
-                product.object_.get_layers_flattened(),
-                product.object_.get_pixel_geometry(),
-                params,
-            )
-        except RenderParamsError as exc:
-            raise ToolError(str(exc)) from exc
-        return MCPImage(data=product_to_png_bytes(vp), format='png')
+        png = await _render(view_as_png, object_view, (path,), params)
+        return MCPImage(data=png, format='png')
 
     @mcp.tool()
     async def render_object_layer(
@@ -538,22 +548,12 @@ def create_mcp_server() -> FastMCP:
         """Render a single object layer as a complex-valued image."""
         target = UUID(uuid)
         await _ensure_row_exists(ResourceKind.PRODUCT, target)
-        path = _resolve_resource_file(ResourceKind.PRODUCT, target, 'product.h5')
-        product = load_product(path)
-        if not 0 <= layer < product.object_.num_layers:
-            raise ToolError(f'object layer {layer} out of range [0, {product.object_.num_layers})')
+        path = _resolve_resource_file(ResourceKind.PRODUCT, target)
         params = _coerce_render_params_or_error(
             colormap, transform, component, color_model, value_min, value_max, clip
         )
-        try:
-            vp = build_visualization_complex(
-                product.object_.get_layer(layer),
-                product.object_.get_pixel_geometry(),
-                params,
-            )
-        except RenderParamsError as exc:
-            raise ToolError(str(exc)) from exc
-        return MCPImage(data=product_to_png_bytes(vp), format='png')
+        png = await _render(view_as_png, object_layer_view, (path, layer), params)
+        return MCPImage(data=png, format='png')
 
     @mcp.tool()
     async def render_scan_positions(
@@ -566,39 +566,28 @@ def create_mcp_server() -> FastMCP:
 
         Pass several UUIDs to overlay them on shared axes and compare scans.
         """
-        scans: list[ScanPath] = []
+        entries: list[tuple[Path, str]] = []
 
         for raw_uuid in uuid:
             target = UUID(raw_uuid)
             await _ensure_row_exists(ResourceKind.PRODUCT, target)
-            path = _resolve_resource_file(ResourceKind.PRODUCT, target, 'product.h5')
-            product = load_product(path)
-            positions = product.probe_positions
+            entries.append((_resolve_resource_file(ResourceKind.PRODUCT, target), raw_uuid[:8]))
 
-            if len(positions) == 0:
-                raise ToolError(f'product {raw_uuid} has no probe positions')
-
-            scans.append(
-                ScanPath(
-                    label=product.metadata.name or raw_uuid[:8],
-                    x_m=[p.x_m for p in positions],
-                    y_m=[p.y_m for p in positions],
-                )
-            )
-
-        plot = render_scan_paths(
-            scans, connect_path=connect_path, width_px=width_px, height_px=height_px
+        plot = await _render(
+            partial(
+                scan_paths_view, connect_path=connect_path, width_px=width_px, height_px=height_px
+            ),
+            entries,
         )
         return MCPImage(data=b64decode(plot.png_base64), format='png')
 
-    async def _fluorescence_pixel_geometry(product_uuid: str | None) -> PixelGeometry:
+    async def _paired_product_file(product_uuid: str | None) -> Path | None:
         if product_uuid is None:
-            return _DEFAULT_FLUORESCENCE_PIXEL_GEOMETRY
+            return None
 
         product_target = UUID(product_uuid)
         await _ensure_row_exists(ResourceKind.PRODUCT, product_target)
-        product_path = _resolve_resource_file(ResourceKind.PRODUCT, product_target, 'product.h5')
-        return load_product(product_path).object_.get_pixel_geometry()
+        return _resolve_resource_file(ResourceKind.PRODUCT, product_target)
 
     @mcp.tool()
     async def render_fluorescence_summary(
@@ -613,21 +602,13 @@ def create_mcp_server() -> FastMCP:
         """Render the elementwise sum of every element map in a fluorescence dataset."""
         target = UUID(uuid)
         await _ensure_row_exists(ResourceKind.FLUORESCENCE, target)
-        path = _resolve_resource_file(ResourceKind.FLUORESCENCE, target, 'fluorescence.h5')
-        dataset = load_fluorescence_data(path)
-        if not len(dataset):
-            raise ToolError('fluorescence dataset has no element maps')
-
-        summary = numpy.sum([emap.counts_per_second for emap in dataset], axis=0)
-        pixel_geometry = await _fluorescence_pixel_geometry(product_uuid)
+        path = _resolve_resource_file(ResourceKind.FLUORESCENCE, target)
+        product_path = await _paired_product_file(product_uuid)
         params = _coerce_render_params_or_error(
             colormap, transform, None, None, value_min, value_max, clip
         )
-        try:
-            vp = build_visualization_real(summary, pixel_geometry, params, value_label='counts/s')
-        except RenderParamsError as exc:
-            raise ToolError(str(exc)) from exc
-        return MCPImage(data=product_to_png_bytes(vp), format='png')
+        png = await _render(view_as_png, fluorescence_summary_view, (path, product_path), params)
+        return MCPImage(data=png, format='png')
 
     @mcp.tool()
     async def render_fluorescence_element(
@@ -643,29 +624,15 @@ def create_mcp_server() -> FastMCP:
         """Render one element map from a fluorescence dataset."""
         target = UUID(uuid)
         await _ensure_row_exists(ResourceKind.FLUORESCENCE, target)
-        path = _resolve_resource_file(ResourceKind.FLUORESCENCE, target, 'fluorescence.h5')
-        dataset = load_fluorescence_data(path)
-        matches = [emap for emap in dataset if emap.name == name]
-        if not matches:
-            available = ', '.join(emap.name for emap in dataset)
-            raise ToolError(f'element {name!r} not found; available: [{available}]')
-        emap = matches[0]
-
-        pixel_geometry = await _fluorescence_pixel_geometry(product_uuid)
-
+        path = _resolve_resource_file(ResourceKind.FLUORESCENCE, target)
+        product_path = await _paired_product_file(product_uuid)
         params = _coerce_render_params_or_error(
             colormap, transform, None, None, value_min, value_max, clip
         )
-        try:
-            vp = build_visualization_real(
-                emap.counts_per_second,
-                pixel_geometry,
-                params,
-                value_label=f'{emap.name} counts/s',
-            )
-        except RenderParamsError as exc:
-            raise ToolError(str(exc)) from exc
-        return MCPImage(data=product_to_png_bytes(vp), format='png')
+        png = await _render(
+            view_as_png, fluorescence_element_view, (path, name, product_path), params
+        )
+        return MCPImage(data=png, format='png')
 
     mcp.mount(create_xraydb_mcp(), namespace='xraydb')
 

@@ -18,7 +18,13 @@ from ptychodus.webapp.config import Settings, get_settings
 from ptychodus.webapp.db.session import SessionProvider, create_engine, create_schema
 from ptychodus.webapp.ingest.reconciler import full_rescan
 from ptychodus.webapp.ingest.watcher import ManifestWatcher
-from ptychodus.webapp.mcp_server import bind_layout, bind_session_provider, create_mcp_server
+from ptychodus.webapp.mcp_server import (
+    bind_layout,
+    bind_render_runner,
+    bind_session_provider,
+    create_mcp_server,
+)
+from ptychodus.webapp.rendering.offload import RenderRunner
 from ptychodus.webapp.routers import (
     admin,
     campaign,
@@ -48,6 +54,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     layout = StorageLayout(settings.storage_root)
     engine = create_engine(settings.database_url)
     session_provider = SessionProvider(engine)
+    render_runner = RenderRunner(settings.render_concurrency)
 
     # Built before the lifespan below so that lifespan can run the MCP app's own: a
     # mounted Starlette app's lifespan is never run by its parent, and without it the
@@ -67,6 +74,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await create_schema(engine)
             bind_session_provider(session_provider)
             bind_layout(layout)
+            bind_render_runner(render_runner)
             layout.ensure_kind_dirs()
 
             if settings.auto_reconcile_on_startup:
@@ -94,6 +102,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.layout = layout
     app.state.session_provider = session_provider
+    app.state.render_runner = render_runner
 
     api_prefix = settings.api_prefix
     app.include_router(health.router, prefix=api_prefix)

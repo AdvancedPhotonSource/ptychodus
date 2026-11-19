@@ -19,7 +19,14 @@ from fastmcp.exceptions import ToolError
 from PIL import Image
 
 from ptychodus.webapp.ingest.pipeline import ingest_manifest
-from ptychodus.webapp.mcp_server import bind_layout, bind_session_provider, create_mcp_server
+from ptychodus.api.processing import RunState, create_run_record
+from ptychodus.webapp.mcp_server import (
+    bind_layout,
+    bind_render_runner,
+    bind_session_provider,
+    create_mcp_server,
+)
+from ptychodus.webapp.rendering.offload import RenderRunner
 
 pytestmark = pytest.mark.asyncio
 
@@ -66,6 +73,7 @@ async def test_mcp_tools_registered_and_callable(
 
     bind_session_provider(session_provider)
     bind_layout(layout)
+    bind_render_runner(RenderRunner(4))
     mcp = create_mcp_server()
     tools_list = await mcp.list_tools()
     names = {t.name for t in tools_list}
@@ -111,6 +119,7 @@ async def test_mcp_tools_registered_and_callable(
 def bound_mcp(session_provider: SessionProvider, layout: StorageLayout):
     bind_session_provider(session_provider)
     bind_layout(layout)
+    bind_render_runner(RenderRunner(4))
     return create_mcp_server()
 
 
@@ -324,3 +333,33 @@ async def test_mcp_list_tools_accept_every_rest_filter() -> None:
         actual = set(tools[name].parameters.get('properties', {}))
 
         assert expected <= actual, f'{name} is missing {sorted(expected - actual)}'
+
+
+async def test_mcp_lists_products_by_run_state(
+    bound_mcp: FastMCP,
+    session_provider: SessionProvider,
+    layout: StorageLayout,
+    seed_product: Callable[..., UUID],
+) -> None:
+    run = create_run_record(RunState.CANCELLED, command='ptychodus-reconstruct')
+    cancelled = seed_product(run=run)
+    imported = seed_product()
+    for uuid in (cancelled, imported):
+        await _ingest(session_provider, layout, layout.manifest_path('product', uuid))
+
+    payload = _structured(await bound_mcp.call_tool('list_product', {'run_state': ['cancelled']}))
+    assert [item['uuid'] for item in payload['items']] == [str(cancelled)]
+    assert payload['items'][0]['run']['state'] == 'cancelled'
+
+
+async def test_mcp_render_of_a_running_product_without_data(
+    bound_mcp: FastMCP,
+    session_provider: SessionProvider,
+    layout: StorageLayout,
+    seed_product: Callable[..., UUID],
+) -> None:
+    run = create_run_record(RunState.RUNNING, command='ptychodus-reconstruct')
+    p = seed_product(data_file=None, run=run)
+    await _ingest(session_provider, layout, layout.manifest_path('product', p))
+    with pytest.raises(ToolError, match='no product data yet'):
+        await bound_mcp.call_tool('render_object', {'uuid': str(p)})

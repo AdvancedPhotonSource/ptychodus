@@ -18,12 +18,21 @@ stdin
     document names the library and algorithm beside the backend's own options.
 
 events
-    One JSON object per line: ``started`` (with the ``library`` and ``algorithm``),
-    ``epoch`` (each output the reconstructor yields, with its ``num_epochs`` goal),
-    ``checkpoint``, ``cancelling``, ``finished``, ``error``. They go to stdout by default,
-    and fds 1 and 2 are redirected into ``reconstruct.log`` in the output directory first,
-    so progress bars and torch chatter cannot corrupt the stream. ``--event-file`` sends them to a file instead and
-    leaves stdout and stderr alone, which is what a launcher that owns stdout itself needs.
+    One JSON object per line, in the vocabulary of :mod:`ptychodus.api.processing`:
+
+    - ``started``, with the ``library`` and ``algorithm``;
+    - ``progress``, for each output the reconstructor yields: ``progress`` towards
+      ``progress_goal`` (zero when unknown) and the last ``loss``;
+    - ``checkpoint``, for each one saved: the ``path`` of the snapshot at that ``progress``;
+    - ``cancelling``, when a signal asks the run to stop;
+    - ``finished``, always last: the run's ``state`` (``succeeded``, ``cancelled`` or
+      ``failed``), its ``reason`` (the signal, or the exception's type), the ``path`` of its
+      result, and for a failure the traceback in ``detail``.
+
+    They go to stdout by default, and fds 1 and 2 are redirected into ``reconstruct.log``
+    in the output directory first, so progress bars and torch chatter cannot corrupt the
+    stream. ``--event-file`` sends them to a file instead and leaves stdout and stderr
+    alone, which is what a launcher that owns stdout itself needs.
 
 Cancellation
     SIGTERM or SIGINT sets a flag that is checked at each output the reconstructor yields.
@@ -68,16 +77,22 @@ from typing import IO, Any
 import ptychodus
 from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.io import StandardFileLayout, load_diffraction_data, load_product
+from ptychodus.api.processing import RunState
 from ptychodus.api.reconstruct import PositionIndexFilter, ReconstructOutput
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.cli import DirectoryType, add_log_level_argument, configure_logging, open_action_log
-from ptychodus.cli._reconstruct_common import (
+from ptychodus.cli import (
     CancellationToken,
+    DirectoryType,
+    add_log_level_argument,
+    configure_logging,
+    install_signal_handlers,
+    open_action_log,
+)
+from ptychodus.cli._reconstruct_common import (
     add_options_argument,
     add_print_options_argument,
     default_reconstruction,
     find_options_document,
-    install_signal_handlers,
     load_trained_model,
     pair_patterns_with_positions,
     process_rank,
@@ -119,12 +134,24 @@ class EventStream:
             flush=True,
         )
 
-    def emit_exception(self, exc: BaseException) -> None:
+    def emit_failure(
+        self,
+        exc: BaseException,
+        *,
+        path: Path | None = None,
+        progress: int = 0,
+        progress_goal: int = 0,
+    ) -> None:
+        """The ``finished`` event of a run that failed with `exc`; `path` is what it kept."""
         self.emit(
-            'error',
-            type=type(exc).__name__,
-            message=str(exc),
-            traceback=traceback.format_exc(),
+            'finished',
+            state=RunState.FAILED,
+            reason=type(exc).__name__,
+            progress=progress,
+            progress_goal=progress_goal,
+            path=None if path is None else str(path),
+            elapsed_s=self.elapsed_s(),
+            detail=traceback.format_exc(),
         )
 
 
@@ -140,24 +167,33 @@ def _finite_loss(output: ReconstructOutput) -> float | None:
 
 
 class _SyncReporter:
-    """Emit an ``epoch`` event, and a ``checkpoint`` one where a file was written, per output."""
+    """Emit a ``progress`` event, and a ``checkpoint`` one where a file was written, per output."""
 
     def __init__(self, stream: EventStream) -> None:
         self._stream = stream
-        self.last_progress = 0
+        self.progress = 0
+        self.progress_goal = 0
+        self.last_checkpoint: Path | None = None
 
     def __call__(self, output: ReconstructOutput, checkpoint_file: Path | None) -> None:
-        self.last_progress = output.progress
+        self.progress = output.progress
+        self.progress_goal = output.progress_goal
         self._stream.emit(
-            'epoch',
-            epoch=output.progress,
-            num_epochs=output.progress_goal,
+            'progress',
+            progress=output.progress,
+            progress_goal=output.progress_goal,
             loss=_finite_loss(output),
             elapsed_s=self._stream.elapsed_s(),
         )
 
         if checkpoint_file is not None:
-            self._stream.emit('checkpoint', epoch=output.progress, path=str(checkpoint_file))
+            self.last_checkpoint = checkpoint_file
+            self._stream.emit(
+                'checkpoint',
+                progress=output.progress,
+                progress_goal=output.progress_goal,
+                path=str(checkpoint_file),
+            )
 
 
 def _reconstruct(
@@ -177,7 +213,7 @@ def _reconstruct(
         options_file = find_options_document(args.options, input_directory)
         resolved = None if options_file is None else read_reconstruction(libraries, options_file)
     except (OSError, ValueError) as exc:
-        stream.emit_exception(exc)
+        stream.emit_failure(exc)
         logger.exception('Failed to read the options.')
         return ExitCode.USAGE
 
@@ -191,7 +227,7 @@ def _reconstruct(
         try:
             resolved = default_reconstruction(libraries, far_field=product.metadata.far_field)
         except ValueError as exc:
-            stream.emit_exception(exc)
+            stream.emit_failure(exc)
             logger.exception('No options, and no default to fall back to.')
             return ExitCode.USAGE
 
@@ -217,28 +253,41 @@ def _reconstruct(
     # The sync callback is the only place the progress is visible: run_reconstruction
     # returns the product alone, and losses are not written by every reconstructor.
     reporter = _SyncReporter(stream)
-    final_product = run_reconstruction(
-        logger,
-        resolved,
-        reconstruct_input,
-        output_directory,
-        cancellation=cancellation,
-        on_sync=reporter,
-    )
 
-    if final_product is None:
-        stream.emit('finished', epoch=0, cancelled=True, path=None, elapsed_s=stream.elapsed_s())
-        return ExitCode.CANCELLED
+    try:
+        final_product = run_reconstruction(
+            logger,
+            resolved,
+            reconstruct_input,
+            output_directory,
+            cancellation=cancellation,
+            on_sync=reporter,
+        )
+    except Exception as exc:
+        stream.emit_failure(
+            exc,
+            path=reporter.last_checkpoint,
+            progress=reporter.progress,
+            progress_goal=reporter.progress_goal,
+        )
+        logger.exception('Reconstruction failed.')
+        return ExitCode.FAILURE
 
-    is_cancelled = cancellation.is_cancelled
+    if cancellation.is_cancelled:
+        state, code = RunState.CANCELLED, ExitCode.CANCELLED
+    else:
+        state, code = RunState.SUCCEEDED, ExitCode.SUCCESS
+
     stream.emit(
         'finished',
-        epoch=reporter.last_progress,
-        cancelled=is_cancelled,
-        path=str(product_file),
+        state=state,
+        reason=cancellation.reason or None,
+        progress=reporter.progress,
+        progress_goal=reporter.progress_goal,
+        path=None if final_product is None else str(product_file),
         elapsed_s=stream.elapsed_s(),
     )
-    return ExitCode.CANCELLED if is_cancelled else ExitCode.SUCCESS
+    return code
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -354,7 +403,7 @@ def main() -> ExitCode:
     try:
         return _reconstruct(stream, cancellation, args, log_path)
     except Exception as exc:
-        stream.emit_exception(exc)
+        stream.emit_failure(exc)
         logger.exception('Reconstruction failed.')
         return ExitCode.FAILURE
 

@@ -7,10 +7,21 @@ Resources are named by their uuid alone; a uuid4 does not collide across kinds, 
 :meth:`StorageLayout.locate` finds any resource from its uuid, and a caller never needs
 a path.
 
-The chainable savers are the only way a resource folder is created: each is handed the
-data, assembles the resource in ``<root>/.staging/`` and renames it into place in one
-step, so a resource appears complete or not at all, and returns its uuid for the next
-saver's ``derived_from`` or ``campaign``.
+A resource folder is created in one of two ways. The chainable savers write a resource
+whole: each is handed the data, assembles the resource in ``<root>/.staging/`` and renames
+it into place in one step, so it appears complete or not at all, and returns its uuid for
+the next saver's ``derived_from`` or ``campaign``. A processing run instead creates its
+result in place with :func:`start_run`, and the folder is the run's output directory in
+the standard layout -- its options document, its log, a checkpoint per saved result and,
+at the end, the final file. :func:`commit_checkpoint` and :func:`finish_run` advance it by
+replacing the manifest atomically, so a reader always finds a manifest naming a complete
+file, and can watch a result while it is made. Either way the manifest's ``run`` records
+how a processed resource came to be (:class:`~ptychodus.api.processing.RunRecord`).
+
+Every write is flushed to disk before the rename that publishes it. Data files are never
+modified once a manifest names them, so a reader on another NFS client never has a file
+replaced under it; a manifest names a resource's current data in its ``files``, which
+:func:`resolve_resource_file` follows.
 """
 
 from __future__ import annotations
@@ -23,13 +34,16 @@ from pathlib import Path
 from typing import Annotated, Any, Final, Literal, Union, cast
 from uuid import UUID, uuid4
 import json
+import os
 import shutil
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from .assemble import AssembledDiffractionData
 from .diffraction import Polarization
-from .io import save_diffraction_data, save_product
+from .fluorescence import FluorescenceDataset
+from .io import StandardFileLayout, save_diffraction_data, save_fluorescence_data, save_product
+from .processing import RunRecord, RunState
 from .product import Product
 
 __all__ = [
@@ -47,13 +61,19 @@ __all__ = [
     'ResourceKind',
     'ResourceLocation',
     'STORAGE_ROOT_ENVIRONMENT_VARIABLE',
+    'StorageInputs',
     'StorageLayout',
+    'commit_checkpoint',
+    'finish_run',
     'load_manifest',
+    'resolve_resource_file',
     'resolve_storage_inputs',
     'save_campaign_resource',
     'save_diffraction_resource',
+    'save_fluorescence_resource',
     'save_manifest',
     'save_product_resource',
+    'start_run',
 ]
 
 MANIFEST_FILENAME: Final[str] = 'manifest.json'
@@ -150,6 +170,8 @@ class _ManifestBase(BaseModel):
     schema_version: Literal[1] = 1
     uuid: UUID
     created_at: datetime
+    run: RunRecord | None = None
+    """How a processed resource came to be; ``None`` for imported data."""
     extra: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode='after')
@@ -268,9 +290,61 @@ def load_manifest(path: Path, *, expected_kind: str, expected_uuid: UUID) -> Man
     return cast(Manifest, manifest)
 
 
+def _fsync_file(path: Path) -> None:
+    with open(path, 'rb') as handle:
+        os.fsync(handle.fileno())
+
+
+def _fsync_directory(path: Path) -> None:
+    """Flush `path`'s entries to disk, where the platform supports a directory sync."""
+    try:
+        descriptor = os.open(path, os.O_RDONLY)
+    except OSError:
+        return
+
+    try:
+        os.fsync(descriptor)
+    except OSError:
+        pass
+    finally:
+        os.close(descriptor)
+
+
+def _fsync_tree(folder: Path) -> None:
+    """Flush every file under `folder`, then its directories from the deepest up."""
+    directories: list[Path] = []
+
+    for path in sorted(folder.rglob('*')):
+        if path.is_dir():
+            directories.append(path)
+        else:
+            _fsync_file(path)
+
+    for directory in sorted(directories, key=lambda p: len(p.parts), reverse=True):
+        _fsync_directory(directory)
+
+    _fsync_directory(folder)
+
+
 def save_manifest(path: Path, manifest: Manifest) -> None:
-    """Write `manifest` to `path` for :func:`load_manifest` to read back."""
-    path.write_text(manifest.model_dump_json(indent=2), encoding='utf-8')
+    """Write `manifest` to `path` in one atomic step, flushed to disk, for :func:`load_manifest`.
+
+    The manifest is written beside `path` under a hidden name, flushed, and renamed over
+    `path`, so a reader finds either the manifest that was there or this one -- never a
+    part of one -- whether the manifest is new or replaces another; the folder is flushed
+    after the rename.
+    """
+    temporary = path.with_name(f'.{path.name}.tmp')
+
+    try:
+        temporary.write_text(manifest.model_dump_json(indent=2), encoding='utf-8')
+        _fsync_file(temporary)
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+    _fsync_directory(path.parent)
 
 
 # ---------------------------------------------------------------------------
@@ -407,14 +481,47 @@ def _load_located(layout: StorageLayout, uuid: UUID, kind: str) -> tuple[Path, M
     return location.folder, manifest
 
 
-def resolve_storage_inputs(layout: StorageLayout, product_uuid: UUID) -> tuple[Path, Path]:
-    """Return the `(diffraction_file, product_file)` a stored product reconstructs from.
+def _data_file(folder: Path, manifest: Manifest, kind: str) -> Path:
+    """The file `manifest` names for its `kind` data, which a running resource may lack."""
+    files: dict[str, str] = getattr(manifest, 'files', {})
+    name = files.get(kind)
 
-    The diffraction file is the one the product manifest's `derived_from` names.
+    if name is None:
+        raise LayoutError(f'Resource {manifest.uuid} has no {kind} data yet.')
+
+    return folder / name
+
+
+def resolve_resource_file(layout: StorageLayout, uuid: UUID, kind: str) -> Path:
+    """The file holding the `kind` resource `uuid`'s current data, as its manifest names it.
+
+    A finished resource names its final file; a running one names its newest checkpoint.
 
     Raises:
-        LayoutError: if `product_uuid` names no product, or the product names no
-            single diffraction resource.
+        LayoutError: if `uuid` names no resource of `kind`, or one with no data yet.
+        ManifestLoadError: if its manifest fails to load.
+    """
+    folder, manifest = _load_located(layout, uuid, kind)
+    return _data_file(folder, manifest, kind)
+
+
+@dataclass(frozen=True)
+class StorageInputs:
+    """What a stored product reconstructs from: its diffraction resource and both files."""
+
+    diffraction_uuid: UUID
+    diffraction_file: Path
+    product_file: Path
+
+
+def resolve_storage_inputs(layout: StorageLayout, product_uuid: UUID) -> StorageInputs:
+    """Return what the stored product `product_uuid` reconstructs from.
+
+    The diffraction resource is the one the product manifest's `derived_from` names.
+
+    Raises:
+        LayoutError: if `product_uuid` names no product, the product names no single
+            diffraction resource, or either has no data yet.
         ManifestLoadError: if a manifest fails to load.
     """
     product_folder, product = _load_located(layout, product_uuid, ResourceKind.PRODUCT)
@@ -436,9 +543,10 @@ def resolve_storage_inputs(layout: StorageLayout, product_uuid: UUID) -> tuple[P
     if not isinstance(diffraction, DiffractionManifest):
         raise ManifestLoadError(f'Resource {sources[0].uuid} has no diffraction manifest.')
 
-    return (
-        diffraction_folder / diffraction.files['diffraction'],
-        product_folder / product.files['product'],
+    return StorageInputs(
+        diffraction_uuid=sources[0].uuid,
+        diffraction_file=_data_file(diffraction_folder, diffraction, ResourceKind.DIFFRACTION),
+        product_file=_data_file(product_folder, product, ResourceKind.PRODUCT),
     )
 
 
@@ -479,12 +587,15 @@ def _save_resource(
     try:
         save_files(staging)
         save_manifest(staging / MANIFEST_FILENAME, manifest)
+        _fsync_tree(staging)
         target.parent.mkdir(parents=True, exist_ok=True)
         staging.rename(target)
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
         raise
 
+    _fsync_directory(target.parent)
+    _fsync_directory(staging.parent)
     return manifest.uuid
 
 
@@ -524,10 +635,12 @@ def save_diffraction_resource(
     polarization: Polarization | None = None,
     crop_center_x_px: int | None = None,
     crop_center_y_px: int | None = None,
+    run: RunRecord | None = None,
 ) -> UUID:
     """Save assembled diffraction data as a resource; return its uuid.
 
-    `campaign` and `derived_from` name resources already saved, by uuid.
+    `campaign` and `derived_from` name resources already saved, by uuid; `run` records
+    the process that produced the data, and is ``None`` for imported data.
 
     Raises:
         LayoutError: if `campaign` is not a campaign, or a `derived_from` resource is
@@ -551,6 +664,7 @@ def save_diffraction_resource(
         polarization=polarization,
         crop_center_x_px=crop_center_x_px,
         crop_center_y_px=crop_center_y_px,
+        run=run,
     )
     file_name = manifest.files['diffraction']
     return _save_resource(
@@ -562,9 +676,15 @@ def save_diffraction_resource(
 
 
 def save_product_resource(
-    layout: StorageLayout, product: Product, *, derived_from: Sequence[UUID] = ()
+    layout: StorageLayout,
+    product: Product,
+    *,
+    derived_from: Sequence[UUID] = (),
+    run: RunRecord | None = None,
 ) -> UUID:
     """Save a product as a resource; return its uuid.
+
+    `run` records the process that produced the product.
 
     Raises:
         LayoutError: if a `derived_from` resource is missing or of a kind nothing
@@ -574,6 +694,7 @@ def save_product_resource(
         uuid=uuid4(),
         created_at=datetime.now(timezone.utc),
         derived_from=_derived_from(layout, derived_from),
+        run=run,
     )
     file_name = manifest.files['product']
     return _save_resource(
@@ -582,3 +703,190 @@ def save_product_resource(
         manifest,
         lambda folder: save_product(folder / file_name, product),
     )
+
+
+def save_fluorescence_resource(
+    layout: StorageLayout,
+    dataset: FluorescenceDataset,
+    *,
+    label: str = '',
+    comments: str = '',
+    derived_from: Sequence[UUID] = (),
+    run: RunRecord | None = None,
+) -> UUID:
+    """Save a fluorescence dataset as a resource; return its uuid.
+
+    `run` records the process that produced the dataset, and is ``None`` for measured
+    data imported as it was recorded.
+
+    Raises:
+        LayoutError: if a `derived_from` resource is missing or of a kind nothing
+            derives from; nothing is written then.
+    """
+    manifest = FluorescenceManifest(
+        uuid=uuid4(),
+        created_at=datetime.now(timezone.utc),
+        label=label,
+        comments=comments,
+        derived_from=_derived_from(layout, derived_from),
+        run=run,
+    )
+    file_name = manifest.files['fluorescence']
+    return _save_resource(
+        layout,
+        ResourceKind.FLUORESCENCE,
+        manifest,
+        lambda folder: save_fluorescence_data(folder / file_name, dataset),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Run resources
+# ---------------------------------------------------------------------------
+
+_RUN_DATA_LAYOUT: Final[dict[str, StandardFileLayout]] = {
+    ResourceKind.PRODUCT: StandardFileLayout.PRODUCT,
+    ResourceKind.FLUORESCENCE: StandardFileLayout.FLUORESCENCE,
+}
+
+
+def _require_run_kind(kind: str) -> StandardFileLayout:
+    try:
+        return _RUN_DATA_LAYOUT[kind]
+    except KeyError:
+        raise LayoutError(f'A processing run does not produce {kind} resources.') from None
+
+
+def start_run(
+    layout: StorageLayout,
+    kind: str,
+    *,
+    initial: Path | Product | FluorescenceDataset | None,
+    derived_from: Sequence[UUID],
+    options_file_name: str,
+    options_document: str,
+    log_file_name: str,
+    run: RunRecord,
+) -> tuple[UUID, Path]:
+    """Create a processing run's result in place, and return its uuid and folder.
+
+    The folder is the run's output directory in the standard layout. It receives the
+    options document `options_document` as `options_file_name`, and `initial` as its first
+    checkpoint: a file is copied there, and a product or fluorescence dataset is saved
+    there, under the checkpoint name for ``run.progress``. A copy rather than a link, so
+    that no later write to that name could reach the file it came from. With `initial`
+    ``None`` the resource holds no data until its first :func:`commit_checkpoint`. The
+    manifest names the options document and `log_file_name`, which the run appends to.
+
+    Raises:
+        LayoutError: if `kind` is not one a run produces, ``run.state`` is not
+            ``running``, or a `derived_from` resource is missing; nothing is written then.
+    """
+    data_layout = _require_run_kind(kind)
+
+    if run.state != RunState.RUNNING:
+        raise LayoutError(f'A run starts in state running, not {run.state}.')
+
+    references = _derived_from(layout, derived_from)
+    uuid = uuid4()
+    folder = layout.resource_folder(kind, uuid)
+    folder.mkdir(parents=True)
+
+    try:
+        options_file = folder / options_file_name
+        options_file.write_text(options_document, encoding='utf-8')
+        _fsync_file(options_file)
+        files = {'options': options_file_name, 'log': log_file_name}
+
+        if initial is not None:
+            data_file = data_layout.checkpoint_path(folder, run.progress)
+
+            if isinstance(initial, Path):
+                shutil.copyfile(initial, data_file)
+            elif isinstance(initial, Product):
+                save_product(data_file, initial)
+            else:
+                save_fluorescence_data(data_file, initial)
+
+            _fsync_file(data_file)
+            files[kind] = data_file.name
+
+        created_at = datetime.now(timezone.utc)
+        manifest: Manifest
+
+        if kind == ResourceKind.PRODUCT:
+            manifest = ProductManifest(
+                uuid=uuid, created_at=created_at, derived_from=references, files=files, run=run
+            )
+        else:
+            manifest = FluorescenceManifest(
+                uuid=uuid, created_at=created_at, derived_from=references, files=files, run=run
+            )
+
+        save_manifest(folder / MANIFEST_FILENAME, manifest)
+    except BaseException:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise
+
+    _fsync_directory(folder.parent)
+    return uuid, folder
+
+
+def _commit_run(layout: StorageLayout, uuid: UUID, data_file: Path | None, run: RunRecord) -> None:
+    location = layout.locate(uuid)
+    _require_run_kind(location.kind)
+    manifest = load_manifest(
+        location.manifest_path, expected_kind=location.kind, expected_uuid=uuid
+    )
+
+    if manifest.run is None or manifest.run.state != RunState.RUNNING:
+        current = 'no run' if manifest.run is None else manifest.run.state
+        raise LayoutError(f'Resource {uuid} is not running ({current}); it cannot change.')
+
+    files = dict(getattr(manifest, 'files', {}))
+
+    if data_file is not None:
+        if data_file.parent.resolve() != location.folder or not data_file.is_file():
+            raise LayoutError(f'{data_file} is not a file in the folder of resource {uuid}.')
+
+        _fsync_file(data_file)
+        files[location.kind] = data_file.name
+
+    revised = manifest.model_copy(update={'files': files, 'run': run})
+    save_manifest(location.manifest_path, cast(Manifest, revised))
+
+
+def commit_checkpoint(
+    layout: StorageLayout, uuid: UUID, *, data_file: Path, run: RunRecord
+) -> None:
+    """Make `data_file`, a new checkpoint in the run's folder, its current result.
+
+    The file is flushed to disk before the manifest naming it is published, and is not to
+    be modified afterwards. `run` replaces the run's record and stays ``running``.
+
+    Raises:
+        LayoutError: if the resource is not running, ``run.state`` is not ``running``,
+            or `data_file` is not a file in the resource's folder.
+    """
+    if run.state != RunState.RUNNING:
+        raise LayoutError(f'A checkpoint keeps the run running, not {run.state}.')
+
+    _commit_run(layout, uuid, data_file, run)
+
+
+def finish_run(
+    layout: StorageLayout, uuid: UUID, *, data_file: Path | None, run: RunRecord
+) -> None:
+    """End the run with the terminal ``run.state``; `data_file`, if any, is its result.
+
+    With `data_file` ``None`` the result stays whatever the manifest names, which is
+    nothing for a run that ended before its first checkpoint.
+
+    Raises:
+        LayoutError: if the resource is not running, ``run.state`` is not terminal, or
+            `data_file` is not a file in the resource's folder.
+    """
+    if not run.state.is_terminal:
+        raise LayoutError(f'A run finishes in a terminal state, not {run.state}.')
+
+    _commit_run(layout, uuid, data_file, run)

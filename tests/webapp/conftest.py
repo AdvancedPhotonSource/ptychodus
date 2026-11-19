@@ -17,6 +17,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ptychodus.api.processing import RunRecord
 from ptychodus.webapp.config import Settings
 from ptychodus.webapp.db.session import SessionProvider, create_engine, create_schema
 from ptychodus.api.storage import StorageLayout
@@ -177,20 +178,26 @@ def seed_product(tmp_storage_root: Path) -> Callable[..., UUID]:
         *,
         derived_from: list[dict] | None = None,
         write_h5: bool = True,
+        data_file: str | None = 'product.h5',
+        run: RunRecord | None = None,
     ) -> UUID:
+        """`data_file` is the file the manifest names, `None` for a run with no data yet."""
         uuid = uuid or uuid4()
         folder = tmp_storage_root / 'product' / str(uuid)
         folder.mkdir(parents=True)
-        if write_h5:
-            _write_product_h5(folder / 'product.h5')
-        manifest = {
+        if write_h5 and data_file is not None:
+            _write_product_h5(folder / data_file)
+        manifest: dict = {
             'schema_version': 1,
             'kind': 'product',
             'uuid': str(uuid),
             'created_at': datetime.now(timezone.utc).isoformat(),
+            'files': {} if data_file is None else {'product': data_file},
         }
         if derived_from is not None:
             manifest['derived_from'] = derived_from
+        if run is not None:
+            manifest['run'] = run.model_dump(mode='json')
         _write_manifest(folder, manifest)
         return uuid
 
@@ -237,6 +244,7 @@ async def app_client(
 
     from ptychodus.webapp.db.session import SessionProvider
     from ptychodus.webapp.mcp_server import bind_session_provider
+    from ptychodus.webapp.rendering.offload import RenderRunner
     from ptychodus.webapp.routers import (
         admin,
         campaign,
@@ -261,6 +269,7 @@ async def app_client(
     app.state.settings = settings
     app.state.layout = layout
     app.state.session_provider = provider
+    app.state.render_runner = RenderRunner(settings.render_concurrency)
     api_prefix = '/api/v1'
     app.include_router(health.router, prefix=api_prefix)
     app.include_router(campaign.router, prefix=api_prefix)

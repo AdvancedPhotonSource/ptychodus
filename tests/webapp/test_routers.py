@@ -9,6 +9,7 @@ from uuid import UUID
 
 import pytest
 
+from ptychodus.api.processing import RunState, create_run_record
 from ptychodus.webapp.ingest.pipeline import ingest_manifest
 
 pytestmark = pytest.mark.asyncio
@@ -302,3 +303,60 @@ async def test_derived_from_edges_carry_the_target_name(
     body = (await app_client.get(f'/api/v1/fluorescence/{f}')).json()
 
     assert body['derived_from'] == [{'kind': 'product', 'uuid': str(p), 'label': 'test-product'}]
+
+
+async def test_a_product_reports_its_run_and_filters_by_state(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StorageLayout,
+    seed_product: Callable[..., UUID],
+) -> None:
+    running = seed_product(
+        data_file='product.000020.h5',
+        run=create_run_record(
+            RunState.RUNNING, command='ptychodus-reconstruct', progress=20, progress_goal=100
+        ),
+    )
+    failed = seed_product(
+        run=create_run_record(RunState.FAILED, command='ptychodus-reconstruct', reason='OSError')
+    )
+    imported = seed_product()
+    for uuid in (running, failed, imported):
+        await _ingest(app_client, db_engine, layout, layout.manifest_path('product', uuid))
+
+    resp = await app_client.get(f'/api/v1/product/{running}')
+    assert resp.status_code == 200
+    run = resp.json()['run']
+    assert run['state'] == 'running'
+    assert (run['progress'], run['progress_goal']) == (20, 100)
+    assert run['command'] == 'ptychodus-reconstruct'
+    assert run['reason'] is None
+
+    resp = await app_client.get(f'/api/v1/product/{imported}')
+    assert resp.json()['run'] is None
+
+    resp = await app_client.get('/api/v1/product', params={'run_state': 'running'})
+    assert [item['uuid'] for item in resp.json()['items']] == [str(running)]
+
+    resp = await app_client.get(
+        '/api/v1/product', params=[('run_state', 'running'), ('run_state', 'failed')]
+    )
+    assert {item['uuid'] for item in resp.json()['items']} == {str(running), str(failed)}
+
+    resp = await app_client.get('/api/v1/product', params={'run_state': 'thinking'})
+    assert resp.status_code == 422
+
+
+async def test_file_download_follows_the_manifest(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StorageLayout,
+    seed_product: Callable[..., UUID],
+) -> None:
+    run = create_run_record(RunState.RUNNING, command='ptychodus-reconstruct', progress=20)
+    p = seed_product(data_file='product.000020.h5', run=run)
+    await _ingest(app_client, db_engine, layout, layout.manifest_path('product', p))
+
+    resp = await app_client.get(f'/api/v1/product/{p}/files/product')
+    assert resp.status_code == 200
+    assert len(resp.content) > 0

@@ -2,7 +2,7 @@ import { api, type FluorescenceRead, type RenderParams, type RenderedImage } fro
 import { createDownloadBar } from '../components/download_bar.js';
 import { createImagePanel } from '../components/image_panel.js';
 import { createTree, type TreeNode } from '../components/tree.js';
-import { MISSING, fmt, fmtBytes, ingestRowState, infoText } from '../format.js';
+import { MISSING, fmt, fmtBytes, ingestRowState, infoText, withRunBadge } from '../format.js';
 import { buildPageLayout, infoLabel } from '../layout.js';
 
 export async function mountFluorescence(root: HTMLElement): Promise<void> {
@@ -66,7 +66,7 @@ export async function mountFluorescence(root: HTMLElement): Promise<void> {
 
     return {
       id: `flu:${f.uuid}`,
-      label,
+      label: withRunBadge(label, f),
       state,
       cells: [
         productName(f),

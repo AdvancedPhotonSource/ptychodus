@@ -192,10 +192,10 @@ The scan appears under the `fly001 demo` campaign as a diffraction resource and 
 ### Reconstruct
 
 ```sh
-uv run ptychodus-reconstruct --storage-root /path/to/storage --product <product_uuid> -o result
+uv run ptychodus-reconstruct --storage-root /path/to/storage --product <product_uuid>
 ```
 
-`<product_uuid>` is the one `ptychodus:scan` reported; with `PTYCHODUS_WEBAPP_STORAGE_ROOT` set, `--storage-root` can be left out.
+`<product_uuid>` is the one `ptychodus:scan` reported; with `PTYCHODUS_WEBAPP_STORAGE_ROOT` set, `--storage-root` can be left out. The result is a new product resource derived from the scan's diffraction resource and that product, whose uuid the command prints as it starts. Its folder is the run's output directory — options document, log and checkpoints — and the store shows it `running`, rendering its newest checkpoint, until it ends `succeeded`, `cancelled` (on Ctrl-C or SIGTERM, keeping the result so far) or `failed` (keeping its last checkpoint).
 
 ### Variations
 

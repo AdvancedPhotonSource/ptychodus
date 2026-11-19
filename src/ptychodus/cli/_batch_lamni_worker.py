@@ -52,10 +52,9 @@ def reconstruct_scan(payload: dict[str, Any], queue: SimpleQueue[Any]) -> None:
         load_batch_settings_from_text,
     )
     from ptychodus.api.io import StandardFileLayout
-    from ptychodus.cli import open_action_log
+    from ptychodus.cli import install_signal_handlers, open_action_log
     from ptychodus.cli._reconstruct_common import (
         default_reconstruction,
-        install_signal_handlers,
         parse_reconstruction,
         require_ptychi_options,
     )
