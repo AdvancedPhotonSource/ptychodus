@@ -149,12 +149,19 @@ def load_task_options(text: str) -> PtychographyTaskOptions:
     return load_task_options_from_mapping(json.loads(text))
 
 
-def _initial_opr_mode_weights(probe: ProbeEnsemble) -> RealArrayType:
-    """Return the probe's OPR weights, or all weight on the primary mode."""
-    try:
-        return probe.get_opr_weights()
-    except ValueError:
-        pass
+def _initial_opr_mode_weights(probe: ProbeEnsemble) -> RealArrayType | None:
+    """Return the probe's OPR weights, or all weight on the primary mode.
+
+    A single-mode probe without weights returns ``None``, leaving pty-chi to fill in
+    its default of ones, the same starting weights.
+    """
+    opr_weights = probe.get_opr_weights_or_none()
+
+    if opr_weights is not None:
+        return opr_weights
+
+    if probe.num_coherent_modes == 1:
+        return None
 
     initial_weights = numpy.zeros((probe.num_coherent_modes))
     initial_weights[0] = 1.0

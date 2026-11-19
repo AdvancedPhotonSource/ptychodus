@@ -292,7 +292,7 @@ def _make_probes(num_coherent_modes: int, opr_weights: numpy.ndarray | None) -> 
 
 
 def test_initial_opr_mode_weights_falls_back_to_primary_mode() -> None:
-    """A probe with no OPR weights must yield all weight on the primary mode.
+    """A multi-mode probe with no OPR weights must yield all weight on the primary mode.
 
     ``reconstruct_with_ptychi`` runs only inside the GPU subprocess, so this
     fallback is otherwise reachable only from a real reconstruction. Importing
@@ -305,14 +305,23 @@ def test_initial_opr_mode_weights_falls_back_to_primary_mode() -> None:
         probes.get_opr_weights()
 
     weights = _initial_opr_mode_weights(probes)
+    assert weights is not None
     assert weights.shape == (probes.num_coherent_modes,)
     assert weights == pytest.approx([1.0, 0.0, 0.0])
 
 
-def test_initial_opr_mode_weights_passes_through_existing_weights() -> None:
+def test_initial_opr_mode_weights_defers_single_mode_to_ptychi() -> None:
+    """A single-mode probe with no OPR weights must leave pty-chi its default of ones."""
+    assert _initial_opr_mode_weights(_make_probes(1, opr_weights=None)) is None
+
+
+@pytest.mark.parametrize('num_coherent_modes', [1, 2])
+def test_initial_opr_mode_weights_passes_through_existing_weights(
+    num_coherent_modes: int,
+) -> None:
     """A probe that carries OPR weights must have them used as-is, not replaced."""
-    opr_weights = numpy.random.default_rng(2).random((NUM_PATTERNS, 2))
-    probes = _make_probes(2, opr_weights=opr_weights)
+    opr_weights = numpy.random.default_rng(2).random((NUM_PATTERNS, num_coherent_modes))
+    probes = _make_probes(num_coherent_modes, opr_weights=opr_weights)
 
     assert _initial_opr_mode_weights(probes) is probes.get_opr_weights()
 
