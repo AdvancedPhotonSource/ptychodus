@@ -54,7 +54,7 @@ from ptychodus.api.simulate.object import (
     generate_stxm_dpc_object,
     generate_uniform_object,
     compute_stxm_dpc_signals,
-    interpolate_scan_values,
+    interpolate_position_values,
     STXMDPCSignals,
 )
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
@@ -134,7 +134,7 @@ def _make_assembled_data(
     pixel_width_m: float = 75e-6,
     pixel_height_m: float = 75e-6,
 ) -> AssembledDiffractionData:
-    """Build AssembledDiffractionData so each pattern's total count equals the given value."""
+    """Build AssembledDiffractionData so each pattern's detector sum equals the given value."""
     num_patterns = len(pattern_counts)
     indexes = numpy.arange(num_patterns, dtype=int)
     patterns = numpy.zeros((num_patterns, height_px, width_px), dtype=numpy.int32)
@@ -635,10 +635,10 @@ def test_autocorrelation_length_increases_with_grid_scale() -> None:
 
 
 def _make_stxm_signals(counts: list[int]) -> STXMDPCSignals:
-    """Signals carrying `counts` as totals, one per scan index, with no phase contrast."""
+    """Signals carrying `counts` as detector sums, one per scan index, with no phase contrast."""
     return STXMDPCSignals(
         indexes=numpy.arange(len(counts)),
-        total_counts=numpy.asarray(counts, dtype=float),
+        detector_sums=numpy.asarray(counts, dtype=float),
         center_of_mass_x_px=numpy.zeros(len(counts)),
         center_of_mass_y_px=numpy.zeros(len(counts)),
     )
@@ -647,13 +647,13 @@ def _make_stxm_signals(counts: list[int]) -> STXMDPCSignals:
 def _stxm_map(
     geometry: ObjectGeometry, data: AssembledDiffractionData, positions: list[ProbePosition]
 ) -> tuple[numpy.ndarray, numpy.ndarray]:
-    """Each position's total counts mapped linearly onto the grid, with the hull."""
-    totals = dict(zip(data.get_indexes().tolist(), data.get_total_counts().tolist()))
-    kept = [position for position in positions if position.index in totals]
-    grids, supported = interpolate_scan_values(
+    """Each position's detector sum mapped linearly onto the grid, with the hull."""
+    detector_sums = dict(zip(data.get_indexes().tolist(), data.get_detector_sums().tolist()))
+    kept = [position for position in positions if position.index in detector_sums]
+    grids, supported = interpolate_position_values(
         geometry,
         ProbePositionSequence(kept),
-        numpy.array([totals[position.index] for position in kept]),
+        numpy.array([detector_sums[position.index] for position in kept]),
     )
     return grids[0], supported
 
@@ -733,7 +733,7 @@ class TestStxmDpcObject:
         assert numpy.mean(intensity[scanned]) == pytest.approx(1.0, rel=1e-9)
 
     def test_border_takes_the_nearest_measured_value(self) -> None:
-        """Outside the scan every pixel takes the count of the scan position nearest it,
+        """Outside the scan every pixel takes the count of the probe position nearest it,
         so the border continues the measurement instead of stepping to a level nothing
         observed -- zero, the old fill, being a fully opaque wall."""
         geometry = _make_geometry(64, 64)

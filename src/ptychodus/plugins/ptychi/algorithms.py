@@ -1,10 +1,10 @@
 """Which pty-chi algorithms exist, and what each one declares.
 
-An algorithm is the six ``*Options`` classes pty-chi subclasses per engine,
+An algorithm is the six ``*Options`` classes pty-chi subclasses for it,
 named together in a :class:`_Spec`. That is the whole of the per-algorithm
 difference: the options object a reconstructor declares is an instance of its
 own ``task_options_cls``, and the settings behind it are generated from what
-that object states. Adding an engine is one subclass plus one entry in
+that object states. Adding an algorithm is one subclass plus one entry in
 :data:`_ALGORITHM_CLASSES`.
 
 The module imports ``ptychi.api`` (for the Options dataclasses), which pulls
@@ -98,7 +98,7 @@ class _Spec:
 
 
 class PtyChiAlgorithm:
-    """One pty-chi engine, identified by the options classes it is built from.
+    """One pty-chi algorithm, identified by the options classes it is built from.
 
     Carries no values. An options object arrives per call, already holding
     whatever the settings layer has in it, and the only thing left to do with
@@ -229,7 +229,7 @@ def task_options_classes() -> dict[str, type[PtychographyTaskOptions]]:
 
 
 def _declared(options: BaseModel) -> PtyChiOptions:
-    """Narrow the options a call was given to what this backend declares.
+    """Narrow the options a call was given to what this reconstructor declares.
 
     Checked rather than asserted: the dispatching layer validates the type
     against what ``get_default_options`` returns, so a mismatch here means

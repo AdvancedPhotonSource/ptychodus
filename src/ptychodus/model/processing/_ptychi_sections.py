@@ -5,7 +5,7 @@ sections. This is the whole of the difference: which branch feeds which section,
 what each key is called, which fields are not surfaced, and the handful that
 change shape on the way out.
 
-It lives here rather than beside the backend because a plugin never names an INI
+It lives here rather than beside the library because a plugin never names an INI
 key, and **it is transitional**: when the Qt panels retire and the nested
 declaration goes straight to the web UI, this file goes with them.
 
@@ -789,7 +789,7 @@ def _reconstructor_policy(extras: set[str], *, ignores_batching: bool = False) -
             {
                 # Both halves of the clustering switch: ptychodus persists one
                 # count whose zero means off, which is a shape the declaration
-                # does not have, so the backend states it instead.
+                # does not have, so the library states it instead.
                 'compact_mode_update_clustering',
                 'compact_mode_update_clustering_stride',
                 'default_device',
@@ -852,7 +852,7 @@ _ALGORITHM_GROUPS: Mapping[str, str] = {
 }
 
 
-# Where the pty-chi options sit inside what the backend declares. The
+# Where the pty-chi options sit inside what the library declares. The
 # declaration wraps them so that the one knob ptychodus adds has somewhere to
 # live that is not inside a class pty-chi stamps its own name into.
 _TASK = 'task'

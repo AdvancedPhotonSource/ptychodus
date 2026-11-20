@@ -21,11 +21,11 @@ COPY . /src
 #     matching CPU build rather than PyPI's, which is built against a
 #     different torch.
 #   * /tmp/constraints.txt pins the torch just installed. cdtools, ptychi and
-#     the staged backends all depend on torch; without the pin, one asking for
+#     the staged libraries all depend on torch; without the pin, one asking for
 #     a newer torch makes pip quietly swap in PyPI's CUDA build. With it, pip
 #     backtracks to an older release of that package or fails the resolve
 #     naming it.
-#   * Backends published on no index (PtychoPINN, PtychoFM) arrive as wheels
+#   * Libraries published on no index (PtychoPINN, PtychoFM) arrive as wheels
 #     that scripts/podman/build builds from sibling checkouts and stages in
 #     containers/wheels/. The glob is optional: a plain build omits them.
 #     Everything goes into a SINGLE pip invocation so one resolution pass

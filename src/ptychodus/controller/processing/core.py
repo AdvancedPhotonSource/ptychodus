@@ -50,7 +50,7 @@ class _AlgorithmComboViewController(ParameterViewController, Observer):
     """A combo box whose items change with the library that offers them.
 
     ``ComboBoxParameterViewController`` fixes its items at construction,
-    which an algorithm list cannot be: selecting another backend replaces
+    which an algorithm list cannot be: selecting another library replaces
     every choice. Kept here rather than beside that one because the shared
     module is tested and this is panel wiring.
     """
@@ -227,9 +227,9 @@ class ProcessingController(Observer):
             algorithms = list(self._processing_api.available_algorithms(library))
 
             if not algorithms:
-                # The backend is registered but its packages are not
+                # The library is registered but its packages are not
                 # installed. It is still offered, so it needs somewhere to
-                # land rather than leaving the previous backend's panel up.
+                # land rather than leaving the previous library's panel up.
                 self._empty_page[library.casefold()] = self._stacked_widget.addWidget(
                     _centered_label(f'{library} is not installed.')
                 )

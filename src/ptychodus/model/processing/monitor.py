@@ -56,7 +56,7 @@ class ReconstructBackgroundTask:
     """Run one reconstruction in a spawned child restricted to the selected devices.
 
     The child gives each run a clean GPU context, released when it exits, so
-    backends built on different frameworks never share driver state with each
+    libraries built on different frameworks never share driver state with each
     other or with this process. ``device_environment`` is asked when the run
     starts, so the selection in force then is the one applied.
     """
@@ -101,16 +101,16 @@ class ReconstructBackgroundTask:
 
 @dataclass(frozen=True)
 class TrainBackgroundTask:
-    """Run one training session in a spawned child, then load the model it reports.
+    """Run one training session in a spawned child, then load the trained model it reports.
 
     Runs as :class:`ReconstructBackgroundTask` does. Training does not load
     what it wrote, and could not usefully do so in a child that is gone when it
-    returns, so the model a finished run names in ``trained_model`` is loaded
-    here. A stopped run loads nothing, so a half-written model is never picked up.
+    returns, so the trained model a finished run names in ``trained_model`` is loaded
+    here. A stopped run loads nothing, so a half-written trained model is never picked up.
     """
 
     task_monitor: ProcessingTaskMonitor
-    trainer: TrainableReconstructor
+    reconstructor: TrainableReconstructor
     reconstruct_input: ReconstructInput
     input_directory: Path
     output_directory: Path
@@ -123,7 +123,7 @@ class TrainBackgroundTask:
             tic = time.perf_counter()
             trained_model: Path | None = None
             work = partial(
-                self.trainer.train,
+                self.reconstructor.train,
                 self.input_directory,
                 self.output_directory,
                 options=self.options,
@@ -147,6 +147,8 @@ class TrainBackgroundTask:
                 return
 
             if trained_model is None:
-                logger.warning(f'{self.trainer.name} finished without reporting a trained model.')
+                logger.warning(
+                    f'{self.reconstructor.name} finished without reporting a trained model.'
+                )
             else:
-                self.trainer.load_model(trained_model)
+                self.reconstructor.load_model(trained_model)

@@ -43,7 +43,7 @@ class ControllerCore:
 
         self._memory_controller = MemoryController(model.memory_presenter, view.memory_widget)
         self._file_dialog_factory = FileDialogFactory()
-        # Every backend's panel is rendered from what it declares, so adding
+        # Every library's panel is rendered from what it declares, so adding
         # one needs no wiring here.
         self._view_controller_factories: list[ReconstructorViewControllerFactory] = [
             GeneratedViewControllerFactory(name, model.processing_core.parameter_store)

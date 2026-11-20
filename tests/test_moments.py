@@ -6,7 +6,7 @@ Behaviors verified:
   - it works over a leading batch axis, and a masked pixel carries no weight
   - an empty image has a zero total and NaN moments rather than raising
   - the marginal sums agree with direct pixel sums over an integer stack with bad pixels,
-    an off-centre distribution and an empty frame
+    an off-centre distribution and an empty pattern
   - subtract_noise_floor removes a pedestal and keeps the full height of the signal above it
   - with keep_filtered=False the measured heights survive, only the mask is filtered
   - estimate_beam_center ignores a hot pixel once it is masked

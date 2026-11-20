@@ -1,6 +1,6 @@
 """The NPZ archive PtychoPINN trains from: written from a ReconstructInput, found, merged.
 
-Pure numpy: nothing here imports the backend, so the format is on offer whether or
+Pure numpy: nothing here imports the library, so the format is on offer whether or
 not PtychoPINN is installed.
 """
 
@@ -58,13 +58,13 @@ def save_ptychopinn_training_data(
     *,
     inpaint_bad_pixels: bool = True,
 ) -> None:
-    """Write a ReconstructInput to the NPZ format consumed by PtychoPINN trainers.
+    """Write a ReconstructInput to the NPZ format PtychoPINN training consumes.
 
     Bad pixels are filled by biharmonic inpainting, or zeroed when
     `inpaint_bad_pixels` is False; `diff3d` keeps the source dtype either way, and
     `bad_pixels` records which positions were filled rather than measured.
     `probeGuess` is the full `(N_modes, H, W)` mode stack at OPR index zero. All
-    scan points are assigned `scan_index=0` (single-object assumption).
+    probe positions are assigned `scan_index=0` (single-object assumption).
 
     The archive declares its measurement domain as photon counts, which is what
     a detector reports and what this function passes through unscaled. A reader

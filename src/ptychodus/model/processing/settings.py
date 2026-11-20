@@ -4,13 +4,13 @@ from ..observer import Observable, Observer
 from ..settings import SettingsRegistry
 
 
-# The backend a fresh install starts on, and its algorithm. The algorithm is
+# The library a fresh install starts on, and its algorithm. The algorithm is
 # named so that it can also be the fallback for a persisted name the selected
 # library cannot resolve, which is a better answer than whichever algorithm
 # that library happens to list first -- the one is a choice ptychodus made,
-# the other is an accident of registration order. Both name a backend that an
+# the other is an accident of registration order. Both name a library that an
 # extra installs, so a bare install starts on a selection it cannot run; that
-# is what every uninstalled backend does, and ptychodus ships no reconstructor
+# is what every uninstalled library does, and ptychodus ships no reconstructor
 # of its own to put here instead.
 _DEFAULT_LIBRARY: Final = 'PtyChi'
 _DEFAULT_ALGORITHM: Final = 'LSQML'

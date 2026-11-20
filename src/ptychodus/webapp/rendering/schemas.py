@@ -66,7 +66,7 @@ class OptionsRead(BaseModel):
     """Enumeration of valid choices a client may pass to visualization endpoints.
 
     Each list holds the values the render endpoints accept. The label maps carry the
-    names the desktop shows for the same choices, keyed by those values.
+    names the GUI shows for the same choices, keyed by those values.
     """
 
     colormaps_linear: list[str]

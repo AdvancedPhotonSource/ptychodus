@@ -1,7 +1,7 @@
 """Unit tests for the NPZ archive PtychoPINN trains from.
 
 Nothing here imports ptycho_torch: the writer is pure numpy, so the format is tested
-on a bare install whether or not the backend is.
+on a bare install whether or not the library is.
 """
 
 from __future__ import annotations
@@ -163,7 +163,7 @@ class TestPtychoPINNTrainingDataFileWriter:
 
     def test_the_writer_is_registered_under_the_library_name(self) -> None:
         # The shared name is what makes this the format offered by default whenever
-        # PtychoPINN is the selected backend.
+        # PtychoPINN is the selected library.
         registry = PluginRegistry.load_plugins()
 
         assert registry.reconstructor_libraries.find_plugin('PtychoPINN')

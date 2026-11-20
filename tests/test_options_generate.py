@@ -202,7 +202,7 @@ class TestRestoringOptions:
         assert restore_options(defaults, parameters, policy).mode is Mode.EXACT
 
     def test_the_defaults_are_not_mutated_by_restoring(self) -> None:
-        """The store keeps the defaults as its record of where each field started."""
+        """The parameter store keeps the defaults as its record of where each field started."""
         defaults, parameters, policy = self._round_trip()
         parameters['Count'].set_value(11)
         restore_options(defaults, parameters, policy)

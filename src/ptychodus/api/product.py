@@ -68,7 +68,7 @@ class ProductMetadata:
 
     I0 -- an upstream ion chamber, diode or scaler -- is recorded in whatever units the
     instrument uses; this converts it to incident photons. Zero means uncalibrated, so
-    I0 then only corrects the detector totals for beam decay.
+    I0 then only corrects the detector sums for beam decay.
     """
     scattering_geometry: ScatteringGeometry = ScatteringGeometry()
     """Directions of the exit beam and the sample surface; forward for transmission.
@@ -148,7 +148,7 @@ class Product:
         return sz
 
     def iter_position_probes(self) -> Iterator[tuple[ProbePosition, Probe]]:
-        """Yield ``(scan_position, probe)`` pairs for every scan position.
+        """Yield ``(probe_position, probe)`` pairs for every probe position.
 
         See :meth:`ptychodus.api.probe.ProbeEnsemble.iter_position_probes`.
         """
@@ -325,7 +325,7 @@ def transform_product(
     The object's array therefore changes shape as well as pitch, and the two axes change
     independently: a finer pixel needs more of them to cover the same scan, and asymmetry and
     rotation act differently on each axis. The probe array is reinterpreted rather than resampled,
-    since the scale-free part distorts the scan frame and not the illumination optics.
+    since the scale-free part distorts the probe-position frame and not the illumination optics.
 
     The correction is translation-free. A translation shifts the positions and the object center
     by the same amount, so it relabels the product's lab coordinates without changing a single

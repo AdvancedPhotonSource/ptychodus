@@ -10,7 +10,7 @@ never in CI.
 The strings are discovered rather than enumerated, so a new one is covered the
 day it is added. Both halves are checked without importing the target:
 ``find_spec`` for the module, and an AST scan of its source for the function.
-Importing would pull torch or a backend package and defeat the point of a test
+Importing would pull torch or a library package and defeat the point of a test
 that must pass on a bare install.
 """
 

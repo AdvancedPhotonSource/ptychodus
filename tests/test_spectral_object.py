@@ -477,13 +477,9 @@ def test_i0_removes_a_beam_decay() -> None:
     reference = _estimate(data, positions, probe, tolerance=1e-10)
     decay = numpy.linspace(1.0, 0.6, len(positions))
     decayed = _with(data, patterns=numpy.array(data.get_patterns()) * decay[:, None, None])
-    i0_counts_by_index = {
-        int(index): 500.0 * float(d) for index, d in zip(data.get_indexes(), decay)
-    }
+    i0_by_index = {int(index): 500.0 * float(d) for index, d in zip(data.get_indexes(), decay)}
 
-    estimate = _estimate(
-        decayed, positions, probe, tolerance=1e-10, i0_counts_by_index=i0_counts_by_index
-    )
+    estimate = _estimate(decayed, positions, probe, tolerance=1e-10, i0_by_index=i0_by_index)
 
     numpy.testing.assert_allclose(estimate, reference, atol=1e-6)
 

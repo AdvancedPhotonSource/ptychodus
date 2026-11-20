@@ -12,7 +12,7 @@ export interface Column<T> {
 
 export interface TableOptions<T> {
   /**
-   * Adds a checkbox column, as the desktop Positions panel has, before the column
+   * Adds a checkbox column, as the GUI Positions panel has, before the column
    * at `position` (default 0). `onChange` receives the checked rows in table order.
    */
   checkbox?: { header: string; onChange: (checked: T[]) => void; position?: number };

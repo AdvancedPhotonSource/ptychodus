@@ -32,7 +32,7 @@ class TwoStepOptions(BaseModel):
     upscaling_method: UpscalingMethod = Field(
         UpscalingMethod.LINEAR,
         title='Upscaling Method:',
-        description='How values measured at the scan positions are spread onto the object grid.',
+        description='How values measured at the probe positions are spread onto the object grid.',
     )
     deconvolution_method: DeconvolutionMethod = Field(
         DeconvolutionMethod.RICHARDSON_LUCY,

@@ -108,7 +108,7 @@ class ProductRepositoryItem(ParameterGroup):
         """Copy inner state from a freshly-built source item into this stub.
 
         Uses each subgroup's assign_item so the stub's subgroup identities are
-        preserved (peripheral scan/probe/object repositories continue to observe
+        preserved (peripheral probe-positions/probe/object repositories continue to observe
         the same subgroup instances they registered at insert time). The item's
         index in the ProductRepository never changes.
 
@@ -233,7 +233,7 @@ class ProductRepositoryItem(ParameterGroup):
 
         estimate = estimate_incident_beam(
             moments,
-            self._probe_positions_item.get_probe_positions().get_probe_photon_counts_by_index(),
+            self._probe_positions_item.get_probe_positions().get_i0_by_index(),
             i0_photons_per_count=self._metadata_item.i0_photons_per_count.get_value(),
         )
         self._geometry.set_mean_amplitude_transmission(estimate.mean_amplitude_transmission)

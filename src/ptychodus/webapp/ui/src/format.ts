@@ -9,7 +9,7 @@ function isMissing(x: number | null | undefined): x is null | undefined {
 }
 
 /**
- * Python's `format(x, '.<precision>g')`, which the desktop applies to every derived
+ * Python's `format(x, '.<precision>g')`, which the GUI applies to every derived
  * quantity: significant digits without trailing zeros, switching to an exponent with
  * at least two digits below 1e-4 or at 10**precision and above.
  */
@@ -30,19 +30,19 @@ export function formatG(x: number, precision = 4): string {
 }
 
 /**
- * A derived quantity, as the desktop's `:.4g`. A precision of 6 matches a cell the
- * desktop hands Qt as a bare float, which Qt renders as `%g`.
+ * A derived quantity, as the GUI's `:.4g`. A precision of 6 matches a cell the
+ * GUI hands Qt as a bare float, which Qt renders as `%g`.
  */
 export function fmt(x: number | null | undefined, precision = 4): string {
   return isMissing(x) ? MISSING : formatG(x, precision);
 }
 
-/** A count the desktop shows exactly: pixels, frames, bad pixels. */
+/** A count the GUI shows exactly: pixels, patterns, bad pixels. */
 export function fmtInt(x: number | null | undefined): string {
   return isMissing(x) ? MISSING : String(x);
 }
 
-/** A fixed number of decimals, as the desktop's `:.<digits>f`. */
+/** A fixed number of decimals, as the GUI's `:.<digits>f`. */
 export function fmtFixed(x: number | null | undefined, digits: number): string {
   return isMissing(x) ? MISSING : x.toFixed(digits);
 }
@@ -77,7 +77,7 @@ export function fmtBytes(n: number | null | undefined): string {
   return power === 0 ? `${n} ${label}` : `${(n / 10 ** power).toFixed(2)} ${label}`;
 }
 
-/** A fraction as a whole percentage, truncated as the desktop's `int(100 * x)` is. */
+/** A fraction as a whole percentage, truncated as the GUI's `int(100 * x)` is. */
 export function fmtPercent(x: number | null | undefined): string {
   return isMissing(x) ? MISSING : `${Math.trunc(100 * x)}%`;
 }
@@ -97,7 +97,7 @@ export function sumBytes(parts: (number | null | undefined)[]): number | null {
   return known.length === 0 ? null : known.reduce((a, b) => a + b, 0);
 }
 
-/** A repository's totals, as the desktop's info label reads, e.g. "Products: 3 [1.20 GB]". */
+/** A repository's totals, as the GUI's info label reads, e.g. "Products: 3 [1.20 GB]". */
 export function infoText(noun: string, count: number, nbytes: (number | null)[]): string {
   return `${noun}: ${count} [${fmtBytes(sumBytes(nbytes) ?? 0)}]`;
 }
@@ -109,7 +109,7 @@ export interface RowState {
 }
 
 /**
- * The desktop greys a failed item out and italicises one still loading; the store's
+ * The GUI greys a failed item out and italicises one still loading; the webapp's
  * counterparts are a manifest that failed to ingest and one not yet ingested.
  */
 export function ingestRowState(row: {

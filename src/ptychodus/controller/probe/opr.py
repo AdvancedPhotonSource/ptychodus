@@ -36,18 +36,18 @@ logger = logging.getLogger(__name__)
 _SAVE_FILE_FILTER = FileFormat.NPZ.file_filter
 
 # Positions sampled when fixing the color scale. A locked scale is what keeps playback
-# from flickering, and sampling is what keeps locking it cheap on a long scan; a position
+# from flickering, and sampling is what keeps locking it cheap over many probe positions; a position
 # outside the sample whose amplitude exceeds the others simply clips.
 _NUM_DISPLAY_RANGE_SAMPLES = 64
 
 
 class _ColorBy(Enum):
-    """Quantity the scan grid colors each probe position by."""
+    """Quantity the probe-positions plot colors each probe position by."""
 
     DEVIATION = auto()
     PRIMARY = auto()
     TOTAL = auto()
-    MEASURED = auto()
+    I0_OR_DETECTOR_SUM = auto()
     WEIGHT = auto()
 
 
@@ -108,7 +108,7 @@ class _BlittedMarker:
 
 
 class OPRModeViewController:
-    """Drives the dialog showing how a probe's coherent (OPR) basis varies over a scan."""
+    """Drives the dialog showing how a probe's coherent (OPR) basis varies over its positions."""
 
     def __init__(
         self,
@@ -123,7 +123,7 @@ class OPRModeViewController:
         self._product_index = -1
         self._series: OPRModeSeries | None = None
         self._probes: ProbeEnsemble | None = None
-        self._measured_photon_count: RealArrayType | None = None
+        self._i0_or_detector_sums: RealArrayType | None = None
         self._num_positions = 0
         self._was_playing_before_drag = False
         self._position_marker: Line2D | None = None
@@ -179,8 +179,8 @@ class OPRModeViewController:
             parent,
         )
         # Complex so the dialog can render the composed mode and the deviation from its
-        # across-scan mean as wavefields: OPR moves amplitude and phase together, and the
-        # default 'Complex' renderer shows both at once.
+        # mean over the probe positions as wavefields: OPR moves amplitude and phase
+        # together, and the default 'Complex' renderer shows both at once.
         self._engine = VisualizationEngine(is_complex=True)
         self._image_controller = ImageController(
             self._engine,
@@ -189,7 +189,7 @@ class OPRModeViewController:
             file_dialog_factory,
         )
         self._series_marker = _BlittedMarker(self._dialog.series_plot_view.figure_canvas)
-        self._grid_marker = _BlittedMarker(self._dialog.scan_grid_plot_view.figure_canvas)
+        self._grid_marker = _BlittedMarker(self._dialog.probe_positions_plot_view.figure_canvas)
 
         self._dialog.position_slider.valueChanged.connect(self._update_current_position)
         # Dragging while playing would otherwise issue a render per drag tick and leave the
@@ -200,7 +200,7 @@ class OPRModeViewController:
         self._play_button.toggled.connect(self._handle_play_toggled)
         self._mode_spin_box.valueChanged.connect(self._update_image)
         self._dialog.curves_view.color_by_combo_box.currentIndexChanged.connect(
-            self._redraw_scan_grid
+            self._redraw_probe_positions_plot
         )
         self._dialog.curves_view.normalize_check_box.toggled.connect(self._redraw_series)
         self._dialog.curves_view.mode_list_widget.itemChanged.connect(self._redraw_series)
@@ -224,7 +224,7 @@ class OPRModeViewController:
         self._product_index = product_index
         self._series = None
         self._probes = None
-        self._measured_photon_count = None
+        self._i0_or_detector_sums = None
         self._num_positions = 0
 
         try:
@@ -240,7 +240,7 @@ class OPRModeViewController:
                 self._parent,
                 'Coherent (OPR) Modes',
                 f'This probe has {probes.num_coherent_modes} coherent (OPR) mode(s) and no'
-                ' per-position weights, so there is nothing that varies across the scan to'
+                ' per-position weights, so nothing varies across the probe positions to'
                 ' show.\n\nWeights come from a reconstruction run with OPR enabled, or from'
                 ' a product file that stored them.',
             )
@@ -252,22 +252,22 @@ class OPRModeViewController:
         try:
             self._series = self._analyzer.analyze(product_index)
             self._probes = probes
-            self._measured_photon_count = self._analyzer.get_measured_photon_counts(product_index)
-            num_scan_points = len(self._analyzer.get_probe_positions(product_index))
+            self._i0_or_detector_sums = self._analyzer.get_i0_or_detector_sums(product_index)
+            num_probe_positions = len(self._analyzer.get_probe_positions(product_index))
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.show_exception('OPR Mode Analyzer', err)
             self._series = None
-            num_scan_points = 0
+            num_probe_positions = 0
 
         if self._series is not None:
             self._num_positions = self._series.num_positions
 
-            if self._num_positions != num_scan_points:
+            if self._num_positions != num_probe_positions:
                 self._dialog.status_bar.showMessage(
                     f'OPR weights describe {self._num_positions} probe position(s) but the'
-                    f' product has {num_scan_points}; the scan grid shows the shorter of'
-                    ' the two.'
+                    f' product has {num_probe_positions}; the probe-positions plot shows the'
+                    ' shorter of the two.'
                 )
 
         self._sync_model_to_view()
@@ -295,9 +295,9 @@ class OPRModeViewController:
         return probes.compose_opr_field(weight)
 
     def _lock_display_range(self) -> None:
-        """Fix the color axis over the whole scan so playback does not flicker.
+        """Fix the color axis over every probe position so playback does not flicker.
 
-        Sampling rather than sweeping every position keeps this cheap on a long scan, at
+        Sampling rather than sweeping every position keeps this cheap over many probe positions, at
         the cost of clipping an unsampled outlier. The range suits the amplitude-mapping
         renderers the dialog opens on; the ribbon's Data Range controls override it.
         """
@@ -418,22 +418,22 @@ class OPRModeViewController:
             label = 'Weight (normalized)' if normalize else 'Weight − mean'
             weight_axes.set_ylabel(label)
 
-        measured = self._measured_photon_count
+        reference = self._i0_or_detector_sums
 
-        if measured is not None and measured.size == self._num_positions:
-            measured_axes = axes.twinx()
+        if reference is not None and reference.size == self._num_positions:
+            reference_axes = axes.twinx()
             # Detector counts and probe-array power share no scale, so this needs its own
             # axis. It goes outboard on the left rather than stacking behind the weight
             # axis on the right, where the two y-labels would overlap.
-            measured_axes.yaxis.set_label_position('left')
-            measured_axes.yaxis.tick_left()
-            measured_axes.spines['left'].set_position(('outward', 52))
-            (artist,) = measured_axes.plot(
-                position, measured, '.', markersize=2, color='0.4', label='Measured'
+            reference_axes.yaxis.set_label_position('left')
+            reference_axes.yaxis.tick_left()
+            reference_axes.spines['left'].set_position(('outward', 52))
+            (artist,) = reference_axes.plot(
+                position, reference, '.', markersize=2, color='0.4', label='I0 or detector sum'
             )
             artists.append(artist)
-            measured_axes.set_ylabel('Measured Counts', color='0.4')
-            measured_axes.tick_params(axis='y', labelcolor='0.4')
+            reference_axes.set_ylabel('I0 or Detector Sum', color='0.4')
+            reference_axes.tick_params(axis='y', labelcolor='0.4')
 
         self._position_marker = axes.axvline(
             self._dialog.position_slider.value(), color='tab:red', linewidth=1
@@ -469,18 +469,18 @@ class OPRModeViewController:
                 return series.primary_mode_photon_count[:num_points], 'Primary Mode Counts'
             case _ColorBy.TOTAL:
                 return series.total_photon_count[:num_points], 'Whole Probe Counts'
-            case _ColorBy.MEASURED:
-                measured = self._measured_photon_count
-                values = numpy.zeros(num_points) if measured is None else measured[:num_points]
-                return values, 'Measured Counts'
+            case _ColorBy.I0_OR_DETECTOR_SUM:
+                reference = self._i0_or_detector_sums
+                values = numpy.zeros(num_points) if reference is None else reference[:num_points]
+                return values, 'I0 or Detector Sum'
             case _ColorBy.WEIGHT:
                 weight = series.opr_weight[:num_points, mode]
                 return weight - weight.mean(), f'OPR Mode {mode + 1} Weight − mean'
             case _:
                 return series.deviation_photon_count[:num_points], 'Deviation Power'
 
-    def _redraw_scan_grid(self) -> None:
-        view = self._dialog.scan_grid_plot_view
+    def _redraw_probe_positions_plot(self) -> None:
+        view = self._dialog.probe_positions_plot_view
         view.figure.clear()
         axes = view.axes = view.figure.add_subplot(111)
         self._grid_highlight = None
@@ -532,7 +532,7 @@ class OPRModeViewController:
         """Move the current-position markers without redrawing either plot.
 
         Rebuilding the curves and the scatter every frame would not keep up with playback
-        over a long scan, so the static content is drawn once and only these two artists
+        over many probe positions, so the static content is drawn once and only these two artists
         move.
         """
         if self._position_marker is not None:
@@ -672,8 +672,8 @@ class OPRModeViewController:
             combo_box.addItem('Primary Mode Counts', (_ColorBy.PRIMARY, 0))
             combo_box.addItem('Whole Probe Counts', (_ColorBy.TOTAL, 0))
 
-            if self._measured_photon_count is not None:
-                combo_box.addItem('Measured Counts', (_ColorBy.MEASURED, 0))
+            if self._i0_or_detector_sums is not None:
+                combo_box.addItem('I0 or Detector Sum', (_ColorBy.I0_OR_DETECTOR_SUM, 0))
 
             for mode in range(num_modes):
                 combo_box.addItem(f'OPR Mode {mode + 1} Weight', (_ColorBy.WEIGHT, mode))
@@ -701,7 +701,7 @@ class OPRModeViewController:
         self._sync_statistics_view()
         self._lock_display_range()
         self._redraw_series()
-        self._redraw_scan_grid()
+        self._redraw_probe_positions_plot()
         self._update_current_position(0)
 
     # ------------------------------------------------------------------ saving

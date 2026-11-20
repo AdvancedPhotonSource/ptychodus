@@ -44,7 +44,7 @@ export async function mountObject(root: HTMLElement, uuid: string | null): Promi
   const found = await findLinked(items, uuid, api.getProduct);
   items = found.items;
 
-  // A layer of null is the object itself: the product of its layers, as the desktop
+  // A layer of null is the object itself: the product of its layers, as the GUI
   // shows when the object's own row is selected.
   const show = (p: ProductRead, layer: number | null) => {
     const label = p.name ?? p.uuid.slice(0, 8);
@@ -88,7 +88,7 @@ export async function mountObject(root: HTMLElement, uuid: string | null): Promi
           label: `Layer ${i + 1}`,
           state,
           // N layers have N-1 spacings, so the last layer has no distance to the next
-          // and the desktop leaves it blank.
+          // and the GUI leaves it blank.
           cells: [
             i < p.object_layer_spacing_m.length ? fmt(p.object_layer_spacing_m[i], 6) : '',
             '',

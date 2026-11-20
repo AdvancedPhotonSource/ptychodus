@@ -11,7 +11,7 @@ Three detector layouts have been written, each beside an EPICS MDA scan record
   beside a metadata-only member ``scan_<N>_000000.h5`` holding an ``/entry/instrument``
   snapshot of the beamline motors, with the MDA in ``../mda/``.
 
-Patterns pair with scan points in order: the k-th frame, sorted by frame number, is the
+Patterns pair with probe positions in order: the k-th frame, sorted by frame number, is the
 k-th MDA point. Checked against the MDA's per-point ``QMPX3:Stats1:Total_RBV``, which
 peaks at that pairing in every Medipix era; ``QMPX3:TIFF1:FileNumber_RBV`` does not
 track it (it equals the frame number in some scans, runs one ahead in others, and steps
@@ -200,7 +200,7 @@ class _MedipixTiffArray(TiffDiffractionPatternArray):
 
 
 class APS26IDTiffDiffractionFileReader(DiffractionFileReader):
-    """The Medipix3 layouts: one TIFF, plain or gzipped, per scan point.
+    """The Medipix3 layouts: one TIFF, plain or gzipped, per probe position.
 
     `detector_pixel_size_m` is the Medipix3 pitch the files do not record. `seam_pixels`
     are rows and columns of the frame, as recorded, to report as bad pixels -- the

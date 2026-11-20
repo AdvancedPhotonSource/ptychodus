@@ -216,7 +216,7 @@ class _Replayer:
         points = {int(index): k for k, index in enumerate(self._positions.get_indexes())}
         x_m = self._positions.get_coordinates_x_m()
         y_m = self._positions.get_coordinates_y_m()
-        i0 = self._positions.get_probe_photon_counts()
+        i0 = self._positions.get_i0()
         num_frames = 0
         start_s = time.monotonic()
 

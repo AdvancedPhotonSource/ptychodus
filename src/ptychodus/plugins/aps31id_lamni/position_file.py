@@ -1,4 +1,4 @@
-"""Probe position reader for APS 31-ID-E LamNI ``*.dat`` scan-position files.
+"""Probe position reader for APS 31-ID-E LamNI ``*.dat`` probe-position files.
 
 LamNI writes positions as space-delimited text with a title line, a column-header
 line, then one row per sample. Two data-acquisition paths produce three header
@@ -134,7 +134,7 @@ def _describe_known_formats() -> str:
 
 
 class LamNIPositionFileReader(ProbePositionFileReader):
-    """Reader for APS 31-ID-E LamNI scan-position files, sensing the layout by header."""
+    """Reader for APS 31-ID-E LamNI probe-position files, sensing the layout by header."""
 
     SIMPLE_NAME: Final[str] = 'APS_LamNI'
 
@@ -168,7 +168,7 @@ class LamNIPositionFileReader(ProbePositionFileReader):
                     f'Expected one of:\n{_describe_known_formats()}\n'
                 )
 
-            logger.debug(f'Reading {format_.name} scan positions for "{scan_name}"...')
+            logger.debug(f'Reading {format_.name} probe positions for "{scan_name}"...')
 
             for row in csv_iterator:
                 if row[0].startswith('#'):

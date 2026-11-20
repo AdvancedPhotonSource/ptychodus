@@ -163,10 +163,10 @@ class ProbeEnsembleBuilder(ParameterGroup):
             return None
 
         try:
-            # The moments' mean frame is already corrected for the background and flat
+            # The moments' mean pattern is already corrected for the background and flat
             # field, and their mask includes the pixels those maps leave unusable.
             return estimate_probe_extent(
-                moments.mean_frame,
+                moments.mean_pattern,
                 geometry_provider.get_probe_geometry(),
                 photon_wavelength_m=geometry_provider.photon_wavelength_m,
                 defocus_distance_m=geometry_provider.defocus_distance_m,
@@ -288,15 +288,15 @@ class ProbeEnsembleBuilder(ParameterGroup):
         start whose weights already fit comes through untouched.
 
         An override supplied for a single ingest takes precedence and applies even when
-        the counts agree, which is what lets a caller ask for a fresh basis on a scan of
-        the same size.
+        the counts agree, which is what lets a caller ask for a fresh basis on probe positions of
+        the same count.
         """
         weights = probe_seq.get_opr_weights_or_none()
 
         if weights is None:
             return probe_seq
 
-        num_positions = geometry_provider.num_scan_points
+        num_positions = geometry_provider.num_probe_positions
 
         if num_positions < 1:
             # No probe positions bound yet; the observer chain re-runs the build.
@@ -381,7 +381,7 @@ class ProbeEnsembleBuilder(ParameterGroup):
                 self._rng,
                 probe,
                 num_cmodes=num_cmodes_requested,
-                num_positions=geometry_provider.num_scan_points,
+                num_positions=geometry_provider.num_probe_positions,
             )
         else:
             probe_seq = ProbeEnsemble.from_probe(probe)
@@ -412,8 +412,8 @@ The first entry is what an unrecognized stored name falls back to.
 class FromMemoryProbeBuilder(ProbeEnsembleBuilder):
     """A probe that has already been conditioned.
 
-    Two things produce these. Reconstruction output, which `ProcessingTaskMonitor`
-    re-assigns to the output product item on every reconstructor iteration (see
+    Two things produce these. A reconstruction, which `ProcessingTaskMonitor`
+    re-assigns to its product item on every reconstructor iteration (see
     `model/processing/monitor.py`), and products loaded from a product file, whose probe
     was conditioned before it was saved. In both cases the incoherent and coherent
     (OPR) mode structure is already what the reconstructor solved for, so
@@ -429,9 +429,9 @@ class FromMemoryProbeBuilder(ProbeEnsembleBuilder):
     on them.
 
     Reconciling the OPR weights is the one step that still runs, because a probe
-    copied onto a scan of a different size is unusable until its weight rows are
+    copied onto probe positions of a different count is unusable until its weight rows are
     resolved. It runs no generator and is a strict no-op whenever the row count
-    already matches, which it always does for reconstruction output.
+    already matches, which it always does for a reconstruction.
 
     An *editable* builder runs the expand-only conditioning after all, so modes can be
     added to a result. Only :meth:`make_editable` makes one, starting the mode counts at

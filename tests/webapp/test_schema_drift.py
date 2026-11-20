@@ -32,7 +32,7 @@ async def _product_columns(engine) -> set[str]:
 
 
 def _database_url(tmp_path: Path) -> str:
-    return f'sqlite+aiosqlite:///{tmp_path / "store.db"}'
+    return f'sqlite+aiosqlite:///{tmp_path / "metadata.db"}'
 
 
 @pytest.mark.asyncio

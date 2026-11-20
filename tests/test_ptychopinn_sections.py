@@ -5,7 +5,7 @@ a saved setting silently -- and the values are hand-transcribed from the
 settings classes, so a slipped default would change what a reconstruction runs
 with while every key still matched.
 
-Needs no backend installed: the declaration is ptychodus's own precisely
+Needs no library installed: the declaration is ptychodus's own precisely
 because importing PtychoPINN's would pull torch into the parent. That is also
 why it is read through `model/declared.py` rather than through the flattener.
 """

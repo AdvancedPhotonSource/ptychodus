@@ -161,7 +161,7 @@ def test_rebuild_warns_when_the_object_is_sampled_differently_from_the_product(
         item, canned = _make_item_with_canned_pixel_size(2.0e-6, 1.0e-6)
 
     assert 'wrong scale' in caplog.text
-    # Reported, not corrected: the same path carries reconstruction output.
+    # Reported, not corrected: the same path carries reconstructions.
     assert item.get_object().get_array() is canned.get_array()
 
 

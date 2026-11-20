@@ -319,7 +319,7 @@ def test_the_record_payload_is_plain_data() -> None:
 # physical devices. These pin the composition between the two.
 
 
-def test_the_fanout_runs_one_worker_per_accelerator(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_the_fanout_runs_one_worker_per_gpu(monkeypatch: pytest.MonkeyPatch) -> None:
     """The CPU is a device to the shared probe, but not something to fan out across."""
     probed = [
         Device('cpu', 'CPU'),
@@ -328,7 +328,7 @@ def test_the_fanout_runs_one_worker_per_accelerator(monkeypatch: pytest.MonkeyPa
     ]
     monkeypatch.setattr(reconstruct_batch_lamni, 'probe_devices', lambda: probed)
 
-    assert [d.identifier for d in reconstruct_batch_lamni.visible_accelerators()] == [
+    assert [d.identifier for d in reconstruct_batch_lamni.visible_gpus()] == [
         'cuda:0',
         'cuda:1',
     ]
@@ -336,7 +336,7 @@ def test_the_fanout_runs_one_worker_per_accelerator(monkeypatch: pytest.MonkeyPa
 
 def test_a_cpu_only_host_fans_out_across_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(reconstruct_batch_lamni, 'probe_devices', lambda: [Device('cpu', 'CPU')])
-    assert reconstruct_batch_lamni.visible_accelerators() == []
+    assert reconstruct_batch_lamni.visible_gpus() == []
 
 
 # --- the Python API --------------------------------------------------------------------

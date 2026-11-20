@@ -1,6 +1,6 @@
 ---
 name: add-webapp-endpoint
-description: Add a matched pair of a FastAPI REST route and an MCP tool in the ptychodus.webapp service. Use when the user says "add an endpoint to the webapp" or "to the store", "expose X in the API", or "add an MCP tool for Y" — because REST and MCP surfaces must stay in sync.
+description: Add a matched pair of a FastAPI REST route and an MCP tool in the ptychodus.webapp service. Use when the user says "add an endpoint to the webapp", "add a route to the webapp", "expose X in the API", or "add an MCP tool for Y" — because REST and MCP surfaces must stay in sync.
 ---
 
 # add-webapp-endpoint

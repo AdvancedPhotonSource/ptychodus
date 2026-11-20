@@ -51,7 +51,7 @@ Perform steps 1-3 on the local and remote computers.
 A submission stages a directory for the selected product, transfers it to the compute collection, runs one command over it on the endpoint, and transfers the results back.
 
 - A reconstruction stages `diffraction.h5`, `product.h5` and `reconstruct_options.yaml` — the selected library, algorithm and options — plus the trained model for a learned reconstructor, and runs `ptychodus-reconstruct` over them.
-- Training stages the product's training data in the selected backend's format and `train_options.yaml`, and runs `ptychodus-train`.
+- Training stages the product's training data in the selected library's format and `train_options.yaml`, and runs `ptychodus-train`.
 
 Each writes its outputs, its options and its log into the output directory, with the command's standard output and error in `stdout.log` and `stderr.log`. Any library installed in the endpoint's environment can reconstruct.
 

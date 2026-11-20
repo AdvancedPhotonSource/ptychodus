@@ -17,7 +17,7 @@ from .visualization import VisualizationParametersView, VisualizationWidget
 
 
 class ObjectMetricsDialog(DashboardDialog):
-    """What one object looks like over the region its scan illuminated."""
+    """What one object looks like over the region its probe positions illuminated."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)

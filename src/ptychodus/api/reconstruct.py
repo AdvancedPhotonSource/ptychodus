@@ -54,7 +54,7 @@ class NoOptions(BaseModel):
     """Declared by a reconstructor that does not yet describe its options.
 
     A reconstructor states what it accepts by returning a pydantic object from
-    :meth:`Reconstructor.get_default_options`. Until a backend declares one it keeps
+    :meth:`Reconstructor.get_default_options`. Until a library declares one it keeps
     reading whatever configuration it already holds, and this stands in so that
     callers can build the ``options`` argument uniformly.
     """
@@ -83,10 +83,10 @@ class TrainingDataFileWriter(FileWriter[ReconstructInput]):
 
 @dataclass(frozen=True)
 class ReconstructOutput:
-    """Reconstruction result yielded at each iteration.
+    """What a reconstructor yields at each iteration: the product so far and its progress.
 
     ``progress_goal`` is what ``progress`` counts towards, reported by the run
-    rather than predicted before it: a backend that resolves its own iteration
+    rather than predicted before it: a library that resolves its own iteration
     count can only say so once it has started. Zero means unknown, which a
     progress bar reads as indeterminate.
     """
@@ -105,7 +105,7 @@ class Reconstructor(ABC):
     and only what the method yields comes back. So :meth:`reconstruct` leaves
     ``self`` unchanged and imports the framework it computes with inside the
     method, while every other method -- the options, and for a trainable
-    reconstructor the model file handling -- imports no GPU framework at all.
+    reconstructor the trained-model file handling -- imports no GPU framework at all.
     """
 
     @property
@@ -125,7 +125,7 @@ class Reconstructor(ABC):
         ``default_factory`` reports its class-level default as undefined. Only
         an instance carries the value such a field actually starts at.
 
-        Override when the backend declares its options.
+        Override when the library declares its options.
         """
         return NoOptions()
 
@@ -142,7 +142,7 @@ class TrainOutput:
 
     ``progress_goal`` is reported by the run, as for :class:`ReconstructOutput`.
 
-    ``trained_model`` is the model the run wrote, in the form
+    ``trained_model`` is the trained model the run wrote, in the form
     :meth:`TrainableReconstructor.load_model` accepts, set on the output that
     reports it. Training does not load it; whoever asked for the training does.
     """
@@ -159,7 +159,7 @@ class TrainableReconstructor(Reconstructor):
     """Reconstructor that also supports ML model loading and training.
 
     :meth:`train` is held to what :class:`Reconstructor` asks of
-    :meth:`~Reconstructor.reconstruct`, and so announces the model it wrote in
+    :meth:`~Reconstructor.reconstruct`, and so announces the trained model it wrote in
     :attr:`TrainOutput.trained_model` rather than loading it. :meth:`load_model`
     records what a later :meth:`~Reconstructor.reconstruct` reads, and does no
     more than that needs.
@@ -176,9 +176,9 @@ class TrainableReconstructor(Reconstructor):
 
     @abstractmethod
     def get_model_file_extensions(self) -> tuple[str, ...]:
-        """Return the model file extensions, each with a leading dot.
+        """Return the trained-model file extensions, each with a leading dot.
 
-        A model is read from any of them and saved under the first.
+        A trained model is read from any of them and saved under the first.
         """
         pass
 
@@ -202,11 +202,11 @@ class TrainableReconstructor(Reconstructor):
         """Whether one ``train`` call per rank of a distributed launch trains one model.
 
         True promises that, started once per rank by a launcher such as ``torchrun``, the
-        backend joins a single process group from the environment it inherits and writes
+        library joins a single process group from the environment it inherits and writes
         its outputs from global rank zero alone. False, the default, means each rank would
-        train a model of its own into the same output directory.
+        write a trained model of its own into the same output directory.
 
-        Override when the backend makes that promise.
+        Override when the library makes that promise.
         """
         return False
 
@@ -294,14 +294,14 @@ class ReconstructorLibrary(Iterable[Reconstructor], ABC):
             # Locating a module does not execute it, so a package that is
             # present but unusable -- a dependency of its own missing, a
             # partial install -- is only discovered here. Said differently
-            # from the branch above, and louder: not installing a backend is
+            # from the branch above, and louder: not installing a library is
             # a choice, while installing one that cannot import is a fault
             # nobody asked for, and a run that silently proceeds without it
             # is the failure worth reporting. The traceback goes with it as
             # the only thing that names what is actually broken.
             self._logger.warning(
                 f'{self._distribution} is installed but failed to import; '
-                'this backend is disabled.',
+                'this library is disabled.',
                 exc_info=True,
             )
             return []
@@ -314,12 +314,12 @@ class ReconstructorLibrary(Iterable[Reconstructor], ABC):
         """Create the reconstructors, importing whatever they need.
 
         Called at most once, and only after ``is_available`` has agreed, so
-        an implementation imports its backend directly rather than guarding.
+        an implementation imports its library directly rather than guarding.
         """
 
 
 class PositionIndexFilter(Enum):
-    """Filter scan points by scan index.
+    """Filter probe positions by scan index.
 
     ``ODD`` and ``EVEN`` split a scan into two interleaved halves by index parity. How
     the halves sit on the sample follows from how the scan is numbered: a raster
@@ -334,7 +334,7 @@ class PositionIndexFilter(Enum):
     EVEN = auto()
 
     def __call__(self, index: int) -> bool:
-        """Return True to include the scan point, False to exclude it."""
+        """Return True to include the probe position, False to exclude it."""
         if self is PositionIndexFilter.ODD:
             return index & 1 != 0
         elif self is PositionIndexFilter.EVEN:
@@ -391,7 +391,7 @@ def prepare_reconstruct_input(
     pos_x_all = product.probe_positions.get_coordinates_x_m()
     pos_y_all = product.probe_positions.get_coordinates_y_m()
 
-    pos_photon_counts_all = product.probe_positions.get_probe_photon_counts()
+    pos_i0_all = product.probe_positions.get_i0()
     opr_weights_all = product.probes.get_opr_weights_or_none()
 
     if opr_weights_all is not None and opr_weights_all.shape[0] != n_positions:
@@ -409,7 +409,7 @@ def prepare_reconstruct_input(
     pos_indexes = pos_indexes_all[pos_keep]
     pos_x = pos_x_all[pos_keep]
     pos_y = pos_y_all[pos_keep]
-    pos_photon_counts = None if pos_photon_counts_all is None else pos_photon_counts_all[pos_keep]
+    pos_i0 = None if pos_i0_all is None else pos_i0_all[pos_keep]
 
     if filtered_pattern_indexes.size == 0 or pos_indexes.size == 0:
         raise ValueError('Index filter eliminated all pattern indexes and/or all position indexes.')
@@ -446,11 +446,9 @@ def prepare_reconstruct_input(
     # rates (Hz) over unequal integration windows. NaN placeholders (positions whose
     # reader did not supply a count) propagate through the mean, marking the anchor
     # invalid so any pattern index interpolated from it comes out NaN.
-    photon_counts: RealArrayType | None = None
-    if pos_photon_counts is not None:
-        _, photon_counts = interpolate_at_indexes(
-            pos_indexes, pos_photon_counts, filtered_pattern_indexes
-        )
+    i0: RealArrayType | None = None
+    if pos_i0 is not None:
+        _, i0 = interpolate_at_indexes(pos_indexes, pos_i0, filtered_pattern_indexes)
 
     probes = product.probes
     if opr_weights_all is not None:
@@ -472,7 +470,7 @@ def prepare_reconstruct_input(
         f'duplicate positions; interpolated {n_interpolated} positions'
     )
 
-    # The all-or-nothing invariant on ProbePositionSequence means photon_counts is either
+    # The all-or-nothing invariant on ProbePositionSequence means i0 is either
     # None (no reader ever measured it) or a fully-populated finite array; interpolation
     # over a fully-populated anchor array preserves that. So the output list carries a
     # count on every point or on none of them, preserving the invariant for the trimmed
@@ -482,7 +480,7 @@ def prepare_reconstruct_input(
             index=int(i),
             x_m=float(x),
             y_m=float(y),
-            probe_photon_count=None if photon_counts is None else float(photon_counts[k]),
+            i0=None if i0 is None else float(i0[k]),
         )
         for k, (i, x, y) in enumerate(zip(in_range_pattern_indexes, x_coords, y_coords))
     ]
@@ -598,7 +596,7 @@ class ReconstructionAmbiguities:
     where ``(x, y)`` are measured in meters from the geometric center of the
     object **array** (``(width_px - 1) / 2`` in each axis, not
     ``Object.get_center()``). The corresponding complementary transform on the
-    probe leaves the diffraction-pattern intensities at every scan position
+    probe leaves the diffraction-pattern intensities at every probe position
     unchanged. See :meth:`standardize_product` for what is and is not exactly
     preserved.
 
@@ -649,7 +647,7 @@ class ReconstructionAmbiguities:
 
         What is preserved:
 
-        - **Diffraction-pattern intensities** at every scan position, exactly
+        - **Diffraction-pattern intensities** at every probe position, exactly
           (up to floating-point precision).
         - **Exit waves** (``probe * object``) exactly, when the phase ramp is
           zero (``phase_ramp_x_rad_per_m == phase_ramp_y_rad_per_m == 0``).

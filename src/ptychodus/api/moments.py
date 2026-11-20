@@ -10,7 +10,7 @@ from .diffraction import DiffractionPattern, DiffractionPatterns
 from .typing import BooleanArrayType, NumberArrayType, RealArrayType
 
 __all__ = [
-    'FrameStatistics',
+    'PatternStatistics',
     'IntensityMoments',
     'compute_intensity_moments',
 ]
@@ -91,8 +91,8 @@ def compute_intensity_moments(
     )
 
 
-class FrameStatistics:
-    """Thread-safe running minimum, mean and maximum frames over chunks of patterns.
+class PatternStatistics:
+    """Thread-safe running minimum, mean and maximum patterns over chunks of patterns.
 
     The mean is kept as a running mean rather than a running sum: each chunk is reduced
     to its own float64 mean and folded in as ``mean += (chunk_mean - mean) * n_c / (n +
@@ -101,31 +101,31 @@ class FrameStatistics:
     extrema keep the pattern dtype.
 
     Each chunk is reduced outside the lock; the lock is held only long enough to fold
-    that chunk's frames into the running ones.
+    that chunk's statistics into the running ones.
     """
 
     def __init__(self, height: int, width: int) -> None:
         self._lock = threading.Lock()
         self._shape = (height, width)
-        self._mean_frame = numpy.zeros((height, width), dtype=numpy.float64)
-        self._minimum_frame: DiffractionPattern | None = None
-        self._maximum_frame: DiffractionPattern | None = None
+        self._mean_pattern = numpy.zeros((height, width), dtype=numpy.float64)
+        self._minimum_pattern: DiffractionPattern | None = None
+        self._maximum_pattern: DiffractionPattern | None = None
         self._num_patterns = 0
 
     @classmethod
-    def from_frames(
+    def from_patterns(
         cls,
         num_patterns: int,
-        minimum_frame: DiffractionPattern,
-        mean_frame: RealArrayType,
-        maximum_frame: DiffractionPattern,
-    ) -> FrameStatistics:
-        """Statistics standing for *num_patterns* patterns already reduced to these frames."""
-        height, width = mean_frame.shape
+        minimum_pattern: DiffractionPattern,
+        mean_pattern: RealArrayType,
+        maximum_pattern: DiffractionPattern,
+    ) -> PatternStatistics:
+        """Statistics standing for *num_patterns* patterns already reduced to these three."""
+        height, width = mean_pattern.shape
         statistics = cls(height, width)
 
         if num_patterns > 0:
-            statistics._fold(num_patterns, mean_frame, minimum_frame, maximum_frame)
+            statistics._fold(num_patterns, mean_pattern, minimum_pattern, maximum_pattern)
 
         return statistics
 
@@ -142,7 +142,7 @@ class FrameStatistics:
 
         if patterns.shape[-2:] != self._shape:
             raise ValueError(
-                f'Patterns of shape {patterns.shape[-2:]} do not match the {self._shape} frames!'
+                f'Patterns of shape {patterns.shape[-2:]} do not match the {self._shape} patterns!'
             )
 
         self._fold(
@@ -152,47 +152,47 @@ class FrameStatistics:
             patterns.max(axis=0),
         )
 
-    def merge(self, other: FrameStatistics) -> None:
+    def merge(self, other: PatternStatistics) -> None:
         """Fold another set of running statistics into these, as if its chunks were added."""
-        frames = other.get_frames()
+        statistics = other.get_statistics()
 
-        if frames is not None:
-            minimum_frame, mean_frame, maximum_frame = frames
-            self._fold(other.num_patterns, mean_frame, minimum_frame, maximum_frame)
+        if statistics is not None:
+            minimum_pattern, mean_pattern, maximum_pattern = statistics
+            self._fold(other.num_patterns, mean_pattern, minimum_pattern, maximum_pattern)
 
     def _fold(
         self,
         num_patterns: int,
-        mean_frame: RealArrayType,
-        minimum_frame: DiffractionPattern,
-        maximum_frame: DiffractionPattern,
+        mean_pattern: RealArrayType,
+        minimum_pattern: DiffractionPattern,
+        maximum_pattern: DiffractionPattern,
     ) -> None:
         with self._lock:
             total = self._num_patterns + num_patterns
-            self._mean_frame += (mean_frame - self._mean_frame) * (num_patterns / total)
+            self._mean_pattern += (mean_pattern - self._mean_pattern) * (num_patterns / total)
             self._num_patterns = total
 
-            if self._minimum_frame is None or self._maximum_frame is None:
-                self._minimum_frame = minimum_frame
-                self._maximum_frame = maximum_frame
+            if self._minimum_pattern is None or self._maximum_pattern is None:
+                self._minimum_pattern = minimum_pattern
+                self._maximum_pattern = maximum_pattern
             else:
-                self._minimum_frame = numpy.minimum(self._minimum_frame, minimum_frame)
-                self._maximum_frame = numpy.maximum(self._maximum_frame, maximum_frame)
+                self._minimum_pattern = numpy.minimum(self._minimum_pattern, minimum_pattern)
+                self._maximum_pattern = numpy.maximum(self._maximum_pattern, maximum_pattern)
 
-    def get_frames(
+    def get_statistics(
         self,
     ) -> tuple[DiffractionPattern, RealArrayType, DiffractionPattern] | None:
-        """Return copies of the ``(minimum, mean, maximum)`` frames, or None if nothing was added.
+        """Return copies of the ``(minimum, mean, maximum)`` patterns, or None if nothing was added.
 
         The mean averages the patterns actually folded in, not however many some caller
         expected, so missing chunks do not bias it toward zero.
         """
         with self._lock:
-            if self._minimum_frame is None or self._maximum_frame is None:
+            if self._minimum_pattern is None or self._maximum_pattern is None:
                 return None
 
             return (
-                self._minimum_frame.copy(),
-                self._mean_frame.copy(),
-                self._maximum_frame.copy(),
+                self._minimum_pattern.copy(),
+                self._mean_pattern.copy(),
+                self._maximum_pattern.copy(),
             )

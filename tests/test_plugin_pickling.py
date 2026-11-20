@@ -3,7 +3,7 @@
 The application runs ``reconstruct``, ``train`` and ``enhance`` in a spawned child
 by pickling the plugin object, so a plugin that does not pickle cannot run at all
 -- and nothing short of a real run would say so. Checked against whatever
-registered, so a backend installed here is covered and one that is not drops out.
+registered, so a library installed here is covered and one that is not drops out.
 """
 
 from __future__ import annotations

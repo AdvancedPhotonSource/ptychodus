@@ -1,12 +1,12 @@
-"""Unit tests for online accumulation: FrameStatistics, DiffractionMomentAccumulator and friends.
+"""Unit tests for online accumulation: PatternStatistics, DiffractionMomentAccumulator and friends.
 
 Behaviors verified:
-  - FrameStatistics matches numpy's min, mean and max for any chunking, merges exactly,
+  - PatternStatistics matches numpy's min, mean and max for any chunking, merges exactly,
     and keeps its running mean at single-pattern scale over a long uint32 stream
-  - the accumulator gives the same rows and frames for any chunking, order, thread
+  - the accumulator gives the same rows and patterns for any chunking, order, thread
     interleaving or merge, including a merge from a pickled snapshot
   - snapshots are unaffected by later additions, and an empty accumulator gives None
-  - the inpainted mean equals the mean of the inpainted frames
+  - the inpainted mean equals the mean of the inpainted patterns
   - select, sort_by_index, normalize_by_i0 and estimate_incident_photon_count on snapshots
   - an accumulator from assembled data applies its mask and carried maps
   - moments accumulated during assemble_dataset equal one pass over what it assembled,
@@ -52,7 +52,7 @@ from ptychodus.api.diffraction import (
     SimpleDiffractionDataset,
 )
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.moments import FrameStatistics, compute_intensity_moments
+from ptychodus.api.moments import PatternStatistics, compute_intensity_moments
 from ptychodus.api.preprocess.diffraction import BinningStep, inpaint_bad_pixels
 
 _SHAPE = (24, 32)
@@ -97,7 +97,7 @@ def _sorted_rows(moments: DiffractionMoments) -> tuple[numpy.ndarray, ...]:
     order = numpy.argsort(moments.indexes)
     return (
         moments.indexes[order],
-        moments.total_counts[order],
+        moments.detector_sums[order],
         moments.center_of_mass_x_px[order],
         moments.center_of_mass_y_px[order],
         numpy.empty(0) if moments.binned_patterns is None else moments.binned_patterns[order],
@@ -106,9 +106,9 @@ def _sorted_rows(moments: DiffractionMoments) -> tuple[numpy.ndarray, ...]:
 
 def _assert_same_moments(actual: DiffractionMoments, expected: DiffractionMoments) -> None:
     assert actual.num_patterns == expected.num_patterns
-    numpy.testing.assert_array_equal(actual.minimum_frame, expected.minimum_frame)
-    numpy.testing.assert_array_equal(actual.maximum_frame, expected.maximum_frame)
-    numpy.testing.assert_allclose(actual.mean_frame, expected.mean_frame, rtol=1e-12)
+    numpy.testing.assert_array_equal(actual.minimum_pattern, expected.minimum_pattern)
+    numpy.testing.assert_array_equal(actual.maximum_pattern, expected.maximum_pattern)
+    numpy.testing.assert_allclose(actual.mean_pattern, expected.mean_pattern, rtol=1e-12)
     assert actual.binning == expected.binning
 
     for got, want in zip(_sorted_rows(actual), _sorted_rows(expected)):
@@ -116,39 +116,39 @@ def _assert_same_moments(actual: DiffractionMoments, expected: DiffractionMoment
 
 
 # ---------------------------------------------------------------------------
-# FrameStatistics
+# PatternStatistics
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize('step', [1, 7, 40])
-def test_frame_statistics_match_numpy_for_any_chunking(step: int) -> None:
+def test_pattern_statistics_match_numpy_for_any_chunking(step: int) -> None:
     patterns = _patterns(40)
-    statistics = FrameStatistics(*_SHAPE)
+    statistics = PatternStatistics(*_SHAPE)
 
     for start in range(0, 40, step):
         statistics.add(patterns[start : start + step])
 
-    frames = statistics.get_frames()
-    assert frames is not None
-    minimum_frame, mean_frame, maximum_frame = frames
+    extrema = statistics.get_statistics()
+    assert extrema is not None
+    minimum_pattern, mean_pattern, maximum_pattern = extrema
 
-    numpy.testing.assert_array_equal(minimum_frame, patterns.min(axis=0))
-    numpy.testing.assert_array_equal(maximum_frame, patterns.max(axis=0))
-    numpy.testing.assert_allclose(mean_frame, patterns.mean(axis=0, dtype=numpy.float64))
-    assert minimum_frame.dtype == patterns.dtype
-    assert mean_frame.dtype == numpy.float64
+    numpy.testing.assert_array_equal(minimum_pattern, patterns.min(axis=0))
+    numpy.testing.assert_array_equal(maximum_pattern, patterns.max(axis=0))
+    numpy.testing.assert_allclose(mean_pattern, patterns.mean(axis=0, dtype=numpy.float64))
+    assert minimum_pattern.dtype == patterns.dtype
+    assert mean_pattern.dtype == numpy.float64
 
 
-def test_frame_statistics_merge_equals_one_pass() -> None:
+def test_pattern_statistics_merge_equals_one_pass() -> None:
     patterns = _patterns(30)
-    left, right, whole = (FrameStatistics(*_SHAPE) for _ in range(3))
+    left, right, whole = (PatternStatistics(*_SHAPE) for _ in range(3))
     left.add(patterns[:11])
     right.add(patterns[11:])
     whole.add(patterns)
 
     left.merge(right)
 
-    for merged, single in zip(left.get_frames() or (), whole.get_frames() or ()):
+    for merged, single in zip(left.get_statistics() or (), whole.get_statistics() or ()):
         numpy.testing.assert_allclose(merged, single, rtol=1e-12)
 
     assert left.num_patterns == 30
@@ -156,7 +156,7 @@ def test_frame_statistics_merge_equals_one_pass() -> None:
 
 def test_running_mean_stays_at_pattern_scale_over_a_long_stream() -> None:
     rng = numpy.random.default_rng(4)
-    statistics = FrameStatistics(4, 4)
+    statistics = PatternStatistics(4, 4)
     chunks = [
         rng.integers(4_000_000_000, 4_294_967_295, size=(1000, 4, 4), dtype=numpy.uint32)
         for _ in range(50)
@@ -165,19 +165,19 @@ def test_running_mean_stays_at_pattern_scale_over_a_long_stream() -> None:
     for chunk in chunks:
         statistics.add(chunk)
 
-    frames = statistics.get_frames()
-    assert frames is not None
+    extrema = statistics.get_statistics()
+    assert extrema is not None
     expected = numpy.mean(numpy.concatenate(chunks), axis=0, dtype=numpy.float64)
-    numpy.testing.assert_allclose(frames[1], expected, rtol=1e-14)
-    assert frames[1].max() < 4_294_967_295
+    numpy.testing.assert_allclose(extrema[1], expected, rtol=1e-14)
+    assert extrema[1].max() < 4_294_967_295
 
 
-def test_empty_frame_statistics_have_no_frames() -> None:
-    statistics = FrameStatistics(*_SHAPE)
+def test_empty_pattern_statistics_have_no_patterns() -> None:
+    statistics = PatternStatistics(*_SHAPE)
     statistics.add(numpy.zeros((0, *_SHAPE)))
 
-    assert statistics.get_frames() is None
-    assert FrameStatistics.from_frames(0, *(numpy.zeros(_SHAPE),) * 3).get_frames() is None
+    assert statistics.get_statistics() is None
+    assert PatternStatistics.from_patterns(0, *(numpy.zeros(_SHAPE),) * 3).get_statistics() is None
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +185,7 @@ def test_empty_frame_statistics_have_no_frames() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_rows_are_the_inpainted_totals_and_centroids() -> None:
+def test_rows_are_the_inpainted_detector_sums_and_centroids() -> None:
     patterns = _patterns(9)
     indexes = numpy.arange(100, 109)
 
@@ -194,7 +194,7 @@ def test_rows_are_the_inpainted_totals_and_centroids() -> None:
     repaired = inpaint_bad_pixels(patterns.astype(numpy.float64), _bad_pixels())
     expected = compute_intensity_moments(repaired)
     numpy.testing.assert_array_equal(moments.indexes, indexes)
-    numpy.testing.assert_allclose(moments.total_counts, expected.total, rtol=1e-12)
+    numpy.testing.assert_allclose(moments.detector_sums, expected.total, rtol=1e-12)
     numpy.testing.assert_allclose(moments.center_of_mass_x_px, expected.centroid_x_px)
     numpy.testing.assert_allclose(moments.center_of_mass_y_px, expected.centroid_y_px)
 
@@ -310,7 +310,7 @@ def test_a_snapshot_does_not_change_with_later_additions() -> None:
 
 
 def test_snapshots_taken_during_accumulation_are_consistent() -> None:
-    """A snapshot's mean frame covers exactly the patterns its rows list, mid-stream too."""
+    """A snapshot's mean pattern covers exactly the patterns its rows list, mid-stream too."""
     patterns = _patterns(600)
     accumulator = DiffractionMomentAccumulator(*_SHAPE, bad_pixels=_bad_pixels(), chunk_size=4)
     snapshots: list[DiffractionMoments] = []
@@ -342,9 +342,9 @@ def test_snapshots_taken_during_accumulation_are_consistent() -> None:
     assert snapshots
 
     for moments in snapshots:
-        assert moments.num_patterns == moments.indexes.size == moments.total_counts.size
+        assert moments.num_patterns == moments.indexes.size == moments.detector_sums.size
         numpy.testing.assert_allclose(
-            moments.mean_frame, patterns[moments.indexes].mean(axis=0), rtol=1e-12
+            moments.mean_pattern, patterns[moments.indexes].mean(axis=0), rtol=1e-12
         )
 
 
@@ -402,26 +402,26 @@ def test_mismatched_shapes_are_rejected() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_the_inpainted_mean_is_the_mean_of_the_inpainted_frames() -> None:
+def test_the_inpainted_mean_is_the_mean_of_the_inpainted_patterns() -> None:
     patterns = _patterns(12)
     moments = _accumulate(numpy.arange(12), patterns, chunk_size=5, step=4)
 
     expected = numpy.mean(inpaint_bad_pixels(patterns.astype(numpy.float64), _bad_pixels()), axis=0)
-    numpy.testing.assert_allclose(moments.mean_pattern(), expected, rtol=1e-10)
+    numpy.testing.assert_allclose(moments.inpainted_mean_pattern(), expected, rtol=1e-10)
 
 
-def test_select_keeps_the_rows_and_the_frames() -> None:
+def test_select_keeps_the_rows_and_the_patterns() -> None:
     moments = _accumulate(numpy.arange(10), _patterns(10), chunk_size=4, step=4)
 
     selected = moments.select([7, 2, 99])
 
     numpy.testing.assert_array_equal(selected.indexes, [2, 7])
-    numpy.testing.assert_array_equal(selected.total_counts, moments.total_counts[[2, 7]])
+    numpy.testing.assert_array_equal(selected.detector_sums, moments.detector_sums[[2, 7]])
     assert selected.num_patterns == moments.num_patterns
-    numpy.testing.assert_array_equal(selected.mean_frame, moments.mean_frame)
+    numpy.testing.assert_array_equal(selected.mean_pattern, moments.mean_pattern)
 
 
-def test_sorting_by_index_moves_every_row_and_keeps_the_frames() -> None:
+def test_sorting_by_index_moves_every_row_and_keeps_the_patterns() -> None:
     indexes = numpy.array([5, 2, 9, 2, 0])
     moments = _accumulate(indexes, _patterns(5), chunk_size=2, step=5)
 
@@ -429,7 +429,7 @@ def test_sorting_by_index_moves_every_row_and_keeps_the_frames() -> None:
 
     order = [4, 1, 3, 0, 2]  # stable: the first 2 stays ahead of the second
     numpy.testing.assert_array_equal(ordered.indexes, [0, 2, 2, 5, 9])
-    numpy.testing.assert_array_equal(ordered.total_counts, moments.total_counts[order])
+    numpy.testing.assert_array_equal(ordered.detector_sums, moments.detector_sums[order])
     numpy.testing.assert_array_equal(
         ordered.center_of_mass_x_px, moments.center_of_mass_x_px[order]
     )
@@ -438,7 +438,7 @@ def test_sorting_by_index_moves_every_row_and_keeps_the_frames() -> None:
     )
     assert ordered.binned_patterns is not None and moments.binned_patterns is not None
     numpy.testing.assert_array_equal(ordered.binned_patterns, moments.binned_patterns[order])
-    numpy.testing.assert_array_equal(ordered.mean_frame, moments.mean_frame)
+    numpy.testing.assert_array_equal(ordered.mean_pattern, moments.mean_pattern)
 
 
 def test_i0_removes_a_beam_decay(caplog: pytest.LogCaptureFixture) -> None:
@@ -451,7 +451,7 @@ def test_i0_removes_a_beam_decay(caplog: pytest.LogCaptureFixture) -> None:
 
     normalized = moments.normalize_by_i0(indexes[::-1], 1000.0 * decay[::-1])
 
-    ratio = normalized.total_counts / reference.total_counts
+    ratio = normalized.detector_sums / reference.detector_sums
     numpy.testing.assert_allclose(ratio / ratio.mean(), 1.0, rtol=2e-3)
 
     counts = 1000.0 * decay
@@ -460,12 +460,12 @@ def test_i0_removes_a_beam_decay(caplog: pytest.LogCaptureFixture) -> None:
     with caplog.at_level(logging.WARNING, logger='ptychodus.api.accumulate'):
         partial = moments.normalize_by_i0(indexes[:-1], counts[:-1])
 
-    assert partial.total_counts[3] == moments.total_counts[3]
-    assert partial.total_counts[9] == moments.total_counts[9]
+    assert partial.detector_sums[3] == moments.detector_sums[3]
+    assert partial.detector_sums[9] == moments.detector_sums[9]
     assert any('2 I0 readings' in record.message for record in caplog.records)
 
 
-def test_the_i0_scale_is_the_factor_the_totals_take() -> None:
+def test_the_i0_scale_is_the_factor_the_detector_sums_take() -> None:
     moments = _accumulate(numpy.arange(6), _patterns(6), chunk_size=4, step=6)
     # Index 2 reads zero, index 4 is not finite and index 5 has no reading at all.
     i0_indexes = numpy.array([4, 3, 2, 1, 0])
@@ -474,8 +474,8 @@ def test_the_i0_scale_is_the_factor_the_totals_take() -> None:
     scale = compute_i0_scale(moments.indexes, i0_indexes, i0_counts)
 
     numpy.testing.assert_allclose(
-        moments.normalize_by_i0(i0_indexes, i0_counts).total_counts,
-        moments.total_counts * scale,
+        moments.normalize_by_i0(i0_indexes, i0_counts).detector_sums,
+        moments.detector_sums * scale,
     )
     expected = {0: 7.0 / 3.0, 1: 7.0 / 6.0, 2: 1.0, 3: 7.0 / 12.0, 4: 1.0, 5: 1.0}
     numpy.testing.assert_allclose(scale, [expected[int(index)] for index in moments.indexes])
@@ -488,19 +488,19 @@ def test_i0_indexes_must_be_unique() -> None:
         moments.normalize_by_i0(numpy.array([0, 0, 1, 2]), numpy.ones(4))
 
 
-def test_incident_photon_count_is_a_high_quantile_of_the_totals() -> None:
-    totals = numpy.concatenate([numpy.full(99, 100.0), [1.0e6]])
+def test_incident_photon_count_is_a_high_quantile_of_the_detector_sums() -> None:
+    detector_sums = numpy.concatenate([numpy.full(99, 100.0), [1.0e6]])
 
-    assert estimate_incident_photon_count(totals, quantile=0.99) == pytest.approx(
-        numpy.quantile(totals, 0.99)
+    assert estimate_incident_photon_count(detector_sums, quantile=0.99) == pytest.approx(
+        numpy.quantile(detector_sums, 0.99)
     )
-    assert estimate_incident_photon_count(totals, quantile=0.95) == pytest.approx(100.0)
-    assert estimate_incident_photon_count(totals, quantile=1.0) == 1.0e6
+    assert estimate_incident_photon_count(detector_sums, quantile=0.95) == pytest.approx(100.0)
+    assert estimate_incident_photon_count(detector_sums, quantile=1.0) == 1.0e6
     assert estimate_incident_photon_count(numpy.array([numpy.nan, 5.0]), quantile=1.0) == 5.0
     assert estimate_incident_photon_count(numpy.array([numpy.nan])) == 0.0
 
     with pytest.raises(ValueError):
-        estimate_incident_photon_count(totals, quantile=1.5)
+        estimate_incident_photon_count(detector_sums, quantile=1.5)
 
 
 # ---------------------------------------------------------------------------
@@ -530,7 +530,7 @@ def test_carried_corrections_are_applied_first() -> None:
 
     assert moments is not None and expected is not None
     assert moments.bad_pixels[0, 0]
-    numpy.testing.assert_allclose(moments.total_counts, expected.total_counts, rtol=1e-9)
+    numpy.testing.assert_allclose(moments.detector_sums, expected.detector_sums, rtol=1e-9)
     numpy.testing.assert_allclose(
         moments.center_of_mass_x_px, expected.center_of_mass_x_px, atol=1e-9
     )
@@ -636,9 +636,9 @@ def test_accumulated_moments_serve_a_selection_of_the_assembled_patterns() -> No
 
     expected = _one_pass(selected)
     assert moments is not None
-    assert moments.num_patterns == 9  # the frames are of every pattern assembled
+    assert moments.num_patterns == 9  # the patterns are of every pattern assembled
     numpy.testing.assert_array_equal(moments.indexes, [1, 2, 5, 7])
-    numpy.testing.assert_allclose(moments.total_counts, expected.total_counts, rtol=1e-12)
+    numpy.testing.assert_allclose(moments.detector_sums, expected.detector_sums, rtol=1e-12)
     numpy.testing.assert_allclose(
         moments.center_of_mass_y_px, expected.center_of_mass_y_px, atol=1e-12
     )
@@ -758,7 +758,7 @@ def test_select_and_i0_carry_the_binned_patterns() -> None:
     i0 = numpy.linspace(1.0, 2.0, 10)
     normalized = moments.normalize_by_i0(indexes, i0)
     assert normalized.binned_patterns is not None
-    scale = normalized.total_counts / moments.total_counts
+    scale = normalized.detector_sums / moments.detector_sums
     numpy.testing.assert_allclose(scale, i0.mean() / i0, rtol=1e-12)
     numpy.testing.assert_allclose(
         normalized.binned_patterns,
@@ -815,8 +815,8 @@ def test_each_snapshot_is_the_accumulation_of_its_prefix() -> None:
         assert expected is not None
         assert moments.num_patterns == num_seen
         numpy.testing.assert_array_equal(moments.indexes, expected.indexes)
-        numpy.testing.assert_allclose(moments.total_counts, expected.total_counts)
-        numpy.testing.assert_allclose(moments.mean_frame, expected.mean_frame)
+        numpy.testing.assert_allclose(moments.detector_sums, expected.detector_sums)
+        numpy.testing.assert_allclose(moments.mean_pattern, expected.mean_pattern)
 
 
 def test_snapshots_never_repeat_and_need_at_least_one() -> None:
@@ -842,67 +842,67 @@ def test_snapshots_never_repeat_and_need_at_least_one() -> None:
         )
 
 
-def _with_totals(totals: list[float]) -> DiffractionMoments:
-    """Moments whose totals are exactly `totals`, at scan indexes 0, 1, ..."""
-    num_patterns = len(totals)
-    frame = numpy.zeros(_SHAPE)
+def _with_detector_sums(detector_sums: list[float]) -> DiffractionMoments:
+    """Moments whose detector_sums are exactly `detector_sums`, at scan indexes 0, 1, ..."""
+    num_patterns = len(detector_sums)
+    pattern = numpy.zeros(_SHAPE)
     rows = numpy.zeros(num_patterns)
     return DiffractionMoments(
         num_patterns=num_patterns,
-        minimum_frame=frame,
-        mean_frame=frame,
-        maximum_frame=frame,
+        minimum_pattern=pattern,
+        mean_pattern=pattern,
+        maximum_pattern=pattern,
         bad_pixels=numpy.zeros(_SHAPE, dtype=bool),
         indexes=numpy.arange(num_patterns),
-        total_counts=numpy.asarray(totals, dtype=numpy.float64),
+        detector_sums=numpy.asarray(detector_sums, dtype=numpy.float64),
         center_of_mass_x_px=rows,
         center_of_mass_y_px=rows.copy(),
     )
 
 
 def test_an_unattenuated_scan_is_transparent() -> None:
-    estimate = estimate_incident_beam(_with_totals([64, 64, 64]))
+    estimate = estimate_incident_beam(_with_detector_sums([64, 64, 64]))
 
     assert estimate.incident_photon_count == pytest.approx(64.0)
     assert estimate.mean_amplitude_transmission == pytest.approx(1.0)
     assert not estimate.decay_corrected
 
 
-def test_without_i0_the_brightest_frames_stand_in_for_the_empty_beam() -> None:
-    totals = [64.0, 32.0, 32.0, 32.0]
-    estimate = estimate_incident_beam(_with_totals(totals))
-    incident = numpy.quantile(totals, 0.99)
+def test_without_i0_the_brightest_patterns_stand_in_for_the_empty_beam() -> None:
+    detector_sums = [64.0, 32.0, 32.0, 32.0]
+    estimate = estimate_incident_beam(_with_detector_sums(detector_sums))
+    incident = numpy.quantile(detector_sums, 0.99)
 
     assert estimate.incident_photon_count == pytest.approx(incident)
     assert estimate.mean_amplitude_transmission == pytest.approx(numpy.sqrt(40.0 / incident))
     assert estimate_incident_beam(
-        _with_totals(totals), quantile=1.0
+        _with_detector_sums(detector_sums), quantile=1.0
     ).mean_amplitude_transmission == pytest.approx(numpy.sqrt(40.0 / 64.0))
 
 
-def test_one_anomalous_frame_does_not_set_the_incident_beam() -> None:
-    totals = [32.0] * 150 + [64.0] * 49 + [640.0]
-    estimate = estimate_incident_beam(_with_totals(totals))
+def test_one_anomalous_pattern_does_not_set_the_incident_beam() -> None:
+    detector_sums = [32.0] * 150 + [64.0] * 49 + [640.0]
+    estimate = estimate_incident_beam(_with_detector_sums(detector_sums))
 
     assert estimate.incident_photon_count == pytest.approx(64.0)
     assert estimate.mean_amplitude_transmission == pytest.approx(
-        numpy.sqrt(numpy.mean(totals) / 64)
+        numpy.sqrt(numpy.mean(detector_sums) / 64)
     )
 
 
 def test_uncalibrated_i0_corrects_the_decay_before_the_quantile() -> None:
-    """The beam halves for the second frame, so its half-height total is no absorption."""
-    estimate = estimate_incident_beam(_with_totals([64.0, 32.0]), {0: 2.0, 1: 1.0})
+    """The beam halves for the second pattern, so its half-height total is no absorption."""
+    estimate = estimate_incident_beam(_with_detector_sums([64.0, 32.0]), {0: 2.0, 1: 1.0})
 
     assert estimate.decay_corrected
-    numpy.testing.assert_allclose(estimate.moments.total_counts, [48.0, 48.0])
+    numpy.testing.assert_allclose(estimate.moments.detector_sums, [48.0, 48.0])
     assert estimate.incident_photon_count == pytest.approx(48.0)
     assert estimate.mean_amplitude_transmission == pytest.approx(1.0)
 
 
 def test_calibrated_i0_gives_the_incident_photons_and_a_per_position_transmission() -> None:
     estimate = estimate_incident_beam(
-        _with_totals([64.0, 32.0]), {0: 32.0, 1: 32.0}, i0_photons_per_count=2.0
+        _with_detector_sums([64.0, 32.0]), {0: 32.0, 1: 32.0}, i0_photons_per_count=2.0
     )
 
     assert estimate.decay_corrected
@@ -912,8 +912,8 @@ def test_calibrated_i0_gives_the_incident_photons_and_a_per_position_transmissio
 
 
 def test_a_calibration_without_i0_is_unused() -> None:
-    plain = estimate_incident_beam(_with_totals([64.0, 32.0]))
-    calibrated = estimate_incident_beam(_with_totals([64.0, 32.0]), i0_photons_per_count=5.0)
+    plain = estimate_incident_beam(_with_detector_sums([64.0, 32.0]))
+    calibrated = estimate_incident_beam(_with_detector_sums([64.0, 32.0]), i0_photons_per_count=5.0)
 
     assert calibrated.incident_photon_count == pytest.approx(plain.incident_photon_count)
     assert calibrated.mean_amplitude_transmission == pytest.approx(
@@ -923,9 +923,9 @@ def test_a_calibration_without_i0_is_unused() -> None:
 
 
 def test_a_non_positive_calibration_leaves_i0_uncalibrated() -> None:
-    uncalibrated = estimate_incident_beam(_with_totals([64.0, 32.0]), {0: 2.0, 1: 1.0})
+    uncalibrated = estimate_incident_beam(_with_detector_sums([64.0, 32.0]), {0: 2.0, 1: 1.0})
     zero = estimate_incident_beam(
-        _with_totals([64.0, 32.0]), {0: 2.0, 1: 1.0}, i0_photons_per_count=0.0
+        _with_detector_sums([64.0, 32.0]), {0: 2.0, 1: 1.0}, i0_photons_per_count=0.0
     )
 
     assert zero.incident_photon_count == pytest.approx(uncalibrated.incident_photon_count)
@@ -933,7 +933,7 @@ def test_a_non_positive_calibration_leaves_i0_uncalibrated() -> None:
 
 def test_positions_without_usable_i0_drop_out_of_a_calibrated_estimate() -> None:
     estimate = estimate_incident_beam(
-        _with_totals([64.0, 32.0]), {0: 0.0, 1: 64.0}, i0_photons_per_count=1.0
+        _with_detector_sums([64.0, 32.0]), {0: 0.0, 1: 64.0}, i0_photons_per_count=1.0
     )
 
     assert estimate.incident_photon_count == pytest.approx(64.0)
@@ -943,7 +943,7 @@ def test_positions_without_usable_i0_drop_out_of_a_calibrated_estimate() -> None
 def test_an_implausible_calibration_is_reported_but_kept(caplog: pytest.LogCaptureFixture) -> None:
     with caplog.at_level(logging.WARNING, logger='ptychodus.api.accumulate'):
         estimate = estimate_incident_beam(
-            _with_totals([64.0, 64.0]), {0: 32.0, 1: 32.0}, i0_photons_per_count=1.0
+            _with_detector_sums([64.0, 64.0]), {0: 32.0, 1: 32.0}, i0_photons_per_count=1.0
         )
 
     assert estimate.incident_photon_count == pytest.approx(32.0)
@@ -952,7 +952,7 @@ def test_an_implausible_calibration_is_reported_but_kept(caplog: pytest.LogCaptu
 
 
 def test_a_scan_that_recorded_nothing_is_transparent() -> None:
-    estimate = estimate_incident_beam(_with_totals([0.0, 0.0]))
+    estimate = estimate_incident_beam(_with_detector_sums([0.0, 0.0]))
 
     assert estimate.incident_photon_count == 0.0
     assert estimate.mean_amplitude_transmission == 1.0
@@ -961,5 +961,7 @@ def test_a_scan_that_recorded_nothing_is_transparent() -> None:
 def test_transmission_bounds_must_be_ordered() -> None:
     with pytest.raises(ValueError, match='minimum'):
         estimate_incident_beam(
-            _with_totals([1.0]), min_intensity_transmission=2.0, max_intensity_transmission=1.0
+            _with_detector_sums([1.0]),
+            min_intensity_transmission=2.0,
+            max_intensity_transmission=1.0,
         )

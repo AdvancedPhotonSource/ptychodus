@@ -27,7 +27,7 @@ class ProbePositionsRepositoryItemFactory:
     def _warn_if_conditioning_ignored(self) -> None:
         """Note that conditioning settings do not apply to in-memory positions.
 
-        Positions supplied in memory come from reconstruction output or a product
+        Positions supplied in memory come from a reconstruction or a product
         loaded from file, so they are already conditioned, and a trim set in the
         settings would otherwise silently do nothing. Trim at ingest instead --
         the from-file builder reads raw probe positions and does condition them.

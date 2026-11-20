@@ -1,4 +1,4 @@
-"""Full-store rescan: ingest every manifest, drop rows whose folder is gone."""
+"""Full rescan of the storage root: ingest every manifest, drop rows whose folder is gone."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 async def full_rescan(session: AsyncSession, layout: StorageLayout) -> dict[str, int]:
-    """Walk the store, upsert every manifest, then drop rows whose folder no longer exists."""
+    """Walk the storage root, upsert every manifest, then drop rows whose folder is gone."""
 
     found_uuids: dict[str, set[UUID]] = {
         ResourceKind.CAMPAIGN: set(),

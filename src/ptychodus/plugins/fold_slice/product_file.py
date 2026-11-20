@@ -44,7 +44,7 @@ def _conform_opr_weights(
 ) -> RealArrayType | None:
     """Condition ``outputs.probe_evolution`` into OPR weights, or None if it cannot be.
 
-    The format stores the varying probe as a basis plus a weight per scan position, and
+    The format stores the varying probe as a basis plus a weight per probe position, and
     the reconstruction recombines them by contracting the weight's second index against
     the basis. The weights are therefore meaningless without the basis they index, and
     a count that disagrees with it describes some other probe -- so say so and keep the
@@ -53,7 +53,7 @@ def _conform_opr_weights(
     weights = probe_evolution
 
     if numpy.iscomplexobj(weights):
-        # Stored complex by some engines; the imaginary part is discarded where
+        # Stored complex by some algorithms; the imaginary part is discarded where
         # fold_slice itself plots these.
         weights = weights.real
 
@@ -73,8 +73,8 @@ def _conform_opr_weights(
 def _conform_positions_px(probe_positions: RealArrayType) -> RealArrayType:
     """Reduce the stored positions to one ``(N, 2)`` table.
 
-    A fly scan records a separate table per probe mode. They describe one trajectory
-    sampled by each mode, so the first is the trajectory.
+    A fly scan records a separate table per probe mode. They describe one probe path
+    sampled by each mode, so the first is the probe path.
     """
     if probe_positions.ndim > 2:
         return probe_positions[..., 0]
@@ -85,7 +85,7 @@ def _conform_positions_px(probe_positions: RealArrayType) -> RealArrayType:
 def _read_losses(fourier_error_out: RealArrayType) -> list[LossValue]:
     """Read the loss history, dropping the iterations that recorded no error.
 
-    The engine averages across positions with ``omitnan`` and leaves the entry NaN on
+    The algorithm averages across positions with ``omitnan`` and leaves the entry NaN on
     every iteration where nothing was measured, which is most of them -- whole runs are
     NaN throughout. Each value carries its own iteration number, so dropping one leaves
     a gap on a real axis rather than renumbering what survives.
@@ -239,7 +239,7 @@ class FoldSliceProductFileReader(ProductFileReader):
             except KeyError:
                 pass
             else:
-                # The multislice engine records this whatever the layer count, and a
+                # The multislice algorithm records this whatever the layer count, and a
                 # single-layer run has no layer axis at all. `z_distance` ends with the
                 # free-space distance to the detector, so the gaps are what precedes it.
                 num_layers = object_array.shape[-3] if object_array.ndim > 2 else 1

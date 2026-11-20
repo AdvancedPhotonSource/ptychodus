@@ -2,7 +2,7 @@
 
 Training reads from one directory and writes to another, and has since the
 interface was written; only the GUI used to collapse them, passing one chosen
-path as both and leaving every backend's checkpoints beside the data it learned
+path as both and leaving every library's checkpoints beside the data it learned
 from. This asks for the two separately.
 
 The pair is remembered for the session rather than persisted. They are

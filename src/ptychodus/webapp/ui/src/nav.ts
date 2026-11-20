@@ -48,7 +48,7 @@ export function renderNav(root: HTMLElement, current: string, onSelect: (route: 
     const img = document.createElement('img');
     img.src = `/ui/icons/${entry.icon}`;
     img.alt = '';
-    // The label sits under the icon, as the desktop toolbar's buttons carry theirs.
+    // The label sits under the icon, as the GUI toolbar's buttons carry theirs.
     const text = document.createElement('span');
     text.textContent = entry.label;
     btn.append(img, text);
@@ -62,7 +62,7 @@ export function renderNav(root: HTMLElement, current: string, onSelect: (route: 
     if (entry.children === undefined) continue;
 
     // A rail down the left and an indent mark the child group, matching the
-    // _SubviewGroupContainer the desktop nav draws.
+    // _SubviewGroupContainer the GUI nav draws.
     const group = document.createElement('div');
     group.className = 'nav-group';
     for (const child of entry.children) group.appendChild(button(child));

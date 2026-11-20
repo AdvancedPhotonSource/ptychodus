@@ -22,24 +22,24 @@ from diffraction_dataset_fixtures import (
 )
 
 
-FRAME_SHAPE = (4, 5)  # deliberately non-square: catches height/width transposition
+PATTERN_SHAPE = (4, 5)  # deliberately non-square: catches height/width transposition
 
 
 def _array(label: str, first_index: int, num_patterns: int, fill: int) -> SimpleDiffractionArray:
-    return make_array(label, first_index, num_patterns, fill, frame_shape=FRAME_SHAPE)
+    return make_array(label, first_index, num_patterns, fill, pattern_shape=PATTERN_SHAPE)
 
 
 # ------------------------------ inpaint_bad_pixels ------------------------------
 
 
-def test_inpaint_frame_returns_input_unchanged_when_mask_is_none() -> None:
+def test_inpaint_pattern_returns_input_unchanged_when_mask_is_none() -> None:
     """A None mask short-circuits: the input is returned as-is."""
     pattern = numpy.arange(20, dtype=numpy.float64).reshape(4, 5)
     result = inpaint_bad_pixels(pattern, None)
     assert result is pattern
 
 
-def test_inpaint_frame_returns_input_unchanged_when_mask_all_false() -> None:
+def test_inpaint_pattern_returns_input_unchanged_when_mask_all_false() -> None:
     """An all-good mask short-circuits: the input is returned as-is."""
     pattern = numpy.arange(20, dtype=numpy.float64).reshape(4, 5)
     bad = numpy.zeros((4, 5), dtype=numpy.bool_)
@@ -47,7 +47,7 @@ def test_inpaint_frame_returns_input_unchanged_when_mask_all_false() -> None:
     assert result is pattern
 
 
-def test_inpaint_frame_replaces_bad_positions_and_preserves_good() -> None:
+def test_inpaint_pattern_replaces_bad_positions_and_preserves_good() -> None:
     """Bad-pixel positions are filled by biharmonic; good positions are unchanged."""
     pattern = numpy.ones((8, 8), dtype=numpy.float64) * 5.0
     pattern[3, 3] = 1.0e9
@@ -118,17 +118,17 @@ def test_inpaint_patterns_returns_input_unchanged_when_mask_all_false() -> None:
     assert inpaint_bad_pixels(patterns, bad) is patterns
 
 
-def test_inpaint_patterns_equals_the_per_frame_loop() -> None:
-    """Solving the shared mask once matches inpainting each frame separately.
+def test_inpaint_patterns_equals_the_per_pattern_loop() -> None:
+    """Solving the shared mask once matches inpainting each pattern separately.
 
-    The stack solves one biharmonic system for all frames rather than one per
-    frame; that optimization is only valid if it changes nothing.
+    The stack solves one biharmonic system for all patterns rather than one per
+    pattern; that optimization is only valid if it changes nothing.
     """
     patterns = _pattern_stack(numpy.float64)
     bad = _square_mask()
 
     result = inpaint_bad_pixels(patterns, bad)
-    expected = numpy.stack([inpaint_bad_pixels(frame, bad) for frame in patterns])
+    expected = numpy.stack([inpaint_bad_pixels(pattern, bad) for pattern in patterns])
 
     numpy.testing.assert_allclose(result, expected)
 
@@ -149,7 +149,7 @@ def test_inpaint_patterns_replaces_bad_positions_and_preserves_good() -> None:
 
 @pytest.mark.parametrize('dtype', [numpy.uint16, numpy.int32, numpy.float32, numpy.float64])
 def test_inpaint_patterns_preserves_dtype(dtype: numpy.typing.DTypeLike) -> None:
-    """The detector dtype survives, unlike the float64 frame-level helper."""
+    """The detector dtype survives, unlike the float64 pattern-level helper."""
     patterns = _pattern_stack(dtype)
     result = inpaint_bad_pixels(patterns, _square_mask())
     assert result.dtype == numpy.dtype(dtype)
@@ -169,13 +169,13 @@ def test_inpaint_patterns_rounds_rather_than_truncates() -> None:
     assert numpy.any(exact % 1.0 != 0.0), 'fixture must exercise a fractional fill'
 
 
-def test_inpaint_patterns_fills_stay_within_each_frame_good_pixel_range() -> None:
-    """Fills never leave the range of their own frame's measured pixels.
+def test_inpaint_patterns_fills_stay_within_each_pattern_good_pixel_range() -> None:
+    """Fills never leave the range of their own pattern's measured pixels.
 
     This is what makes the integer cast safe: a fill outside the dtype range
     would wrap, and an unsigned wrap turns a dim pixel into the brightest one in
-    the frame. The bound is per frame, so a stack whose frames differ in scale
-    cannot borrow another frame's headroom.
+    the pattern. The bound is per pattern, so a stack whose patterns differ in scale
+    cannot borrow another pattern's headroom.
     """
     patterns = numpy.zeros((2, 16, 16), dtype=numpy.uint16)
     patterns[0, 4:8, :] = 60000
@@ -186,45 +186,45 @@ def test_inpaint_patterns_fills_stay_within_each_frame_good_pixel_range() -> Non
     result = inpaint_bad_pixels(patterns, bad)
 
     good = numpy.logical_not(bad)
-    for frame, filled in zip(patterns, result):
-        assert filled[bad].min() >= frame[good].min()
-        assert filled[bad].max() <= frame[good].max()
+    for pattern, filled in zip(patterns, result):
+        assert filled[bad].min() >= pattern[good].min()
+        assert filled[bad].max() <= pattern[good].max()
 
 
-def test_inpaint_frame_matches_a_one_frame_stack() -> None:
+def test_inpaint_pattern_matches_a_one_pattern_stack() -> None:
     """The two arities are one operation: same mask, same answer.
 
-    This is the contract the merge creates -- a frame and a stack of one take
+    This is the contract the merge creates -- a pattern and a stack of one take
     different code paths (a plain call vs the shared-mask channel_axis solve)
     and must still agree.
     """
     rng = numpy.random.default_rng(2)
-    frame = rng.integers(0, 1000, size=(16, 16)).astype(numpy.uint16)
+    pattern = rng.integers(0, 1000, size=(16, 16)).astype(numpy.uint16)
     bad = _square_mask()
 
-    from_frame = inpaint_bad_pixels(frame, bad)
-    from_stack = inpaint_bad_pixels(frame[numpy.newaxis], bad)[0]
+    from_pattern = inpaint_bad_pixels(pattern, bad)
+    from_stack = inpaint_bad_pixels(pattern[numpy.newaxis], bad)[0]
 
-    numpy.testing.assert_array_equal(from_frame, from_stack)
+    numpy.testing.assert_array_equal(from_pattern, from_stack)
 
 
-def test_inpaint_frame_preserves_integer_dtype() -> None:
-    """A frame keeps its dtype, as a stack does and as zero_bad_pixels does.
+def test_inpaint_pattern_preserves_integer_dtype() -> None:
+    """A pattern keeps its dtype, as a stack does and as zero_bad_pixels does.
 
-    The frame path used to return float64 unconditionally, so every other frame
+    The pattern path used to return float64 unconditionally, so every other pattern
     test here uses float64 input and would not notice a regression to it.
     """
     rng = numpy.random.default_rng(4)
-    frame = rng.integers(0, 1000, size=(16, 16)).astype(numpy.uint16)
+    pattern = rng.integers(0, 1000, size=(16, 16)).astype(numpy.uint16)
 
-    result = inpaint_bad_pixels(frame, _square_mask())
+    result = inpaint_bad_pixels(pattern, _square_mask())
 
     assert result.dtype == numpy.uint16
 
 
 @pytest.mark.parametrize('shape', [(16,), (2, 3, 16, 16)])
 def test_inpaint_rejects_other_ranks(shape: tuple[int, ...]) -> None:
-    """Anything but a frame or a stack is refused rather than mis-dispatched."""
+    """Anything but a pattern or a stack is refused rather than mis-dispatched."""
     data = numpy.zeros(shape, dtype=numpy.uint16)
     bad = numpy.ones((16, 16), dtype=numpy.bool_)
 
@@ -237,7 +237,7 @@ def test_inpaint_rejects_other_ranks(shape: tuple[int, ...]) -> None:
 
 
 def test_summary_single_array_no_bad_pixels() -> None:
-    """Frame stats match direct numpy reductions when no bad pixels are present."""
+    """Pattern stats match direct numpy reductions when no bad pixels are present."""
     rng = numpy.random.default_rng(0)
     patterns = rng.integers(0, 100, size=(5, 4, 6), dtype=numpy.uint16)
     indexes = numpy.arange(5, dtype=numpy.intp)
@@ -251,11 +251,11 @@ def test_summary_single_array_no_bad_pixels() -> None:
     numpy.testing.assert_array_equal(summary.maximum_pattern, patterns.max(axis=0))
     numpy.testing.assert_allclose(summary.mean_pattern, patterns.mean(axis=0))
     numpy.testing.assert_array_equal(summary.indexes, indexes)
-    numpy.testing.assert_array_equal(summary.total_counts, patterns.sum(axis=(-2, -1)))
+    numpy.testing.assert_array_equal(summary.detector_sums, patterns.sum(axis=(-2, -1)))
 
 
-def test_summary_concatenates_indexes_and_totals_across_arrays() -> None:
-    """indexes and total_counts are laid out in array order with the right total length."""
+def test_summary_concatenates_indexes_and_detector_sums_across_arrays() -> None:
+    """indexes and detector_sums are laid out in array order with the right total length."""
     patterns_a = numpy.ones((3, 4, 5), dtype=numpy.uint16)
     patterns_b = numpy.full((2, 4, 5), 7, dtype=numpy.uint16)
     indexes_a = numpy.array([10, 11, 12], dtype=numpy.intp)
@@ -268,11 +268,11 @@ def test_summary_concatenates_indexes_and_totals_across_arrays() -> None:
 
     assert summary.indexes.shape == (5,)
     numpy.testing.assert_array_equal(summary.indexes, [10, 11, 12, 20, 21])
-    numpy.testing.assert_array_equal(summary.total_counts, [20, 20, 20, 140, 140])
+    numpy.testing.assert_array_equal(summary.detector_sums, [20, 20, 20, 140, 140])
 
 
-def test_summary_total_counts_excludes_bad_pixels() -> None:
-    """Per-pattern totals sum over good pixels only."""
+def test_summary_detector_sums_excludes_bad_pixels() -> None:
+    """Per-detector sums sum over good pixels only."""
     patterns = numpy.ones((3, 4, 5), dtype=numpy.uint16)
     patterns[:, 0, 0] = 999  # will be masked
     patterns[:, 3, 4] = 555  # will be masked
@@ -287,11 +287,11 @@ def test_summary_total_counts_excludes_bad_pixels() -> None:
 
     good = numpy.logical_not(bad)
     expected = patterns[:, good].sum(axis=-1)
-    numpy.testing.assert_array_equal(summary.total_counts, expected)
+    numpy.testing.assert_array_equal(summary.detector_sums, expected)
 
 
-def test_summary_inpaints_frame_arrays_at_bad_pixel_positions() -> None:
-    """Frame min/mean/max at bad positions come from inpainting, not the raw reduction."""
+def test_summary_inpaints_pattern_arrays_at_bad_pixel_positions() -> None:
+    """Pattern min/mean/max at bad positions come from inpainting, not the raw reduction."""
     patterns = numpy.full((3, 8, 8), 10, dtype=numpy.int32)
     patterns[:, 3, 3] = 10_000_000  # would dominate max
     patterns[:, 4, 4] = -10_000_000  # would dominate min
@@ -322,7 +322,7 @@ def test_summary_inpaints_frame_arrays_at_bad_pixel_positions() -> None:
 def test_summary_treats_non_finite_values_as_bad_pixels(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """NaN and Inf are zeroed and masked, so totals and frames stay finite."""
+    """NaN and Inf are zeroed and masked, so detector sums and patterns stay finite."""
     patterns = numpy.full((3, 4, 4), 2.0, dtype=numpy.float32)
     patterns[0, 1, 1] = numpy.nan
     patterns[2, 2, 2] = numpy.inf
@@ -332,15 +332,15 @@ def test_summary_treats_non_finite_values_as_bad_pixels(
     with caplog.at_level('WARNING', logger='ptychodus.api.assemble'):
         summary = summarize_dataset(dataset, max_workers=1)
 
-    assert numpy.isfinite(summary.total_counts).all()
-    # Both pixels are excluded from every frame's total, not only the frame holding them.
-    numpy.testing.assert_array_equal(summary.total_counts, [2.0 * 14] * 3)
+    assert numpy.isfinite(summary.detector_sums).all()
+    # Both pixels are excluded from every pattern's total, not only the pattern holding them.
+    numpy.testing.assert_array_equal(summary.detector_sums, [2.0 * 14] * 3)
     assert numpy.isfinite(summary.mean_pattern).all()
     assert numpy.isfinite(summary.maximum_pattern).all()
     assert 'NaN or infinite' in caplog.text
 
 
-def test_summary_empty_dataset_returns_zero_frames_and_empty_arrays() -> None:
+def test_summary_empty_dataset_returns_zero_patterns_and_empty_arrays() -> None:
     """An empty dataset yields a well-formed summary at the detector extent."""
     dataset = make_dataset([], (4, 6))
 
@@ -353,7 +353,7 @@ def test_summary_empty_dataset_returns_zero_frames_and_empty_arrays() -> None:
     assert numpy.all(summary.mean_pattern == 0)
     assert numpy.all(summary.maximum_pattern == 0)
     assert summary.indexes.shape == (0,)
-    assert summary.total_counts.shape == (0,)
+    assert summary.detector_sums.shape == (0,)
 
 
 # ------------------------------ summarize_dataset: alignment surface ------------------------------
@@ -375,7 +375,7 @@ def test_summary_bad_pixels_override_wins_over_the_dataset_mask() -> None:
 
     # 999 at [0,0] is counted (not masked by the override); 555 at [1,1] is not.
     expected = patterns[:, numpy.logical_not(override)].sum(axis=-1)
-    numpy.testing.assert_array_equal(summary.total_counts, expected)
+    numpy.testing.assert_array_equal(summary.detector_sums, expected)
 
 
 def test_summary_rejects_a_bad_pixels_override_of_the_wrong_shape() -> None:
@@ -401,7 +401,7 @@ def test_summary_skips_a_missing_array_and_summarizes_the_rest() -> None:
 
     # 'b' reserves slots 2-3; they keep their sentinel and are elided.
     numpy.testing.assert_array_equal(summary.indexes, [0, 1, 10, 11])
-    numpy.testing.assert_array_equal(summary.total_counts, [20, 20, 60, 60])
+    numpy.testing.assert_array_equal(summary.detector_sums, [20, 20, 60, 60])
     numpy.testing.assert_array_equal(summary.mean_pattern, numpy.full((4, 5), 2.0))
 
 
@@ -462,7 +462,7 @@ def test_summary_should_stop_returns_a_partial_summary() -> None:
     assert not gated.timed_out
     # At least the first array landed; the pending ones were cancelled.
     assert 2 <= summary.indexes.size < 12
-    assert summary.indexes.size == summary.total_counts.size
+    assert summary.indexes.size == summary.detector_sums.size
 
 
 def test_summary_is_deterministic_regardless_of_worker_count() -> None:
@@ -472,7 +472,7 @@ def test_summary_is_deterministic_regardless_of_worker_count() -> None:
     parallel = summarize_dataset(make_dataset(arrays, (4, 5)), max_workers=4)
 
     numpy.testing.assert_array_equal(serial.indexes, parallel.indexes)
-    numpy.testing.assert_array_equal(serial.total_counts, parallel.total_counts)
+    numpy.testing.assert_array_equal(serial.detector_sums, parallel.detector_sums)
     numpy.testing.assert_array_equal(serial.minimum_pattern, parallel.minimum_pattern)
     numpy.testing.assert_array_equal(serial.maximum_pattern, parallel.maximum_pattern)
     numpy.testing.assert_allclose(serial.mean_pattern, parallel.mean_pattern)

@@ -55,7 +55,7 @@ from ptychodus.webapp.rendering.views import (
     object_view,
     probe_modes_view,
     probe_view,
-    scan_paths_view,
+    probe_positions_view,
     view_as_rendered_image,
 )
 from ptychodus.webapp.routers._convert import (
@@ -73,7 +73,7 @@ from ptychodus.webapp.routers.schemas import (
     LineageRead,
     Page,
     ProductRead,
-    StoreStats,
+    ResourceStats,
 )
 
 logger = logging.getLogger(__name__)
@@ -335,7 +335,7 @@ def create_mcp_server() -> FastMCP:
         photon_energy_eV_max: float | None = None,  # noqa: N803
         scattering_regime: ScatteringRegime | None = None,
     ) -> Page[ProductRead]:
-        """List reconstruction products, optionally only transmission, Bragg or Laue ones.
+        """List products, optionally only transmission, Bragg or Laue ones.
 
         `run_state` keeps only resources whose run is in one of those states (pending, running,
         succeeded, failed, cancelled); imported data has no run.
@@ -442,34 +442,15 @@ def create_mcp_server() -> FastMCP:
             )
 
     @mcp.tool()
-    async def get_store_stats() -> StoreStats:
-        """Return resource counts and invalid-row count for the store."""
+    async def get_resource_stats() -> ResourceStats:
+        """Return counts of the resources the webapp has indexed, and of the invalid ones."""
         async with _session() as session:
-
-            async def _count(model):
-                return int(
-                    (await session.execute(select(func.count()).select_from(model))).scalar_one()
-                )
-
-            invalid_total = 0
-            for model in (Campaign, Diffraction, Product, Fluorescence):
-                stmt = (
-                    select(func.count())
-                    .select_from(model)
-                    .where(
-                        model.ingest_state.in_(
-                            [IngestState.INVALID, IngestState.MISSING_FILES, IngestState.ORPHANED]
-                        )
-                    )
-                )
-                invalid_total += int((await session.execute(stmt)).scalar_one())
-
-            return StoreStats(
-                campaign_count=await _count(Campaign),
-                diffraction_count=await _count(Diffraction),
-                product_count=await _count(Product),
-                fluorescence_count=await _count(Fluorescence),
-                invalid_count=invalid_total,
+            return ResourceStats(
+                campaign_count=await repo.count_rows(session, Campaign),
+                diffraction_count=await repo.count_rows(session, Diffraction),
+                product_count=await repo.count_rows(session, Product),
+                fluorescence_count=await repo.count_rows(session, Fluorescence),
+                invalid_count=await repo.count_invalid_rows(session),
             )
 
     @mcp.tool()
@@ -581,15 +562,15 @@ def create_mcp_server() -> FastMCP:
         return await _render_image(object_layer_view, (path, layer), params, True)
 
     @mcp.tool(output_schema=_PLOT_IMAGE_SCHEMA)
-    async def render_scan_positions(
+    async def render_probe_positions(
         uuid: Annotated[list[UUID], Field(min_length=1)],
         connect_path: bool = True,
         width_px: _PlotSizePx = 640,
         height_px: _PlotSizePx = 640,
     ) -> ToolResult:
-        """Plot scan paths, one color and legend entry per product, with the plot's size.
+        """Plot probe positions, one color and legend entry per product, with the plot's size.
 
-        Pass several UUIDs to overlay them on shared axes and compare scans.
+        Pass several UUIDs to overlay them on shared axes and compare products.
         """
         entries = [
             (await _resource_file(ResourceKind.PRODUCT, product_uuid), str(product_uuid)[:8])
@@ -597,7 +578,10 @@ def create_mcp_server() -> FastMCP:
         ]
         plot = await _render(
             partial(
-                scan_paths_view, connect_path=connect_path, width_px=width_px, height_px=height_px
+                probe_positions_view,
+                connect_path=connect_path,
+                width_px=width_px,
+                height_px=height_px,
             ),
             entries,
         )

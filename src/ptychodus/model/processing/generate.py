@@ -104,7 +104,7 @@ def populate_parameter_group(
 
     for flat in flatten_options(options, policy):
         # Reused rather than recreated, so that two reconstructors declaring
-        # the same options share one set of live values. A backend's modes are
+        # the same options share one set of live values. A library's modes are
         # configured by one settings section, and a file holds one copy of it.
         parameter = existing.get(flat.ini_key)
         parameters[flat.ini_key] = _create(group, flat) if parameter is None else parameter
@@ -129,7 +129,7 @@ def _accepted(flat: FlatParameter, value: Any) -> Any:
     a key can hold something the declaration does not allow. Warning and
     falling back keeps a run going with a value that is at least valid, and
     says which key was ignored -- where passing it through would hand a
-    backend a word it has no case for.
+    library a word it has no case for.
 
     Only a key that holds one of the choices is policed. A key naming a
     *subset* of them carries the same list and holds a number instead, which
@@ -210,7 +210,7 @@ def restore_options(
     reconstructor is handed, so edits made against the flat live parameters have
     to be written back into its nested shape before the call.
 
-    A copy, because the defaults are the store's record of where each field
+    A copy, because the defaults are the parameter store's record of where each field
     started and must survive being read repeatedly.
     """
     restored = copy.deepcopy(defaults)

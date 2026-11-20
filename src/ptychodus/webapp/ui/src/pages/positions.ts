@@ -11,7 +11,7 @@ export async function mountPositions(root: HTMLElement, uuid: string | null): Pr
 
   const image = createImagePanel();
   right.replaceChildren(image.el);
-  image.setEmpty('Tick one or more scans to plot them.');
+  image.setEmpty('Tick one or more products to plot them.');
 
   let items: ProductRead[] = [];
   let total = 0;
@@ -29,12 +29,12 @@ export async function mountPositions(root: HTMLElement, uuid: string | null): Pr
 
   const plot = (checked: ProductRead[]): void => {
     if (checked.length === 0) {
-      image.setEmpty('Tick one or more scans to plot them.');
+      image.setEmpty('Tick one or more products to plot them.');
       return;
     }
 
     setActiveTab('right');
-    image.setLoading(checked.length === 1 ? 'scan positions' : `${checked.length} scans`);
+    image.setLoading(checked.length === 1 ? 'probe positions' : `${checked.length} products`);
     api
       .productPositionsImage(checked.map((p) => p.uuid))
       .then((img) => image.setPlot(img, checked.map(labelFor).join(', ')))
@@ -45,20 +45,25 @@ export async function mountPositions(root: HTMLElement, uuid: string | null): Pr
     [
       { header: 'Name', render: labelFor },
       {
-        header: 'Points',
-        render: (p) => fmtInt(p.num_scan_points),
-        sortKey: (p) => p.num_scan_points,
+        header: 'Positions',
+        render: (p) => fmtInt(p.num_probe_positions),
+        sortKey: (p) => p.num_probe_positions,
         numeric: true,
       },
       {
         header: 'Length [m]',
-        render: (p) => fmtFixed(p.scan_length_m, 6),
-        sortKey: (p) => p.scan_length_m,
+        render: (p) => fmtFixed(p.probe_path_length_m, 6),
+        sortKey: (p) => p.probe_path_length_m,
         numeric: true,
       },
-      { header: 'Size', render: (p) => fmtBytes(p.scan_nbytes), sortKey: (p) => p.scan_nbytes, numeric: true },
+      {
+        header: 'Size',
+        render: (p) => fmtBytes(p.probe_positions_nbytes),
+        sortKey: (p) => p.probe_positions_nbytes,
+        numeric: true,
+      },
     ],
-    // As on the desktop, a click only selects, and links to the row; the Plot checkboxes
+    // As in the GUI, a click only selects, and links to the row; the Plot checkboxes
     // choose what is drawn, in table order.
     (row) => showLink('positions', row.uuid),
     { checkbox: { header: 'Plot', onChange: plot, position: 1 }, rowState: ingestRowState }
@@ -66,11 +71,11 @@ export async function mountPositions(root: HTMLElement, uuid: string | null): Pr
 
   left.replaceChildren(
     table.el,
-    infoLabel(infoText('Positions', total, items.map((p) => p.scan_nbytes)))
+    infoLabel(infoText('Positions', total, items.map((p) => p.probe_positions_nbytes)))
   );
   table.setRows(items);
 
-  // A deep link selects its scan and plots it.
+  // A deep link selects its product and plots it.
   if (found.linked !== null) {
     table.setSelected(items.indexOf(found.linked));
     table.setChecked([found.linked]);

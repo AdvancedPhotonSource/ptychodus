@@ -87,7 +87,7 @@ async def test_mcp_tools_registered_and_callable(
         'list_fluorescence',
         'get_fluorescence',
         'get_lineage',
-        'get_store_stats',
+        'get_resource_stats',
         'get_visualization_options',
         'render_diffraction_pattern',
         'render_diffraction_aggregate',
@@ -95,13 +95,13 @@ async def test_mcp_tools_registered_and_callable(
         'render_probe_modes',
         'render_object',
         'render_object_layer',
-        'render_scan_positions',
+        'render_probe_positions',
         'render_fluorescence_summary',
         'render_fluorescence_element',
     }
     assert expected.issubset(names), f'missing MCP tools: {expected - names}'
 
-    stats_result = await mcp.call_tool('get_store_stats', {})
+    stats_result = await mcp.call_tool('get_resource_stats', {})
     payload = _structured(stats_result)
     assert payload['campaign_count'] == 1
     assert payload['diffraction_count'] == 1

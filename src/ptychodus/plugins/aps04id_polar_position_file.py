@@ -194,7 +194,7 @@ class PolarPositionFileReader(ProbePositionFileReader):
         Uses the eiger detector's NDArrayUniqueId when reachable -- either directly in
         this file, or via the /entry/externals/eiger external link on the master wrapper.
         Normalizes to ``uid - uid[0] + 1``, which is exactly what the diffraction reader
-        emits, so step-scan positions pair 1:1 with patterns.
+        emits, so step-probe positions pair 1:1 with patterns.
         """
         uid = self._try_read_uid_here(h5_file, n_frames)
         if uid is None:

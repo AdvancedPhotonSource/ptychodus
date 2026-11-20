@@ -15,7 +15,7 @@ Protocol
 
 stdin
     Nothing, unless ``--options -`` asks for the options document to be read from it. The
-    document names the library and algorithm beside the backend's own options.
+    document names the library and algorithm beside the library's own options.
 
 events
     One JSON object per line, in the vocabulary of :mod:`ptychodus.api.processing`:
@@ -23,7 +23,7 @@ events
     - ``started``, with the ``library`` and ``algorithm``;
     - ``progress``, for each output the reconstructor yields: ``progress`` towards
       ``progress_goal`` (zero when unknown) and the last ``loss``;
-    - ``checkpoint``, for each one saved: the ``path`` of the snapshot at that ``progress``;
+    - ``checkpoint``, for each one saved: the ``path`` of the checkpoint at that ``progress``;
     - ``cancelling``, when a signal asks the run to stop;
     - ``finished``, always last: the run's ``state`` (``succeeded``, ``cancelled`` or
       ``failed``), its ``reason`` (the signal, or the exception's type), the ``path`` of its
@@ -36,7 +36,7 @@ events
 
 Cancellation
     SIGTERM or SIGINT sets a flag that is checked at each output the reconstructor yields.
-    A backend has no interruption point between them, so a cancel takes effect at the next
+    A reconstructor has no interruption point between them, so a cancel takes effect at the next
     one -- every ``num_sync_epochs`` epochs for pty-chi; the partially converged product is
     still written.
     A second signal exits immediately.
@@ -57,7 +57,7 @@ Scope and limitations
   it cancels.
 - No GPU selection or thread-count side effects. Choose a device with
   ``CUDA_VISIBLE_DEVICES`` in the environment.
-- Under a multi-process launch only the main process emits events and writes artifacts; the
+- Under a multi-process launch only the main process emits events and writes files; the
   other ranks log to their own files and are silent on the event stream.
 """
 
@@ -377,7 +377,7 @@ def main() -> ExitCode:
     rank = process_rank()
 
     # Only one process may speak on the stream a launcher reads, and only one may write the
-    # artifacts; both follow the same rank guard.
+    # files; both follow the same rank guard.
     events = _open_event_stream(args.event_file) if rank == 0 else None
     log_path: Path | None = None
 

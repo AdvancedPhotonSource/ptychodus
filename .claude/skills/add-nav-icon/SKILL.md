@@ -96,7 +96,7 @@ Entries present in `ViewCore` but deliberately absent here are the panels that w
 
 Routing is keyed by `route`, and `main.ts` walks the tree, so a nested entry needs a `PAGES` entry exactly like a top-level one.
 
-No backend router change is needed. FastAPI already serves `src/ptychodus/webapp/ui/` at `/ui/` via the `StaticFiles` mount in [`src/ptychodus/webapp/app.py`](../../src/ptychodus/webapp/app.py), so a new SVG in `ui/icons/` is automatically reachable at `/ui/icons/my-icon.svg`.
+The webapp needs no router change. FastAPI already serves `src/ptychodus/webapp/ui/` at `/ui/` via the `StaticFiles` mount in [`src/ptychodus/webapp/app.py`](../../src/ptychodus/webapp/app.py), so a new SVG in `ui/icons/` is automatically reachable at `/ui/icons/my-icon.svg`.
 
 ## Step 6 — Rebuild the TypeScript
 

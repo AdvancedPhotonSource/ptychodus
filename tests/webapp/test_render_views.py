@@ -16,7 +16,7 @@ from ptychodus.webapp.rendering.views import (
     fluorescence_summary_view,
     object_layer_view,
     probe_view,
-    scan_paths_view,
+    probe_positions_view,
     view_as_png,
     view_as_rendered_image,
 )
@@ -94,11 +94,11 @@ def test_a_fluorescence_map_takes_the_paired_products_pixel_size(
     assert paired.get_pixel_geometry().width_m == pytest.approx(1e-9)
 
 
-def test_scan_paths_render_one_plot_for_every_product(
+def test_probe_positions_render_one_plot_for_every_product(
     tmp_storage_root: Path, seed_product: Callable[..., UUID]
 ) -> None:
     entries = [(_file(tmp_storage_root, 'product', seed_product()), label) for label in ('a', 'b')]
 
-    plot = scan_paths_view(entries, connect_path=True, width_px=320, height_px=240)
+    plot = probe_positions_view(entries, connect_path=True, width_px=320, height_px=240)
 
     assert plot.png_base64

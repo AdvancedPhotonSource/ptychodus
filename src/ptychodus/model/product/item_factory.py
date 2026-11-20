@@ -37,7 +37,7 @@ class ProductRepositoryItemFactory:
     def __init__(
         self,
         settings: ProductSettings,
-        scan_item_factory: ProbePositionsRepositoryItemFactory,
+        probe_positions_item_factory: ProbePositionsRepositoryItemFactory,
         probe_item_factory: ProbeRepositoryItemFactory,
         object_item_factory: ObjectRepositoryItemFactory,
         repository: ProductRepository,
@@ -45,7 +45,7 @@ class ProductRepositoryItemFactory:
     ) -> None:
         super().__init__()
         self._settings = settings
-        self._scan_item_factory = scan_item_factory
+        self._probe_positions_item_factory = probe_positions_item_factory
         self._probe_item_factory = probe_item_factory
         self._object_item_factory = object_item_factory
         self._repository = repository
@@ -106,8 +106,10 @@ class ProductRepositoryItemFactory:
             scattering_geometry=scattering_geometry,
         )
 
-        scan_item = self._scan_item_factory.create(metadata_item=metadata_item)
-        geometry = ProductGeometryProvider(metadata_item, scan_item)
+        probe_positions_item = self._probe_positions_item_factory.create(
+            metadata_item=metadata_item
+        )
+        geometry = ProductGeometryProvider(metadata_item, probe_positions_item)
         self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create(geometry)
         object_item = self._object_item_factory.create(
@@ -117,7 +119,7 @@ class ProductRepositoryItemFactory:
         return ProductRepositoryItem(
             parent=self._repository,
             metadata_item=metadata_item,
-            probe_positions_item=scan_item,
+            probe_positions_item=probe_positions_item,
             geometry=geometry,
             probe_item=probe_item,
             object_item=object_item,
@@ -151,10 +153,10 @@ class ProductRepositoryItemFactory:
             scattering_geometry=product.metadata.scattering_geometry,
         )
 
-        scan_item = self._scan_item_factory.create(
+        probe_positions_item = self._probe_positions_item_factory.create(
             product.probe_positions, metadata_item=metadata_item
         )
-        geometry = ProductGeometryProvider(metadata_item, scan_item)
+        geometry = ProductGeometryProvider(metadata_item, probe_positions_item)
         self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create(geometry, product.probes)
         object_item = self._object_item_factory.create(
@@ -164,7 +166,7 @@ class ProductRepositoryItemFactory:
         return ProductRepositoryItem(
             parent=self._repository,
             metadata_item=metadata_item,
-            probe_positions_item=scan_item,
+            probe_positions_item=probe_positions_item,
             geometry=geometry,
             probe_item=probe_item,
             object_item=object_item,
@@ -178,8 +180,10 @@ class ProductRepositoryItemFactory:
         ProductRepositoryItem.copy_contents_from once the source dataset finishes
         loading."""
         metadata_item = MetadataRepositoryItem(self._settings, self._repository, name=name)
-        scan_item = self._scan_item_factory.create(metadata_item=metadata_item)
-        geometry = ProductGeometryProvider(metadata_item, scan_item)
+        probe_positions_item = self._probe_positions_item_factory.create(
+            metadata_item=metadata_item
+        )
+        geometry = ProductGeometryProvider(metadata_item, probe_positions_item)
         probe_item = self._probe_item_factory.create(geometry)
         object_item = self._object_item_factory.create(
             geometry, probe_supplier=probe_item.get_probes
@@ -187,7 +191,7 @@ class ProductRepositoryItemFactory:
         return ProductRepositoryItem(
             parent=self._repository,
             metadata_item=metadata_item,
-            probe_positions_item=scan_item,
+            probe_positions_item=probe_positions_item,
             geometry=geometry,
             probe_item=probe_item,
             object_item=object_item,
@@ -216,8 +220,10 @@ class ProductRepositoryItemFactory:
         metadata_item = MetadataRepositoryItem(
             self._settings, self._repository, name=resolve_product_name('', dataset)
         )
-        scan_item = self._scan_item_factory.create_from_settings(metadata_item=metadata_item)
-        geometry = ProductGeometryProvider(metadata_item, scan_item)
+        probe_positions_item = self._probe_positions_item_factory.create_from_settings(
+            metadata_item=metadata_item
+        )
+        geometry = ProductGeometryProvider(metadata_item, probe_positions_item)
         self._bind_dataset_geometry(geometry, dataset)
         has_diffraction_data = dataset is not None
         probe_item = self._probe_item_factory.create_from_settings(
@@ -232,7 +238,7 @@ class ProductRepositoryItemFactory:
         item = ProductRepositoryItem(
             parent=self._repository,
             metadata_item=metadata_item,
-            probe_positions_item=scan_item,
+            probe_positions_item=probe_positions_item,
             geometry=geometry,
             probe_item=probe_item,
             object_item=object_item,

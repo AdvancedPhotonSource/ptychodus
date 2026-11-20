@@ -9,8 +9,8 @@ the position-index anchors, so renumbering the survivors would silently pair eve
 pattern with the wrong position.
 
 Second, FromMemoryProbePositionsBuilder must never condition. It holds positions
-that are already conditioned -- reconstruction output, which ProcessingTaskMonitor
-re-assigns to the output product item on every reconstructor iteration, and
+that are already conditioned -- a reconstruction, which ProcessingTaskMonitor
+re-assigns to its product item on every reconstructor iteration, and
 products loaded from HDF5/NPZ. Re-applying the trim or the affine transform there
 would corrupt position-corrected output a little more on every iteration.
 """
@@ -164,7 +164,7 @@ def test_from_file_builder_applies_affine_and_trim() -> None:
 
 
 def test_from_memory_builder_ignores_conditioning() -> None:
-    """Guards reconstruction output: the from-memory builder must return its
+    """Guards reconstructions: the from-memory builder must return its
     positions verbatim no matter what the conditioning parameters say."""
     settings = _make_settings()
     raw = _make_line(5)

@@ -336,10 +336,7 @@ class TestProbePositionsMetricsReport:
 
     def test_i0_is_calibrated_only_when_the_metadata_says_how(self) -> None:
         positions = ProbePositionSequence(
-            [
-                ProbePosition(index=i, x_m=float(i) * 1e-8, y_m=0.0, probe_photon_count=2.0)
-                for i in range(4)
-            ]
+            [ProbePosition(index=i, x_m=float(i) * 1e-8, y_m=0.0, i0=2.0) for i in range(4)]
         )
 
         raw = compute_probe_positions_metrics_report(_make_product(positions=positions))

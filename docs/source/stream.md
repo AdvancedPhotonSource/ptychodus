@@ -52,7 +52,7 @@ One NTNDArray per point: its `uniqueId` is the point's index, and Float64 NDAttr
 
 ### I0
 
-Optional incident-beam readings per point, on the axis `i0_name`, in any unit. They correct the totals for beam decay; `i0_photons_per_count` converts them to photons, and zero leaves them uncalibrated. I0 is used only when it covers every paired frame.
+Optional incident-beam readings per point, on the axis `i0_name`, in any unit. They correct the detector sums for beam decay; `i0_photons_per_count` converts them to photons, and zero leaves them uncalibrated. I0 is used only when it covers every paired pattern.
 
 ### Trigger
 
@@ -92,7 +92,7 @@ A `configure` names only the keys to change. It is validated first and rejected 
 | A frame is never covered by positions | Dropped when it expires or at the end of the settle | `num_frames_dropped` |
 | Frames between scans (free-running detector) | Never covered, so dropped as above | `num_frames_dropped` |
 | A frame of another shape or dtype | Rejected | `num_frames_rejected` |
-| A frame outside the total-count bounds | Filtered, as batch assembly does | `num_frames_filtered` |
+| A frame outside the detector-sum bounds | Filtered, as batch assembly does | `num_frames_filtered` |
 | A repeated or decreasing index | Kept, and logged once per scan | `num_frames_duplicated`, `num_frames_regressed` |
 | A mid-scan `configure` | The scan is discarded | `num_frames_discarded` |
 | A trigger with no frames, or while settling | Acknowledged and ignored | none |
@@ -150,7 +150,7 @@ output_directory: /path/to/storage
 campaign_label: fly001 demo
 ```
 
-The other keys keep their defaults: maps (`bad_pixels_file`, `background_file`, `flat_field_file`, each `{file_path, file_type}`), `pipeline` steps, total-count bounds, `index_offset`, `i0_name` and `i0_photons_per_count`, the models (`probe_generator`, `object_generator` and their `*_options`; the probe takes no defocus option, since its defocus is the negated `focus_object_distance_m`, which each scan's parallax measures while it is unset and an explicit value, 0 included, skips), parallax thresholds, `unpaired_retention_s`, `num_frames_per_block`, `consumer_queue_size` and `queue_warning_frames`.
+The other keys keep their defaults: maps (`bad_pixels_file`, `background_file`, `flat_field_file`, each `{file_path, file_type}`), `pipeline` steps, detector-sum bounds (`total_counts_lower_bound`, `total_counts_upper_bound`), `index_offset`, `i0_name` and `i0_photons_per_count`, the models (`probe_generator`, `object_generator` and their `*_options`; the probe takes no defocus option, since its defocus is the negated `focus_object_distance_m`, which each scan's parallax measures while it is unset and an explicit value, 0 included, skips), parallax thresholds, `unpaired_retention_s`, `num_frames_per_block`, `consumer_queue_size` and `queue_warning_frames`.
 
 ### Run
 
@@ -195,7 +195,7 @@ The scan appears under the `fly001 demo` campaign as a diffraction resource and 
 uv run ptychodus-reconstruct --storage-root /path/to/storage --product <product_uuid>
 ```
 
-`<product_uuid>` is the one `ptychodus:scan` reported; with `PTYCHODUS_WEBAPP_STORAGE_ROOT` set, `--storage-root` can be left out. The result is a new product resource derived from the scan's diffraction resource and that product, whose uuid the command prints as it starts. Its folder is the run's output directory — options document, log and checkpoints — and the store shows it `running`, rendering its newest checkpoint, until it ends `succeeded`, `cancelled` (on Ctrl-C or SIGTERM, keeping the result so far) or `failed` (keeping its last checkpoint).
+`<product_uuid>` is the one `ptychodus:scan` reported; with `PTYCHODUS_WEBAPP_STORAGE_ROOT` set, `--storage-root` can be left out. The result is a new product resource derived from the scan's diffraction resource and that product, whose uuid the command prints as it starts. Its folder is the run's output directory — options document, log and checkpoints — and the webapp shows it `running`, rendering its newest checkpoint, until it ends `succeeded`, `cancelled` (on Ctrl-C or SIGTERM, keeping the result so far) or `failed` (keeping its last checkpoint).
 
 ### Variations
 

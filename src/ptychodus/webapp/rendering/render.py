@@ -1,4 +1,4 @@
-"""Adapters from `ptychodus.api.visualize` to the store's HTTP and MCP response shapes."""
+"""Adapters from `ptychodus.api.visualize` to the webapp's HTTP and MCP response shapes."""
 
 from __future__ import annotations
 

@@ -25,7 +25,7 @@ class Column(Enum):
     NAME = ('Name', True)
     PLOT = ('Plot', False)
     BUILDER = ('Builder', True)
-    POINTS = ('Points', False)
+    POSITIONS = ('Positions', False)
     LENGTH_M = ('Length [m]', False)
     SIZE = ('Size', False)
 
@@ -111,7 +111,7 @@ class ProbePositionsTableModel(QAbstractTableModel):
                 return None
             elif column is Column.BUILDER:
                 return item.get_builder().get_name()
-            elif column is Column.POINTS:
+            elif column is Column.POSITIONS:
                 return len(probe_positions)
             elif column is Column.LENGTH_M:
                 return f'{length_m:.6f}'

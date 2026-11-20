@@ -65,7 +65,7 @@ def _make_product(
     with_opr: bool = False,
     with_layer_spacing: bool = False,
     with_losses: bool = False,
-    with_position_photon_counts: bool = False,
+    with_i0: bool = False,
     object_center: ObjectCenter | None = None,
     metadata: ProductMetadata | None = None,
 ) -> Product:
@@ -89,7 +89,7 @@ def _make_product(
                 i,
                 i * 1e-6,
                 i * 2e-6,
-                probe_photon_count=(100.0 + i if with_position_photon_counts else None),
+                i0=(100.0 + i if with_i0 else None),
             )
             for i in range(num_positions)
         ]
@@ -255,8 +255,8 @@ class TestDiffractionRoundTrip:
         assert mapped.nbytes == in_memory.nbytes
 
     def test_mmap_spans_multiple_staging_chunks(self, tmp_path: Path) -> None:
-        chunk_frames = 8
-        num_patterns = 3 * chunk_frames + 7
+        chunk_patterns = 8
+        num_patterns = 3 * chunk_patterns + 7
         indexes = numpy.arange(num_patterns, dtype=numpy.int32)
         patterns = numpy.arange(num_patterns * 2 * 2, dtype=numpy.uint16).reshape(
             num_patterns, 2, 2
@@ -271,7 +271,7 @@ class TestDiffractionRoundTrip:
         save_diffraction_data(file, original)
 
         mapped = load_diffraction_data(
-            file, mmap_file=tmp_path / 'mmap.bin', mmap_chunk_frames=chunk_frames
+            file, mmap_file=tmp_path / 'mmap.bin', mmap_chunk_patterns=chunk_patterns
         )
 
         numpy.testing.assert_array_equal(mapped._patterns, patterns)
@@ -296,7 +296,7 @@ class TestDiffractionRoundTrip:
 
         numpy.testing.assert_array_equal(loaded._indexes, numpy.arange(6))
 
-    def test_a_legacy_probe_photon_counts_dataset_is_left_unread(self, tmp_path: Path) -> None:
+    def test_a_legacy_i0_dataset_is_left_unread(self, tmp_path: Path) -> None:
         """I0 lives with the probe positions; an older file's pattern-side copy loads unread."""
         original = _make_diffraction_data(num_patterns=3)
         file = tmp_path / 'diff.h5'
@@ -484,7 +484,7 @@ class TestProductRoundTrip:
             assert load.x_m == pytest.approx(orig.x_m)
             assert load.y_m == pytest.approx(orig.y_m)
 
-    def test_product_probe_photon_counts_absent_when_unmeasured(self, tmp_path: Path) -> None:
+    def test_product_i0_absent_when_unrecorded(self, tmp_path: Path) -> None:
         original = _make_product(num_positions=3)
         file = tmp_path / 'product.h5'
         save_product(file, original)
@@ -493,13 +493,13 @@ class TestProductRoundTrip:
             assert 'probe_photon_counts' not in h5_file
 
         loaded = load_product(file)
-        assert loaded.probe_positions.get_probe_photon_counts() is None
+        assert loaded.probe_positions.get_i0() is None
 
-    def test_product_probe_photon_counts_round_trip(self, tmp_path: Path) -> None:
+    def test_product_i0_round_trip(self, tmp_path: Path) -> None:
         original = _make_product(num_positions=3)
         # Rebuild the positions with photon counts on every point.
         positions = ProbePositionSequence(
-            [ProbePosition(i, i * 1e-6, i * 2e-6, probe_photon_count=100.0 + i) for i in range(3)]
+            [ProbePosition(i, i * 1e-6, i * 2e-6, i0=100.0 + i) for i in range(3)]
         )
         original = Product(
             metadata=original.metadata,
@@ -515,9 +515,9 @@ class TestProductRoundTrip:
             assert 'probe_photon_counts' in h5_file
 
         loaded = load_product(file)
-        assert loaded.probe_positions.get_probe_photon_counts() is not None
+        assert loaded.probe_positions.get_i0() is not None
         for i, point in enumerate(loaded.probe_positions):
-            assert point.probe_photon_count == pytest.approx(100.0 + i)
+            assert point.i0 == pytest.approx(100.0 + i)
 
     def test_losses_preserved(self, tmp_path: Path) -> None:
         original = _make_product(with_losses=True)
@@ -907,13 +907,13 @@ def test_unpolarized_round_trips_as_none(tmp_path: Path, file_io: Any, suffix: s
 
 
 @pytest.mark.parametrize(('file_io', 'suffix'), PRODUCT_FILE_IO)
-def test_position_photon_counts_round_trip(tmp_path: Path, file_io: Any, suffix: str) -> None:
-    product = _make_product(num_positions=4, with_position_photon_counts=True)
+def test_i0_round_trip(tmp_path: Path, file_io: Any, suffix: str) -> None:
+    product = _make_product(num_positions=4, with_i0=True)
 
     loaded = _round_trip_product(file_io, tmp_path / f'product{suffix}', product)
-    counts = loaded.probe_positions.get_probe_photon_counts()
+    counts = loaded.probe_positions.get_i0()
 
-    expected = product.probe_positions.get_probe_photon_counts()
+    expected = product.probe_positions.get_i0()
 
     assert counts is not None
     assert expected is not None
@@ -921,18 +921,16 @@ def test_position_photon_counts_round_trip(tmp_path: Path, file_io: Any, suffix:
 
 
 @pytest.mark.parametrize(('file_io', 'suffix'), PRODUCT_FILE_IO)
-def test_absent_position_photon_counts_stay_absent(
-    tmp_path: Path, file_io: Any, suffix: str
-) -> None:
+def test_absent_i0_stays_absent(tmp_path: Path, file_io: Any, suffix: str) -> None:
     """Unmeasured counts must come back as None, not as a column of zeros."""
-    product = _make_product(with_position_photon_counts=False)
+    product = _make_product(with_i0=False)
 
     loaded = _round_trip_product(file_io, tmp_path / f'product{suffix}', product)
 
-    assert loaded.probe_positions.get_probe_photon_counts() is None
+    assert loaded.probe_positions.get_i0() is None
 
     for point in loaded.probe_positions:
-        assert point.probe_photon_count is None
+        assert point.i0 is None
 
 
 @pytest.mark.parametrize(('file_io', 'suffix'), PRODUCT_FILE_IO)

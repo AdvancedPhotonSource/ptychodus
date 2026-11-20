@@ -377,7 +377,7 @@ def main() -> ExitCode:
 
     try:
         configuration = StreamConfiguration.from_file(args.config)
-        # Loads the maps, resolves the models and prepares the storage root, so a bad
+        # Loads the maps, resolves the generators and prepares the storage root, so a bad
         # configuration fails here rather than inside the consumer.
         ScanSetup.from_configuration(configuration, PluginRegistry.load_plugins())
     except (OSError, ValueError, ValidationError, LookupError) as exc:

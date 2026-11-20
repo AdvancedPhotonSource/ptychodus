@@ -64,7 +64,7 @@ __all__ = [
     'generate_spectral_object',
     'generate_stxm_dpc_object',
     'generate_uniform_object',
-    'interpolate_scan_values',
+    'interpolate_position_values',
     'pad_object',
 ]
 
@@ -86,7 +86,7 @@ class ObjectGenerator(ABC):
 
     What it returns is raw: a single layer on the provider's object grid, unpadded, at
     whatever modulus the model produces. Padding the canvas and scaling to the sample's
-    measured transmission are separate concerns from describing a specimen, and a
+    measured transmission are separate concerns from describing a sample, and a
     generator that applied either would be applying it twice.
     """
 
@@ -140,7 +140,7 @@ class ObjectGenerator(ABC):
         return False
 
 
-def interpolate_scan_values(
+def interpolate_position_values(
     geometry: ObjectGeometry,
     positions: ProbePositionSequence,
     values: RealArrayType,
@@ -217,7 +217,7 @@ class STXMDPCSignals:
     """
 
     indexes: IntegerArrayType
-    total_counts: RealArrayType
+    detector_sums: RealArrayType
     center_of_mass_x_px: RealArrayType
     center_of_mass_y_px: RealArrayType
 
@@ -226,7 +226,7 @@ class STXMDPCSignals:
         """The per-pattern rows of accumulated diffraction moments."""
         return cls(
             indexes=moments.indexes.copy(),
-            total_counts=moments.total_counts.copy(),
+            detector_sums=moments.detector_sums.copy(),
             center_of_mass_x_px=moments.center_of_mass_x_px.copy(),
             center_of_mass_y_px=moments.center_of_mass_y_px.copy(),
         )
@@ -236,7 +236,7 @@ def compute_stxm_dpc_signals(
     assembled_data: AssembledDiffractionData,
     *,
     max_patterns_per_chunk: int = 256,
-    i0_counts_by_index: Mapping[int, float] | None = None,
+    i0_by_index: Mapping[int, float] | None = None,
 ) -> STXMDPCSignals:
     """Measure each pattern's transmitted total and its intensity centroid.
 
@@ -253,9 +253,9 @@ def compute_stxm_dpc_signals(
 
     The total sums the whole inpainted frame; it is the absorption signal. Summing only
     the good pixels instead would let a beam that walks across a dead region with the
-    sample's phase gradient read as absorption. *i0_counts_by_index* holds the I0
+    sample's phase gradient read as absorption. *i0_by_index* holds the I0
     readings keyed by scan index, as
-    :meth:`ptychodus.api.probe_positions.ProbePositionSequence.get_probe_photon_counts_by_index`
+    :meth:`ptychodus.api.probe_positions.ProbePositionSequence.get_i0_by_index`
     gives them; each total is then scaled by ``mean(I0) / I0_j`` so beam decay does not
     read as absorption, and a reading at or below zero cannot correct anything and leaves
     its total unscaled.
@@ -292,15 +292,15 @@ def compute_stxm_dpc_signals(
         empty = numpy.zeros(0, dtype=numpy.float64)
         return STXMDPCSignals(
             indexes=indexes.copy(),
-            total_counts=empty,
+            detector_sums=empty,
             center_of_mass_x_px=empty.copy(),
             center_of_mass_y_px=empty.copy(),
         )
 
-    if i0_counts_by_index:
+    if i0_by_index:
         moments = moments.normalize_by_i0(
-            numpy.fromiter(i0_counts_by_index.keys(), dtype=numpy.intp),
-            numpy.fromiter(i0_counts_by_index.values(), dtype=numpy.float64),
+            numpy.fromiter(i0_by_index.keys(), dtype=numpy.intp),
+            numpy.fromiter(i0_by_index.values(), dtype=numpy.float64),
         )
 
     return STXMDPCSignals.from_moments(moments)
@@ -427,14 +427,14 @@ def generate_stxm_dpc_object(
 ) -> Object:
     """Generate a coarse complex object from far-field data by STXM differential phase contrast.
 
-    The amplitude is the STXM one: per-position totals mapped onto the object grid. With
+    The amplitude is the STXM one: per-position detector sums mapped onto the object grid. With
     *incident_photon_count*, the unattenuated incident photon count, they are divided by it, so the
     modulus is the sample's amplitude transmission. Without it they are divided by their
     mean over the supported region, a dimensionless contrast map that a position
     recording the unobstructed beam brings to unit modulus once a caller scales it to the
     sample's mean opacity.
 
-    The totals and the gradients are mapped by :func:`interpolate_scan_values`, linearly
+    The detector sums and the gradients are mapped by :func:`interpolate_position_values`, linearly
     between the positions. A given `probe`, whose incoherent modes are summed, sets the
     supported region -- where the gradient is integrated and the transmission is
     referenced -- to its illumination rather than the hull of the positions.
@@ -526,7 +526,7 @@ def generate_stxm_dpc_object(
     )
     probes = None if probe is None else ProbeEnsemble.from_probe(probe)
 
-    total_counts = signals.total_counts[paired]
+    detector_sums = signals.detector_sums[paired]
     centroid_x_px = signals.center_of_mass_x_px[paired]
     centroid_y_px = signals.center_of_mass_y_px[paired]
     finite = numpy.isfinite(centroid_x_px) & numpy.isfinite(centroid_y_px)
@@ -539,12 +539,12 @@ def generate_stxm_dpc_object(
 
     radians_per_px_x = TWO_PI / (detector_extent.width_px * geometry.pixel_width_m)
     radians_per_px_y = TWO_PI / (detector_extent.height_px * geometry.pixel_height_m)
-    grids, scanned = interpolate_scan_values(
+    grids, scanned = interpolate_position_values(
         geometry,
         positions,
         numpy.column_stack(
             (
-                total_counts,
+                detector_sums,
                 radians_per_px_x * deviation_x_px,
                 radians_per_px_y * deviation_y_px,
             )
@@ -564,7 +564,7 @@ def generate_stxm_dpc_object(
     if probes is not None and correct_shadow:
         shadow = _compute_probe_shadow_gradient(transmission, probes, positions, geometry)
         shadow -= numpy.mean(shadow, axis=0)
-        shadow_grids, _ = interpolate_scan_values(geometry, positions, shadow, probes=probes)
+        shadow_grids, _ = interpolate_position_values(geometry, positions, shadow, probes=probes)
         gradient_x = gradient_x - shadow_grids[0]
         gradient_y = gradient_y - shadow_grids[1]
 
@@ -609,7 +609,7 @@ def generate_paganin_object(
     """Generate a complex object via Paganin single-material phase retrieval on an STXM-like intensity image.
 
     See D. Paganin et al., J. Microsc. 206, 33 (2002). The intensity image
-    I(x,y) is the per-position totals of `signals`, mapped onto the object grid as
+    I(x,y) is the per-position detector sums of `signals`, mapped onto the object grid as
     :func:`generate_stxm_dpc_object` maps them, and normalized by its mean over the
     supported region -- the illumination of a given `probe`, or the hull of the
     positions -- to approximate I/I_0. It is then low-pass filtered to recover the projected thickness
@@ -630,10 +630,10 @@ def generate_paganin_object(
     paired, positions = _pair_indexes_with_positions(
         signals.indexes, probe_positions, what='STXM-DPC signal'
     )
-    grids, scanned = interpolate_scan_values(
+    grids, scanned = interpolate_position_values(
         geometry,
         positions,
-        signals.total_counts[paired],
+        signals.detector_sums[paired],
         probes=None if probe is None else ProbeEnsemble.from_probe(probe),
     )
     intensity = grids[0]
@@ -981,7 +981,7 @@ def generate_spectral_object(
     max_restarts: int = 50,
     num_lanczos_vectors: int = 8,
     correct_amplitude: bool = False,
-    i0_counts_by_index: Mapping[int, float] | None = None,
+    i0_by_index: Mapping[int, float] | None = None,
     support_fraction: float = 0.05,
     max_patterns_per_chunk: int = 64,
     max_cached_bytes: int = 1 << 30,
@@ -1009,7 +1009,7 @@ def generate_spectral_object(
     The intensities are corrected for any detector background or flat field the data
     still carries, as ``(pattern - background) / flat_field`` clipped at zero, and their
     bad pixels widened by the pixels those maps make unusable take zero weight, so a gap
-    or masked beamstop leaves ``Z`` exactly. With `i0_counts_by_index`, keyed by scan
+    or masked beamstop leaves ``Z`` exactly. With `i0_by_index`, keyed by scan
     index, each pattern is scaled by ``mean(I0) / I0_j`` as
     :func:`ptychodus.api.accumulate.compute_i0_scale` gives it. The stack is then divided
     by its mean over every good pixel of every pattern, the normalization under which
@@ -1131,10 +1131,10 @@ def generate_spectral_object(
     i0_scale = (
         compute_i0_scale(
             indexes[pattern_rows],
-            numpy.fromiter(i0_counts_by_index.keys(), dtype=numpy.intp),
-            numpy.fromiter(i0_counts_by_index.values(), dtype=numpy.float64),
+            numpy.fromiter(i0_by_index.keys(), dtype=numpy.intp),
+            numpy.fromiter(i0_by_index.values(), dtype=numpy.float64),
         )
-        if i0_counts_by_index
+        if i0_by_index
         else numpy.ones(pattern_rows.size)
     )
     forward, backward = _build_propagator_pair(
@@ -1234,7 +1234,7 @@ def generate_uniform_object(geometry: ObjectGeometry, *, amplitude: float = 1.0)
 
     The default is a transparent sample. An amplitude below one asserts uniform
     absorption instead, which is what a measured mean transmission states: the exit wave
-    then predicts the pattern totals the detector recorded rather than the unobstructed
+    then predicts the detector sums the detector recorded rather than the unobstructed
     beam.
     """
     array = numpy.full((1, geometry.height_px, geometry.width_px), amplitude, dtype=complex)

@@ -130,9 +130,9 @@ RenderParamsDep = Annotated[RenderParams, Depends(render_params_dep)]
 
 
 def visualization_options() -> OptionsRead:
-    """Every choice the render parameters accept, ordered as the desktop lists them.
+    """Every choice the render parameters accept, ordered as the GUI lists them.
 
-    The desktop keeps each list sorted by its display name, so these are too.
+    The GUI keeps each list sorted by its display name, so these are too.
     """
     transforms = sorted(ScalarTransformation, key=lambda member: member.display_name)
     components = sorted(ComplexComponent, key=lambda member: member.display_name)

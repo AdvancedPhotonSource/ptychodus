@@ -18,7 +18,7 @@ ARG PTYCHODUS_VERSION
 # CUDA build from PyPI onto an AMD image.
 #
 # This is a headless image for batch and HPC use, with pty-chi as its only
-# backend; the GUI needs the CPU or CUDA image. ptychodus comes from PyPI: the
+# reconstruction library; the GUI needs the CPU or CUDA image. ptychodus comes from PyPI: the
 # release named by PTYCHODUS_VERSION, or the latest one when it is unset. An
 # unpinned build reuses its cached layer after a new release, so pin it or
 # pass --no-cache. /tmp/constraints.txt pins the base image's torch, and

@@ -29,7 +29,7 @@ class FluorescenceEnhanceParametersView(QGroupBox):
     """
 
     def __init__(self, algorithm_widget: QWidget, parent: QWidget | None = None) -> None:
-        super().__init__('Enhancement Strategy', parent)
+        super().__init__('Enhancer', parent)
         self.stacked_widget = QStackedWidget()
 
         stacked_widget_layout = self.stacked_widget.layout()

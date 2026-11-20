@@ -28,7 +28,7 @@ class ObjectRepositoryItemFactory:
     def _warn_if_conditioning_ignored(self) -> None:
         """Note that conditioning settings do not apply to in-memory objects.
 
-        An object supplied in memory comes from reconstruction output or a product
+        An object supplied in memory comes from a reconstruction or a product
         loaded from file, so its layer structure and canvas size are already what
         the reconstructor solved for, and a layer spacing set in the settings would
         otherwise silently do nothing. Set it on the run that produces the object

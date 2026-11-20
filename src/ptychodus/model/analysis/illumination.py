@@ -27,13 +27,13 @@ class IlluminationMapper:
         product = item.get_product()
 
         # Dose follows the incident beam, so positions are weighted by their I0 when it
-        # was recorded and equally otherwise; the detector totals would fold the
+        # was recorded and equally otherwise; the detector sums would fold the
         # sample's own absorption into the dose.
         logger.info('Computing illumination map...')
         tic = time.perf_counter()
         result = compute_illumination_map(
             product,
-            probe_photon_counts_by_index=product.probe_positions.get_probe_photon_counts_by_index(),
+            i0_by_index=product.probe_positions.get_i0_by_index(),
         )
         toc = time.perf_counter()
         logger.info(f'Computed illumination map in {toc - tic:.4f} seconds.')

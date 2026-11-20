@@ -50,7 +50,7 @@ class ProbePositionsBuilderFactory(Iterable[str]):
         self.file_writers = FileTypeChooser(file_writer_chooser)
 
         # Every registered generator, not only the one selected: the settings
-        # file holds one section for scan positions and it must hold the same
+        # file holds one section for probe positions and it must hold the same
         # keys however the application was driven, so a pattern never chosen
         # still contributes the keys it would be configured by.
         self._parameters: dict[str, Mapping[str, Parameter[Any]]] = {
@@ -68,7 +68,7 @@ class ProbePositionsBuilderFactory(Iterable[str]):
         plugin = self._generators.find_plugin(name)
 
         if plugin is None:
-            raise KeyError(f'Unknown scan builder "{name}"!')
+            raise KeyError(f'Unknown probe positions builder "{name}"!')
 
         return PluginProbePositionsBuilder(
             self._rng,
@@ -86,17 +86,21 @@ class ProbePositionsBuilderFactory(Iterable[str]):
         name_repaired = name.casefold()
 
         if name_repaired == 'from_file':
-            return self.create_scan_from_file(
+            return self.create_probe_positions_from_file(
                 self._settings.file_path.get_value(),
                 self._settings.file_type.get_value(),
             )
 
         return self.create(name_repaired)
 
-    def create_scan_from_memory(self, position_seq: ProbePositionSequence) -> ProbePositionsBuilder:
+    def create_probe_positions_from_memory(
+        self, position_seq: ProbePositionSequence
+    ) -> ProbePositionsBuilder:
         return FromMemoryProbePositionsBuilder(self._rng, self._settings, position_seq)
 
-    def create_scan_from_file(self, file_path: Path, file_type: str) -> ProbePositionsBuilder:
+    def create_probe_positions_from_file(
+        self, file_path: Path, file_type: str
+    ) -> ProbePositionsBuilder:
         plugin = self.file_readers.select(file_type)
 
         builder = FromFileProbePositionsBuilder(self._rng, self._settings, plugin.strategy)
@@ -104,7 +108,7 @@ class ProbePositionsBuilderFactory(Iterable[str]):
         builder.file_type.set_value(plugin.simple_name)
         return builder
 
-    def save_scan(
+    def save_probe_positions(
         self, file_path: Path, file_type: str, position_seq: ProbePositionSequence
     ) -> None:
         plugin = self.file_writers.select(file_type)

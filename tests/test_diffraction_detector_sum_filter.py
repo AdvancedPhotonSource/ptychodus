@@ -1,12 +1,12 @@
-"""Tests for the total-counts pattern-drop filter.
+"""Tests for the detector-sum pattern-drop filter.
 
-Covers the free `compute_total_counts` helper (and its delegation from
-`AssembledDiffractionData.get_total_counts`) plus the wiring that carries the
+Covers the free `compute_detector_sums` helper (and its delegation from
+`AssembledDiffractionData.get_detector_sums`) plus the wiring that carries the
 `DiffractionSettings` bounds into the assembly. The filter semantics themselves
 (inclusive boundaries, index/pattern alignment, all-dropped) are pinned in
 tests/test_assemble.py against the pure `preprocess_array`.
 
-Also covers `compute_dataset_total_counts`, the pass that measures the counts the
+Also covers `compute_dataset_detector_sums`, the pass that measures the counts the
 filter actually compares its bounds against, and the guards that keep an array the
 filter emptied from reaching the repository.
 """
@@ -22,8 +22,8 @@ import pytest
 from ptychodus.model.task_manager import BackgroundTask, ForegroundTask, TaskManager
 from ptychodus.api.assemble import (
     AssembledDiffractionData,
-    compute_dataset_total_counts,
-    compute_total_counts,
+    compute_dataset_detector_sums,
+    compute_detector_sums,
 )
 from ptychodus.api.diffraction import (
     BadPixels,
@@ -47,10 +47,10 @@ from ptychodus.model.diffraction.summary import DiffractionSummaryService
 from ptychodus.model.diffraction.settings import DetectorSettings, DiffractionSettings
 
 
-# ---------- compute_total_counts ----------
+# ---------- compute_detector_sums ----------
 
 
-def test_compute_total_counts_sums_only_good_pixels() -> None:
+def test_compute_detector_sums_sums_only_good_pixels() -> None:
     patterns = numpy.array(
         [
             [[1, 2], [3, 4]],
@@ -59,26 +59,26 @@ def test_compute_total_counts_sums_only_good_pixels() -> None:
         dtype=numpy.int32,
     )
     bad_pixels = numpy.array([[False, True], [False, False]], dtype=bool)
-    counts = compute_total_counts(patterns, bad_pixels)
+    counts = compute_detector_sums(patterns, bad_pixels)
     assert counts.tolist() == [1 + 3 + 4, 5 + 7 + 8]
 
 
-def test_compute_total_counts_all_bad_returns_zero() -> None:
+def test_compute_detector_sums_all_bad_returns_zero() -> None:
     patterns = numpy.ones((3, 2, 2), dtype=numpy.int32)
     bad_pixels = numpy.ones((2, 2), dtype=bool)
-    counts = compute_total_counts(patterns, bad_pixels)
+    counts = compute_detector_sums(patterns, bad_pixels)
     assert counts.shape == (3,)
     assert numpy.all(counts == 0)
 
 
-def test_compute_total_counts_shape_matches_pattern_count() -> None:
+def test_compute_detector_sums_shape_matches_pattern_count() -> None:
     patterns = numpy.arange(5 * 4 * 3, dtype=numpy.int32).reshape(5, 4, 3)
     bad_pixels = numpy.zeros((4, 3), dtype=bool)
-    counts = compute_total_counts(patterns, bad_pixels)
+    counts = compute_detector_sums(patterns, bad_pixels)
     assert counts.shape == (5,)
 
 
-def test_assembled_get_total_counts_delegates_to_free_helper() -> None:
+def test_assembled_get_detector_sums_delegates_to_free_helper() -> None:
     patterns = numpy.arange(3 * 2 * 2, dtype=numpy.int32).reshape(3, 2, 2)
     bad_pixels = numpy.array([[False, True], [False, False]], dtype=bool)
     data = AssembledDiffractionData(
@@ -87,8 +87,8 @@ def test_assembled_get_total_counts_delegates_to_free_helper() -> None:
         pixel_geometry=PixelGeometry(1.0, 1.0),
         bad_pixels=bad_pixels,
     )
-    expected = compute_total_counts(patterns, bad_pixels)
-    assert numpy.array_equal(data.get_total_counts(), expected)
+    expected = compute_detector_sums(patterns, bad_pixels)
+    assert numpy.array_equal(data.get_detector_sums(), expected)
 
 
 # ---------- Settings-to-assembly wiring ----------
@@ -113,7 +113,7 @@ class _InlineTaskManager(TaskManager):
 
 
 def _known_counts_array() -> SimpleDiffractionArray:
-    """Four 2x2 patterns with total counts 4, 10, 20, 40 (all pixels good)."""
+    """Four 2x2 patterns with detector sums 4, 10, 20, 40 (all pixels good)."""
     patterns = numpy.stack(
         [
             numpy.full((2, 2), 1, dtype=numpy.int32),  # sum = 4
@@ -139,12 +139,12 @@ def _load_dataset_with_bounds(
     diffraction_settings = DiffractionSettings(registry)
 
     if lower is not None:
-        diffraction_settings.total_counts_lower_bound_enabled.set_value(enable_lower)
-        diffraction_settings.total_counts_lower_bound.set_value(lower)
+        diffraction_settings.detector_sum_lower_bound_enabled.set_value(enable_lower)
+        diffraction_settings.detector_sum_lower_bound.set_value(lower)
 
     if upper is not None:
-        diffraction_settings.total_counts_upper_bound_enabled.set_value(enable_upper)
-        diffraction_settings.total_counts_upper_bound.set_value(upper)
+        diffraction_settings.detector_sum_upper_bound_enabled.set_value(enable_upper)
+        diffraction_settings.detector_sum_upper_bound.set_value(upper)
 
     task_manager = _InlineTaskManager()
     dataset = AssembledDiffractionDataset(
@@ -240,7 +240,7 @@ def test_dropped_patterns_leave_sentinel_holes_in_the_buffer() -> None:
 def test_bounds_that_drop_everything_publish_no_array() -> None:
     """Regression: an emptied array used to reach the tree and crash on .max().
 
-    A zero-pattern array carries no counts, no frames, and no mean pattern, so it
+    A zero-pattern array carries no counts, no patterns, and no mean pattern, so it
     is dropped rather than published. Its buffer slots keep their sentinel indexes.
     """
     dataset = _load_dataset_with_bounds(lower=1_000_000)
@@ -253,7 +253,7 @@ def test_emptied_dataset_reports_no_mean_pattern_rather_than_nan() -> None:
     assert dataset.get_mean_pattern() is None
 
 
-def test_empty_assembled_data_means_a_zero_frame_not_nan() -> None:
+def test_empty_assembled_data_means_a_zero_pattern_not_nan() -> None:
     """numpy.mean over an empty axis returns NaN; the accessor must not."""
     data = AssembledDiffractionData(
         indexes=numpy.zeros(0, dtype=numpy.intp),
@@ -275,15 +275,15 @@ def test_empty_array_counts_accessors_return_zero() -> None:
         bad_pixels=numpy.zeros((2, 2), dtype=bool),
     )
     array = AssembledDiffractionArray(array_index=0, label='empty', data=data)
-    assert array.get_max_total_counts() == 0
-    assert array.get_mean_total_counts() == 0.0
+    assert array.get_max_detector_sum() == 0
+    assert array.get_mean_detector_sum() == 0.0
 
 
-# ---------- Dataset mean total counts ----------
+# ---------- Dataset mean detector sum ----------
 
 
 def _load_unequal_arrays_dataset() -> AssembledDiffractionDataset:
-    """The four known-counts patterns split across two arrays, 1 frame then 3."""
+    """The four known-counts patterns split across two arrays, 1 pattern then 3."""
     registry = SettingsRegistry()
     detector_settings = DetectorSettings(registry)
     diffraction_settings = DiffractionSettings(registry)
@@ -310,79 +310,79 @@ def _load_unequal_arrays_dataset() -> AssembledDiffractionDataset:
     return dataset
 
 
-def test_dataset_mean_total_counts_weights_arrays_by_frame_count() -> None:
+def test_dataset_mean_detector_sum_weights_arrays_by_pattern_count() -> None:
     """Averaging the per-array means unweighted would answer 25.67 instead of 18.5."""
     dataset = _load_unequal_arrays_dataset()
     assert [array.get_num_patterns() for array in dataset] == [1, 3]
-    assert dataset[0].get_mean_total_counts() == pytest.approx(40.0)
-    assert dataset[1].get_mean_total_counts() == pytest.approx(34.0 / 3.0)
+    assert dataset[0].get_mean_detector_sum() == pytest.approx(40.0)
+    assert dataset[1].get_mean_detector_sum() == pytest.approx(34.0 / 3.0)
     # (40 + 4 + 10 + 20) / 4
-    assert dataset.get_mean_total_counts() == pytest.approx(18.5)
+    assert dataset.get_mean_detector_sum() == pytest.approx(18.5)
 
 
-def test_dataset_mean_total_counts_ignores_how_frames_are_grouped() -> None:
-    """The same four frames in one array must answer the same as split across two."""
-    assert _load_dataset_with_bounds().get_mean_total_counts() == pytest.approx(18.5)
+def test_dataset_mean_detector_sum_ignores_how_patterns_are_grouped() -> None:
+    """The same four patterns in one array must answer the same as split across two."""
+    assert _load_dataset_with_bounds().get_mean_detector_sum() == pytest.approx(18.5)
 
 
-def test_emptied_dataset_reports_zero_mean_total_counts() -> None:
-    """numpy would divide by a zero frame count; the accessor must not."""
+def test_emptied_dataset_reports_zero_mean_detector_sum() -> None:
+    """numpy would divide by a zero pattern count; the accessor must not."""
     dataset = _load_dataset_with_bounds(lower=1_000_000)
     assert len(dataset) == 0
-    assert dataset.get_mean_total_counts() == 0.0
+    assert dataset.get_mean_detector_sum() == 0.0
 
 
-# ---------- compute_dataset_total_counts ----------
+# ---------- compute_dataset_detector_sums ----------
 
 
-def test_dataset_total_counts_match_the_raw_totals_without_a_plan() -> None:
-    measured = compute_dataset_total_counts(_known_counts_dataset())
+def test_dataset_detector_sums_match_the_raw_detector_sums_without_a_plan() -> None:
+    measured = compute_dataset_detector_sums(_known_counts_dataset())
     assert measured.indexes.tolist() == [7, 8, 9, 10]
-    # 12 ring pixels at 100 each, plus the known center totals.
-    assert measured.total_counts.tolist() == [1204, 1210, 1220, 1240]
+    # 12 ring pixels at 100 each, plus the known center detector sums.
+    assert measured.detector_sums.tolist() == [1204, 1210, 1220, 1240]
 
 
-def test_dataset_total_counts_follow_the_read_region() -> None:
+def test_dataset_detector_sums_follow_the_read_region() -> None:
     """The point of the pass: a crop changes the distribution the bounds face."""
     read_region = CropRegion(x_range=(1, 3), y_range=(1, 3))
-    measured = compute_dataset_total_counts(_known_counts_dataset(), read_region=read_region)
+    measured = compute_dataset_detector_sums(_known_counts_dataset(), read_region=read_region)
     assert measured.indexes.tolist() == [7, 8, 9, 10]
-    assert measured.total_counts.tolist() == [4, 10, 20, 40]
+    assert measured.detector_sums.tolist() == [4, 10, 20, 40]
 
 
-def test_dataset_total_counts_exclude_bad_pixels() -> None:
+def test_dataset_detector_sums_exclude_bad_pixels() -> None:
     bad_pixels = numpy.zeros((4, 4), dtype=bool)
     bad_pixels[1, 1] = True
     read_region = CropRegion(x_range=(1, 3), y_range=(1, 3))
-    measured = compute_dataset_total_counts(
+    measured = compute_dataset_detector_sums(
         _known_counts_dataset(), bad_pixels=bad_pixels, read_region=read_region
     )
     # Drops the [1, 1] pixel of each center block: 1, 3, 5, 10 respectively.
-    assert measured.total_counts.tolist() == [3, 7, 15, 30]
+    assert measured.detector_sums.tolist() == [3, 7, 15, 30]
 
 
-def test_dataset_total_counts_never_apply_the_filter() -> None:
+def test_dataset_detector_sums_never_apply_the_filter() -> None:
     """The pass measures the distribution bounds are chosen from, so it cannot filter."""
-    measured = compute_dataset_total_counts(_known_counts_dataset())
-    assert measured.total_counts.size == 4
+    measured = compute_dataset_detector_sums(_known_counts_dataset())
+    assert measured.detector_sums.size == 4
 
 
-def test_dataset_total_counts_need_no_detector_pixel_geometry() -> None:
-    """Regression: the pass keeps only per-pattern totals, so a dataset whose
+def test_dataset_detector_sums_need_no_detector_pixel_geometry() -> None:
+    """Regression: the pass keeps only per-pattern detector sums, so a dataset whose
     reader never set detector_pixel_geometry must still measure.
 
     Refresh Counts used to raise ValueError here for every generic HDF5/NPZ/TIFF
     file, while an actual load of the same dataset succeeded through the
     DetectorSettings fallback.
     """
-    measured = compute_dataset_total_counts(_known_counts_dataset(pixel_geometry=None))
+    measured = compute_dataset_detector_sums(_known_counts_dataset(pixel_geometry=None))
     assert measured.indexes.tolist() == [7, 8, 9, 10]
-    assert measured.total_counts.tolist() == [1204, 1210, 1220, 1240]
+    assert measured.detector_sums.tolist() == [1204, 1210, 1220, 1240]
 
 
-def test_dataset_total_counts_report_progress_over_the_arrays() -> None:
+def test_dataset_detector_sums_report_progress_over_the_arrays() -> None:
     progress: list[tuple[int, int]] = []
-    compute_dataset_total_counts(
+    compute_dataset_detector_sums(
         _known_counts_dataset(), on_progress=lambda i, n: progress.append((i, n))
     )
     assert progress[0] == (0, 1)
@@ -453,29 +453,29 @@ def test_service_measures_counts_without_a_detector_pixel_geometry() -> None:
     """
     service, _, _ = _summary_service(_known_counts_dataset(pixel_geometry=None))
 
-    assert service.compute_total_counts(0, force=True)
+    assert service.compute_detector_sums(0, force=True)
 
     assert service.task_monitor.get_last_error() is None
-    measured = service.get_last_total_counts()
+    measured = service.get_last_detector_sums()
     assert measured is not None
-    assert measured.total_counts.tolist() == [1204, 1210, 1220, 1240]
+    assert measured.detector_sums.tolist() == [1204, 1210, 1220, 1240]
 
 
 def test_service_caches_counts_against_the_processing_settings() -> None:
     service, _, _ = _summary_service(_known_counts_dataset(pixel_geometry=None))
-    assert service.compute_total_counts(0)
-    assert not service.compute_total_counts(0)
-    assert not service.is_total_counts_stale(0)
+    assert service.compute_detector_sums(0)
+    assert not service.compute_detector_sums(0)
+    assert not service.are_detector_sums_stale(0)
 
 
 def test_detector_correction_settings_invalidate_cached_counts() -> None:
     """Subtracting a background changes the counts, so the cache must not survive it."""
     service, detector_settings, _ = _summary_service(_known_counts_dataset(pixel_geometry=None))
-    service.compute_total_counts(0)
+    service.compute_detector_sums(0)
 
     detector_settings.subtract_background.set_value(True)
 
-    assert service.is_total_counts_stale(0)
+    assert service.are_detector_sums_stale(0)
 
 
 _BEAM_CENTER = BeamCenter(x_px=64, y_px=64)
@@ -487,11 +487,11 @@ def _beam_dataset(
     background: numpy.ndarray | None = None,
     marker_columns: slice | None = None,
 ) -> SimpleDiffractionDataset:
-    """Three 128x128 frames of a Gaussian beam over a Poisson floor, centered at (64, 64).
+    """Three 128x128 patterns of a Gaussian beam over a Poisson floor, centered at (64, 64).
 
-    `background` is both added to every frame and carried by the dataset, as a reader
-    that records a dark frame would; `marker_columns` are set to the Dectris dead-pixel
-    marker in every frame.
+    `background` is both added to every pattern and carried by the dataset, as a reader
+    that records a dark pattern would; `marker_columns` are set to the Dectris dead-pixel
+    marker in every pattern.
     """
     y = numpy.arange(128, dtype=numpy.float64).reshape(-1, 1) - _BEAM_CENTER.y_px
     x = numpy.arange(128, dtype=numpy.float64).reshape(1, -1) - _BEAM_CENTER.x_px
@@ -571,15 +571,15 @@ def test_service_estimates_apply_the_configured_value_filter() -> None:
 # ---------- Error attribution ----------
 
 
-def test_counts_pass_labels_the_monitor_with_its_own_actor() -> None:
+def test_detector_sum_pass_labels_the_task_monitor_with_its_own_actor() -> None:
     service, _, _ = _summary_service(_known_counts_dataset(pixel_geometry=None))
-    service.compute_total_counts(0, force=True)
-    assert service.task_monitor.actor == 'Refresh Counts'
+    service.compute_detector_sums(0, force=True)
+    assert service.task_monitor.actor == 'Refresh Detector Sums'
 
 
 def test_summarize_pass_labels_the_monitor_with_its_own_actor() -> None:
     service, _, _ = _summary_service(_known_counts_dataset(pixel_geometry=None))
-    service.compute_total_counts(0, force=True)
+    service.compute_detector_sums(0, force=True)
     service.compute(0)
     assert service.task_monitor.actor == 'Compute Summary'
 
@@ -607,35 +607,35 @@ def test_a_failing_pass_leaves_the_error_and_the_actor_describing_it() -> None:
     assert service.task_monitor.get_last_error() is None
 
     with pytest.raises(ValueError, match='more arrays than metadata'):
-        service.compute_total_counts(0, force=True)
+        service.compute_detector_sums(0, force=True)
 
-    assert service.task_monitor.actor == 'Refresh Counts'
+    assert service.task_monitor.actor == 'Refresh Detector Sums'
     assert isinstance(service.task_monitor.get_last_error(), ValueError)
 
 
 @pytest.mark.parametrize(
     'dtype', [numpy.uint8, numpy.uint16, numpy.int32, numpy.float32, numpy.float64]
 )
-def test_compute_total_counts_matches_the_masked_form_when_nothing_is_masked(dtype) -> None:
-    # Nothing masked takes a reduction over the frame axes instead of a boolean fancy
-    # index. The two must agree in value and dtype, or a total-counts bound would admit
+def test_compute_detector_sums_matches_the_masked_form_when_nothing_is_masked(dtype) -> None:
+    # Nothing masked takes a reduction over the pattern axes instead of a boolean fancy
+    # index. The two must agree in value and dtype, or a detector-sum bound would admit
     # different patterns depending on whether a bad-pixel mask happened to be empty.
     patterns = numpy.arange(4 * 3 * 2, dtype=dtype).reshape(4, 3, 2)
     none_bad = numpy.zeros((3, 2), dtype=bool)
     expected = numpy.sum(patterns[:, numpy.logical_not(none_bad)], axis=-1)
 
-    counts = compute_total_counts(patterns, none_bad)
+    counts = compute_detector_sums(patterns, none_bad)
 
     assert counts.dtype == expected.dtype
     numpy.testing.assert_array_equal(counts, expected)
 
 
-def test_compute_total_counts_of_an_empty_stack_keeps_the_masked_form_shape() -> None:
+def test_compute_detector_sums_of_an_empty_stack_keeps_the_masked_form_shape() -> None:
     patterns = numpy.zeros((0, 3, 2), dtype=numpy.uint16)
     none_bad = numpy.zeros((3, 2), dtype=bool)
     expected = numpy.sum(patterns[:, numpy.logical_not(none_bad)], axis=-1)
 
-    counts = compute_total_counts(patterns, none_bad)
+    counts = compute_detector_sums(patterns, none_bad)
 
     assert counts.shape == expected.shape == (0,)
     assert counts.dtype == expected.dtype

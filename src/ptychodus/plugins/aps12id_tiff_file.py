@@ -1,4 +1,4 @@
-"""Readers for APS 12-ID-E Ptycho-SAXS scans stored as one TIFF per scan point.
+"""Readers for APS 12-ID-E Ptycho-SAXS scans stored as one TIFF per probe position.
 
 A scan is a directory of ``<sample>_<scan>_<line>_<point>.tif`` frames with a matching
 directory of ``<sample>_<scan>_<line>_<point>.dat`` position files. Both readers take

@@ -393,7 +393,7 @@ class ProbeEditorViewControllerFactory:
 
         # A from-file probe is conditioned on the way in, so the mode parameters
         # do something and belong in the dialog. A from-memory probe holds an
-        # already-conditioned probe -- reconstruction output, or a product loaded
+        # already-conditioned probe -- a reconstruction, or a product loaded
         # from file -- whose mode parameters are deliberately inert until it is made
         # editable, so offering controls that would silently do nothing is worse than
         # offering the button that makes them apply.

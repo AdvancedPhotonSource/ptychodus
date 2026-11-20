@@ -16,13 +16,13 @@ import {
   withRunBadge,
 } from '../format.js';
 
-// The desktop's columns, less Counts and the physical pixel pair: diffraction.h5 holds
+// The GUI's columns, less Counts and the physical pixel pair: diffraction.h5 holds
 // the assembled patterns, after cropping and binning, and records neither the raw
 // detector's pitch nor a per-pattern sum.
 const PROCESSED = 'The assembled patterns, after cropping and binning';
 const COLUMNS: TreeColumn[] = [
   'Name',
-  'Frames',
+  'Patterns',
   { header: 'Width\n[px]', title: PROCESSED },
   { header: 'Height\n[px]', title: PROCESSED },
   'Processed Pixel\nWidth [µm]',
@@ -61,7 +61,7 @@ export async function mountDiffraction(root: HTMLElement, uuid: string | null): 
   if (found.error !== null) image.setError(found.error);
 
   if (items.length === 0) {
-    left.replaceChildren(emptyBlock('No diffraction datasets in store.'));
+    left.replaceChildren(emptyBlock('No diffraction datasets in the storage root.'));
     return;
   }
 
@@ -102,7 +102,7 @@ function datasetNode(
   };
 
   const itemsize = dtypeItemsize(d.pattern_dtype);
-  const frameBytes =
+  const patternBytes =
     itemsize === null || d.pattern_width_px === null || d.pattern_height_px === null
       ? null
       : d.pattern_width_px * d.pattern_height_px * itemsize;
@@ -121,21 +121,21 @@ function datasetNode(
       fmtInt(d.num_bad_pixels),
       fmtBytes(d.nbytes),
     ],
-    // Selecting the dataset itself shows the mean pattern, as the desktop tree does;
+    // Selecting the dataset itself shows the mean pattern, as the GUI tree does;
     // there is no synthetic "aggregate" child.
     onSelect: () => show('mean pattern', (q) => api.diffractionAggregateImage(d.uuid, q)),
-    // One node per frame, built only near the viewport: a dataset runs to tens of
+    // One node per pattern, built only near the viewport: a dataset runs to tens of
     // thousands, which the DOM will not hold.
     windowedChildren: {
       count: total,
       build: (i: number) => ({
         id: `diff:${d.uuid}:${i}`,
-        label: `Frame ${i}`,
+        label: `Pattern ${i}`,
         state,
-        // The extent, pitch and bad pixels describe the dataset, so the desktop
-        // leaves them blank on a frame.
-        cells: ['1', '', '', '', '', '', frameBytes === null ? MISSING : fmtBytes(frameBytes)],
-        onSelect: () => show(`frame ${i}`, (q) => api.diffractionPatternImage(d.uuid, i, q)),
+        // The extent, pitch and bad pixels describe the dataset, so the GUI
+        // leaves them blank on a pattern.
+        cells: ['1', '', '', '', '', '', patternBytes === null ? MISSING : fmtBytes(patternBytes)],
+        onSelect: () => show(`pattern ${i}`, (q) => api.diffractionPatternImage(d.uuid, i, q)),
       }),
     },
   };

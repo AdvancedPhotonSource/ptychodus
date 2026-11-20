@@ -18,10 +18,10 @@ from .probe_positions import ProbePositionsRepositoryItem
 
 
 class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Observable, Observer):
-    """Live product geometry: the bound metadata, scan and detector, as a provider.
+    """Live product geometry: the bound metadata, probe positions and detector, as a provider.
 
     Adapts a product under edit to the two geometry-provider interfaces, tracking
-    changes to the metadata and scan it was built from. The derived quantities
+    changes to the metadata and probe positions it was built from. The derived quantities
     themselves are the frozen :class:`ProductGeometry` returned by
     :meth:`get_derived_values`; this class only supplies its inputs and republishes
     the handful of them the provider interfaces require.
@@ -30,11 +30,11 @@ class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Obs
     def __init__(
         self,
         metadata_item: MetadataRepositoryItem,
-        scan_item: ProbePositionsRepositoryItem,
+        probe_positions_item: ProbePositionsRepositoryItem,
     ) -> None:
         super().__init__()
         self._metadata_item = metadata_item
-        self._scan_item = scan_item
+        self._probe_positions_item = probe_positions_item
         # Set via set_detector_extent()/set_detector_pixel_geometry() when a dataset
         # is bound (see ProductRepositoryItem.bind_dataset / unbind_dataset). Both
         # describe the assembled patterns (post-preprocessing), so downstream
@@ -53,7 +53,7 @@ class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Obs
         self._dataset: AssembledDiffractionDataset | None = None
 
         self._metadata_item.add_observer(self)
-        self._scan_item.add_observer(self)
+        self._probe_positions_item.add_observer(self)
 
     def set_detector_extent(self, extent: ImageExtent | None) -> None:
         if extent == self._detector_extent:
@@ -127,8 +127,8 @@ class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Obs
         return self.get_derived_values().probe_power_W
 
     @property
-    def num_scan_points(self) -> int:
-        return len(self._scan_item.get_probe_positions())
+    def num_probe_positions(self) -> int:
+        return len(self._probe_positions_item.get_probe_positions())
 
     @property
     def detector_distance_m(self) -> float:
@@ -205,7 +205,7 @@ class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Obs
         )
 
     def get_probe_positions(self) -> Sequence[ProbePosition]:
-        return self._scan_item.get_probe_positions()
+        return self._probe_positions_item.get_probe_positions()
 
     def get_object_geometry(self) -> ObjectGeometry:
         probe_geometry = self.get_probe_geometry()
@@ -213,7 +213,7 @@ class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Obs
         try:
             return compute_object_geometry(self.get_probe_positions(), probe_geometry)
         except ValueError:
-            # Empty scan: the sampling is known but no positions place it yet, so fall
+            # No probe positions: the sampling is known but no positions place it yet, so fall
             # back to a probe-sized canvas at the origin rather than raising.
             return ObjectGeometry(
                 width_px=probe_geometry.width_px,
@@ -227,5 +227,5 @@ class ProductGeometryProvider(ProbeGeometryProvider, ObjectGeometryProvider, Obs
     def _update(self, observable: Observable) -> None:
         if observable is self._metadata_item:
             self.notify_observers()
-        elif observable is self._scan_item:
+        elif observable is self._probe_positions_item:
             self.notify_observers()

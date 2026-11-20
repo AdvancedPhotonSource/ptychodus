@@ -12,8 +12,8 @@ The free functions at the end of the module are helpers used *alongside* the
 pipeline rather than steps within it, and they deliberately stay that way.
 `zero_bad_pixels` and `inpaint_bad_pixels` are interchangeable bad-pixel
 repairs that run in raw detector coordinates before the pipeline, and
-`estimate_beam_center` and `estimate_signal_radius` take a whole frame at
-once. A step that repaired or dropped frames would also break the index/pattern 1:1 invariant that
+`estimate_beam_center` and `estimate_signal_radius` take a whole pattern at
+once. A step that repaired or dropped patterns would also break the index/pattern 1:1 invariant that
 `prepare_reconstruct_input` relies on, because
 `DiffractionPrepPipeline.__call__` passes the original indexes through
 unchanged.
@@ -395,21 +395,21 @@ def inpaint_bad_pixels(
 ) -> DiffractionPattern | DiffractionPatterns:
     """Return `data` with bad-pixel positions filled by biharmonic inpainting.
 
-    Takes a single frame or a stack of them and returns the same shape and dtype
+    Takes a single pattern or a stack of them and returns the same shape and dtype
     it was given, so for a pattern stack this is interchangeable with
     :func:`zero_bad_pixels` -- the two differ in what they put at the bad-pixel
     positions, nothing else.
 
     Only interior holes are inpainted. A bad region that touches the array border
-    -- padding, a detector edge, a gap running off the frame -- is zeroed instead,
+    -- padding, a detector edge, a gap running off the pattern -- is zeroed instead,
     because filling it would extrapolate beyond every measured pixel rather than
     interpolate between them.
 
     Returns the input unchanged when `bad_pixels` is None or all-False. Otherwise
     the result is a new array, from a :class:`~ptychodus.api.inpaint.BiharmonicInpainter`
     built for this one call; one built once serves many calls under the same mask. A
-    stack shares the mask across all its frames, so the biharmonic system is solved
-    once for the whole stack rather than once per frame; the result is identical
+    stack shares the mask across all its patterns, so the biharmonic system is solved
+    once for the whole stack rather than once per pattern; the result is identical
     either way.
 
     Integer values are rounded rather than truncated, which would bias every

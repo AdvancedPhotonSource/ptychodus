@@ -89,7 +89,7 @@ def make_positions(*, seed: int = 2, spread_px: float = 10.0) -> ProbePositionSe
                 index=10 + 3 * i,
                 x_m=OBJECT_CENTER.x_m + float(rng.uniform(-spread_px, spread_px)) * PIXEL_WIDTH_M,
                 y_m=OBJECT_CENTER.y_m + float(rng.uniform(-spread_px, spread_px)) * PIXEL_HEIGHT_M,
-                probe_photon_count=1.0e6 + i,
+                i0=1.0e6 + i,
             )
             for i in range(NUM_POSITIONS)
         ]

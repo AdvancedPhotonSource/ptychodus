@@ -12,8 +12,8 @@ export interface ImagePanel {
   /**
    * Show the Colorize and Data Range controls, re-fetching through `refresh`
    * whenever one changes. Omitted on a page whose output is a plot: a plot carries
-   * its own axes and takes no render parameters, exactly as the desktop panel has
-   * no ribbon there. `isComplex` offers the complex renderers, as the desktop does
+   * its own axes and takes no render parameters, exactly as the GUI panel has
+   * no ribbon there. `isComplex` offers the complex renderers, as the GUI does
    * for the probe and object but not for patterns or element maps.
    */
   enableControls: (
@@ -30,7 +30,7 @@ export interface ImagePanel {
   setPlot: (img: PlotImage, title: string) => void;
 }
 
-/** The renderer the desktop's Complex entry stands for: a color model, not a component. */
+/** The renderer the GUI's Complex entry stands for: a color model, not a component. */
 const COMPLEX = 'complex';
 
 interface Choice {
@@ -59,20 +59,20 @@ export function createImagePanel(): ImagePanel {
   let current: Partial<RenderParams> = {};
   let legendVisible = false;
   let lastImage: RenderedImage | null = null;
-  // Written back after every render, as the desktop slider is after autoscaling.
+  // Written back after every render, as the GUI slider is after autoscaling.
   let rangeInputs: { min: HTMLInputElement; max: HTMLInputElement } | null = null;
 
-  // Mirrors the desktop ImageRibbon, minus the image tools: the pan, ruler and
+  // Mirrors the GUI ImageRibbon, minus the image tools: the pan, ruler and
   // line-cut buttons act on a canvas this panel does not have.
   function enableControls(
     refresh: (params: Partial<RenderParams>) => void,
     { isComplex }: { isComplex: boolean }
   ): void {
-    // The desktop's defaults, usable before the options arrive: Complex with HSV-V
+    // The GUI's defaults, usable before the options arrive: Complex with HSV-V
     // for a complex array, Real with gray otherwise.
     let renderer = isComplex ? COMPLEX : 'real';
     let transform = 'identity';
-    // One choice per kind of variant, kept across renderer changes as the desktop
+    // One choice per kind of variant, kept across renderer changes as the GUI
     // shares one colormap parameter among its acyclic renderers.
     const variant = { linear: 'gray', cyclic: 'colorwheel', model: 'hsv_value' };
     let range: { min: number | null; max: number | null } = { min: null, max: null };
@@ -257,7 +257,7 @@ export function createImagePanel(): ImagePanel {
   };
 }
 
-/** The desktop's renderer combo: every component plus Complex, sorted by name. */
+/** The GUI's renderer combo: every component plus Complex, sorted by name. */
 function rendererChoices(opts: VisualizationOptions, isComplex: boolean): Choice[] {
   if (!isComplex) {
     return [{ value: 'real', label: opts.component_labels['real'] ?? 'Real' }];
@@ -287,7 +287,7 @@ function buildLegend(img: RenderedImage): HTMLElement {
   const legend = document.createElement('div');
 
   if (img.legend_cyclic) {
-    // Counterclockwise from twelve o'clock, as the desktop's conical gradient runs.
+    // Counterclockwise from twelve o'clock, as the GUI's conical gradient runs.
     legend.className = 'color-legend cyclic';
     legend.style.background = `conic-gradient(${[...colors].reverse().join(', ')})`;
     return legend;

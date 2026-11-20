@@ -39,11 +39,11 @@ class OPRModeAnalyzer:
     def get_probe_positions(self, product_index: int) -> ProbePositionSequence:
         return self._repository[product_index].get_probe_positions_item().get_probe_positions()
 
-    def get_measured_photon_counts(self, product_index: int) -> RealArrayType | None:
-        """Per-position I0, or the detector totals when no I0 was recorded.
+    def get_i0_or_detector_sums(self, product_index: int) -> RealArrayType | None:
+        """Per-position I0, or the detector sums when no I0 was recorded.
 
         The I0 the probe positions carry is what the incident beam did; without it the
-        totals from the bound data's moments are the nearest measure, folding in the
+        detector sums from the bound data's moments are the nearest measure, folding in the
         sample's absorption, and the log says which is returned. None when neither is
         available.
 
@@ -55,7 +55,7 @@ class OPRModeAnalyzer:
         """
         item = self._repository[product_index]
         positions = item.get_probe_positions_item().get_probe_positions()
-        counts_by_index = positions.get_probe_photon_counts_by_index()
+        counts_by_index = positions.get_i0_by_index()
 
         if counts_by_index:
             logger.info('Comparing the OPR weights with the recorded I0.')
@@ -66,10 +66,10 @@ class OPRModeAnalyzer:
             if moments is None:
                 return None
 
-            logger.info('No I0 was recorded; comparing the OPR weights with the detector totals.')
+            logger.info('No I0 was recorded; comparing the OPR weights with the detector sums.')
             counts_by_index = {
                 int(index): float(total)
-                for index, total in zip(moments.indexes, moments.total_counts, strict=True)
+                for index, total in zip(moments.indexes, moments.detector_sums, strict=True)
             }
 
         return numpy.array(

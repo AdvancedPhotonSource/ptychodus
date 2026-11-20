@@ -606,7 +606,7 @@ class TestGenerateAveragePatternProbe:
 
         from_moments = generate_average_pattern_probe(
             _sample_plane_geometry(),
-            moments.mean_pattern(),
+            moments.inpainted_mean_pattern(),
             detector_pixel_geometry=data.get_pixel_geometry(),
             bad_pixels=moments.bad_pixels,
             photon_wavelength_m=_BACKPROP_WAVELENGTH_M,

@@ -249,7 +249,7 @@ class AffineTransform:
             index=position.index,
             x_m=self.a00 * position.x_m + self.a01 * position.y_m + self.a02,
             y_m=self.a10 * position.x_m + self.a11 * position.y_m + self.a12,
-            probe_photon_count=position.probe_photon_count,
+            i0=position.i0,
         )
 
     def transform_coordinates(
@@ -294,7 +294,7 @@ def transform_probe_positions(
                 index=transformed.index,
                 x_m=transformed.x_m + radius_m * numpy.cos(angle_rad),
                 y_m=transformed.y_m + radius_m * numpy.sin(angle_rad),
-                probe_photon_count=transformed.probe_photon_count,
+                i0=transformed.i0,
             )
 
         yield transformed
@@ -408,7 +408,7 @@ def _match_pair(
 ) -> _MatchedPair:
     """Pair two position sequences by scan index and return the displacement vectors.
 
-    Positions present on only one side are dropped, so a corrected set that lost scan points
+    Positions present on only one side are dropped, so a corrected set that lost probe positions
     still contributes every point it kept; positions sharing an index average into one.
     """
     indexes, matched_uncorrected, matched_corrected = uncorrected.match_indexes(corrected)

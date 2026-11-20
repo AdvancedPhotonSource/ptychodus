@@ -1,6 +1,6 @@
 """Objects estimated from the measured data: STXM-DPC, Paganin and spectral phase retrieval.
 
-STXM-DPC and Paganin read the per-pattern totals the diffraction moments carry, and use
+STXM-DPC and Paganin read the per-pattern detector sums the diffraction moments carry, and use
 the product's probe, when it is on the object's pixels, to bound the region the estimate
 is supported on. The spectral estimate reads every pixel of the assembled patterns, so it
 waits for the moments as the others do and then corrects the patterns as the moments
@@ -32,21 +32,21 @@ from ._options import expect_options
 logger = logging.getLogger(__name__)
 
 
-def _get_i0_counts_by_index(geometry_provider: ObjectGeometryProvider) -> dict[int, float]:
+def _get_i0_by_index(geometry_provider: ObjectGeometryProvider) -> dict[int, float]:
     """The I0 readings the probe positions carry, keyed by scan index; empty without any."""
     positions = geometry_provider.get_probe_positions()
     return (
         positions
         if isinstance(positions, ProbePositionSequence)
         else ProbePositionSequence(positions)
-    ).get_probe_photon_counts_by_index()
+    ).get_i0_by_index()
 
 
 def compute_decay_corrected_signals(geometry_provider: ObjectGeometryProvider) -> STXMDPCSignals:
     """STXM-DPC signals from the bound data's moments, corrected for beam decay by I0.
 
     The I0 the probe positions carry scales each total by ``mean(I0) / I0_j``; without
-    any the totals are used as they are.
+    any the detector sums are used as they are.
 
     Raises:
         GeometryNotDefinedError: while the moments are not yet available, so the build
@@ -57,12 +57,12 @@ def compute_decay_corrected_signals(geometry_provider: ObjectGeometryProvider) -
     if moments is None:
         raise GeometryNotDefinedError('No diffraction moments to estimate the object from yet.')
 
-    i0_counts_by_index = _get_i0_counts_by_index(geometry_provider)
+    i0_by_index = _get_i0_by_index(geometry_provider)
 
-    if i0_counts_by_index:
+    if i0_by_index:
         moments = moments.normalize_by_i0(
-            numpy.fromiter(i0_counts_by_index.keys(), dtype=numpy.intp),
-            numpy.fromiter(i0_counts_by_index.values(), dtype=numpy.float64),
+            numpy.fromiter(i0_by_index.keys(), dtype=numpy.intp),
+            numpy.fromiter(i0_by_index.values(), dtype=numpy.float64),
         )
 
     return STXMDPCSignals.from_moments(moments)
@@ -133,7 +133,7 @@ class STXMDPCObjectGenerator(ObjectGenerator):
         if dpc.shadow_correction and probe is None:
             logger.warning('No probe to correct the STXM-DPC shadow term with; skipping it.')
 
-        height_px, width_px = moments.mean_frame.shape
+        height_px, width_px = moments.mean_pattern.shape
         return generate_stxm_dpc_object(
             geometry_provider.get_object_geometry(),
             compute_decay_corrected_signals(geometry_provider),
@@ -147,7 +147,7 @@ class STXMDPCObjectGenerator(ObjectGenerator):
 
 class PaganinOptions(BaseModel):
     # The wavelength and propagation distance are the experiment's, read from the
-    # provider at build time; only delta/beta is the specimen's, and unknowable from
+    # provider at build time; only delta/beta is the sample's, and unknowable from
     # the product. They enter the filter as one product, so a stale duplicate of either
     # would be absorbed invisibly into a hand-tuned delta/beta.
     delta_over_beta: float = Field(100.0, ge=1e-3, title='Delta / Beta:')
@@ -308,5 +308,5 @@ class SpectralObjectGenerator(ObjectGenerator):
             tolerance=spectral.eigensolver_tolerance,
             max_restarts=spectral.eigensolver_max_restarts,
             correct_amplitude=spectral.reference_amplitude_correction,
-            i0_counts_by_index=_get_i0_counts_by_index(geometry_provider),
+            i0_by_index=_get_i0_by_index(geometry_provider),
         )

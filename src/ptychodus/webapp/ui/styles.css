@@ -41,7 +41,7 @@ body {
   gap: 0.25rem;
 }
 
-/* Text under the icon, as the desktop toolbar lays out its buttons. */
+/* Text under the icon, as the GUI toolbar lays out its buttons. */
 .nav button {
   width: 5.75rem;
   padding: 0.375rem 0.25rem;
@@ -75,7 +75,7 @@ body {
 .nav button.active img { filter: invert(100%) brightness(100%); }
 
 /* Child entries of a nav group: a rail down the left and an indent, the same
-   3px/14px the desktop nav uses, with the desktop's 3/4-size icon to mark the
+   3px/14px the GUI nav uses, with the GUI's 3/4-size icon to mark the
    second level. */
 .nav-group {
   display: flex;
@@ -384,7 +384,7 @@ body {
 .data-table .check-col { width: 2.5rem; text-align: center; }
 
 /* --- viewer ribbon ---------------------------------------------------- */
-/* Grouped as the desktop ImageRibbon is, minus the image tools: pan, ruler and
+/* Grouped as the GUI ImageRibbon is, minus the image tools: pan, ruler and
    line-cut act on a canvas this panel does not have. */
 .image-ribbon {
   display: flex;
@@ -421,7 +421,7 @@ body {
 .ribbon-group input[type='number'] { width: 7ch; }
 
 /* --- row state --------------------------------------------------------- */
-/* As the desktop shows an item still loading (italic) or one that failed
+/* As the GUI shows an item still loading (italic) or one that failed
    (struck through), both greyed out. */
 .row-pending,
 .row-failed { color: var(--fg-muted); }
@@ -455,7 +455,7 @@ body {
 }
 
 /* --- color legend ------------------------------------------------------ */
-/* Drawn over the image as the desktop paints it in the view's foreground: a bar
+/* Drawn over the image as the GUI paints it in the view's foreground: a bar
    with five ticks at the right edge, or a disc in the corner for a cyclic map. */
 .image-panel .image-wrap { position: relative; }
 

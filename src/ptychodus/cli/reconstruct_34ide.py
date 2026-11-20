@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Reconstruct one APS 34-ID-E Microdiffraction ptychography dataset through the ptychodus api.
 
-34-ID-E writes one uncompressed EPICS-areaDetector TIFF per scan point into a per-scan
+34-ID-E writes one uncompressed EPICS-areaDetector TIFF per probe position into a per-scan
 directory, beside an EPICS MDA file holding the positions and a JSON list of the
 detector's bad pixels. The TIFF frame counter is not zero padded, so a scan longer than
 999 points rolls from ``_999`` to ``_1000`` partway through and the series is globbed at

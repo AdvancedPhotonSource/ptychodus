@@ -3,9 +3,9 @@
 **This module is transitional.** ptychodus persists one flat section of prefixed
 scalar keys per settings group because Qt controllers bind to a flat
 ``ParameterGroup``. A declared options model is nested instead, mirroring the
-structure the backend actually accepts. Until the Qt panels retire, something has
+structure the library actually accepts. Until the Qt panels retire, something has
 to collapse one onto the other, and that something lives here rather than in the
-plugin -- so a backend never names an INI key, and so this file can be deleted
+plugin -- so a library never names an INI key, and so this file can be deleted
 whole rather than unpicked.
 
 The projection is rule-driven, not a key-by-key map. A nested options object
@@ -17,7 +17,7 @@ by far the largest table -- what a declaration ptychodus does not own cannot
 carry about itself.
 
 Naming policy is per model, because no single convention fits: ptychodus's own
-groups are PascalCase with spelled-out units, while two backends persist the
+groups are PascalCase with spelled-out units, while two libraries persist the
 snake_case field names of the libraries they wrap.
 """
 
@@ -210,7 +210,7 @@ class BoolEnum(StructuralAdapter):
 class EnumSpelling(Enum):
     """Which of an enum member's two names the settings file holds.
 
-    ptychodus writes pty-chi's enums by member name and its own backends' by
+    ptychodus writes pty-chi's enums by member name and its own libraries' by
     value, so a `StrEnum` member has two valid spellings and the key decides
     which. Everything that writes one, reads one back, or offers the choices a
     key accepts has to agree, and they are in different layers -- so the rule
@@ -248,7 +248,7 @@ class NamingConvention(Enum):
     """How one declared model's field names are spelled as persisted keys.
 
     Per model because no single convention fits: ptychodus's own groups are
-    PascalCase with units spelled out, while two backends persist the
+    PascalCase with units spelled out, while two libraries persist the
     snake_case field names of the libraries they wrap. Stating which rather
     than switching on a flag keeps both named, and keeps the spelling with the
     convention that does it.
@@ -342,7 +342,7 @@ class FlatParameter:
     # a field typed as an enum already carries its members in its annotation.
     choices: Sequence[str] = ()
     # Set when several keys share one declared field, naming this key's role.
-    # The value adapter is the backend's, since only it knows the field's shape.
+    # The value adapter is the library's, since only it knows the field's shape.
     structural_role: str = ''
     # How an enum value is spelled in the settings file, resolved here so that
     # whatever writes or reads the key needs only this record.
@@ -412,7 +412,7 @@ class FlatteningPolicy:
     structural: Mapping[str, StructuralAdapter] = field(default_factory=dict)
     # Leaf names that merely switch their group on, and so take the bare prefix.
     collapse_onto_prefix: frozenset[str] = frozenset({'enabled', 'optimizable'})
-    # ptychodus persists pty-chi enums by member name; the backends it owns
+    # ptychodus persists pty-chi enums by member name; the libraries it owns
     # persist theirs by value.
     spelling: EnumSpelling = EnumSpelling.BY_NAME
     # How this model's field names become persisted keys.
@@ -525,7 +525,7 @@ def _leaf(
     # such a key does have is the overlay's to state. Inheriting instead
     # clamps the key silently -- a parameter reports a bounded value but
     # persists the raw one, so the settings file looks right and the value
-    # handed to the backend is not.
+    # handed to the library is not.
     declared_minimum, declared_maximum = (None, None) if role else read_bounds(info)
     # Read off the declared field, so an adapter's key reports none: an adapter may
     # persist a pair of radians as a pair of degrees, and inheriting the field's unit

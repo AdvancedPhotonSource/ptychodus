@@ -1,4 +1,4 @@
-"""End-to-end smoke test for the PtychoFM backend against the current ptycho-fm.
+"""End-to-end smoke test for the PtychoFM library against the current ptycho-fm.
 
 Not part of the test suite -- ptycho-fm is not installed in the venv, so this is
 run manually with PYTHONPATH pointing at the sibling checkout:

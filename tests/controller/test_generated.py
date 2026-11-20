@@ -8,7 +8,7 @@ list[_Item]`` pipeline and are exercised as one. Which editor a field actually
 gets is a widget, and needs a ``QApplication`` to build.
 
 A `DescribedField` is assembled here rather than flattened from a model, so a
-shape the backends do not currently produce can still be stated.
+shape the libraries do not currently produce can still be stated.
 """
 
 from __future__ import annotations
@@ -256,16 +256,16 @@ class TestHowAChoiceIsSpelled:
 
 
 class TestTitlingAGroup:
-    def test_the_backend_name_is_stripped(self) -> None:
+    def test_the_library_name_is_stripped(self) -> None:
         assert _group_label('PtyChiObject', 'pty-chi') == 'Object'
 
-    def test_a_group_that_is_only_the_backend_name_keeps_it(self) -> None:
+    def test_a_group_that_is_only_the_library_name_keeps_it(self) -> None:
         assert _group_label('PtyChi', 'pty-chi') == 'PtyChi'
 
-    def test_a_group_naming_another_backend_is_left_alone(self) -> None:
+    def test_a_group_naming_another_library_is_left_alone(self) -> None:
         assert _group_label('PtychoFMInference', 'pty-chi') == 'PtychoFMInference'
 
-    def test_the_algorithm_name_is_stripped_where_the_backend_name_is_absent(self) -> None:
+    def test_the_algorithm_name_is_stripped_where_the_library_name_is_absent(self) -> None:
         assert _group_label('LSQMLProbe', 'pty-chi', 'LSQML') == 'Probe'
 
     def test_a_group_that_is_only_the_algorithm_name_keeps_it(self) -> None:

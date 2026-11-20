@@ -12,8 +12,8 @@ that object on every load/reconstruct/save/load round trip, unbounded -- and the
 padding defaults to 1, so it would happen to users who never touched the setting.
 
 Second, FromMemoryObjectBuilder must never condition. It holds an object that is
-already conditioned -- reconstruction output, which ProcessingTaskMonitor
-re-assigns to the output product item on every reconstructor iteration, and
+already conditioned -- a reconstruction, which ProcessingTaskMonitor
+re-assigns to its product item on every reconstructor iteration, and
 products loaded from HDF5/NPZ. Padding there would grow the array once per
 iteration, and generate_layers would collapse a converged multislice result back
 to whatever the item's layer spacing happens to say.
@@ -282,7 +282,7 @@ def test_from_file_conditioning_is_idempotent() -> None:
 
 
 def test_from_memory_builder_ignores_conditioning() -> None:
-    """Guards reconstruction output: the from-memory builder must return its
+    """Guards reconstructions: the from-memory builder must return its
     object verbatim no matter what the conditioning parameters say."""
     settings = _make_settings()
     raw = _make_object(3)
@@ -511,7 +511,7 @@ def test_from_file_object_keeps_its_own_transmission() -> None:
 
 
 def test_from_memory_object_keeps_its_own_transmission() -> None:
-    """Reconstruction output flows through this builder once per iteration, so a
+    """A reconstruction flows through this builder once per iteration, so a
     rescale here would compound on every one."""
     settings = _make_settings()
     raw = _make_object(1)

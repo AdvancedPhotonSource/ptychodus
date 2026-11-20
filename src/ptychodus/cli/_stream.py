@@ -1,4 +1,4 @@
-"""The pvapy-free core of ``ptychodus-stream``: one scan at a time, from frames to the store.
+"""The pvapy-free core of ``ptychodus-stream``: one scan at a time, from frames to the storage root.
 
 A scan is collected from a stream of detector frames and probe positions, paired by
 scan index; a frame joins the scan only once positions cover its index. Each scan is
@@ -272,7 +272,7 @@ def prepare_storage_root(directory: Path) -> StorageLayout:
 
 @dataclass(frozen=True)
 class ScanSetup:
-    """A configuration with everything it names loaded and checked: maps, models, store."""
+    """A configuration with everything it names loaded and checked."""
 
     configuration: StreamConfiguration
     bad_pixels: BadPixels | None
@@ -288,12 +288,12 @@ class ScanSetup:
     def from_configuration(
         cls, configuration: StreamConfiguration, registry: PluginRegistry
     ) -> ScanSetup:
-        """Load the maps, resolve the models and prepare the store `configuration` names.
+        """Load the maps, resolve the generators and prepare the storage root `configuration` names.
 
         Raises:
             LookupError: if a reader or generator is not registered.
-            ValueError: if a model option is unknown or invalid.
-            OSError: if a map cannot be read or the store is not writable.
+            ValueError: if a generator option is unknown or invalid.
+            OSError: if a map cannot be read or the storage root is not writable.
         """
         bad_pixels = None
         background = None
@@ -620,7 +620,7 @@ class ProbePositionStream:
                 index=int(targets[k]),
                 x_m=float(x_m[k]),
                 y_m=float(y_m[k]),
-                probe_photon_count=None if i0 is None else float(i0[k]),
+                i0=None if i0 is None else float(i0[k]),
             )
             for k in numpy.flatnonzero(covered)
         ]
@@ -750,7 +750,7 @@ class ScanSnapshot(ProbeGeometryProvider, ObjectGeometryProvider):
         return self._derived().probe_power_W
 
     @property
-    def num_scan_points(self) -> int:
+    def num_probe_positions(self) -> int:
         return len(self._positions)
 
     @property
@@ -857,8 +857,8 @@ class ScanSession:
                 dataset,
                 configuration.pipeline,
                 read_region=configuration.get_read_region(),
-                total_counts_lower_bound=configuration.total_counts_lower_bound,
-                total_counts_upper_bound=configuration.total_counts_upper_bound,
+                detector_sum_lower_bound=configuration.total_counts_lower_bound,
+                detector_sum_upper_bound=configuration.total_counts_upper_bound,
             )
         except ValueError:
             logger.exception(f'Cannot prepare {width}x{height} frames with this configuration!')
@@ -1025,7 +1025,7 @@ class ScanSession:
             return None
 
         _, positions = self.positions.at(moments.indexes)
-        height, width = moments.mean_frame.shape
+        height, width = moments.mean_pattern.shape
         return ScanSnapshot(
             metadata,
             ImageExtent(width_px=width, height_px=height),
@@ -1090,7 +1090,7 @@ def estimate_product(
 ) -> Product:
     """A product from a scan's moments, by the GUI's sequence.
 
-    1. The incident beam -- photon count and mean transmission -- from the totals,
+    1. The incident beam -- photon count and mean transmission -- from the detector sums,
        corrected for beam decay by the positions' I0.
     2. When the configuration states no focus, the patterns are far field and the moments
        were binned, the parallax defocus; a resolved estimate sets the focus, and an
@@ -1104,7 +1104,7 @@ def estimate_product(
     metadata = snapshot.metadata
     beam = estimate_incident_beam(
         moments,
-        positions.get_probe_photon_counts_by_index(),
+        positions.get_i0_by_index(),
         i0_photons_per_count=metadata.i0_photons_per_count,
     )
     metadata = replace(metadata, probe_photon_count=beam.incident_photon_count)
@@ -1278,7 +1278,7 @@ class ScanPipeline:
     - **ingest** is the only thread that changes a scan: it prepares frames, pairs them
       with positions, and decides where scans end;
     - **worker** is the only thread that estimates, publishes or writes files, so
-      publishes are in order and store writes are serialized.
+      publishes are in order and storage writes are serialized.
 
     A trigger is acknowledged at once, then the scan settles: whatever arrives within
     ``settle_s`` of the trigger still belongs to it. At the cut, frames still waiting

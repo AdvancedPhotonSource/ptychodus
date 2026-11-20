@@ -11,8 +11,8 @@ scratch. The guards in ProbeEnsembleBuilder._condition_probe are what stop a
 converged OPR basis being replaced with noise.
 
 Second, FromMemoryProbeBuilder must never condition. It holds a probe that is
-already conditioned -- reconstruction output, which ProcessingTaskMonitor
-re-assigns to the output product item on every reconstructor iteration, and
+already conditioned -- a reconstruction, which ProcessingTaskMonitor
+re-assigns to its product item on every reconstructor iteration, and
 products loaded from HDF5/NPZ. Re-running the mode generators there would destroy
 the reconstruction, once per iteration.
 
@@ -71,7 +71,7 @@ from ptychodus.model.product.probe.settings import ProbeSettings
 from ptychodus.plugins import probe as probe_plugins
 from ptychodus.api.constants import PI
 
-NUM_SCAN_POINTS = 7
+NUM_PROBE_POSITIONS = 7
 PROBE_PHOTON_COUNT = 1.0e6
 # Fine enough that the default 1 um disk covers several pixels; at a coarser
 # pixel size the generated probe is empty and rescale_probe_intensity bails.
@@ -192,8 +192,8 @@ class _StubProbeGeometryProvider(ProbeGeometryProvider):
         return 1.0
 
     @property
-    def num_scan_points(self) -> int:
-        return NUM_SCAN_POINTS
+    def num_probe_positions(self) -> int:
+        return NUM_PROBE_POSITIONS
 
     def get_detector_pixel_geometry(self) -> PixelGeometry:
         # The model's provider takes the pitch from the bound data, as here.
@@ -223,12 +223,12 @@ def _make_probe_seq(
     num_imodes: int,
     *,
     with_opr_weights: bool = False,
-    num_positions: int = NUM_SCAN_POINTS,
+    num_positions: int = NUM_PROBE_POSITIONS,
 ) -> ProbeEnsemble:
     """A deterministic, non-degenerate probe of the requested mode structure.
 
     ``num_positions`` sizes the OPR weights, so passing something other than
-    ``NUM_SCAN_POINTS`` produces the probe of a *different* scan.
+    ``NUM_PROBE_POSITIONS`` produces the probe of a *different* scan.
     """
     rng = numpy.random.default_rng(7)
     shape = (num_cmodes, num_imodes, 8, 8)
@@ -303,7 +303,7 @@ def test_generator_expands_coherent_modes() -> None:
 
     opr_weights = probe_seq.get_opr_weights_or_none()
     assert opr_weights is not None
-    assert opr_weights.shape == (NUM_SCAN_POINTS, 3)
+    assert opr_weights.shape == (NUM_PROBE_POSITIONS, 3)
 
 
 def test_generator_rescales_to_photon_count() -> None:
@@ -411,7 +411,7 @@ def test_conditioning_is_idempotent(num_imodes: int, num_cmodes: int) -> None:
 
 
 def test_from_memory_builder_ignores_conditioning() -> None:
-    """Guards reconstruction output: the from-memory builder must return its
+    """Guards reconstructions: the from-memory builder must return its
     probe verbatim no matter what the mode parameters say."""
     settings = _make_settings()
     raw = _make_probe_seq(2, 3, with_opr_weights=True)
@@ -749,13 +749,13 @@ class TestIncoherentModeStrategySettings:
         assert _total_intensity(probe_seq) == pytest.approx(PROBE_PHOTON_COUNT)
 
 
-OTHER_SCAN_POSITIONS = NUM_SCAN_POINTS + 4
+OTHER_NUM_PROBE_POSITIONS = NUM_PROBE_POSITIONS + 4
 """A probe-position count that is deliberately not this run's."""
 
 
 def _opr_from_another_scan(num_cmodes: int = 3, num_imodes: int = 2) -> ProbeEnsemble:
     return _make_probe_seq(
-        num_cmodes, num_imodes, with_opr_weights=True, num_positions=OTHER_SCAN_POSITIONS
+        num_cmodes, num_imodes, with_opr_weights=True, num_positions=OTHER_NUM_PROBE_POSITIONS
     )
 
 
@@ -776,14 +776,14 @@ def test_from_file_builder_conforms_opr_weights_from_another_scan(
         probe_seq = builder.build(_StubProbeGeometryProvider())
 
     weights = probe_seq.get_opr_weights()
-    assert weights.shape == (NUM_SCAN_POINTS, 3)
-    assert probe_seq.num_opr_positions == NUM_SCAN_POINTS
+    assert weights.shape == (NUM_PROBE_POSITIONS, 3)
+    assert probe_seq.num_opr_positions == NUM_PROBE_POSITIONS
     # The default is AVERAGE, so every position starts from the same row.
     numpy.testing.assert_allclose(
         weights,
         numpy.broadcast_to(from_file.get_opr_weights().mean(axis=0), weights.shape),
     )
-    assert str(OTHER_SCAN_POSITIONS) in caplog.text
+    assert str(OTHER_NUM_PROBE_POSITIONS) in caplog.text
     assert 'AVERAGE' in caplog.text
 
 
@@ -827,7 +827,7 @@ def test_an_unknown_policy_name_still_builds() -> None:
 
     probe_seq = builder.build(_StubProbeGeometryProvider())
 
-    assert probe_seq.get_opr_weights().shape == (NUM_SCAN_POINTS, 3)
+    assert probe_seq.get_opr_weights().shape == (NUM_PROBE_POSITIONS, 3)
 
 
 def test_an_override_applies_even_when_the_counts_already_agree() -> None:
@@ -841,7 +841,7 @@ def test_an_override_applies_even_when_the_counts_already_agree() -> None:
     probe_seq = builder.build(_StubProbeGeometryProvider())
 
     weights = probe_seq.get_opr_weights()
-    assert weights.shape == (NUM_SCAN_POINTS, 3)
+    assert weights.shape == (NUM_PROBE_POSITIONS, 3)
     numpy.testing.assert_array_equal(weights[:, 0], 1.0)
     assert numpy.absolute(weights[:, 1:]).max() < 1.0e-5
 
@@ -868,7 +868,7 @@ def test_discarding_an_old_basis_composes_with_a_new_mode_count() -> None:
     probe_seq = builder.build(_StubProbeGeometryProvider())
 
     assert probe_seq.num_coherent_modes == 3
-    assert probe_seq.get_opr_weights().shape == (NUM_SCAN_POINTS, 3)
+    assert probe_seq.get_opr_weights().shape == (NUM_PROBE_POSITIONS, 3)
 
 
 def test_from_memory_builder_conforms_opr_weights_from_another_scan() -> None:
@@ -878,11 +878,11 @@ def test_from_memory_builder_conforms_opr_weights_from_another_scan() -> None:
 
     probe_seq = builder.build(_StubProbeGeometryProvider())
 
-    assert probe_seq.get_opr_weights().shape == (NUM_SCAN_POINTS, 3)
+    assert probe_seq.get_opr_weights().shape == (NUM_PROBE_POSITIONS, 3)
 
 
 def test_from_memory_builder_is_untouched_when_the_counts_agree() -> None:
-    """The regression guard for reconstruction output.
+    """The regression guard for reconstructions.
 
     ProcessingTaskMonitor re-assigns the reconstructor's probe through this builder on
     every iteration, and those weights always match the run. Conforming must be a strict
@@ -1381,10 +1381,10 @@ class TestModelProbesInTheExitFrame:
     def test_a_probe_estimated_from_the_patterns_is_left_alone(self) -> None:
         rng = numpy.random.default_rng(3)
         patterns = rng.poisson(
-            100.0, size=(NUM_SCAN_POINTS, PROBE_EXTENT_PX, PROBE_EXTENT_PX)
+            100.0, size=(NUM_PROBE_POSITIONS, PROBE_EXTENT_PX, PROBE_EXTENT_PX)
         ).astype(float)
         data = AssembledDiffractionData(
-            numpy.arange(NUM_SCAN_POINTS),
+            numpy.arange(NUM_PROBE_POSITIONS),
             patterns,
             PixelGeometry(width_m=PIXEL_SIZE_M, height_m=PIXEL_SIZE_M),
             numpy.zeros((PROBE_EXTENT_PX, PROBE_EXTENT_PX), dtype=bool),

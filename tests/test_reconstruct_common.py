@@ -1,6 +1,6 @@
 """Rank-guarding and cancellation of the shared reconstruction body.
 
-``save_assembled_diffraction`` and ``run_reconstruction`` write four artifacts between them,
+``save_assembled_diffraction`` and ``run_reconstruction`` write four files between them,
 each with a truncating open. Under a multi-process launch every rank runs the same
 reconstruction and ends up holding the same product, so without a guard every rank would
 write the same paths concurrently. These tests pin down that the writes happen exactly once,
@@ -108,7 +108,7 @@ class _FakeOptions(BaseModel):
 
 
 class _FakeReconstructor(Reconstructor):
-    """Yields every `num_sync_epochs` epochs, calling `on_epoch` first, as a backend would."""
+    """Yields every `num_sync_epochs` epochs, calling `on_epoch` first, as a reconstructor would."""
 
     def __init__(
         self, *, on_epoch: Callable[[int], None] | None = None, empty: bool = False
@@ -232,9 +232,7 @@ def _run(
     return product
 
 
-def test_main_process_writes_every_artifact(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_main_process_writes_every_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _run(monkeypatch, tmp_path, rank=0)
 
     assert (tmp_path / 'reconstruct_options.yaml').is_file()
@@ -267,7 +265,7 @@ def test_product_is_returned_on_every_rank(
 def test_secondary_process_writes_nothing_before_the_group_exists(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    # The first artifact is written before the reconstruction task is built, so there is
+    # The first file is written before the reconstruction task is built, so there is
     # no process group yet and pty-chi reports rank 0 everywhere. Without consulting the
     # launcher's environment too, every rank would write the same paths at once.
     _run(monkeypatch, tmp_path, rank=1, rank_variable='RANK')
@@ -295,9 +293,7 @@ def test_srun_secondary_task_writes_nothing(
     assert list(tmp_path.iterdir()) == []
 
 
-def test_srun_main_task_writes_every_artifact(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_srun_main_task_writes_every_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _run(monkeypatch, tmp_path, rank=0, rank_variable='SLURM_PROCID')
 
     assert (tmp_path / 'reconstruct_options.yaml').is_file()
@@ -356,7 +352,7 @@ def test_save_assembled_diffraction_writes_once_on_the_main_process(
 def test_save_assembled_diffraction_writes_nothing_on_a_secondary_rank(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, rank_variable: str | None
 ) -> None:
-    # The largest artifact of the run, and a truncating write: concurrent ranks writing
+    # The largest file of the run, and a truncating write: concurrent ranks writing
     # the same path corrupt it.
     _set_rank(monkeypatch, 1, rank_variable=rank_variable)
     output_directory = tmp_path / 'out'
@@ -1272,7 +1268,7 @@ def test_the_beam_estimate_takes_the_moments_accumulated_during_assembly(
     )
     dataset = SimpleDiffractionDataset(metadata, DiffractionDatasetLayoutNode.create_root(), arrays)
     positions = ProbePositionSequence(
-        [ProbePosition(index=i, x_m=0.0, y_m=0.0, probe_photon_count=100.0 - i) for i in range(6)]
+        [ProbePosition(index=i, x_m=0.0, y_m=0.0, i0=100.0 - i) for i in range(6)]
     )
     assembly_moments = AssemblyMomentAccumulator()
     assembled = assemble_dataset(dataset, on_array_assembled=assembly_moments.add_assembled)
@@ -1341,7 +1337,7 @@ def test_printing_another_librarys_options_takes_its_only_algorithm(
 
 
 def test_an_nccl_flag_lives_on_the_ranks_default_device(monkeypatch: pytest.MonkeyPatch) -> None:
-    # A backend puts each rank on its own GPU through torch's default device, while the
+    # A library puts each rank on its own GPU through torch's default device, while the
     # current device stays cuda:0 everywhere. A flag there would have every rank but the
     # first build a second communicator its peers never join, hanging the run.
     import torch

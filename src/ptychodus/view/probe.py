@@ -101,15 +101,15 @@ class OPRWeightPolicyDialog(QDialog):
         self.setLayout(layout)
 
     def set_counts(
-        self, num_weight_rows: int, num_scan_points: int, num_coherent_modes: int
+        self, num_weight_rows: int, num_probe_positions: int, num_coherent_modes: int
     ) -> None:
         """State what the file holds and what this run needs, and gate "use as is" on it."""
-        counts_agree = num_weight_rows == num_scan_points
+        counts_agree = num_weight_rows == num_probe_positions
         agreement = 'matches' if counts_agree else 'does not match'
         self._counts_label.setText(
             f'This probe has {num_coherent_modes} coherent (OPR) mode(s) with weights for'
             f' {num_weight_rows} probe position(s), which {agreement} the'
-            f' {num_scan_points} probe position(s) in this run.'
+            f' {num_probe_positions} probe position(s) in this run.'
         )
         self._buttons[OPRWeightPolicy.KEEP.value].setEnabled(counts_agree)
 
@@ -128,8 +128,8 @@ class OPRWeightPolicyDialog(QDialog):
 class OPRModeStatisticsView(QGroupBox):
     """Per-mode weight statistics, and the two numbers that summarize them.
 
-    The table says how each coherent mode behaves across the scan; the two summary rows
-    beneath it answer whether the OPR basis is earning its degrees of freedom at all,
+    The table says how each coherent mode behaves across the probe positions; the two
+    summary rows beneath it answer whether the OPR basis is earning its degrees of freedom at all,
     and how many of its modes are doing the work.
     """
 
@@ -139,7 +139,7 @@ class OPRModeStatisticsView(QGroupBox):
         self.effective_mode_count_label = QLabel('—')
 
         self.relative_variation_label.setToolTip(
-            'Share of the composed mode’s power that varies across the scan.'
+            'Share of the composed mode’s power that varies across the probe positions.'
             ' Near zero means the OPR basis is not modeling anything.'
         )
         self.effective_mode_count_label.setToolTip(
@@ -210,8 +210,8 @@ class OPRModeDisplayView(QGroupBox):
 
     The composed mode barely changes from position to position -- OPR variation is
     typically a fraction of a percent -- so on a fixed color scale it looks frozen.
-    Subtracting the across-scan mean leaves only what the weights move, which is the
-    view in which the variation is actually visible. The basis modes themselves are
+    Subtracting the mean over the probe positions leaves only what the weights move,
+    which is the view in which the variation is actually visible. The basis modes themselves are
     position-independent and say what *kind* of variation each one models.
     """
 
@@ -225,7 +225,7 @@ class OPRModeDisplayView(QGroupBox):
             'Incoherent mode 0 after the coherent weighted sum, at the selected position'
         )
         self.deviation_button.setToolTip(
-            'That mode minus its across-scan mean: what the OPR weights actually change'
+            'That mode minus its mean over the probe positions: what the OPR weights change'
         )
         self.basis_button.setToolTip(
             'One coherent basis mode on its own; the same at every probe position'
@@ -240,7 +240,7 @@ class OPRModeDisplayView(QGroupBox):
 
 
 class OPRModeCurvesView(QGroupBox):
-    """Picks which weight curves are plotted and what colors the scan grid."""
+    """Picks which weight curves are plotted and what colors the probe-positions plot."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Curves', parent)
@@ -248,7 +248,9 @@ class OPRModeCurvesView(QGroupBox):
         self.normalize_check_box = QCheckBox('Normalize Weight Curves')
         self.mode_list_widget = QListWidget()
 
-        self.color_by_combo_box.setToolTip('Quantity the scan grid colors each position by')
+        self.color_by_combo_box.setToolTip(
+            'Quantity the probe-positions plot colors each position by'
+        )
         self.normalize_check_box.setToolTip(
             'Rescale each weight curve to unit standard deviation so a weak mode’s'
             ' shape can be compared against a strong one'
@@ -281,10 +283,10 @@ class OPRModePlotView(QWidget):
 
 
 class OPRModeDialog(QDialog):
-    """How a probe's coherent (OPR) basis varies over a scan.
+    """How a probe's coherent (OPR) basis varies over the probe positions.
 
     The image pane and the two plots are three views of one selection: the slider picks
-    a probe position, and the series plot and scan grid mark where it sits.
+    a probe position, and the series plot and probe-positions plot mark where it sits.
     """
 
     def __init__(
@@ -298,7 +300,7 @@ class OPRModeDialog(QDialog):
         self.probe_view = ImageView()
         self.display_view = OPRModeDisplayView(mode_spin_box)
         self.series_plot_view = OPRModePlotView()
-        self.scan_grid_plot_view = OPRModePlotView()
+        self.probe_positions_plot_view = OPRModePlotView()
         self.statistics_view = OPRModeStatisticsView()
         self.curves_view = OPRModeCurvesView()
         self.position_slider = QSlider(Qt.Orientation.Horizontal)
@@ -328,7 +330,7 @@ class OPRModeDialog(QDialog):
         probe_layout.addWidget(self.display_view)
         probe_widget.setLayout(probe_layout)
 
-        series_group = QGroupBox('Across the Scan')
+        series_group = QGroupBox('Along the Probe Path')
         series_layout = QVBoxLayout()
         series_layout.addWidget(self.series_plot_view)
         series_group.setLayout(series_layout)
@@ -341,14 +343,14 @@ class OPRModeDialog(QDialog):
         left_splitter.setStretchFactor(0, 2)
         left_splitter.setStretchFactor(1, 1)
 
-        scan_grid_group = QGroupBox('Across the Scan Grid')
-        scan_grid_layout = QVBoxLayout()
-        scan_grid_layout.addWidget(self.scan_grid_plot_view)
-        scan_grid_group.setLayout(scan_grid_layout)
+        probe_positions_group = QGroupBox('At the Probe Positions')
+        probe_positions_layout = QVBoxLayout()
+        probe_positions_layout.addWidget(self.probe_positions_plot_view)
+        probe_positions_group.setLayout(probe_positions_layout)
 
         right_layout = QVBoxLayout()
         right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.addWidget(scan_grid_group, 1)
+        right_layout.addWidget(probe_positions_group, 1)
         right_layout.addWidget(self.statistics_view)
         right_layout.addWidget(self.curves_view)
 
@@ -638,7 +640,7 @@ class IlluminationDialog(QDialog):
 
 
 class ProbeMetricsDialog(DashboardDialog):
-    """Everything one probe says about itself and about its scan's overlap."""
+    """Everything one probe says about itself and about its probe positions' overlap."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -688,7 +690,7 @@ class ProbeMetricsDialog(DashboardDialog):
         self.median_pairwise_overlap_label = self.overlap_group.add_row('Pairwise Overlap Median')
         self.minimum_pairwise_overlap_label = self.overlap_group.add_row(
             'Pairwise Overlap Minimum',
-            'A value near zero marks a scan position that no neighbor overlaps',
+            'A value near zero marks a probe position that no neighbor overlaps',
         )
         self.maximum_pairwise_overlap_label = self.overlap_group.add_row('Pairwise Overlap Maximum')
         self.num_positions_label = self.overlap_group.add_row('Number of Positions')
@@ -732,7 +734,7 @@ class ProbeCompareDialog(DashboardDialog):
         self.object_shift_x_label = self.registration_group.add_row('Object Shift X [px]')
         self.object_shift_y_label = self.registration_group.add_row('Object Shift Y [px]')
         shift_tooltip = (
-            'When the reconstructions share their scan positions, the probe and object '
+            'When the reconstructions share their probe positions, the probe and object '
             'shifts agree. A large difference means they disagree about the positions.'
         )
         self.shift_difference_x_label = self.registration_group.add_row(

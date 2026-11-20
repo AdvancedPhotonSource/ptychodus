@@ -5,7 +5,7 @@ from .monitor import ProductTaskMonitor
 from .object_repository import ObjectRepository
 from .probe_repository import ProbeRepository
 from .repository import ProductRepository
-from .scan_repository import ProbePositionsRepository
+from .probe_positions_repository import ProbePositionsRepository
 from .settings import ProductSettings
 
 __all__ = [

@@ -54,7 +54,7 @@ def _make_product(
     canvas_px: int = 24,
     num_modes: int = 1,
 ) -> Product:
-    """Build a product whose scan positions sit at the given object-pixel centers."""
+    """Build a product whose probe positions sit at the given object-pixel centers."""
     pixel_geometry = PixelGeometry(width_m=_PIXEL_SIZE_M, height_m=_PIXEL_SIZE_M)
     radius_px = (canvas_px - 1) / 2
     positions = [

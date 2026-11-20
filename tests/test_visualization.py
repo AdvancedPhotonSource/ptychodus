@@ -670,7 +670,7 @@ class TestVisualizeComplexValues:
 # ---------------------------------------------------------------------------
 
 
-def test_transformation_names_are_those_the_desktop_registered() -> None:
+def test_transformation_names_are_those_the_gui_registered() -> None:
     """Simple names round-trip through settings, so they must not change."""
     assert [t.simple_name for t in ScalarTransformation] == [
         'identity',

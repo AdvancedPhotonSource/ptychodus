@@ -2,7 +2,7 @@
 
 The invariant the refactor buys us is that the parent ptychodus process never
 acquires a GPU context. Acquiring one is what pins driver state and GPU memory
-to the long-lived parent, and it is what stops ptychodus from mixing backends
+to the long-lived parent, and it is what stops ptychodus from mixing libraries
 built on different frameworks. Context acquisition means things like
 constructing ``ptychi.api.task.PtychographyTask``, placing a tensor on a
 device, ``tf.keras.Model.fit``, constructing a Lightning ``Trainer``, or
@@ -50,25 +50,25 @@ CONTEXT_CAPABLE_MODULES = (
 )
 
 # Modules banned from the parent AT IMPORT TIME: importing them acquires a
-# context, or they are child-side backend packages the composition roots have
+# context, or they are child-side library packages the composition roots have
 # no reason to touch.
 #
-# These used to be a softer case than ``cupy``: the parent reached a backend's
+# These used to be a softer case than ``cupy``: the parent reached a library's
 # config subpackage AT CALL TIME to build the config objects it shipped to the
-# child, so the ban held only at import time. It no longer does. Every backend
+# child, so the ban held only at import time. It no longer does. Every library
 # is now configured from a mapping of plain scalars assembled from settings, so
-# no parent-side code path imports a backend at all and the ban is absolute.
+# no parent-side code path imports a library at all and the ban is absolute.
 # ``tests/test_parent_config_builders.py`` pins the call-time half of that,
-# asserting the settings builders import no backend even when one is installed;
-# this probe pins the import-time half. Hoisting a backend import to module
+# asserting the settings builders import no library even when one is installed;
+# this probe pins the import-time half. Hoisting a library import to module
 # scope in a ``reconstructor.py`` is what this list is here to catch.
 CHILD_ONLY_MODULES = (
     'cupy',  # links and initialises the CUDA runtime at import; no non-invasive probe
-    'cdtools',  # cdtools backend; child-side entry point only
+    'cdtools',  # cdtools library; child-side entry point only
     'ptycho',  # ptychopinn TensorFlow package; raw_data/probe/tf_helper pull TensorFlow
-    'ptycho_torch',  # ptychopinn backend; child-side entry point only
-    'ptycho_fm',  # ptycho_fm backend; child-side entry point only
-    'ptychozoon',  # fluorescence backend; vspi_enhance pulls CuPy
+    'ptycho_torch',  # ptychopinn library; child-side entry point only
+    'ptycho_fm',  # ptycho_fm library; child-side entry point only
+    'ptychozoon',  # fluorescence library; vspi_enhance pulls CuPy
 )
 
 # The exceptions, named in full. Each is a configuration submodule the parent
@@ -145,7 +145,7 @@ def _check_in_subprocess(result_queue: multiprocessing.Queue[dict[str, list[str]
         import ptychodus.api.spawn  # noqa: F401
         from ptychodus.api.plugins import PluginRegistry
 
-        # Registering is what reaches every backend now that no composition
+        # Registering is what reaches every library now that no composition
         # root names one. It must still not import a GPU framework: a library
         # resolves its modules without loading them and builds its
         # reconstructors only when something asks for them.
@@ -190,10 +190,10 @@ def test_parent_imports_no_child_only_modules(probe_result: dict[str, list[str]]
         Offending sys.modules entries: {offenders}
 
         These modules acquire a GPU context just by being imported, or are
-        backend packages the parent has no reason to touch. Importing a GPU
+        library packages the parent has no reason to touch. Importing a GPU
         framework parent-side to build a picklable payload is fine -- see
         CONTEXT_CAPABLE_MODULES -- but these are not in that category. Import
-        them inside the backend's reconstruct/train/enhance, which ptychodus runs
+        them inside the library's reconstruct/train/enhance, which ptychodus runs
         in a spawned child, instead of at module scope.
         """
     )
@@ -211,7 +211,7 @@ def test_parent_holds_no_gpu_context(probe_result: dict[str, list[str]]) -> None
         Importing torch/tensorflow/ptychi in the parent is allowed; acquiring a
         context is not. Something at import time placed a tensor on a device,
         constructed a PtychographyTask/Trainer, or otherwise initialised the
-        runtime. Move that work into the backend's reconstruct/train/enhance,
+        runtime. Move that work into the library's reconstruct/train/enhance,
         which ptychodus runs in a spawned child (see
         ptychodus.api.spawn.iterate_in_subprocess).
         """

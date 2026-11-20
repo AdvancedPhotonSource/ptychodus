@@ -90,7 +90,7 @@ class AssembledDiffractionArray(DiffractionArray):
         self._array_index = array_index
         self._label = label
         self._data = data
-        self._total_counts = data.get_total_counts()
+        self._detector_sums = data.get_detector_sums()
         self._mean_pattern = data.get_mean_pattern()
 
     @classmethod
@@ -121,28 +121,28 @@ class AssembledDiffractionArray(DiffractionArray):
     def get_pattern(self, index: int) -> DiffractionPattern:
         return self._data.get_pattern(index)
 
-    def get_total_counts(self, index: int) -> int:
-        return self._total_counts[index]
+    def get_detector_sum(self, index: int) -> int:
+        return self._detector_sums[index]
 
-    def get_mean_total_counts(self) -> float:
-        """Mean per-pattern total counts, or zero when the array holds no patterns."""
-        if self._total_counts.size == 0:
+    def get_mean_detector_sum(self) -> float:
+        """Mean per-pattern detector sums, or zero when the array holds no patterns."""
+        if self._detector_sums.size == 0:
             return 0.0
 
-        return float(numpy.mean(self._total_counts))
+        return float(numpy.mean(self._detector_sums))
 
-    def get_max_total_counts(self) -> int:
-        """Largest per-pattern total counts, or zero when the array holds no patterns.
+    def get_max_detector_sum(self) -> int:
+        """Largest per-pattern detector sums, or zero when the array holds no patterns.
 
         Both reductions are guarded because a null array and (before the filter
-        learned to skip them) an array the total-counts filter emptied are legal
+        learned to skip them) an array the detector-sum filter emptied are legal
         zero-pattern blocks, and `numpy.mean`/`ndarray.max` answer those with a
         NaN and a `ValueError` respectively.
         """
-        if self._total_counts.size == 0:
+        if self._detector_sums.size == 0:
             return 0
 
-        return int(self._total_counts.max())
+        return int(self._detector_sums.max())
 
     def get_mean_pattern(self) -> DiffractionPattern:
         return self._mean_pattern
@@ -410,19 +410,19 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
         return numpy.average(means, axis=0, weights=weights)
 
-    def get_mean_total_counts(self) -> float:
-        """Mean per-pattern total counts over every assembled pattern.
+    def get_mean_detector_sum(self) -> float:
+        """Mean per-pattern detector sums over every assembled pattern.
 
-        Weighted by frames per array, like get_mean_pattern: averaging the
+        Weighted by patterns per array, like get_mean_pattern: averaging the
         per-array means unweighted would misreport any dataset whose arrays hold
-        different numbers of frames. Zero when no patterns are assembled.
+        different numbers of patterns. Zero when no patterns are assembled.
         """
         total = 0.0
         num_patterns = 0
 
         for array in self._array_list:
             array_num_patterns = array.get_num_patterns()
-            total += array.get_mean_total_counts() * array_num_patterns
+            total += array.get_mean_detector_sum() * array_num_patterns
             num_patterns += array_num_patterns
 
         if num_patterns == 0:
@@ -449,16 +449,16 @@ class AssembledDiffractionDataset(DiffractionDataset):
     def __len__(self) -> int:
         return len(self._array_list)
 
-    def _get_total_counts_bounds(self) -> tuple[int | None, int | None]:
-        """Snapshot the enabled total-counts bounds from settings."""
+    def _get_detector_sum_bounds(self) -> tuple[int | None, int | None]:
+        """Snapshot the enabled detector-sum bounds from settings."""
         lower = (
-            self._settings.total_counts_lower_bound.get_value()
-            if self._settings.total_counts_lower_bound_enabled.get_value()
+            self._settings.detector_sum_lower_bound.get_value()
+            if self._settings.detector_sum_lower_bound_enabled.get_value()
             else None
         )
         upper = (
-            self._settings.total_counts_upper_bound.get_value()
-            if self._settings.total_counts_upper_bound_enabled.get_value()
+            self._settings.detector_sum_upper_bound.get_value()
+            if self._settings.detector_sum_upper_bound_enabled.get_value()
             else None
         )
         return lower, upper
@@ -510,9 +510,9 @@ class AssembledDiffractionDataset(DiffractionDataset):
         single-threaded; arrays may complete out of order and are sorted there by
         their monotonic array_index.
 
-        An array the total-counts filter emptied is dropped rather than published:
+        An array the detector-sum filter emptied is dropped rather than published:
         it contributes no patterns to the reconstruction, and a zero-pattern row in
-        the tree carries no counts, no frames, and no mean pattern to show. Its
+        the tree carries no detector sums, no patterns, and no mean pattern to show. Its
         slots in the buffer keep their sentinel indexes and stay elided.
         """
         if view.get_patterns_shape()[0] == 0:
@@ -573,7 +573,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
         read_region = plan.read_region if plan is not None else None
         pipeline = plan.pipeline if plan is not None else None
         raw_pixel_geometry = self.get_raw_pixel_geometry()
-        lower, upper = self._get_total_counts_bounds()
+        lower, upper = self._get_detector_sum_bounds()
         corrections = self._create_corrections()
 
         patterns_shape = compute_assembled_patterns_shape(
@@ -620,8 +620,8 @@ class AssembledDiffractionDataset(DiffractionDataset):
             pipeline,
             bad_pixels=self._bad_pixels,
             raw_pixel_geometry=raw_pixel_geometry,
-            total_counts_lower_bound=lower,
-            total_counts_upper_bound=upper,
+            detector_sum_lower_bound=lower,
+            detector_sum_upper_bound=upper,
             read_region=read_region,
             corrections=corrections,
             on_array_assembled=self._on_array_assembled,

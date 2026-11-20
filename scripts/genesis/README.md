@@ -18,7 +18,7 @@ python scripts/genesis/olcf/check_token.py                  # introspect an OLCF
 | | ALCF | NERSC | OLCF |
 | --- | --- | --- | --- |
 | System | Polaris | Perlmutter | Odo |
-| Accelerator | NVIDIA A100 | NVIDIA A100 | AMD MI250X |
+| GPU | NVIDIA A100 | NVIDIA A100 | AMD MI250X |
 | Image variant | `containers/Dockerfile.cuda` | `containers/Dockerfile.cuda` | `containers/Dockerfile.rocm` |
 | Container runtime | stock podman, or Apptainer | `podman-hpc` wrapper | stock podman, then Apptainer |
 | Runs the container directly | yes | yes | no — convert to SIF first |
@@ -85,7 +85,7 @@ Use passcode only.
 
 ### Containers
 
-Polaris has NVIDIA A100 GPUs, so the matching image is [containers/Dockerfile.cuda](../../containers/Dockerfile.cuda), in the newest CUDA variant the Polaris driver allows — `cuda13.0` under the CUDA 13.0 driver installed in August 2026; the [system updates page](https://docs.alcf.anl.gov/polaris/system-updates/) records driver changes. See [docs/source/getting_started.md](../../docs/source/getting_started.md) for how to build it. The release images install ptychodus from PyPI and need only the `containers/` directory as build context, so building on Polaris needs a copy of that directory rather than a full checkout. The PtychoPINN and PtychoFM backends are included only when their wheels are staged in `containers/wheels/`, which `scripts/podman/build` does from sibling checkouts; otherwise build the image elsewhere and bring it over.
+Polaris has NVIDIA A100 GPUs, so the matching image is [containers/Dockerfile.cuda](../../containers/Dockerfile.cuda), in the newest CUDA variant the Polaris driver allows — `cuda13.0` under the CUDA 13.0 driver installed in August 2026; the [system updates page](https://docs.alcf.anl.gov/polaris/system-updates/) records driver changes. See [docs/source/getting_started.md](../../docs/source/getting_started.md) for how to build it. The release images install ptychodus from PyPI and need only the `containers/` directory as build context, so building on Polaris needs a copy of that directory rather than a full checkout. The PtychoPINN and PtychoFM libraries are included only when their wheels are staged in `containers/wheels/`, which `scripts/podman/build` does from sibling checkouts; otherwise build the image elsewhere and bring it over.
 
 Stock podman — the podman that ships with the Linux distribution — is supported on Polaris and runs containers directly, with no conversion step. ALCF has no page covering that route, which is why the reference below describes only Apptainer.
 

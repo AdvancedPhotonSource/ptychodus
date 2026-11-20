@@ -3,7 +3,7 @@
 
 Reads the layout written from 2026_2 on: a scan directory holding a NeXus
 ``<sample>_<scan>_master.h5`` beside its ``<sample>_<scan>_<NNNNN>.h5`` frame files. The master
-supplies the energy, exposure, detector distance and pitch, and the nominal scan positions. The
+supplies the energy, exposure, detector distance and pitch, and the nominal probe positions. The
 long flight path (up to 10 m) and the Pilatus 172 um pitch make this the coarsest-sampled
 instrument here. The beam center is not recorded, so it is estimated from the patterns
 unless given on the command line.

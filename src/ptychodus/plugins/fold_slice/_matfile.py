@@ -213,6 +213,6 @@ def open_matlab_file(file_path: Path) -> Iterator[Mapping[str, Any]]:
     else:
         contents = scipy.io.loadmat(file_path, simplify_cells=True)
         # The older parser reports the file header and the global list alongside the
-        # workspace. Dropping them is what makes the two backends agree on iteration
+        # workspace. Dropping them is what makes the two libraries agree on iteration
         # and length, not only on lookup.
         yield {key: value for key, value in contents.items() if not _is_metadata_key(key)}

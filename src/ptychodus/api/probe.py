@@ -1078,7 +1078,7 @@ class ProbeGeometryProvider(ABC):
 
     @property
     @abstractmethod
-    def num_scan_points(self) -> int:
+    def num_probe_positions(self) -> int:
         pass
 
     @abstractmethod
@@ -1307,7 +1307,7 @@ class ProbeEnsemble:
 
     Supports optional OPR (orthogonal probe relaxation) weights for per-position probe
     variation. Deliberately not a sequence: without OPR weights a single probe describes
-    every scan position, so there is no element count to report and no index that is out
+    every probe position, so there is no element count to report and no index that is out
     of range. :meth:`get_probe` names what an index means instead, and
     :attr:`num_opr_positions` answers how many positions the weights describe.
     """
@@ -1442,7 +1442,7 @@ class ProbeEnsemble:
     def iter_position_probes(
         self, positions: Sequence[ProbePosition]
     ) -> Iterator[tuple[ProbePosition, Probe]]:
-        """Yield ``(scan_position, probe)`` pairs for every scan position, in order.
+        """Yield ``(probe_position, probe)`` pairs for every probe position, in order.
 
         Without OPR weights one probe describes the whole scan and is yielded at every
         position. With them each position takes its own weight row, and weights carrying
@@ -1467,7 +1467,7 @@ class ProbeEnsemble:
             yield position, self.get_probe(index)
 
     def get_probe(self, position_index: int) -> Probe:
-        """Return the probe at scan position ``position_index``.
+        """Return the probe at probe position ``position_index``.
 
         Without OPR weights one probe describes the whole scan and every position
         yields it. With them the index selects a weight row, which is why the valid

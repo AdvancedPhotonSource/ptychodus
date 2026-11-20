@@ -3,7 +3,7 @@
 The format is two HDF5 files sharing a stem, associated by that suffix and nothing
 else. Its parameter half is a subset of the ptychodus product layout, which is what
 makes a round trip meaningful: what the exporter writes is what the reader has to
-recover. The constraints pinned here are the trainer's -- a strictly four-dimensional
+recover. The constraints pinned here are PtychoFM training's -- a strictly four-dimensional
 probe, a square pattern with a probe the same size, positions as long as the pattern
 stack, and a span-based rule deciding whether coordinates are meters or pixels.
 
@@ -226,7 +226,7 @@ class TestPtychoFMProductFileReader:
         assert product.probe_positions[2].x_m == pytest.approx(3e-9)
 
     def test_positions_in_pixels_are_scaled(self, tmp_path: Path) -> None:
-        # A span of 16 against a 32-pixel object falls inside the trainer's window,
+        # A span of 16 against a 32-pixel object falls inside PtychoFM's window,
         # so the same numbers mean pixels and convert to meters.
         path = _write_para(
             tmp_path,
@@ -239,7 +239,7 @@ class TestPtychoFMProductFileReader:
         assert product.probe_positions[2].x_m == pytest.approx(16.0 * PIXEL_SIZE_M)
 
     def test_one_axis_inside_the_window_is_not_enough(self, tmp_path: Path) -> None:
-        # The trainer requires both axes to look like pixels before it treats either
+        # PtychoFM requires both axes to look like pixels before it treats either
         # as pixels, so a mixed pair has to read as meters.
         path = _write_para(
             tmp_path, x_m=numpy.array([0.0, 8.0, 16.0]), y_m=numpy.array([0.0, 1e-9, 2e-9])
@@ -284,7 +284,7 @@ class TestPtychoFMProductFileReader:
         assert reloaded.object_.get_center() == product.object_.get_center()
 
     def test_both_readers_are_registered(self) -> None:
-        # One artifact that is both the patterns and the reconstruction, so it is
+        # One file pair that is both the patterns and the reconstruction, so it is
         # offered as a scan to reconstruct and as a product to inspect.
         registry = PluginRegistry.load_plugins()
 
@@ -297,7 +297,7 @@ class TestPtychoFMProductFileReader:
 
     def test_the_writer_is_registered_under_the_library_name(self) -> None:
         # The shared name is what makes this the format offered by default whenever
-        # PtychoFM is the selected backend.
+        # PtychoFM is the selected library.
         registry = PluginRegistry.load_plugins()
 
         assert registry.reconstructor_libraries.find_plugin(PtychoFMProductFileReader.SIMPLE_NAME)

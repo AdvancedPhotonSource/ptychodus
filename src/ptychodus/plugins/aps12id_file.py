@@ -6,9 +6,9 @@ scan writes one file holding a stack of frames; a step scan writes one file per 
 holding a single 2-D frame. Either way the frames are at ``/entry/data/data`` and run in
 scan traversal order across the files taken in numeric order.
 
-The master carries the geometry and the nominal scan positions. Energy is recorded in keV
+The master carries the geometry and the nominal probe positions. Energy is recorded in keV
 and every length in millimeters; both are converted here. ``/entry/sample/positions`` lists
-one (horizontal, vertical) row per scan point in traversal order, so row ``i`` pairs with
+one (horizontal, vertical) row per probe position in traversal order, so row ``i`` pairs with
 frame ``i``. A sibling ``positions/S<scan>/`` directory holds the raw positioner stream,
 which is not calibrated and is not read.
 
@@ -251,7 +251,7 @@ class APS12IDPositionFileReader(ProbePositionFileReader):
                 dataset = h5_file[positions_path]
             except KeyError:
                 raise ProbePositionParseError(
-                    f'"{master}" records no scan positions at "{positions_path}".'
+                    f'"{master}" records no probe positions at "{positions_path}".'
                 ) from None
 
             positions_mm = numpy.asarray(dataset[()], dtype=float)

@@ -13,7 +13,7 @@ class PtychoFMReconstructorLibrary(ReconstructorLibrary):
     borrows ``ptychi.image_proc.ObjectPatchSampler`` to stitch
     predicted patches. Only the reconstruct path needs it, but a reconstructor
     that can train and not reconstruct is not worth advertising, so a missing
-    pty-chi disables the backend here rather than failing mid-reconstruction.
+    pty-chi disables the library here rather than failing mid-reconstruction.
     """
 
     def __init__(self) -> None:

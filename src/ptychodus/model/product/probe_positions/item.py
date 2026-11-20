@@ -6,8 +6,8 @@ import numpy
 from ptychodus.api.affine import AffineTransform, transform_probe_positions
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
-    ScanGeometry,
-    calculate_scan_geometry,
+    ProbePositionsGeometry,
+    calculate_probe_positions_geometry,
 )
 from ptychodus.api.scattering.frame import resolve_exit_frame_transform
 from ptychodus.api.scattering.geometry import ScatteringGeometry
@@ -28,7 +28,7 @@ class ProbePositionsRepositoryItem(ParameterGroup):
     carried into the exit frame of the product's geometry by
     :func:`ptychodus.api.scattering.frame.resolve_exit_frame_transform` and re-carried whenever the
     geometry changes, so editing an angle moves them exactly. Positions that arrive in the
-    exit frame -- reconstruction output, a loaded product -- are taken back to the lab
+    exit frame -- a reconstruction, a loaded product -- are taken back to the lab
     frame once, by the inverse, so they are never transformed twice. Without a metadata
     item the transform is the identity.
     """
@@ -47,7 +47,7 @@ class ProbePositionsRepositoryItem(ParameterGroup):
         self._builder = builder
         self._metadata_item = metadata_item
         self._probe_positions = ProbePositionSequence()
-        self._geometry: ScanGeometry | None = None
+        self._geometry: ProbePositionsGeometry | None = None
         self._exit_frame_key: tuple[ScatteringGeometry, bool] | None = None
         self._exit_transform = AffineTransform.create_identity()
         self._resolve_exit_transform()
@@ -78,21 +78,23 @@ class ProbePositionsRepositoryItem(ParameterGroup):
         self.set_builder(item.get_builder().copy())
         self._rebuild()
 
-    def assign(self, scan: ProbePositionSequence) -> None:
+    def assign(self, probe_positions: ProbePositionSequence) -> None:
         """Take positions already in the exit frame of the product's current geometry."""
-        builder = FromMemoryProbePositionsBuilder(self._rng, self._settings, self._to_lab(scan))
+        builder = FromMemoryProbePositionsBuilder(
+            self._rng, self._settings, self._to_lab(probe_positions)
+        )
         self.set_builder(builder)
 
     def get_exit_transform(self) -> AffineTransform:
         """The map from the builder's lab-frame positions to the exposed ones."""
         return self._exit_transform
 
-    def _to_lab(self, scan: ProbePositionSequence) -> ProbePositionSequence:
+    def _to_lab(self, probe_positions: ProbePositionSequence) -> ProbePositionSequence:
         if self._exit_transform == AffineTransform.create_identity():
-            return scan
+            return probe_positions
 
         return ProbePositionSequence(
-            list(transform_probe_positions(scan, self._exit_transform.inverted()))
+            list(transform_probe_positions(probe_positions, self._exit_transform.inverted()))
         )
 
     def _resolve_exit_transform(self) -> bool:
@@ -138,7 +140,7 @@ class ProbePositionsRepositoryItem(ParameterGroup):
         self._add_group(group, self._builder, observe=True)
         self._rebuild()
 
-    def get_geometry(self) -> ScanGeometry | None:
+    def get_geometry(self) -> ProbePositionsGeometry | None:
         if self.expand_bbox.get_value():
             minimum_x_m = self.expand_bbox_xmin_m.get_value()
             maximum_x_m = self.expand_bbox_xmax_m.get_value()
@@ -153,7 +155,7 @@ class ProbePositionsRepositoryItem(ParameterGroup):
                 maximum_y_m = max(maximum_y_m, self._geometry.maximum_y_m)
                 lenth_m = self._geometry.length_m
 
-            return ScanGeometry(
+            return ProbePositionsGeometry(
                 minimum_x_m=minimum_x_m,
                 maximum_x_m=maximum_x_m,
                 minimum_y_m=minimum_y_m,
@@ -167,7 +169,7 @@ class ProbePositionsRepositoryItem(ParameterGroup):
         try:
             probe_positions = self._builder.build()
         except Exception:
-            logger.exception('Failed to rebuild scan!')
+            logger.exception('Failed to rebuild probe positions!')
             return
 
         if self._exit_transform != AffineTransform.create_identity():
@@ -180,7 +182,7 @@ class ProbePositionsRepositoryItem(ParameterGroup):
         # runs once per reconstructor iteration; the old round-trip through
         # Python dataclasses was O(N) every time.
         self._probe_positions = probe_positions
-        self._geometry = calculate_scan_geometry(probe_positions)
+        self._geometry = calculate_probe_positions_geometry(probe_positions)
         self.notify_observers()
 
     def _update(self, observable: Observable) -> None:

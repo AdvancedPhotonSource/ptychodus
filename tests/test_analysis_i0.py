@@ -2,8 +2,8 @@
 
 Behaviors verified:
   - the illumination map weights positions by their I0, and equally without it, never
-    by the detector totals
-  - the OPR analysis compares the weights with the I0, and with the detector totals of
+    by the detector sums
+  - the OPR analysis compares the weights with the I0, and with the detector sums of
     the bound data's moments when no I0 was recorded
 """
 
@@ -26,17 +26,17 @@ def _positions(i0: list[float] | None) -> ProbePositionSequence:
     )
 
 
-def _moments(totals: list[float]) -> DiffractionMoments:
-    frame = numpy.zeros((2, 2))
-    rows = numpy.zeros(len(totals))
+def _moments(detector_sums: list[float]) -> DiffractionMoments:
+    pattern = numpy.zeros((2, 2))
+    rows = numpy.zeros(len(detector_sums))
     return DiffractionMoments(
-        num_patterns=len(totals),
-        minimum_frame=frame,
-        mean_frame=frame,
-        maximum_frame=frame,
+        num_patterns=len(detector_sums),
+        minimum_pattern=pattern,
+        mean_pattern=pattern,
+        maximum_pattern=pattern,
         bad_pixels=numpy.zeros((2, 2), dtype=bool),
-        indexes=numpy.arange(len(totals)),
-        total_counts=numpy.asarray(totals, dtype=numpy.float64),
+        indexes=numpy.arange(len(detector_sums)),
+        detector_sums=numpy.asarray(detector_sums, dtype=numpy.float64),
         center_of_mass_x_px=rows,
         center_of_mass_y_px=rows.copy(),
     )
@@ -63,22 +63,22 @@ def test_the_illumination_map_is_weighted_by_i0_only(
     with patch('ptychodus.model.analysis.illumination.compute_illumination_map') as compute:
         IlluminationMapper(repository).map(0)
 
-    assert compute.call_args.kwargs['probe_photon_counts_by_index'] == expected
+    assert compute.call_args.kwargs['i0_by_index'] == expected
 
 
 def test_the_opr_analysis_compares_with_i0_when_recorded() -> None:
     repository = _repository(_positions([1.0, 2.0, 3.0]), _moments([10.0, 20.0, 30.0]))
 
-    counts = OPRModeAnalyzer(repository).get_measured_photon_counts(0)
+    counts = OPRModeAnalyzer(repository).get_i0_or_detector_sums(0)
 
     assert counts is not None
     numpy.testing.assert_array_equal(counts, [1.0, 2.0, 3.0])
 
 
-def test_the_opr_analysis_falls_back_to_the_detector_totals() -> None:
+def test_the_opr_analysis_falls_back_to_the_detector_detector_sums() -> None:
     repository = _repository(_positions(None), _moments([10.0, 20.0]))
 
-    counts = OPRModeAnalyzer(repository).get_measured_photon_counts(0)
+    counts = OPRModeAnalyzer(repository).get_i0_or_detector_sums(0)
 
     assert counts is not None
     numpy.testing.assert_array_equal(counts, [10.0, 20.0, numpy.nan])
@@ -87,4 +87,4 @@ def test_the_opr_analysis_falls_back_to_the_detector_totals() -> None:
 def test_the_opr_analysis_has_nothing_without_i0_or_moments() -> None:
     repository = _repository(_positions(None), None)
 
-    assert OPRModeAnalyzer(repository).get_measured_photon_counts(0) is None
+    assert OPRModeAnalyzer(repository).get_i0_or_detector_sums(0) is None

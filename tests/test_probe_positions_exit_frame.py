@@ -90,7 +90,7 @@ def test_editing_an_angle_remaps_the_positions_exactly() -> None:
 
 
 def test_exit_frame_positions_are_not_transformed_twice() -> None:
-    """Reconstruction output arrives in the exit frame and stays exactly where it was put."""
+    """A reconstruction arrives in the exit frame and stays exactly where it was put."""
     item, _ = _make_item(_BRAGG)
     exit_positions = item.get_probe_positions()
 

@@ -108,7 +108,7 @@ class TestASelectionThatNoLongerFits:
 
 
 class TestChoosingTheCpu:
-    """Where to run and whether to use an accelerator are one question here."""
+    """Where to run and whether to use a GPU are one question here."""
 
     def test_the_probe_always_offers_a_cpu(self) -> None:
         assert CPU.identifier == 'cpu'

@@ -78,7 +78,7 @@ def yield_then_modify_in_place() -> Iterator[Any]:
 
 
 class FakeTrainableReconstructor(TrainableReconstructor):
-    """A trainable reconstructor touching no GPU framework, as a backend would be written.
+    """A trainable reconstructor touching no GPU framework, written as a library's would be.
 
     ``reconstruct`` yields the input product ``num_outputs`` times. ``train``
     writes a model file into the output directory and names it in its last

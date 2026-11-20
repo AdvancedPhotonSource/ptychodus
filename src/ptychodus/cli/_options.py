@@ -1,4 +1,4 @@
-"""The commented options template ``--print-options`` writes, and backend selection.
+"""The commented options template ``--print-options`` writes, and library selection.
 
 :func:`format_options_document` writes an options document at the defaults, each field's
 description above it as a comment, for a person to edit and pass back with ``--options``;
@@ -23,7 +23,7 @@ from ptychodus.api.reconstruct import Reconstructor, ReconstructorLibrary, Train
 __all__ = [
     'format_options_document',
     'resolve_reconstructor',
-    'resolve_trainer',
+    'resolve_trainable_reconstructor',
 ]
 
 ReconstructorT = TypeVar('ReconstructorT', bound=Reconstructor)
@@ -40,7 +40,7 @@ def _format_fields(model: BaseModel, values: Mapping[str, Any], depth: int) -> l
         value = getattr(model, name)
 
         if field.frozen:
-            lines.append(f'{indent}# {name} is fixed by the backend and cannot be set here.')
+            lines.append(f'{indent}# {name} is fixed by the library and cannot be set here.')
         elif isinstance(value, BaseModel) and type(value).model_fields:
             lines.append(f'{indent}{name}:')
             lines.extend(_format_fields(value, values[name], depth + 1))
@@ -127,14 +127,14 @@ def resolve_reconstructor(
     return plugin, _select(plugin, list(plugin.strategy), algorithm_name, 'reconstructs')
 
 
-def resolve_trainer(
+def resolve_trainable_reconstructor(
     libraries: PluginCatalog[ReconstructorLibrary], library_name: str, algorithm_name: str | None
 ) -> tuple[Plugin[ReconstructorLibrary], TrainableReconstructor]:
     """As :func:`resolve_reconstructor`, among the algorithms that can train."""
     plugin = _find_library(libraries, library_name)
-    trainers = [
+    trainable = [
         reconstructor
         for reconstructor in plugin.strategy
         if isinstance(reconstructor, TrainableReconstructor)
     ]
-    return plugin, _select(plugin, trainers, algorithm_name, 'trains')
+    return plugin, _select(plugin, trainable, algorithm_name, 'trains')

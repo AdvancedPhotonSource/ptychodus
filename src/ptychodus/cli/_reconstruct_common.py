@@ -8,17 +8,18 @@ convergence, and writes the standard-layout outputs identically. :func:`read_rec
 extracted so it is written and tested once rather than duplicated in eleven files.
 
 A run is any registered reconstructor, named by an options document (library, algorithm and
-the backend's own options; see :mod:`ptychodus.api.options`) and run in this process through
-its plugin. Nothing here imports a backend, so a command built on it works with whichever
-backends are installed; pty-chi is only the fallback when no options are given.
+the library's own options; see :mod:`ptychodus.api.options`) and run in this process through
+its plugin. Nothing here imports a library, so a command built on it works with whichever
+libraries are installed; pty-chi is only the fallback when no options are given.
 
 Both writers write under :func:`is_main_process`, so a multi-process launch produces one copy of
-each artifact instead of having every rank truncate the same paths concurrently.
+each file instead of having every rank truncate the same paths concurrently.
 
 Cancellation lives here for the same reason. A reconstruction has no interruption point inside
-the backend, so a signal cannot stop it where it lands; :func:`ptychodus.cli.install_signal_handlers` instead
-raises a flag that :func:`run_reconstruction` reads at each output, and a partially converged
-``product.h5`` is left behind. Under a multi-process launch that flag is agreed across ranks
+the library, so a signal cannot stop it where it lands;
+:func:`ptychodus.cli.install_signal_handlers` instead raises a flag that
+:func:`run_reconstruction` reads at each output, and a partially converged ``product.h5`` is
+left behind. Under a multi-process launch that flag is agreed across ranks
 before it is acted on, because a rank that left the loop alone would hang its peers at their
 next collective.
 """
@@ -119,7 +120,7 @@ logger = logging.getLogger(__name__)
 def _group_rank() -> int:
     """This process's rank in the torch process group, or 0 where there is none.
 
-    Read off torch only if something has imported it: a backend that runs ranks brings
+    Read off torch only if something has imported it: a library that runs ranks brings
     ``torch.distributed`` in, and a run that never imports torch has no process group.
     """
     dist = sys.modules.get('torch.distributed')
@@ -134,7 +135,7 @@ def process_rank() -> int:
     """This process's rank, as either the process group or the launcher reports it.
 
     Two independent sources are consulted because neither alone covers the whole run. The
-    torch process group does not exist until the backend builds it, so until then every
+    torch process group does not exist until the library builds it, so until then every
     process reports rank 0 and only the environment tells them apart; a group created
     programmatically rather than by a launcher, in turn, exports nothing. A run under
     neither -- an ordinary single-process invocation -- is rank 0 by both, which is what
@@ -163,8 +164,8 @@ def _agree_on_cancellation(token: CancellationToken | None) -> bool:
     it. Reducing the flag with MAX makes one rank's request everyone's.
 
     The reduction is itself a collective, so it is only correct because every rank reaches
-    this point the same number of times: a backend that runs ranks yields in lockstep. With
-    no process group -- an ordinary single-process run, and every rank before the backend
+    this point the same number of times: a library that runs ranks yields in lockstep. With
+    no process group -- an ordinary single-process run, and every rank before the library
     creates one -- there is nobody to agree with and the local flag stands.
     """
     if token is None:
@@ -179,9 +180,10 @@ def _agree_on_cancellation(token: CancellationToken | None) -> bool:
     # Present in sys.modules, so importing it is a lookup rather than a load.
     import torch
 
-    # NCCL reduces on the GPU and raises on a CPU tensor, so the device follows the backend.
+    # NCCL reduces on the GPU and raises on a CPU tensor, so the device follows the
+    # process group's backend.
     # On the GPU it must be the one this rank's communicator was built on, which is the
-    # default device a backend sets per rank rather than torch's current device: that stays
+    # default device a library sets per rank rather than torch's current device: that stays
     # cuda:0 on every rank, and a flag there would have one rank build a second communicator
     # its peers never join, hanging both.
     device = torch.device('cpu')
@@ -585,7 +587,7 @@ def invalid_count_threshold(
 
 _OPTIONS_HELP = (
     f'Options document, as {StandardFileLayout.RECONSTRUCT_OPTIONS} holds one and '
-    '--print-options writes one: "library", "algorithm" and the backend\'s "options". '
+    '--print-options writes one: "library", "algorithm" and the library\'s "options". '
     'Fields it omits keep their defaults. "-" reads from stdin. Hand-written YAML must '
     'spell scientific notation 1.0e-3 rather than 1e-3, which YAML reads as a string.'
 )
@@ -738,7 +740,7 @@ def read_reconstruction(
 
     Raises:
         OptionsError: if the document is malformed, names no installed library or
-            algorithm, or gives options its backend does not accept.
+            algorithm, or gives options its library does not accept.
         OSError: if `options_file` cannot be read.
     """
     text = sys.stdin.read() if options_file == Path('-') else options_file.read_text()
@@ -893,7 +895,7 @@ def check_ptychi_options(resolved: ResolvedReconstruction, product: Product) -> 
 def load_trained_model(
     logger: logging.Logger, reconstructor: Reconstructor, input_directory: Path
 ) -> None:
-    """Load the model a trainable `reconstructor` finds in `input_directory`, if there is one."""
+    """Load the trained model a trainable `reconstructor` finds in `input_directory`, if any."""
     if not isinstance(reconstructor, TrainableReconstructor):
         return
 
@@ -924,7 +926,7 @@ def save_assembled_diffraction(
     """Create `output_directory` and write the assembled patterns to ``diffraction.h5``.
 
     Called ahead of the reconstruction, so an interrupted run still leaves the directory
-    usable: the assembled patterns are the one artifact that cannot be rebuilt without the
+    usable: the assembled patterns are the one file that cannot be rebuilt without the
     raw beamline files. Pass `skip` to create the directory without writing them, for a
     run whose patterns would be larger than they are worth keeping.
 
@@ -970,7 +972,7 @@ def estimate_incident_beam_from_assembled_data(
 
     return estimate_incident_beam(
         moments,
-        positions.get_probe_photon_counts_by_index(),
+        positions.get_i0_by_index(),
         i0_photons_per_count=i0_photons_per_count,
     )
 
@@ -1028,7 +1030,7 @@ def run_reconstruction(
     """Run `resolved` to completion in this process, and write the outputs.
 
     Assumes `output_directory` already exists, and does not touch `diffraction.h5`: that
-    artifact depends on the assembled dataset rather than on the reconstruction, so it is
+    file depends on the assembled dataset rather than on the reconstruction, so it is
     written by :func:`save_assembled_diffraction` before this runs. Writes the options to
     ``reconstruct_options.yaml``, a ``product.NNNNNN.h5`` checkpoint at every output the
     reconstructor yields, then the final ``product.h5``. Returns the final product.

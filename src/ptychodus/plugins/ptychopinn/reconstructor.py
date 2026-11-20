@@ -1,9 +1,9 @@
 """PtychoPINN as a ptychodus :class:`TrainableReconstructor`.
 
 Importing this module imports no ``ptycho_torch``, no lightning and no torch, and
-so acquires no GPU context: every backend import is local to the method or
+so acquires no GPU context: every library import is local to the method or
 helper that needs it. The declared options are translated here into a plain
-mapping of the backend's documented resolver names, which the backend turns into
+mapping of the library's documented resolver names, which the library turns into
 resolved configuration.
 
 Two operations:
@@ -11,7 +11,7 @@ Two operations:
 - :meth:`PtychoPINNReconstructor.reconstruct` -- run one inference pass with the
   loaded bundle and yield a single :class:`ReconstructOutput`.
 - :meth:`PtychoPINNReconstructor.train` -- run one training session through the
-  backend's public dataset-to-bundle door on every training archive in the input
+  library's public dataset-to-bundle door on every training archive in the input
   directory, then yield the final :class:`TrainOutput`, naming the saved bundle.
 """
 
@@ -58,7 +58,7 @@ logger = logging.getLogger(__name__)
 MODEL_FILE_NAME: Final[str] = 'wts.h5.zip'
 
 
-# 'None' in a settings combo box means "no auxiliary loss", which the backend
+# 'None' in a settings combo box means "no auxiliary loss", which the library
 # spells as the absent value rather than a string.
 _NO_AUXILIARY_LOSS = 'none'
 
@@ -68,7 +68,7 @@ def _optional_auxiliary_loss(value: str) -> str | None:
 
 
 def _declared(options: BaseModel) -> PtychoPINNOptions:
-    """Narrow the options a call was given to what this backend declares.
+    """Narrow the options a call was given to what this reconstructor declares.
 
     Checked rather than asserted: the dispatching layer validates the type
     against what ``get_default_options`` returns, so a mismatch here means
@@ -82,10 +82,10 @@ def _declared(options: BaseModel) -> PtychoPINNOptions:
 
 
 def _build_settings(model_training_mode: str, options: PtychoPINNOptions) -> dict[str, Any]:
-    """Translate the declared options into the backend's resolver vocabulary.
+    """Translate the declared options into the library's resolver vocabulary.
 
     The result is a flat mapping of documented setting names to values. Names
-    absent from it keep the backend's own defaults, which is deliberate in two
+    absent from it keep the library's own defaults, which is deliberate in two
     cases:
 
     ``nphotons`` is omitted. Ptychodus exports diffraction patterns that are
@@ -95,10 +95,10 @@ def _build_settings(model_training_mode: str, options: PtychoPINNOptions) -> dic
     amplitude-to-counts conversion of data that is already counts, silently
     changing its scale.
 
-    ``loss_function`` and ``nll`` are omitted because the backend derives both
+    ``loss_function`` and ``nll`` are omitted because the library derives both
     from ``torch_loss_mode``; supplying them directly is rejected.
 
-    Enum members are rendered as their values, because the backend reads the
+    Enum members are rendered as their values, because the library reads the
     mapping as plain configuration.
     """
     data = options.data
@@ -110,7 +110,7 @@ def _build_settings(model_training_mode: str, options: PtychoPINNOptions) -> dic
     gridsize = data.gridsize
 
     # A group holds gridsize**2 members, so the neighbour search must return at
-    # least that many candidates minus the centre itself. The backend raises
+    # least that many candidates minus the centre itself. The library raises
     # rather than shrinking the group, so clamp here where the option is read.
     group_size = gridsize * gridsize
     neighbor_count = max(data.neighbor_count, group_size - 1)
@@ -191,7 +191,7 @@ def _build_settings(model_training_mode: str, options: PtychoPINNOptions) -> dic
 
 
 def _extract_bundle_dir(model_bundle_path: Path) -> Path:
-    """Resolve a model path to the bundle directory the backend loads from.
+    """Resolve a trained-model path to the bundle directory the library loads from.
 
     Accepts the bundle directory itself, a ``wts.h5.zip`` inside a bundle
     directory, or an outer zip archive to unpack into a fresh tempdir. Pure
@@ -219,7 +219,7 @@ def _extract_bundle_dir(model_bundle_path: Path) -> Path:
 
 
 def _save_model_bundle(loaded_from: Path, dest: Path) -> None:
-    """Write the model recorded at ``loaded_from`` to ``dest`` as a zip of its bundle.
+    """Write the trained model recorded at ``loaded_from`` to ``dest`` as a zip of its bundle.
 
     The recorded path is either a bundle directory (as training reports it) or
     a ``wts.h5.zip`` file (as a user picks it). A bundle is that one
@@ -321,7 +321,7 @@ def _canvas_center(
 
 
 def _build_arrays(parameters: Any) -> dict[str, Any]:
-    """Convert a ReconstructInput into the backend's flat-acquisition mapping.
+    """Convert a ReconstructInput into the library's flat-acquisition mapping.
 
     Mirrors the training-data export so inference sees the same preprocessing
     and the same declared measurement domain the model was trained on.
@@ -369,7 +369,7 @@ def _latest_metrics_csv(output_path: Path) -> Path | None:
 def _select_loss_column(field_names: Sequence[str], infix: str) -> str | None:
     """Return the single loss column for one split, or None if it is ambiguous.
 
-    The backend assembles these names from the loss mode and the optional
+    The library assembles these names from the loss mode and the optional
     auxiliary terms, so they are matched by shape rather than enumerated.
     """
     matches = [name for name in field_names if infix in name and name.endswith('_loss')]
@@ -429,9 +429,9 @@ def _read_epoch_losses(output_path: Path) -> tuple[list[LossValue], list[LossVal
 
 
 def _compute_truth_patches(file_path: Path) -> ComplexArrayType:
-    """Each frame's ground-truth object patch, cut from the archive's objectGuess by the backend.
+    """Each frame's ground-truth object patch, cut from the archive's objectGuess by the library.
 
-    Cutting with the backend's own grouping keeps the patch convention its supervised loss
+    Cutting with the library's own grouping keeps the patch convention its supervised loss
     expects; one-member groups taken in order give one patch per frame.
     """
     # ptycho ships beside ptycho_torch, without type information
@@ -454,7 +454,7 @@ class PtychoPINNReconstructor(TrainableReconstructor):
     """One PtychoPINN mode, 'Unsupervised' or 'Supervised'.
 
     The mode is both the reconstructor's display name and the mode string the
-    backend resolves. Loading a model records it and unpacks its archive once,
+    library resolves. Loading a trained model records it and unpacks its archive once,
     so repeated reconstructs against one model pay for that once.
     """
 
@@ -577,7 +577,7 @@ class PtychoPINNReconstructor(TrainableReconstructor):
     ) -> Iterator[TrainOutput]:
         """Run one training session and yield its final output, naming the saved bundle.
 
-        Hands the translated settings mapping to the backend's public
+        Hands the translated settings mapping to the library's public
         dataset-to-bundle training door, on the devices this process can see.
         That door takes one archive, so several in the input directory are first
         merged into one object bank in a private directory under the output

@@ -9,8 +9,8 @@ from ptychodus.api.assemble import (
     CropSuggestion,
     DetectorCorrections,
     DiffractionSummary,
-    DiffractionTotalCounts,
-    compute_dataset_total_counts,
+    DiffractionDetectorSums,
+    compute_dataset_detector_sums,
     suggest_crop_region,
     summarize_dataset,
 )
@@ -31,10 +31,10 @@ __all__ = [
     'DiffractionSummaryService',
     'DiffractionSummaryTaskMonitor',
     'SummarizeBackgroundTask',
-    'TotalCountsBackgroundTask',
+    'DetectorSumsBackgroundTask',
 ]
 
-_TotalCountsKey = tuple[int, DiffractionPrepPlan, tuple[object, ...]]
+_DetectorSumsKey = tuple[int, DiffractionPrepPlan, tuple[object, ...]]
 
 logger = logging.getLogger(__name__)
 
@@ -118,8 +118,8 @@ class SummarizeBackgroundTask:
             self._service._publish(summary, self._source, bad_pixels)
 
 
-class TotalCountsBackgroundTask:
-    """Background task adapting :func:`compute_dataset_total_counts` to the task manager.
+class DetectorSumsBackgroundTask:
+    """Background task adapting :func:`compute_dataset_detector_sums` to the task manager.
 
     Snapshotting matches :class:`SummarizeBackgroundTask`: the prep plan, the
     bad-pixels mask, and the cache key are all resolved by the caller before the
@@ -127,7 +127,7 @@ class TotalCountsBackgroundTask:
     measured or mislabel the result it publishes.
     """
 
-    ACTOR: Final[str] = 'Refresh Counts'
+    ACTOR: Final[str] = 'Refresh Detector Sums'
 
     def __init__(
         self,
@@ -136,7 +136,7 @@ class TotalCountsBackgroundTask:
         pipeline: DiffractionPrepPipeline,
         bad_pixels: BadPixels | None,
         read_region: CropRegion | None,
-        cache_key: _TotalCountsKey,
+        cache_key: _DetectorSumsKey,
         corrections: DetectorCorrections | None = None,
     ) -> None:
         self._service = service
@@ -149,7 +149,7 @@ class TotalCountsBackgroundTask:
 
     def __call__(self) -> None:
         with self._service.task_monitor.run_as(self.ACTOR) as monitor:
-            total_counts = compute_dataset_total_counts(
+            detector_sums = compute_dataset_detector_sums(
                 self._source,
                 self._pipeline,
                 bad_pixels=self._bad_pixels,
@@ -161,7 +161,7 @@ class TotalCountsBackgroundTask:
             if monitor.is_stopping:
                 # A partial pass must not be cached against the full-run key.
                 return
-            self._service._publish_total_counts(total_counts, self._cache_key)
+            self._service._publish_detector_sums(detector_sums, self._cache_key)
 
 
 class DiffractionSummaryService:
@@ -177,11 +177,11 @@ class DiffractionSummaryService:
     private: controllers reach this service via ``DiffractionCore.summary_service``
     and never see the task manager.
 
-    ``compute_total_counts`` is the second, cheaper pass. The summary's own
-    ``total_counts`` are summed over the raw full detector, but the total-counts
-    filter compares its bounds against post-crop, post-pipeline counts, so bounds
+    ``compute_detector_sums`` is the second, cheaper pass. The summary's own
+    ``detector_sums`` are summed over the raw full detector, but the detector-sum
+    filter compares its bounds against post-crop, post-pipeline detector sums, so bounds
     derived from the summary can be an order of magnitude too high and empty every
-    array. This pass measures the counts the filter actually sees, reading only the
+    array. This pass measures the detector sums the filter actually sees, reading only the
     crop rectangle from disk. Its result is cached against the prep plan that
     produced it, so re-requesting it with unchanged processing settings is free.
     """
@@ -203,9 +203,9 @@ class DiffractionSummaryService:
         self._last_source: DiffractionDataset | None = None
         self._last_bad_pixels: BadPixels | None = None
         self._last_run_id = 0
-        self._last_total_counts: DiffractionTotalCounts | None = None
-        self._last_total_counts_key: _TotalCountsKey | None = None
-        self._last_total_counts_run_id = 0
+        self._last_detector_sums: DiffractionDetectorSums | None = None
+        self._last_detector_sums_key: _DetectorSumsKey | None = None
+        self._last_detector_sums_run_id = 0
 
     def get_last_summary(self) -> DiffractionSummary | None:
         return self._last_summary
@@ -260,34 +260,34 @@ class DiffractionSummaryService:
         """
         return self._last_run_id
 
-    def get_last_total_counts(self) -> DiffractionTotalCounts | None:
-        """Post-crop, post-pipeline per-pattern counts from the last completed pass."""
-        return self._last_total_counts
+    def get_last_detector_sums(self) -> DiffractionDetectorSums | None:
+        """Post-crop, post-pipeline per-pattern detector sums from the last completed pass."""
+        return self._last_detector_sums
 
-    def get_last_total_counts_run_id(self) -> int:
-        """Monotonic counter incremented every time total counts are published."""
-        return self._last_total_counts_run_id
+    def get_last_detector_sums_run_id(self) -> int:
+        """Monotonic counter incremented every time detector sums are published."""
+        return self._last_detector_sums_run_id
 
-    def is_total_counts_stale(self, dataset_index: int) -> bool:
-        """True when no cached counts match the current dataset and processing settings.
+    def are_detector_sums_stale(self, dataset_index: int) -> bool:
+        """True when no cached detector sums match the current dataset and processing settings.
 
         Cheap enough to call from a settings observer: it resolves the prep plan
         from live settings but touches neither the repository's file handles nor
         the bad-pixels file.
         """
-        if self._last_total_counts is None:
+        if self._last_detector_sums is None:
             return True
 
         try:
-            key = self._build_total_counts_key(dataset_index)
+            key = self._build_detector_sums_key(dataset_index)
         except ValueError:
             # No dataset at that index, so there is nothing a cached pass could match.
             return True
 
-        return key != self._last_total_counts_key
+        return key != self._last_detector_sums_key
 
-    def _build_total_counts_key(self, dataset_index: int) -> _TotalCountsKey:
-        """Identify a counts pass by everything that changes the numbers it yields.
+    def _build_detector_sums_key(self, dataset_index: int) -> _DetectorSumsKey:
+        """Identify a detector-sum pass by everything that changes the numbers it yields.
 
         Raises ``ValueError`` when there is no dataset at ``dataset_index``. The
         bad-pixels mask and the detector maps enter the key by their settings rather
@@ -318,17 +318,21 @@ class DiffractionSummaryService:
         )
         return (dataset_index, plan, detector_inputs)
 
-    def compute_total_counts(self, dataset_index: int, *, force: bool = False) -> bool:
-        """Kick off a background counts pass for the dataset at ``dataset_index``.
+    def compute_detector_sums(self, dataset_index: int, *, force: bool = False) -> bool:
+        """Kick off a background detector-sum pass for the dataset at ``dataset_index``.
 
-        Returns whether a pass was dispatched; ``False`` means the cached counts
+        Returns whether a pass was dispatched; ``False`` means the cached detector sums
         already match the current settings and nothing needed to run. Pass
         ``force`` to re-measure regardless. Raises the same errors as
         :meth:`compute`, synchronously, on the calling thread.
         """
-        key = self._build_total_counts_key(dataset_index)
+        key = self._build_detector_sums_key(dataset_index)
 
-        if not force and self._last_total_counts is not None and key == self._last_total_counts_key:
+        if (
+            not force
+            and self._last_detector_sums is not None
+            and key == self._last_detector_sums_key
+        ):
             return False
 
         repository = self._api.get_repository()
@@ -341,7 +345,7 @@ class DiffractionSummaryService:
         corrections = self._load_corrections(source)
         plan = key[1]
         self._task_manager.put_background_task(
-            TotalCountsBackgroundTask(
+            DetectorSumsBackgroundTask(
                 self,
                 source,
                 plan.pipeline,
@@ -431,15 +435,15 @@ class DiffractionSummaryService:
         self._last_bad_pixels = bad_pixels
         self._last_run_id += 1
 
-    def _publish_total_counts(
-        self, total_counts: DiffractionTotalCounts, cache_key: _TotalCountsKey
+    def _publish_detector_sums(
+        self, detector_sums: DiffractionDetectorSums, cache_key: _DetectorSumsKey
     ) -> None:
-        """Publish a winning counts pass and the key it was measured under.
+        """Publish a winning detector-sum pass and the key it was measured under.
 
         Same threading contract as :meth:`_publish`: called on the background
         thread, made visible to observers by the monitor's foreground-queued
         notification.
         """
-        self._last_total_counts = total_counts
-        self._last_total_counts_key = cache_key
-        self._last_total_counts_run_id += 1
+        self._last_detector_sums = detector_sums
+        self._last_detector_sums_key = cache_key
+        self._last_detector_sums_run_id += 1

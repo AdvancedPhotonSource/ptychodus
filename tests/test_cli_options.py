@@ -1,7 +1,7 @@
 """Options documents: printed at the defaults, read back, and merged onto the defaults.
 
-The models here are shaped like the backends' own: nested sections, defaults that differ
-from the class's, a field left unset because the backend resolves it at runtime when
+The models here are shaped like the libraries' own: nested sections, defaults that differ
+from the class's, a field left unset because the library resolves it at runtime when
 absent, and a section frozen against change.
 """
 
@@ -40,7 +40,7 @@ class _Options(BaseModel):
 
 
 def _defaults() -> _Options:
-    # Set explicitly and away from the class defaults, as a backend overlay does; batch_size
+    # Set explicitly and away from the class defaults, as a library overlay does; batch_size
     # is left unset on purpose.
     return _Options(training=_Training(epochs=2), architecture=_Architecture(depth=12))
 
@@ -68,7 +68,7 @@ def test_a_frozen_field_is_printed_only_as_a_comment() -> None:
     text = format_options_document('Fake options', {'algorithm': 'fake'}, _defaults())
 
     assert 'architecture' not in yaml.safe_load(text)['options']
-    assert '  # architecture is fixed by the backend and cannot be set here.' in text.splitlines()
+    assert '  # architecture is fixed by the library and cannot be set here.' in text.splitlines()
 
 
 def test_an_unedited_document_reproduces_the_defaults_and_what_they_set() -> None:
@@ -150,7 +150,7 @@ def test_the_canonical_document_holds_only_what_is_set() -> None:
 
     assert document['library'] == 'lib'
     assert document['algorithm'] == 'fake'
-    # batch_size was never set, so a backend that resolves it at runtime still can.
+    # batch_size was never set, so a library that resolves it at runtime still can.
     assert 'batch_size' not in document['options']['training']
 
 

@@ -533,7 +533,7 @@ def _require_points(
 
 
 class MDAPositionFileReader(ProbePositionFileReader):
-    """Read scan positions from a two-dimensional raster: one positioner per axis.
+    """Read probe positions from a two-dimensional raster: one positioner per axis.
 
     The outer scan supplies y and each of its lower scans supplies that row's x.
 
@@ -604,7 +604,7 @@ class MDAPositionFileReader(ProbePositionFileReader):
 
 
 def _point_scans(mda_file: MDAFile) -> list[MDAScan] | None:
-    """The scans whose detector arrays hold one entry per scan point, in scan order.
+    """The scans whose detector arrays hold one entry per probe position, in scan order.
 
     A rank-1 file records its channels in the scan itself. A rank-2 file records them in
     each lower scan, one per row, so the rows are returned in the order they were taken.
@@ -620,7 +620,7 @@ def _point_scans(mda_file: MDAFile) -> list[MDAScan] | None:
 
 
 def read_detector_channel(mda_file: MDAFile, name: str) -> RealArrayType | None:
-    """The detector channel whose PV is `name`, one value per scan point, or None.
+    """The detector channel whose PV is `name`, one value per probe position, or None.
 
     Rank-1 and rank-2 scans are both read, the second row by row; a deeper scan, an
     empty one and a file that does not record the channel exactly once all return None.
@@ -693,7 +693,7 @@ def _select_channel(
 
 
 class MDADetectorChannelPositionFileReader(ProbePositionFileReader):
-    """Read scan positions from MDA detector channels rather than from positioners.
+    """Read probe positions from MDA detector channels rather than from positioners.
 
     An encoder readback records where each frame was taken, which a positioner's demanded
     coordinate does not: a fly scan does not stop on it, and a step scan settles near it.

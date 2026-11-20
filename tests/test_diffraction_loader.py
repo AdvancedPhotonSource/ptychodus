@@ -306,8 +306,8 @@ def _assert_moments_of(dataset: AssembledDiffractionDataset) -> None:
 
     assert expected is not None and moments is not None
     numpy.testing.assert_array_equal(moments.indexes, expected.indexes)
-    numpy.testing.assert_allclose(moments.total_counts, expected.total_counts)
-    numpy.testing.assert_allclose(moments.mean_frame, expected.mean_frame)
+    numpy.testing.assert_allclose(moments.detector_sums, expected.detector_sums)
+    numpy.testing.assert_allclose(moments.mean_pattern, expected.mean_pattern)
 
 
 def test_a_load_accumulates_the_moments_of_what_it_assembled() -> None:
@@ -333,11 +333,11 @@ def _assert_sorted_moments_of(dataset: AssembledDiffractionDataset) -> None:
     expected = expected.sort_by_index()
     numpy.testing.assert_array_equal(moments.bad_pixels, expected.bad_pixels)
     numpy.testing.assert_array_equal(moments.indexes, expected.indexes)
-    numpy.testing.assert_allclose(moments.total_counts, expected.total_counts, rtol=1e-12)
+    numpy.testing.assert_allclose(moments.detector_sums, expected.detector_sums, rtol=1e-12)
     numpy.testing.assert_allclose(
         moments.center_of_mass_x_px, expected.center_of_mass_x_px, atol=1e-12
     )
-    numpy.testing.assert_allclose(moments.mean_frame, expected.mean_frame, rtol=1e-12)
+    numpy.testing.assert_allclose(moments.mean_pattern, expected.mean_pattern, rtol=1e-12)
 
 
 def test_moments_accumulated_during_a_load_come_sorted_by_index(

@@ -59,7 +59,7 @@ class AveragePatternProbeGenerator(ProbeGenerator):
         # and their mask includes the pixels those maps leave unusable.
         return generate_average_pattern_probe(
             geometry_provider.get_probe_geometry(),
-            moments.mean_frame,
+            moments.mean_pattern,
             detector_pixel_geometry=geometry_provider.get_detector_pixel_geometry(),
             bad_pixels=moments.bad_pixels,
             photon_wavelength_m=geometry_provider.photon_wavelength_m,

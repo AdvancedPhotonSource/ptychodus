@@ -27,7 +27,7 @@ class MultisliceViewController(ParameterViewController, Observer):
         self._widget.setToolTip(
             'Reslicing preserves the object: layers are resampled onto the new spacing'
             ' rather than discarded. Setting this to 1 leaves a multislice object alone,'
-            ' and a reconstruction result is reassigned every iteration so it keeps the'
+            ' and a reconstruction is reassigned every iteration so it keeps the'
             ' layer count it was solved with.'
         )
 

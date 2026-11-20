@@ -45,7 +45,7 @@ from ptychodus.cli import CancellationToken, enhance_xrf
 _PIXEL_SIZE_M = 1.0e-7
 _CANVAS_PX = 24
 _PROBE_PX = 6
-_SCAN_SIDE = 6
+_GRID_SIDE = 6
 _CHANNELS = ('Fe', 'Zn')
 
 
@@ -64,7 +64,7 @@ def cancellation(monkeypatch: pytest.MonkeyPatch) -> CancellationToken:
 
 def _product() -> Product:
     pixel_geometry = PixelGeometry(width_m=_PIXEL_SIZE_M, height_m=_PIXEL_SIZE_M)
-    offsets_px = numpy.linspace(-6.0, 6.0, _SCAN_SIDE)
+    offsets_px = numpy.linspace(-6.0, 6.0, _GRID_SIDE)
     positions = [
         ProbePosition(index=index, x_m=x_px * _PIXEL_SIZE_M, y_m=y_px * _PIXEL_SIZE_M)
         for index, (y_px, x_px) in enumerate(
@@ -104,7 +104,7 @@ def _write_inputs(directory: Path) -> tuple[Path, Path]:
     rng = numpy.random.default_rng(7)
     dataset = FluorescenceDataset(
         _element_maps=[
-            ElementMap(name, rng.uniform(1.0, 2.0, (_SCAN_SIDE, _SCAN_SIDE))) for name in _CHANNELS
+            ElementMap(name, rng.uniform(1.0, 2.0, (_GRID_SIDE, _GRID_SIDE))) for name in _CHANNELS
         ],
         counts_per_second_path=FluorescenceFileKeys.COUNTS_PER_SECOND,
         channel_names_path=FluorescenceFileKeys.CHANNEL_NAMES,

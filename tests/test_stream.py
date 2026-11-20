@@ -1,4 +1,4 @@
-"""The pvapy-free core of ptychodus-stream: configuration, contract, scans, store, pipeline.
+"""The pvapy-free core of ptychodus-stream: configuration, contract, scans, storage, pipeline.
 
 The scans are the far-field disk-probe simulations of ``parallax_scan_fixtures``; a
 streamed scan must give exactly what the same patterns give in one batch pass.
@@ -116,7 +116,7 @@ def _sorted(moments: DiffractionMoments) -> tuple[numpy.ndarray, ...]:
     order = numpy.argsort(moments.indexes)
     return (
         moments.indexes[order],
-        moments.total_counts[order],
+        moments.detector_sums[order],
         moments.center_of_mass_x_px[order],
         moments.center_of_mass_y_px[order],
     )
@@ -267,7 +267,7 @@ def test_axes_at_different_rates_interpolate_independently() -> None:
     numpy.testing.assert_array_equal(covered, [False, True, True, True, False])
     numpy.testing.assert_allclose(positions.get_coordinates_x_m(), [1.0, 2.0, 3.0])
     numpy.testing.assert_allclose(positions.get_coordinates_y_m(), [10.0, 20.0, 30.0])
-    assert positions.get_probe_photon_counts() is None
+    assert positions.get_i0() is None
 
 
 def test_i0_is_left_out_when_it_does_not_cover_every_frame(
@@ -284,9 +284,9 @@ def test_i0_is_left_out_when_it_does_not_cover_every_frame(
 
     _, covered = stream.at(indexes[:2])
 
-    assert partial.get_probe_photon_counts() is None
+    assert partial.get_i0() is None
     assert any('I0' in record.getMessage() for record in caplog.records)
-    counts = covered.get_probe_photon_counts()
+    counts = covered.get_i0()
     assert counts is not None
     numpy.testing.assert_allclose(counts, [1.0, 1.0])
 
@@ -353,7 +353,7 @@ def test_a_streamed_scan_equals_one_batch_pass() -> None:
         numpy.testing.assert_allclose(got, want, rtol=1e-12, atol=1e-12)
 
     numpy.testing.assert_allclose(
-        streamed.get_diffraction_moments().mean_frame, batch_moments.mean_frame, rtol=1e-12
+        streamed.get_diffraction_moments().mean_pattern, batch_moments.mean_pattern, rtol=1e-12
     )
 
     batch = ScanSnapshot(

@@ -95,7 +95,7 @@ class ProbePositionsTransformViewController(ParameterViewController):
         return self._widget
 
 
-class ScanBoundingBoxViewController(CheckableGroupBoxParameterViewController):
+class ProbePositionsBoundingBoxViewController(CheckableGroupBoxParameterViewController):
     def __init__(self, item: ProbePositionsRepositoryItem) -> None:
         super().__init__(item.expand_bbox, 'Expand Bounding Box')
         self._xmin_controller = LengthParameterViewController(item.expand_bbox_xmin_m)
@@ -128,21 +128,21 @@ class ProbePositionsEditorViewControllerFactory:
                 builder.num_discard_at_start,
                 'Discard at Start:',
                 tool_tip='Number of probe positions to discard from the beginning'
-                ' of the scan, in acquisition order.',
+                ' of the probe path, in acquisition order.',
                 group=trim_group,
             )
             dialog_builder.add_spin_box(
                 builder.num_discard_at_end,
                 'Discard at End:',
                 tool_tip='Number of probe positions to discard from the end'
-                ' of the scan, in acquisition order.',
+                ' of the probe path, in acquisition order.',
                 group=trim_group,
             )
             dialog_builder.add_view_controller_to_bottom(
                 ProbePositionsTransformViewController(builder)
             )
 
-        dialog_builder.add_view_controller_to_bottom(ScanBoundingBoxViewController(item))
+        dialog_builder.add_view_controller_to_bottom(ProbePositionsBoundingBoxViewController(item))
 
     def create_editor_dialog(
         self, item_name: str, item: ProbePositionsRepositoryItem, parent: QWidget

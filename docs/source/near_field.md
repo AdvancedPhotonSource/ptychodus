@@ -2,7 +2,7 @@
 
 Near-field ptychography records Fresnel holograms rather than far-field diffraction patterns. The sample sits close enough to the detector that the beam footprint, not the diffraction envelope, sets what each frame covers, and a single frame already spans the full field of view.
 
-Ptychodus treats the propagation regime as a property of the product, not a choice on the reconstructor. Declaring it is sufficient: the sampling, the propagation distance and the initial probe all follow from the declaration, and a reconstruction backend is handed a product that is already correct for the regime.
+Ptychodus treats the propagation regime as a property of the product, not a choice on the reconstructor. Declaring it is sufficient: the sampling, the propagation distance and the initial probe all follow from the declaration, and a reconstruction library is handed a product that is already correct for the regime.
 
 ## The Regime Is A Product Property
 
@@ -15,7 +15,7 @@ Declaring near field changes three things about the product itself:
 - `average_pattern` back-propagates with the angular spectrum, which preserves pitch.
 
 ```{warning}
-Only one backend acts on the regime today. A near-field product handed to any other reconstructor is reconstructed with a far-field forward model, silently and without a warning, because the product carries correct sampling either way. See [Reconstructing With pty-chi](#reconstructing-with-pty-chi).
+Only one library acts on the regime today. A near-field product handed to any other reconstructor is reconstructed with a far-field forward model, silently and without a warning, because the product carries correct sampling either way. See [Reconstructing With pty-chi](#reconstructing-with-pty-chi).
 ```
 
 ## Two Inputs And One Derived Distance
@@ -70,7 +70,7 @@ Attach a negative value with `=`. `--focus-object-distance-m=-1e-3` works and so
 
 ### Why `z` Is Not `z_d`
 
-A cone beam magnifying by `M` images exactly like a parallel beam propagating `z_d / M` onto pixels `dx_det / M`. That is the Fresnel scaling theorem. A reconstruction runs in that equivalent parallel-beam geometry, which is why the propagation distance a backend is given is `z_d / M` rather than the lab-frame distance.
+A cone beam magnifying by `M` images exactly like a parallel beam propagating `z_d / M` onto pixels `dx_det / M`. That is the Fresnel scaling theorem. A reconstruction runs in that equivalent parallel-beam geometry, which is why the propagation distance a library is given is `z_d / M` rather than the lab-frame distance.
 
 The figures below are illustrative, rounded from a detector of 512 pixels at 75 µm sitting 2 m from the sample at 10 keV — the rough scale of a zone-plate instrument, not a configuration to copy. Yours will differ; the identities will not.
 
@@ -90,7 +90,7 @@ Far field only cares about `z_d`. The magnification cancels there — the equiva
 
 The propagator is selected from the geometry. Ptychodus exposes no switch, and a near-field geometry lands on the angular spectrum in every realistic case, which is exact at every Fresnel number and preserves pitch. That is *why* the object pixel equals the detector pixel in the parallel-beam case, rather than it being a separate convention.
 
-Two selections exist for two purposes, and conflating them is the easy mistake. Ptychodus chooses a propagator for probe simulation and the propagation-analysis panel; a reconstruction backend chooses its own, internally. The crossover is the same in both, the threshold `choose_propagator` applies, and it is small enough that near field stays clear of it. [Reconstructing With pty-chi](#reconstructing-with-pty-chi) gives the measured numbers for that backend.
+Two selections exist for two purposes, and conflating them is the easy mistake. Ptychodus chooses a propagator for probe simulation and the propagation-analysis panel; a reconstruction library chooses its own, internally. The crossover is the same in both, the threshold `choose_propagator` applies, and it is small enough that near field stays clear of it. [Reconstructing With pty-chi](#reconstructing-with-pty-chi) gives the measured numbers for that library.
 
 ## Setting It Up In The GUI
 
@@ -136,9 +136,9 @@ metadata_overrides:
 
 ## Reconstructing With pty-chi
 
-pty-chi is currently the only backend with a near-field forward model, so it is the only one that acts on the regime. The others receive a product whose sampling is correct and reconstruct it as though the detector were in the far field, which fails as a poor image rather than as an error.
+pty-chi is currently the only library with a near-field forward model, so it is the only one that acts on the regime. The others receive a product whose sampling is correct and reconstruct it as though the detector were in the far field, which fails as a poor image rather than as an error.
 
-Nothing below is configured by hand. A near-field product resolves it all on the way into the backend, and a value you set that contradicts the product is reported rather than silently honoured.
+Nothing below is configured by hand. A near-field product resolves it all on the way into the library, and a value you set that contradicts the product is reported rather than silently honoured.
 
 | Option | Near field | Why |
 | --- | --- | --- |
@@ -158,7 +158,7 @@ Set **Shift Operator:** to `PATCH` to cut a patch from the object under each pro
 
 Pick **BH**, which reconstructs a hologram better than stock LSQML. The GUI default is **LSQML**, so selecting BH is a manual step. The beamline drivers reconstruct with pty-chi and fall back to BH on their own for a near-field run given no `--options` document.
 
-Near-field scans are often few enough frames to run as a single batch, where **BH Method:** `CG` converges faster than the default `GD`.
+Near-field scans often have few enough patterns to run as a single batch, where **BH Method:** `CG` converges faster than the default `GD`.
 
 A high-count hologram suits the Gaussian noise model, which is pty-chi's default. Poisson buys nothing here and costs conditioning.
 
@@ -185,7 +185,7 @@ The **Forward Model:** combo in the Autodiff panel is not a propagator selector.
 ## Known Limitations
 
 Multi-distance holo-ptychography is not supported
-: `detector_distance_m` is a scalar on the product, and the backends carry a single propagation distance to match. One distance per reconstruction; combining several detector planes would need a forward model that accepts more than one.
+: `detector_distance_m` is a scalar on the product, and the libraries carry a single propagation distance to match. One distance per reconstruction; combining several detector planes would need a forward model that accepts more than one.
 
 Affine position correction rejects near field
 : `transform_product` raises for a near-field product, whose object pixel carries no detector distance for a position scale to calibrate. A focused far-field product is calibrated like any other, since the magnification cancels from the far-field pixel.
@@ -193,7 +193,7 @@ Affine position correction rejects near field
 Near-field *simulation* is exact only at `M == 1`
 : The forward model does not normalize amplitudes by `1 / M**2`, so simulated counts scale with the magnified area, and `layer_spacing_m` is taken in the object frame rather than rescaled into the equivalent parallel-beam geometry.
 
-Only one backend implements near field
+Only one library implements near field
 : Any other reconstructor given a near-field product reconstructs it with a far-field forward model and reports nothing, because the product it receives is well-formed either way.
 
 A near-field dataset left declared far field is not detected

@@ -295,7 +295,7 @@ class LCLSPositionFileReader(ProbePositionFileReader):
 
         return ProbePositionSequence(
             [
-                ProbePosition(int(index), float(x), float(y), probe_photon_count=float(count))
+                ProbePosition(int(index), float(x), float(y), i0=float(count))
                 for index, x, y, count in zip(indexes, x_m, y_m, i0)
             ]
         )

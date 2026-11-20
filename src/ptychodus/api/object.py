@@ -23,7 +23,11 @@ from .fourier import fourier_shift_2d
 from .geometry import PixelGeometry
 from .interpolate import resample_complex_on_grid
 from .probe import ProbeGeometry
-from .probe_positions import ProbePosition, ProbePositionSequence, calculate_scan_geometry
+from .probe_positions import (
+    ProbePosition,
+    ProbePositionSequence,
+    calculate_probe_positions_geometry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -177,8 +181,8 @@ class ObjectGeometryProvider(ABC):
     def mean_amplitude_transmission(self) -> float:
         """Modulus a uniform object of the sample's measured opacity would carry.
 
-        A generated object scaled to this predicts the pattern totals the data holds,
-        rather than predicting the unobstructed beam at every scan position. One where
+        A generated object scaled to this predicts the detector sums the data holds,
+        rather than predicting the unobstructed beam at every probe position. One where
         no data says otherwise, which asserts a transparent sample.
         """
 
@@ -860,7 +864,7 @@ def compute_uniform_layer_spacing_m(total_thickness_m: float, num_layers: int) -
     The layers are phase screens at depths ``0`` through ``total_thickness_m``, so there
     are ``num_layers - 1`` gaps of ``total_thickness_m / (num_layers - 1)`` and the
     returned list sums to ``total_thickness_m`` exactly. This is the convention
-    :meth:`Object.get_total_thickness_m` reports and the one the reconstruction backends
+    :meth:`Object.get_total_thickness_m` reports and the one the reconstruction libraries
     propagate: they step between consecutive screens and traverse the whole stack.
 
     A non-positive thickness yields the right number of zero gaps rather than an empty
@@ -1322,27 +1326,27 @@ def compute_object_geometry(
     *,
     padding_px: int = 0,
 ) -> ObjectGeometry:
-    """Size an object canvas covering the scan bounding box plus a probe-extent border on each side, with optional additional padding in pixels.
+    """Size an object canvas covering the probe positions' bounding box plus a probe-extent border on each side, with optional additional padding in pixels.
 
-    The canvas is centered on the scan. A probe's beam axis sits at pixel ``N // 2``
+    The canvas is centered on the probe positions. A probe's beam axis sits at pixel ``N // 2``
     (:meth:`ProbeGeometry.get_transverse_coordinates`), so on an even axis the probe
     reaches half a pixel further before its axis than after it; each such axis gets one
-    more pixel, twice that offset, so the patch at either edge of the scan fits.
+    more pixel, twice that offset, so the patch at either extreme probe position fits.
 
     Raises :class:`ValueError` when ``positions`` is empty. Pass a re-iterable
-    sequence: :func:`calculate_scan_geometry` iterates twice.
+    sequence: :func:`calculate_probe_positions_geometry` iterates twice.
     """
-    scan = calculate_scan_geometry(positions)
+    positions_geometry = calculate_probe_positions_geometry(positions)
 
-    if scan is None:
+    if positions_geometry is None:
         raise ValueError('Probe positions are empty; cannot compute an object geometry.')
 
     core_width_px = math.ceil(
-        (scan.width_m + probe_geometry.width_m) / probe_geometry.pixel_width_m
+        (positions_geometry.width_m + probe_geometry.width_m) / probe_geometry.pixel_width_m
         + 2 * probe_geometry.axis_offset_x_px
     )
     core_height_px = math.ceil(
-        (scan.height_m + probe_geometry.height_m) / probe_geometry.pixel_height_m
+        (positions_geometry.height_m + probe_geometry.height_m) / probe_geometry.pixel_height_m
         + 2 * probe_geometry.axis_offset_y_px
     )
 
@@ -1351,8 +1355,8 @@ def compute_object_geometry(
         height_px=core_height_px + 2 * padding_px,
         pixel_width_m=probe_geometry.pixel_width_m,
         pixel_height_m=probe_geometry.pixel_height_m,
-        center_x_m=scan.center_x_m,
-        center_y_m=scan.center_y_m,
+        center_x_m=positions_geometry.center_x_m,
+        center_y_m=positions_geometry.center_y_m,
     )
 
 

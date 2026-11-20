@@ -7,7 +7,7 @@ allocations, no ``ptychi.api.task.PtychographyTask`` construction, no
 happens inside a child process started with ``spawn`` that lives only for the
 duration of one call (reconstruct / train / enhance) and dies immediately
 after. This gives each call a clean GPU context and fully releases GPU
-memory between calls, which lets ptychodus mix reconstructor backends built
+memory between calls, which lets ptychodus mix reconstruction libraries built
 on different GPU frameworks without driver-state interference.
 
 The parent MAY import a GPU framework if doing so is required to construct

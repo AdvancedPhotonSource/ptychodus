@@ -1,7 +1,7 @@
 """cdtools' declaration must reproduce the settings layout it persists.
 
 The keys are the external contract -- a missing one orphans a saved setting silently --
-and the golden values pin the defaults a run starts from. Needs no backend installed:
+and the golden values pin the defaults a run starts from. Needs no library installed:
 the declaration is ptychodus's own, which is also why it is read through
 `model/declared.py` rather than through the flattener.
 """

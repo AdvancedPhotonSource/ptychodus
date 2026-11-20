@@ -15,7 +15,9 @@ class ProbePositionsSettings(Observable, Observer):
         self._group.add_observer(self)
 
         self.builder = self._group.create_string_parameter('Builder', 'rectangular_raster')
-        self.file_path = self._group.create_path_parameter('FilePath', Path('/path/to/scan.csv'))
+        self.file_path = self._group.create_path_parameter(
+            'FilePath', Path('/path/to/positions.csv')
+        )
         self.file_type = self._group.create_string_parameter('FileType', 'CSV')
 
         self.affine00 = self._group.create_real_parameter('Affine00', 1.0)
@@ -54,7 +56,7 @@ class ProbePositionsSettings(Observable, Observer):
         The pattern-specific keys of this section are not written out above,
         because which of them exist is settled by which generators registered.
         They land in the same group all the same, so one section still holds
-        everything a scan is configured by.
+        everything the probe positions are configured by.
         """
         return declare_in(self._group, described)
 

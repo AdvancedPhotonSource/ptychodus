@@ -23,8 +23,8 @@ from ptychodus.webapp.routers import schemas
 _API_TS = Path(__file__).parents[2] / 'src' / 'ptychodus' / 'webapp' / 'ui' / 'src' / 'api.ts'
 
 # Mirrored interface -> the pydantic model it copies. CampaignRead and LineageRead
-# are absent on purpose: campaigns and lineage are a store-only grouping with no
-# desktop counterpart, served to agents and scripts but not browsed.
+# are absent on purpose: campaigns and lineage are a webapp-only grouping with no
+# GUI counterpart, served to agents and scripts but not browsed.
 _MIRRORED: dict[str, type[BaseModel]] = {
     'DiffractionRead': schemas.DiffractionRead,
     'ProductRead': schemas.ProductRead,

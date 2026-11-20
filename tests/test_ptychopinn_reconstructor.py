@@ -1,8 +1,8 @@
-"""What the PtychoPINN reconstructor hands its backend.
+"""What the PtychoPINN reconstructor hands its library.
 
-The reconstructor translates declared options into plain values and the backend
+The reconstructor translates declared options into plain values and the library
 turns them into calls. These tests pin the shape of those calls against a stubbed
-backend, because the real one needs lightning and a GPU.
+library, because the real one needs lightning and a GPU.
 """
 
 from __future__ import annotations
@@ -83,7 +83,7 @@ def _make_reconstruct_input() -> ReconstructInput:
     return ReconstructInput(patterns, bad_pixels, product)
 
 
-# ----------------------------- stubbed backend -----------------------------
+# ----------------------------- stubbed library -----------------------------
 
 
 def _fake_module(name: str, **attrs: Any) -> ModuleType:
@@ -97,7 +97,7 @@ def _fake_module(name: str, **attrs: Any) -> ModuleType:
     return module
 
 
-def _install_fake_backend(monkeypatch: pytest.MonkeyPatch, **modules: dict[str, Any]) -> None:
+def _install_fake_library(monkeypatch: pytest.MonkeyPatch, **modules: dict[str, Any]) -> None:
     """Put a minimal fake ``ptycho_torch`` (and ``torch``) on ``sys.modules`` for one test.
 
     ``modules`` maps a dotted submodule name, with dots spelled ``_DOT_``, to the
@@ -166,7 +166,7 @@ def _train(
 ) -> tuple[dict[str, Any], list[TrainOutput]]:
     """What training hands the stubbed door, and what it yields, given these options."""
     door = _TrainingDoor()
-    _install_fake_backend(
+    _install_fake_library(
         monkeypatch,
         ptycho_torch_DOT_execution_request={'ExecutionRequest': _FakeExecutionRequest},
         ptycho_torch_DOT_train={'train': door},
@@ -233,7 +233,7 @@ def test_train_names_the_bundle_and_leaves_loading_to_the_caller(
     output_directory = tmp_path / 'output'
     reconstructor = PtychoPINNReconstructor('Unsupervised')
     door = _TrainingDoor()
-    _install_fake_backend(
+    _install_fake_library(
         monkeypatch,
         ptycho_torch_DOT_execution_request={'ExecutionRequest': _FakeExecutionRequest},
         ptycho_torch_DOT_train={'train': door},
@@ -350,7 +350,7 @@ def test_reconstruct_stages_declared_arrays_through_the_embedder_seam(
         training_config=object(),
     )
     door = _InferenceDoor()
-    _install_fake_backend(
+    _install_fake_library(
         monkeypatch,
         ptycho_torch_DOT_inference={
             'ReconstructionRuntimeParams': SimpleNamespace,
@@ -365,7 +365,7 @@ def test_reconstruct_stages_declared_arrays_through_the_embedder_seam(
     options.inference.batch_size = 64
     options.training.accelerator = Accelerator.AUTO
     options.training.num_dataloader_workers = 3
-    # Named as the backend names it: the loaded bundle's mode is compared against it.
+    # Named as the library names it: the loaded bundle's mode is compared against it.
     reconstructor = PtychoPINNReconstructor('Unsupervised')
     reconstructor.load_model(tmp_path)
 
@@ -406,7 +406,7 @@ def test_the_returned_canvas_is_centered_where_ptychopinn_anchors_it(
         data_config=object(),
         training_config=object(),
     )
-    _install_fake_backend(
+    _install_fake_library(
         monkeypatch,
         ptycho_torch_DOT_inference={
             'ReconstructionRuntimeParams': SimpleNamespace,

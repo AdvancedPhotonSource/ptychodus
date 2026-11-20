@@ -66,8 +66,8 @@ class GlobusExecutor:
         compute_collection_globus_path = self._settings.compute_collection_globus_path.get_value()
         output_collection_globus_path = self._settings.output_collection_globus_path.get_value()
 
-        # Remote-workflow directory layout mirrors Genesis: input artifacts sit
-        # under <flow_label>/input/, results are written to <flow_label>/output/.
+        # Remote-workflow directory layout mirrors Genesis: input files sit
+        # under <flow_label>/input/, output files are written to <flow_label>/output/.
         # Transfer only the relevant subtree in each direction.
         input_data_globus_path = f'{input_collection_globus_path}/{flow_label}/input'
         compute_input_globus_path = f'{compute_collection_globus_path}/{flow_label}/input'

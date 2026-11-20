@@ -168,10 +168,10 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
     ) -> OPRWeightPolicy | None:
         """Ask how a loaded probe's OPR weights should carry over; None if the user cancels."""
         num_weight_rows, num_coherent_modes = opr_weights_shape
-        num_scan_points = self._repository[item_index].get_num_scan_points()
+        num_probe_positions = self._repository[item_index].get_num_probe_positions()
 
         dialog = OPRWeightPolicyDialog(self._view)
-        dialog.set_counts(num_weight_rows, num_scan_points, num_coherent_modes)
+        dialog.set_counts(num_weight_rows, num_probe_positions, num_coherent_modes)
         dialog.set_policy(OPRWeightPolicy.KEEP)
 
         if dialog.exec_() != QDialog.DialogCode.Accepted:

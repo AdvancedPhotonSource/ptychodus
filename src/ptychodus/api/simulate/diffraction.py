@@ -41,7 +41,7 @@ def generate_diffraction_data(
     background: DetectorBackground | None = None,
     flat_field: FlatField | None = None,
 ) -> AssembledDiffractionData:
-    """Simulate diffraction patterns for all scan positions in *product* using a multislice forward model.
+    """Simulate diffraction patterns for all probe positions in *product* using a multislice forward model.
 
     The propagation follows the product's declared regime. Far field uses the Fresnel
     transform onto the reciprocal grid ``lambda z / (N dx)``, ignoring any
@@ -217,7 +217,7 @@ def generate_scattering_data(
     product's geometry declares. The returned truth carries *geometry* in its metadata.
 
     Args:
-        product: Surface object, incident probe and scan positions, with far-field
+        product: Surface object, incident probe and probe positions, with far-field
             metadata.
         geometry: Exit-beam and surface directions.
         rng: Adds Poisson noise to the patterns when supplied.

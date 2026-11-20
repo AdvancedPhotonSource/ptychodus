@@ -57,7 +57,7 @@ Each enhancer declares its own options, and they persist in a group of that enha
 
 ### `two_step` — `[FluorescenceTwoStep]`
 
-Each element map is spread from the scan positions onto the object grid, and the probe intensity is then deconvolved from it.
+Each element map is spread from the probe positions onto the object grid, and the probe intensity is then deconvolved from it.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
@@ -67,7 +67,7 @@ Each element map is spread from the scan positions onto the object grid, and the
 
 ### `vspi` — `[FluorescenceVSPI]`
 
-Virtual single pixel imaging: each element map is solved for on the object grid by least squares (LSMR) against a forward model that weights the object by the probe intensity at every scan position.
+Virtual single pixel imaging: each element map is solved for on the object grid by least squares (LSMR) against a forward model that weights the object by the probe intensity at every probe position.
 
 | Key | Default | Meaning |
 | --- | --- | --- |

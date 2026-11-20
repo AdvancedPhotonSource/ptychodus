@@ -111,7 +111,7 @@ def build_train_config(name: str, options: PtychoFMOptions) -> dict[str, Any]:
 
 
 def _declared(options: BaseModel) -> PtychoFMOptions:
-    """Narrow the options a call was given to what this backend declares.
+    """Narrow the options a call was given to what this reconstructor declares.
 
     Checked rather than asserted: the dispatching layer validates the type
     against what ``get_default_options`` returns, so a mismatch here means
@@ -503,7 +503,7 @@ def _build_param_groups(
 def _train(
     input_directory: Path, output_directory: Path, config: dict[str, Any]
 ) -> Iterator[TrainOutput]:
-    """One training session, yielding a TrainOutput per epoch and a final one naming the model.
+    """One training session, yielding a TrainOutput per epoch and a final one naming its model.
 
     Single-device, no DDP, no mlflow, no wandb. Builds a CombinedDataset over
     ``input_directory`` (a directory of paired ``*_dp.hdf5`` / ``*_para.hdf5``
@@ -624,7 +624,7 @@ def _train(
         # Supervised compares the decoded object patch against the ground truth
         # the dataset carries; unsupervised compares the modelled diffraction
         # against the measurement and needs no object at all. Same split as
-        # ptycho_fm's own trainer, minus its wandb-driven auxiliary terms.
+        # ptycho_fm's own training loop, minus its wandb-driven auxiliary terms.
         if is_supervised:
             amp_loss = criterion(pred_amp, amp_patch.to(device))
             ph_loss = criterion(pred_ph, ph_patch.to(device))

@@ -3,7 +3,7 @@
 ``torchrun`` and ``torch.distributed.launch`` export the torch names; a plain ``srun``
 exports only the SLURM ones. Each reader consults the torch name first, because a job
 launched through ``srun`` under ``torchrun`` sets both and the torch one is what tracks the
-process group a backend will build.
+process group a library will build.
 
 Nothing here imports torch or any other optional extra. The environment is the only source
 a process has before it builds a process group, and the only one at all for a process that

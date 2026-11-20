@@ -21,7 +21,7 @@ from ptychodus.api.io import load_diffraction_data, load_fluorescence_data, load
 from ptychodus.api.visualize import VisualizationProduct
 
 from ptychodus.webapp.rendering.params import RenderParams
-from ptychodus.webapp.rendering.plot import ScanPath, render_scan_paths
+from ptychodus.webapp.rendering.plot import ProbePositionsTrace, render_probe_positions
 from ptychodus.webapp.rendering.render import (
     build_visualization_complex,
     build_visualization_real,
@@ -40,8 +40,8 @@ __all__ = [
     'object_layer_view',
     'object_view',
     'probe_modes_view',
+    'probe_positions_view',
     'probe_view',
-    'scan_paths_view',
     'view_as_png',
     'view_as_rendered_image',
 ]
@@ -168,11 +168,11 @@ def fluorescence_element_view(
     )
 
 
-def scan_paths_view(
+def probe_positions_view(
     entries: Sequence[tuple[Path, str]], *, connect_path: bool, width_px: int, height_px: int
 ) -> PlotImage:
-    """The scan paths of the products in `entries`, each a product file and its label."""
-    scans: list[ScanPath] = []
+    """The probe positions of the products in `entries`, each a product file and its label."""
+    traces: list[ProbePositionsTrace] = []
 
     for path, label in entries:
         product = load_product(path)
@@ -181,16 +181,16 @@ def scan_paths_view(
         if len(positions) == 0:
             raise RenderLookupError(f'product {label} has no probe positions')
 
-        scans.append(
-            ScanPath(
+        traces.append(
+            ProbePositionsTrace(
                 label=product.metadata.name or label,
                 x_m=[p.x_m for p in positions],
                 y_m=[p.y_m for p in positions],
             )
         )
 
-    return render_scan_paths(
-        scans, connect_path=connect_path, width_px=width_px, height_px=height_px
+    return render_probe_positions(
+        traces, connect_path=connect_path, width_px=width_px, height_px=height_px
     )
 
 

@@ -69,7 +69,7 @@ def test_introspect_product(tmp_path: Path) -> None:
     assert result['photon_energy_eV'] == 8500.0
     assert result['object_shape'] == (2, 32, 48)
     assert result['probe_shape'] == (3, 16, 16)
-    assert result['num_scan_points'] == 11
+    assert result['num_probe_positions'] == 11
     assert result['num_loss_epochs'] == 2
     assert result['tomography_angle_deg'] == 30.0
     assert result['tilt_angle_deg'] == 12.5
@@ -104,8 +104,8 @@ def test_introspect_fluorescence(tmp_path: Path) -> None:
     assert result['map_shape'] == (6, 9)
 
 
-def test_introspect_product_mirrors_the_desktop_property_table(tmp_path: Path) -> None:
-    """The fields the desktop shows that need more than a root attribute read."""
+def test_introspect_product_mirrors_the_gui_property_table(tmp_path: Path) -> None:
+    """The fields the GUI shows that need more than a root attribute read."""
     path = tmp_path / 'product.h5'
     modes = np.stack([np.full((8, 8), 2.0), np.full((8, 8), 1.0)]).astype(np.complex64)
     with h5py.File(path, 'w') as f:
@@ -124,7 +124,7 @@ def test_introspect_product_mirrors_the_desktop_property_table(tmp_path: Path) -
     # The probe's own pitch, which product.h5 keeps apart from the object's.
     assert result['probe_pixel_width_m'] == pytest.approx(7e-9)
     assert result['probe_pixel_height_m'] == pytest.approx(9e-9)
-    # The desktop lists the incoherent modes of the first coherent mode.
+    # The GUI lists the incoherent modes of the first coherent mode.
     assert result['probe_shape'] == (2, 8, 8)
     # Mode powers 4:1, so the shares are 0.8 and 0.2 and the coherence their root
     # sum of squares.
@@ -157,7 +157,7 @@ def test_introspect_fluorescence_element_sizes(tmp_path: Path) -> None:
 
 
 def test_introspect_product_reads_the_legacy_energy_attribute(tmp_path: Path) -> None:
-    """Products written before the rename spell it probe_energy_eV; the desktop reads both."""
+    """Products written before the rename spell it probe_energy_eV; the GUI reads both."""
     path = tmp_path / 'product.h5'
     with h5py.File(path, 'w') as f:
         f.attrs['probe_energy_eV'] = 6722.0

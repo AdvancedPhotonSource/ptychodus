@@ -1,7 +1,7 @@
 """The exit frame of an off-axis scattering geometry, and carrying data into it.
 
 Off the forward direction the detector records the Fourier transform of the sample projected
-along the exit beam. Scan positions reach that exit frame through a linear map
+along the exit beam. Probe positions reach that exit frame through a linear map
 (:func:`compute_exit_frame_transform`), and a probe stated across the incident beam is
 resampled onto it (:func:`transform_probe_to_exit_frame`). :func:`resolve_exit_frame_transform`
 is the one rule for where the map applies.
@@ -34,9 +34,9 @@ logger = logging.getLogger(__name__)
 def compute_exit_frame_transform(
     geometry: ScatteringGeometry, *, grazing_sine_floor: float = 1.0e-6
 ) -> AffineTransform:
-    """The map taking scan positions into the frame where the 2D Fourier relation holds.
+    """The map taking probe positions into the frame where the 2D Fourier relation holds.
 
-    Scan positions are measured across the incident beam. The detector records the
+    Probe positions are measured across the incident beam. The detector records the
     Fourier transform of the sample projected along the exit beam, onto the plane its
     own axes span. A point of a thin sample's surface reaches the first plane by
     projection along the incident beam and the second by projection along the exit
@@ -66,10 +66,10 @@ def compute_exit_frame_transform(
         raise ValueError(
             'A beam grazes the sample surface (incident sine '
             f'{incident_sine:.3g}, exit sine {exit_sine:.3g}); the projection between '
-            'the scan frame and the detector frame is degenerate.'
+            'the probe-position frame and the detector frame is degenerate.'
         )
 
-    # A scan point (x, y) lies on the surface at z = slope_x * x + slope_y * y, and
+    # A probe position (x, y) lies on the surface at z = slope_x * x + slope_y * y, and
     # projecting it along the exit beam keeps its components along the detector axes.
     slope_x = -normal[0] / normal[2]
     slope_y = -normal[1] / normal[2]
@@ -90,7 +90,7 @@ def compute_exit_frame_transform(
 def resolve_exit_frame_transform(
     geometry: ScatteringGeometry, *, far_field: bool, grazing_sine_floor: float = 1.0e-6
 ) -> AffineTransform:
-    """The map from scan positions to the exit frame, or the identity where it is undefined.
+    """The map from probe positions to the exit frame, or the identity where it is undefined.
 
     The exit frame is defined for an off-axis geometry in far field with neither beam
     grazing the surface; there this is :func:`compute_exit_frame_transform`.

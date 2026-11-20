@@ -224,7 +224,7 @@ class TestFlattening:
         assert not [key for key in keys if key.startswith('L1Norm')]
 
     def test_verbatim_policy_persists_declared_field_names(self) -> None:
-        """Two backends mirror their library's own snake_case names."""
+        """Two adapters mirror their library's own snake_case names."""
         keys = _keys(FlatteningPolicy(hidden=_ONLY_SCALARS, naming=NamingConvention.VERBATIM))
         assert 'step_size' in keys and 'StepSize' not in keys
 

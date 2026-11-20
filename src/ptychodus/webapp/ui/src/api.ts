@@ -42,7 +42,7 @@ export interface Page<T> {
 
 /**
  * Valid choices for the render parameters; enumerated live by the service, each list
- * in the order the desktop presents it. The label maps give the desktop's names.
+ * in the order the GUI presents it. The label maps give the GUI's names.
  */
 export interface VisualizationOptions {
   colormaps_linear: string[];
@@ -159,10 +159,10 @@ export interface ProductRead extends RowBase {
   probe_nbytes: number | null;
   probe_mode_relative_power: number[];
 
-  num_scan_points: number | null;
+  num_probe_positions: number | null;
   num_loss_epochs: number | null;
-  scan_length_m: number | null;
-  scan_nbytes: number | null;
+  probe_path_length_m: number | null;
+  probe_positions_nbytes: number | null;
 
   // Derived on read by compute_product_geometry. The last five additionally need
   // the detector, so they are null unless derived_from names an indexed diffraction
@@ -246,7 +246,7 @@ export const api = {
   listProduct: (limit = 200, offset = 0) =>
     get<Page<ProductRead>>(`/product?limit=${limit}&offset=${offset}`),
   getProduct: (uuid: string) => get<ProductRead>(`/product/${uuid}`),
-  // The product of every layer, which the desktop shows for the object itself.
+  // The product of every layer, which the GUI shows for the object itself.
   productObjectFlattenedImage: (uuid: string, params: Partial<RenderParams> = {}) =>
     get<RenderedImage>(`/product/${uuid}/object/image?${renderQuery(params)}`),
   productObjectImage: (uuid: string, layer: number, params: Partial<RenderParams> = {}) =>
@@ -258,7 +258,7 @@ export const api = {
     ),
   productProbeModesImage: (uuid: string, params: Partial<RenderParams> = {}) =>
     get<RenderedImage>(`/product/${uuid}/probe/modes/image?${renderQuery(params)}`),
-  // Takes a list so the Positions page can overlay checked scans on shared axes.
+  // Takes a list so the Positions page can overlay checked products on shared axes.
   productPositionsImage: (uuids: string[], connectPath = true) =>
     get<PlotImage>(
       `/product/positions/image?${uuids

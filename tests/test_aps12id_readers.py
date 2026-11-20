@@ -207,7 +207,7 @@ class TestAPS12IDReaders:
     def test_a_master_without_positions_is_rejected(self, tmp_path: Path) -> None:
         master = _write_master(tmp_path / 'S0042', positions_mm=None)
 
-        with pytest.raises(ProbePositionParseError, match='records no scan positions'):
+        with pytest.raises(ProbePositionParseError, match='records no probe positions'):
             APS12IDPositionFileReader().read(master)
 
     def test_valid_pixel_mask_stored_as_uint8(self, tmp_path: Path) -> None:
@@ -313,7 +313,7 @@ class TestAPS12IDProcessedReaders:
 
 
 def _write_tiff_scan(directory: Path, *, rows_per_point: int = 1) -> Path:
-    """One TIFF per scan point beside one .dat per scan point."""
+    """One TIFF per probe position beside one .dat per probe position."""
     directory.mkdir(parents=True, exist_ok=True)
 
     for line in range(_NUM_LINES):

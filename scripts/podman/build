@@ -3,11 +3,11 @@
 # in as a build arg and included in the image tag.
 #
 # Tag format:
-#   ptychodus:<tag-safe-version>-<backend>
+#   ptychodus:<tag-safe-version>-<variant>
 #
-#   backend ∈ { cpu, cuda12.6, cuda13.0, cuda13.2, rocm7.2.4, xpu, dev }
+#   variant ∈ { cpu, cuda12.6, cuda13.0, cuda13.2, rocm7.2.4, xpu, dev }
 #
-# Every backend but `dev` is a release image: it installs ptychodus from PyPI,
+# Every variant but `dev` is a release image: it installs ptychodus from PyPI,
 # the release named by PTYCHODUS_VERSION or else the latest one, which this
 # script reads from PyPI so the tag names exactly what the image holds. `dev`
 # is the developer image (containers/Dockerfile.dev), installed from this
@@ -45,7 +45,7 @@
 #   PTYCHO_FM_SRC       checkout of ptycho-fm to build its wheel from
 #                       (default: ../ptycho-fm beside this checkout).
 #                       Set either to the empty string to build without that
-#                       backend. Only the cpu, cuda and dev images use them.
+#                       library. Only the cpu, cuda and dev images use them.
 #
 # Lint with: shellcheck scripts/podman/build
 
@@ -136,14 +136,14 @@ fi
 
 needs_release=0
 needs_checkout=0
-needs_backends=0
+needs_libraries=0
 for v in "${variants[@]}"; do
     case "$v" in
         dev) needs_checkout=1 ;;
         *) needs_release=1 ;;
     esac
     case "$v" in
-        cpu|cuda*|dev) needs_backends=1 ;;
+        cpu|cuda*|dev) needs_libraries=1 ;;
     esac
 done
 
@@ -168,7 +168,7 @@ if (( needs_checkout )); then
         || die "setuptools_scm cannot derive a version from this checkout"
 fi
 
-# --- Backend wheels ----------------------------------------------------------
+# --- Library wheels ----------------------------------------------------------
 
 # PtychoPINN and PtychoFM are published on no package index, and a Dockerfile
 # can only read files inside its build context, so build each one's wheel from
@@ -176,8 +176,8 @@ fi
 # the build. Each wheel is built from a shared clone of the checkout's HEAD:
 # committed code only, never whatever is half-edited in the working tree, and
 # with the git metadata setuptools_scm needs. PtychoPINN's clone is patched
-# first: its pyproject lists TensorFlow, which ptychodus's backend
-# (ptycho_torch) never imports; OpenCV, which that backend never imports
+# first: its pyproject lists TensorFlow, which ptycho_torch, the
+# package ptychodus uses, never imports; OpenCV, which ptycho_torch never imports
 # either and whose bundled Qt plugins break the PyQt5 GUI; and caps Python
 # below 3.12, which would otherwise refuse every interpreter the images
 # ship. The trap covers the failure and Ctrl-C paths too: a wheel left
@@ -206,7 +206,7 @@ patch_ptychopinn() {
 
 # Clone $1 into $2 and build the clone's wheel into the staging directory, after
 # running the optional patch function $3 inside the clone.
-build_backend_wheel() {
+build_library_wheel() {
     local source=$1 clone=$2 patch=${3:-}
     git clone --quiet --shared "$source" "$clone" \
         || die "cannot clone $source"
@@ -222,39 +222,39 @@ build_backend_wheel() {
         || die "no wheel was built from $source"
 }
 
-if (( needs_backends )) && [[ -n "$PTYCHOPINN_SRC$PTYCHO_FM_SRC" ]]; then
-    command -v uv >/dev/null 2>&1 || die "uv not on PATH; it builds the backend wheels"
+if (( needs_libraries )) && [[ -n "$PTYCHOPINN_SRC$PTYCHO_FM_SRC" ]]; then
+    command -v uv >/dev/null 2>&1 || die "uv not on PATH; it builds the library wheels"
     clone_root=$(mktemp -d) || die "cannot create a scratch directory"
 
     if [[ -n "$PTYCHOPINN_SRC" ]]; then
         [[ -d "$PTYCHOPINN_SRC/.git" ]] \
             || die "no PtychoPINN checkout at $PTYCHOPINN_SRC (set PTYCHOPINN_SRC= to build without it)"
-        build_backend_wheel "$PTYCHOPINN_SRC" "$clone_root/ptychopinn" patch_ptychopinn
+        build_library_wheel "$PTYCHOPINN_SRC" "$clone_root/ptychopinn" patch_ptychopinn
     fi
 
     if [[ -n "$PTYCHO_FM_SRC" ]]; then
         [[ -d "$PTYCHO_FM_SRC/.git" ]] \
             || die "no ptycho-fm checkout at $PTYCHO_FM_SRC (set PTYCHO_FM_SRC= to build without it)"
-        build_backend_wheel "$PTYCHO_FM_SRC" "$clone_root/ptycho-fm"
+        build_library_wheel "$PTYCHO_FM_SRC" "$clone_root/ptycho-fm"
     fi
 fi
 
 # --- Build -------------------------------------------------------------------
 
-for backend in "${variants[@]}"; do
-    if [[ "$backend" == dev ]]; then
+for variant in "${variants[@]}"; do
+    if [[ "$variant" == dev ]]; then
         version="$CHECKOUT_VERSION"
     else
         version="$RELEASE_VERSION"
     fi
-    tag="ptychodus:$(tag_safe "$version")-${backend}"
+    tag="ptychodus:$(tag_safe "$version")-${variant}"
     printf '\n=== %s (version=%s) ===\n' "$tag" "$version"
     # VARIANT_ARGS entries are space-separated argv, but the strict-mode IFS
     # set above contains no space, so unquoted word-splitting would hand the
     # engine one giant argument. Split on spaces explicitly instead.
-    IFS=' ' read -r -a variant_args <<<"${VARIANT_ARGS[$backend]}"
+    IFS=' ' read -r -a variant_args <<<"${VARIANT_ARGS[$variant]}"
     "$ENGINE" build "${variant_args[@]}" \
         --build-arg "PTYCHODUS_VERSION=$version" \
         --build-arg "BASE_REGISTRY=$BASE_REGISTRY" \
-        -t "$tag" "${VARIANT_CONTEXT[$backend]:-containers}"
+        -t "$tag" "${VARIANT_CONTEXT[$variant]:-containers}"
 done

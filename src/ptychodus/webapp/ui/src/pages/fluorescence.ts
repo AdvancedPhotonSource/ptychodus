@@ -36,7 +36,7 @@ export async function mountFluorescence(root: HTMLElement, uuid: string | null):
   if (found.error !== null) image.setError(found.error);
 
   if (items.length === 0) {
-    left.replaceChildren(emptyBlock('No fluorescence datasets in store.'));
+    left.replaceChildren(emptyBlock('No fluorescence datasets in the storage root.'));
     return;
   }
 
@@ -80,7 +80,7 @@ export async function mountFluorescence(root: HTMLElement, uuid: string | null):
         fmt(f.element_counts.reduce((a, b) => a + b, 0)),
         fmtBytes(f.nbytes),
       ],
-      // Selecting the dataset shows every element map summed, as the desktop does.
+      // Selecting the dataset shows every element map summed, as the GUI does.
       onSelect: () =>
         show('all elements', (q) => api.fluorescenceSummaryImage(f.uuid, product, q)),
       children: f.element_names.map((name, i) => ({
@@ -121,7 +121,7 @@ function productOf(f: FluorescenceRead): string | undefined {
   return f.derived_from.find((e) => e.kind === 'product')?.uuid;
 }
 
-/** That product by name, as the desktop's Product column shows it. */
+/** That product by name, as the GUI's Product column shows it. */
 function productName(f: FluorescenceRead): string {
   const edge = f.derived_from.find((e) => e.kind === 'product');
   if (edge === undefined) return MISSING;

@@ -1,7 +1,7 @@
 """The reconstruct and train tasks run their reconstructor in a spawned child.
 
-What a backend yields comes back; what it does to itself does not. So the train
-task, not the backend, loads the model a finished run names, and a stopped run
+What a reconstructor yields comes back; what it does to itself does not. So the train
+task, not the reconstructor, loads the model a finished run names, and a stopped run
 loads nothing.
 """
 
@@ -90,22 +90,22 @@ def test_reconstruct_streams_what_the_child_yields() -> None:
 
 
 def test_train_loads_the_model_the_child_names(tmp_path: Path) -> None:
-    trainer = FakeTrainableReconstructor()
+    reconstructor = FakeTrainableReconstructor()
     task = TrainBackgroundTask(
-        _task_monitor(), trainer, _reconstruct_input(), tmp_path, tmp_path, NoOptions(), dict
+        _task_monitor(), reconstructor, _reconstruct_input(), tmp_path, tmp_path, NoOptions(), dict
     )
 
     task()
 
-    assert not trainer.trained_in_this_process
-    assert trainer.loaded_model == tmp_path / 'model.fake'
+    assert not reconstructor.trained_in_this_process
+    assert reconstructor.loaded_model == tmp_path / 'model.fake'
 
 
 def test_a_stopped_training_run_loads_nothing(tmp_path: Path) -> None:
-    trainer = FakeTrainableReconstructor()
+    reconstructor = FakeTrainableReconstructor()
     task = TrainBackgroundTask(
         _task_monitor(is_stopping=True),
-        trainer,
+        reconstructor,
         _reconstruct_input(),
         tmp_path,
         tmp_path,
@@ -115,4 +115,4 @@ def test_a_stopped_training_run_loads_nothing(tmp_path: Path) -> None:
 
     task()
 
-    assert not trainer.is_model_loaded()
+    assert not reconstructor.is_model_loaded()

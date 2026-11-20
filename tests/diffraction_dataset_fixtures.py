@@ -2,7 +2,7 @@
 
 ``test_assemble`` and ``test_diffraction_summary`` both drive the pure assembly
 layer over synthetic arrays, so the fakes live here rather than being forked
-per module. The two differ only in frame shape, which is a parameter below.
+per module. The two differ only in pattern shape, which is a parameter below.
 
 Every fake implements :class:`DiffractionArray` on its real signature,
 ``read_region`` keyword included. That matters: ``mypy`` runs over
@@ -40,10 +40,10 @@ GATE_TIMEOUT_SEC = 10.0
 
 
 def make_array(
-    label: str, first_index: int, num_patterns: int, fill: int, *, frame_shape: tuple[int, int]
+    label: str, first_index: int, num_patterns: int, fill: int, *, pattern_shape: tuple[int, int]
 ) -> SimpleDiffractionArray:
     """A constant-valued array whose indexes run from `first_index`."""
-    height, width = frame_shape
+    height, width = pattern_shape
     patterns = numpy.full((num_patterns, height, width), fill, dtype=numpy.int32)
     indexes = numpy.arange(first_index, first_index + num_patterns, dtype=numpy.intp)
     return SimpleDiffractionArray(label, indexes, patterns)
@@ -60,20 +60,20 @@ def _resolve_pattern_dtype(
 
 def make_dataset(
     arrays: Sequence[DiffractionArray],
-    frame_shape: tuple[int, int],
+    pattern_shape: tuple[int, int],
     bad_pixels: BadPixels | None = None,
     num_patterns_per_array: Sequence[int] | None = None,
     pixel_geometry: PixelGeometry | None = GEOMETRY,
     exposure_time_s: float | None = None,
     pattern_dtype: numpy.typing.DTypeLike | None = None,
 ) -> SimpleDiffractionDataset:
-    """Build a dataset over `arrays`, with `frame_shape` as the detector extent.
+    """Build a dataset over `arrays`, with `pattern_shape` as the detector extent.
 
     `pattern_dtype` is read off `arrays[0]` when it is not given. Pass it
     explicitly whenever `arrays[0]` is a :class:`BlockingArray`, so that building
     the metadata does not trip the gate before the test has armed it.
     """
-    height, width = frame_shape
+    height, width = pattern_shape
     metadata = DiffractionMetadata(
         num_patterns_per_array=(
             [a.get_num_patterns() for a in arrays]

@@ -13,19 +13,18 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from ptychodus.webapp.ingest.pipeline import ingest_manifest
 from ptychodus.webapp.ingest.reconciler import full_rescan
 from ptychodus.webapp.routers.deps import LayoutDep, get_session_provider
-from ptychodus.webapp.routers.schemas import ReindexResponse, StoreStats
-from ptychodus.webapp.db.base import IngestState
+from ptychodus.webapp.routers.schemas import ReindexResponse, ResourceStats
+from ptychodus.webapp.db import repositories as repo
 from ptychodus.webapp.db.models import Campaign, Diffraction, Fluorescence, Product
 from ptychodus.webapp.routers.deps import SessionDep
 from ptychodus.api.storage import LayoutError
-from sqlalchemy import func, or_, select
 from fastapi import Request
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix='/admin', tags=['admin'])
 
 
-# A full rescan walks the whole store and opens every HDF5 file it finds. The endpoint is
+# A full rescan walks the whole storage root and opens every HDF5 file it finds. The endpoint is
 # unauthenticated, so without this guard each request piles another concurrent walk onto the
 # same session factory.
 _rescan_lock = asyncio.Lock()
@@ -70,32 +69,12 @@ async def rescan_one(
     return {'status': 'rescanned', 'kind': kind, 'uuid': str(uuid)}
 
 
-@router.get('/stats', response_model=StoreStats)
-async def stats(session: SessionDep) -> StoreStats:
-    async def _count(model) -> int:
-        return int((await session.execute(select(func.count()).select_from(model))).scalar_one())
-
-    async def _invalid_count() -> int:
-        total = 0
-        for model in (Campaign, Diffraction, Product, Fluorescence):
-            stmt = (
-                select(func.count())
-                .select_from(model)
-                .where(
-                    or_(
-                        model.ingest_state == IngestState.INVALID,
-                        model.ingest_state == IngestState.MISSING_FILES,
-                        model.ingest_state == IngestState.ORPHANED,
-                    )
-                )
-            )
-            total += int((await session.execute(stmt)).scalar_one())
-        return total
-
-    return StoreStats(
-        campaign_count=await _count(Campaign),
-        diffraction_count=await _count(Diffraction),
-        product_count=await _count(Product),
-        fluorescence_count=await _count(Fluorescence),
-        invalid_count=await _invalid_count(),
+@router.get('/stats', response_model=ResourceStats)
+async def stats(session: SessionDep) -> ResourceStats:
+    return ResourceStats(
+        campaign_count=await repo.count_rows(session, Campaign),
+        diffraction_count=await repo.count_rows(session, Diffraction),
+        product_count=await repo.count_rows(session, Product),
+        fluorescence_count=await repo.count_rows(session, Fluorescence),
+        invalid_count=await repo.count_invalid_rows(session),
     )

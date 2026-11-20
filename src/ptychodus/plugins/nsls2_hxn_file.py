@@ -358,7 +358,7 @@ class NSLS2HXNPositionFileReader(ProbePositionFileReader):
                     index=index,
                     x_m=float(x_um) * self._x_scale_to_meters,
                     y_m=float(y_um) * self._y_scale_to_meters,
-                    probe_photon_count=None if i0_counts is None else float(i0_counts[index]),
+                    i0=None if i0_counts is None else float(i0_counts[index]),
                 )
                 for index, (x_um, y_um) in enumerate(positions_um.T)
             ]

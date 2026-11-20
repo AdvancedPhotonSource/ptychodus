@@ -114,8 +114,8 @@ def _probe_modes(probe: Any) -> Probe | None:
     return Probe(array=array, pixel_geometry=PixelGeometry(width_m=1.0, height_m=1.0))
 
 
-def _scan_path_length_m(h5_file: h5py.File) -> float | None:
-    """Total length of the scan path, summed over consecutive positions."""
+def _probe_path_length_m(h5_file: h5py.File) -> float | None:
+    """Total length of the probe path, summed over consecutive positions."""
     h5_x = h5_file.get(ProductFileKeys.PROBE_POSITION_X)
     h5_y = h5_file.get(ProductFileKeys.PROBE_POSITION_Y)
 
@@ -147,7 +147,7 @@ def introspect_product(path: Path) -> dict[str, Any]:
       * probe_shape:         tuple[int, int, int] | None — (incoherent modes, h, w)
       * probe_pixel_width_m, probe_pixel_height_m: float | None
       * probe_mode_relative_power: list[float]; probe_coherence: float | None
-      * num_scan_points:     int | None
+      * num_probe_positions:     int | None
       * num_loss_epochs:     int
     """
     try:
@@ -216,9 +216,9 @@ def introspect_product(path: Path) -> dict[str, Any]:
                 coherence = float(modes.get_coherence())
                 probe_coherence = coherence if numpy.isfinite(coherence) else None
 
-            num_scan_points: int | None = None
+            num_probe_positions: int | None = None
             if isinstance(positions, h5py.Dataset):
-                num_scan_points = int(positions.shape[0])
+                num_probe_positions = int(positions.shape[0])
 
             num_loss_epochs = 0
             if isinstance(loss_epochs, h5py.Dataset):
@@ -241,8 +241,8 @@ def introspect_product(path: Path) -> dict[str, Any]:
                 'object_dtype': str(obj.dtype) if isinstance(obj, h5py.Dataset) else None,
                 'object_nbytes': _dataset_nbytes(obj),
                 'object_layer_spacing_m': layer_spacing_m,
-                'scan_length_m': _scan_path_length_m(f),
-                'scan_nbytes': _dataset_nbytes(positions)
+                'probe_path_length_m': _probe_path_length_m(f),
+                'probe_positions_nbytes': _dataset_nbytes(positions)
                 + _dataset_nbytes(f.get(ProductFileKeys.PROBE_POSITION_X))
                 + _dataset_nbytes(f.get(ProductFileKeys.PROBE_POSITION_Y)),
                 'detector_distance_m': _root_attr(ProductFileKeys.DETECTOR_OBJECT_DISTANCE, float),
@@ -263,7 +263,7 @@ def introspect_product(path: Path) -> dict[str, Any]:
                 'object_pixel_width_m': object_pixel_width_m,
                 'object_pixel_height_m': object_pixel_height_m,
                 'probe_shape': probe_shape,
-                'num_scan_points': num_scan_points,
+                'num_probe_positions': num_probe_positions,
                 'num_loss_epochs': num_loss_epochs,
             }
     except (OSError, KeyError) as exc:

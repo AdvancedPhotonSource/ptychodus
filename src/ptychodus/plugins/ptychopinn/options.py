@@ -11,7 +11,7 @@ Being ptychodus's own, it carries its bounds, choices and display text inline
 through ``pydantic.Field``, rather than needing them supplied alongside.
 
 It describes only what ptychodus surfaces: 65 of the roughly 130 fields the
-backend accepts. The rest keep whatever the backend defaults them to.
+library accepts. The rest keep whatever the library defaults them to.
 """
 
 from __future__ import annotations

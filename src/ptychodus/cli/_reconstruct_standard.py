@@ -38,7 +38,7 @@ from ptychodus.api.assemble import (
     AssembledDiffractionData,
     DetectorCorrections,
     assemble_dataset,
-    compute_dataset_total_counts,
+    compute_dataset_detector_sums,
 )
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import (
@@ -252,10 +252,10 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
 
     if profile.conditions_patterns:
         parser.add_argument(
-            '--min-total-counts',
+            '--min-detector-sum',
             type=int,
             default=None,
-            help='Drop patterns whose total counts fall below this, with their positions.',
+            help='Drop patterns whose detector sums fall below this, with their positions.',
         )
 
         if profile.offers_pattern_filters:
@@ -370,7 +370,7 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
             '--probe-photon-count',
             type=float,
             default=None,
-            help='Override the per-snapshot probe photon count.',
+            help='Override the probe photon count, the photons per exposure.',
         )
     parser.add_argument(
         '--i0-photons-per-count',
@@ -542,7 +542,7 @@ def _add_pattern_filter_arguments(parser: argparse.ArgumentParser) -> None:
         type=float,
         default=None,
         help=(
-            'Drop patterns whose total counts are more than this many MADs from the median. '
+            'Drop patterns whose detector sums are more than this many MADs from the median. '
             'The beamline script uses 5.0. Omit to skip.'
         ),
     )
@@ -556,16 +556,16 @@ def _add_pattern_filter_arguments(parser: argparse.ArgumentParser) -> None:
         ),
     )
     parser.add_argument(
-        '--drop-leading-frames',
+        '--drop-leading-patterns',
         type=int,
         default=0,
-        help='Drop this many patterns from the start of the trajectory, after the MAD filters.',
+        help='Drop this many patterns from the start of the probe path, after the MAD filters.',
     )
     parser.add_argument(
-        '--drop-trailing-frames',
+        '--drop-trailing-patterns',
         type=int,
         default=0,
-        help='Drop this many patterns from the end of the trajectory, after the MAD filters.',
+        help='Drop this many patterns from the end of the probe path, after the MAD filters.',
     )
 
 
@@ -599,7 +599,7 @@ def _select_patterns(
 
     Patterns are dropped rather than positions. Dropping a position would not remove its
     pattern: `prepare_reconstruct_input` interpolates a pattern index that falls inside the
-    position range but has no exact match, so the frame would come back with a made-up
+    position range but has no exact match, so the pattern would come back with a made-up
     coordinate instead of being discarded.
     """
     num_dropped = int((~keep).sum())
@@ -629,7 +629,7 @@ def _select_patterns(
     )
 
 
-def _total_counts_bounds(
+def _detector_sum_bounds(
     logger: logging.Logger,
     args: argparse.Namespace,
     raw_dataset: DiffractionDataset,
@@ -638,28 +638,28 @@ def _total_counts_bounds(
     read_region: CropRegion | None,
     corrections: DetectorCorrections | None = None,
 ) -> tuple[int | None, int | None]:
-    """Resolve the total-counts window from --min-total-counts and --dp-mad-k.
+    """Resolve the detector-sum window from --min-detector-sum and --dp-mad-k.
 
     The MAD bound needs the distribution before it can pick a threshold, so this makes a
-    measuring pass with `compute_dataset_total_counts` -- same crop, same pipeline, same
+    measuring pass with `compute_dataset_detector_sums` -- same crop, same pipeline, same
     processed bad-pixel mask as the assembler, and no assembled buffer. Whichever of the
     two options gives the tighter lower bound wins, so they compose rather than override.
     """
-    lower = args.min_total_counts
+    lower = args.min_detector_sum
     upper: int | None = None
 
     if getattr(args, 'dp_mad_k', None) is None:
         return lower, upper
 
-    logger.info('Measuring per-pattern total counts for the --dp-mad-k window')
-    measured = compute_dataset_total_counts(
+    logger.info('Measuring per-pattern detector sums for the --dp-mad-k window')
+    measured = compute_dataset_detector_sums(
         raw_dataset,
         pipeline,
         bad_pixels=bad_pixels,
         read_region=read_region,
         corrections=corrections,
     )
-    mad_lower, mad_upper = _mad_bounds(measured.total_counts.astype(float), args.dp_mad_k)
+    mad_lower, mad_upper = _mad_bounds(measured.detector_sums.astype(float), args.dp_mad_k)
 
     # The filter compares integer counts inclusively, so widen each bound outward to the
     # nearest integer; rounding inward would reject patterns the float interval admits.
@@ -671,10 +671,12 @@ def _total_counts_bounds(
         upper = int(math.ceil(mad_upper))
 
     logger.info(
-        'Total counts (median %.4g, MAD %.4g over %d patterns): keeping [%s, %s]',
-        float(numpy.median(measured.total_counts)),
-        float(numpy.median(numpy.abs(measured.total_counts - numpy.median(measured.total_counts)))),
-        measured.total_counts.size,
+        'Detector sums (median %.4g, MAD %.4g over %d patterns): keeping [%s, %s]',
+        float(numpy.median(measured.detector_sums)),
+        float(
+            numpy.median(numpy.abs(measured.detector_sums - numpy.median(measured.detector_sums)))
+        ),
+        measured.detector_sums.size,
         lower,
         upper,
     )
@@ -694,7 +696,7 @@ def _reject_i0_outliers(
     stream reduces the I0 counter over each trigger group, while step-scan motor readbacks
     have no counter to reduce.
     """
-    counts = positions.get_probe_photon_counts()
+    counts = positions.get_i0()
 
     if counts is None:
         logger.warning(
@@ -727,10 +729,10 @@ def _trim_ends(
     num_leading: int,
     num_trailing: int,
 ) -> AssembledDiffractionData:
-    """Drop the first and last patterns of the trajectory.
+    """Drop the first and last patterns of the probe path.
 
-    The scanner takes a few stabilization frames as the stage comes up to speed, and may
-    take a shutter-close frame at the end. This runs after the MAD filters, so the counts
+    The scanner takes a few stabilization patterns as the stage comes up to speed, and may
+    take a shutter-close pattern at the end. This runs after the MAD filters, so the counts
     are of surviving patterns, matching the beamline script's ``_start_drop_mask`` applied
     to the combined keep mask.
     """
@@ -1089,7 +1091,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
                 else f'the {metadata.pattern_dtype} maximum'
             )
 
-        # One step, two consumers: the assembled patterns below and the mean frame the beam
+        # One step, two consumers: the assembled patterns below and the mean pattern the beam
         # center is estimated from. Sharing the object is what keeps those two cuts identical.
         value_filter: FilterValuesStep | None = None
 
@@ -1122,7 +1124,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
                 None if probe_from_file is None else _get_probe_extent(probe_from_file)
             ),
         )
-        lower_counts, upper_counts = _total_counts_bounds(
+        lower_counts, upper_counts = _detector_sum_bounds(
             logger, args, raw_dataset, pipeline, bad_pixels, read_region, corrections
         )
 
@@ -1138,8 +1140,8 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             raw_pixel_geometry=raw_pixel_geometry,
             read_region=read_region,
             corrections=corrections,
-            total_counts_lower_bound=lower_counts,
-            total_counts_upper_bound=upper_counts,
+            detector_sum_lower_bound=lower_counts,
+            detector_sum_upper_bound=upper_counts,
             on_array_assembled=assembly_moments.add_assembled,
         )
     else:
@@ -1171,9 +1173,9 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
         if args.i0_mad_k is not None:
             assembled_data = _reject_i0_outliers(logger, assembled_data, positions, args.i0_mad_k)
 
-        if args.drop_leading_frames > 0 or args.drop_trailing_frames > 0:
+        if args.drop_leading_patterns > 0 or args.drop_trailing_patterns > 0:
             assembled_data = _trim_ends(
-                logger, assembled_data, args.drop_leading_frames, args.drop_trailing_frames
+                logger, assembled_data, args.drop_leading_patterns, args.drop_trailing_patterns
             )
 
         num_patterns = assembled_data.get_num_patterns()
@@ -1273,7 +1275,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
     logger.info('Probe: %s', probe_ensemble.get_array().shape)
 
     # Uniform, but not transparent: scaled to the mean transmission the patterns imply,
-    # so the exit wave predicts the totals the detector recorded instead of the
+    # so the exit wave predicts the detector sums recorded instead of the
     # unobstructed beam. Absorption belongs here rather than in the probe, which has to
     # go on meaning the incident illumination that probe_photon_count states.
     object_ = generate_uniform_object(

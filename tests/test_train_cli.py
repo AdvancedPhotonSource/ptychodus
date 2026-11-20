@@ -2,7 +2,7 @@
 
 The library trains in process and writes a stand-in model, so these tests pin down what the
 command decides -- which algorithm, which options, whether a launch may go ahead, which rank
-writes -- without a backend, a child process or a GPU. Launches are simulated by the
+writes -- without a library, a child process or a GPU. Launches are simulated by the
 environment variables a launcher sets, which is all the command reads of one.
 """
 
@@ -61,7 +61,7 @@ class _Solver(Reconstructor):
         yield from ()
 
 
-class _FakeTrainer(TrainableReconstructor):
+class _FakeTrainableReconstructor(TrainableReconstructor):
     def __init__(self, name: str, *, distributed: bool) -> None:
         self._name = name
         self._distributed = distributed
@@ -122,26 +122,30 @@ class _FakeTrainer(TrainableReconstructor):
 
 
 class _FakeLibrary(ReconstructorLibrary):
-    def __init__(self, trainers: Iterable[Reconstructor]) -> None:
+    def __init__(self, reconstructors: Iterable[Reconstructor]) -> None:
         super().__init__('fake', 'fake-distribution')
-        self._offered = list(trainers)
+        self._offered = list(reconstructors)
 
     def _build(self) -> Iterable[Reconstructor]:
         return self._offered
 
 
 @pytest.fixture
-def ddp() -> _FakeTrainer:
-    return _FakeTrainer('DDP', distributed=True)
+def ddp() -> _FakeTrainableReconstructor:
+    return _FakeTrainableReconstructor('DDP', distributed=True)
 
 
 @pytest.fixture
-def single() -> _FakeTrainer:
-    return _FakeTrainer('Single', distributed=False)
+def single() -> _FakeTrainableReconstructor:
+    return _FakeTrainableReconstructor('Single', distributed=False)
 
 
 @pytest.fixture(autouse=True)
-def _registry(monkeypatch: pytest.MonkeyPatch, ddp: _FakeTrainer, single: _FakeTrainer) -> None:
+def _registry(
+    monkeypatch: pytest.MonkeyPatch,
+    ddp: _FakeTrainableReconstructor,
+    single: _FakeTrainableReconstructor,
+) -> None:
     """Offer only the fake library, and keep ``main()`` off the test process's globals."""
     registry = PluginRegistry()
     registry.reconstructor_libraries.register_plugin(
@@ -178,7 +182,7 @@ def _directories(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def test_training_writes_the_model_under_the_standard_name(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ddp: _FakeTrainer
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ddp: _FakeTrainableReconstructor
 ) -> None:
     input_directory, output_directory = _directories(tmp_path)
 
@@ -196,7 +200,7 @@ def test_printed_options_load_back_and_select_their_algorithm(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
-    single: _FakeTrainer,
+    single: _FakeTrainableReconstructor,
 ) -> None:
     with pytest.raises(SystemExit) as exit_info:
         _main(monkeypatch, '--print-options', 'Fake/single')
@@ -274,8 +278,11 @@ def test_the_output_directory_must_differ_from_the_input(
 
 
 @pytest.mark.parametrize('variable', ['WORLD_SIZE', 'SLURM_NTASKS'])
-def test_a_backend_that_trains_alone_is_refused_across_processes(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, single: _FakeTrainer, variable: str
+def test_a_library_that_trains_alone_is_refused_across_processes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    single: _FakeTrainableReconstructor,
+    variable: str,
 ) -> None:
     monkeypatch.setenv(variable, '2')
     input_directory, output_directory = _directories(tmp_path)
@@ -307,7 +314,7 @@ def test_a_launch_across_nodes_is_refused(
 def test_only_the_main_process_saves_the_model(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    ddp: _FakeTrainer,
+    ddp: _FakeTrainableReconstructor,
     rank: str,
     writes_model: bool,
 ) -> None:
@@ -326,7 +333,7 @@ def test_only_the_main_process_saves_the_model(
 
 
 def test_a_failed_training_reports_failure_and_saves_nothing(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ddp: _FakeTrainer
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ddp: _FakeTrainableReconstructor
 ) -> None:
     ddp.fail = True
     input_directory, output_directory = _directories(tmp_path)
@@ -341,7 +348,7 @@ def test_a_failed_training_reports_failure_and_saves_nothing(
 
 
 def test_a_training_that_reports_no_model_is_a_failure(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ddp: _FakeTrainer
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ddp: _FakeTrainableReconstructor
 ) -> None:
     ddp.report_model = False
     input_directory, output_directory = _directories(tmp_path)
@@ -355,7 +362,7 @@ def test_a_training_that_reports_no_model_is_a_failure(
 
 
 def test_a_dry_run_writes_nothing(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ddp: _FakeTrainer
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ddp: _FakeTrainableReconstructor
 ) -> None:
     input_directory, output_directory = _directories(tmp_path)
 

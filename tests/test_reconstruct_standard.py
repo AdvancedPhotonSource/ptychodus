@@ -172,7 +172,7 @@ def test_unconditioned_profile_drops_the_conditioning_options() -> None:
         'crop_extent_px',
         'beam_center_x_px',
         'beam_center_y_px',
-        'min_total_counts',
+        'min_detector_sum',
         'max_valid_count',
         'bad_pixels_file',
         'bad_pixels_file_type',
@@ -196,12 +196,12 @@ def test_pattern_filters_are_offered_only_where_the_profile_asks() -> None:
 
     assert polar.dp_mad_k is None
     assert polar.i0_mad_k is None
-    assert polar.drop_leading_frames == 0
-    assert polar.drop_trailing_frames == 0
+    assert polar.drop_leading_patterns == 0
+    assert polar.drop_trailing_patterns == 0
 
     for name in ('12ide', '26idc', '2ide', '34ide', 'bnp', 'isn', 'lamni', 'velociprobe'):
         args = _defaults(profiles[name])
-        for absent in ('dp_mad_k', 'i0_mad_k', 'drop_leading_frames', 'drop_trailing_frames'):
+        for absent in ('dp_mad_k', 'i0_mad_k', 'drop_leading_patterns', 'drop_trailing_patterns'):
             assert not hasattr(args, absent), f'{name}.{absent}'
 
 
@@ -348,21 +348,21 @@ def test_reject_i0_outliers_is_a_no_op_without_i0() -> None:
     data = _assembled(numpy.arange(4))
     positions = ProbePositionSequence([ProbePosition(i, float(i), 0.0) for i in range(4)])
 
-    assert positions.get_probe_photon_counts() is None
+    assert positions.get_i0() is None
     assert rs._reject_i0_outliers(logger, data, positions, 5.0) is data
 
 
-def test_total_counts_bounds_passes_min_through_when_mad_is_off() -> None:
-    args = argparse.Namespace(min_total_counts=42, dp_mad_k=None)
-    assert rs._total_counts_bounds(logger, args, _never_read_dataset(), None, None, None) == (
+def test_detector_sum_bounds_passes_min_through_when_mad_is_off() -> None:
+    args = argparse.Namespace(min_detector_sum=42, dp_mad_k=None)
+    assert rs._detector_sum_bounds(logger, args, _never_read_dataset(), None, None, None) == (
         42,
         None,
     )
 
 
-def test_total_counts_bounds_is_inert_when_both_options_are_off() -> None:
-    args = argparse.Namespace(min_total_counts=None, dp_mad_k=None)
-    assert rs._total_counts_bounds(logger, args, _never_read_dataset(), None, None, None) == (
+def test_detector_sum_bounds_is_inert_when_both_options_are_off() -> None:
+    args = argparse.Namespace(min_detector_sum=None, dp_mad_k=None)
+    assert rs._detector_sum_bounds(logger, args, _never_read_dataset(), None, None, None) == (
         None,
         None,
     )

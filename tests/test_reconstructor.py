@@ -104,7 +104,7 @@ def _make_product(num_layers: int = 1) -> Product:
 
 
 def _exit_waves(product: Product) -> list[numpy.ndarray]:
-    """probe(r_local) * object(r_local + r_pos) at every scan position.
+    """probe(r_local) * object(r_local + r_pos) at every probe position.
 
     The probe coordinate frame and the object coordinate frame both use the
     geometric center of their respective arrays as the origin (matching the
@@ -294,7 +294,7 @@ class TestStandardizeProductMultiLayer:
 
 
 class TestStandardizeProductExitWavePreservation:
-    """The contract: diffraction-pattern intensities are preserved at every scan position."""
+    """The contract: diffraction-pattern intensities are preserved at every probe position."""
 
     def test_exit_wave_magnitudes_match_with_non_zero_ramp(self) -> None:
         product = _make_product()
@@ -1400,11 +1400,11 @@ def _library(
 
             return [_Plain()]
 
-    return _Library('backend_under_test', 'backend-under-test', requires=requires)
+    return _Library('library_under_test', 'library-under-test', requires=requires)
 
 
 class TestWhatALibrarySaysAboutItself:
-    """A backend's absence is a choice; a backend that cannot import is a fault.
+    """A library's absence is a choice; a library that cannot import is a fault.
 
     Locating a module does not execute it, so the two outcomes are discovered at
     different moments and only the second carries a traceback. They used to be
@@ -1413,38 +1413,38 @@ class TestWhatALibrarySaysAboutItself:
     asked for -- and invisible wherever the threshold is above INFO.
     """
 
-    def test_an_absent_backend_is_reported_once_at_info(
+    def test_an_absent_library_is_reported_once_at_info(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         library = _library(('a_module_that_does_not_exist',))
 
-        with caplog.at_level(logging.INFO, logger='backend_under_test'):
+        with caplog.at_level(logging.INFO, logger='library_under_test'):
             assert list(library) == []
 
         (record,) = caplog.records
         assert record.levelname == 'INFO'
-        assert record.getMessage() == 'backend-under-test not found.'
+        assert record.getMessage() == 'library-under-test not found.'
         assert record.exc_info is None
 
-    def test_a_backend_that_cannot_import_warns_and_says_so(
+    def test_a_library_that_cannot_import_warns_and_says_so(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         library = _library((), build=ImportError('no module named thing'))
 
-        with caplog.at_level(logging.INFO, logger='backend_under_test'):
+        with caplog.at_level(logging.INFO, logger='library_under_test'):
             assert list(library) == []
 
         (record,) = caplog.records
         assert record.levelname == 'WARNING'
         assert 'installed but failed to import' in record.getMessage()
-        assert 'backend-under-test' in record.getMessage()
+        assert 'library-under-test' in record.getMessage()
 
     def test_and_carries_the_traceback_naming_what_broke(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         library = _library((), build=ImportError('no module named thing'))
 
-        with caplog.at_level(logging.INFO, logger='backend_under_test'):
+        with caplog.at_level(logging.INFO, logger='library_under_test'):
             list(library)
 
         (record,) = caplog.records
@@ -1455,7 +1455,7 @@ class TestWhatALibrarySaysAboutItself:
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         """Whichever happened has to be readable from the message alone."""
-        with caplog.at_level(logging.INFO, logger='backend_under_test'):
+        with caplog.at_level(logging.INFO, logger='library_under_test'):
             list(_library(('a_module_that_does_not_exist',)))
             absent = caplog.records[-1].getMessage()
             list(_library((), build=ImportError('broken')))
@@ -1463,23 +1463,23 @@ class TestWhatALibrarySaysAboutItself:
 
         assert absent != broken
 
-    def test_a_backend_that_builds_reports_its_version(
+    def test_a_library_that_builds_reports_its_version(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         library = _library(())
 
-        with caplog.at_level(logging.INFO, logger='backend_under_test'):
+        with caplog.at_level(logging.INFO, logger='library_under_test'):
             assert [r.name for r in library] == ['algo']
 
         (record,) = caplog.records
         assert record.levelname == 'INFO'
-        assert record.getMessage().startswith('backend-under-test ')
+        assert record.getMessage().startswith('library-under-test ')
 
     def test_the_outcome_is_settled_once(self, caplog: pytest.LogCaptureFixture) -> None:
-        """Iterating is not reprobing; a broken backend must not warn per panel."""
+        """Iterating is not reprobing; a broken library must not warn per panel."""
         library = _library((), build=ImportError('broken'))
 
-        with caplog.at_level(logging.INFO, logger='backend_under_test'):
+        with caplog.at_level(logging.INFO, logger='library_under_test'):
             list(library)
             list(library)
 

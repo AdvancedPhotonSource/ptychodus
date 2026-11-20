@@ -1,8 +1,8 @@
-"""Render a reconstructor's panel from what the backend declares.
+"""Render a reconstructor's panel from what it declares.
 
 A declaration already says everything an editor needs: the kind of value a
 field holds, the range it may take, the values it accepts, and the words to
-put beside it. So the panel is derived rather than written, and a backend
+put beside it. So the panel is derived rather than written, and a library
 gains one by declaring rather than by someone hand-wiring a widget per key.
 
 Widget choice follows from the declaration alone. A field with a fixed set of
@@ -72,7 +72,7 @@ logger = logging.getLogger(__name__)
 
 # The three fields of a plan, in the order they read, and what to call each on
 # screen. Named by the declaration's own words rather than by persisted key, so
-# a backend spelling its keys differently still gets one editor.
+# a library spelling its keys differently still gets one editor.
 _PLAN_FIELDS: Final = ('start', 'stop', 'stride')
 _PLAN_CAPTIONS: Final = ('Start', 'Stop', 'Stride')
 _PLAN_LABEL: Final = 'Plan:'
@@ -431,12 +431,12 @@ def _build_layout(
 
 
 def _group_label(group_name: str, library_name: str, reconstructor_name: str = '') -> str:
-    """Strip the backend's or the algorithm's own name off a group, leaving what
+    """Strip the library's or the algorithm's own name off a group, leaving what
     distinguishes it.
 
     A group is named for the settings section it persists as, which carries
-    the backend name -- or, in a library of several algorithms, the algorithm's --
-    because an INI is flat. A panel already knows which backend and algorithm it
+    the library name -- or, in a library of several algorithms, the algorithm's --
+    because an INI is flat. A panel already knows which library and algorithm it
     belongs to, so repeating either in every box title says nothing.
     """
     stripped = group_name
@@ -451,7 +451,7 @@ def _group_label(group_name: str, library_name: str, reconstructor_name: str = '
 
 
 class GeneratedViewControllerFactory(ReconstructorViewControllerFactory):
-    """Builds every panel for one backend out of what its reconstructors declare."""
+    """Builds every panel for one library out of what its reconstructors declare."""
 
     def __init__(self, library_name: str, parameter_store: ProcessingParameterStore) -> None:
         super().__init__()

@@ -16,7 +16,7 @@ __all__ = [
 
 def register_plugins(registry: PluginRegistry) -> None:
     # One name for the library and its file formats, so the format offered by default
-    # is the selected backend's own.
+    # is the selected library's own.
     registry.reconstructor_libraries.register_plugin(
         PtychoFMReconstructorLibrary(),
         simple_name=PtychoFMProductFileReader.SIMPLE_NAME,

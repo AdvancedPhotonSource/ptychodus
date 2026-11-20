@@ -311,7 +311,7 @@ class TestFoldSliceReconstructionVariants:
     """Layouts the solvers write that the reader used to mishandle.
 
     Each is derived from what the MATLAB source emits rather than from a file on hand:
-    the multislice engine records its slice spacing whatever the layer count, a fly
+    the multislice algorithm records its slice spacing whatever the layer count, a fly
     scan records one position table per probe mode, a variable probe records a weight
     matrix beside the basis, and the error history is NaN wherever nothing was
     measured. Every case runs against both containers, since a fix proven only on the
@@ -353,7 +353,7 @@ class TestFoldSliceReconstructionVariants:
         }
 
         if multi_slice:
-            # The engine always writes a trailing free-space distance to the detector.
+            # The algorithm always writes a trailing free-space distance to the detector.
             spacings = [1e-5] * max(num_layers - 1, 0)
             p_struct['multi_slice_param'] = {'z_distance': numpy.array([*spacings, numpy.inf])}
 
@@ -381,7 +381,7 @@ class TestFoldSliceReconstructionVariants:
         return FoldSliceProductFileReader(detector_pixel_size_m=EIGER_PIXEL_SIZE_M).read(file_path)
 
     def test_a_single_layer_multislice_object_reads(self, tmp_path: Path, mat_format: str) -> None:
-        # The multislice engine records multi_slice_param whatever the layer count, and
+        # The multislice algorithm records multi_slice_param whatever the layer count, and
         # MATLAB drops the layer axis at one -- so the object is 2-D and the spacing is
         # present, which used to index an axis that is not there.
         path = self._write(tmp_path / 'ms.mat', mat_format, num_layers=1, multi_slice=True)
@@ -399,8 +399,8 @@ class TestFoldSliceReconstructionVariants:
         assert list(product.object_.layer_spacing_m) == pytest.approx([1e-5, 1e-5])
 
     def test_fly_scan_positions_take_the_first_mode(self, tmp_path: Path, mat_format: str) -> None:
-        # A fly scan records one table per probe mode. They sample one trajectory, so
-        # the first is the trajectory rather than a coordinate pair of arrays.
+        # A fly scan records one table per probe mode. They sample one probe path, so
+        # the first is the probe path rather than a coordinate pair of arrays.
         path = self._write(tmp_path / 'fly.mat', mat_format, num_positions=4, num_fly_modes=3)
 
         product = self._read(path)
@@ -455,7 +455,7 @@ class TestFoldSliceReconstructionVariants:
     def test_nan_losses_are_dropped_and_the_epochs_survive(
         self, tmp_path: Path, mat_format: str
     ) -> None:
-        # The engine averages with omitnan and leaves NaN wherever nothing was
+        # The algorithm averages with omitnan and leaves NaN wherever nothing was
         # measured. Each value carries its own iteration, so a gap stays a gap.
         errors = numpy.array([numpy.nan, 1.0, numpy.nan, numpy.nan, 0.5])
         path = self._write(tmp_path / 'nan.mat', mat_format, fourier_error_out=errors)

@@ -20,8 +20,8 @@ from .monitor import ProcessingTaskMonitor
 from .parameter_store import OptionsBranch, OptionsSection, ProcessingParameterStore
 from .settings import ProcessingSettings
 
-# A backend's section table, given one reconstructor's name and the options it
-# declares. Both arguments because a backend may persist one reconstructor
+# A library's section table, given one reconstructor's name and the options it
+# declares. Both arguments because a library may persist one reconstructor
 # differently from another: pty-chi files each algorithm's additions to the
 # shared branches under a group of its own, and which fields those are is
 # answered by the declaration rather than by the name.
@@ -31,7 +31,7 @@ SectionTable = Callable[[str, Any], Sequence[OptionsSection]]
 def _regardless(
     sections: Callable[[], Sequence[OptionsSection]],
 ) -> SectionTable:
-    """Adapt a table that is the same for every reconstructor a backend offers."""
+    """Adapt a table that is the same for every reconstructor a library offers."""
 
     def table(_name: str, _options: Any) -> Sequence[OptionsSection]:
         return sections()
@@ -39,18 +39,18 @@ def _regardless(
     return table
 
 
-# Which settings groups back which backend. **Transitional**, with the flat
-# layout it serves: a backend states what it accepts, and this says where each
-# option is persisted until the Qt panels stop needing a flat one. A backend
+# Which settings groups back which library. **Transitional**, with the flat
+# layout it serves: a library states what it accepts, and this says where each
+# option is persisted until the Qt panels stop needing a flat one. A library
 # absent here registers no groups and runs on its declared defaults.
 _SECTIONS_BY_LIBRARY: Mapping[str, SectionTable] = {
     'PtychoFM': _regardless(_ptycho_fm_sections.sections),
     'pty-chi': _ptychi_sections.sections_for,
 }
 
-# Which groups back the backends whose declaration ptychodus owns. No policy and
+# Which groups back the libraries whose declaration ptychodus owns. No policy and
 # no overlay: the fields carry their own bounds and display text, the field name
-# is the key, and this says only which branch each group covers. A backend that
+# is the key, and this says only which branch each group covers. A library that
 # can be described this way belongs here rather than above.
 _BRANCHES_BY_LIBRARY: Mapping[str, Sequence[OptionsBranch]] = {
     'PtychoPINN': (
@@ -75,11 +75,11 @@ def _no_sections(_name: str, _options: Any) -> Sequence[OptionsSection]:
 
 
 class ProcessingCore:
-    """Which reconstructor backends are in play, and the live settings behind them.
+    """Which reconstruction libraries are in play, and the live settings behind them.
 
-    Takes the chooser the backends registered themselves with rather than a
+    Takes the chooser the libraries registered themselves with rather than a
     list drawn from it, so that this is the one place that answers which
-    backends exist. Anything else that needs to know -- the panels, above all
+    libraries exist. Anything else that needs to know -- the panels, above all
     -- asks here instead of walking the plugin registry a second time.
     """
 
@@ -130,7 +130,7 @@ class ProcessingCore:
 
         # Every reconstructor is filed under the same key the algorithm selection
         # uses, so a panel and the options handed to a run cannot disagree.
-        # Every library, not only the selected one: a backend reached for the
+        # Every library, not only the selected one: a library reached for the
         # first time when someone changes the selection would build itself --
         # and import torch -- wherever that selection was made.
         algorithms_by_library: dict[str, list[str]] = {}
@@ -168,7 +168,7 @@ class ProcessingCore:
         )
 
     def library_names(self) -> Sequence[str]:
-        """Every backend in play, named as it names itself, in the chooser's order.
+        """Every library in play, named as it names itself, in the chooser's order.
 
         A method returning a fixed sequence rather than an attribute, so a
         caller cannot edit its copy into disagreement with what was actually

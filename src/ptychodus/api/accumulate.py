@@ -2,10 +2,10 @@
 
 One pass over the patterns, in chunks of any size and in any order, gathers everything
 a coarse estimate of the probe and the object needs: the running mean, minimum and
-maximum frames, and each pattern's total and intensity centroid keyed by its scan index.
+maximum patterns, and each pattern's total and intensity centroid keyed by its scan index.
 Optionally each pattern is also kept binned, the bright-field images a parallax estimate
 of the defocus is made from.
-Every per-pattern quantity depends only on its own frame, so nothing has to be seen
+Every per-pattern quantity depends only on its own pattern, so nothing has to be seen
 twice and partial results from separate workers merge exactly.
 """
 
@@ -33,7 +33,7 @@ from .diffraction import (
 )
 from .geometry import ImageExtent
 from .inpaint import BiharmonicInpainter
-from .moments import FrameStatistics, compute_intensity_moments
+from .moments import PatternStatistics, compute_intensity_moments
 from .preprocess.diffraction import BinningStep, inpaint_bad_pixels
 from .typing import IntegerArrayType, RealArrayType
 
@@ -55,13 +55,13 @@ logger = logging.getLogger(__name__)
 class DiffractionMoments:
     """A snapshot of accumulated diffraction statistics; frozen, and picklable.
 
-    The frames are those of the patterns as accumulated -- corrected for any background
-    and flat field, before bad pixels were filled; `bad_pixels` is the mask the
-    accumulator inpainted with. Per-pattern rows
-    pair with probe positions by `indexes`, never by order. Totals sum the whole frame
+    The minimum, mean and maximum patterns are over the patterns as accumulated --
+    corrected for any background and flat field, before bad pixels were filled;
+    `bad_pixels` is the mask the accumulator inpainted with. Per-pattern rows pair with
+    probe positions by `indexes`, never by order. Detector sums cover the whole pattern
     with its bad pixels inpainted. Centroids are in detector pixels about the DC pixel
-    ``N // 2``, x along columns and y along rows; a frame with no signal
-    has a NaN centroid.
+    ``N // 2``, x along columns and y along rows; a pattern with no signal has a NaN
+    centroid.
 
     With a `binning` step, `binned_patterns` holds every pattern binned by it, as float32
     and row-aligned with `indexes`. Binning follows :class:`BinningStep`: bad pixels
@@ -69,37 +69,38 @@ class DiffractionMoments:
     """
 
     num_patterns: int
-    minimum_frame: DiffractionPattern
-    mean_frame: RealArrayType
-    maximum_frame: DiffractionPattern
+    minimum_pattern: DiffractionPattern
+    mean_pattern: RealArrayType
+    maximum_pattern: DiffractionPattern
     bad_pixels: BadPixels
     indexes: IntegerArrayType
-    total_counts: RealArrayType
+    detector_sums: RealArrayType
     center_of_mass_x_px: RealArrayType
     center_of_mass_y_px: RealArrayType
     binning: BinningStep | None = None
     binned_patterns: RealArrayType | None = None
 
-    def mean_pattern(self) -> RealArrayType:
-        """The mean frame with its bad pixels inpainted.
+    def inpainted_mean_pattern(self) -> RealArrayType:
+        """The mean pattern with its bad pixels inpainted.
 
         Inpainting is linear for a fixed mask, so this equals the mean of the inpainted
-        frames exactly, while costing one fill rather than one per pattern.
+        patterns exactly, while costing one fill rather than one per pattern.
         """
-        # A float64 frame inpaints to float64; the overload only promises the dtype family.
-        return cast(RealArrayType, inpaint_bad_pixels(self.mean_frame, self.bad_pixels))
+        # A float64 pattern inpaints to float64; the overload only promises the dtype family.
+        return cast(RealArrayType, inpaint_bad_pixels(self.mean_pattern, self.bad_pixels))
 
     def select(self, indexes: Sequence[int] | IntegerArrayType) -> DiffractionMoments:
         """Keep the per-pattern rows whose index is in *indexes*, in their stored order.
 
-        The frames stay those of every pattern accumulated: the mean pattern describes
-        the probe, not any one position, so a subset of positions does not change it.
+        The minimum, mean and maximum patterns stay those of every pattern accumulated:
+        the mean pattern describes the probe, not any one position, so a subset of
+        positions does not change it.
         """
         keep = numpy.isin(self.indexes, numpy.asarray(indexes))
         return replace(
             self,
             indexes=self.indexes[keep],
-            total_counts=self.total_counts[keep],
+            detector_sums=self.detector_sums[keep],
             center_of_mass_x_px=self.center_of_mass_x_px[keep],
             center_of_mass_y_px=self.center_of_mass_y_px[keep],
             binned_patterns=None if self.binned_patterns is None else self.binned_patterns[keep],
@@ -108,14 +109,14 @@ class DiffractionMoments:
     def sort_by_index(self) -> DiffractionMoments:
         """Put the per-pattern rows in ascending order of their scan indexes.
 
-        The sort is stable, so rows sharing an index keep their stored order. The frames
-        are unchanged.
+        The sort is stable, so rows sharing an index keep their stored order. The minimum,
+        mean and maximum patterns are unchanged.
         """
         order = numpy.argsort(self.indexes, kind='stable')
         return replace(
             self,
             indexes=self.indexes[order],
-            total_counts=self.total_counts[order],
+            detector_sums=self.detector_sums[order],
             center_of_mass_x_px=self.center_of_mass_x_px[order],
             center_of_mass_y_px=self.center_of_mass_y_px[order],
             binned_patterns=None if self.binned_patterns is None else self.binned_patterns[order],
@@ -130,7 +131,7 @@ class DiffractionMoments:
 
         *i0_counts* are the incident-beam readings an upstream ion chamber, diode or scaler
         records, in any units, keyed by *i0_indexes*; each index must be unique. A reading
-        that is not a positive finite number cannot correct anything and leaves its total
+        that is not a positive finite number cannot correct anything and leaves its detector sum
         unscaled, with a warning, as does a pattern whose index has no reading.
         """
         scale = compute_i0_scale(self.indexes, i0_indexes, i0_counts)
@@ -142,12 +143,12 @@ class DiffractionMoments:
             )
 
         return replace(
-            self, total_counts=self.total_counts * scale, binned_patterns=binned_patterns
+            self, detector_sums=self.detector_sums * scale, binned_patterns=binned_patterns
         )
 
     def estimate_incident_photon_count(self, *, quantile: float = 0.99) -> float:
         """The unattenuated incident photon count; see :func:`estimate_incident_photon_count`."""
-        return estimate_incident_photon_count(self.total_counts, quantile=quantile)
+        return estimate_incident_photon_count(self.detector_sums, quantile=quantile)
 
 
 class DiffractionMomentAccumulator:
@@ -161,7 +162,7 @@ class DiffractionMomentAccumulator:
     rather than with what one call adds. The biharmonic fill of the bad pixels is
     factorized once and solved once per chunk.
 
-    Each full chunk is reduced outside the lock, and its frame statistics and per-pattern
+    Each full chunk is reduced outside the lock, and its pattern statistics and per-pattern
     rows are folded in together under it, so a snapshot taken at any moment describes
     exactly the patterns its rows list.
 
@@ -190,7 +191,7 @@ class DiffractionMomentAccumulator:
             binned_extent = binning.apply_to_extent(ImageExtent(width_px=width, height_px=height))
 
             if binned_extent.width_px < 1 or binned_extent.height_px < 1:
-                raise ValueError(f'{binning!r} leaves no whole bin in the frames!')
+                raise ValueError(f'{binning!r} leaves no whole bin in the patterns!')
 
         self._shape = (height, width)
         initial_bad_pixels: BadPixels = (
@@ -200,7 +201,7 @@ class DiffractionMomentAccumulator:
         if initial_bad_pixels.shape != self._shape:
             raise ValueError(
                 f'Bad pixels of shape {initial_bad_pixels.shape} do not match the '
-                f'{self._shape} frames!'
+                f'{self._shape} patterns!'
             )
 
         self._corrections = corrections
@@ -218,13 +219,13 @@ class DiffractionMomentAccumulator:
         self._binning = binning
         self._binned_bad_pixels = None if binning is None else binning.apply(self._bad_pixels)
 
-        self._frame_statistics = FrameStatistics(height, width)
+        self._pattern_statistics = PatternStatistics(height, width)
         self._lock = threading.Lock()
         self._pending_indexes: list[IntegerArrayType] = []
         self._pending_patterns: list[DiffractionPatterns] = []
         self._num_pending = 0
         self._indexes: list[IntegerArrayType] = []
-        self._total_counts: list[RealArrayType] = []
+        self._detector_sums: list[RealArrayType] = []
         self._center_of_mass_x_px: list[RealArrayType] = []
         self._center_of_mass_y_px: list[RealArrayType] = []
         self._binned_patterns: list[RealArrayType] = []
@@ -239,7 +240,7 @@ class DiffractionMomentAccumulator:
     ) -> DiffractionMomentAccumulator:
         """An empty accumulator for patterns assembled into *data*.
 
-        It takes the frame shape and bad pixels of *data* as they stand, and applies the
+        It takes the pattern shape and bad pixels of *data* as they stand, and applies the
         background and flat field the patterns still carry, as
         :func:`iterate_diffraction_moments` does. No pattern is added.
         """
@@ -257,7 +258,7 @@ class DiffractionMomentAccumulator:
         """Buffer patterns, keyed by their scan indexes, and reduce every chunk that fills."""
         if patterns.shape[-2:] != self._shape:
             raise ValueError(
-                f'Patterns of shape {patterns.shape[-2:]} do not match the {self._shape} frames!'
+                f'Patterns of shape {patterns.shape[-2:]} do not match the {self._shape} patterns!'
             )
 
         if indexes.shape[0] != patterns.shape[0]:
@@ -292,14 +293,14 @@ class DiffractionMomentAccumulator:
             raise ValueError('Only accumulations with the same binning can be merged!')
 
         self._fold(
-            FrameStatistics.from_frames(
+            PatternStatistics.from_patterns(
                 moments.num_patterns,
-                moments.minimum_frame,
-                moments.mean_frame,
-                moments.maximum_frame,
+                moments.minimum_pattern,
+                moments.mean_pattern,
+                moments.maximum_pattern,
             ),
             moments.indexes,
-            moments.total_counts,
+            moments.detector_sums,
             moments.center_of_mass_x_px,
             moments.center_of_mass_y_px,
             moments.binned_patterns,
@@ -316,29 +317,29 @@ class DiffractionMomentAccumulator:
         if chunk is not None:
             self._reduce(*chunk)
 
-        # The frames and the row lists are read together, so they describe the same
+        # The statistics and the row lists are read together, so they describe the same
         # patterns; the rows are never mutated once folded, so they are joined outside.
         with self._lock:
-            frames = self._frame_statistics.get_frames()
-            num_patterns = self._frame_statistics.num_patterns
+            statistics = self._pattern_statistics.get_statistics()
+            num_patterns = self._pattern_statistics.num_patterns
             indexes = list(self._indexes)
-            total_counts = list(self._total_counts)
+            detector_sums = list(self._detector_sums)
             center_of_mass_x_px = list(self._center_of_mass_x_px)
             center_of_mass_y_px = list(self._center_of_mass_y_px)
             binned_patterns = list(self._binned_patterns)
 
-        if frames is None:
+        if statistics is None:
             return None
 
-        minimum_frame, mean_frame, maximum_frame = frames
+        minimum_pattern, mean_pattern, maximum_pattern = statistics
         return DiffractionMoments(
             num_patterns=num_patterns,
-            minimum_frame=minimum_frame,
-            mean_frame=mean_frame,
-            maximum_frame=maximum_frame,
+            minimum_pattern=minimum_pattern,
+            mean_pattern=mean_pattern,
+            maximum_pattern=maximum_pattern,
             bad_pixels=self._bad_pixels.copy(),
             indexes=numpy.concatenate(indexes),
-            total_counts=numpy.concatenate(total_counts),
+            detector_sums=numpy.concatenate(detector_sums),
             center_of_mass_x_px=numpy.concatenate(center_of_mass_x_px),
             center_of_mass_y_px=numpy.concatenate(center_of_mass_y_px),
             binning=self._binning,
@@ -380,7 +381,7 @@ class DiffractionMomentAccumulator:
             patterns = self._corrections.apply(patterns)
 
         height, width = self._shape
-        chunk_statistics = FrameStatistics(height, width)
+        chunk_statistics = PatternStatistics(height, width)
         chunk_statistics.add(patterns)
         weights = patterns.astype(numpy.float64, order='C')
         binned_patterns: RealArrayType | None = None
@@ -408,17 +409,17 @@ class DiffractionMomentAccumulator:
 
     def _fold(
         self,
-        frame_statistics: FrameStatistics,
+        pattern_statistics: PatternStatistics,
         indexes: IntegerArrayType,
-        total_counts: RealArrayType,
+        detector_sums: RealArrayType,
         center_of_mass_x_px: RealArrayType,
         center_of_mass_y_px: RealArrayType,
         binned_patterns: RealArrayType | None,
     ) -> None:
         with self._lock:
-            self._frame_statistics.merge(frame_statistics)
+            self._pattern_statistics.merge(pattern_statistics)
             self._indexes.append(numpy.asarray(indexes).copy())
-            self._total_counts.append(numpy.asarray(total_counts, dtype=numpy.float64).copy())
+            self._detector_sums.append(numpy.asarray(detector_sums, dtype=numpy.float64).copy())
             self._center_of_mass_x_px.append(
                 numpy.asarray(center_of_mass_x_px, dtype=numpy.float64).copy()
             )
@@ -492,11 +493,11 @@ class AssemblyMomentAccumulator:
         *data* is what assembly produced, or a selection of its patterns, as a filter
         applied afterwards leaves. The accumulated moments, narrowed to the indexes of
         *data*, serve when they were taken under its bad pixels and carried maps and
-        cover exactly its patterns; their frames are then those of every pattern
-        assembled. Otherwise, as when a pixel found non-finite widened the mask after
-        arrays were accumulated, the moments come from one pass over *data*, as
-        :func:`compute_diffraction_moments` takes them. Returns None when *data* holds
-        no patterns.
+        cover exactly its patterns; their minimum, mean and maximum patterns are then
+        those of every pattern assembled. Otherwise, as when a pixel found non-finite
+        widened the mask after arrays were accumulated, the moments come from one pass
+        over *data*, as :func:`compute_diffraction_moments` takes them. Returns None when
+        *data* holds no patterns.
         """
         if data.get_num_patterns() == 0:
             return None
@@ -660,7 +661,7 @@ class IncidentBeamEstimate:
 
     `incident_photon_count` is the photons per exposure the probe is scaled to, and
     `mean_amplitude_transmission` the modulus a uniform object of the sample's mean
-    opacity carries. `moments` are those given, with the totals corrected for beam decay
+    opacity carries. `moments` are those given, with the detector sums corrected for beam decay
     by I0 when `decay_corrected` says I0 was recorded.
     """
 
@@ -672,7 +673,7 @@ class IncidentBeamEstimate:
 
 def estimate_incident_beam(
     moments: DiffractionMoments,
-    i0_counts_by_index: Mapping[int, float] | None = None,
+    i0_by_index: Mapping[int, float] | None = None,
     *,
     i0_photons_per_count: float | None = None,
     quantile: float = 0.99,
@@ -680,21 +681,21 @@ def estimate_incident_beam(
     min_intensity_transmission: float = 1.0e-3,
     roundoff_floor: float = 1.0e-12,
 ) -> IncidentBeamEstimate:
-    """Estimate the incident photon count and the sample's mean transmission from the totals.
+    """Estimate the incident photon count and the sample's mean transmission from the detector sums.
 
-    *i0_counts_by_index* holds the I0 readings keyed by scan index. Where they are given
-    the totals are first corrected for beam decay, scaled by ``mean(I0) / I0_j``. Then
+    *i0_by_index* holds the I0 readings keyed by scan index. Where they are given
+    the detector sums are first corrected for beam decay, scaled by ``mean(I0) / I0_j``. Then
     one of three rules applies, decided by the inputs alone and named in the log:
 
     - **I0 with a calibration.** A positive *i0_photons_per_count* converts I0 to
       incident photons: the incident photon count is ``factor * mean(I0)`` and the
       intensity transmission ``mean(total_j / (factor * I0_j))``. A transmission
-      outside [*min_intensity_transmission*, *max_intensity_transmission*] -- totals
+      outside [*min_intensity_transmission*, *max_intensity_transmission*] -- detector sums
       above the incident beam, or a vanishing fraction of it -- is reported but kept,
       because the calibration is a statement about the instrument.
-    - **I0 without a calibration.** The brightest corrected totals stand in for the
+    - **I0 without a calibration.** The brightest corrected detector sums stand in for the
       empty beam: the incident photon count is their *quantile*.
-    - **No I0.** The same, over the uncorrected totals; a calibration is unused.
+    - **No I0.** The same, over the uncorrected detector sums; a calibration is unused.
 
     Without a calibration the intensity transmission is the mean total over the
     incident photon count. Its square root, clipped to [0, 1], is the mean amplitude
@@ -711,9 +712,9 @@ def estimate_incident_beam(
     corrected = moments
     i0 = numpy.full(moments.indexes.shape, numpy.nan)
 
-    if i0_counts_by_index:
-        i0_indexes = numpy.fromiter(i0_counts_by_index.keys(), dtype=numpy.intp)
-        i0_counts = numpy.fromiter(i0_counts_by_index.values(), dtype=numpy.float64)
+    if i0_by_index:
+        i0_indexes = numpy.fromiter(i0_by_index.keys(), dtype=numpy.intp)
+        i0_counts = numpy.fromiter(i0_by_index.values(), dtype=numpy.float64)
         corrected = moments.normalize_by_i0(i0_indexes, i0_counts)
         order = numpy.argsort(i0_indexes)
         i0 = _pair_by_index(moments.indexes, i0_indexes[order], i0_counts[order])
@@ -725,7 +726,7 @@ def estimate_incident_beam(
     if decay_corrected and is_calibrated and i0_photons_per_count is not None:
         incident_photons = i0_photons_per_count * i0[usable]
         incident_photon_count = float(numpy.mean(incident_photons))
-        intensity_transmission = numpy.mean(moments.total_counts[usable] / incident_photons)
+        intensity_transmission = numpy.mean(moments.detector_sums[usable] / incident_photons)
         logger.info(
             f'Incident photon count {incident_photon_count:.4g} from I0 at '
             f'{i0_photons_per_count:.4g} photons per count.'
@@ -738,15 +739,19 @@ def estimate_incident_beam(
                 f'{max_intensity_transmission:.4g}]; check the I0 calibration.'
             )
     else:
-        totals = corrected.total_counts
-        incident_photon_count = estimate_incident_photon_count(totals, quantile=quantile)
-        finite = totals[numpy.isfinite(totals)]
+        detector_sums = corrected.detector_sums
+        incident_photon_count = estimate_incident_photon_count(detector_sums, quantile=quantile)
+        finite = detector_sums[numpy.isfinite(detector_sums)]
         intensity_transmission = (
             numpy.mean(finite) / incident_photon_count
             if finite.size > 0 and incident_photon_count > roundoff_floor
             else 1.0
         )
-        source = 'decay-corrected totals' if decay_corrected else 'totals; no I0 was recorded'
+        source = (
+            'decay-corrected detector sums'
+            if decay_corrected
+            else 'detector_sums; no I0 was recorded'
+        )
         logger.info(
             f'Incident photon count {incident_photon_count:.4g} from the {quantile:g} '
             f'quantile of the {source}.'

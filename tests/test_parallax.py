@@ -192,12 +192,12 @@ def test_moments_without_binned_patterns_are_rejected() -> None:
     moments = accumulate_scan(2.0e-3)
     unbinned = DiffractionMoments(
         num_patterns=moments.num_patterns,
-        minimum_frame=moments.minimum_frame,
-        mean_frame=moments.mean_frame,
-        maximum_frame=moments.maximum_frame,
+        minimum_pattern=moments.minimum_pattern,
+        mean_pattern=moments.mean_pattern,
+        maximum_pattern=moments.maximum_pattern,
         bad_pixels=moments.bad_pixels,
         indexes=moments.indexes,
-        total_counts=moments.total_counts,
+        detector_sums=moments.detector_sums,
         center_of_mass_x_px=moments.center_of_mass_x_px,
         center_of_mass_y_px=moments.center_of_mass_y_px,
     )
@@ -436,10 +436,10 @@ def test_the_parallax_of_an_off_axis_scan_matches_its_geometry(
     if geometry.detector_gamma_deg != 0.0:
         # Sheared, the transpose differs from both the inverse and the map itself; the
         # parallax follows the transpose.
-        scan_to_exit = compute_exit_frame_transform(geometry)
+        positions_to_exit = compute_exit_frame_transform(geometry)
         assert compute_geometry_mismatch(transform, geometry) < 0.5 * min(
-            _mismatch_from(transform, scan_to_exit.inverted()),
-            _mismatch_from(transform, scan_to_exit),
+            _mismatch_from(transform, positions_to_exit.inverted()),
+            _mismatch_from(transform, positions_to_exit),
         )
 
 

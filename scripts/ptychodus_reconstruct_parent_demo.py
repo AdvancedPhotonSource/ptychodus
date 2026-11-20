@@ -112,7 +112,7 @@ def main() -> int:
         )
         names[reconstructor.name.casefold()] = reconstructor.name
 
-    # The settings name the backend and the algorithm separately. Case-folded
+    # The settings name the library and the algorithm separately. Case-folded
     # on the way in, so that 'rPIE' and 'rpie' both resolve.
     processing_settings = ProcessingSettings(registry)
     selected_library = processing_settings.library.get_value()

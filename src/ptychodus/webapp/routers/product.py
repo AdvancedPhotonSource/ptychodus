@@ -24,7 +24,7 @@ from ptychodus.webapp.rendering.views import (
     object_view,
     probe_modes_view,
     probe_view,
-    scan_paths_view,
+    probe_positions_view,
     view_as_rendered_image,
 )
 from ptychodus.webapp.routers._convert import product_to_read
@@ -165,17 +165,19 @@ async def get_positions_image(
             min_length=1, description='Product to plot; repeat to overlay several on shared axes.'
         ),
     ],
-    connect_path: bool = Query(True, description='Join successive scan points with a line.'),
+    connect_path: bool = Query(True, description='Join successive probe positions with a line.'),
     width_px: int = Query(640, ge=128, le=2048),
     height_px: int = Query(640, ge=128, le=2048),
 ) -> PlotImage:
-    """Plot one or more products' scan paths, one color and legend entry per product."""
+    """Plot one or more products' probe positions, one color and legend entry per product."""
     entries = [
         (await _product_file_or_404(product_uuid, session, layout), str(product_uuid)[:8])
         for product_uuid in uuid
     ]
     return await render_or_http_error(
         runner,
-        partial(scan_paths_view, connect_path=connect_path, width_px=width_px, height_px=height_px),
+        partial(
+            probe_positions_view, connect_path=connect_path, width_px=width_px, height_px=height_px
+        ),
         entries,
     )

@@ -106,7 +106,7 @@ class ObjectBuilder(ParameterGroup):
         pipeline. `PluginObjectBuilder`, the one builder that generates, pads what its
         generator returns with `_pad_object` and scales it with
         `_rescale_to_mean_transmission`, so the padding lands on the canvas the
-        generator just sized against the scan geometry.
+        generator just sized against the probe-positions geometry.
         """
         pass
 
@@ -215,8 +215,8 @@ class ObjectBuilder(ParameterGroup):
 class FromMemoryObjectBuilder(ObjectBuilder):
     """An object that has already been conditioned.
 
-    Two things produce these. Reconstruction output, which `ProcessingTaskMonitor`
-    re-assigns to the output product item on every reconstructor iteration (see
+    Two things produce these. A reconstruction, which `ProcessingTaskMonitor`
+    re-assigns to its product item on every reconstructor iteration (see
     `model/processing/monitor.py`), and products loaded from a product file. In both
     cases the layer structure and the canvas size are already what the
     reconstructor solved for. `generate_layers` would truncate a multislice result

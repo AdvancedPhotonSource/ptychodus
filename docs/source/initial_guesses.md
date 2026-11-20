@@ -74,7 +74,7 @@ Probe sequence
 : {py:class}`ptychodus.api.probe.ProbeEnsemble` stores its array as `(n_coherent_modes, n_incoherent_modes, height, width)`. The first dimension is the OPR/coherent-mode dimension. The second dimension is the mutually incoherent probe-mode dimension. A two-dimensional complex input is promoted to `(1, 1, height, width)`; a three-dimensional input is promoted to `(1, n_incoherent_modes, height, width)`.
 
 OPR weights
-: If OPR/coherent modes are active, `ProbeEnsemble` may also carry `opr_weights` with shape `(n_scan_points, n_coherent_modes)`. Asking a `ProbeEnsemble` for the probe at a scan position forms the position-specific dominant incoherent mode as the weighted sum of the coherent/OPR modes and returns a regular `Probe`. Without `opr_weights` one probe describes every position, which is why a `ProbeEnsemble` is addressed by position rather than being a sequence with a length.
+: If OPR/coherent modes are active, `ProbeEnsemble` may also carry `opr_weights` with shape `(n_probe_positions, n_coherent_modes)`. Asking a `ProbeEnsemble` for the probe at a probe position forms the position-specific dominant incoherent mode as the weighted sum of the coherent/OPR modes and returns a regular `Probe`. Without `opr_weights` one probe describes every position, which is why a `ProbeEnsemble` is addressed by position rather than being a sequence with a length.
 
 Object
 : {py:class}`ptychodus.api.object.Object` stores its complex transmission array as `(n_layers, height, width)`. A two-dimensional complex input is promoted to `(1, height, width)`. For multislice objects, the `layer_spacing_m` sequence must contain `n_layers - 1` spacings.
@@ -160,7 +160,7 @@ All generated probe builders first create a base complex probe, rescale its tota
 
 Each probe model is a plugin that states the parameters it accepts, so the names below are what it registered under and the parameter names are the ones it declares. A model added to `ptychodus.plugins` appears here, in the settings file and in the editor dialog without any of them being told about it. A plugin knows nothing about where its values come from: the settings file, a command-line option, a preset and a size measured from the data are all just sources of the same declared parameters. Parameters with the same name share one settings key and one value across models — `propagation_distance_m`, and the `diameter_m` that `disk` and `zernike` both take as the diameter of a circular pupil — so switching models keeps them.
 
-Every model is built at the product's defocus, how far past the focus the object sits: the negated product metadata field `focus_object_distance_m`, positive downstream (diverging) and negative upstream (converging), shown in the product editor as both **Focus-Object Distance** and **Defocus Distance**. In far field a model carries the curvature of a beam sampled that far past its focus. In near field it is built in the equivalent parallel-beam frame the magnification already places it in (see [Near-Field Ptychography](near_field.md)): an aperture model stays flat-phased, and an optic is simulated at the defocus and has the spherical wave of its focus divided out by {py:func}`ptychodus.api.simulate.probe.remove_defocus_phase`. Every model centres its beam axis on pixel `N // 2` of each axis, the FFT origin and the middle pixel of an odd axis, and that pixel is the one placed on each scan position.
+Every model is built at the product's defocus, how far past the focus the object sits: the negated product metadata field `focus_object_distance_m`, positive downstream (diverging) and negative upstream (converging), shown in the product editor as both **Focus-Object Distance** and **Defocus Distance**. In far field a model carries the curvature of a beam sampled that far past its focus. In near field it is built in the equivalent parallel-beam frame the magnification already places it in (see [Near-Field Ptychography](near_field.md)): an aperture model stays flat-phased, and an optic is simulated at the defocus and has the spherical wave of its focus divided out by {py:func}`ptychodus.api.simulate.probe.remove_defocus_phase`. Every model centres its beam axis on pixel `N // 2` of each axis, the FFT origin and the middle pixel of an odd axis, and that pixel is the one placed on each probe position.
 
 `disk`
 : Generates a binary circular aperture with parameter `diameter_m`. In far field it first takes the quadratic phase of a beam sampled the product's defocus past its focus. The aperture is then optionally propagated by `propagation_distance_m` with the angular-spectrum propagator. This is the default probe builder. With far-field diffraction data loaded, **Estimate from Diffraction** sets `diameter_m` from the second moments of the mean pattern: the bright field's angular spread times the defocus is the geometric shadow the aperture casts, so set the product's focus first. It sets the parameter once and leaves it there. A zone plate's annular bright field reads about 5% larger than its outer diameter at a central stop of a third, and at zero defocus the estimate falls back to the transform-limited waist with a warning.
@@ -298,7 +298,7 @@ For `num_coherent_modes == 1`, no OPR weights are stored and the probe sequence 
 For `num_coherent_modes > 1`:
 
 - `opr_weights` is initialized with shape `(num_positions, num_coherent_modes)`: one row per probe position, which the index matcher later conditions to one row per diffraction pattern.
-- The first OPR weight is set to `1.0` for every scan point.
+- The first OPR weight is set to `1.0` for every probe position.
 - Other weights are initialized as small random normal values with default scale `1.0e-6`.
 - OPR mode 0 copies the full incoherent-mode probe.
 - Additional OPR modes are initialized as random complex arrays only in incoherent mode 0. Other incoherent modes in those OPR modes are left zero.
@@ -334,7 +334,7 @@ In the GUI this is **Analyze → Coherent (OPR) Modes...** on the probe panel. T
 
 #### Generate a multimode probe from scratch
 
-This example generates only the probe: a defocused Fresnel zone plate probe with three incoherent modes and two OPR/coherent modes. The OPR weights hold one row per scan position, so the number of positions is all the scan it needs.
+This example generates only the probe: a defocused Fresnel zone plate probe with three incoherent modes and two OPR/coherent modes. The OPR weights hold one row per probe position, so the number of positions is all it needs to know.
 
 ```python
 import numpy
@@ -406,7 +406,7 @@ probes = generate_coherent_probe_modes(
 assert probes.get_array().shape[:2] == (2, 3)
 ```
 
-The result is a `ProbeEnsemble` whose shape is `(2, 3, height, width)` and whose OPR weights have shape `(n_scan_points, 2)`.
+The result is a `ProbeEnsemble` whose shape is `(2, 3, height, width)` and whose OPR weights have shape `(n_probe_positions, 2)`.
 
 ## Object Generators
 
@@ -434,7 +434,7 @@ The four random textures draw from the application's random number generator, so
 `stxm_dpc`
 : Generates a coarse complex object from far-field diffraction data by STXM differential phase contrast. It requires assembled diffraction data, probe positions and far-field metadata; near-field data is rejected, because the center-of-mass theorem it rests on relates a *far-field* centroid to the phase gradient of the exit wave. Parameters are `shadow_correction` and `regularization_fov_fraction`, described below.
 
-- **Amplitude.** The per-position totals, mapped linearly between the positions and divided by their mean over the supported region, as STXM gives them. Totals have any detector background or flat field the data still carries applied and their bad pixels inpainted, and are corrected for beam decay by the I0 the probe positions carry, each scaled by `mean(I0) / I0_j`, so a drifting beam does not read as absorption. The builder reads them from the diffraction moments the dataset accumulates once per load, so rebuilding it does not pass over the patterns again.
+- **Amplitude.** The per-position detector sums, mapped linearly between the positions and divided by their mean over the supported region, as STXM gives them. Detector sums have any detector background or flat field the data still carries applied and their bad pixels inpainted, and are corrected for beam decay by the I0 the probe positions carry, each scaled by `mean(I0) / I0_j`, so a drifting beam does not read as absorption. The builder reads them from the diffraction moments the dataset accumulates once per load, so rebuilding it does not pass over the patterns again.
 - **Support.** Without a probe, the supported region is the convex hull of the positions. With the product's probe on the object's pixels, it is where the probe's illumination reaches 5% of its peak, which follows the footprint past the outermost positions. The phase is integrated and referenced over it. The values themselves are always interpolated linearly: each is already the probe-averaged field at its position, so weighting the map by the probe again would blur it twice.
 - **Phase.** Each pattern's intensity centroid, taken over the whole frame with its bad pixels inpainted, is the intensity-weighted mean phase gradient under the probe. The crop bounds both what is lost off the detector and how much high-angle shot noise enters, so data from an integrating detector with read noise should be cropped tightly. The mean centroid is subtracted, which removes the beam-center offset and any net phase wedge across the sample. The gradient is integrated by a least-squares FFT Poisson solve and referenced to zero over the most transparent 5% of the scan — the empty beam, when the scan includes one. Resolution is set by the probe size and the scan step.
 - **Orientation.** The centroids are taken to lie in the frame the forward model simulates, with the detector's x and y along the scan's. A detector rotated or flipped relative to the scan should be oriented with the probe-position affine transform or the diffraction `hflip`, `vflip` and `transpose` steps, which the reconstruction needs in any case. With a defocused probe and a textured sample, `python scripts/check_detector_orientation.py`, a checkout tool that is not installed with the package, names those steps from the raw files (see [Measuring the Defocus](#measuring-the-defocus) above).
@@ -442,7 +442,7 @@ The four random textures draw from the application's random number generator, so
 - **Regularization.** Integrating noisy gradients leaves its error as drift across the field of view. `regularization_fov_fraction` adds a Tikhonov term that damps phase variations longer than that fraction of the object canvas's larger dimension, halving them at exactly that length. 0 disables it, and values beyond about 2 have little effect.
 
 `paganin`
-: Generates a complex object by Paganin single-material phase retrieval on the STXM intensity of the diffraction data, corrected for beam decay by I0 as `stxm_dpc`'s amplitude is. It requires assembled diffraction data. The wavelength and propagation distance are the product's; the one parameter is the specimen's `delta_over_beta`. With the product's probe on the object's pixels, the mean intensity is taken over the probe's illumination rather than the convex hull of the positions. The object does not rebuild when the probe changes, so rebuild it after changing the probe.
+: Generates a complex object by Paganin single-material phase retrieval on the STXM intensity of the diffraction data, corrected for beam decay by I0 as `stxm_dpc`'s amplitude is. It requires assembled diffraction data. The wavelength and propagation distance are the product's; the one parameter is the sample's `delta_over_beta`. With the product's probe on the object's pixels, the mean intensity is taken over the probe's illumination rather than the convex hull of the positions. The object does not rebuild when the probe changes, so rebuild it after changing the probe.
 
 `spectral`
 : Generates a complex object as the spectral estimate: the leading eigenvector of the intensity-weighted covariance `Z = Σ_j Σ_k S_jk† diag(T(y_j)) S_jk`, where `S_jk` places incoherent probe mode `k` at position `j`, multiplies it into the object and propagates it to the detector, exactly as the forward model does. It reads every pixel of the assembled diffraction data, needs the product's probe on the object's pixels, and works in far and near field. Parameters are `preprocessing`, `preprocessing_lower_bound`, `threshold_fraction`, `eigensolver_tolerance`, `eigensolver_max_restarts` and `reference_amplitude_correction`, described below. The method is L. Valzania, J. Dong and S. Gigan, *Opt. Lett.* **46**, 1357 (2021), <https://doi.org/10.1364/OL.406156>.
@@ -455,11 +455,11 @@ The four random textures draw from the application's random number generator, so
 
 ### Incident Photon Count and Transmission
 
-The product's `probe_photon_count` and the mean transmission that generated objects are scaled to are estimated together from the diffraction moments the dataset accumulates once per load ({py:func}`ptychodus.api.accumulate.estimate_incident_beam`). Each pattern's total sums its whole frame with the bad pixels inpainted. **I0** is the incident-beam reading -- an upstream ion chamber, diode or scaler -- that a position reader may record for each exposure, in whatever units the instrument uses. When I0 is recorded, every total is first corrected for beam decay, scaled by `mean(I0) / I0_j`. Then one of three rules applies, and the log names it:
+The product's `probe_photon_count` and the mean transmission that generated objects are scaled to are estimated together from the diffraction moments the dataset accumulates once per load ({py:func}`ptychodus.api.accumulate.estimate_incident_beam`). Each pattern's detector sum covers its whole frame with the bad pixels inpainted. **I0** is the incident-beam reading -- an upstream ion chamber, diode or scaler -- that a position reader may record for each exposure, in whatever units the instrument uses. When I0 is recorded, every detector sum is first corrected for beam decay, scaled by `mean(I0) / I0_j`. Then one of three rules applies, and the log names it:
 
-- **I0 with a calibration.** `I0PhotonsPerCount` (the product's **I0 Calibration [photons/count]**, or `--i0-photons-per-count` on the standard drivers) converts I0 to incident photons. The incident photon count is `factor * mean(I0)`, and the intensity transmission is `mean(total_j / (factor * I0_j))`. A transmission above about one or a vanishing fraction of it is reported, since it usually means a wrong calibration, but the calibration is kept.
-- **I0 without a calibration.** The brightest corrected totals stand in for the empty beam: the incident photon count is their 0.99 quantile.
-- **No I0.** The same, over the uncorrected totals.
+- **I0 with a calibration.** `I0PhotonsPerCount` (the product's **I0 Calibration [photons/count]**, or `--i0-photons-per-count` on the standard drivers) converts I0 to incident photons. The incident photon count is `factor * mean(I0)`, and the intensity transmission is `mean(detector_sum_j / (factor * I0_j))`. A transmission above about one or a vanishing fraction of it is reported, since it usually means a wrong calibration, but the calibration is kept.
+- **I0 without a calibration.** The brightest corrected detector sums stand in for the empty beam: the incident photon count is their 0.99 quantile.
+- **No I0.** The same, over the uncorrected detector sums.
 
 Without a calibration the intensity transmission is the mean total over the incident photon count. Either way the mean amplitude transmission is its square root, clipped to `[0, 1]`. The photon count is only filled while it is zero, so a value from the user or a file is kept; **Estimate Probe Photon Count** in the product editor replaces it.
 
@@ -485,7 +485,7 @@ The **cdtools** reconstructor library (the `cdtools` extra) offers **FancyPtycho
 - **Object.** A single layer, on the probe's pixel grid. A multislice object is refused.
 - **Canvas.** Every probe window must lie inside the object array. With `RefinePositions` on, a position can move only within the canvas, so leave room with `ExtraPaddingX` / `ExtraPaddingY` when generating the object.
 - **Detector maps.** A background the data carries starts cdtools' additive background term (`UseBackground`), refined unless `RefineBackground` is off. A flat field multiplies the model (`UseFlatField`) and is never refined.
-- **Scale.** The probe is measured against cdtools' forward model before the run and carried back after it, so the product it returns is in ptychodus's conventions and can warm-start another backend.
+- **Scale.** The probe is measured against cdtools' forward model before the run and carried back after it, so the product it returns is in ptychodus's conventions and can warm-start another library.
 
 ## Low-Level Generator API
 
@@ -605,16 +605,16 @@ Pty-Chi's planar object convention is `(n_slices, height, width)`, which matches
 
 Pty-Chi accepts OPR weights as either:
 
-- `(n_scan_points, n_opr_modes)`: per-position weights; or
-- `(n_opr_modes,)`: one weight vector broadcast to every scan point.
+- `(n_probe_positions, n_opr_modes)`: per-position weights; or
+- `(n_opr_modes,)`: one weight vector broadcast to every probe position.
 
-Ptychodus generated OPR weights use `(n_scan_points, n_coherent_modes)` when `num_coherent_modes > 1`. This is directly compatible with Pty-Chi.
+Ptychodus generated OPR weights use `(n_probe_positions, n_coherent_modes)` when `num_coherent_modes > 1`. This is directly compatible with Pty-Chi.
 
 If the probe has more than one OPR mode, Pty-Chi requires initial OPR weights. Ptychodus satisfies this when the OPR modes were generated by `generate_coherent_probe_modes`. If a custom `ProbeEnsemble` is created manually with multiple leading modes, provide matching `opr_weights`.
 
 ### Positions and Object Origin
 
-Ptychodus stores probe positions in meters. Pty-Chi stores probe positions in object pixel units, with order `(y, x)`. The Ptychodus Pty-Chi helper converts positions by calling `object_geometry.map_coordinates_probe_to_object(scan_point)` and then passing the resulting pixel `x` and `y` arrays to `PtychographyTask` as `probe_position_x_px` and `probe_position_y_px`.
+Ptychodus stores probe positions in meters. Pty-Chi stores probe positions in object pixel units, with order `(y, x)`. The Ptychodus Pty-Chi helper converts positions by calling `object_geometry.map_coordinates_probe_to_object(probe_position)` and then passing the resulting pixel `x` and `y` arrays to `PtychographyTask` as `probe_position_x_px` and `probe_position_y_px`.
 
 The current Ptychodus helper chooses Pty-Chi's `SPECIFIED` position-origin mode and returns an origin coordinate of zero. This works together with the absolute object-pixel coordinates produced by the mapping above. If bypassing the Ptychodus helper and creating Pty-Chi options directly, make sure the position origin convention is consistent with the positions you pass:
 
@@ -643,8 +643,8 @@ slice_spacings_m = product.object_.layer_spacing_m or None
 object_geometry = product.object_.get_geometry()
 position_y_px = []
 position_x_px = []
-for scan_point in product.probe_positions:
-    object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
+for probe_position in product.probe_positions:
+    object_point = object_geometry.map_coordinates_probe_to_object(probe_position)
     position_y_px.append(object_point.coordinate_y_px)
     position_x_px.append(object_point.coordinate_x_px)
 ```

@@ -1,6 +1,6 @@
 """Selecting a reconstructor, and what happens when the selection cannot resolve.
 
-A settings file routinely names a backend the current install does not have --
+A settings file routinely names a library the current install does not have --
 one machine has pty-chi, another does not, and the same file is carried between
 them. That is the normal case rather than an error, so the selection has to
 survive being unresolvable: a bare install that rewrote the key would lose the
@@ -95,7 +95,7 @@ def test_a_name_is_resolved_case_insensitively_and_written_back_canonical() -> N
 def test_an_unresolvable_name_leaves_the_setting_alone(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """The key a backendless install cannot resolve is the key it must not rewrite."""
+    """The key an install without that library cannot resolve is the key it must not rewrite."""
     _, _, setting = _selection('ptychi_LSQML')
 
     assert setting.get_value() == 'ptychi_LSQML'
@@ -125,7 +125,7 @@ def test_an_unresolvable_name_still_leaves_something_usable() -> None:
 def test_a_library_offering_nothing_resolves_to_no_reconstructor() -> None:
     """A bare install selects nothing, so there is nothing to reconstruct or train with.
 
-    A backend registers whether or not its packages are installed, so the
+    A library registers whether or not its packages are installed, so the
     empty case is a library that offers nothing rather than no library.
     """
     algorithm, _, _ = _selection('nope', ('lib', _Library('lib')))
@@ -134,7 +134,7 @@ def test_a_library_offering_nothing_resolves_to_no_reconstructor() -> None:
     assert algorithm.get_current_reconstructor() is None
 
 
-def test_no_backend_at_all_is_survivable() -> None:
+def test_no_library_at_all_is_survivable() -> None:
     """Nothing registers in this test; production always registers something."""
     algorithm, _, _ = _selection('nope')
 
@@ -173,7 +173,7 @@ def test_changing_library_settles_on_one_of_its_own_algorithms() -> None:
 
 
 def test_returning_to_a_library_returns_to_what_was_chosen_there() -> None:
-    """Flipping between backends to compare them must not lose the selection."""
+    """Flipping between libraries to compare them must not lose the selection."""
     algorithm, library_setting, _ = _selection(
         'one',
         ('lib', _Library('lib', _Reconstructor('one'), _Reconstructor('two'))),
@@ -213,7 +213,7 @@ def test_the_two_keys_resolve_whichever_order_they_arrive_in() -> None:
 class TestWhatStandsInForAnUnresolvableName:
     """Which algorithm is selected when the persisted one resolves to nothing.
 
-    The real case this exists for: a settings file predating a backend's split
+    The real case this exists for: a settings file predating a library's split
     into per-algorithm reconstructors still names the old combined value, and
     the install it is opened on has every algorithm the file's author meant --
     just not under that spelling.
@@ -229,7 +229,7 @@ class TestWhatStandsInForAnUnresolvableName:
         assert algorithm.get_value() == 'LSQML'
 
     def test_the_first_offering_stands_in_where_the_default_is_not_offered(self) -> None:
-        """A backend with its own vocabulary has no reason to offer ptychodus's default."""
+        """A library with its own vocabulary has no reason to offer ptychodus's default."""
         algorithm, _, _ = _selection(
             'nope',
             ('lib', _Library('lib', _Reconstructor('Unsupervised'), _Reconstructor('Supervised'))),

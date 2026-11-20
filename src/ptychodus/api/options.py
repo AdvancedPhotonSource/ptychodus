@@ -1,4 +1,4 @@
-"""Options documents: a backend's pydantic options as YAML, named beside what they configure.
+"""Options documents: a library's pydantic options as YAML, named beside what they configure.
 
 A document names what it configures beside the values it gives that thing's fields::
 
@@ -9,11 +9,11 @@ A document names what it configures beside the values it gives that thing's fiel
         nested_field: value
 
 :func:`dump_options_document` writes one in canonical form -- only the fields that are set,
-so a backend that resolves the others at runtime still can -- and
+so a library that resolves the others at runtime still can -- and
 :func:`read_options_document` and :func:`apply_options_document` take one back. Fields a
 document omits keep their defaults, at any depth.
 
-**Set means set by the defaults or changed by the document.** A backend may read which
+**Set means set by the defaults or changed by the document.** A library may read which
 fields are explicitly set -- ``model_dump(exclude_unset=True)`` -- and resolve the others at
 runtime. A document written with every field, as a commented template is, names them all;
 were naming a field enough to set it, a round trip would silently end those runtime

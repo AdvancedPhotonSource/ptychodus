@@ -234,7 +234,7 @@ def _build_initial_object(
 
     if initial.object_source == 'simulated':
         # Uniform and zero phase: a guess that asserts no structure, but carries the
-        # mean transmission the patterns imply so the exit wave predicts their totals.
+        # mean transmission the patterns imply so the exit wave predicts their detector sums.
         object_ = generate_uniform_object(object_geometry, amplitude=mean_amplitude_transmission)
 
         if num_slices > 1:
@@ -386,7 +386,7 @@ def reconstruct_one_scan(
         bad_pixels=bad_pixels,
         raw_pixel_geometry=raw_pixel_geometry,
         read_region=read_region,
-        total_counts_lower_bound=settings.diffraction.min_total_counts,
+        detector_sum_lower_bound=settings.diffraction.min_total_counts,
         on_array_assembled=assembly_moments.add_assembled,
     )
     num_patterns = assembled_data.get_num_patterns()

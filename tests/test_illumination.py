@@ -186,7 +186,7 @@ class TestComputeIlluminationMap:
         zero subpixel residual), the canvas patch equals sum(|probe|^2) over modes."""
         probe = _gaussian_probe(8, 8, sigma=1.5)
         # Object is 16x16, probe is 8x8. Object center is at world (0, 0) so the world
-        # origin maps to object-pixel (8, 8). A scan position at world (0, 0) puts the
+        # origin maps to object-pixel (8, 8). A probe position at world (0, 0) puts the
         # probe corner at object-pixel (4, 4) — an integer-aligned placement.
         product = _make_product(
             object_array=_delta_object(16, 16),
@@ -226,7 +226,7 @@ class TestComputeIlluminationMap:
         assert total_out == pytest.approx(total_in, rel=1e-6)
 
     def test_two_disjoint_positions_accumulate_additively(self) -> None:
-        """With two well-separated scan positions, each contributes its own probe
+        """With two well-separated probe positions, each contributes its own probe
         intensity to the canvas independently of the other."""
         probe = _gaussian_probe(8, 8, sigma=1.0)
         pixel_size_m = 1.0e-7
@@ -343,7 +343,7 @@ class TestComputeIlluminationMap:
         expected_patch = numpy.abs(mode_a) ** 2 + numpy.abs(mode_b) ** 2
         numpy.testing.assert_allclose(m.photon_number[4:12, 4:12], expected_patch, atol=1e-12)
 
-    def test_probe_photon_counts_weight_patches_and_preserve_budget(self) -> None:
+    def test_i0_weight_patches_and_preserve_budget(self) -> None:
         """Per-scan-index weights redistribute photons across positions without
         changing the total photon budget on the canvas."""
         probe = _gaussian_probe(8, 8, sigma=1.0)
@@ -360,9 +360,7 @@ class TestComputeIlluminationMap:
         )
         uniform = compute_illumination_map(product)
         # Weight index 0 at 100, index 1 at 300 -> mean 200 -> factors 0.5, 1.5.
-        weighted = compute_illumination_map(
-            product, probe_photon_counts_by_index={0: 100.0, 1: 300.0}
-        )
+        weighted = compute_illumination_map(product, i0_by_index={0: 100.0, 1: 300.0})
         expected_patch = numpy.abs(probe) ** 2
         numpy.testing.assert_allclose(weighted.photon_number[4:12, 4:12], 0.5 * expected_patch)
         numpy.testing.assert_allclose(weighted.photon_number[4:12, 20:28], 1.5 * expected_patch)
@@ -371,7 +369,7 @@ class TestComputeIlluminationMap:
             float(uniform.photon_number.sum())
         )
 
-    def test_probe_photon_counts_missing_index_gets_unit_weight(self) -> None:
+    def test_i0_missing_index_gets_unit_weight(self) -> None:
         """A scan index absent from the mapping is weighted by the provided mean."""
         probe = _gaussian_probe(8, 8, sigma=1.0)
         pixel_size_m = 1.0e-7
@@ -387,7 +385,7 @@ class TestComputeIlluminationMap:
         )
         # Only index 0 is in the mapping; index 1 gets the mean of the mapping (=100)
         # divided by the mean (=100) -> unit weight.
-        weighted = compute_illumination_map(product, probe_photon_counts_by_index={0: 100.0})
+        weighted = compute_illumination_map(product, i0_by_index={0: 100.0})
         expected_patch = numpy.abs(probe) ** 2
         numpy.testing.assert_allclose(weighted.photon_number[4:12, 20:28], expected_patch)
 

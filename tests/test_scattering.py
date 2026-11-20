@@ -593,14 +593,14 @@ def test_the_exit_frame_transform_is_the_identity_where_undefined(
 
 def test_the_inverse_undoes_the_transform() -> None:
     transform = replace(compute_exit_frame_transform(_BRAGG_ASYMMETRIC), a02=3e-7, a12=-1e-7)
-    position = ProbePosition(index=5, x_m=2.5e-7, y_m=-4e-7, probe_photon_count=7.0)
+    position = ProbePosition(index=5, x_m=2.5e-7, y_m=-4e-7, i0=7.0)
 
     round_trip = transform.inverted()(transform(position))
 
     assert round_trip.index == 5
     assert round_trip.x_m == pytest.approx(position.x_m, abs=1e-20)
     assert round_trip.y_m == pytest.approx(position.y_m, abs=1e-20)
-    assert round_trip.probe_photon_count == 7.0
+    assert round_trip.i0 == 7.0
 
 
 def test_a_singular_transform_has_no_inverse() -> None:

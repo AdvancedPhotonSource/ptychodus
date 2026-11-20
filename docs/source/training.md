@@ -16,7 +16,7 @@ By default the command exports the measured scan: its patterns, paired with the 
 
 Every file is named `<stem>_NNNN`, after the highest index already in the output directory; `--stem` defaults to `train_data`. A PtychoPINN file is `train_data_0000.npz`, and a PtychoFM training pair is `train_data_0000_dp.hdf5` with `train_data_0000_para.hdf5`. Running the command again adds files rather than replacing any, so exports of several scans, synthetic sets, or a mix of both can share one training directory.
 
-Nothing is overwritten, even by runs into the same directory at the same time, such as the tasks of a job array. A run reserves an index by creating a hidden directory `.staging-<stem>_NNNN`, which only one run can create, has the writer write there, and links each file into place with a call that fails rather than replaces an existing name. The reservation is removed when the file is in place. One left behind by a killed run is harmless to numbering, but PtychoFM's trainer searches subdirectories, so delete stale `.staging-*` directories; the command warns about any it finds.
+Nothing is overwritten, even by runs into the same directory at the same time, such as the tasks of a job array. A run reserves an index by creating a hidden directory `.staging-<stem>_NNNN`, which only one run can create, has the writer write there, and links each file into place with a call that fails rather than replaces an existing name. The reservation is removed when the file is in place. One left behind by a killed run is harmless to numbering, but PtychoFM's training searches subdirectories, so delete stale `.staging-*` directories; the command warns about any it finds.
 
 ## Synthetic training data
 
@@ -53,7 +53,7 @@ ptychodus-train -i ./training-data -o ./trained --options pinn.yaml
 
 A directory holding one archive is trained from as it is. PtychoPINN trains from one archive, so several are first merged into one object bank, the form PtychoPINN's own synthetic pipeline uses for several objects:
 
-- each archive becomes one object, with its frames tagged by `object_index`, so neighbor groups never mix objects;
+- each archive becomes one object, with its patterns tagged by `object_index`, so neighbor groups never mix objects;
 - supervised training cuts each frame's ground-truth patch from that archive's `objectGuess` with PtychoPINN's own patch extraction, while unsupervised training needs none;
 - the merged bank is held in memory, once per process under `torchrun`, in a temporary directory under the output directory that is removed afterwards.
 

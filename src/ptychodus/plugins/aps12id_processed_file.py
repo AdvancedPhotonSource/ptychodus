@@ -6,7 +6,7 @@ A processed scan is a master file plus one file per scan line, the lines named
 a ``beam_center_YX`` attribute.
 
 Positions come from column 1 (y) and column 2 (x) of ``/positions``, in nanometers,
-with x negated. ``/positions`` holds one row per scan point, so rows and indexes
+with x negated. ``/positions`` holds one row per probe position, so rows and indexes
 correspond one to one.
 """
 

@@ -51,8 +51,8 @@ async def test_visualization_options(app_client: AsyncClient) -> None:
     assert 'gray' in body['colormaps_linear'] or 'gray' in body['colormaps_cyclic']
 
 
-async def test_visualization_options_follow_the_desktop(app_client: AsyncClient) -> None:
-    """Sorted as the desktop lists them, with the names its combo boxes show."""
+async def test_visualization_options_follow_the_gui(app_client: AsyncClient) -> None:
+    """Sorted as the GUI lists them, with the names its combo boxes show."""
     body = (await app_client.get('/api/v1/visualization/options')).json()
 
     assert body['colormaps_linear'] == sorted(body['colormaps_linear'])
@@ -322,11 +322,11 @@ async def test_positions_plot_overlays_several_products(
     layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ):
-    """The scan plot takes repeated uuid params and draws them on shared axes.
+    """The probe-positions plot takes repeated uuid params and draws them on shared axes.
 
     A plot is not a colormapped array, so it answers with PlotImage: no color axis and
-    no physical pixel size, where the old hand-rolled renderer reported a synthetic
-    'meters per canvas pixel' that meant something different from every other endpoint.
+    no physical pixel size, since a canvas pixel of a plot has no extent on the sample
+    that would mean what it means at every other endpoint.
     """
     a = seed_product()
     b = seed_product()
@@ -415,7 +415,7 @@ async def test_object_flattened_image(
     layout: StorageLayout,
     seed_product: Callable[..., UUID],
 ) -> None:
-    """The object's own row shows the product of its layers, as the desktop's does."""
+    """The object's own row shows the product of its layers, as the GUI's does."""
     p = seed_product()
     await _ingest(db_engine, layout, layout.manifest_path('product', p))
 
@@ -430,7 +430,7 @@ async def test_fluorescence_summary_image(
     layout: StorageLayout,
     seed_fluorescence: Callable[..., UUID],
 ) -> None:
-    """The dataset's own row shows every element map summed, as the desktop's does."""
+    """The dataset's own row shows every element map summed, as the GUI's does."""
     f = seed_fluorescence(elements=['Fe', 'Cu'])
     await _ingest(db_engine, layout, layout.manifest_path('fluorescence', f))
 

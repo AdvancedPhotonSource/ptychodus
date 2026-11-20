@@ -162,9 +162,9 @@ class ProbePositionsBuilder(ParameterGroup):
         )
 
     def _trim_positions(self, positions: Sequence[ProbePosition]) -> Sequence[ProbePosition]:
-        """Discard points from each end of the scan, in acquisition order.
+        """Discard probe positions from each end of the probe path, in acquisition order.
 
-        Surviving points keep their original scan indexes. Diffraction patterns
+        Surviving positions keep their original scan indexes. Diffraction patterns
         whose index falls outside the trimmed range are dropped downstream by
         `prepare_reconstruct_input`, which never
         extrapolates beyond the position-index anchors.
@@ -191,8 +191,8 @@ class ProbePositionsBuilder(ParameterGroup):
 class FromMemoryProbePositionsBuilder(ProbePositionsBuilder):
     """Probe positions that have already been conditioned.
 
-    Two things produce these. Reconstruction output, which `ProcessingTaskMonitor`
-    re-assigns to the output product item on every reconstructor iteration (see
+    Two things produce these. A reconstruction, which `ProcessingTaskMonitor`
+    re-assigns to its product item on every reconstructor iteration (see
     `model/processing/monitor.py`), and products loaded from a product file, whose
     positions were conditioned before they were saved. In both cases the trim,
     affine transform, and jitter have already been applied upstream. Re-applying

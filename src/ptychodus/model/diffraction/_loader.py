@@ -39,8 +39,8 @@ class LoadDiffractionDataset:
         *,
         bad_pixels: BadPixels,
         raw_pixel_geometry: PixelGeometry,
-        total_counts_lower_bound: int | None,
-        total_counts_upper_bound: int | None,
+        detector_sum_lower_bound: int | None,
+        detector_sum_upper_bound: int | None,
         read_region: CropRegion | None,
         corrections: DetectorCorrections,
         on_array_assembled: Callable[[int, str, AssembledDiffractionData], None],
@@ -54,8 +54,8 @@ class LoadDiffractionDataset:
         self._pipeline = pipeline
         self._bad_pixels = bad_pixels
         self._raw_pixel_geometry = raw_pixel_geometry
-        self._total_counts_lower_bound = total_counts_lower_bound
-        self._total_counts_upper_bound = total_counts_upper_bound
+        self._detector_sum_lower_bound = detector_sum_lower_bound
+        self._detector_sum_upper_bound = detector_sum_upper_bound
         self._read_region = read_region
         self._corrections = corrections
         self._on_array_assembled = on_array_assembled
@@ -96,8 +96,8 @@ class LoadDiffractionDataset:
                     bad_pixels=self._bad_pixels,
                     raw_pixel_geometry=self._raw_pixel_geometry,
                     out=self._out,
-                    total_counts_lower_bound=self._total_counts_lower_bound,
-                    total_counts_upper_bound=self._total_counts_upper_bound,
+                    detector_sum_lower_bound=self._detector_sum_lower_bound,
+                    detector_sum_upper_bound=self._detector_sum_upper_bound,
                     read_region=self._read_region,
                     corrections=self._corrections,
                     on_array_assembled=self._accumulate_array,

@@ -1,18 +1,18 @@
-"""Discipline gate for the parent-side backend config builders.
+"""Discipline gate for the parent-side library config builders.
 
-Each backend translates ptychodus settings into backend inputs in the parent
+Each library's adapter translates ptychodus settings into that library's inputs in the parent
 so the child receives something finished and does nothing but GPU work. That
 translation happens at call time, which ``tests/test_no_gpu_context.py`` cannot
 observe: its probe only imports the composition roots and never dispatches a
 reconstruction.
 
-This module closes that gap. For each installed backend it spawns a probe that
+This module closes that gap. For each installed library it spawns a probe that
 calls the builders exactly as ``build_*_payload`` does, then asserts:
 
 1. the inputs build and survive the pickle round-trip the spawn transport
    requires,
 2. no GPU context was acquired in the process that built them, and
-3. no backend module was imported at all, where the builder claims not to need
+3. no library module was imported at all, where the builder claims not to need
    one.
 
 Each probe runs in its own spawned process so a framework loaded by an earlier
@@ -20,7 +20,7 @@ test cannot mask a failure here.
 
 The module also pins the rejections those builders perform in the parent, which
 run in-process. PtychoFM's options re-declare upstream's config models, so its
-tests skip where ptycho_fm is not installed; PtychoPINN's need no backend.
+tests skip where ptycho_fm is not installed; PtychoPINN's need no library.
 """
 
 from __future__ import annotations
@@ -81,7 +81,7 @@ def _build_ptycho_fm_configs() -> list[Any]:
     # The name selects the training objective, coupled_decoder_mode the model
     # class, and loss_function the criterion the child builds. Both section
     # sets are built, since each operation narrows to its own and a builder
-    # that imported a backend would do it for either.
+    # that imported a library would do it for either.
     configs: list[Any] = []
 
     for name in ('Unsupervised', 'Supervised'):
@@ -119,7 +119,7 @@ _BUILDERS = {
     'ptycho_fm': _build_ptycho_fm_configs,
 }
 
-# Every builder is a pure-Python factory that imports no backend, so these probes
+# Every builder is a pure-Python factory that imports no library, so these probes
 # run everywhere. An entry here would mean a builder that cannot.
 _REQUIRED_MODULES: dict[str, tuple[str, ...]] = {
     'cdtools': (),
@@ -138,7 +138,7 @@ _FORBIDDEN_MODULES: tuple[str, ...] = (
 )
 
 
-def _probe(backend: str, result_queue: multiprocessing.Queue[dict[str, Any] | str]) -> None:
+def _probe(library: str, result_queue: multiprocessing.Queue[dict[str, Any] | str]) -> None:
     """Build the configs, then report the outcome AND the GPU-context state.
 
     A build failure is reported rather than raised, because the context check
@@ -150,7 +150,7 @@ def _probe(backend: str, result_queue: multiprocessing.Queue[dict[str, Any] | st
     result: dict[str, Any] = {'count': 0, 'types': [], 'build_error': None}
 
     try:
-        configs = _BUILDERS[backend]()
+        configs = _BUILDERS[library]()
         round_tripped = [pickle.loads(pickle.dumps(config)) for config in configs]
         result['count'] = len(configs)
         result['types'] = [type(config).__name__ for config in round_tripped]
@@ -168,30 +168,30 @@ def _probe(backend: str, result_queue: multiprocessing.Queue[dict[str, Any] | st
     result_queue.put(result)
 
 
-@pytest.mark.parametrize('backend', sorted(_BUILDERS))
-def test_parent_config_builders_acquire_no_gpu_context(backend: str) -> None:
-    for module_name in _REQUIRED_MODULES[backend]:
+@pytest.mark.parametrize('library', sorted(_BUILDERS))
+def test_parent_config_builders_acquire_no_gpu_context(library: str) -> None:
+    for module_name in _REQUIRED_MODULES[library]:
         if find_spec(module_name) is None:
             pytest.skip(f'{module_name} is not installed')
 
     ctx = multiprocessing.get_context('spawn')
     result_queue: multiprocessing.Queue[dict[str, Any] | str] = ctx.Queue()
-    process = ctx.Process(target=_probe, args=(backend, result_queue))
+    process = ctx.Process(target=_probe, args=(library, result_queue))
     process.start()
     process.join(timeout=180.0)
 
-    assert not process.is_alive(), f'{backend} config-builder probe did not exit in 180s.'
+    assert not process.is_alive(), f'{library} config-builder probe did not exit in 180s.'
 
     result: Any = result_queue.get(timeout=1.0)
 
     if isinstance(result, str):
-        raise AssertionError(f'{backend} config-builder probe raised: {result}')
+        raise AssertionError(f'{library} config-builder probe raised: {result}')
 
     # The invariant this module exists to pin, checked whether or not the
     # builder itself succeeded.
     assert result['context'] == [], textwrap.dedent(
         f"""\
-        Building {backend} configs parent-side acquired a GPU context.
+        Building {library} configs parent-side acquired a GPU context.
         Offenders: {result['context']}
         Configs built: {result['types']}
 
@@ -204,23 +204,23 @@ def test_parent_config_builders_acquire_no_gpu_context(backend: str) -> None:
     )
 
     assert result['imported'] == [], (
-        f'Building {backend} inputs parent-side imported {result["imported"]}. '
+        f'Building {library} inputs parent-side imported {result["imported"]}. '
         'These builders translate settings into plain Python values and must not '
-        'reach the backend to do it; the child owns every backend import.'
+        'reach the library to do it; the child owns every library import.'
     )
 
     if result['build_error'] is not None:
-        # The installed backend's config schema does not match what the
+        # The installed library's config schema does not match what the
         # settings mapping targets. That is an environment/version mismatch
         # rather than a ptychodus defect -- the mapping is the same one the
         # child used before it moved parent-side -- so report it loudly
         # instead of failing the suite against an arbitrary local checkout.
         pytest.skip(
-            f'{backend} config schema has drifted from the installed backend: '
+            f'{library} config schema has drifted from the installed library: '
             f'{result["build_error"]}'
         )
 
-    assert result['count'] > 0, f'{backend} built no configs.'
+    assert result['count'] > 0, f'{library} built no configs.'
 
 
 def test_ptycho_fm_maps_the_uncoupled_mode_to_null() -> None:
@@ -329,13 +329,13 @@ def test_ptychopinn_settings_map_no_auxiliary_loss_to_absent() -> None:
 
 
 def test_ptychopinn_settings_disable_gradient_clipping_with_none() -> None:
-    """Zero is the settings spelling for "off"; the backend reads it as null."""
+    """Zero is the settings spelling for "off"; the library reads it as null."""
     assert _build_ptychopinn_settings_mapping(gradient_clip_val=0.0)['gradient_clip_val'] is None
     assert _build_ptychopinn_settings_mapping(gradient_clip_val=1.5)['gradient_clip_val'] == 1.5
 
 
 def _accepted_override_names() -> set[str]:
-    """Read the backend's accepted override names out of its source.
+    """Read the library's accepted override names out of its source.
 
     Parsed rather than imported: importing ``ptycho_torch`` would pull torch
     into this process, which is exactly what the rest of this module exists to
@@ -378,12 +378,12 @@ def _accepted_override_names() -> set[str]:
     if match:
         accepted |= set(re.findall(r'"([^"]+)"', match.group(1)))
 
-    assert accepted, 'could not read any override names from the installed backend'
+    assert accepted, 'could not read any override names from the installed library'
     return accepted
 
 
 def test_ptychopinn_settings_are_all_accepted_override_names() -> None:
-    """Every emitted name must be one the backend resolves.
+    """Every emitted name must be one the library resolves.
 
     An unrecognized name is rejected rather than ignored, so a vocabulary
     rename upstream turns into a failed training run. This catches that at test
@@ -393,6 +393,6 @@ def test_ptychopinn_settings_are_all_accepted_override_names() -> None:
     unknown = sorted(emitted - _accepted_override_names())
 
     assert unknown == [], (
-        f'These settings names are not accepted by the installed backend: {unknown}. '
+        f'These settings names are not accepted by the installed library: {unknown}. '
         'Check the generated settings table in its configuration reference.'
     )

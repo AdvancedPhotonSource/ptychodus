@@ -242,7 +242,7 @@ def default_options(task_options_cls: type[PtychographyTaskOptions]) -> PtyChiOp
     task.probe_position_options.affine_transform_constraint.degrees_of_freedom = []
 
     # Only LSQML declares it; every other algorithm's reconstructor options lack the
-    # field, and a backend must not fail to offer itself over a default.
+    # field, and a library must not fail to offer itself over a default.
     if hasattr(task.reconstructor_options, 'rescale_probe_intensity_in_first_epoch'):
         task.reconstructor_options.rescale_probe_intensity_in_first_epoch = False
 

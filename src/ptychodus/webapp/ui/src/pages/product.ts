@@ -40,7 +40,7 @@ export async function mountProduct(root: HTMLElement, uuid: string | null): Prom
   if (found.error !== null) detail.replaceChildren(errorBlock(found.error));
 
   if (items.length === 0) {
-    left.replaceChildren(emptyBlock('No products in store.'));
+    left.replaceChildren(emptyBlock('No products in the storage root.'));
     return;
   }
 
@@ -126,7 +126,7 @@ function showDetail(host: HTMLElement, p: ProductRead): void {
 
   const dl = document.createElement('dl');
   dl.className = 'detail-list';
-  // In the order and with the labels of the desktop's product property table.
+  // In the order and with the labels of the GUI's product property table.
   const rows: [string, string][] = [
     ['UUID', p.uuid],
     ['State', p.ingest_state],
@@ -196,14 +196,14 @@ function emptyBlock(msg: string): HTMLElement {
   return el;
 }
 
-/** The diffraction dataset a product derives from, by name, as the desktop shows it. */
+/** The diffraction dataset a product derives from, by name, as the GUI shows it. */
 function datasetName(p: ProductRead): string {
   const edge = p.derived_from.find((e) => e.kind === 'diffraction');
   if (edge === undefined) return MISSING;
   return edge.label || edge.uuid.slice(0, 8);
 }
 
-// As the desktop editor's geometry row reads: the regime, then the propagation.
+// As the GUI editor's geometry row reads: the regime, then the propagation.
 function scatteringText(p: ProductRead): string {
   if (p.scattering_regime === null) return MISSING;
   const regime = p.scattering_regime.charAt(0).toUpperCase() + p.scattering_regime.slice(1);
@@ -216,5 +216,5 @@ function farFieldText(farField: boolean | null): string {
 }
 
 function totalBytes(p: ProductRead): number | null {
-  return sumBytes([p.probe_nbytes, p.object_nbytes, p.scan_nbytes]);
+  return sumBytes([p.probe_nbytes, p.object_nbytes, p.probe_positions_nbytes]);
 }

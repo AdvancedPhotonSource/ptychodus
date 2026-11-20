@@ -180,7 +180,7 @@ class TestOutputProperties:
 
         The end-to-end statement of the scaling convention: a field array holds photons
         per pixel, so ``sum|P|^2`` is the photon count, propagation to the detector
-        leaves it alone, and the pattern totals the estimator reads back recover what
+        leaves it alone, and the detector sums the estimator reads back recover what
         went in. Parameterized over both regimes because they take different
         propagators, and only the far-field one changes pitch.
         """
@@ -197,7 +197,7 @@ class TestOutputProperties:
         result = generate_diffraction_data(product)
 
         assert result.get_patterns()[0].sum() == pytest.approx(photon_count, rel=1e-9)
-        assert result.get_total_counts().max() == pytest.approx(photon_count, rel=1e-6)
+        assert result.get_detector_sums().max() == pytest.approx(photon_count, rel=1e-6)
 
 
 # ---------------------------------------------------------------------------
@@ -355,7 +355,7 @@ class TestMultislice:
 
 class TestMultiPositionWithoutOpr:
     def test_all_positions_populated_without_opr_weights(self) -> None:
-        """With multiple scan positions and no OPR weights, every output pattern
+        """With multiple probe positions and no OPR weights, every output pattern
         must be populated — not just the first."""
         rng = numpy.random.default_rng(40)
         probe = _random_probe(rng)

@@ -280,7 +280,8 @@ class TestNearFieldSampling:
 
     def test_object_geometry_carries_the_near_field_pitch(self) -> None:
         geometry = _make_geometry(far_field=False)
-        geometry._scan_item.get_probe_positions.return_value = []  # type: ignore[attr-defined]
+        positions_item = geometry._probe_positions_item
+        positions_item.get_probe_positions.return_value = []  # type: ignore[attr-defined]
 
         assert geometry.get_object_geometry().pixel_width_m == pytest.approx(_DETECTOR_PITCH_M)
 

@@ -10,7 +10,7 @@ Importing ``ptycho_fm.config`` costs exactly two modules -- the package root is
 empty and the config module imports only pydantic -- so the application can read the
 declaration without pulling torch in. That is what makes the overlay possible
 here and not for PtychoPINN, whose configuration is inseparable from its
-backend.
+library.
 
 **Absent means absent.** Upstream resolves pretrained encoder sizes, validation
 batch size and dataset normalization from a field having no value at all, so the
@@ -73,7 +73,7 @@ class PtychoFMOptions(PtychoFMConfig):
     """Upstream's configuration plus the inference branch ptychodus adds.
 
     A subclass rather than a wrapper, so the object stays a ``PtychoFMConfig``
-    and dumps to the same nested shape the backend already reads. Upstream allows
+    and dumps to the same nested shape the library already reads. Upstream allows
     extra keys, so the added branch rides along as a top-level section; this subclass forbids
     any other, so a misspelled field is refused rather than carried.
 

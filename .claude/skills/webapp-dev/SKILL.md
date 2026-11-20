@@ -1,6 +1,6 @@
 ---
 name: webapp-dev
-description: Bootstrap and launch the ptychodus-webapp REST + MCP + browser-UI service locally against a storage root. Use when the user says "start the store", "run ptychodus-webapp", "serve the store", or wants to iterate on ptychodus.webapp code (routers, MCP tools, or the TypeScript UI in src/ptychodus/webapp/ui/).
+description: Bootstrap and launch the ptychodus-webapp REST + MCP + web UI service locally against a storage root. Use when the user says "start the webapp", "run ptychodus-webapp", "serve the webapp", or wants to iterate on ptychodus.webapp code (routers, MCP tools, or the TypeScript UI in src/ptychodus/webapp/ui/).
 ---
 
 # webapp-dev
@@ -13,7 +13,7 @@ Ask the user for the storage root path if not already provided. Options, in prio
 
 1. Path passed in the invocation.
 2. `PTYCHODUS_WEBAPP_STORAGE_ROOT` env var if already set in the shell.
-3. Prompt: "Which storage root should the store serve from?" — do not guess a path.
+3. Prompt: "Which storage root should the webapp serve from?" — do not guess a path.
 
 ## Steps
 
@@ -23,7 +23,7 @@ Ask the user for the storage root path if not already provided. Options, in prio
    uv sync --extra webapp
    ```
 
-2. **Rebuild the SQLite index from disk** (optional — offer this only if the user says the on-disk artifacts changed outside the running service, e.g. after `git pull` or manual file moves):
+2. **Rebuild the SQLite index from disk** (optional — offer this only if the user says resources in the storage root changed outside the running service, e.g. after `git pull` or manual file moves):
 
    ```sh
    uv run ptychodus-webapp rebuild-index
@@ -53,7 +53,7 @@ The TypeScript UI lives in `src/ptychodus/webapp/ui/src/` and compiles to `src/p
 cd src/ptychodus/webapp/ui && tsc --watch
 ```
 
-`dist/` is a build artifact — never commit it.
+`dist/` is build output — never commit it.
 
 ## Stopping
 

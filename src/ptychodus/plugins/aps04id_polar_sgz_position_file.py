@@ -119,7 +119,7 @@ def read_position_stream(file_path: Path) -> ProbePositionSequence:
             int(trigger_index),
             -LengthUnit.NANOMETER.to_meters(float(x)),
             -LengthUnit.NANOMETER.to_meters(float(y)),
-            probe_photon_count=float(i0),
+            i0=float(i0),
         )
         for trigger_index, x, y, i0 in zip(trigger_indexes, xs, ys, i0s)
     ]

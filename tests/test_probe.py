@@ -1361,7 +1361,7 @@ class TestComputeOPRModeSeries:
 
 
 class TestProbeEnsembleGetProbe:
-    """A probe ensemble is addressed by scan position, not as a Python sequence.
+    """A probe ensemble is addressed by probe position, not as a Python sequence.
 
     Without OPR weights one probe describes the whole scan, so every position index is
     valid and there is no element count to report; with them the index selects a weight

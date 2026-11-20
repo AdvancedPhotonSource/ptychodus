@@ -59,7 +59,7 @@ def warn_on_dropped_frames(h5_file: h5py.File, file_path: Path) -> None:
         logger.warning(
             'Frames in "%s" are not consecutive in the detector frame counter (steps %s);'
             ' the detector dropped frames, so patterns after the gap pair with the wrong'
-            ' scan positions.',
+            ' probe positions.',
             file_path,
             steps.tolist(),
         )

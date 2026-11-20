@@ -7,9 +7,9 @@ from .parameters import ParameterViewController
 
 
 class MakeEditableViewController(ParameterViewController):
-    """A button that lets a reconstruction result be conditioned, then reopens its editor.
+    """A button that lets a reconstruction be conditioned, then reopens its editor.
 
-    A result's builder deliberately ignores the editor's settings, so the dialog offers
+    A reconstruction's builder deliberately ignores the editor's settings, so the dialog offers
     nothing else until it is pressed; the reopened dialog then shows the controls that
     now apply.
     """

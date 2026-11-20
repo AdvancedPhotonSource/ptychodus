@@ -422,15 +422,15 @@ class ValueFilterViewController:
 
 
 class RobustStatisticsDialog(QDialog):
-    """Modal helper for computing and applying robust bounds on total_counts.
+    """Modal helper for computing and applying robust bounds on detector_sums.
 
-    Reads the service's post-crop, post-pipeline counts rather than the summary's
+    Reads the service's post-crop, post-pipeline detector sums rather than the summary's
     raw full-detector ones, because those are what the filter compares its bounds
-    against; deriving bounds from raw counts under an active crop puts them an
+    against; deriving bounds from raw detector sums under an active crop puts them an
     order of magnitude too high and drops every pattern. Freshly recomputes
     ``compute_robust_statistics`` each time :meth:`exec_` is called so the median /
-    MAD reflect whichever counts pass the service is currently holding. Apply
-    Bounds writes to the total-counts settings and stays open so the user can
+    MAD reflect whichever detector-sum pass the service is currently holding. Apply
+    Bounds writes to the detector-sum settings and stays open so the user can
     tweak ``k`` and re-apply; Close dismisses.
     """
 
@@ -441,7 +441,7 @@ class RobustStatisticsDialog(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle('Total-Counts Robust Statistics')
+        self.setWindowTitle('Detector-Sum Robust Statistics')
         self.setModal(True)
         self._diffraction_settings = diffraction_settings
         self._summary_service = summary_service
@@ -480,15 +480,15 @@ class RobustStatisticsDialog(QDialog):
         return super().exec_()
 
     def _recompute_stats(self) -> None:
-        measured = self._summary_service.get_last_total_counts()
-        if measured is None or measured.total_counts.size == 0:
+        measured = self._summary_service.get_last_detector_sums()
+        if measured is None or measured.detector_sums.size == 0:
             self._stats = None
             self._median_label.setText('—')
             self._mad_label.setText('—')
             self._apply_button.setEnabled(False)
             return
 
-        counts = numpy.asarray(measured.total_counts, dtype=numpy.float64)
+        counts = numpy.asarray(measured.detector_sums, dtype=numpy.float64)
         try:
             stats = compute_robust_statistics(counts)
         except Exception as exc:
@@ -512,24 +512,24 @@ class RobustStatisticsDialog(QDialog):
         lower_int = max(0, int(numpy.floor(bounds.lower)))
         upper_int = max(lower_int + 1, int(numpy.ceil(bounds.upper)))
 
-        self._diffraction_settings.total_counts_lower_bound.set_value(lower_int)
-        self._diffraction_settings.total_counts_upper_bound.set_value(upper_int)
-        self._diffraction_settings.total_counts_lower_bound_enabled.set_value(True)
-        self._diffraction_settings.total_counts_upper_bound_enabled.set_value(True)
+        self._diffraction_settings.detector_sum_lower_bound.set_value(lower_int)
+        self._diffraction_settings.detector_sum_upper_bound.set_value(upper_int)
+        self._diffraction_settings.detector_sum_lower_bound_enabled.set_value(True)
+        self._diffraction_settings.detector_sum_upper_bound_enabled.set_value(True)
 
 
-class TotalCountsFilterViewController(Observer):
-    """Drop patterns whose good-pixel total counts fall outside [lower_bound, upper_bound]
-    (inclusive). Runs after the prep pipeline, so counts reflect the same patterns the
+class DetectorSumFilterViewController(Observer):
+    """Drop patterns whose good-pixel detector sums fall outside [lower_bound, upper_bound]
+    (inclusive). Runs after the prep pipeline, so detector sums reflect the same patterns the
     reconstructor sees (i.e. after any pixel-value zeroing, crop, binning, and padding).
 
-    Because the bounds are compared against processed counts, they cannot be chosen
-    from the summary, whose ``total_counts`` sum the raw full detector. Refresh
-    Counts runs :meth:`DiffractionSummaryService.compute_total_counts`, a second
+    Because the bounds are compared against processed detector sums, they cannot be chosen
+    from the summary, whose ``detector_sums`` sum the raw full detector. Refresh
+    Detector Sums runs :meth:`DiffractionSummaryService.compute_detector_sums`, a second
     streaming pass that measures exactly what the filter will see -- cheaper than
     the summarize, since it reads only the crop rectangle and accumulates no
-    frame-shaped statistics. Robust Statistics stays disabled until that pass has
-    run, and the status line calls out counts that a later settings edit has made
+    pattern-shaped statistics. Robust Statistics stays disabled until that pass has
+    run, and the status line calls out detector sums that a later settings edit has made
     stale.
     """
 
@@ -544,24 +544,24 @@ class TotalCountsFilterViewController(Observer):
         self._summary_service = summary_service
         self._get_pending_dataset_index = get_pending_dataset_index
         self._lower_bound_enabled_view_controller = CheckBoxParameterViewController(
-            settings.total_counts_lower_bound_enabled, 'Total Counts Lower Bound:'
+            settings.detector_sum_lower_bound_enabled, 'Detector Sum Lower Bound:'
         )
         self._lower_bound_view_controller = SpinBoxParameterViewController(
-            settings.total_counts_lower_bound
+            settings.detector_sum_lower_bound
         )
         self._upper_bound_enabled_view_controller = CheckBoxParameterViewController(
-            settings.total_counts_upper_bound_enabled, 'Total Counts Upper Bound:'
+            settings.detector_sum_upper_bound_enabled, 'Detector Sum Upper Bound:'
         )
         self._upper_bound_view_controller = SpinBoxParameterViewController(
-            settings.total_counts_upper_bound
+            settings.detector_sum_upper_bound
         )
         self._status_label = QLabel()
         self._status_label.setWordWrap(True)
-        self._refresh_counts_button = QPushButton('Refresh Counts')
-        self._refresh_counts_button.setToolTip(
-            'Measure per-pattern total counts with the current crop and pipeline applied.'
+        self._refresh_detector_sums_button = QPushButton('Refresh Detector Sums')
+        self._refresh_detector_sums_button.setToolTip(
+            'Measure per-pattern detector sums with the current crop and pipeline applied.'
         )
-        self._refresh_counts_button.clicked.connect(self._on_refresh_counts_clicked)
+        self._refresh_detector_sums_button.clicked.connect(self._on_refresh_detector_sums_clicked)
         self._robust_stats_button = QPushButton('Robust Statistics…')
         self._robust_stats_button.clicked.connect(self._on_robust_stats_clicked)
 
@@ -571,17 +571,17 @@ class TotalCountsFilterViewController(Observer):
         layout.addWidget(self._upper_bound_enabled_view_controller.get_widget(), 1, 0)
         layout.addWidget(self._upper_bound_view_controller.get_widget(), 1, 1)
         layout.addWidget(self._status_label, 2, 0, 1, 2)
-        layout.addWidget(self._refresh_counts_button, 3, 0)
+        layout.addWidget(self._refresh_detector_sums_button, 3, 0)
         layout.addWidget(self._robust_stats_button, 3, 1)
         layout.setColumnStretch(1, 1)
 
-        self._widget = QGroupBox('Total Counts Filter')
+        self._widget = QGroupBox('Detector Sum Filter')
         self._widget.setLayout(layout)
 
         self._dialog = RobustStatisticsDialog(settings, summary_service, parent=self._widget)
 
         summary_service.task_monitor.add_observer(self)
-        # Crop, binning, and the value filter all move the counts distribution, so
+        # Crop, binning, and the value filter all move the detector-sum distribution, so
         # any of them can strand a measured pass.
         settings.add_observer(self)
         self._sync_button_state()
@@ -592,30 +592,32 @@ class TotalCountsFilterViewController(Observer):
     def _sync_button_state(self) -> None:
         monitor = self._summary_service.task_monitor
         is_processing = monitor.is_processing
-        measured = self._summary_service.get_last_total_counts()
+        measured = self._summary_service.get_last_detector_sums()
         dataset_index = self._get_pending_dataset_index()
 
-        self._refresh_counts_button.setEnabled(not is_processing)
+        self._refresh_detector_sums_button.setEnabled(not is_processing)
         self._robust_stats_button.setEnabled(measured is not None and not is_processing)
 
         if measured is None:
-            self._status_label.setText('Counts not measured yet; press Refresh Counts.')
-        elif self._summary_service.is_total_counts_stale(dataset_index):
             self._status_label.setText(
-                f'{measured.total_counts.size} patterns measured under different'
-                ' processing settings; press Refresh Counts.'
+                'Detector sums not measured yet; press Refresh Detector Sums.'
+            )
+        elif self._summary_service.are_detector_sums_stale(dataset_index):
+            self._status_label.setText(
+                f'{measured.detector_sums.size} patterns measured under different'
+                ' processing settings; press Refresh Detector Sums.'
             )
         else:
-            self._status_label.setText(f'{measured.total_counts.size} patterns measured.')
+            self._status_label.setText(f'{measured.detector_sums.size} patterns measured.')
 
-    def _on_refresh_counts_clicked(self) -> None:
+    def _on_refresh_detector_sums_clicked(self) -> None:
         try:
-            self._summary_service.compute_total_counts(
+            self._summary_service.compute_detector_sums(
                 self._get_pending_dataset_index(), force=True
             )
         except Exception as exc:
             logger.exception(exc)
-            ExceptionDialog.show_exception('Refresh Counts', exc)
+            ExceptionDialog.show_exception('Refresh Detector Sums', exc)
 
     def _on_robust_stats_clicked(self) -> None:
         self._dialog.exec_()
@@ -657,9 +659,9 @@ class TransformViewController:
 class OpenDatasetWizardProcessingViewController(ParameterViewController):
     """Processing wizard page. Split horizontally: preprocess-pipeline groups on
     the left (in :class:`DiffractionPrepPipeline` execution order), collapsible
-    summary viewer on the right so the user can tune Crop and Total Counts
-    Filter against a rendered mean_pattern and a plot of per-pattern total
-    counts.
+    summary viewer on the right so the user can tune Crop and Detector Sum
+    Filter against a rendered mean_pattern and a plot of per-pattern detector
+    sums.
 
     The summary pane starts hidden and is revealed by the toggle button that
     sits below the left column's scroll area -- outside it, so it stays put once
@@ -690,7 +692,7 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
             detector_settings, api, file_dialog_factory
         )
         self._value_filter_view_controller = ValueFilterViewController(diffraction_settings)
-        self._total_counts_filter_view_controller = TotalCountsFilterViewController(
+        self._detector_sum_filter_view_controller = DetectorSumFilterViewController(
             diffraction_settings, summary_service, get_pending_dataset_index
         )
         self._crop_view_controller = CropViewController(
@@ -719,7 +721,7 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
         left_layout.addWidget(self._bad_pixels_view_controller.get_widget())
         left_layout.addWidget(separator)
         left_layout.addWidget(self._value_filter_view_controller.get_widget())
-        left_layout.addWidget(self._total_counts_filter_view_controller.get_widget())
+        left_layout.addWidget(self._detector_sum_filter_view_controller.get_widget())
         left_layout.addWidget(self._crop_view_controller.get_widget())
         left_layout.addWidget(self._binning_view_controller.get_widget())
         left_layout.addWidget(self._padding_view_controller.get_widget())

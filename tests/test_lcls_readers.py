@@ -158,7 +158,7 @@ def test_positions_carry_i0(tmp_path: Path, tomography_angle_deg: float) -> None
 
     numpy.testing.assert_allclose(positions.get_coordinates_x_m(), expected_x_m)
     numpy.testing.assert_allclose(positions.get_coordinates_y_m(), -stage_z_um * 1e-6)
-    counts = positions.get_probe_photon_counts()
+    counts = positions.get_i0()
     assert counts is not None
     numpy.testing.assert_array_equal(counts, IPM2[KEPT])
 

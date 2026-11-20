@@ -79,14 +79,14 @@ class IlluminationMap:
 def compute_illumination_map(
     product: Product,
     *,
-    probe_photon_counts_by_index: Mapping[int, float] | None = None,
+    i0_by_index: Mapping[int, float] | None = None,
 ) -> IlluminationMap:
     """Build a per-object-pixel photon-count canvas by summing the subpixel-shifted
-    probe intensities at every scan position, packaged with the metadata needed to
+    probe intensities at every probe position, packaged with the metadata needed to
     derive fluence and dose quantities.
 
-    Pass ``probe_photon_counts_by_index`` (per-scan-index photon counts) to weight
-    each scan-point contribution by its true exposure. Weights are normalized to
+    Pass ``i0_by_index`` (per-scan-index photon counts) to weight
+    each probe-position contribution by its true exposure. Weights are normalized to
     the mean of the provided counts so the total photon budget across the canvas
     matches the uniform-weight case; a scan index missing from the mapping gets
     the unit weight. Without a mapping the accumulation is uniform, matching the
@@ -95,13 +95,13 @@ def compute_illumination_map(
     object_geometry = product.object_.get_geometry()
     weights: RealArrayType | None = None
 
-    if probe_photon_counts_by_index:
-        mean_counts = float(numpy.mean(list(probe_photon_counts_by_index.values())))
+    if i0_by_index:
+        mean_counts = float(numpy.mean(list(i0_by_index.values())))
 
         if mean_counts > 0.0:
             weights = numpy.array(
                 [
-                    probe_photon_counts_by_index.get(position.index, mean_counts) / mean_counts
+                    i0_by_index.get(position.index, mean_counts) / mean_counts
                     for position in product.probe_positions
                 ]
             )
@@ -226,7 +226,7 @@ class ProbeOverlapMetrics:
     """Participation-ratio area of the accumulated illumination canvas."""
 
     num_positions: int
-    """Number of scan positions the metrics were computed over."""
+    """Number of probe positions the metrics were computed over."""
 
     pixel_geometry: PixelGeometry
     """Object pixel geometry, matching :attr:`redundancy`."""
@@ -241,13 +241,13 @@ class ProbeOverlapMetrics:
 
     @property
     def effective_step_size_m(self) -> float:
-        """Side of the square whose area is the covered area per scan position."""
+        """Side of the square whose area is the covered area per probe position."""
         return math.sqrt(self.effective_covered_area_m2 / self.num_positions)
 
     @property
     def areal_redundancy(self) -> float:
         """Total probe footprint area divided by the area actually covered: the number of
-        probes illuminating a typical point. Only meaningful for many scan positions."""
+        probes illuminating a typical point. Only meaningful for many probe positions."""
         if not self.effective_covered_area_m2 > 0.0:
             return float('nan')
 

@@ -31,7 +31,7 @@ from ptychodus.api.simulate.object import (
     STXMDPCSignals,
     compute_stxm_dpc_signals,
     generate_stxm_dpc_object,
-    interpolate_scan_values,
+    interpolate_position_values,
 )
 from ptychodus.api.simulate.probe import propagate_probe
 from ptychodus.model.settings import SettingsRegistry
@@ -261,17 +261,17 @@ def test_empty_beam_is_the_phase_reference(absorbing_scan: _Scan) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Amplitude and totals
+# Amplitude and detector sums
 # ---------------------------------------------------------------------------
 
 
 def test_amplitude_is_the_normalized_stxm_map(phase_scan: _Scan) -> None:
     signals = compute_stxm_dpc_signals(phase_scan.data)
-    totals = dict(zip(signals.indexes.tolist(), signals.total_counts.tolist()))
-    grids, scanned = interpolate_scan_values(
+    detector_sums = dict(zip(signals.indexes.tolist(), signals.detector_sums.tolist()))
+    grids, scanned = interpolate_position_values(
         _GEOMETRY,
         ProbePositionSequence(phase_scan.positions),
-        numpy.array([totals[position.index] for position in phase_scan.positions]),
+        numpy.array([detector_sums[position.index] for position in phase_scan.positions]),
     )
     intensity = grids[0]
     expected = numpy.sqrt(intensity / numpy.mean(intensity[scanned]))
@@ -285,10 +285,10 @@ def test_i0_removes_a_beam_decay(absorbing_scan: _Scan) -> None:
     data = absorbing_scan.data
     decay = numpy.linspace(1.0, 0.6, data.get_patterns().shape[0])
     decayed = _with(data, patterns=data.get_patterns() * decay[:, numpy.newaxis, numpy.newaxis])
-    i0_counts_by_index = {
+    i0_by_index = {
         int(index): 1.0e6 * float(scale) for index, scale in zip(data.get_indexes(), decay)
     }
-    signals = compute_stxm_dpc_signals(decayed, i0_counts_by_index=i0_counts_by_index)
+    signals = compute_stxm_dpc_signals(decayed, i0_by_index=i0_by_index)
 
     expected = numpy.abs(_recover(data, absorbing_scan.positions).get_array())
     actual = numpy.abs(_recover(decayed, absorbing_scan.positions, signals).get_array())
@@ -306,7 +306,7 @@ def test_an_opaque_position_stays_dark_with_a_finite_phase(phase_scan: _Scan) ->
     recovered = _recover(data, phase_scan.positions, signals)
 
     assert numpy.isnan(signals.center_of_mass_x_px[dark])
-    assert signals.total_counts[dark] == 0.0
+    assert signals.detector_sums[dark] == 0.0
     point = _GEOMETRY.map_coordinates_probe_to_object(phase_scan.positions[dark])
     row, column = round(point.y_px), round(point.x_px)
     amplitude = numpy.abs(recovered.get_array()[0])
@@ -364,7 +364,7 @@ def test_a_carried_background_does_not_move_the_centroids(phase_scan: _Scan) -> 
     numpy.testing.assert_allclose(
         actual.center_of_mass_y_px, expected.center_of_mass_y_px, atol=1e-9
     )
-    numpy.testing.assert_allclose(actual.total_counts, expected.total_counts, rtol=1e-9)
+    numpy.testing.assert_allclose(actual.detector_sums, expected.detector_sums, rtol=1e-9)
 
 
 def test_chunk_size_does_not_change_the_signals(phase_scan: _Scan) -> None:
@@ -373,7 +373,7 @@ def test_chunk_size_does_not_change_the_signals(phase_scan: _Scan) -> None:
 
     # Relaxed from byte equality: numpy's per-row sums over a stack are not bit-stable
     # in the number of rows, and differ in the last place.
-    numpy.testing.assert_allclose(actual.total_counts, expected.total_counts, rtol=1e-12)
+    numpy.testing.assert_allclose(actual.detector_sums, expected.detector_sums, rtol=1e-12)
     numpy.testing.assert_allclose(
         actual.center_of_mass_x_px, expected.center_of_mass_x_px, rtol=1e-12, atol=1e-12
     )
@@ -397,7 +397,7 @@ def test_signals_are_one_pass_of_the_accumulator(phase_scan: _Scan) -> None:
     expected = compute_stxm_dpc_signals(data)
 
     numpy.testing.assert_array_equal(moments.indexes, expected.indexes)
-    numpy.testing.assert_allclose(moments.total_counts, expected.total_counts, rtol=1e-12)
+    numpy.testing.assert_allclose(moments.detector_sums, expected.detector_sums, rtol=1e-12)
     numpy.testing.assert_allclose(
         moments.center_of_mass_x_px, expected.center_of_mass_x_px, rtol=1e-12, atol=1e-12
     )
@@ -428,7 +428,7 @@ def test_pairing_is_by_index_not_order(phase_scan: _Scan) -> None:
     out_of_range = replace(
         signals,
         indexes=numpy.append(signals.indexes, beyond + 10),
-        total_counts=numpy.append(signals.total_counts, 1.0),
+        detector_sums=numpy.append(signals.detector_sums, 1.0),
         center_of_mass_x_px=numpy.append(signals.center_of_mass_x_px, 5.0),
         center_of_mass_y_px=numpy.append(signals.center_of_mass_y_px, 5.0),
     )
@@ -731,8 +731,8 @@ def test_a_probe_sets_the_support_but_not_the_values(phase_scan: _Scan) -> None:
     values = numpy.arange(len(positions), dtype=float)
     probes = _ensemble(phase_scan.probe)
 
-    linear, hull = interpolate_scan_values(_GEOMETRY, positions, values)
-    same, illuminated = interpolate_scan_values(_GEOMETRY, positions, values, probes=probes)
+    linear, hull = interpolate_position_values(_GEOMETRY, positions, values)
+    same, illuminated = interpolate_position_values(_GEOMETRY, positions, values, probes=probes)
 
     numpy.testing.assert_array_equal(same, linear)
     # The footprint reaches past the outermost positions, and not to the far corners.
@@ -740,12 +740,14 @@ def test_a_probe_sets_the_support_but_not_the_values(phase_scan: _Scan) -> None:
     assert not illuminated[0, 0] and not illuminated[-1, -1]
 
     with pytest.raises(ValueError, match='Support fraction'):
-        interpolate_scan_values(_GEOMETRY, positions, values, probes=probes, support_fraction=0.0)
+        interpolate_position_values(
+            _GEOMETRY, positions, values, probes=probes, support_fraction=0.0
+        )
 
 
 def test_the_incident_photon_count_gives_an_absolute_transmission(absorbing_scan: _Scan) -> None:
     signals = compute_stxm_dpc_signals(absorbing_scan.data)
-    incident = float(numpy.max(signals.total_counts))
+    incident = float(numpy.max(signals.detector_sums))
     relative = _recover(absorbing_scan.data, absorbing_scan.positions, signals=signals)
     absolute = _recover(
         absorbing_scan.data,
@@ -765,9 +767,7 @@ def test_the_incident_photon_count_gives_an_absolute_transmission(absorbing_scan
 
 def _with_position_i0(scan: _Scan, decay: numpy.ndarray) -> list[ProbePosition]:
     return [
-        ProbePosition(
-            index=position.index, x_m=position.x_m, y_m=position.y_m, probe_photon_count=float(m)
-        )
+        ProbePosition(index=position.index, x_m=position.x_m, y_m=position.y_m, i0=float(m))
         for position, m in zip(scan.positions, decay)
     ]
 
@@ -786,7 +786,7 @@ def test_the_positions_i0_corrects_the_builders_signals(absorbing_scan: _Scan) -
     )
 
     def spread(signals: STXMDPCSignals) -> float:
-        ratio = signals.total_counts / reference.total_counts
+        ratio = signals.detector_sums / reference.detector_sums
         return float(numpy.std(ratio / numpy.mean(ratio)))
 
     assert spread(uncorrected) > 0.05
@@ -816,7 +816,7 @@ def test_the_builders_wait_for_the_moments(absorbing_scan: _Scan) -> None:
         compute_decay_corrected_signals(_StubProvider(absorbing_scan.positions))
 
 
-def test_paganin_builds_on_the_decay_corrected_totals(absorbing_scan: _Scan) -> None:
+def test_paganin_builds_on_the_decay_corrected_detector_sums(absorbing_scan: _Scan) -> None:
     data = absorbing_scan.data
     decay = numpy.linspace(1.0, 0.6, data.get_patterns().shape[0])
     decayed = _with(data, patterns=data.get_patterns() * decay[:, numpy.newaxis, numpy.newaxis])

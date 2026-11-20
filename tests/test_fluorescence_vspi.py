@@ -1,7 +1,7 @@
 """Characterization tests for the VSPI linear operator in ptychodus.api.fluorescence.
 
 The operator is the forward and adjoint model of probe-weighted fluorescence
-imaging: each scan position integrates the object against that position's
+imaging: each probe position integrates the object against that position's
 normalized probe intensity. Its adjointness is what ``scipy.sparse.linalg.lsmr``
 relies on, and nothing else in the suite exercises it.
 """
@@ -26,7 +26,7 @@ _PROBE_PX = 6
 
 
 def _make_product(positions_px: list[tuple[float, float]]) -> Product:
-    """Build a product whose scan positions sit at the given object-pixel centers.
+    """Build a product whose probe positions sit at the given object-pixel centers.
 
     Positions are given in pixels and converted to meters through the inverse of
     the centered-pixel convention, so a test can place a patch at an exact integer

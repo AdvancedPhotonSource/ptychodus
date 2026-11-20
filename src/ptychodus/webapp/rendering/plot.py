@@ -1,9 +1,9 @@
 """Server-side plot rendering for quantities that are not colormapped arrays.
 
-Scan positions are a scatter in continuous coordinates rather than a raster, so
+Probe positions are a scatter in continuous coordinates rather than a raster, so
 ``ptychodus.api.visualize`` -- which maps a 2-D value array through a colormap -- does
-not apply. The desktop app draws them with matplotlib, and so does this, to the same
-recipe, so the two panels read alike.
+not apply. The GUI draws them with matplotlib, and so does this, to the same recipe, so
+the two panels read alike.
 
 Figures are built through :class:`~matplotlib.figure.Figure` rather than ``pyplot``:
 pyplot keeps a global registry that a long-lived server would have to remember to clear
@@ -27,36 +27,37 @@ _DPI = 100
 
 
 @dataclass(frozen=True)
-class ScanPath:
-    """One scan's positions, labelled for the legend."""
+class ProbePositionsTrace:
+    """One product's probe positions as plotted, labelled for the legend."""
 
     label: str
     x_m: Sequence[float]
     y_m: Sequence[float]
 
 
-def render_scan_paths(
-    scans: Sequence[ScanPath],
+def render_probe_positions(
+    traces: Sequence[ProbePositionsTrace],
     *,
     connect_path: bool = True,
     width_px: int = 640,
     height_px: int = 640,
 ) -> PlotImage:
-    """Draw one or more scan paths on shared axes, one color and legend entry each.
+    """Plot probe positions, one color and legend entry per product, on shared axes to compare
+    products.
 
-    Mirrors the desktop plot: dots joined by lines, y inverted, equal aspect, a grid
-    and axes in meters.
+    Mirrors the GUI plot: dots joined by lines, y inverted, equal aspect, a grid and axes in
+    meters.
     """
     figure = Figure(figsize=(width_px / _DPI, height_px / _DPI), dpi=_DPI, layout='constrained')
     canvas = FigureCanvasAgg(figure)
     axes = figure.add_subplot(111)
 
-    for scan in scans:
+    for trace in traces:
         axes.plot(
-            scan.x_m,
-            scan.y_m,
+            trace.x_m,
+            trace.y_m,
             '.-' if connect_path else '.',
-            label=scan.label,
+            label=trace.label,
             linewidth=1.5,
         )
 

@@ -211,7 +211,7 @@ async def test_detector_dependent_quantities_need_the_lineage_edge(
 ):
     """product.h5 records no detector pitch, so these three come through derived_from.
 
-    Without the edge they are null rather than invented -- the store reports what it
+    Without the edge they are null rather than invented -- the webapp reports what it
     cannot determine as unknown, and the UI renders that as an em dash.
     """
     detector_dependent = ('fresnel_number', 'detector_numerical_aperture', 'depth_of_field_m')
@@ -237,14 +237,14 @@ async def test_detector_dependent_quantities_need_the_lineage_edge(
     assert without_edge['probe_photon_flux_per_s'] == pytest.approx(1.0e7)
 
 
-async def test_product_reports_every_desktop_property(
+async def test_product_reports_every_gui_property(
     app_client: AsyncClient,
     db_engine: AsyncEngine,
     layout: StorageLayout,
     seed_diffraction: Callable[..., UUID],
     seed_product: Callable[..., UUID],
 ):
-    """Magnification, the object-plane pitch, wavelength and thickness, as the desktop."""
+    """Magnification, the object-plane pitch, wavelength and thickness, as the GUI."""
     from ptychodus.api.constants import energy_eV_to_wavelength_m
     from ptychodus.api.geometry import ImageExtent, PixelGeometry
     from ptychodus.api.propagate import compute_product_geometry
@@ -294,7 +294,7 @@ async def test_derived_from_edges_carry_the_target_name(
     seed_product: Callable[..., UUID],
     seed_fluorescence: Callable[..., UUID],
 ):
-    """A client names what an edge points at, as the desktop does, without a lookup."""
+    """A client names what an edge points at, as the GUI does, without a lookup."""
     p = seed_product()
     f = seed_fluorescence(derived_from=[{'kind': 'product', 'uuid': str(p)}])
     for m in (layout.manifest_path('product', p), layout.manifest_path('fluorescence', f)):

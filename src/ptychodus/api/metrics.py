@@ -434,7 +434,7 @@ class ProbeComparison:
     object_shift_x_px: float
     """Horizontal translation that registered the objects, in pixels.
 
-    When the reconstructions share their scan positions, a shared translation of object
+    When the reconstructions share their probe positions, a shared translation of object
     and probe is itself an ambiguity, and the two shifts agree. A large difference means
     the reconstructions disagree about the positions rather than about the probe.
     """
@@ -1247,14 +1247,14 @@ def compute_product_scoring_region(
 ) -> ScoringRegion:
     """Derive the region to score ``product``'s object over from its own illumination.
 
-    The illumination map of the product's probe and scan positions is reduced by
+    The illumination map of the product's probe and probe positions is reduced by
     :func:`compute_illumination_scoring_region`, with the mask eroded by the probe
-    extent divided by ``erosion_divisor``. The outermost scan positions leave a rim
+    extent divided by ``erosion_divisor``. The outermost probe positions leave a rim
     that only part of the probe ever covered, so the photon count there is real but
     the reconstruction is not converged.
 
     Args:
-        product: Supplies the probe and scan positions that define the illuminated area.
+        product: Supplies the probe and probe positions that define the illuminated area.
         array_shape: Shape of the object array the region will be applied to.
         erosion_divisor: Erode the illuminated mask by the smaller probe extent divided
             by this. Larger values erode less.
@@ -1528,16 +1528,16 @@ class ReconstructionResiduals:
     real_space_error_map: RealArrayType
     """2D amplitude R-factor on the object grid.
 
-    NaN where the R-factor is undefined: un-illuminated pixels (no frame contributed) and
-    object regions touched only by frames with zero measured signal (``Σ √I_meas = 0``).
+    NaN where the R-factor is undefined: un-illuminated pixels (no pattern contributed) and
+    object regions touched only by patterns with zero measured signal (``Σ √I_meas = 0``).
     """
     object_pixel_geometry: PixelGeometry
     object_center: ObjectCenter
     reciprocal_space_error_map: RealArrayType
     """2D amplitude R-factor on the detector grid.
 
-    Each pixel is ``Σ_n |√I_meas,n − √I_pred,n| / Σ_n √I_meas,n``, summed across frames. NaN
-    at bad pixels and at detector pixels with no measured signal across any frame.
+    Each pixel is ``Σ_n |√I_meas,n − √I_pred,n| / Σ_n √I_meas,n``, summed across patterns. NaN
+    at bad pixels and at detector pixels with no measured signal across any pattern.
     """
     detector_pixel_geometry: PixelGeometry
 
@@ -1557,15 +1557,15 @@ def compute_reconstruction_residuals(
     denominator together so brightness and thickness cancel — only model
     misfit moves the value.
 
-    The reciprocal-space map sums numerator and denominator over all frames at
+    The reciprocal-space map sums numerator and denominator over all patterns at
     each detector pixel; bad pixels become NaN. The real-space map aggregates
-    per-frame amplitude residual sums and per-frame measured-amplitude sums
-    onto the object grid, both weighted by the same per-frame-normalized
-    probe-intensity patch (each frame's ``|probe|²`` divided by its own total),
-    then divides. The shared probe-weighting makes the ratio scan-density
-    invariant (variable-probe frames included) and ensures every frame
+    per-pattern amplitude residual sums and per-pattern measured-amplitude sums
+    onto the object grid, both weighted by the same per-pattern-normalized
+    probe-intensity patch (each pattern's ``|probe|²`` divided by its own total),
+    then divides. The shared probe-weighting makes the ratio position-density
+    invariant (variable-probe patterns included) and ensures every pattern
     contributes equal total weight regardless of probe power. Un-illuminated
-    pixels and detector pixels with no measured signal across any frame both
+    pixels and detector pixels with no measured signal across any pattern both
     remain zero.
 
     Inputs must already be aligned: ``measured_patterns`` is shape ``(N, H, W)``
@@ -1590,8 +1590,8 @@ def compute_reconstruction_residuals(
 
     if measured_patterns.shape[1:] != bad_pixels.shape:
         raise ValueError(
-            'measured_patterns frame shape does not match bad_pixels shape '
-            f'(measured frame={measured_patterns.shape[1:]} vs bad_pixels={bad_pixels.shape})'
+            'measured_patterns pattern shape does not match bad_pixels shape '
+            f'(measured pattern={measured_patterns.shape[1:]} vs bad_pixels={bad_pixels.shape})'
         )
 
     simulated = generate_diffraction_data(product)
@@ -1622,15 +1622,15 @@ def compute_reconstruction_residuals(
     reciprocal_map = numpy.where(valid, recip_ratio, numpy.nan)
 
     valid_f = valid.astype(abs_amp_diff.dtype)
-    per_frame_numerator = numpy.einsum('nhw,hw->n', abs_amp_diff, valid_f)  # (N,)
-    per_frame_denominator = numpy.einsum('nhw,hw->n', meas_amp, valid_f)  # (N,)
+    per_pattern_numerator = numpy.einsum('nhw,hw->n', abs_amp_diff, valid_f)  # (N,)
+    per_pattern_denominator = numpy.einsum('nhw,hw->n', meas_amp, valid_f)  # (N,)
 
     object_geometry = product.object_.get_geometry()
     # Both splats spread the same normalized probe intensity and differ only in the
-    # per-frame scale, so they accumulate together in one pass.
+    # per-pattern scale, so they accumulate together in one pass.
     numerator_splat, denominator_splat = accumulate_probe_intensity(
         product,
-        weights=numpy.stack([per_frame_numerator, per_frame_denominator]),
+        weights=numpy.stack([per_pattern_numerator, per_pattern_denominator]),
         normalize=True,
     )
 

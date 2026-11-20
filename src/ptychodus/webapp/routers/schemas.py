@@ -125,14 +125,14 @@ class ProductRead(_RowBase):
     probe_pixel_width_m: float | None = None
     probe_pixel_height_m: float | None = None
     probe_coherence: float | None = None
-    num_scan_points: int | None
+    num_probe_positions: int | None
     num_loss_epochs: int | None
-    scan_length_m: float | None = None
+    probe_path_length_m: float | None = None
     probe_dtype: str | None = None
     object_dtype: str | None = None
     probe_nbytes: int | None = None
     object_nbytes: int | None = None
-    scan_nbytes: int | None = None
+    probe_positions_nbytes: int | None = None
     probe_mode_relative_power: list[float] = []
     object_layer_spacing_m: list[float] = []
 
@@ -144,7 +144,7 @@ class ProductRead(_RowBase):
     # Derived on read from the columns above; never stored, so the formula has one
     # home in ptychodus.api.propagate. The last five additionally need the detector,
     # which product.h5 does not record -- they are null unless the manifest's
-    # derived_from names a diffraction dataset this store has indexed.
+    # derived_from names a diffraction resource the webapp has indexed.
     probe_wavenumber_per_m: float | None = None
     probe_angular_wavenumber_rad_per_m: float | None = None
     probe_photon_flux_per_s: float | None = None
@@ -206,7 +206,7 @@ class LineageRead(BaseModel):
     campaign: CampaignRead | None
 
 
-class StoreStats(BaseModel):
+class ResourceStats(BaseModel):
     campaign_count: int
     diffraction_count: int
     product_count: int

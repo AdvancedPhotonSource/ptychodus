@@ -8,9 +8,9 @@ there: it reads no raw files and knows nothing about any instrument, so the same
 directory can be reconstructed on another node, or again with other options -- or another
 library -- without assembling the data a second time.
 
-The options are a document naming the library and algorithm beside the backend's own
-options (``--print-options`` writes one), and the run goes through that backend's plugin in
-this process. A trainable backend loads the ``model`` file the input directory holds.
+The options are a document naming the library and algorithm beside the library's own
+options (``--print-options`` writes one), and the run goes through that library's plugin in
+this process. A trainable reconstructor loads the ``model`` file the input directory holds.
 
 The prepared directory is left untouched. Its ``product.h5`` is the initial product and the
 output's ``product.h5`` is the final one, which is why the two directories must differ.
@@ -21,7 +21,7 @@ product's lineage. The result then goes into the same storage root, as a new pro
 resource derived from the diffraction data and the input product, and that resource's
 folder is the run's output directory: its uuid is printed as the run starts, each checkpoint
 becomes its current result as soon as it is written, and it ends ``succeeded``,
-``cancelled`` or ``failed`` with whatever the run produced. A trainable backend has no
+``cancelled`` or ``failed`` with whatever the run produced. A trainable reconstructor has no
 model to load in this mode.
 
 ``ptychodus-reconstruct-subprocess`` reconstructs the same input for a launching process,

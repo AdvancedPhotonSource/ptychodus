@@ -165,14 +165,14 @@ class Product(RunColumns, Base):
     probe_pixel_width_m: Mapped[float | None] = mapped_column(Float, nullable=True)
     probe_pixel_height_m: Mapped[float | None] = mapped_column(Float, nullable=True)
     probe_coherence: Mapped[float | None] = mapped_column(Float, nullable=True)
-    num_scan_points: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    num_probe_positions: Mapped[int | None] = mapped_column(Integer, nullable=True)
     num_loss_epochs: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    scan_length_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    probe_path_length_m: Mapped[float | None] = mapped_column(Float, nullable=True)
     probe_dtype: Mapped[str | None] = mapped_column(String, nullable=True)
     object_dtype: Mapped[str | None] = mapped_column(String, nullable=True)
     probe_nbytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     object_nbytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    scan_nbytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    probe_positions_nbytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Per-mode and per-layer, so JSON rather than a column each: the counts vary
     # per product and nothing queries them.
     probe_mode_relative_power: Mapped[list[float]] = mapped_column(

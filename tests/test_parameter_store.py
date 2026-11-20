@@ -216,7 +216,7 @@ def _register(
 class TestKeysAPanelDoesNotShow:
     """A reconstructor that ignores one of a shared group's keys still persists it.
 
-    Two reconstructors of one backend write the same settings section, so what that
+    Two reconstructors of one library write the same settings section, so what that
     section contains cannot depend on which of them was registered first.
     """
 
@@ -252,7 +252,7 @@ class TestKeysAPanelDoesNotShow:
             f.described.ini_key for f in reversed_store.describe('lib', 'frugal')[0].fields
         ]
 
-    def test_the_value_still_reaches_the_backend(self, registry: SettingsRegistry) -> None:
+    def test_the_value_still_reaches_the_library(self, registry: SettingsRegistry) -> None:
         """Hidden from the panel is not withheld from the run."""
         store = _register(ProcessingParameterStore(registry), 'frugal', ignores_slices=True)
         registry['Algo'].parameters()['Slices'].set_value(7)

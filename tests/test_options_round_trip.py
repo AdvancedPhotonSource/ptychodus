@@ -1,12 +1,12 @@
-"""Every registered backend's options survive the trip through an options document.
+"""Every registered library's options survive the trip through an options document.
 
 A job, a prepared directory and a remote run all carry their options as a document rather
 than as live objects, and the GUI hands live ones to a child process by pickle. So each
 reconstructor's and enhancer's declared options must come back from either with the same
-values, the same concrete types and the same set fields -- a backend may resolve an unset
+values, the same concrete types and the same set fields -- a library may resolve an unset
 field at runtime, so losing set-ness would silently change what runs. Every options model
 also forbids fields it does not declare, so a misspelled one is refused rather than run at
-its default. A backend that is not installed is skipped.
+its default. A library that is not installed is skipped.
 """
 
 from __future__ import annotations

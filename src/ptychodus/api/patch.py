@@ -19,7 +19,7 @@ exact transpose of its gather. The cost is that bilinear resampling is a low-pas
 filter: it is not invertible, and it damps the phase excursions of a transmission
 function that a Fourier shift carries exactly.
 
-Both place the probe's beam axis, pixel ``N // 2``, on the scan position, as
+Both place the probe's beam axis, pixel ``N // 2``, on the probe position, as
 :meth:`ptychodus.api.probe.ProbeGeometry.resolve_patch_bounds` does, and both
 refuse a window that leaves the canvas rather than returning a truncated or wrapped
 one.
@@ -55,7 +55,7 @@ __all__ = [
 
 @dataclass(frozen=True)
 class ProbePatch:
-    """One scan position's object-canvas placement and its sub-pixel-shifted probe."""
+    """One probe position's object-canvas placement and its sub-pixel-shifted probe."""
 
     position: ProbePosition
     bounds: PatchBounds
@@ -92,11 +92,11 @@ def _validate_patch_bounds(bounds: PatchBounds, geometry: ObjectGeometry, index:
 
 
 def _resolve_patch_bounds(
-    probe_geometry: ProbeGeometry, scan_point: ProbePosition, object_geometry: ObjectGeometry
+    probe_geometry: ProbeGeometry, probe_position: ProbePosition, object_geometry: ObjectGeometry
 ) -> PatchBounds:
-    object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
+    object_point = object_geometry.map_coordinates_probe_to_object(probe_position)
     bounds = probe_geometry.resolve_patch_bounds(object_point.x_px, object_point.y_px)
-    _validate_patch_bounds(bounds, object_geometry, scan_point.index)
+    _validate_patch_bounds(bounds, object_geometry, probe_position.index)
     return bounds
 
 
@@ -105,7 +105,7 @@ def resolve_probe_patch_bounds_on(
     positions: Sequence[ProbePosition],
     object_geometry: ObjectGeometry,
 ) -> list[PatchBounds]:
-    """Return the object-canvas placement of every scan position, in order.
+    """Return the object-canvas placement of every probe position, in order.
 
     The placement :func:`iter_probe_patches_on` yields, without shifting a probe: each
     bounds holds exact-width integer slices and the sub-pixel residual a Fourier shift
@@ -203,7 +203,7 @@ def iter_probe_patches_on(
     positions: Sequence[ProbePosition],
     object_geometry: ObjectGeometry,
 ) -> Iterator[ProbePatch]:
-    """Yield the object-canvas placement and sub-pixel-shifted probe of every scan position.
+    """Yield the object-canvas placement and sub-pixel-shifted probe of every probe position.
 
     The bounds are exact-width integer slices, so a patch can be read or accumulated
     with a plain assignment and the object array is never interpolated. The probe at
@@ -216,11 +216,11 @@ def iter_probe_patches_on(
     """
     probe_geometry = probes.get_geometry()
 
-    for scan_point, probe in probes.iter_position_probes(positions):
-        bounds = _resolve_patch_bounds(probe_geometry, scan_point, object_geometry)
+    for probe_position, probe in probes.iter_position_probes(positions):
+        bounds = _resolve_patch_bounds(probe_geometry, probe_position, object_geometry)
 
         yield ProbePatch(
-            position=scan_point,
+            position=probe_position,
             bounds=bounds,
             modes=fourier_shift_2d(probe.get_array(), dx=bounds.dx, dy=bounds.dy),
         )
@@ -265,15 +265,15 @@ def accumulate_probe_intensity_on(
     weights: RealArrayType | Sequence[RealArrayType] | None = None,
     normalize: bool = False,
 ) -> RealArrayType:
-    """Sum every scan position's probe intensity onto the object canvas.
+    """Sum every probe position's probe intensity onto the object canvas.
 
-    This is the probe intensity cross-correlated with the scan positions, so it is
+    This is the probe intensity cross-correlated with the probe positions, so it is
     expressed as one accumulation rather than as per-position patches: the result
     depends on the positions only through where each contribution lands.
 
     Args:
         probes: The probe, paired with each position as for :func:`iter_probe_patches_on`.
-        positions: The scan positions.
+        positions: The probe positions.
         object_geometry: The canvas.
         weights: Per-position scale factors, ``(N,)`` for one canvas or ``(K, N)`` for
             ``K`` canvases accumulated in a single pass. The default weights every

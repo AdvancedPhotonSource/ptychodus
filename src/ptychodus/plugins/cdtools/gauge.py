@@ -25,7 +25,7 @@ import math
 
 import numpy
 
-from ptychodus.api.assemble import compute_total_counts
+from ptychodus.api.assemble import compute_detector_sums
 from ptychodus.api.diffraction import FlatField
 from ptychodus.api.patch import iter_probe_patches
 from ptychodus.api.probe import ProbeEnsemble
@@ -86,7 +86,7 @@ def _measure_predicted_intensity(
 
     The exit wave is the probe times the object patch beneath it, incoherent modes
     summed after propagation, and multiplied by the flat field when the model applies
-    one. Only the good pixels are summed, because the measured totals it will be
+    one. Only the good pixels are summed, because the detector sums it will be
     compared against are summed the same way.
     """
     object_array = product.object_.get_layers_flattened()
@@ -126,12 +126,12 @@ def _measure_detector_intensity(
     A carried background has not been applied to the patterns, so it is subtracted here:
     left in, it would inflate the measurement and shrink the probe to compensate.
     """
-    total_counts = compute_total_counts(parameters.diffraction_patterns, parameters.bad_pixels)
+    detector_sums = compute_detector_sums(parameters.diffraction_patterns, parameters.bad_pixels)
 
-    if total_counts.size == 0:
+    if detector_sums.size == 0:
         return 0.0
 
-    measured = float(numpy.mean(total_counts))
+    measured = float(numpy.mean(detector_sums))
 
     if parameters.background is not None:
         measured -= float(numpy.sum(numpy.asarray(parameters.background)[good_pixels]))

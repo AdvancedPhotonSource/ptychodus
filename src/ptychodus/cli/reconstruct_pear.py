@@ -566,7 +566,7 @@ def _prep_pipeline(params: PearParameters) -> DiffractionPrepPipeline | None:
     return DiffractionPrepPipeline(steps=tuple(steps)) if steps else None
 
 
-def _total_counts_bounds(params: PearParameters, num_pixels: int) -> tuple[int | None, int | None]:
+def _detector_sum_bounds(params: PearParameters, num_pixels: int) -> tuple[int | None, int | None]:
     """Convert per-pixel average photon thresholds into whole-pattern count bounds.
 
     The parameter file states an average over the cropped frame; the assembler filters
@@ -860,7 +860,7 @@ def main() -> ExitCode:
             logger.warning('Crop clamped to the detector: %s', read_region)
 
     num_pixels = crop_px * crop_px if crop_px > 0 else 0
-    lower_counts, upper_counts = _total_counts_bounds(params, num_pixels)
+    lower_counts, upper_counts = _detector_sum_bounds(params, num_pixels)
 
     logger.info('Assembling diffraction patterns')
     # Accumulated as the arrays land, so the beam estimate below costs no second pass.
@@ -870,8 +870,8 @@ def main() -> ExitCode:
         _prep_pipeline(params),
         raw_pixel_geometry=detector_pixel_geometry,
         read_region=read_region,
-        total_counts_lower_bound=lower_counts,
-        total_counts_upper_bound=upper_counts,
+        detector_sum_lower_bound=lower_counts,
+        detector_sum_upper_bound=upper_counts,
         on_array_assembled=assembly_moments.add_assembled,
     )
     num_patterns = assembled_data.get_num_patterns()
@@ -1017,7 +1017,7 @@ def main() -> ExitCode:
 
     if object_file is None:
         # Uniform, but carrying the mean transmission the patterns imply, so the exit
-        # wave predicts their totals rather than the unobstructed beam.
+        # wave predicts their detector sums rather than the unobstructed beam.
         object_ = generate_uniform_object(
             object_geometry, amplitude=incident_beam.mean_amplitude_transmission
         )

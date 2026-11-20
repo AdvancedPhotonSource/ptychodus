@@ -49,7 +49,11 @@ from .fluorescence import ElementMap, FluorescenceDataset
 from .geometry import ImageExtent, PixelGeometry
 from .object import Object, ObjectCenter
 from .probe import ProbeEnsemble
-from .probe_positions import ProbePositionSequence, ProbePosition, calculate_scan_geometry
+from .probe_positions import (
+    ProbePositionSequence,
+    ProbePosition,
+    calculate_probe_positions_geometry,
+)
 from .product import LossValue, Product, ProductMetadata
 from .propagate import compute_far_field_pixel_geometry, compute_near_field_pixel_geometry
 from .reconstruct import ReconstructInput
@@ -121,16 +125,16 @@ class StandardFileLayout(StrEnum):
 
     DIFFRACTION = 'diffraction.h5'
     FLUORESCENCE = 'fluorescence.h5'
-    # Stem only; the per-backend extensions come from
+    # Stem only; the per-library extensions come from
     # TrainableReconstructor.get_model_file_extensions(). A model is saved as
     # f'{directory}/{MODEL_BASENAME}{extensions[0]}' and read from any of them.
     MODEL_BASENAME = 'model'
     PRODUCT = 'product.h5'
     # One options document and one log per action, each named after the action, so a
     # directory reconstructed and then enhanced keeps both runs' files without a clash,
-    # and a tool finds them by the action it performs without knowing the backend. An
+    # and a tool finds them by the action it performs without knowing the library. An
     # options document names what it configures (library and algorithm, or enhancer)
-    # beside the backend's own options, as ptychodus.api.options reads and writes it.
+    # beside the library's own options, as ptychodus.api.options reads and writes it.
     # A log holds a run's records, appended to rather than replaced.
     RECONSTRUCT_OPTIONS = 'reconstruct_options.yaml'
     RECONSTRUCT_LOG = 'reconstruct.log'
@@ -174,14 +178,14 @@ def load_diffraction_data(
     file: Path,
     *,
     mmap_file: Path | None = None,
-    mmap_chunk_frames: int = 1024,
+    mmap_chunk_patterns: int = 1024,
 ) -> AssembledDiffractionData:
     """Load assembled diffraction data from an HDF5 file written by :func:`save_diffraction_data`.
 
     When ``mmap_file`` is given, the patterns are staged into a read-only ``numpy.memmap``
     backed by that path rather than held in RAM; indexes and bad pixels are small and load
     normally. The caller owns ``mmap_file`` — it is overwritten if present and never removed.
-    ``mmap_chunk_frames`` sets how many frames are copied from HDF5 into the memory map
+    ``mmap_chunk_patterns`` sets how many patterns are copied from HDF5 into the memory map
     per read.
 
     A background or flat field the patterns were not corrected for is loaded when the
@@ -217,8 +221,8 @@ def load_diffraction_data(
             staging = numpy.memmap(
                 mmap_file, dtype=h5_patterns.dtype, mode='w+', shape=h5_patterns.shape
             )
-            for lo in range(0, h5_patterns.shape[0], mmap_chunk_frames):
-                hi = lo + mmap_chunk_frames
+            for lo in range(0, h5_patterns.shape[0], mmap_chunk_patterns):
+                hi = lo + mmap_chunk_patterns
                 staging[lo:hi] = h5_patterns[lo:hi]
             staging.flush()
             del staging
@@ -470,21 +474,17 @@ def load_product(file: Path) -> Product:
         # The all-or-nothing invariant on ProbePositionSequence means save_product only
         # writes probe_photon_counts when every position had a count; a present
         # dataset therefore aligns 1:1 with probe_position_indexes and needs no dict.
-        position_photon_counts_array: RealArrayType | None = None
-        h5_position_photon_counts = h5_file.get(ProductFileKeys.PROBE_PHOTON_COUNTS)
-        if isinstance(h5_position_photon_counts, h5py.Dataset):
-            position_photon_counts_array = h5_position_photon_counts[()]
+        i0: RealArrayType | None = None
+        h5_i0 = h5_file.get(ProductFileKeys.PROBE_PHOTON_COUNTS)
+        if isinstance(h5_i0, h5py.Dataset):
+            i0 = h5_i0[()]
 
         indexes = h5_position_indexes[()]
         xs = h5_position_x[()]
         ys = h5_position_y[()]
         for i, (idx, x_m, y_m) in enumerate(zip(indexes, xs, ys)):
-            photon_count = (
-                None
-                if position_photon_counts_array is None
-                else float(position_photon_counts_array[i])
-            )
-            point = ProbePosition(idx, x_m, y_m, probe_photon_count=photon_count)
+            i0_reading = None if i0 is None else float(i0[i])
+            point = ProbePosition(idx, x_m, y_m, i0=i0_reading)
             point_list.append(point)
 
         losses: list[LossValue] = []
@@ -516,10 +516,10 @@ def load_product(file: Path) -> Product:
 
 def save_product(file: Path, product: Product) -> None:
     """Write a data product to an HDF5 file."""
-    scan_indexes = product.probe_positions.get_indexes()
-    scan_x_m = product.probe_positions.get_coordinates_x_m()
-    scan_y_m = product.probe_positions.get_coordinates_y_m()
-    position_photon_counts = product.probe_positions.get_probe_photon_counts()
+    position_indexes = product.probe_positions.get_indexes()
+    position_x_m = product.probe_positions.get_coordinates_x_m()
+    position_y_m = product.probe_positions.get_coordinates_y_m()
+    i0 = product.probe_positions.get_i0()
 
     with h5py.File(file, 'w') as h5_file:
         metadata = product.metadata
@@ -542,13 +542,13 @@ def save_product(file: Path, product: Product) -> None:
         if metadata.polarization is not None:
             h5_file.attrs[ProductFileKeys.POLARIZATION] = metadata.polarization.value
 
-        h5_file.create_dataset(ProductFileKeys.PROBE_POSITION_INDEXES, data=scan_indexes)
-        h5_file.create_dataset(ProductFileKeys.PROBE_POSITION_X, data=scan_x_m)
-        h5_file.create_dataset(ProductFileKeys.PROBE_POSITION_Y, data=scan_y_m)
-        if position_photon_counts is not None:
+        h5_file.create_dataset(ProductFileKeys.PROBE_POSITION_INDEXES, data=position_indexes)
+        h5_file.create_dataset(ProductFileKeys.PROBE_POSITION_X, data=position_x_m)
+        h5_file.create_dataset(ProductFileKeys.PROBE_POSITION_Y, data=position_y_m)
+        if i0 is not None:
             h5_file.create_dataset(
                 ProductFileKeys.PROBE_PHOTON_COUNTS,
-                data=position_photon_counts,
+                data=i0,
             )
 
         probe = product.probes
@@ -1303,11 +1303,11 @@ def _read_cxi_probe_positions(entry: h5py.Group) -> ProbePositionSequence:
         else:
             logger.warning('Ignoring %d stored position indexes.', stored_indexes.size)
 
-    photon_counts = _read_cxi_array(entry, CXIFileKeys.PROBE_PHOTON_COUNTS)
+    i0 = _read_cxi_array(entry, CXIFileKeys.PROBE_PHOTON_COUNTS)
 
-    if photon_counts is not None and photon_counts.shape != (num_positions,):
-        logger.warning('Ignoring %d stored photon counts.', photon_counts.size)
-        photon_counts = None
+    if i0 is not None and i0.shape != (num_positions,):
+        logger.warning('Ignoring %d stored I0 readings.', i0.size)
+        i0 = None
 
     return ProbePositionSequence(
         [
@@ -1315,7 +1315,7 @@ def _read_cxi_probe_positions(entry: h5py.Group) -> ProbePositionSequence:
                 int(index),
                 float(x_m),
                 float(y_m),
-                None if photon_counts is None else float(photon_counts[number]),
+                None if i0 is None else float(i0[number]),
             )
             for number, (index, x_m, y_m) in enumerate(
                 zip(indexes, translation[:, 0], translation[:, 1])
@@ -1553,9 +1553,9 @@ def _read_cxi_object(
 
     if center_x_m is None or center_y_m is None:
         # Centering the object on the scan keeps every position on it.
-        scan_geometry = calculate_scan_geometry(positions)
-        center_x_m = 0.0 if scan_geometry is None else scan_geometry.center_x_m
-        center_y_m = 0.0 if scan_geometry is None else scan_geometry.center_y_m
+        positions_geometry = calculate_probe_positions_geometry(positions)
+        center_x_m = 0.0 if positions_geometry is None else positions_geometry.center_x_m
+        center_y_m = 0.0 if positions_geometry is None else positions_geometry.center_y_m
 
     return Object(
         array,
@@ -1859,10 +1859,10 @@ def _write_cxi_product(
     entry.create_dataset(
         CXIFileKeys.PROBE_POSITION_INDEXES, data=positions.get_indexes().astype(numpy.int64)
     )
-    photon_counts = positions.get_probe_photon_counts()
+    i0 = positions.get_i0()
 
-    if photon_counts is not None:
-        entry.create_dataset(CXIFileKeys.PROBE_PHOTON_COUNTS, data=photon_counts)
+    if i0 is not None:
+        entry.create_dataset(CXIFileKeys.PROBE_PHOTON_COUNTS, data=i0)
 
     if has_patterns:
         entry[CXIFileKeys.DATA_1_TRANSLATION] = h5py.SoftLink(translation_dataset.name)

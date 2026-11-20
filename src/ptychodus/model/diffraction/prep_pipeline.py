@@ -129,7 +129,7 @@ class PrepPipelineBuilder:
                 dropped_x = pre_w % bin_x
                 dropped_y = pre_h % bin_y
 
-                # Reported once per plan rather than once per frame, and only where
+                # Reported once per plan rather than once per pattern, and only where
                 # something is actually discarded.
                 if dropped_x or dropped_y:
                     logger.warning(

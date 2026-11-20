@@ -1,9 +1,9 @@
-"""REST and MCP are one surface in two channels: the same store answers alike on both.
+"""REST and MCP are one surface in two channels: the same resources answer alike on both.
 
-Each tool is paired with its REST route. On one shared store, a tool and its route take the
-same parameters (names, types, defaults and bounds), return the same data, and refuse the
-same requests with the same reason. A route or tool that is not paired fails here unless it
-is listed as an intended difference.
+Each tool is paired with its REST route. Over one shared set of resources, a tool and its
+route take the same parameters (names, types, defaults and bounds), return the same data,
+and refuse the same requests with the same reason. A route or tool that is not paired fails
+here unless it is listed as an intended difference.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ _ROUTES: dict[str, str] = {
     'list_fluorescence': '/fluorescence',
     'get_fluorescence': '/fluorescence/{uuid}',
     'get_lineage': '/lineage/{uuid}',
-    'get_store_stats': '/admin/stats',
+    'get_resource_stats': '/admin/stats',
     'get_visualization_options': '/visualization/options',
     'render_diffraction_pattern': '/diffraction/{uuid}/patterns/{index}/image',
     'render_diffraction_aggregate': '/diffraction/{uuid}/patterns/aggregate/image',
@@ -48,13 +48,13 @@ _ROUTES: dict[str, str] = {
     'render_probe_modes': '/product/{uuid}/probe/modes/image',
     'render_object': '/product/{uuid}/object/image',
     'render_object_layer': '/product/{uuid}/object/{layer}/image',
-    'render_scan_positions': '/product/positions/image',
+    'render_probe_positions': '/product/positions/image',
     'render_fluorescence_summary': '/fluorescence/{uuid}/image',
     'render_fluorescence_element': '/fluorescence/{uuid}/elements/{name}/image',
 }
 
 # Intended differences. Downloads and administration are not for agents; the xraydb tools
-# answer from a physics table, not the store.
+# answer from a physics table, not the storage root.
 _REST_ONLY = {
     ('get', '/health'),
     ('get', '/diffraction/{uuid}/files/diffraction'),
@@ -77,7 +77,7 @@ _REST_PARAMETERS_NOT_ON_MCP = {
 
 
 @dataclass(frozen=True)
-class _Store:
+class _Resources:
     tagged_campaign: UUID
     other_campaign: UUID
     polarized_diffraction: UUID
@@ -98,14 +98,14 @@ async def _ingest_all(
 
 
 @pytest_asyncio.fixture
-async def store(
+async def resources(
     session_provider: SessionProvider,
     layout: StorageLayout,
     seed_campaign: Callable[..., UUID],
     seed_diffraction: Callable[..., UUID],
     seed_product: Callable[..., UUID],
     seed_fluorescence: Callable[..., UUID],
-) -> _Store:
+) -> _Resources:
     c1 = seed_campaign(sample_name='alpha', tags=['xmcd', '2026'])
     c2 = seed_campaign(sample_name='beta', tags=['other'])
     d1 = seed_diffraction(campaign_uuid=c1, polarization='left_circular')
@@ -140,7 +140,7 @@ async def store(
             ('fluorescence', f1),
         ],
     )
-    return _Store(c1, c2, d1, d2, p1, p2, p3, f1)
+    return _Resources(c1, c2, d1, d2, p1, p2, p3, f1)
 
 
 def _structured(result: Any) -> dict[str, Any]:
@@ -169,15 +169,16 @@ def _strings(value: Any) -> Any:
     return value
 
 
-def _arguments(store: _Store, raw: dict[str, Any]) -> dict[str, Any]:
-    """`raw` with each `_Store` field name in a value replaced by its uuid."""
+def _arguments(resources: _Resources, raw: dict[str, Any]) -> dict[str, Any]:
+    """`raw` with each `_Resources` field name in a value replaced by its uuid."""
     resolved: dict[str, Any] = {}
     for name, value in raw.items():
-        if isinstance(value, str) and hasattr(store, value):
-            value = getattr(store, value)
+        if isinstance(value, str) and hasattr(resources, value):
+            value = getattr(resources, value)
         elif isinstance(value, list):
             value = [
-                getattr(store, v) if isinstance(v, str) and hasattr(store, v) else v for v in value
+                getattr(resources, v) if isinstance(v, str) and hasattr(resources, v) else v
+                for v in value
             ]
         resolved[name] = _strings(value)
     return resolved
@@ -216,16 +217,20 @@ _DATA_CASES = [
     ('list_fluorescence', {'derived_from_uuid': 'succeeded_product'}),
     ('get_fluorescence', {'uuid': 'fluorescence'}),
     ('get_lineage', {'uuid': 'succeeded_product'}),
-    ('get_store_stats', {}),
+    ('get_resource_stats', {}),
     ('get_visualization_options', {}),
 ]
 
 
 @pytest.mark.parametrize(('tool', 'raw'), _DATA_CASES)
 async def test_a_tool_returns_what_its_route_returns(
-    app_client: AsyncClient, bound_mcp: FastMCP, store: _Store, tool: str, raw: dict[str, Any]
+    app_client: AsyncClient,
+    bound_mcp: FastMCP,
+    resources: _Resources,
+    tool: str,
+    raw: dict[str, Any],
 ) -> None:
-    rest, result = await _both(app_client, bound_mcp, tool, _arguments(store, raw))
+    rest, result = await _both(app_client, bound_mcp, tool, _arguments(resources, raw))
     assert _structured(result) == rest
 
 
@@ -243,20 +248,24 @@ _RENDER_CASES = [
 
 @pytest.mark.parametrize(('tool', 'raw'), _RENDER_CASES)
 async def test_a_render_tool_returns_the_route_s_image_and_scales(
-    app_client: AsyncClient, bound_mcp: FastMCP, store: _Store, tool: str, raw: dict[str, Any]
+    app_client: AsyncClient,
+    bound_mcp: FastMCP,
+    resources: _Resources,
+    tool: str,
+    raw: dict[str, Any],
 ) -> None:
-    rest, result = await _both(app_client, bound_mcp, tool, _arguments(store, raw))
+    rest, result = await _both(app_client, bound_mcp, tool, _arguments(resources, raw))
 
     assert [item.type for item in result.content] == ['image']
     assert result.content[0].data == rest['png_base64']
     assert _structured(result) == {name: rest[name] for name in RenderedImageInfo.model_fields}
 
 
-async def test_the_scan_positions_tool_returns_the_route_s_plot_and_size(
-    app_client: AsyncClient, bound_mcp: FastMCP, store: _Store
+async def test_the_probe_positions_tool_returns_the_route_s_plot_and_size(
+    app_client: AsyncClient, bound_mcp: FastMCP, resources: _Resources
 ) -> None:
-    arguments = _arguments(store, {'uuid': ['succeeded_product', 'imported_product']})
-    rest, result = await _both(app_client, bound_mcp, 'render_scan_positions', arguments)
+    arguments = _arguments(resources, {'uuid': ['succeeded_product', 'imported_product']})
+    rest, result = await _both(app_client, bound_mcp, 'render_probe_positions', arguments)
 
     assert result.content[0].data == rest['png_base64']
     assert _structured(result) == {name: rest[name] for name in PlotImageInfo.model_fields}
@@ -305,12 +314,12 @@ _REFUSAL_CASES = [
 async def test_a_tool_refuses_what_its_route_refuses_and_says_why(
     app_client: AsyncClient,
     bound_mcp: FastMCP,
-    store: _Store,
+    resources: _Resources,
     tool: str,
     raw: dict[str, Any],
     status: int,
 ) -> None:
-    arguments = _arguments(store, raw)
+    arguments = _arguments(resources, raw)
     path, query = _rest_path(tool, arguments)
     response = await app_client.get(path, params=query)
     assert response.status_code == status, response.text
@@ -332,16 +341,20 @@ _INVALID_CASES = [
     ('list_fluorescence', {'derived_from_uuid': 'not-a-uuid'}),
     ('get_product', {'uuid': 'not-a-uuid'}),
     ('render_probe', {'uuid': 'succeeded_product', 'incoherent': -1}),
-    ('render_scan_positions', {'uuid': ['succeeded_product'], 'width_px': 64}),
-    ('render_scan_positions', {'uuid': ['not-a-uuid']}),
+    ('render_probe_positions', {'uuid': ['succeeded_product'], 'width_px': 64}),
+    ('render_probe_positions', {'uuid': ['not-a-uuid']}),
 ]
 
 
 @pytest.mark.parametrize(('tool', 'raw'), _INVALID_CASES)
 async def test_a_tool_rejects_the_arguments_its_route_rejects(
-    app_client: AsyncClient, bound_mcp: FastMCP, store: _Store, tool: str, raw: dict[str, Any]
+    app_client: AsyncClient,
+    bound_mcp: FastMCP,
+    resources: _Resources,
+    tool: str,
+    raw: dict[str, Any],
 ) -> None:
-    arguments = _arguments(store, raw)
+    arguments = _arguments(resources, raw)
     path, query = _rest_path(tool, arguments)
     assert (await app_client.get(path, params=query)).status_code == 422
 
@@ -349,9 +362,9 @@ async def test_a_tool_rejects_the_arguments_its_route_rejects(
         await bound_mcp.call_tool(tool, arguments)
 
 
-async def test_the_scan_positions_tool_needs_a_product(bound_mcp: FastMCP) -> None:
+async def test_the_probe_positions_tool_needs_a_product(bound_mcp: FastMCP) -> None:
     with pytest.raises(ValidationError):
-        await bound_mcp.call_tool('render_scan_positions', {'uuid': []})
+        await bound_mcp.call_tool('render_probe_positions', {'uuid': []})
 
 
 def _comparable(schema: Any, definitions: dict[str, Any]) -> Any:

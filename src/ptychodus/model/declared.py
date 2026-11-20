@@ -129,7 +129,7 @@ def render_key(field_name: str, *, expand_num: bool = False) -> str:
 
     *expand_num* additionally writes the word ``num`` out as ``NumberOf``, which
     is how ptychodus's hand-written settings classes spell it. Off by default,
-    and deliberately so: two backends already persist ``NumEpochs`` from
+    and deliberately so: two libraries already persist ``NumEpochs`` from
     ``num_epochs``, and expanding theirs would rename a key that is already in
     every settings file in existence.
     """

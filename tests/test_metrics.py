@@ -1635,7 +1635,7 @@ class TestComputeReconstructionResiduals:
             compute_reconstruction_residuals(product, measured, bad_pixels)
 
     def test_real_space_map_is_invariant_to_scan_density(self) -> None:
-        # Duplicating every scan position doubles both the amplitude-residual
+        # Duplicating every probe position doubles both the amplitude-residual
         # splat and the measured-amplitude splat at every covered pixel, so
         # their ratio — the real-space R_F map — is unchanged. This is the
         # scan-density invariance the normalization is designed to provide.

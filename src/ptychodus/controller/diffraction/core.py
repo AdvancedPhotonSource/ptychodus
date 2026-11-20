@@ -93,8 +93,10 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         view.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         header = view.tree_view.header()
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
-        counts_item_delegate = ProgressBarItemDelegate(view.tree_view)
-        view.tree_view.setItemDelegateForColumn(Column.COUNTS.index, counts_item_delegate)
+        detector_sum_item_delegate = ProgressBarItemDelegate(view.tree_view)
+        view.tree_view.setItemDelegateForColumn(
+            Column.DETECTOR_SUM.index, detector_sum_item_delegate
+        )
         selection_model = view.tree_view.selectionModel()
 
         if selection_model is None:
@@ -153,7 +155,7 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         return selection_model.currentIndex()
 
     def _dataset_for_index(self, index: QModelIndex) -> AssembledDiffractionDataset | None:
-        """The dataset containing any tree row — dataset, frame group, or frame."""
+        """The dataset containing any tree row — dataset, pattern group, or pattern."""
         dataset_row = self._tree_model.dataset_row_for_index(index)
 
         if dataset_row is None or not 0 <= dataset_row < len(self._repository):
@@ -180,7 +182,7 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         """Display the selected node's pattern.
 
         Each level answers get_data() with what describes its own scope: the mean over
-        the whole dataset, the mean over one frame group, or a single frame.
+        the whole dataset, the mean over one pattern group, or a single pattern.
         """
         dataset = self._dataset_for_index(current)
 

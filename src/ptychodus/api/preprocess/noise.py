@@ -115,14 +115,14 @@ def estimate_noise_floor(
         return compute_robust_statistics(fallback)
 
     hist, edges = numpy.histogram(flat, bins=num_bins, range=(pmin, pmax))
-    total_count = hist.sum()
+    detector_sum = hist.sum()
 
-    if total_count == 0:
+    if detector_sum == 0:
         return compute_robust_statistics(fallback)
 
     # Otsu: maximize between-class variance.
     bin_centers = 0.5 * (edges[:-1] + edges[1:])
-    probability = hist.astype(numpy.float64) / total_count
+    probability = hist.astype(numpy.float64) / detector_sum
     cumulative_weight = numpy.cumsum(probability)
     cumulative_mean = numpy.cumsum(probability * bin_centers)
     total_mean = cumulative_mean[-1]

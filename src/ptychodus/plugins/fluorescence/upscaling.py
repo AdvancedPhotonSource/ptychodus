@@ -17,7 +17,7 @@ __all__ = [
 
 
 class UpscalingMethod(StrEnum):
-    """How measured values at the scan positions are spread onto the object pixels.
+    """How measured values at the probe positions are spread onto the object pixels.
 
     Only the radial basis kernels that need no shape parameter are offered: the
     others take an ``epsilon`` whose scale nothing here can choose.
@@ -36,7 +36,7 @@ class UpscalingMethod(StrEnum):
     QUINTIC_RBF = 'quintic_rbf'
 
 
-def _scan_points_px(product: Product) -> RealArrayType:
+def _probe_positions_px(product: Product) -> RealArrayType:
     object_geometry = product.object_.get_geometry()
     return numpy.column_stack(
         (
@@ -48,7 +48,7 @@ def _scan_points_px(product: Product) -> RealArrayType:
 
 def _upscale_with_griddata(emap: ElementMap, product: Product, method: str) -> ElementMap:
     object_geometry = product.object_.get_geometry()
-    points = _scan_points_px(product)
+    points = _probe_positions_px(product)
     values = emap.counts_per_second.flat
     shape = (object_geometry.height_px, object_geometry.width_px)
     query_points = numpy.indices(shape).reshape(2, -1).T
@@ -63,7 +63,7 @@ def _upscale_with_rbf(
 ) -> ElementMap:
     object_geometry = product.object_.get_geometry()
     interpolator = RBFInterpolator(
-        _scan_points_px(product),
+        _probe_positions_px(product),
         emap.counts_per_second.flat,
         kernel=kernel,
         neighbors=neighbors,
@@ -82,7 +82,7 @@ def upscale(
 ) -> ElementMap:
     """Return *emap* sampled on the object grid of *product* by *method*.
 
-    *rbf_neighbors* is how many nearest scan points each radial basis evaluation
+    *rbf_neighbors* is how many nearest probe positions each radial basis evaluation
     draws on; None uses every point, which is exact but scales with the square of
     the scan size. The grid-data methods ignore it.
 

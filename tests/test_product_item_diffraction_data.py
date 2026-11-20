@@ -118,17 +118,17 @@ def test_the_moments_arriving_reestimate_and_rebuild() -> None:
     assert item.estimates == estimates + 1  # type: ignore[attr-defined]
 
 
-def _moments(totals: list[float]) -> DiffractionMoments:
-    frame = numpy.zeros((4, 4))
-    rows = numpy.zeros(len(totals))
+def _moments(detector_sums: list[float]) -> DiffractionMoments:
+    pattern = numpy.zeros((4, 4))
+    rows = numpy.zeros(len(detector_sums))
     return DiffractionMoments(
-        num_patterns=len(totals),
-        minimum_frame=frame,
-        mean_frame=frame,
-        maximum_frame=frame,
+        num_patterns=len(detector_sums),
+        minimum_pattern=pattern,
+        mean_pattern=pattern,
+        maximum_pattern=pattern,
         bad_pixels=numpy.zeros((4, 4), dtype=bool),
-        indexes=numpy.arange(len(totals)),
-        total_counts=numpy.asarray(totals, dtype=numpy.float64),
+        indexes=numpy.arange(len(detector_sums)),
+        detector_sums=numpy.asarray(detector_sums, dtype=numpy.float64),
         center_of_mass_x_px=rows,
         center_of_mass_y_px=rows.copy(),
     )

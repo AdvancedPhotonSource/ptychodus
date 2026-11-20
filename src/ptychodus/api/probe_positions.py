@@ -1,4 +1,4 @@
-"""Probe position (scan point) data structures and file I/O plugin interfaces."""
+"""Probe position data structures and file I/O plugin interfaces."""
 
 from __future__ import annotations
 from collections.abc import Iterable, Sequence
@@ -27,7 +27,7 @@ def _read_only(array: _ArrayT) -> _ArrayT:
 class ProbePosition:
     """Probe position with its scan index and (x, y) physical coordinates in meters.
 
-    `probe_photon_count` is the I0 reading recorded for the exposure -- an upstream ion
+    `i0` is the I0 reading recorded for the exposure -- an upstream ion
     chamber, diode or scaler -- in the units the instrument records it, photons only once
     calibrated by :attr:`ptychodus.api.product.ProductMetadata.i0_photons_per_count`.
     """
@@ -35,11 +35,11 @@ class ProbePosition:
     index: int
     x_m: float
     y_m: float
-    probe_photon_count: float | None = None
+    i0: float | None = None
 
 
 @dataclass(frozen=True)
-class ScanGeometry:
+class ProbePositionsGeometry:
     """Bounding box and total path length of a set of probe positions."""
 
     minimum_x_m: float = +numpy.inf
@@ -71,47 +71,45 @@ class ProbePositionSequence(Sequence[ProbePosition]):
     def __init__(self, point_seq: Sequence[ProbePosition] | None = None) -> None:
         indexes: list[int] = []
         coordinates_m: list[float] = []
-        photon_counts: list[float] = []
+        i0_values: list[float] = []
 
         if point_seq is not None:
             for point in point_seq:
                 indexes.append(point.index)
                 coordinates_m.append(point.y_m)
                 coordinates_m.append(point.x_m)
-                if point.probe_photon_count is not None:
-                    photon_counts.append(point.probe_photon_count)
+                if point.i0 is not None:
+                    i0_values.append(point.i0)
 
         self._indexes = numpy.array(indexes, dtype=numpy.intp)
         self._coordinates_m = numpy.reshape(coordinates_m, (-1, 2))
-        # All-or-nothing invariant: either every input point supplies probe_photon_count
+        # All-or-nothing invariant: either every input point supplies i0
         # or none of them do. A mix indicates a reader bug; refuse the input so it surfaces
         # immediately rather than silently degrading downstream weighting.
         num_points = len(indexes)
-        if len(photon_counts) == 0:
-            self._probe_photon_counts: RealArrayType | None = None
-        elif len(photon_counts) == num_points:
-            counts_array = numpy.asarray(photon_counts, dtype=numpy.float64)
+        if len(i0_values) == 0:
+            self._i0: RealArrayType | None = None
+        elif len(i0_values) == num_points:
+            counts_array = numpy.asarray(i0_values, dtype=numpy.float64)
             bad = ~numpy.isfinite(counts_array) | (counts_array < 0.0)
             if bad.any():
                 first = int(numpy.argmax(bad))
                 raise ValueError(
-                    'ProbePositionSequence requires finite non-negative probe_photon_count; '
+                    'ProbePositionSequence requires finite non-negative i0; '
                     f'got {counts_array[first]!r} at point index {indexes[first]}.'
                 )
-            self._probe_photon_counts = counts_array
+            self._i0 = counts_array
         else:
             raise ValueError(
-                'ProbePositionSequence requires probe_photon_count on every point or none; '
-                f'got {len(photon_counts)} populated out of {num_points}.'
+                'ProbePositionSequence requires i0 on every point or none; '
+                f'got {len(i0_values)} populated out of {num_points}.'
             )
 
     def copy(self) -> ProbePositionSequence:
         seq = ProbePositionSequence()
         seq._indexes = self._indexes.copy()
         seq._coordinates_m = self._coordinates_m.copy()
-        seq._probe_photon_counts = (
-            None if self._probe_photon_counts is None else self._probe_photon_counts.copy()
-        )
+        seq._i0 = None if self._i0 is None else self._i0.copy()
         return seq
 
     @overload
@@ -128,20 +126,18 @@ class ProbePositionSequence(Sequence[ProbePosition]):
             seq = ProbePositionSequence()
             seq._indexes = self._indexes[index]
             seq._coordinates_m = self._coordinates_m[index, :]
-            seq._probe_photon_counts = (
-                None if self._probe_photon_counts is None else self._probe_photon_counts[index]
-            )
+            seq._i0 = None if self._i0 is None else self._i0[index]
             return seq
 
-        photon_count: float | None = None
-        if self._probe_photon_counts is not None:
-            photon_count = float(self._probe_photon_counts[index])
+        i0: float | None = None
+        if self._i0 is not None:
+            i0 = float(self._i0[index])
 
         return ProbePosition(
             index=self._indexes[index],
             x_m=self._coordinates_m[index, -1],
             y_m=self._coordinates_m[index, -2],
-            probe_photon_count=photon_count,
+            i0=i0,
         )
 
     def __len__(self) -> int:
@@ -165,22 +161,22 @@ class ProbePositionSequence(Sequence[ProbePosition]):
         """Return the y coordinates in meters, read-only and row-aligned with the indexes."""
         return _read_only(self._coordinates_m[:, -2])
 
-    def get_probe_photon_counts(self) -> RealArrayType | None:
+    def get_i0(self) -> RealArrayType | None:
         """Return the per-position I0 readings, or ``None`` when the reader recorded none.
 
         The all-or-nothing invariant guaranteed at construction means the returned array,
         when non-None, is fully populated and 1:1 aligned with the index / coordinate arrays.
         See :class:`ProbePosition` for their units.
         """
-        return self._probe_photon_counts
+        return self._i0
 
-    def get_probe_photon_counts_by_index(self) -> dict[int, float]:
+    def get_i0_by_index(self) -> dict[int, float]:
         """Return the I0 readings keyed by scan index, empty when the reader recorded none.
 
         Positions sharing a scan index average into one reading, so the mapping pairs with
         diffraction patterns by index as the positions themselves do.
         """
-        counts = self._probe_photon_counts
+        counts = self._i0
 
         if counts is None or counts.size == 0:
             return {}
@@ -231,8 +227,8 @@ class ProbePositionSequence(Sequence[ProbePosition]):
     @property
     def nbytes(self) -> int:
         total = self._indexes.nbytes + self._coordinates_m.nbytes
-        if self._probe_photon_counts is not None:
-            total += self._probe_photon_counts.nbytes
+        if self._i0 is not None:
+            total += self._i0.nbytes
         return total
 
     def __repr__(self) -> str:
@@ -253,7 +249,9 @@ class ProbePositionFileWriter(FileWriter[ProbePositionSequence]):
     """Plugin interface for writing probe position files."""
 
 
-def calculate_scan_geometry(positions: Iterable[ProbePosition]) -> ScanGeometry | None:
+def calculate_probe_positions_geometry(
+    positions: Iterable[ProbePosition],
+) -> ProbePositionsGeometry | None:
     """Compute the bounding box and total path length of a set of probe positions; returns None if empty.
 
     ``positions`` is iterated twice (once for the bounding box, once for the
@@ -290,7 +288,7 @@ def calculate_scan_geometry(positions: Iterable[ProbePosition]) -> ScanGeometry 
         dy = point_r.y_m - point_l.y_m
         length_m += numpy.hypot(dx, dy)
 
-    return ScanGeometry(
+    return ProbePositionsGeometry(
         minimum_x_m=minimum_x_m,
         maximum_x_m=maximum_x_m,
         minimum_y_m=minimum_y_m,

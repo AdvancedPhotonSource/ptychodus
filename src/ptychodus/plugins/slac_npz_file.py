@@ -41,8 +41,8 @@ def _get_scalar(npz_file: numpy.lib.npyio.NpzFile, key: str, fallback: float) ->
         return fallback
 
 
-def _coords_in_pixels(scan_x: RealArrayType, scan_y: RealArrayType) -> bool:
-    max_abs = max(float(numpy.max(numpy.abs(scan_x))), float(numpy.max(numpy.abs(scan_y))))
+def _coords_in_pixels(position_x: RealArrayType, position_y: RealArrayType) -> bool:
+    max_abs = max(float(numpy.max(numpy.abs(position_x))), float(numpy.max(numpy.abs(position_y))))
     return max_abs > PIXEL_COORDINATE_THRESHOLD_M
 
 
@@ -89,8 +89,8 @@ class SLACProductFileReader(ProductFileReader):
 
     def read(self, file_path: Path) -> Product:
         with numpy.load(file_path) as npz_file:
-            scan_x = numpy.asarray(npz_file['xcoords_start'])
-            scan_y = numpy.asarray(npz_file['ycoords_start'])
+            position_x = numpy.asarray(npz_file['xcoords_start'])
+            position_y = numpy.asarray(npz_file['ycoords_start'])
             probe_array = npz_file['probeGuess']
             object_array = npz_file['objectGuess']
 
@@ -106,10 +106,10 @@ class SLACProductFileReader(ProductFileReader):
                 npz_file, 'detector_pixel_size_m', DEFAULT_DETECTOR_PIXEL_SIZE_M
             )
 
-        scan_x_m = scan_x
-        scan_y_m = scan_y
+        position_x_m = position_x
+        position_y_m = position_y
 
-        if _coords_in_pixels(scan_x, scan_y):
+        if _coords_in_pixels(position_x, position_y):
             width_px = float(probe_array.shape[-1])
             detector_width_m = detector_pixel_size_m * width_px
             pixel_size_m = 0.0
@@ -118,8 +118,8 @@ class SLACProductFileReader(ProductFileReader):
                 pixel_size_m /= detector_width_m
 
             if pixel_size_m > 0.0:
-                scan_x_m = scan_x * pixel_size_m
-                scan_y_m = scan_y * pixel_size_m
+                position_x_m = position_x * pixel_size_m
+                position_y_m = position_y * pixel_size_m
             else:
                 logger.warning('SLAC NPZ coordinate scaling skipped (invalid pixel size).')
 
@@ -136,7 +136,7 @@ class SLACProductFileReader(ProductFileReader):
 
         point_list: list[ProbePosition] = list()
 
-        for idx, (x_m, y_m) in enumerate(zip(scan_x_m, scan_y_m)):
+        for idx, (x_m, y_m) in enumerate(zip(position_x_m, position_y_m)):
             point = ProbePosition(idx, x_m, y_m)
             point_list.append(point)
 

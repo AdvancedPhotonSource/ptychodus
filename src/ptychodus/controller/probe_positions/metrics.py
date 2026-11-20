@@ -61,8 +61,8 @@ class ProbePositionsMetricsViewController:
         ):
             group.reset()
 
-        dialog.scan_plot_view.figure.clear()
-        dialog.scan_plot_view.figure_canvas.draw()
+        dialog.probe_positions_plot_view.figure.clear()
+        dialog.probe_positions_plot_view.figure_canvas.draw()
 
         for axes in (dialog.step_histogram_axes, dialog.i0_axes):
             axes.clear()
@@ -144,18 +144,18 @@ class ProbePositionsMetricsViewController:
             colors = report.i0
             color_label = f'I0 [{i0_unit}]'
 
-        figure = dialog.scan_plot_view.figure
+        figure = dialog.probe_positions_plot_view.figure
         figure.clear()
-        scan_axes = figure.add_subplot(111)
-        scatter = scan_axes.scatter(x_um, y_um, c=colors, s=12, cmap='viridis')
-        figure.colorbar(scatter, ax=scan_axes, label=color_label)
-        scan_axes.invert_yaxis()
-        scan_axes.set_aspect('equal')
-        scan_axes.grid(True)
-        scan_axes.set_xlabel(f'X{frame} [µm]')
-        scan_axes.set_ylabel(f'Y{frame} [µm]')
+        positions_axes = figure.add_subplot(111)
+        scatter = positions_axes.scatter(x_um, y_um, c=colors, s=12, cmap='viridis')
+        figure.colorbar(scatter, ax=positions_axes, label=color_label)
+        positions_axes.invert_yaxis()
+        positions_axes.set_aspect('equal')
+        positions_axes.grid(True)
+        positions_axes.set_xlabel(f'X{frame} [µm]')
+        positions_axes.set_ylabel(f'Y{frame} [µm]')
         figure.tight_layout()
-        dialog.scan_plot_view.figure_canvas.draw()
+        dialog.probe_positions_plot_view.figure_canvas.draw()
 
         dialog.step_histogram_axes.clear()
         plot_histogram(

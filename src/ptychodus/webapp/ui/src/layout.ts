@@ -91,7 +91,7 @@ function wireSplitterDrag(divider: HTMLElement): void {
   });
 }
 
-/** A repository's totals under its table, as the desktop's info label sits. */
+/** A repository's totals under its table, as the GUI's info label sits. */
 export function infoLabel(text: string): HTMLElement {
   const el = document.createElement('div');
   el.className = 'info-label';

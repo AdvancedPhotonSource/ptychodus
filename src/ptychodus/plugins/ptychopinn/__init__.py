@@ -12,7 +12,7 @@ __all__ = [
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    # One name for both, so the format offered by default is the selected backend's own.
+    # One name for both, so the format offered by default is the selected library's own.
     simple_name = 'PtychoPINN'
 
     registry.reconstructor_libraries.register_plugin(

@@ -33,12 +33,12 @@ COPY wheels/ /tmp/wheels/
 # Two more concern what goes on top:
 #
 #   * /tmp/constraints.txt pins the base image's torch and torchvision.
-#     cdtools, ptychi and the staged backends all depend on torch; without the
+#     cdtools, ptychi and the staged libraries all depend on torch; without the
 #     pin, one asking for a newer torch makes pip quietly install a second,
 #     generic torch from PyPI. With it, pip backtracks to an older release of
 #     that package or fails the resolve naming it. A `torch.__version__`
 #     without a +cuXXX suffix in the built image means that went wrong.
-#   * Backends published on no index (PtychoPINN, PtychoFM) arrive as wheels
+#   * Libraries published on no index (PtychoPINN, PtychoFM) arrive as wheels
 #     that scripts/podman/build builds from sibling checkouts and stages in
 #     containers/wheels/. The glob is optional: a plain `podman build -f
 #     containers/Dockerfile.cuda containers/` omits them. Everything goes into

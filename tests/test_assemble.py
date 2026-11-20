@@ -23,7 +23,7 @@ from ptychodus.api.assemble import (
     assemble_dataset,
     compute_array_offsets,
     compute_assembled_patterns_shape,
-    compute_dataset_total_counts,
+    compute_dataset_detector_sums,
     default_max_workers,
     preprocess_array,
 )
@@ -50,18 +50,22 @@ from diffraction_dataset_fixtures import (
     make_dataset,
 )
 
-FRAME_SHAPE = (4, 4)
+PATTERN_SHAPE = (4, 4)
 
 
 def _array(label: str, first_index: int, num_patterns: int, fill: int) -> SimpleDiffractionArray:
-    return make_array(label, first_index, num_patterns, fill, frame_shape=FRAME_SHAPE)
+    return make_array(label, first_index, num_patterns, fill, pattern_shape=PATTERN_SHAPE)
 
 
 def _float_array(
-    label: str, first_index: int, num_patterns: int, *, frame_shape: tuple[int, int] = FRAME_SHAPE
+    label: str,
+    first_index: int,
+    num_patterns: int,
+    *,
+    pattern_shape: tuple[int, int] = PATTERN_SHAPE,
 ) -> SimpleDiffractionArray:
     """A constant float32 array of 3s, for planting non-finite values in."""
-    patterns = numpy.full((num_patterns, *frame_shape), 3.0, dtype=numpy.float32)
+    patterns = numpy.full((num_patterns, *pattern_shape), 3.0, dtype=numpy.float32)
     indexes = numpy.arange(first_index, first_index + num_patterns, dtype=numpy.intp)
     return SimpleDiffractionArray(label, indexes, patterns)
 
@@ -217,7 +221,7 @@ def test_missing_geometry_raises_rather_than_defaulting_to_zero() -> None:
 
 
 def _counts_array() -> SimpleDiffractionArray:
-    """Four 2x2 patterns with total counts 4, 10, 20, 40 (all pixels good)."""
+    """Four 2x2 patterns with detector sums 4, 10, 20, 40 (all pixels good)."""
     patterns = numpy.stack(
         [
             numpy.full((2, 2), 1, dtype=numpy.int32),  # sum = 4
@@ -238,8 +242,8 @@ def _preprocess_counts(
         raw_bad_pixels=good,
         processed_bad_pixels=good,
         raw_pixel_geometry=GEOMETRY,
-        total_counts_lower_bound=lower,
-        total_counts_upper_bound=upper,
+        detector_sum_lower_bound=lower,
+        detector_sum_upper_bound=upper,
     )
 
 
@@ -403,9 +407,9 @@ def test_assemble_leaves_sentinel_holes_where_the_counts_filter_dropped_patterns
     array_a = SimpleDiffractionArray('a', numpy.array([0, 1], dtype=numpy.intp), patterns_a)
     dataset = make_dataset([array_a, _array('b', 2, 2, 2)], (4, 4))
 
-    data = assemble_dataset(dataset, total_counts_upper_bound=100)
+    data = assemble_dataset(dataset, detector_sum_upper_bound=100)
 
-    # Pattern 1 of array 'a' totals 1600 and is dropped; its slot keeps the sentinel.
+    # Pattern 1 of array 'a' sums to 1600 and is dropped; its slot keeps the sentinel.
     numpy.testing.assert_array_equal(data.get_indexes(), [0, 2, 3])
     numpy.testing.assert_array_equal(data.get_patterns()[:, 0, 0], [1, 2, 2])
 
@@ -540,7 +544,7 @@ def test_assemble_rejects_an_array_that_overflows_its_reserved_slice() -> None:
 
 
 def test_assemble_accepts_an_empty_array_list_with_reserved_capacity() -> None:
-    """The streaming path reloads with no arrays and appends frames later."""
+    """The streaming path reloads with no arrays and appends patterns later."""
     dataset = make_dataset([], (4, 4), num_patterns_per_array=[2, 2])
 
     data = assemble_dataset(dataset)
@@ -596,9 +600,9 @@ def test_array_preprocessor_equals_assembling_the_whole_dataset() -> None:
     pipeline = DiffractionPrepPipeline(steps=(BinningStep(bin_size_x=2, bin_size_y=2),))
     region = CropRegion(x_range=(2, 6), y_range=(1, 5))
 
-    whole = assemble_dataset(dataset, pipeline, read_region=region, total_counts_lower_bound=10)
+    whole = assemble_dataset(dataset, pipeline, read_region=region, detector_sum_lower_bound=10)
     preprocessor = ArrayPreprocessor.from_dataset(
-        dataset, pipeline, read_region=region, total_counts_lower_bound=10
+        dataset, pipeline, read_region=region, detector_sum_lower_bound=10
     )
     # Out of order, one array at a time, as a stream delivers them.
     blocks = [preprocessor(array) for array in reversed(list(dataset))]
@@ -780,14 +784,14 @@ def test_an_explicit_worker_count_is_passed_through(monkeypatch: pytest.MonkeyPa
 # ---------- non-finite values ----------
 
 
-def test_assemble_masks_a_pixel_that_is_non_finite_in_any_frame(
+def test_assemble_masks_a_pixel_that_is_non_finite_in_any_pattern(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """One NaN masks its pixel for every frame of every array, and the value is zeroed."""
+    """One NaN masks its pixel for every pattern of every array, and the value is zeroed."""
     first = _float_array('a', 0, 2)
     second = _float_array('b', 2, 2)
     cast(numpy.ndarray, second.get_patterns())[1, 2, 3] = numpy.nan
-    dataset = make_dataset([first, second], FRAME_SHAPE)
+    dataset = make_dataset([first, second], PATTERN_SHAPE)
     reported: list[numpy.ndarray] = []
 
     with caplog.at_level('WARNING', logger='ptychodus.api.assemble'):
@@ -799,14 +803,14 @@ def test_assemble_masks_a_pixel_that_is_non_finite_in_any_frame(
     assert data.get_bad_pixels()[2, 3]
     assert data.get_bad_pixels().sum() == 1
     assert len(reported) == 1
-    assert reported[0].shape == FRAME_SHAPE
+    assert reported[0].shape == PATTERN_SHAPE
     assert reported[0][2, 3]
     assert 'NaN or infinite' in caplog.text
 
 
 def test_assemble_reports_non_finite_pixels_in_detector_coordinates() -> None:
     """After a load-time crop, the reported mask is placed back on the full detector."""
-    array = _float_array('a', 0, 1, frame_shape=(8, 8))
+    array = _float_array('a', 0, 1, pattern_shape=(8, 8))
     cast(numpy.ndarray, array.get_patterns())[0, 3, 4] = numpy.inf
     dataset = make_dataset([array], (8, 8))
     region = CropRegion(x_range=(2, 6), y_range=(2, 6))
@@ -827,8 +831,8 @@ def test_assemble_leaves_the_supplied_bad_pixels_untouched() -> None:
     """Masking non-finite pixels widens the buffer's mask without writing to the caller's."""
     array = _float_array('a', 0, 1)
     cast(numpy.ndarray, array.get_patterns())[0, 0, 1] = numpy.nan
-    supplied = numpy.zeros(FRAME_SHAPE, dtype=bool)
-    dataset = make_dataset([array], FRAME_SHAPE, bad_pixels=supplied)
+    supplied = numpy.zeros(PATTERN_SHAPE, dtype=bool)
+    dataset = make_dataset([array], PATTERN_SHAPE, bad_pixels=supplied)
 
     data = assemble_dataset(dataset, max_workers=1)
 
@@ -840,7 +844,7 @@ def test_assemble_follows_non_finite_pixels_through_the_pipeline() -> None:
     """The masked pixel is binned like any bad pixel: its whole bin becomes bad."""
     array = _float_array('a', 0, 1)
     cast(numpy.ndarray, array.get_patterns())[0, 3, 0] = numpy.nan
-    dataset = make_dataset([array], FRAME_SHAPE)
+    dataset = make_dataset([array], PATTERN_SHAPE)
     pipeline = DiffractionPrepPipeline(steps=(BinningStep(bin_size_x=2, bin_size_y=2),))
 
     data = assemble_dataset(dataset, pipeline, max_workers=1)
@@ -852,7 +856,7 @@ def test_assemble_follows_non_finite_pixels_through_the_pipeline() -> None:
 
 def test_integer_patterns_skip_the_non_finite_check() -> None:
     """Integer data cannot hold NaN; it is assembled as before with nothing reported."""
-    dataset = make_dataset([_array('a', 0, 2, fill=5)], FRAME_SHAPE)
+    dataset = make_dataset([_array('a', 0, 2, fill=5)], PATTERN_SHAPE)
     reported: list[numpy.ndarray] = []
 
     data = assemble_dataset(dataset, on_nonfinite_pixels=reported.append, max_workers=1)
@@ -864,7 +868,7 @@ def test_integer_patterns_skip_the_non_finite_check() -> None:
 def test_preprocess_array_masks_non_finite_pixels_in_its_block() -> None:
     array = _float_array('a', 0, 2)
     cast(numpy.ndarray, array.get_patterns())[0, 1, 1] = -numpy.inf
-    clean = numpy.zeros(FRAME_SHAPE, dtype=bool)
+    clean = numpy.zeros(PATTERN_SHAPE, dtype=bool)
     reported: list[numpy.ndarray] = []
 
     block = preprocess_array(
@@ -880,19 +884,19 @@ def test_preprocess_array_masks_non_finite_pixels_in_its_block() -> None:
     assert reported[0][1, 1]
 
 
-def test_total_counts_exclude_non_finite_pixels() -> None:
+def test_detector_sums_exclude_non_finite_pixels() -> None:
     array = _float_array('a', 0, 2)
     cast(numpy.ndarray, array.get_patterns())[1, 0, 0] = numpy.nan
-    dataset = make_dataset([array], FRAME_SHAPE)
+    dataset = make_dataset([array], PATTERN_SHAPE)
 
-    counts = compute_dataset_total_counts(dataset, max_workers=1)
+    counts = compute_dataset_detector_sums(dataset, max_workers=1)
 
-    numpy.testing.assert_array_equal(counts.total_counts[1], 3.0 * 15)
-    assert numpy.isfinite(counts.total_counts).all()
+    numpy.testing.assert_array_equal(counts.detector_sums[1], 3.0 * 15)
+    assert numpy.isfinite(counts.detector_sums).all()
 
 
 def test_add_bad_pixels_rejects_a_mismatched_shape() -> None:
-    data = allocate_assembled_data(make_dataset([_array('a', 0, 1, fill=1)], FRAME_SHAPE))
+    data = allocate_assembled_data(make_dataset([_array('a', 0, 1, fill=1)], PATTERN_SHAPE))
 
     with pytest.raises(ValueError, match='shape'):
         data.add_bad_pixels(numpy.zeros((2, 2), dtype=bool))

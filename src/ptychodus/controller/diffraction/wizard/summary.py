@@ -61,20 +61,20 @@ class SummaryPanelViewController(Observer):
       the crop settings. That engine is separate from the one behind the main
       diffraction pane so autoscaling the mean_pattern's color range does not
       disturb whatever range the user set on the main pane, and vice versa.
-    - total_counts is plotted on a log-y matplotlib axes with live threshold
-      lines driven by the total-counts settings.
+    - detector_sums is plotted on a log-y matplotlib axes with live threshold
+      lines driven by the detector-sum settings.
 
-    The displayed frame is a live preview: the value filter from the current
+    The displayed pattern is a live preview: the value filter from the current
     :class:`DiffractionPrepPlan` is applied to the cached mean_pattern on every
     settings change. Only that one step is previewed. Binning, padding, and
-    the flip/transpose steps change the frame's extent and
+    the flip/transpose steps change the pattern's extent and
     orientation, so applying them here would stop the pane reading as a view of
     the detector; crop is likewise shown as an overlay rather than applied. The
-    frame therefore stays at full detector extent in raw detector coordinates,
+    pattern therefore stays at full detector extent in raw detector coordinates,
     which is also what lets the overlay and the pixel geometry stay untransformed.
 
     Two summary-driven actions — Estimate Beam Center and Robust Statistics —
-    live on the Crop and Total Counts Filter group boxes respectively (see
+    live on the Crop and Detector Sum Filter group boxes respectively (see
     :class:`CropViewController` and :class:`RobustStatisticsDialog` in
     processing.py). They read `summary_service.get_last_summary()` on click
     and observe the same task_monitor for their enable state; both keep
@@ -96,7 +96,7 @@ class SummaryPanelViewController(Observer):
         self._extent_source = extent_source
         self._get_pending_dataset_index = get_pending_dataset_index
         self._last_rendered_run_id = summary_service.get_last_run_id()
-        self._last_rendered_counts_run_id = summary_service.get_last_total_counts_run_id()
+        self._last_rendered_detector_sums_run_id = summary_service.get_last_detector_sums_run_id()
         self._summarized_dataset_index = -1
         # Stateless; reads live settings on each get_plan call, so one instance
         # serves the pane's lifetime.
@@ -121,15 +121,15 @@ class SummaryPanelViewController(Observer):
         self._crop_overlay.setZValue(100)
         self._crop_overlay.hide()
 
-        # --- total_counts plot (middle) ---
+        # --- detector_sums plot (middle) ---
         self._figure = Figure()
         self._figure_canvas = FigureCanvasQTAgg(self._figure)
         self._axes = self._figure.add_subplot(111)
         self._axes.set_yscale('log')
         self._axes.set_xlabel('Scan Index')
-        self._axes.set_ylabel('Total Counts')
+        self._axes.set_ylabel('Detector Sum')
         self._axes.grid(True, which='both', linestyle=':', alpha=0.5)
-        (self._counts_line,) = self._axes.plot([], [], '.', markersize=2)
+        (self._detector_sums_line,) = self._axes.plot([], [], '.', markersize=2)
         self._lower_line = self._axes.axhline(
             1.0, visible=False, color='tab:red', linestyle='--', linewidth=1
         )
@@ -284,10 +284,10 @@ class SummaryPanelViewController(Observer):
             self._last_rendered_run_id = run_id
             self._render_summary()
 
-        counts_run_id = self._summary_service.get_last_total_counts_run_id()
-        if counts_run_id != self._last_rendered_counts_run_id:
-            self._last_rendered_counts_run_id = counts_run_id
-            self._render_counts()
+        detector_sums_run_id = self._summary_service.get_last_detector_sums_run_id()
+        if detector_sums_run_id != self._last_rendered_detector_sums_run_id:
+            self._last_rendered_detector_sums_run_id = detector_sums_run_id
+            self._render_detector_sums()
 
     # ------------------------------------------------------------------
     # Rendering
@@ -312,33 +312,33 @@ class SummaryPanelViewController(Observer):
                 self._raw_mean_pattern = None
                 self._raw_pixel_geometry = None
 
-        self._render_counts()
+        self._render_detector_sums()
         self._render_preview()
         self._update_threshold_overlay()
 
-    def _render_counts(self) -> None:
-        """Plot per-pattern total counts, preferring the measured post-pipeline pass.
+    def _render_detector_sums(self) -> None:
+        """Plot per-pattern detector sums, preferring the measured post-pipeline pass.
 
         The threshold lines drawn over this axes are the filter's bounds, and the
-        filter compares them against post-crop, post-pipeline counts. So whenever
-        a counts pass has run, its numbers are what belong here; the summary's raw
-        full-detector totals are only a stand-in until then, and the axes label
+        filter compares them against post-crop, post-pipeline detector sums. So whenever
+        a detector-sum pass has run, its numbers are what belong here; the summary's raw
+        full-detector sums are only a stand-in until then, and the axes label
         says which of the two is showing.
         """
-        measured = self._summary_service.get_last_total_counts()
+        measured = self._summary_service.get_last_detector_sums()
 
         if measured is not None:
-            self._counts_line.set_data(measured.indexes, measured.total_counts)
-            self._axes.set_ylabel('Total Counts (processed)')
+            self._detector_sums_line.set_data(measured.indexes, measured.detector_sums)
+            self._axes.set_ylabel('Detector Sum (processed)')
         else:
             summary = self._summary_service.get_last_summary()
 
             if summary is None:
-                self._counts_line.set_data([], [])
+                self._detector_sums_line.set_data([], [])
                 return
 
-            self._counts_line.set_data(summary.indexes, summary.total_counts)
-            self._axes.set_ylabel('Total Counts (raw)')
+            self._detector_sums_line.set_data(summary.indexes, summary.detector_sums)
+            self._axes.set_ylabel('Detector Sum (raw)')
 
         self._axes.relim()
         self._axes.autoscale_view()
@@ -348,10 +348,10 @@ class SummaryPanelViewController(Observer):
 
         Only the value filter is applied; see the class docstring for why the
         geometry-changing steps and the crop are not. Two fidelity limits are
-        inherent to previewing on a mean frame and cannot be fixed here:
+        inherent to previewing on a mean pattern and cannot be fixed here:
 
-        - Thresholding the mean is not thresholding each frame and averaging. A
-          pixel whose per-frame values straddle the upper bound is partially
+        - Thresholding the mean is not thresholding each pattern and averaging. A
+          pixel whose per-pattern values straddle the upper bound is partially
           zeroed in production but survives whole here when its mean sits inside
           the bounds. This shows which detector regions the filter targets, not
           the exact result.
@@ -360,7 +360,7 @@ class SummaryPanelViewController(Observer):
           interpolated values where production sees zeros.
         """
         if self._raw_mean_pattern is None or self._raw_pixel_geometry is None:
-            # No frame behind it, so the rectangle would mark nothing.
+            # No pattern behind it, so the rectangle would mark nothing.
             self._crop_overlay.hide()
             return
 
@@ -370,13 +370,13 @@ class SummaryPanelViewController(Observer):
 
         plan = self._pipeline_builder.get_plan(self._extent_source.get_extent())
 
-        frame = self._raw_mean_pattern
+        pattern = self._raw_mean_pattern
         step = next((s for s in plan.pipeline.steps if isinstance(s, FilterValuesStep)), None)
 
         if step is not None:
-            frame = step.apply(frame)
+            pattern = step.apply(pattern)
 
-        self._image_controller.set_array(frame, self._raw_pixel_geometry)
+        self._image_controller.set_array(pattern, self._raw_pixel_geometry)
         self._update_crop_overlay(plan.read_region)
 
     # ------------------------------------------------------------------
@@ -405,10 +405,10 @@ class SummaryPanelViewController(Observer):
         self._crop_overlay.show()
 
     def _update_threshold_overlay(self) -> None:
-        lower_enabled = self._diffraction_settings.total_counts_lower_bound_enabled.get_value()
-        upper_enabled = self._diffraction_settings.total_counts_upper_bound_enabled.get_value()
-        lower_value = self._diffraction_settings.total_counts_lower_bound.get_value()
-        upper_value = self._diffraction_settings.total_counts_upper_bound.get_value()
+        lower_enabled = self._diffraction_settings.detector_sum_lower_bound_enabled.get_value()
+        upper_enabled = self._diffraction_settings.detector_sum_upper_bound_enabled.get_value()
+        lower_value = self._diffraction_settings.detector_sum_lower_bound.get_value()
+        upper_value = self._diffraction_settings.detector_sum_upper_bound.get_value()
 
         # Log-scale y clamps at a positive floor; a lower bound of 0 would be -inf.
         lower_y = max(1.0, float(lower_value))

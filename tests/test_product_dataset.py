@@ -119,7 +119,7 @@ def test_get_reconstruct_input_raises_without_dataset() -> None:
 
 
 def test_reconstruct_without_a_reconstructor_raises_before_inserting_a_product() -> None:
-    """A library offering no algorithm must not leave a stray output product behind."""
+    """A library offering no algorithm must not leave a stray product behind."""
     product_api = MagicMock()
     algorithm = MagicMock()
     algorithm.get_current_reconstructor.return_value = None

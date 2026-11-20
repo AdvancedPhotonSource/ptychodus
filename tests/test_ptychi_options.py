@@ -59,7 +59,7 @@ from ptychodus.plugins.ptychi.algorithms import (  # noqa: E402
 )
 from ptychodus.plugins.ptychi.options import apply_to_task  # noqa: E402
 
-# The name pty-chi registers itself under, which is how the store files it.
+# The name pty-chi registers itself under, which is how the parameter store files it.
 _LIBRARY = 'pty-chi'
 from ptychodus.api.plugins import PluginRegistry  # noqa: E402
 from ptychodus.cli._reconstruct_common import (  # noqa: E402

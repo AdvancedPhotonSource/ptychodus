@@ -51,7 +51,7 @@ DISTINCTIVE_METADATA = ProductMetadata(
 def _make_factory(settings: Any = None) -> ProductRepositoryItemFactory:
     return ProductRepositoryItemFactory(
         settings=MagicMock() if settings is None else settings,
-        scan_item_factory=MagicMock(),
+        probe_positions_item_factory=MagicMock(),
         probe_item_factory=MagicMock(),
         object_item_factory=MagicMock(),
         repository=MagicMock(),

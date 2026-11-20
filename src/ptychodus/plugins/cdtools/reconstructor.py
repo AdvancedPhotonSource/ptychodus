@@ -331,7 +331,7 @@ def _give_the_model_unit_weights(model: Any, num_positions: int, device: str) ->
 
 
 def _declared(options: BaseModel) -> CDToolsOptions:
-    """Narrow the options a call was given to what this backend declares.
+    """Narrow the options a call was given to what this reconstructor declares.
 
     Checked rather than asserted: the dispatching layer validates the type against what
     ``get_default_options`` returns, so a mismatch here means those two have drifted

@@ -55,13 +55,8 @@ The remaining arguments fall into four groups.
 : Override metadata the data file records wrongly or not at all. Each is used only when given.
   The last three are offered only by the commands whose file layout needs them.
 
-`--min-total-counts`, `--max-valid-count`, `--bad-pixels-file`
-: Drop patterns whose total counts fall below a floor, zero pixels at or above a ceiling, and
-  apply a bad-pixel mask covering the full uncropped detector. The ceiling defaults to the
-  detector's invalid-pixel marker: the pattern dtype's maximum, which is how Dectris
-  detectors mark an invalid pixel, except where the instrument names a lower one for the
-  dtype. `ptychodus-reconstruct-lamni` stores 12-bit Eiger frames as uint16 and marks them
-  with 4095.
+`--min-detector-sum`, `--max-valid-count`, `--bad-pixels-file`
+: Drop patterns whose detector sum falls below a floor, zero pixels at or above a ceiling, and apply a bad-pixel mask covering the full uncropped detector. The ceiling defaults to the detector's invalid-pixel marker: the pattern dtype's maximum, which is how Dectris detectors mark an invalid pixel, except where the instrument names a lower one for the dtype. `ptychodus-reconstruct-lamni` stores 12-bit Eiger frames as uint16 and marks them with 4095.
 
 `--background-file`, `--flat-field-file`, `--subtract-background`, `--divide-flat-field`
 : Supply a measured detector background and flat-field response covering the full detector,
@@ -108,15 +103,12 @@ Every driver writes one directory in the same layout, whatever instrument it rea
 fly054/
   diffraction.h5         # the assembled patterns, as reconstructed
   product.h5             # the final object, probe and positions
-  product.000100.h5      # a snapshot every num_sync_epochs epochs
+  product.000100.h5      # a checkpoint every num_sync_epochs epochs
   reconstruct_options.yaml  # the options the run was given
   reconstruct.log        # every log record the run wrote
 ```
 
-`product.h5` is the result: it carries the object, the probe, the refined probe positions, and
-the metadata the reconstruction used. It opens in the GUI and reads back through the Python
-API. `ptychodus-enhance-xrf` takes it with a fluorescence dataset from the same scan, as
-{doc}`fluorescence` describes.
+`product.h5` is the reconstructed product: it carries the object, the probe, the refined probe positions, and the metadata the reconstruction used. It opens in the GUI and reads back through the Python API. `ptychodus-enhance-xrf` takes it with a fluorescence dataset from the same scan, as {doc}`fluorescence` describes.
 
 `reconstruct_options.yaml` records the options the run was given, as a document naming the
 library and algorithm, and can be passed straight back to `--options` to repeat the run. The
@@ -125,9 +117,7 @@ options it actually ran with are written to `reconstruct.log`. A log is appended
 replaced, and each process of a multi-process launch writes its own, `reconstruct.rank01.log`
 and so on.
 
-`diffraction.h5` is written before the reconstruction starts, so an interrupted run still
-leaves the one artifact that cannot be rebuilt without the raw files. It can run to several
-gigabytes; `--no-save-diffraction` skips it.
+`diffraction.h5` is written before the reconstruction starts, so an interrupted run still leaves the one file that cannot be rebuilt without the raw files. It can run to several gigabytes; `--no-save-diffraction` skips it.
 
 `ptychodus-reconstruct-batch-lamni` writes one such directory per scan, and adds
 `batch_settings.yaml` and `affine_fit.yaml` to each. The fit's `scale`, `asymmetry`,
@@ -342,8 +332,8 @@ effect at preparation, and the options are carried into the prepared directory.
 takes its options from the prepared directory's `reconstruct_options.yaml` unless `--options`
 names another document, and falls back to stock pty-chi LSQML, or BH for a near-field product,
 when there is neither. The document names the library, so the same prepared directory
-reconstructs with any installed backend — `--print-options cdtools` writes cdtools' defaults,
-for one — and a trainable backend loads the `model` file the directory holds. The input directory is never modified, and the output must be a different directory,
+reconstructs with any installed library — `--print-options cdtools` writes cdtools' defaults,
+for one — and a trainable reconstructor loads the `model` file the directory holds. The input directory is never modified, and the output must be a different directory,
 since the final `product.h5` would otherwise overwrite the initial one. `--dry-run` loads and
 pairs the inputs and reports what would run.
 
@@ -370,16 +360,16 @@ uses, so results land where that workflow expects them.
 
 ## Training a model
 
-`ptychodus-train` trains a learned reconstructor such as PtychoPINN from a directory of training data in the backend's own format, as the GUI's export or `ptychodus-generate-training-data` writes it — every PtychoPINN archive (`*.npz`) in the directory, merged into one object bank when there are several, or PtychoFM's `_dp`/`_para` pairs. It reads no raw beamline files and no settings file, and leaves the input directory untouched. [Training Data](training.md) shows how to write such a directory from measured scans and synthetic objects.
+`ptychodus-train` trains a learned reconstructor such as PtychoPINN from a directory of training data in the library's own format, as the GUI's export or `ptychodus-generate-training-data` writes it — every PtychoPINN archive (`*.npz`) in the directory, merged into one object bank when there are several, or PtychoFM's `_dp`/`_para` pairs. It reads no raw beamline files and no settings file, and leaves the input directory untouched. [Training Data](training.md) shows how to write such a directory from measured scans and synthetic objects.
 
-Its options come from a YAML document, as `ptychodus-enhance-xrf`'s do. `--print-options` writes one at the defaults, naming the library and the algorithm beside every field, and `--options` passes an edited copy back. Fields it omits keep their defaults; a misspelled field, or one the backend fixes, is refused rather than ignored.
+Its options come from a YAML document, as `ptychodus-enhance-xrf`'s do. `--print-options` writes one at the defaults, naming the library and the algorithm beside every field, and `--options` passes an edited copy back. Fields it omits keep their defaults; a misspelled field, or one the library fixes, is refused rather than ignored.
 
 ```sh
 $ ptychodus-train --print-options PtychoPINN/Unsupervised > pinn.yaml
 $ ptychodus-train -i ./training-data -o ./trained --options pinn.yaml
 ```
 
-The backend writes what it trains into the output directory, and the command adds the trained model there as `model` with the backend's extension, such as `model.zip` for PtychoPINN, beside `train_options.yaml`, the options it trained with, and `train.log`. `--dry-run` checks the inputs, options and launch without training.
+The library writes what it trains into the output directory, and the command adds the trained model there as `model` with the library's extension, such as `model.zip` for PtychoPINN, beside `train_options.yaml`, the options it trained with, and `train.log`. `--dry-run` checks the inputs, options and launch without training.
 
 To train on several GPUs of one node, launch it with `torchrun`:
 
@@ -387,4 +377,4 @@ To train on several GPUs of one node, launch it with `torchrun`:
 $ torchrun --standalone --nproc-per-node=4 -m ptychodus.cli.train -i ./training-data -o ./trained --options pinn.yaml
 ```
 
-Each rank runs the backend in a child process that joins one process group, and only the first rank logs progress and saves the model; add `--local-ranks-filter 0` to see one rank's console. Choose the GPUs with `CUDA_VISIBLE_DEVICES`: every rank must see the same devices, as many as `--nproc-per-node`. PtychoPINN trains this way. A backend that trains on one device only is refused under a launch of more than one process, and any launch across more than one node is refused.
+Each rank runs the library in a child process that joins one process group, and only the first rank logs progress and saves the model; add `--local-ranks-filter 0` to see one rank's console. Choose the GPUs with `CUDA_VISIBLE_DEVICES`: every rank must see the same devices, as many as `--nproc-per-node`. PtychoPINN trains this way. A library that trains on one device only is refused under a launch of more than one process, and any launch across more than one node is refused.

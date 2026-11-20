@@ -80,7 +80,7 @@ class DescribedField:
 
     Pairs the flattened description -- type, bounds, choices, label, tool tip --
     with the live parameter generated from it, which is everything needed to
-    put an editor on screen without knowing which backend it came from.
+    put an editor on screen without knowing which library it came from.
     """
 
     described: FlatParameter
@@ -203,7 +203,7 @@ class ProcessingParameterStore:
 
             # Created on first use and remembered across registrations, so
             # that several sections can feed one group and several
-            # reconstructors can share one. Two modes of the same backend are
+            # reconstructors can share one. Two modes of the same library are
             # configured by one set of keys, and a settings file has one
             # section for them.
             group = self._groups.get(section.group_name)
@@ -224,11 +224,11 @@ class ProcessingParameterStore:
         defaults: BaseModel,
         branches: Sequence[OptionsBranch] = (),
     ) -> None:
-        """Generate the live parameters for a backend that declares its own options.
+        """Generate the live parameters for a library that declares its own options.
 
         The same job as :meth:`register`, for a declaration ptychodus owns: the
         field names are the keys, the bounds and display text are already on the
-        fields, and nothing is overlaid or adapted. A backend reaches this
+        fields, and nothing is overlaid or adapted. A library reaches this
         instead of the other when it has nothing for a policy to say.
 
         Takes the name and the declaration rather than the object declaring them,
@@ -260,7 +260,7 @@ class ProcessingParameterStore:
         """Return the declared object carrying the values currently held.
 
         Falls back to the declared defaults for a reconstructor that was never
-        registered, so a caller does not have to know which backends have
+        registered, so a caller does not have to know which libraries have
         converted.
         """
         key = _compose_key(library, algorithm)
@@ -296,7 +296,7 @@ class ProcessingParameterStore:
 
         A key this reconstructor persists but ignores is left out. It is
         described away rather than never generated, because the group holding
-        it is shared: two reconstructors of one backend write the same section,
+        it is shared: two reconstructors of one library write the same section,
         and which of them was registered first must not decide what that
         section contains.
         """

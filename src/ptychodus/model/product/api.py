@@ -32,7 +32,7 @@ from .probe_repository import ProbeRepository
 from .repository import ProductRepository
 from .probe_positions.builder_factory import ProbePositionsBuilderFactory
 from .probe_positions.settings import ProbePositionsSettings
-from .scan_repository import ProbePositionsRepository
+from .probe_positions_repository import ProbePositionsRepository
 from .settings import ProductSettings
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,8 @@ class ProbePositionsAPI:
                     parameter = builder.parameters()[parameter_name]
                 except KeyError:
                     logger.warning(
-                        f'Scan builder "{builder.get_name()}" does not have parameter "{parameter_name}"!'
+                        f'Probe positions builder "{builder.get_name()}" does not have'
+                        f' parameter "{parameter_name}"!'
                     )
                 else:
                     parameter.set_value(parameter_value)
@@ -100,7 +101,7 @@ class ProbePositionsAPI:
     def open_probe_positions(
         self, index: int, file_path: Path, *, file_type: str | None = None
     ) -> None:
-        builder = self._builder_factory.create_scan_from_file(
+        builder = self._builder_factory.create_probe_positions_from_file(
             file_path,
             self._settings.file_type.get_value() if file_type is None else file_type,
         )
@@ -108,34 +109,38 @@ class ProbePositionsAPI:
         try:
             item = self._repository[index]
         except IndexError:
-            logger.warning(f'Failed to open scan {index}!')
+            logger.warning(f'Failed to open probe positions {index}!')
         else:
             item.set_builder(builder)
 
-    def copy_scan(self, source_index: int, destination_index: int) -> None:
+    def copy_probe_positions(self, source_index: int, destination_index: int) -> None:
         logger.debug(f'Copying {source_index} -> {destination_index}')
 
         try:
             source_item = self._repository[source_index]
         except IndexError:
-            logger.warning(f'Failed to access source scan {source_index} for copying!')
+            logger.warning(f'Failed to access source probe positions {source_index} for copying!')
             return
 
         try:
             destination_item = self._repository[destination_index]
         except IndexError:
-            logger.warning(f'Failed to access destination scan {destination_index} for copying!')
+            logger.warning(
+                f'Failed to access destination probe positions {destination_index} for copying!'
+            )
             return
 
         destination_item.assign_item(source_item)
 
-    def save_scan(self, index: int, file_path: Path, file_type: str) -> None:
+    def save_probe_positions(self, index: int, file_path: Path, file_type: str) -> None:
         try:
             item = self._repository[index]
         except IndexError:
-            logger.warning(f'Failed to save scan {index}!')
+            logger.warning(f'Failed to save probe positions {index}!')
         else:
-            self._builder_factory.save_scan(file_path, file_type, item.get_probe_positions())
+            self._builder_factory.save_probe_positions(
+                file_path, file_type, item.get_probe_positions()
+            )
 
 
 class ProbeAPI:

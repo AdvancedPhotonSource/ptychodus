@@ -1,11 +1,11 @@
-"""The devices a spawned backend may use, probed once and chosen by settings.
+"""The devices a spawned library may use, probed once and chosen by settings.
 
 The probe costs a spawned child that imports torch, so it is taken on first
 request rather than at startup: a run that never asks which devices exist
 should not pay to find out, and a machine whose GPU stack is broken should
 still start.
 
-The selection is ptychodus's own, not any backend's. It is persisted as the
+The selection is ptychodus's own, not any library's. It is persisted as the
 identifiers themselves rather than as indices, so a settings file written on a
 four-GPU host still means something on a one-GPU host -- the entries that no
 longer resolve are dropped with a warning instead of silently renumbering onto

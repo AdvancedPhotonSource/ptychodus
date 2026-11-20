@@ -3,7 +3,7 @@
 Separate from the driver because three processes need it and only one of them may pull in
 a GPU stack: the parent reads the file and plans the run, each worker re-reads the same
 text to rebuild its own copy, and neither path should import torch to do so. Nothing here
-imports a reconstruction backend.
+imports a reconstruction library.
 
 The settings are a file rather than command-line flags so that a run is reproducible from
 something archivable, and the file is the *only* source: a tuning value that is not in it
@@ -383,7 +383,7 @@ class WorkerMessage(StrEnum):
     on: it renders the record that goes out, so it names the tag that comes back.
 
     A string enum because the value is what travels. The value is the worker's
-    own word and means a scan-completion record -- not a reconstruction result,
+    own word and means a scan-completion record -- not a reconstruction,
     which is a different child's vocabulary and travels under its own tag.
     """
 

@@ -45,7 +45,7 @@ class <Feature>Settings(Observable, Observer):
             self.notify_observers()
 ```
 
-**Two idioms exist; this is the one to use.** A hand-written `*Settings` class, which builds its own group and names its own keys, backs every subsystem except the reconstructor backends. Those are migrating to the other idiom: the backend returns a nested pydantic object from `Reconstructor.get_default_options()` describing what it accepts, and `model/processing/` generates the live parameters, the INI keys and the display text from it. That path is reached only through `ProcessingParameterStore`, so a new `*Core` cannot use it — write the class above.
+**Two idioms exist; this is the one to use.** A hand-written `*Settings` class, which builds its own group and names its own keys, backs every subsystem except the reconstruction libraries. Those are migrating to the other idiom: a reconstructor returns a nested pydantic object from `Reconstructor.get_default_options()` describing what it accepts, and `model/processing/` generates the live parameters, the INI keys and the display text from it. That path is reached only through `ProcessingParameterStore`, so a new `*Core` cannot use it — write the class above.
 
 What the new idiom is worth copying for is its discipline: a parameter states its bounds and its display text where it is declared, not in the controller that renders it. A hand-written class can do the first half today by passing `minimum=` and `maximum=`, and should.
 

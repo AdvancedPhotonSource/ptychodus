@@ -190,13 +190,13 @@ def _require(h5_file: h5py.File, key: str) -> Any:
 def _read_positions(
     h5_file: h5py.File, object_extent_px: tuple[int, int], pixel_height_m: float
 ) -> ProbePositionSequence:
-    """Read the scan, converting to meters when it was stored in pixels.
+    """Read the probe positions, converting to meters when they were stored in pixels.
 
-    PtychoFM infers the unit from the span: a scan reaching between a tenth and ten
-    times the object's own extent along both axes is already in pixels, and anything
+    PtychoFM infers the unit from the span: positions reaching between a tenth and ten
+    times the object's own extent along both axes are already in pixels, and anything
     else is in meters. Reproduced rather than reinvented, because a reader that
-    disagreed with the trainer about the unit would describe a different scan. The
-    trainer never consults the pixel width, so neither does this.
+    disagreed with PtychoFM's training about the unit would describe different positions.
+    PtychoFM never consults the pixel width, so neither does this.
     """
     x_m = numpy.asarray(_require(h5_file, ProductFileKeys.PROBE_POSITION_X)[()], dtype=float)
     y_m = numpy.asarray(_require(h5_file, ProductFileKeys.PROBE_POSITION_Y)[()], dtype=float)

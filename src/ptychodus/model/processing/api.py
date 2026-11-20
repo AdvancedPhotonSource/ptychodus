@@ -40,14 +40,14 @@ def _algorithm_tag(library: str, algorithm: str) -> str:
 
     One token, because the de-duplication below recognizes the tag a product
     already carries by matching the end of its name. Both halves, because two
-    backends may offer an algorithm of the same name. An empty half is
+    libraries may offer an algorithm of the same name. An empty half is
     dropped, so an unresolved selection cannot leave a trailing separator.
     """
     return '_'.join(part.casefold() for part in (library, algorithm) if part)
 
 
 def _build_output_product_name(input_name: str, algorithm: str, suffix: str) -> str:
-    """Name a reconstruction output after its input product.
+    """Name a reconstruction after its input product.
 
     The collision counter is stripped first so that continuing a reconstruction from an
     earlier output recognizes the algorithm tag it already carries and lets the counter
@@ -70,7 +70,7 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
 
     Scoped to the library beside it: the values this accepts are whatever
     that library offers, so changing the library changes what this means.
-    Spelled as the backend spells it, resolved case-insensitively, and
+    Spelled as the library spells it, resolved case-insensitively, and
     written back canonicalized.
     """
 
@@ -88,7 +88,7 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
         self._current = ''
         self._current_reconstructor: Reconstructor | None = None
         # The last algorithm chosen for each library this session, so that
-        # looking at another backend and coming back does not quietly land
+        # looking at another library and coming back does not quietly land
         # somewhere else. Not persisted: a key per library is more than a
         # settings file should carry for a convenience.
         self._remembered: dict[str, str] = {}
@@ -101,7 +101,7 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
         try:
             return self._library.get_value()
         except LookupError:
-            # No backend registered at all, which only a test arranges.
+            # No library registered at all, which only a test arranges.
             return ''
 
     def _available(self) -> Sequence[Reconstructor]:
@@ -112,7 +112,7 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
             return []
 
     def choices(self) -> Iterator[str]:
-        """Yield every value this parameter accepts, as the backend spells it."""
+        """Yield every value this parameter accepts, as the library spells it."""
         for reconstructor in self._available():
             yield reconstructor.name
 
@@ -121,7 +121,7 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
 
         An unresolvable name is stood in for, so the application is usable --
         but it is not written back unless *persist*. A settings file naming a
-        backend or an algorithm this install lacks is an ordinary thing to
+        library or an algorithm this install lacks is an ordinary thing to
         carry between machines, and rewriting the key would lose the choice
         the first time it was opened somewhere that could not resolve it.
 
@@ -260,7 +260,7 @@ class ProcessingAPI:
     def _options_for(self, reconstructor: Reconstructor) -> BaseModel:
         """Return the options to run *reconstructor* with, as currently edited.
 
-        The store is keyed the same way the algorithm selection is, so the values
+        The parameter store is keyed the same way the algorithm selection is, so the values
         served are the ones behind the panel the user was just looking at.
         """
         library, algorithm = self._algorithm_parameter.get_current_parts()
@@ -329,9 +329,7 @@ class ProcessingAPI:
 
         if reconstructor is None:
             selected_library, _ = self.current_selection()
-            raise RuntimeError(
-                f'{selected_library} offers no reconstructor; is its backend installed?'
-            )
+            raise RuntimeError(f'{selected_library} offers no reconstructor; is it installed?')
 
         input_product_item = self._product_api.get_item(product_index)
         output_product_name = _build_output_product_name(
@@ -440,7 +438,7 @@ class ProcessingAPI:
         `file_type` names a training-data writer by its simple or display name; None
         writes the format `get_default_training_data_file_type` answers. The selected
         reconstructor plays no part beyond that default, so every format is on offer
-        whether or not its backend is installed.
+        whether or not its library is installed.
 
         Raises:
             LookupError: when `file_type` names no registered writer.
@@ -502,7 +500,7 @@ class ProcessingAPI:
     def stage_train_inputs(self, directory: Path, *, product_index: int) -> None:
         """Write what ``ptychodus-train -i directory`` trains on, as now selected.
 
-        The product's training data in the selected backend's format, and the selected
+        The product's training data in the selected library's format, and the selected
         options as ``train_options.yaml``.
 
         Raises:
@@ -534,14 +532,14 @@ class ProcessingAPI:
         block: bool = False,
     ) -> None:
         self.set_reconstructor_if_provided(library=library, algorithm=algorithm)
-        trainer = self._algorithm_parameter.get_current_reconstructor()
+        reconstructor = self._algorithm_parameter.get_current_reconstructor()
 
-        if isinstance(trainer, TrainableReconstructor):
+        if isinstance(reconstructor, TrainableReconstructor):
             reconstruct_input = self.get_reconstruct_input(product_index=product_index)
-            options = self._options_for(trainer)
+            options = self._options_for(reconstructor)
             background_task = TrainBackgroundTask(
                 self._task_monitor,
-                trainer,
+                reconstructor,
                 reconstruct_input,
                 input_directory,
                 output_directory,
@@ -569,10 +567,10 @@ class ProcessingAPI:
         }
 
     def get_default_training_data_file_type(self) -> str:
-        """Name the format to export in when none is chosen: the selected backend's own.
+        """Name the format to export in when none is chosen: the selected library's own.
 
-        A backend's format is the writer registered under the same simple name as the
-        backend's library; that shared name is the whole of the association. A backend
+        A library's format is the writer registered under the same simple name as the
+        library; that shared name is the whole of the association. A library
         without one, or a selection that resolves to none, falls back to CXI.
         """
         library, _ = self.current_selection()
@@ -583,10 +581,10 @@ class ProcessingAPI:
         self, *, library: str | None = None, algorithm: str | None = None
     ) -> str:
         self.set_reconstructor_if_provided(library=library, algorithm=algorithm)
-        trainer = self._algorithm_parameter.get_current_reconstructor()
+        reconstructor = self._algorithm_parameter.get_current_reconstructor()
 
-        if isinstance(trainer, TrainableReconstructor):
-            return trainer.get_model_file_description()
+        if isinstance(reconstructor, TrainableReconstructor):
+            return reconstructor.get_model_file_description()
         else:
             logger.warning('Algorithm is not trainable!')
 
@@ -596,17 +594,17 @@ class ProcessingAPI:
         self, *, library: str | None = None, algorithm: str | None = None
     ) -> tuple[str, ...]:
         self.set_reconstructor_if_provided(library=library, algorithm=algorithm)
-        trainer = self._algorithm_parameter.get_current_reconstructor()
+        reconstructor = self._algorithm_parameter.get_current_reconstructor()
 
-        if isinstance(trainer, TrainableReconstructor):
-            return trainer.get_model_file_extensions()
+        if isinstance(reconstructor, TrainableReconstructor):
+            return reconstructor.get_model_file_extensions()
         else:
             logger.warning('Algorithm is not trainable!')
 
         return ()
 
     def available_libraries(self) -> Iterator[str]:
-        """Yield every reconstructor backend in play, as each is named."""
+        """Yield every reconstruction library in play, as each is named."""
         return self._library_parameter.choices()
 
     def available_algorithms(self, library: str | None = None) -> Iterator[str]:
@@ -614,7 +612,7 @@ class ProcessingAPI:
 
         Asking about a library does not select it. Enumerating what is on
         offer is exactly what a panel does at startup, and a listing that
-        selected as it went would walk the selection through every backend
+        selected as it went would walk the selection through every library
         and leave it on the last.
         """
         name = self._library_parameter.get_value() if library is None else library

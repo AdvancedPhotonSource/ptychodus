@@ -17,7 +17,7 @@ from .dashboard import DashboardDialog, MetricsGroupView, MetricsTableView, Plot
 
 
 class ProbePositionsMetricsDialog(DashboardDialog):
-    """What one scan's positions say about its indexing, extent and step sizes."""
+    """What one set of probe positions says about its indexing, extent and step sizes."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -40,7 +40,7 @@ class ProbePositionsMetricsDialog(DashboardDialog):
         self.center_y_label = self.extent_group.add_row('Center Y [µm]')
         self.hull_area_label = self.extent_group.add_row(
             'Convex Hull Area [µm²]',
-            'Zero for fewer than three positions or a one-dimensional scan',
+            'Zero for fewer than three positions or a one-dimensional probe path',
         )
         self.density_label = self.extent_group.add_row('Density [1/µm²]')
 
@@ -61,8 +61,8 @@ class ProbePositionsMetricsDialog(DashboardDialog):
 
         self.finish_numbers()
 
-        self.scan_plot_view = PlotView()
-        self.images_layout.addWidget(self.scan_plot_view, 0, 0)
+        self.probe_positions_plot_view = PlotView()
+        self.images_layout.addWidget(self.probe_positions_plot_view, 0, 0)
 
         self.plot_view = PlotView()
         self.plot_view.figure.clear()
@@ -71,7 +71,7 @@ class ProbePositionsMetricsDialog(DashboardDialog):
 
 
 class ProbePositionsCompareDialog(DashboardDialog):
-    """How a test scan's positions are displaced from a reference scan's."""
+    """How a test set of probe positions is displaced from a reference set."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)

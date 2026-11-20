@@ -35,7 +35,7 @@ from .probe_positions import (
     ProbePositionsRepositoryItemFactory,
     ProbePositionsSettings,
 )
-from .scan_repository import ProbePositionsRepository
+from .probe_positions_repository import ProbePositionsRepository
 from .settings import ProductSettings
 
 
@@ -66,9 +66,9 @@ class ProductCore(Observer):
         rng: numpy.random.Generator,
         settings_registry: SettingsRegistry,
         diffraction_api: DiffractionAPI,
-        scan_generator_chooser: PluginCatalog[ProbePositionsGenerator],
-        scan_file_reader_chooser: PluginChooser[ProbePositionFileReader],
-        scan_file_writer_chooser: PluginChooser[ProbePositionFileWriter],
+        probe_positions_generator_chooser: PluginCatalog[ProbePositionsGenerator],
+        probe_positions_file_reader_chooser: PluginChooser[ProbePositionFileReader],
+        probe_positions_file_writer_chooser: PluginChooser[ProbePositionFileWriter],
         probe_generator_chooser: PluginCatalog[ProbeGenerator],
         fresnel_zone_plate_chooser: PluginCatalog[FresnelZonePlate],
         kb_mirror_chooser: PluginCatalog[KirkpatrickBaezMirrorPreset],
@@ -85,16 +85,16 @@ class ProductCore(Observer):
         super().__init__()
         self.settings = ProductSettings(settings_registry)
 
-        self._scan_settings = ProbePositionsSettings(settings_registry)
-        self._scan_builder_factory = ProbePositionsBuilderFactory(
+        self._probe_positions_settings = ProbePositionsSettings(settings_registry)
+        self._probe_positions_builder_factory = ProbePositionsBuilderFactory(
             rng,
-            self._scan_settings,
-            scan_generator_chooser,
-            scan_file_reader_chooser,
-            scan_file_writer_chooser,
+            self._probe_positions_settings,
+            probe_positions_generator_chooser,
+            probe_positions_file_reader_chooser,
+            probe_positions_file_writer_chooser,
         )
-        self._scan_repository_item_factory = ProbePositionsRepositoryItemFactory(
-            rng, self._scan_settings, self._scan_builder_factory
+        self._probe_positions_repository_item_factory = ProbePositionsRepositoryItemFactory(
+            rng, self._probe_positions_settings, self._probe_positions_builder_factory
         )
 
         self._probe_settings = ProbeSettings(settings_registry)
@@ -126,7 +126,7 @@ class ProductCore(Observer):
         self.product_repository = ProductRepository()
         self._item_factory = ProductRepositoryItemFactory(
             self.settings,
-            self._scan_repository_item_factory,
+            self._probe_positions_repository_item_factory,
             self._probe_repository_item_factory,
             self._object_repository_item_factory,
             self.product_repository,
@@ -147,7 +147,9 @@ class ProductCore(Observer):
         diffraction_api.get_repository().add_observer(self._dataset_orphan_observer)
         self.probe_positions_repository = ProbePositionsRepository(self.product_repository)
         self.probe_positions_api = ProbePositionsAPI(
-            self._scan_settings, self.probe_positions_repository, self._scan_builder_factory
+            self._probe_positions_settings,
+            self.probe_positions_repository,
+            self._probe_positions_builder_factory,
         )
         self.probe_repository = ProbeRepository(self.product_repository)
         self.probe_api = ProbeAPI(
@@ -163,10 +165,12 @@ class ProductCore(Observer):
             product_file_reader_chooser, self.settings.file_type
         )
         product_file_writer_chooser.set_current_plugin(self.settings.file_type.get_value())
-        self.scan_file_reader_parameter = PluginChooserParameter(
-            scan_file_reader_chooser, self._scan_settings.file_type
+        self.probe_positions_file_reader_parameter = PluginChooserParameter(
+            probe_positions_file_reader_chooser, self._probe_positions_settings.file_type
         )
-        scan_file_writer_chooser.set_current_plugin(self._scan_settings.file_type.get_value())
+        probe_positions_file_writer_chooser.set_current_plugin(
+            self._probe_positions_settings.file_type.get_value()
+        )
         self.probe_file_reader_parameter = PluginChooserParameter(
             probe_file_reader_chooser, self._probe_settings.file_type
         )

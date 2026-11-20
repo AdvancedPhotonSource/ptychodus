@@ -2,10 +2,10 @@
 
 The keys and defaults are checked against the golden settings fixture, because
 a missing key orphans a saved setting silently and a slipped default changes
-what a run computes while every key still matches. And the config the backend
+what a run computes while every key still matches. And the config the library
 receives is checked against the dict ``_build_config`` hands it today.
 
-That second one is the property specific to this backend: upstream resolves
+That second one is the property specific to this library: upstream resolves
 pretrained encoder sizes, validation batch size and dataset normalization from a
 field having *no value*, so the declaration may set only what ptychodus surfaces
 or freezes. ``model_dump(exclude_unset=True)`` is what preserves that, and it is
@@ -211,7 +211,7 @@ def test_the_frozen_fields_hold_the_values_declared_for_them() -> None:
         assert getattr(restored.data, name) == value, name
 
 
-def test_the_config_the_backend_receives_is_what_the_declaration_sets() -> None:
+def test_the_config_the_library_receives_is_what_the_declaration_sets() -> None:
     """Only the surfaced fields, plus the two that are not settings at all.
 
     The hand-built dict this once compared against went with the settings
@@ -235,7 +235,7 @@ def test_the_config_the_backend_receives_is_what_the_declaration_sets() -> None:
 def test_each_operation_is_sent_only_the_branches_it_reads() -> None:
     """Training values do not reach an inference run, nor the reverse.
 
-    Narrowing here is hygiene rather than a fix -- the backend ignored what it
+    Narrowing here is hygiene rather than a fix -- the library ignored what it
     did not read either way -- but a config that changed when an unrelated
     setting was edited is one nobody can diff.
     """

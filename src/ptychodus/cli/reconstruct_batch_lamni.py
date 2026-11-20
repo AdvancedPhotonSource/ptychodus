@@ -148,7 +148,7 @@ __all__ = [
     'plan_batch_lamni',
     'reconstruct_batch_lamni',
     'report_plan',
-    'visible_accelerators',
+    'visible_gpus',
 ]
 
 logger = logging.getLogger('reconstruct_batch_lamni')
@@ -158,8 +158,8 @@ DIFFRACTION_READER = 'APS_LamNI'
 _WORKER_ENTRY = 'ptychodus.cli._batch_lamni_worker:reconstruct_scan'
 
 
-def visible_accelerators() -> list[Device]:
-    """The accelerators this run may fan out across, one worker each.
+def visible_gpus() -> list[Device]:
+    """The GPUs this run may fan out across, one worker each.
 
     Probed in a throwaway child by the shared device layer, which also owns the
     arithmetic that makes an inherited mask compose correctly. Empty when this
@@ -227,7 +227,7 @@ def _worker_loop(
     waits on its events; the thread never does work of its own, so a thread apiece costs
     nothing against the reconstruction it is waiting for.
 
-    The worker writes every artifact itself, into that scan's own directory, so nothing of
+    The worker writes every file itself, into that scan's own directory, so nothing of
     substance comes back. The child's log records are dispatched into this process's
     logging tree by the subprocess protocol, and all that is awaited here is how it ended.
     """
@@ -488,8 +488,8 @@ def reconstruct_batch_lamni(
         else settings.diffraction.max_valid_count
     )
 
-    # The same cut each scan's pipeline applies, so the frame the beam center is estimated
-    # from matches the frames that will be reconstructed.
+    # The same cut each scan's pipeline applies, so the pattern the beam center is estimated
+    # from matches the patterns that will be reconstructed.
     value_filter: FilterValuesStep | None = None
 
     if max_valid_count is not None:
@@ -517,22 +517,20 @@ def reconstruct_batch_lamni(
 
     tally = _Tally()
     work = _queue_pending_scans(settings, selected, tally)
-    accelerators = visible_accelerators()
+    gpus = visible_gpus()
     available = [device.identifier for device in probe_devices()]
 
-    if accelerators:
+    if gpus:
         logger.info(
             'Reconstructing %d scan(s) across %d device(s): %s',
             work.qsize(),
-            len(accelerators),
-            ', '.join(device.identifier for device in accelerators),
+            len(gpus),
+            ', '.join(device.identifier for device in gpus),
         )
-        environments = [
-            visibility_environment([device.identifier], available) for device in accelerators
-        ]
+        environments = [visibility_environment([device.identifier], available) for device in gpus]
     else:
         logger.warning(
-            'No accelerators are visible. Reconstructing %d scan(s) one at a time on the '
+            'No GPUs are visible. Reconstructing %d scan(s) one at a time on the '
             'CPU, which will be very slow. Set CUDA_VISIBLE_DEVICES, or ask the job '
             'scheduler for GPUs.',
             work.qsize(),

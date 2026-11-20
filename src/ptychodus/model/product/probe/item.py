@@ -54,12 +54,12 @@ class ProbeRepositoryItem(ParameterGroup):
     def get_probes(self) -> ProbeEnsemble:
         return self._probe_seq
 
-    def get_num_scan_points(self) -> int:
+    def get_num_probe_positions(self) -> int:
         """Number of probe positions this probe is being built against.
 
         Named after the geometry-provider property it forwards.
         """
-        return self._geometry_provider.num_scan_points
+        return self._geometry_provider.num_probe_positions
 
     def can_estimate_size_from_diffraction(self) -> bool:
         """Whether the builder has a size to estimate and the product has data to estimate it from."""

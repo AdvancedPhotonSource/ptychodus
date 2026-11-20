@@ -771,7 +771,7 @@ def compute_probe_positions_metrics_report(product: Product) -> ProbePositionsMe
     index_gaps = _index_gaps(anchor_indexes)
     nn_mean, nn_median, nn_minimum, nn_maximum = _nan_statistics(nearest_neighbor_distance_m)
 
-    i0 = positions.get_probe_photon_counts()
+    i0 = positions.get_i0()
     i0_photons_per_count = product.metadata.i0_photons_per_count
     i0_is_calibrated = i0 is not None and i0_photons_per_count > 0.0
 
@@ -871,7 +871,7 @@ def compute_probe_positions_comparison_report(
     if _resolve_exit_transform(test.metadata) != reference_transform:
         raise ValueError(
             'The reference and test positions are in different frames; their scattering'
-            ' geometries map the scan differently, so displacements would mix frames.'
+            ' geometries map the probe positions differently, so displacements would mix frames.'
         )
 
     indexes, reference_xy_m, test_xy_m = reference.probe_positions.match_indexes(

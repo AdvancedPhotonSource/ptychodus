@@ -3,7 +3,7 @@
 Device selection is placement, not configuration. Which GPU a reconstruction
 runs on says nothing about the algorithm it runs, and the process that spawns
 the child is the one in a position to decide it -- so the decision lives here,
-beside the spawn, and a backend neither declares nor receives it.
+beside the spawn, and a library neither declares nor receives it.
 
 A device is named by an opaque identifier rather than an integer index, because
 the index alone cannot say which runtime is being indexed: builds exist for
@@ -12,9 +12,9 @@ The identifier carries the family, which is what decides the variable its
 runtime reads.
 
 **The CPU is a device in this list.** Choosing where to run and choosing whether
-to use an accelerator at all are the same question asked once, so a selection
-naming only the CPU masks every accelerator away and a backend that asks its
-framework what it can see finds nothing. That is what lets a backend hold no
+to use a GPU at all are the same question asked once, so a selection
+naming only the CPU masks every GPU away and a library that asks its
+framework what it can see finds nothing. That is what lets a library hold no
 device option of its own.
 
 **Restriction is a mask over a mask.** A probe inherits whatever mask the parent
@@ -63,7 +63,7 @@ class Device:
     name: str
 
 
-# Always present, and the only way a selection says 'no accelerator'.
+# Always present, and the only way a selection says 'no GPU'.
 CPU = Device('cpu', 'CPU')
 
 
@@ -122,7 +122,7 @@ def probe_devices(*, terminate_grace_sec: float = 5.0) -> Sequence[Device]:
 
     Always reports at least the CPU, so a selection can still say where a run
     should go. Every failure is non-fatal: a broken GPU stack should cost a
-    user the accelerators it could not enumerate, not the application, and not
+    user the GPUs it could not enumerate, not the application, and not
     the one device that is there whatever happens.
     """
     try:
@@ -154,7 +154,7 @@ def visibility_environment(
 
     *available* is every identifier the probe reported. A family that appears
     there and is named by nothing in *selected* is masked to empty, so that
-    selecting the CPU hides the accelerators rather than silently leaving them
+    selecting the CPU hides the GPUs rather than silently leaving them
     in reach. Only families that were actually probed are touched: writing a
     mask for a runtime this machine does not have risks hiding the one it does,
     since HIP reads CUDA's variable as well as its own.

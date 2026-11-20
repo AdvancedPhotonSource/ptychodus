@@ -31,6 +31,32 @@ KIND_TO_MODEL: dict[str, type[Campaign | Diffraction | Product | Fluorescence]] 
 }
 
 
+async def count_rows(
+    session: AsyncSession, model: type[Campaign | Diffraction | Product | Fluorescence]
+) -> int:
+    """Count every row on the table for `model`, whatever its ingest state."""
+    return int((await session.execute(select(func.count()).select_from(model))).scalar_one())
+
+
+async def count_invalid_rows(session: AsyncSession) -> int:
+    """Count the rows on every resource table that are invalid, missing files or orphaned."""
+    total = 0
+
+    for model in KIND_TO_MODEL.values():
+        stmt = (
+            select(func.count())
+            .select_from(model)
+            .where(
+                model.ingest_state.in_(
+                    [IngestState.INVALID, IngestState.MISSING_FILES, IngestState.ORPHANED]
+                )
+            )
+        )
+        total += int((await session.execute(stmt)).scalar_one())
+
+    return total
+
+
 async def upsert_row(session: AsyncSession, kind: str, values: dict[str, Any]) -> None:
     """Insert or update one row keyed by `values['uuid']` on the table for `kind`."""
     model = KIND_TO_MODEL[kind]

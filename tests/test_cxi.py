@@ -158,7 +158,7 @@ def test_every_variant_reads_back_the_whole_product(tmp_path: Path, variant: CXI
         with_opr=True,
         with_layer_spacing=True,
         with_losses=True,
-        with_position_photon_counts=True,
+        with_i0=True,
     )
     path = tmp_path / 'product.cxi'
 

@@ -16,15 +16,15 @@ and registering them still gives shifts that grow with ``q`` -- a systematic slo
 the scatter of the fit cannot reveal.
 
 Fitting a full matrix instead, ``s = a + M q``, checks the detector's orientation: in a
-detector whose frames reach the scan's frame through flips and a transpose with
+detector whose frames reach the probe positions' frame through flips and a transpose with
 coordinate map ``U``, ``M = -lambda * z * U``. Negating ``z`` negates ``U``, which is the
 same as rotating the detector by half a turn, so the parallax alone leaves the two
 apart; a reflection is unambiguous.
 
 Off the forward direction (Bragg or Laue), the probe's curvature is still set across the
-incident beam, so in the exit frame it is stretched by the map ``T`` from the scan to the
+incident beam, so in the exit frame it is stretched by the map ``T`` from the probe positions to the
 exit frame: the ray reaching frequency ``q`` leaves from ``(A^T A)^-1 lambda z q`` with
-``A = T^-1``, and the scan carries it there through ``T``. The shifts are therefore
+``A = T^-1``, and the probe positions carry it there through ``T``. The shifts are therefore
 ``M = -lambda * z * T^T * U``, which makes the fitted matrix a check on the scattering
 angles that needs no reconstruction (:func:`compute_geometry_mismatch`).
 """
@@ -54,7 +54,7 @@ from .probe import ProbeGeometry, estimate_probe_extent
 from .probe_positions import ProbePositionSequence
 from .scattering.frame import compute_exit_frame_transform
 from .scattering.geometry import ScatteringGeometry
-from .simulate.object import interpolate_scan_values
+from .simulate.object import interpolate_position_values
 from .typing import BooleanArrayType, RealArrayType
 
 __all__ = [
@@ -132,7 +132,7 @@ def estimate_defocus_from_assembled_data(
     """Estimate the defocus from assembled far-field patterns, in one binned pass.
 
     The patterns are binned *bin_size_px* detector pixels a side as their moments are
-    accumulated, with the data's own bad pixels, background and flat field; the totals are
+    accumulated, with the data's own bad pixels, background and flat field; the detector sums are
     corrected for beam decay by the I0 the positions carry, converted at
     *i0_photons_per_count* (see :func:`estimate_incident_beam`); and the corrected moments
     go to :func:`estimate_defocus_from_parallax`, which keeps at most *max_bins* of the
@@ -158,7 +158,7 @@ def estimate_defocus_from_assembled_data(
 
     corrected = estimate_incident_beam(
         moments,
-        probe_positions.get_probe_photon_counts_by_index(),
+        probe_positions.get_i0_by_index(),
         i0_photons_per_count=i0_photons_per_count,
     ).moments
     return estimate_defocus_from_parallax(
@@ -199,8 +199,8 @@ def estimate_defocus_from_parallax(
        which bounds the memory the images take: fewer bins scatter the slope more and
        cost less.
     2. Each kept bin's values are mapped onto *object_geometry* by
-       :func:`interpolate_scan_values`, pairing patterns with *probe_positions* by
-       index, *chunk_bins* bins at a time, and cropped to the scan's hull before the
+       :func:`interpolate_position_values`, pairing patterns with *probe_positions* by
+       index, *chunk_bins* bins at a time, and cropped to the probe positions' hull before the
        next chunk is mapped; a smaller chunk lowers the peak memory at no cost in the
        result.
     3. Each image is registered against their mean to ``1 / upsample_factor`` of a
@@ -220,7 +220,7 @@ def estimate_defocus_from_parallax(
     three positions pair with a pattern.
 
     Raises:
-        ValueError: if *moments* holds no binned patterns, its frames do not match
+        ValueError: if *moments* holds no binned patterns, its patterns do not match
             *probe_geometry*, or *max_bins* is below *minimum_bins*.
     """
     measured = _measure_bin_shifts(
@@ -268,7 +268,7 @@ def estimate_defocus_from_parallax(
 
 @dataclass(frozen=True)
 class DetectorOrientation:
-    """The flips and transpose that bring a detector's frames into the scan's frame.
+    """The flips and transpose that bring a detector's frames into the probe positions' frame.
 
     They are applied as the prep pipeline applies its steps: the horizontal flip, then
     the vertical flip, then the transpose. `matrix` is what they do to a detector
@@ -352,7 +352,7 @@ class ParallaxTransform:
 
     @property
     def is_reflection(self) -> bool:
-        """Whether the detector is mirrored relative to the scan, which no sign of z undoes."""
+        """Whether the detector is mirrored relative to the positions, which no sign of z undoes."""
         return float(numpy.linalg.det(self.matrix_m2)) < 0.0
 
     @property
@@ -375,10 +375,10 @@ class ParallaxTransform:
         )
 
     def position_correction(self) -> AffineTransform:
-        """The transform to apply to the recorded positions to align the scan with the detector.
+        """The transform to apply to the recorded positions to align them with the detector.
 
         The same for both candidates: it is what is left of ``M`` once the orientation and
-        ``-lambda * |z|`` are divided out, inverted, since what is left takes scan
+        ``-lambda * |z|`` are divided out, inverted, since what is left takes position
         coordinates aligned with the detector onto the recorded positions. Its scale is one
         and its translation zero: the parallax cannot tell a scale error in the positions
         from the defocus magnitude, and measures no offset. Its matrix entries go into the
@@ -395,7 +395,7 @@ class ParallaxTransform:
     def components(self) -> AffineTransformComponents:
         """The :meth:`position_correction` as rotation, asymmetry and shear, scale one.
 
-        In :class:`AffineTransformComponents`' convention, pty-chi's: a scan rotated from x
+        In :class:`AffineTransformComponents`' convention, pty-chi's: probe positions rotated from x
         towards y relative to the detector needs a negative rotation to correct, and an
         asymmetry or a shear means a position axis is miscalibrated.
 
@@ -437,7 +437,7 @@ def estimate_parallax_transform(
     three positions pair with a pattern.
 
     Raises:
-        ValueError: if *moments* holds no binned patterns, its frames do not match
+        ValueError: if *moments* holds no binned patterns, its patterns do not match
             *probe_geometry*, *minimum_bins* is below four, or *max_bins* is below
             *minimum_bins*.
     """
@@ -491,7 +491,7 @@ def compute_geometry_mismatch(
     """How far a fitted parallax matrix is from the one *geometry* predicts, scale free.
 
     With the positions as the scan recorded them, *geometry* predicts ``M`` proportional to
-    ``T^T U``: ``T`` takes the scan to the exit frame
+    ``T^T U``: ``T`` takes the probe positions to the exit frame
     (:func:`~ptychodus.api.scattering.frame.compute_exit_frame_transform`) and ``U`` is *orientation*'s map.
     The transpose, not the inverse, because the probe's curvature belongs to the incident
     beam (see the module docstring); the two agree only for a mirror. Both matrices are
@@ -529,7 +529,7 @@ def _depth_of_focus_m(
 ) -> float:
     """The probe's depth of focus, from the second moments of the mean pattern."""
     return estimate_probe_extent(
-        moments.mean_frame,
+        moments.mean_pattern,
         probe_geometry,
         photon_wavelength_m=photon_wavelength_m,
         defocus_distance_m=defocus_distance_m,
@@ -563,9 +563,9 @@ def _measure_bin_shifts(
     if binned_patterns is None or binning is None:
         raise ValueError('Parallax needs moments accumulated with a binning step!')
 
-    if moments.mean_frame.shape != (probe_geometry.height_px, probe_geometry.width_px):
+    if moments.mean_pattern.shape != (probe_geometry.height_px, probe_geometry.width_px):
         raise ValueError(
-            f'Frames of shape {moments.mean_frame.shape} do not match the '
+            f'Patterns of shape {moments.mean_pattern.shape} do not match the '
             f'{probe_geometry.height_px} x {probe_geometry.width_px} probe!'
         )
 
@@ -595,7 +595,7 @@ def _measure_bin_shifts(
     images = numpy.concatenate(
         [
             _crop_to_contrast(
-                *interpolate_scan_values(
+                *interpolate_position_values(
                     object_geometry, positions, values[:, start : start + chunk_bins]
                 )
             )

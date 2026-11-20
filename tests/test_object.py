@@ -532,7 +532,7 @@ class TestComputeObjectGeometry:
 
         geometry = compute_object_geometry(positions, probe)
 
-        # A single scan point has zero bounding-box extent, so the object is the probe
+        # A single probe position has zero bounding-box extent, so the object is the probe
         # canvas centered on that point, plus one pixel per even axis: the probe's axis,
         # pixel N // 2, leaves it half a pixel longer before the axis than after.
         assert geometry.width_px == 33
@@ -542,7 +542,7 @@ class TestComputeObjectGeometry:
         numpy.testing.assert_allclose(geometry.pixel_width_m, 1.0e-8)
         numpy.testing.assert_allclose(geometry.pixel_height_m, 1.0e-8)
 
-    def test_bounding_box_arithmetic_expands_canvas_by_scan_span(self) -> None:
+    def test_bounding_box_arithmetic_expands_canvas_by_position_span(self) -> None:
         probe = _make_probe_geometry(width_px=32, pixel_m=1.0e-8)
         # scan spans 200 nm in x, 100 nm in y around (100 nm, 50 nm)
         positions = _make_positions(
@@ -552,8 +552,8 @@ class TestComputeObjectGeometry:
 
         geometry = compute_object_geometry(positions, probe)
 
-        # width_m = scan_span + probe_width = 2e-7 + 32 * 1e-8 = 5.2e-7 -> 52 px, + 1
-        # height_m = scan_span + probe_height = 1e-7 + 32 * 1e-8 = 4.2e-7 -> 42 px, + 1
+        # width_m = position_span + probe_width = 2e-7 + 32 * 1e-8 = 5.2e-7 -> 52 px, + 1
+        # height_m = position_span + probe_height = 1e-7 + 32 * 1e-8 = 4.2e-7 -> 42 px, + 1
         assert geometry.width_px == 53
         assert geometry.height_px == 43
         numpy.testing.assert_allclose(geometry.center_x_m, 1.0e-7)

@@ -26,7 +26,7 @@ class ProbeRepositoryItemFactory:
     def _warn_if_conditioning_ignored(self) -> None:
         """Note that the mode settings do not apply to in-memory probes.
 
-        A probe supplied in memory comes from reconstruction output or a product
+        A probe supplied in memory comes from a reconstruction or a product
         loaded from file, so its mode structure is already what the reconstructor
         solved for, and a mode count set in the settings would otherwise silently
         do nothing. Set the mode counts on the run that produces the probe instead

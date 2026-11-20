@@ -1,6 +1,6 @@
 """The frame cdtools' FancyPtycho places probes in, and the checks before a run.
 
-Needs no backend installed: the mapping is numpy. ``test_cdtools_reconstruct.py``
+Needs no library installed: the mapping is numpy. ``test_cdtools_reconstruct.py``
 confirms against cdtools itself that the frame puts the probe where ptychodus does.
 """
 
@@ -127,7 +127,7 @@ class TestTranslationOffsets:
             pixel_height_m=PIXEL_HEIGHT_M,
         )
         assert [p.index for p in moved] == [p.index for p in positions]
-        assert [p.probe_photon_count for p in moved] == [p.probe_photon_count for p in positions]
+        assert [p.i0 for p in moved] == [p.i0 for p in positions]
 
     def test_a_row_per_position_is_required(self) -> None:
         with pytest.raises(ValueError, match='translation offsets'):

@@ -1,6 +1,6 @@
 """Probe position reader for pre-APS-U Bionanoprobe ``*.mda.h5`` files.
 
-The instrument wrote scan positions two ways across the upgrade. Afterwards they live
+The instrument wrote probe positions two ways across the upgrade. Afterwards they live
 in the EPICS MDA file, which :mod:`ptychodus.plugins.mda` reads. Before it they live in
 the XRF map beside the data, as the two axis vectors ``MAPS/x_axis`` and ``MAPS/y_axis``
 spanning a rectangular grid, which is what this reader handles.

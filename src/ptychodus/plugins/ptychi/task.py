@@ -52,7 +52,7 @@ import ptychi.api
 from ptychi.api import ObjectPosOriginCoordsMethods
 from ptychi.api.options.task import PtychographyTaskOptions
 
-from ptychodus.api.assemble import compute_total_counts
+from ptychodus.api.assemble import compute_detector_sums
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectPosition
 from ptychodus.api.patch import iter_probe_patches
@@ -390,7 +390,7 @@ def _measure_predicted_intensity(
     after propagation. Multislice is approximated by the product through the layers --
     the real model propagates between them -- which a scale estimate tolerates.
 
-    Only the good pixels are summed, because the measured totals it will be compared
+    Only the good pixels are summed, because the detector sums it will be compared
     against are summed the same way; counting the masked ones on one side alone would
     bias the result by the dead-pixel fraction. That only holds while both sides index
     the same frame. A coordinate-shifted propagator -- the plain FFT -- leaves the DC
@@ -437,12 +437,12 @@ def _measure_detector_intensity(parameters: ReconstructInput, good_pixels: numpy
     A carried background has not been applied to the patterns, so it is subtracted here:
     left in, it would inflate the measurement and shrink the probe to compensate.
     """
-    total_counts = compute_total_counts(parameters.diffraction_patterns, parameters.bad_pixels)
+    detector_sums = compute_detector_sums(parameters.diffraction_patterns, parameters.bad_pixels)
 
-    if total_counts.size == 0:
+    if detector_sums.size == 0:
         return 0.0
 
-    measured = float(numpy.mean(total_counts))
+    measured = float(numpy.mean(detector_sums))
 
     if parameters.background is not None:
         measured -= float(numpy.sum(numpy.asarray(parameters.background)[good_pixels]))
@@ -792,7 +792,7 @@ def reconstruct_with_ptychi(
     object_geometry = object_in.get_geometry()
 
     # ptychodus stores a probe in photons per pixel; pty-chi's propagators do not
-    # preserve that sum. Measured once here and undone on every snapshot below, so what
+    # preserve that sum. Measured once here and undone on every yielded product below, so what
     # ptychodus stores stays in its own gauge whatever ran. Only the probe is scaled:
     # the object rides through untouched, which leaves the product the data constrains
     # unchanged, and with it the loss history.
@@ -869,7 +869,7 @@ def reconstruct_with_ptychi(
                 numpy.asarray(task.get_probe_positions_y(as_numpy=True), dtype=numpy.float64),
                 product_in.probes,
             )
-            corrected_scan_points: list[ProbePosition] = list()
+            corrected_probe_positions: list[ProbePosition] = list()
 
             for uncorrected_point, pos_x_px, pos_y_px in zip(
                 product_in.probe_positions, corrected_position_x_px, corrected_position_y_px
@@ -879,12 +879,12 @@ def reconstruct_with_ptychi(
                     x_px=float(pos_x_px),
                     y_px=float(pos_y_px),
                 )
-                scan_point = object_geometry.map_coordinates_object_to_probe(object_point)
-                corrected_scan_points.append(scan_point)
+                probe_position = object_geometry.map_coordinates_object_to_probe(object_point)
+                corrected_probe_positions.append(probe_position)
 
             product = Product(
                 metadata=product_in.metadata,
-                probe_positions=ProbePositionSequence(corrected_scan_points),
+                probe_positions=ProbePositionSequence(corrected_probe_positions),
                 probes=probe_out,
                 object_=object_out,
                 losses=losses,

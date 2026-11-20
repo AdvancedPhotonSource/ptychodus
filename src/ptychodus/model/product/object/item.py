@@ -156,9 +156,9 @@ def _warn_if_pixel_size_disagrees(
     conditioned keeps whatever sampling it was saved with: rebinding a product to another
     dataset, or editing the photon energy or detector distance, moves the run's pixel size
     out from under it. Resampling here is the wrong remedy -- the same path carries
-    reconstruction output, reassigned on every iteration, and a product read back from
+    a reconstruction, reassigned on every iteration, and a product read back from
     file is a finished record rather than an initial guess -- so the disagreement is
-    reported and the array left alone. Output products agree within ``rel_tol``, so this
+    reported and the array left alone. Reconstructions agree within ``rel_tol``, so this
     stays silent for them.
     """
     try:

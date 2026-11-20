@@ -1,6 +1,6 @@
 """pty-chi places every probe where ptychodus does.
 
-ptychodus puts a probe's beam axis, pixel ``N // 2``, on its scan position; pty-chi puts
+ptychodus puts a probe's beam axis, pixel ``N // 2``, on its probe position; pty-chi puts
 the probe's midpoint there and snaps the integer part of each position against an
 origin. The adapter converts between the two at the boundary. These tests compare
 pty-chi's own forward model, fed through that conversion, with ptychodus's simulator on

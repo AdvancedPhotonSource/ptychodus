@@ -284,7 +284,7 @@ def test_coarse_pass_is_scale_free(half_extent_m: float) -> None:
 def test_coarse_pass_tolerates_collinear_subsets() -> None:
     """A raster grid is full of collinear triples and still fits every one of its points."""
     truth = AffineTransform.from_components(_CALIBRATION_COMPONENTS)
-    uncorrected = _grid_scan(10, 1.0e-6, (0.0, 0.0))
+    uncorrected = _grid_positions(10, 1.0e-6, (0.0, 0.0))
 
     result = estimate_affine_transform(
         [(uncorrected, _apply(uncorrected, truth))],
@@ -699,7 +699,7 @@ def test_decompose_rejects_reflection() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _grid_scan(
+def _grid_positions(
     n_side: int, step_m: float, origin: tuple[float, float], start_index: int = 0
 ) -> ProbePositionSequence:
     """Raster grid of ``n_side`` by ``n_side`` positions with consecutive scan indexes."""
@@ -751,7 +751,7 @@ def test_joint_fit_recovers_transform_from_one_pair() -> None:
     """A single noiseless pair pins down the shared linear part and its translation."""
     linear = AffineTransform.from_components(_CALIBRATION_COMPONENTS)
     full = replace(linear, a02=1.0e-8, a12=-2.0e-8)
-    uncorrected = _grid_scan(10, 1.0e-6, (0.0, 0.0))
+    uncorrected = _grid_positions(10, 1.0e-6, (0.0, 0.0))
 
     result = estimate_affine_transform([(uncorrected, _apply(uncorrected, full))])
 
@@ -782,7 +782,7 @@ def test_joint_fit_shares_linear_part_across_independent_origins() -> None:
     pairs = []
 
     for index, (origin, shift) in enumerate(zip(origins, shifts)):
-        uncorrected = _grid_scan(8, 1.0e-6, origin, start_index=1000 * index)
+        uncorrected = _grid_positions(8, 1.0e-6, origin, start_index=1000 * index)
         full = replace(linear, a02=shift[0], a12=shift[1])
         pairs.append((uncorrected, _apply(uncorrected, full)))
 
@@ -805,7 +805,7 @@ def test_joint_fit_shares_linear_part_across_independent_origins() -> None:
 def test_joint_fit_pairs_by_scan_index_not_array_order() -> None:
     """Shuffling the corrected sequence changes nothing, because matching is by scan index."""
     full = replace(AffineTransform.from_components(_CALIBRATION_COMPONENTS), a02=3.0e-9)
-    uncorrected = _grid_scan(6, 1.0e-6, (0.0, 0.0))
+    uncorrected = _grid_positions(6, 1.0e-6, (0.0, 0.0))
     corrected = _apply(uncorrected, full)
     shuffled = ProbePositionSequence(list(corrected)[::-1])
 
@@ -818,9 +818,9 @@ def test_joint_fit_pairs_by_scan_index_not_array_order() -> None:
 
 
 def test_joint_fit_uses_only_shared_scan_indexes() -> None:
-    """A corrected set that lost scan points still contributes every point it kept."""
+    """A corrected set that lost probe positions still contributes every point it kept."""
     full = AffineTransform.from_components(_CALIBRATION_COMPONENTS)
-    uncorrected = _grid_scan(6, 1.0e-6, (0.0, 0.0))
+    uncorrected = _grid_positions(6, 1.0e-6, (0.0, 0.0))
     kept = ProbePositionSequence([p for i, p in enumerate(_apply(uncorrected, full)) if i % 3])
 
     result = estimate_affine_transform([(uncorrected, kept)])
@@ -834,7 +834,7 @@ def test_joint_fit_uses_only_shared_scan_indexes() -> None:
 def test_joint_fit_rejects_outliers() -> None:
     """Sigma clipping keeps a few badly refined positions from dragging the scale."""
     full = AffineTransform.from_components(_CALIBRATION_COMPONENTS)
-    uncorrected = _grid_scan(10, 1.0e-6, (0.0, 0.0))
+    uncorrected = _grid_positions(10, 1.0e-6, (0.0, 0.0))
     corrupted = list(_apply(uncorrected, full))
 
     for row in (3, 40, 77):
@@ -863,7 +863,7 @@ def test_joint_fit_rejects_outliers() -> None:
 def test_joint_fit_reports_residuals() -> None:
     """Residuals are Euclidean distances in meters, near zero for a noiseless fit."""
     full = AffineTransform.from_components(_CALIBRATION_COMPONENTS)
-    uncorrected = _grid_scan(6, 1.0e-6, (0.0, 0.0))
+    uncorrected = _grid_positions(6, 1.0e-6, (0.0, 0.0))
 
     result = estimate_affine_transform([(uncorrected, _apply(uncorrected, full))])
 
@@ -880,8 +880,8 @@ def test_joint_fit_requires_a_pair() -> None:
 
 def test_joint_fit_requires_shared_indexes() -> None:
     """Two sequences with disjoint scan indexes cannot be paired."""
-    left = _grid_scan(4, 1.0e-6, (0.0, 0.0), start_index=0)
-    right = _grid_scan(4, 1.0e-6, (0.0, 0.0), start_index=500)
+    left = _grid_positions(4, 1.0e-6, (0.0, 0.0), start_index=0)
+    right = _grid_positions(4, 1.0e-6, (0.0, 0.0), start_index=500)
 
     with pytest.raises(ValueError, match='shares no scan indexes'):
         estimate_affine_transform([(left, right)])
@@ -894,7 +894,7 @@ def test_joint_fit_pools_across_pairs_better_than_any_pair_alone() -> None:
     rng = numpy.random.default_rng(31)
     pairs = [
         (
-            scan := _grid_scan(6, 1.0e-6, origin, start_index=1000 * index),
+            scan := _grid_positions(6, 1.0e-6, origin, start_index=1000 * index),
             _apply(scan, truth, noise_m=2.0e-9, rng=rng),
         )
         for index, origin in enumerate(origins)
@@ -927,7 +927,7 @@ def test_joint_fit_shared_part_is_invariant_to_translating_one_pair() -> None:
     """
     truth = AffineTransform.from_components(_CALIBRATION_COMPONENTS)
     pairs = [
-        (scan := _grid_scan(6, 1.0e-6, origin, start_index=1000 * index), _apply(scan, truth))
+        (scan := _grid_positions(6, 1.0e-6, origin, start_index=1000 * index), _apply(scan, truth))
         for index, origin in enumerate([(0.0, 0.0), (5.0e-4, -3.0e-4)])
     ]
     shifted = ProbePositionSequence(
@@ -1052,7 +1052,7 @@ def _scale_free(components: AffineTransformComponents) -> AffineTransform:
 
 def test_transform_product_moves_scale_into_the_detector_distance() -> None:
     """The scale lands on the detector distance and is gone from the returned positions."""
-    positions = _grid_scan(6, 1.0e-6, (0.0, 0.0))
+    positions = _grid_positions(6, 1.0e-6, (0.0, 0.0))
     product = _make_product(positions)
     transform = AffineTransform.from_components(_CALIBRATION_COMPONENTS)
 
@@ -1069,7 +1069,7 @@ def test_transform_product_moves_scale_into_the_detector_distance() -> None:
 
 def test_transform_product_keeps_the_scale_free_components() -> None:
     """Asymmetry, rotation and shear stay on the probe positions; the translation is dropped."""
-    positions = _grid_scan(6, 1.0e-6, (0.0, 0.0))
+    positions = _grid_positions(6, 1.0e-6, (0.0, 0.0))
     transform = AffineTransform.from_components(
         _CALIBRATION_COMPONENTS, translation_x_m=1.0e-8, translation_y_m=-2.0e-8
     )
@@ -1101,7 +1101,7 @@ def test_transform_product_preserves_indexes_and_photon_counts() -> None:
                 index=7 * i,
                 x_m=1.0e-6 * (i % 4),
                 y_m=1.0e-6 * (i // 4),
-                probe_photon_count=2.0e6 + i,
+                i0=2.0e6 + i,
             )
             for i in range(16)
         ]
@@ -1111,14 +1111,12 @@ def test_transform_product_preserves_indexes_and_photon_counts() -> None:
     corrected = transform_product(_make_product(positions), transform)
 
     assert [p.index for p in corrected.probe_positions] == [p.index for p in positions]
-    assert [p.probe_photon_count for p in corrected.probe_positions] == [
-        p.probe_photon_count for p in positions
-    ]
+    assert [p.i0 for p in corrected.probe_positions] == [p.i0 for p in positions]
 
 
 def test_transform_product_scales_both_pixel_geometries() -> None:
     """The far-field object pixel follows the detector distance, so both pitches divide by scale."""
-    product = _make_product(_grid_scan(6, 1.0e-6, (0.0, 0.0)))
+    product = _make_product(_grid_positions(6, 1.0e-6, (0.0, 0.0)))
     scale = _CALIBRATION_COMPONENTS.scale
 
     corrected = transform_product(product, AffineTransform.from_components(_CALIBRATION_COMPONENTS))
@@ -1133,7 +1131,7 @@ def test_transform_product_scales_both_pixel_geometries() -> None:
 
 def test_transform_product_reinterprets_the_probe_without_resampling_it() -> None:
     """Only the scan frame is distorted, so the probe array itself is left exactly alone."""
-    product = _make_product(_grid_scan(6, 1.0e-6, (0.0, 0.0)))
+    product = _make_product(_grid_positions(6, 1.0e-6, (0.0, 0.0)))
 
     corrected = transform_product(product, AffineTransform.from_components(_CALIBRATION_COMPONENTS))
 
@@ -1143,7 +1141,7 @@ def test_transform_product_reinterprets_the_probe_without_resampling_it() -> Non
 @pytest.mark.parametrize('padding_px', [0, 4])
 def test_transform_product_object_geometry_follows_the_sizing_rule(padding_px: int) -> None:
     """The corrected canvas is the rule's answer for the corrected scan plus the input's own extra."""
-    positions = _grid_scan(6, 1.0e-6, (0.0, 0.0))
+    positions = _grid_positions(6, 1.0e-6, (0.0, 0.0))
     product = _make_product(positions, padding_px=padding_px)
     components = _CALIBRATION_COMPONENTS
     corrected_probe_geometry = _corrected_probe_geometry(components.scale)
@@ -1174,7 +1172,7 @@ def test_transform_product_object_geometry_follows_the_sizing_rule(padding_px: i
 
 def test_transform_product_changes_the_object_shape_on_each_axis_independently() -> None:
     """A finer pixel needs more of them, and asymmetry and rotation act differently per axis."""
-    product = _make_product(_grid_scan(6, 1.0e-6, (0.0, 0.0)))
+    product = _make_product(_grid_positions(6, 1.0e-6, (0.0, 0.0)))
 
     corrected = transform_product(product, AffineTransform.from_components(_CALIBRATION_COMPONENTS))
 
@@ -1193,7 +1191,7 @@ def test_transform_product_identity_is_an_exact_no_op(padding_px: int, oversize_
     and is nowhere near the minimal canvas its scan implies; recomputing the canvas from the scan
     alone would crop it by hundreds of pixels.
     """
-    positions = _grid_scan(6, 1.0e-6, (0.0, 0.0))
+    positions = _grid_positions(6, 1.0e-6, (0.0, 0.0))
     geometry = compute_object_geometry(positions, _probe_geometry(), padding_px=padding_px)
 
     if oversize_px:
@@ -1224,7 +1222,7 @@ def test_transform_product_resamples_the_object_onto_the_corrected_grid() -> Non
     The fixture is deliberately band-limited; the tolerance is what a single bilinear pass costs
     on content that smooth, and a sharp-edged object would fail it by an order of magnitude.
     """
-    positions = _grid_scan(6, 1.0e-6, (0.0, 0.0))
+    positions = _grid_positions(6, 1.0e-6, (0.0, 0.0))
     product = _make_product(positions)
     components = _CALIBRATION_COMPONENTS
 
@@ -1251,7 +1249,7 @@ def test_transform_product_resamples_the_object_onto_the_corrected_grid() -> Non
 
 
 def test_transform_product_does_not_mutate_its_input() -> None:
-    positions = _grid_scan(4, 1.0e-6, (0.0, 0.0))
+    positions = _grid_positions(4, 1.0e-6, (0.0, 0.0))
     product = _make_product(positions)
     array = product.object_.get_array().copy()
 
@@ -1264,7 +1262,7 @@ def test_transform_product_does_not_mutate_its_input() -> None:
 
 def test_a_focused_far_field_product_calibrates_like_an_unfocused_one() -> None:
     """The magnification cancels from the far-field pixel, so a focus changes nothing."""
-    positions = _grid_scan(4, 1.0e-6, (0.0, 0.0))
+    positions = _grid_positions(4, 1.0e-6, (0.0, 0.0))
     transform = AffineTransform.from_components(_CALIBRATION_COMPONENTS)
 
     unfocused = transform_product(_make_product(positions), transform)
@@ -1276,7 +1274,7 @@ def test_a_focused_far_field_product_calibrates_like_an_unfocused_one() -> None:
 
 def test_transform_product_rejects_cone_beam_near_field() -> None:
     """With a focusing optic in near field the object pixel follows the magnification."""
-    base = _make_product(_grid_scan(4, 1.0e-6, (0.0, 0.0)), focus_object_distance_m=-0.01)
+    base = _make_product(_grid_positions(4, 1.0e-6, (0.0, 0.0)), focus_object_distance_m=-0.01)
     product = replace(base, metadata=replace(base.metadata, far_field=False))
 
     with pytest.raises(ValueError, match='far-field'):
@@ -1290,7 +1288,7 @@ def test_transform_product_rejects_parallel_beam_near_field() -> None:
     distance for a position scale to recover -- the same reason the near-field cone beam is
     refused, reached by a geometry whose focus-object distance is the default of zero.
     """
-    base = _make_product(_grid_scan(4, 1.0e-6, (0.0, 0.0)))
+    base = _make_product(_grid_positions(4, 1.0e-6, (0.0, 0.0)))
     product = replace(base, metadata=replace(base.metadata, far_field=False))
     assert product.metadata.focus_object_distance_m == 0.0
 

@@ -14,7 +14,7 @@ where `M = |M| exp(i alpha)` carries both the magnetic absorption and phase cont
 The LCP object is aligned to the RCP object with sub-pixel precision, both are trimmed to their common shape, and the LCP reconstruction's scale, phase offset and phase ramp are standardized against the RCP one. Each reconstruction carries those ambiguities independently, so the standardization is needed — but it cannot tell them from the magnetic signal:
 
 - **Magnetic contrast is relative to the field of view.** The weighted mean magnetic phase, any linear trend in it, and the weighted mean of `|M|^2` are absorbed into the standardization. A uniform magnetization is not recovered; domains of opposite sign are.
-- **Both outputs are on the RCP product's frame.** Each is the RCP product — its probe, probe positions and metadata — with the object replaced, named `<rcp>-structural` and `<rcp>-magnetic`, with a comment naming both inputs, no polarization and no loss history.
+- **Both products are on the RCP product's frame.** Each is the RCP product — its probe, probe positions and metadata — with the object replaced, named `<rcp>-structural` and `<rcp>-magnetic`, with a comment naming both inputs, no polarization and no loss history.
 - **The magnetic product's object is the factor `M`**, not a transmission. It is a product so it keeps its pixel size and position on the sample, but it is not a starting point for a reconstruction.
 
 Both reconstructions must share an object pixel size. A magnetic phase beyond ±π/2 wraps by π, and the structural object then changes sign with it.

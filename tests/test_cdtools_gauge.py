@@ -1,6 +1,6 @@
 """The probe gauge cdtools is handed a product in, measured against its own far field.
 
-Needs no backend installed: the fixture's numpy far field is the one cdtools
+Needs no library installed: the fixture's numpy far field is the one cdtools
 implements, which ``test_cdtools_reconstruct.py`` checks where cdtools is present.
 """
 

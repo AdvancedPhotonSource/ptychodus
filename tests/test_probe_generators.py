@@ -75,7 +75,7 @@ class _Provider(ProbeGeometryProvider):
         return 1.0
 
     @property
-    def num_scan_points(self) -> int:
+    def num_probe_positions(self) -> int:
         return 7
 
     def get_detector_pixel_geometry(self) -> PixelGeometry:

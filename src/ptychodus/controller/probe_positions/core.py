@@ -91,23 +91,27 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
         )
 
         load_from_file_action = view.button_box.load_menu.addAction('Open File...')
-        connect_triggered_signal(load_from_file_action, self._load_current_scan_from_file)
+        connect_triggered_signal(
+            load_from_file_action, self._load_current_probe_positions_from_file
+        )
 
         copy_action = view.button_box.load_menu.addAction('Copy...')
-        connect_triggered_signal(copy_action, self._copy_to_current_scan)
+        connect_triggered_signal(copy_action, self._copy_to_current_probe_positions)
 
         save_to_file_action = view.button_box.save_menu.addAction('Save File...')
-        connect_triggered_signal(save_to_file_action, self._save_current_scan_to_file)
+        connect_triggered_signal(save_to_file_action, self._save_current_probe_positions_to_file)
 
         sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
-        connect_triggered_signal(sync_to_settings_action, self._sync_current_scan_to_settings)
+        connect_triggered_signal(
+            sync_to_settings_action, self._sync_current_probe_positions_to_settings
+        )
 
-        view.copier_dialog.setWindowTitle('Copy Scan')
+        view.copier_dialog.setWindowTitle('Copy Probe Positions')
         view.copier_dialog.source_combo_box.setModel(self._table_model)
         view.copier_dialog.destination_combo_box.setModel(self._table_model)
-        view.copier_dialog.finished.connect(self._finish_copying_scan)
+        view.copier_dialog.finished.connect(self._finish_copying_probe_positions)
 
-        view.button_box.edit_button.clicked.connect(self._edit_current_scan)
+        view.button_box.edit_button.clicked.connect(self._edit_current_probe_positions)
 
         metrics_action = view.button_box.analyze_menu.addAction('Metrics...')
         connect_triggered_signal(metrics_action, self._show_metrics)
@@ -130,7 +134,7 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
         logger.warning('No current index!')
         return -1
 
-    def _load_current_scan_from_file(self) -> None:
+    def _load_current_probe_positions_from_file(self) -> None:
         item_index = self._get_current_item_index()
 
         if item_index < 0:
@@ -138,7 +142,7 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
 
         file_path, name_filter = self._file_dialog_factory.get_open_file_path(
             self._view,
-            'Open Scan',
+            'Open Probe Positions',
             name_filters=self._api.file_readers.get_filters(),
             selected_name_filter=self._api.file_readers.get_filter(),
         )
@@ -150,20 +154,20 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
                 logger.exception(err)
                 ExceptionDialog.show_exception('File Reader', err)
 
-    def _copy_to_current_scan(self) -> None:
+    def _copy_to_current_probe_positions(self) -> None:
         item_index = self._get_current_item_index()
 
         if item_index >= 0:
             self._view.copier_dialog.destination_combo_box.setCurrentIndex(item_index)
             self._view.copier_dialog.open()
 
-    def _finish_copying_scan(self, result: int) -> None:
+    def _finish_copying_probe_positions(self, result: int) -> None:
         if result == QDialog.DialogCode.Accepted:
             source_index = self._view.copier_dialog.source_combo_box.currentIndex()
             destination_index = self._view.copier_dialog.destination_combo_box.currentIndex()
-            self._api.copy_scan(source_index, destination_index)
+            self._api.copy_probe_positions(source_index, destination_index)
 
-    def _edit_current_scan(self) -> None:
+    def _edit_current_probe_positions(self) -> None:
         item_index = self._get_current_item_index()
 
         if item_index < 0:
@@ -174,7 +178,7 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
         dialog = self._editor_factory.create_editor_dialog(item_name, item, self._view)
         dialog.open()
 
-    def _save_current_scan_to_file(self) -> None:
+    def _save_current_probe_positions_to_file(self) -> None:
         item_index = self._get_current_item_index()
 
         if item_index < 0:
@@ -182,19 +186,19 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
 
         file_path, name_filter = self._file_dialog_factory.get_save_file_path(
             self._view,
-            'Save Scan',
+            'Save Probe Positions',
             name_filters=self._api.file_writers.get_filters(),
             selected_name_filter=self._api.file_writers.get_filter(),
         )
 
         if file_path:
             try:
-                self._api.save_scan(item_index, file_path, name_filter)
+                self._api.save_probe_positions(item_index, file_path, name_filter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.show_exception('File Writer', err)
 
-    def _sync_current_scan_to_settings(self) -> None:
+    def _sync_current_probe_positions_to_settings(self) -> None:
         item_index = self._get_current_item_index()
 
         if item_index < 0:

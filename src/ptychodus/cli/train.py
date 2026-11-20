@@ -1,26 +1,26 @@
 #!/usr/bin/env python
 """Train a reconstructor's model from a directory of training data.
 
-The training data are in the backend's own format -- for PtychoPINN, every ``*.npz``
+The training data are in the library's own format -- for PtychoPINN, every ``*.npz``
 archive in the directory -- as the GUI or ``ptychodus-generate-training-data`` writes them,
-and are only read. The backend writes what it trains into the output
-directory, and the main process adds the trained model there as ``model`` with the backend's
+and are only read. The library writes what it trains into the output
+directory, and the main process adds the trained model there as ``model`` with the library's
 extension, the name a later run reads it under, beside ``train_options.yaml`` (the options
 it trained with, as a document ``--options`` takes back) and ``train.log``. It reads no
 settings file and builds no application model.
 
-A backend's options come from a YAML document naming the library, the algorithm and their
-fields. ``--print-options`` writes one at its defaults, to edit and pass back with
+A reconstructor's options come from a YAML document naming its library, its algorithm and
+their fields. ``--print-options`` writes one at its defaults, to edit and pass back with
 ``--options``.
 
 **Under torchrun.** ``torchrun --standalone --nproc-per-node=N -m ptychodus.cli.train ...``
-runs this command once per rank, and each runs the backend in its own process, joining one
+runs this command once per rank, and each runs the library in its own process, joining one
 process group from the launcher's variables. Every rank
 makes the same checks in the same order, so a run that cannot go ahead stops on every rank;
-only the main process logs progress and saves the model. A backend that cannot train one model
-across ranks is refused rather than run once per rank into the same directory, and so is a
+only the main process logs progress and saves the trained model. A reconstructor that cannot train
+one model across ranks is refused rather than run once per rank into the same directory, and so is a
 launch across more than one node. A SIGTERM -- which torchrun sends to the surviving ranks
-when one fails -- unwinds the backend as an interrupt.
+when one fails -- unwinds the reconstructor as an interrupt.
 
 No GPU selection side effects: choose devices with ``CUDA_VISIBLE_DEVICES``. Under torchrun
 every rank on a node must see the same devices, as many as ``--nproc-per-node``.
@@ -57,19 +57,19 @@ from ptychodus.api.options import (
     dump_options_document,
     read_options_document,
 )
-from ptychodus.cli._options import format_options_document, resolve_trainer
+from ptychodus.cli._options import format_options_document, resolve_trainable_reconstructor
 
 logger = logging.getLogger('train')
 
 
 def format_training_options(
-    plugin: Plugin[ReconstructorLibrary], trainer: TrainableReconstructor
+    plugin: Plugin[ReconstructorLibrary], reconstructor: TrainableReconstructor
 ) -> str:
     """One algorithm's default training options as a commented YAML document."""
     return format_options_document(
-        f'{plugin.display_name} {trainer.name} training options',
-        {'library': plugin.simple_name, 'algorithm': trainer.name},
-        trainer.get_default_options(),
+        f'{plugin.display_name} {reconstructor.name} training options',
+        {'library': plugin.simple_name, 'algorithm': reconstructor.name},
+        reconstructor.get_default_options(),
     )
 
 
@@ -101,13 +101,15 @@ class _PrintOptionsAction(argparse.Action):
         library_name, _, algorithm_name = str(values).partition('/')
 
         try:
-            plugin, trainer = resolve_trainer(self._libraries, library_name, algorithm_name or None)
+            plugin, reconstructor = resolve_trainable_reconstructor(
+                self._libraries, library_name, algorithm_name or None
+            )
         except OptionsError as exc:
             parser.error(str(exc))
 
         # Explicitly stdout, so ``--print-options ... > options.yaml`` captures it;
         # ``parser.exit(message=...)`` would write to stderr.
-        parser._print_message(format_training_options(plugin, trainer), sys.stdout)
+        parser._print_message(format_training_options(plugin, reconstructor), sys.stdout)
         parser.exit()
 
 
@@ -122,7 +124,7 @@ def _build_parser(registry: PluginRegistry) -> argparse.ArgumentParser:
         metavar='INPUT_DIR',
         required=True,
         type=DirectoryType(must_exist=True),
-        help="Training data in the backend's own format, as the GUI exports it. Not modified.",
+        help="Training data in the library's own format, as the GUI exports it. Not modified.",
     )
     parser.add_argument(
         '-o',
@@ -130,7 +132,7 @@ def _build_parser(registry: PluginRegistry) -> argparse.ArgumentParser:
         metavar='OUTPUT_DIR',
         required=True,
         type=DirectoryType(must_exist=False),
-        help='Where the backend writes what it trains, and the main process the trained model '
+        help='Where the library writes what it trains, and the main process the trained model '
         'as model<ext>. Must differ from INPUT_DIR.',
     )
     parser.add_argument(
@@ -221,7 +223,7 @@ def main() -> ExitCode:
     if output_directory.resolve() == input_directory.resolve():
         parser.error('OUTPUT_DIR must differ from INPUT_DIR.')
 
-    # Before the backend is asked anything, so options that cannot be used fail in seconds.
+    # Before the library is asked anything, so options that cannot be used fail in seconds.
     try:
         library_name: str | None = args.library
         algorithm_name: str | None = args.algorithm
@@ -238,11 +240,13 @@ def main() -> ExitCode:
         if library_name is None:
             raise OptionsError('Name a library with --library or an --options file.')
 
-        plugin, trainer = resolve_trainer(
+        plugin, reconstructor = resolve_trainable_reconstructor(
             registry.reconstructor_libraries, library_name, algorithm_name
         )
-        subject = f'{plugin.display_name} {trainer.name}'
-        options = apply_options_document(trainer.get_default_options(), fields, subject=subject)
+        subject = f'{plugin.display_name} {reconstructor.name}'
+        options = apply_options_document(
+            reconstructor.get_default_options(), fields, subject=subject
+        )
     except (OptionsError, OSError) as exc:
         parser.error(str(exc))
 
@@ -255,7 +259,7 @@ def main() -> ExitCode:
     if node_count > 1:
         parser.error(f'Training across {node_count} nodes is not supported; launch on one node.')
 
-    if world_size > 1 and not trainer.supports_distributed_training():
+    if world_size > 1 and not reconstructor.supports_distributed_training():
         parser.error(
             f'{subject} cannot train one model across {world_size} processes; '
             'launch a single process.'
@@ -264,7 +268,7 @@ def main() -> ExitCode:
     configure_logging(args)
     is_main_process = rank == 0
     model_file = output_directory / (
-        f'{StandardFileLayout.MODEL_BASENAME}{trainer.get_model_file_extensions()[0]}'
+        f'{StandardFileLayout.MODEL_BASENAME}{reconstructor.get_model_file_extensions()[0]}'
     )
 
     if is_main_process:
@@ -290,19 +294,19 @@ def main() -> ExitCode:
         logger.info('Writing %s', options_file)
         options_file.write_text(
             dump_options_document(
-                {'library': plugin.simple_name, 'algorithm': trainer.name}, options
+                {'library': plugin.simple_name, 'algorithm': reconstructor.name}, options
             )
         )
 
     # A scheduler or launcher ends a job with SIGTERM. Raised as an interrupt it unwinds
-    # through the backend, so whatever it holds open is released rather than abandoned.
+    # through the library, so whatever it holds open is released rather than abandoned.
     signal.signal(signal.SIGTERM, signal.default_int_handler)
     trained_model: Path | None = None
 
     # In this process: a one-shot command gains nothing from a child of its own, and a
     # distributed launcher's ranks are then exactly the processes it started.
     try:
-        for output in trainer.train(input_directory, output_directory, options=options):
+        for output in reconstructor.train(input_directory, output_directory, options=options):
             if output.trained_model is not None:
                 trained_model = output.trained_model
 
@@ -323,8 +327,8 @@ def main() -> ExitCode:
         return ExitCode.FAILURE
 
     try:
-        trainer.load_model(trained_model)
-        trainer.save_model(model_file)
+        reconstructor.load_model(trained_model)
+        reconstructor.save_model(model_file)
     except Exception:
         logger.exception('Saving the trained model to %s failed.', model_file)
         return ExitCode.FAILURE

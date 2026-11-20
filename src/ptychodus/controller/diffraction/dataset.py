@@ -39,15 +39,15 @@ class Column(Enum):
 
     The member value is the header and the position comes from declaration order, so
     a column cannot be added to the ordering and forgotten in the headers. Public
-    because the controller installs the counts progress-bar delegate on one of them.
+    because the controller installs the detector-sum progress-bar delegate on one of them.
 
     Editability is not a member property here: NAME is the only editable column and
     what actually gates it is the node type, which no column can state.
     """
 
     NAME = 'Name'
-    COUNTS = 'Counts'
-    FRAMES = 'Frames'
+    DETECTOR_SUM = 'Detector Sum'
+    PATTERNS = 'Patterns'
     WIDTH_PX = 'Width\n[px]'
     HEIGHT_PX = 'Height\n[px]'
     PHYSICAL_PIXEL_WIDTH_UM = 'Physical Pixel\nWidth [µm]'
@@ -77,7 +77,7 @@ class Column(Enum):
 
 
 class _TreeNode:
-    """Base tree node — root, dataset, array, or frame."""
+    """Base tree node — root, dataset, array, or pattern."""
 
     def __init__(self, parent_node: _TreeNode | None) -> None:
         self.parent_node = parent_node
@@ -86,11 +86,11 @@ class _TreeNode:
     def get_label(self) -> str:
         return ''
 
-    def get_counts(self) -> int:
+    def get_detector_sum(self) -> int:
         return 0
 
-    def get_nframes(self) -> int:
-        return sum(child.get_nframes() for child in self.child_nodes)
+    def get_num_patterns(self) -> int:
+        return sum(child.get_num_patterns() for child in self.child_nodes)
 
     def get_nbytes(self) -> int:
         return sum(child.get_nbytes() for child in self.child_nodes)
@@ -113,12 +113,12 @@ class _TreeNode:
 
 
 class _DatasetTreeNode(_TreeNode):
-    """A dataset row, owning one array node per frame group.
+    """A dataset row, owning one array node per pattern group.
 
     ``_array_nodes`` is the canonical structure and always holds one node per
     assembled array. ``child_nodes`` is the presentation, which hides the group
-    level for a dataset that has only one frame group, since that group's columns
-    and mean pattern would repeat its parent's exactly. Frame nodes are parented to
+    level for a dataset that has only one pattern group, since that group's columns
+    and mean pattern would repeat its parent's exactly. Pattern nodes are parented to
     whichever node actually shows them, so row and parent lookups need no special
     case for the collapsed shape.
     """
@@ -155,18 +155,18 @@ class _DatasetTreeNode(_TreeNode):
         if len(self._array_nodes) == 1:
             array_node = self._array_nodes[0]
             array_node.child_nodes = []
-            return _create_frame_nodes(array_node, self)
+            return _create_pattern_nodes(array_node, self)
 
         children: list[_TreeNode] = []
 
         for array_node in self._array_nodes:
-            array_node.child_nodes = _create_frame_nodes(array_node, array_node)
+            array_node.child_nodes = _create_pattern_nodes(array_node, array_node)
             children.append(array_node)
 
         return children
 
-    def frame_offset_of(self, array_node: _ArrayTreeNode) -> int:
-        """Position of the array's first frame among the dataset's frames.
+    def pattern_offset_of(self, array_node: _ArrayTreeNode) -> int:
+        """Position of the array's first pattern among the dataset's patterns.
 
         Recomputed on demand rather than cached: arrays are bisect-inserted by array
         index, so one landing out of order shifts every later offset, and only the
@@ -178,20 +178,20 @@ class _DatasetTreeNode(_TreeNode):
             if node is array_node:
                 break
 
-            offset += node.get_nframes()
+            offset += node.get_num_patterns()
 
         return offset
 
     def get_label(self) -> str:
         return self._dataset.get_name()
 
-    def get_counts(self) -> int:
-        return int(self._dataset.get_mean_total_counts())
+    def get_detector_sum(self) -> int:
+        return int(self._dataset.get_mean_detector_sum())
 
-    def get_nframes(self) -> int:
+    def get_num_patterns(self) -> int:
         # Summed over the array nodes rather than the presented children, so the
-        # answer is the same in both shapes and costs one term per frame group.
-        return sum(node.get_nframes() for node in self._array_nodes)
+        # answer is the same in both shapes and costs one term per pattern group.
+        return sum(node.get_num_patterns() for node in self._array_nodes)
 
     def get_data(self) -> DiffractionPattern | None:
         return self._dataset.get_mean_pattern()
@@ -216,30 +216,30 @@ class _DatasetTreeNode(_TreeNode):
 
 
 class _ArrayTreeNode(_TreeNode):
-    """A frame group. Owned by its dataset node even when it is not presented."""
+    """A pattern group. Owned by its dataset node even when it is not presented."""
 
     def __init__(self, dataset_node: _DatasetTreeNode, array: AssembledDiffractionArray) -> None:
         super().__init__(dataset_node)
         self._dataset_node = dataset_node
         self._array = array
         # Snapshot both reductions: each gathers through the shared buffer's index mask,
-        # and the Frames and Size columns ask on every repaint.
+        # and the Patterns and Size columns ask on every repaint.
         self._num_patterns = array.get_num_patterns()
         self._nbytes = array.get_patterns().nbytes
 
     def get_array(self) -> AssembledDiffractionArray:
         return self._array
 
-    def get_frame_offset(self) -> int:
-        return self._dataset_node.frame_offset_of(self)
+    def get_pattern_offset(self) -> int:
+        return self._dataset_node.pattern_offset_of(self)
 
     def get_label(self) -> str:
         return self._array.get_label()
 
-    def get_counts(self) -> int:
-        return int(self._array.get_mean_total_counts())
+    def get_detector_sum(self) -> int:
+        return int(self._array.get_mean_detector_sum())
 
-    def get_nframes(self) -> int:
+    def get_num_patterns(self) -> int:
         return self._num_patterns
 
     def get_nbytes(self) -> int:
@@ -249,41 +249,41 @@ class _ArrayTreeNode(_TreeNode):
         return self._array.get_mean_pattern()
 
 
-class _FrameTreeNode(_TreeNode):
+class _PatternTreeNode(_TreeNode):
     def __init__(
         self,
         parent_node: _TreeNode,
         array_node: _ArrayTreeNode,
-        frame_index: int,
+        pattern_index: int,
     ) -> None:
         super().__init__(parent_node)
         self._array_node = array_node
-        self._frame_index = frame_index
+        self._pattern_index = pattern_index
 
     def get_label(self) -> str:
-        # Numbered across the whole dataset, so a frame keeps its name whether or not
-        # its group level is shown, and "Frame 3" names one frame rather than one per
+        # Numbered across the whole dataset, so a pattern keeps its name whether or not
+        # its group level is shown, and "Pattern 3" names one pattern rather than one per
         # group.
-        return f'Frame {self._array_node.get_frame_offset() + self._frame_index}'
+        return f'Pattern {self._array_node.get_pattern_offset() + self._pattern_index}'
 
-    def get_counts(self) -> int:
-        return int(self._array_node.get_array().get_total_counts(self._frame_index))
+    def get_detector_sum(self) -> int:
+        return int(self._array_node.get_array().get_detector_sum(self._pattern_index))
 
-    def get_nframes(self) -> int:
+    def get_num_patterns(self) -> int:
         return 1
 
     def get_nbytes(self) -> int:
-        return self._array_node.get_array().get_pattern(self._frame_index).nbytes
+        return self._array_node.get_array().get_pattern(self._pattern_index).nbytes
 
     def get_data(self) -> DiffractionPattern:
-        return self._array_node.get_array().get_pattern(self._frame_index)
+        return self._array_node.get_array().get_pattern(self._pattern_index)
 
 
-def _create_frame_nodes(array_node: _ArrayTreeNode, parent_node: _TreeNode) -> list[_TreeNode]:
-    """One frame node per pattern, parented to whichever node presents them."""
+def _create_pattern_nodes(array_node: _ArrayTreeNode, parent_node: _TreeNode) -> list[_TreeNode]:
+    """One pattern node per pattern, parented to whichever node presents them."""
     return [
-        _FrameTreeNode(parent_node, array_node, frame_index)
-        for frame_index in range(array_node.get_nframes())
+        _PatternTreeNode(parent_node, array_node, pattern_index)
+        for pattern_index in range(array_node.get_num_patterns())
     ]
 
 
@@ -310,10 +310,10 @@ def _find_containing_dataset_row(node: _TreeNode) -> int | None:
 
 
 class DiffractionTreeModel(QAbstractItemModel):
-    """Tree of root → dataset → frame group → frame.
+    """Tree of root → dataset → pattern group → pattern.
 
-    The frame-group level is omitted for a dataset that holds a single group, whose
-    frames hang directly off the dataset row instead; see
+    The pattern-group level is omitted for a dataset that holds a single group, whose
+    patterns hang directly off the dataset row instead; see
     :meth:`_DatasetTreeNode.create_children`.
     """
 
@@ -325,7 +325,7 @@ class DiffractionTreeModel(QAbstractItemModel):
         super().__init__(parent)
         self._repository = repository
         self._root = _TreeNode(None)
-        self._max_counts = 1
+        self._max_detector_sum = 1
         self._row_observers: dict[int, _DatasetRowObserver] = {}
 
         for dataset_row, dataset in enumerate(repository):
@@ -337,7 +337,7 @@ class DiffractionTreeModel(QAbstractItemModel):
     def clear(self) -> None:
         self.beginResetModel()
         self._root = _TreeNode(None)
-        self._max_counts = 1
+        self._max_detector_sum = 1
         self.endResetModel()
 
     def insert_dataset(self, row: int, dataset: AssembledDiffractionDataset) -> None:
@@ -356,7 +356,7 @@ class DiffractionTreeModel(QAbstractItemModel):
     def _attach_dataset(self, dataset_row: int, dataset: AssembledDiffractionDataset) -> None:
         """Build the dataset's rows and start watching it for row-level changes."""
         self.insert_dataset(dataset_row, dataset)
-        self._update_max_counts(iter(dataset))
+        self._update_max_detector_sum(iter(dataset))
         self._replace_dataset_children(dataset_row, _DatasetTreeNode.set_arrays_from_dataset)
 
         observer = _DatasetRowObserver(self, dataset)
@@ -404,7 +404,7 @@ class DiffractionTreeModel(QAbstractItemModel):
         if dataset_row is not None:
             # clear(), reload() and import_assembled_patterns() all replace the array
             # list wholesale, so the existing subtree views a buffer that is gone.
-            self._update_max_counts(iter(dataset))
+            self._update_max_detector_sum(iter(dataset))
             self._replace_dataset_children(dataset_row, _DatasetTreeNode.set_arrays_from_dataset)
             self.refresh_dataset(dataset_row)
 
@@ -422,11 +422,11 @@ class DiffractionTreeModel(QAbstractItemModel):
         if dataset_node is None:
             return
 
-        self._update_max_counts([array])
+        self._update_max_detector_sum([array])
 
         if dataset_node.get_num_arrays() < 2:
             # Crossing 0→1 hides the group level and 1→2 reveals it, so the dataset's
-            # children are replaced wholesale. Cheap here: at most two groups of frames.
+            # children are replaced wholesale. Cheap here: at most two groups of patterns.
             self._replace_dataset_children(
                 dataset_row, lambda node: node.add_array_node(array_row, array)
             )
@@ -436,19 +436,19 @@ class DiffractionTreeModel(QAbstractItemModel):
         dataset_index = self.index(dataset_row, 0)
         self.beginInsertRows(dataset_index, array_row, array_row)
         array_node = dataset_node.add_array_node(array_row, array)
-        array_node.child_nodes = _create_frame_nodes(array_node, array_node)
+        array_node.child_nodes = _create_pattern_nodes(array_node, array_node)
         dataset_node.child_nodes.insert(array_row, array_node)
         self.endInsertRows()
 
-        # Frames are numbered across the dataset, so the later groups renumber.
-        self._refresh_frame_labels(dataset_index, array_row + 1)
+        # Patterns are numbered across the dataset, so the later groups renumber.
+        self._refresh_pattern_labels(dataset_index, array_row + 1)
 
     def _replace_dataset_children(
         self, dataset_row: int, mutate: Callable[[_DatasetTreeNode], Any]
     ) -> None:
         """Swap one dataset's whole subtree, announced as a removal then an insert.
 
-        Qt has no way to express a reparent, so every change that moves frames between
+        Qt has no way to express a reparent, so every change that moves patterns between
         the dataset row and a group row — a reload, or an array landing that hides or
         reveals the group level — goes through here.
         """
@@ -472,23 +472,23 @@ class DiffractionTreeModel(QAbstractItemModel):
             dataset_node.child_nodes = children
             self.endInsertRows()
 
-    def _update_max_counts(self, arrays: Iterable[AssembledDiffractionArray]) -> None:
-        """Raise the scale the counts bars are drawn against, restyling every row."""
-        max_counts = max((int(array.get_max_total_counts()) for array in arrays), default=0)
+    def _update_max_detector_sum(self, arrays: Iterable[AssembledDiffractionArray]) -> None:
+        """Raise the scale the detector-sum bars are drawn against, restyling every row."""
+        max_detector_sum = max((int(array.get_max_detector_sum()) for array in arrays), default=0)
 
-        if self._max_counts < max_counts:
-            self._max_counts = max_counts
-            self._rebroadcast_counts()
+        if self._max_detector_sum < max_detector_sum:
+            self._max_detector_sum = max_detector_sum
+            self._rebroadcast_detector_sums()
 
-    def _refresh_frame_labels(self, dataset_index: QModelIndex, first_array_row: int) -> None:
-        """Renumber the frames of the groups an insert shifted."""
+    def _refresh_pattern_labels(self, dataset_index: QModelIndex, first_array_row: int) -> None:
+        """Renumber the patterns of the groups an insert shifted."""
         for array_row in range(first_array_row, self.rowCount(dataset_index)):
             array_index = self.index(array_row, 0, dataset_index)
-            num_frames = self.rowCount(array_index)
+            num_patterns = self.rowCount(array_index)
 
-            if num_frames > 0:
+            if num_patterns > 0:
                 top_left = self.index(0, Column.NAME.index, array_index)
-                bottom_right = self.index(num_frames - 1, Column.NAME.index, array_index)
+                bottom_right = self.index(num_patterns - 1, Column.NAME.index, array_index)
                 self.dataChanged.emit(top_left, bottom_right)
 
     def refresh_array(self, dataset_row: int, array_row: int) -> None:
@@ -501,7 +501,7 @@ class DiffractionTreeModel(QAbstractItemModel):
             return
 
         if dataset_node.get_num_arrays() < 2:
-            # Collapsed: the group has no row of its own, so refresh the frames it
+            # Collapsed: the group has no row of its own, so refresh the patterns it
             # contributed together with the dataset row that summarizes them.
             self.refresh_dataset(dataset_row)
             self._refresh_child_rows(dataset_index)
@@ -528,12 +528,12 @@ class DiffractionTreeModel(QAbstractItemModel):
         bottom_right = self.index(dataset_row, self.columnCount() - 1)
         self.dataChanged.emit(dataset_index, bottom_right)
 
-    def _rebroadcast_counts(self, parent: QModelIndex = QModelIndex()) -> None:
-        """Re-emit the counts column at every level below parent.
+    def _rebroadcast_detector_sums(self, parent: QModelIndex = QModelIndex()) -> None:
+        """Re-emit the detector-sum column at every level below parent.
 
-        The bars are percentages of _max_counts, so a brighter array landing restyles
+        The bars are percentages of _max_detector_sum, so a brighter array landing restyles
         every existing row. Only nodes that have children are descended into, to avoid
-        minting a QModelIndex per frame on a dataset that holds tens of thousands.
+        minting a QModelIndex per pattern on a dataset that holds tens of thousands.
         """
         node = parent.internalPointer() if parent.isValid() else self._root
         num_rows = len(node.child_nodes)
@@ -541,13 +541,13 @@ class DiffractionTreeModel(QAbstractItemModel):
         if num_rows == 0:
             return
 
-        top_left = self.index(0, Column.COUNTS.index, parent)
-        bottom_right = self.index(num_rows - 1, Column.COUNTS.index, parent)
+        top_left = self.index(0, Column.DETECTOR_SUM.index, parent)
+        bottom_right = self.index(num_rows - 1, Column.DETECTOR_SUM.index, parent)
         self.dataChanged.emit(top_left, bottom_right)
 
         for row, child_node in enumerate(node.child_nodes):
             if child_node.child_nodes:
-                self._rebroadcast_counts(self.index(row, 0, parent))
+                self._rebroadcast_detector_sums(self.index(row, 0, parent))
 
     def dataset_row_for_index(self, index: QModelIndex) -> int | None:
         """Return the dataset row that contains the given tree index, or None."""
@@ -595,10 +595,10 @@ class DiffractionTreeModel(QAbstractItemModel):
             match column:
                 case Column.NAME:
                     return node.get_label()
-                case Column.COUNTS:
-                    return str(node.get_counts())
-                case Column.FRAMES:
-                    return node.get_nframes()
+                case Column.DETECTOR_SUM:
+                    return str(node.get_detector_sum())
+                case Column.PATTERNS:
+                    return node.get_num_patterns()
                 case Column.SIZE:
                     return format_bytes(node.get_nbytes())
                 case _:
@@ -607,8 +607,8 @@ class DiffractionTreeModel(QAbstractItemModel):
             if column is Column.NAME and isinstance(node, _DatasetTreeNode):
                 return node.get_label()
         elif role == Qt.ItemDataRole.UserRole:
-            if column is Column.COUNTS:
-                return int(100 * node.get_counts()) // int(self._max_counts)
+            if column is Column.DETECTOR_SUM:
+                return int(100 * node.get_detector_sum()) // int(self._max_detector_sum)
         elif role == Qt.ItemDataRole.FontRole:
             return _state_font(self._state_of(node))
         elif role == Qt.ItemDataRole.ForegroundRole:
@@ -627,7 +627,7 @@ class DiffractionTreeModel(QAbstractItemModel):
     def _state_of(self, node: _TreeNode) -> DiffractionDatasetState:
         """Load state of the dataset a node belongs to.
 
-        Array and frame rows inherit their dataset's state, so a whole subtree greys
+        Array and pattern rows inherit their dataset's state, so a whole subtree greys
         out together while its patterns are still loading.
         """
         dataset_row = _find_containing_dataset_row(node)
@@ -641,7 +641,7 @@ class DiffractionTreeModel(QAbstractItemModel):
             return DiffractionDatasetState.READY
 
     def _dataset_column_display(self, node: _TreeNode, column: Column) -> Any:
-        # WIDTH_PX..NUM_BAD_PIXELS apply only to dataset rows; array/frame nodes
+        # WIDTH_PX..NUM_BAD_PIXELS apply only to dataset rows; array/pattern nodes
         # render blank.
         if not isinstance(node, _DatasetTreeNode):
             return None

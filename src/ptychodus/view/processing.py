@@ -45,7 +45,7 @@ class TrainDialog(QDialog):
     """Where a training run reads its data from and writes its model to.
 
     The two are separate directories because training writes checkpoints, a
-    loss log and whatever else a backend emits, none of which belongs beside
+    loss log and whatever else a library emits, none of which belongs beside
     the data it learned from.
     """
 
@@ -74,7 +74,7 @@ class TrainDialog(QDialog):
 
         form_layout = QFormLayout()
         form_layout.addRow('Training Data:', data_layout)
-        form_layout.addRow('Model Output:', output_layout)
+        form_layout.addRow('Trained Model:', output_layout)
 
         layout = QVBoxLayout()
         layout.addLayout(form_layout)

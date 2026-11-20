@@ -36,7 +36,7 @@ class TestRenderKey:
         assert render_key('probe_energy_eV') == 'ProbeEnergyInElectronVolts'
 
     def test_num_abbreviates_by_default(self) -> None:
-        """Two backends already persist NumEpochs; expanding theirs would rename it."""
+        """Two libraries already persist NumEpochs; expanding theirs would rename it."""
         assert render_key('num_epochs') == 'NumEpochs'
         assert render_key('num_sync_epochs') == 'NumSyncEpochs'
 

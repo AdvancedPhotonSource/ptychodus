@@ -22,7 +22,7 @@ from .settings import ENHANCER_LIBRARY, FluorescenceSettings
 logger = logging.getLogger(__name__)
 
 # Which group backs each enhancer, keyed by the name it registered under. The same
-# table the reconstructor backends have: the fields carry their own bounds and
+# table the reconstruction libraries have: the fields carry their own bounds and
 # display text, the field name is the key, and this says only where each enhancer's
 # options persist. One group each, so no two enhancers share a key.
 _BRANCHES_BY_ENHANCER: Mapping[str, Sequence[OptionsBranch]] = {
@@ -72,7 +72,7 @@ class FluorescenceCore(Observer):
                 branches or (),
             )
 
-            # The package rather than the module, so a backend's forwarded child logs
+            # The package rather than the module, so a library's forwarded child logs
             # reach the monitor too.
             package_loggers.add(type(enhancer).__module__.rpartition('.')[0])
 

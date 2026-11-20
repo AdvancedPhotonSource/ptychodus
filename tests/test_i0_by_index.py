@@ -1,7 +1,7 @@
 """Tests for the I0 the probe positions carry, keyed by scan index, and its propagation.
 
 Covers:
-- ProbePositionSequence.get_probe_photon_counts_by_index keys I0 by scan index, averages
+- ProbePositionSequence.get_i0_by_index keys I0 by scan index, averages
   duplicate indexes, and is empty when the positions carry none.
 - prepare_reconstruct_input averages duplicate-index position counts arithmetically and linearly
   interpolates counts for pattern indexes that lie between anchor positions -- symmetric with the
@@ -61,11 +61,11 @@ def _make_assembled_data(
 
 
 def _make_product(specs: list[tuple[int, float, float, float | None]]) -> Product:
-    """Build a Product from (index, x_m, y_m, probe_photon_count) specs.
+    """Build a Product from (index, x_m, y_m, i0) specs.
 
     Uses a minimally-sized probe/object; the tests only exercise position wiring, not physics.
     """
-    points = [ProbePosition(index=i, x_m=x, y_m=y, probe_photon_count=c) for i, x, y, c in specs]
+    points = [ProbePosition(index=i, x_m=x, y_m=y, i0=c) for i, x, y, c in specs]
     positions = ProbePositionSequence(points)
 
     probe_array = numpy.zeros((1, 1, 4, 4), dtype=numpy.complex128)
@@ -90,18 +90,18 @@ def _make_product(specs: list[tuple[int, float, float, float | None]]) -> Produc
 class TestProbePhotonCountsByIndex:
     def test_i0_is_keyed_by_scan_index(self) -> None:
         product = _make_product([(0, 0.0, 0.0, 111.0), (1, 1.0, 0.0, 222.0), (2, 2.0, 0.0, 333.0)])
-        result = product.probe_positions.get_probe_photon_counts_by_index()
+        result = product.probe_positions.get_i0_by_index()
         assert result == {0: 111.0, 1: 222.0, 2: 333.0}
 
     def test_duplicate_indexes_average_into_one_reading(self) -> None:
         product = _make_product([(1, 1.0, 0.0, 12.0), (1, 3.0, 0.0, 20.0), (4, 0.0, 0.0, 7.0)])
-        result = product.probe_positions.get_probe_photon_counts_by_index()
+        result = product.probe_positions.get_i0_by_index()
         assert result == {1: pytest.approx(16.0), 4: pytest.approx(7.0)}
 
     def test_positions_without_i0_give_an_empty_mapping(self) -> None:
         product = _make_product([(0, 0.0, 0.0, None), (1, 1.0, 0.0, None)])
-        assert product.probe_positions.get_probe_photon_counts_by_index() == {}
-        assert ProbePositionSequence().get_probe_photon_counts_by_index() == {}
+        assert product.probe_positions.get_i0_by_index() == {}
+        assert ProbePositionSequence().get_i0_by_index() == {}
 
 
 class TestPrepareReconstructInputPhotonCountPropagation:
@@ -109,7 +109,7 @@ class TestPrepareReconstructInputPhotonCountPropagation:
         data = _make_assembled_data([0, 1, 2])
         product = _make_product([(0, 0.0, 0.0, 10.0), (1, 1.0, 0.0, 20.0), (2, 2.0, 0.0, 30.0)])
         result = prepare_reconstruct_input(data, product)
-        counts = [p.probe_photon_count for p in result.product.probe_positions]
+        counts = [p.i0 for p in result.product.probe_positions]
         assert counts == [pytest.approx(10.0), pytest.approx(20.0), pytest.approx(30.0)]
 
     def test_duplicate_index_counts_are_arithmetically_averaged(self) -> None:
@@ -118,7 +118,7 @@ class TestPrepareReconstructInputPhotonCountPropagation:
         product = _make_product([(1, 1.0, 0.0, 12.0), (1, 3.0, 0.0, 20.0)])
         result = prepare_reconstruct_input(data, product)
         [only] = list(result.product.probe_positions)
-        assert only.probe_photon_count == pytest.approx(16.0)
+        assert only.i0 == pytest.approx(16.0)
 
     def test_missing_index_counts_are_linearly_interpolated_between_anchors(self) -> None:
         # Anchors at 0 -> 100 and 4 -> 200; pattern 2 has no matching position
@@ -127,16 +127,16 @@ class TestPrepareReconstructInputPhotonCountPropagation:
         data = _make_assembled_data([0, 2, 4])
         product = _make_product([(0, 0.0, 0.0, 100.0), (4, 4.0, 0.0, 200.0)])
         result = prepare_reconstruct_input(data, product)
-        by_index = {p.index: p.probe_photon_count for p in result.product.probe_positions}
+        by_index = {p.index: p.i0 for p in result.product.probe_positions}
         assert by_index[0] == pytest.approx(100.0)
         assert by_index[2] == pytest.approx(150.0)
         assert by_index[4] == pytest.approx(200.0)
 
-    def test_no_position_counts_yields_none_photon_counts_on_output(self) -> None:
-        # If the positions carry no I0, the reconstruct-input positions should have probe_photon_count == None so
+    def test_no_position_counts_yields_no_i0_on_input(self) -> None:
+        # If the positions carry no I0, the reconstruct-input positions should have i0 == None so
         # downstream code that inspects them explicitly can distinguish that case.
         data = _make_assembled_data([0, 1, 2])
         product = _make_product([(0, 0.0, 0.0, None), (1, 1.0, 0.0, None), (2, 2.0, 0.0, None)])
         result = prepare_reconstruct_input(data, product)
         for p in result.product.probe_positions:
-            assert p.probe_photon_count is None
+            assert p.i0 is None

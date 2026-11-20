@@ -43,8 +43,8 @@ class VSPILinearOperator(LinearOperator):
         AX = numpy.zeros(len(self._product.probe_positions))  # noqa: N806
         interpolator = BarycentricArrayInterpolator(object_array)
 
-        for index, (scan_point, probe) in enumerate(self._product.iter_position_probes()):
-            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
+        for index, (probe_position, probe) in enumerate(self._product.iter_position_probes()):
+            object_point = object_geometry.map_coordinates_probe_to_object(probe_position)
             probe_intensity = probe.get_intensity()
             psf = probe_intensity / probe_intensity.sum()
             patch = interpolator.get_patch(
@@ -62,8 +62,8 @@ class VSPILinearOperator(LinearOperator):
         object_array = numpy.zeros((object_geometry.height_px, object_geometry.width_px))
         interpolator = BarycentricArrayInterpolator(object_array)
 
-        for index, (scan_point, probe) in enumerate(self._product.iter_position_probes()):
-            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
+        for index, (probe_position, probe) in enumerate(self._product.iter_position_probes()):
+            object_point = object_geometry.map_coordinates_probe_to_object(probe_position)
             probe_intensity = probe.get_intensity()
             psf = probe_intensity / probe_intensity.sum()
             interpolator.add_patch(

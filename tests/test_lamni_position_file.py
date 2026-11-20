@@ -36,7 +36,7 @@ def test_orchestra_layout(reader: LamNIPositionFileReader) -> None:
     assert positions[7].x_m == pytest.approx(-15.96804 * MICROMETER_M)
     assert positions[7].y_m == pytest.approx(+10.07311 * MICROMETER_M)
 
-    assert positions.get_probe_photon_counts() is None
+    assert positions.get_i0() is None
 
 
 def test_soft_glue_zynq_processed_layout(reader: LamNIPositionFileReader) -> None:
@@ -67,7 +67,7 @@ def test_soft_glue_zynq_raw_layout_keeps_duplicate_indexes(
 def test_index_origin_agrees_across_layouts(reader: LamNIPositionFileReader) -> None:
     """Regression guard for the off-by-one between the two DAQ paths.
 
-    Orchestra numbers the first scan point ``DataPoint = 0`` while softGlueZynq
+    Orchestra numbers the first probe position ``DataPoint = 0`` while softGlueZynq
     numbers the same point ``Detector_Count = 1``. Both must emit index 0, so
     that either recording of a scan joins to the same pattern.
     """

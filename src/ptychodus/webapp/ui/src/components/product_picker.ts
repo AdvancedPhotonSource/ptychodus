@@ -19,7 +19,7 @@ export function createProductPicker(onSelect: (p: ProductRead) => void): Product
       return [];
     }
     if (items.length === 0) {
-      host.replaceChildren(emptyBlock('No products in store.'));
+      host.replaceChildren(emptyBlock('No products in the storage root.'));
       return [];
     }
     const table = createTable<ProductRead>(

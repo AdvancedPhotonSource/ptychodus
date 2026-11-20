@@ -259,12 +259,12 @@ class PluginRegistry:
         self.training_data_file_writers = PluginList[TrainingDataFileWriter]()
         # A fluorescence enhancer is offered the way an object model is.
         self.fluorescence_enhancers = PluginList[FluorescenceEnhancer]()
-        # A reconstructor backend is discovered the same way a file format is:
+        # A reconstruction library is discovered the same way a file format is:
         # by registering itself, rather than by being named somewhere. An
-        # instance like every other catalog holds, which a backend can supply
+        # instance like every other catalog holds, which a library can supply
         # because it is configured per call and holds nothing of its own.
         self.reconstructor_libraries = PluginList[ReconstructorLibrary]()
-        # A language-model provider is offered the way a reconstructor backend is,
+        # A language-model provider is offered the way a reconstruction library is,
         # and like one is constructed whether or not its service can be reached.
         self.language_model_providers = PluginList[LanguageModelProvider]()
 

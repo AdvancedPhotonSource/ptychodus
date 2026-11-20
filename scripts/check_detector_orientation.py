@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-"""Check a detector's orientation relative to the scan from the bright-field parallax.
+"""Check a detector's orientation relative to the probe positions from the bright-field parallax.
 
 A defocused probe makes each bright-field pixel see the sample shifted in proportion to
 its spatial frequency, ``s = a + M q``. Fitting the matrix ``M`` over the bright field
-names the flips and transpose that bring the detector's frames into the scan's frame,
-and what is left: a scan rotation no quarter turn expresses, or a miscalibrated position
+names the flips and transpose that bring the detector's frames into the probe positions' frame,
+and what is left: a probe-position rotation no quarter turn expresses, or a miscalibrated position
 axis. A defocus sign error and a half-turn of the detector look the same to the
 parallax, so both readings are reported; knowing the sign of the defocus picks one.
 
@@ -52,7 +52,7 @@ from ptychodus.api.parallax import (
 from ptychodus.api.plugins import PluginCatalog, PluginRegistry
 from ptychodus.api.preprocess.diffraction import BinningStep
 from ptychodus.api.probe import ProbeGeometry
-from ptychodus.api.probe_positions import ProbePositionSequence, calculate_scan_geometry
+from ptychodus.api.probe_positions import ProbePositionSequence, calculate_probe_positions_geometry
 from ptychodus.api.scattering.frame import compute_exit_frame_transform
 from ptychodus.api.scattering.geometry import ScatteringGeometry
 
@@ -64,7 +64,7 @@ _ReaderT = TypeVar('_ReaderT')
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=Path(__file__).stem,
-        description='Check the detector orientation relative to the scan from the '
+        description='Check the detector orientation relative to the probe positions from the '
         'bright-field parallax of a defocused probe.',
     )
     parser.add_argument('--list-types', action='store_true', help='List the reader names.')
@@ -94,7 +94,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         '--image-pixel-m',
         type=float,
-        help='Pitch of the bright-field images; default half the median scan step.',
+        help='Pitch of the bright-field images; default half the median probe-position step.',
     )
     parser.add_argument(
         '--two-theta-deg',
@@ -160,23 +160,23 @@ def _accumulate(dataset: DiffractionDataset, bin_size_px: int) -> DiffractionMom
 def _correct_beam_decay(
     moments: DiffractionMoments, positions: ProbePositionSequence
 ) -> DiffractionMoments:
-    """Correct the totals for beam decay by the I0 the positions carry, if any."""
-    i0_counts_by_index = positions.get_probe_photon_counts_by_index()
+    """Correct the detector sums for beam decay by the I0 the positions carry, if any."""
+    i0_by_index = positions.get_i0_by_index()
 
-    if not i0_counts_by_index:
+    if not i0_by_index:
         return moments
 
     return moments.normalize_by_i0(
-        numpy.fromiter(i0_counts_by_index.keys(), dtype=numpy.intp),
-        numpy.fromiter(i0_counts_by_index.values(), dtype=numpy.float64),
+        numpy.fromiter(i0_by_index.keys(), dtype=numpy.intp),
+        numpy.fromiter(i0_by_index.values(), dtype=numpy.float64),
     )
 
 
 def _image_geometry(positions: ProbePositionSequence, pixel_m: float | None) -> ObjectGeometry:
-    """A canvas over the scan for the bright-field images, a few pixels of margin each side."""
-    scan = calculate_scan_geometry(positions)
+    """A canvas over the probe positions for the bright-field images, a few pixels of margin."""
+    positions_geometry = calculate_probe_positions_geometry(positions)
 
-    if scan is None:
+    if positions_geometry is None:
         raise SystemExit('The position file holds no positions.')
 
     if pixel_m is None:
@@ -191,12 +191,12 @@ def _image_geometry(positions: ProbePositionSequence, pixel_m: float | None) -> 
 
     margin_px = 4
     return ObjectGeometry(
-        width_px=math.ceil(scan.width_m / pixel_m) + 2 * margin_px,
-        height_px=math.ceil(scan.height_m / pixel_m) + 2 * margin_px,
+        width_px=math.ceil(positions_geometry.width_m / pixel_m) + 2 * margin_px,
+        height_px=math.ceil(positions_geometry.height_m / pixel_m) + 2 * margin_px,
         pixel_width_m=pixel_m,
         pixel_height_m=pixel_m,
-        center_x_m=scan.center_x_m,
-        center_y_m=scan.center_y_m,
+        center_x_m=positions_geometry.center_x_m,
+        center_y_m=positions_geometry.center_y_m,
     )
 
 
@@ -241,7 +241,7 @@ def _report(transform: ParallaxTransform) -> None:
             ' copies of one another, so this result is unreliable.'
         )
 
-    print(f'Mirrored relative to the scan: {"yes" if transform.is_reflection else "no"}')
+    print(f'Mirrored relative to the probe positions: {"yes" if transform.is_reflection else "no"}')
 
     try:
         correction = transform.position_correction()
@@ -282,11 +282,12 @@ def _report_geometry(transform: ParallaxTransform, args: argparse.Namespace) -> 
     orientation = DetectorOrientation(
         hflip='hflip' in flags, vflip='vflip' in flags, transpose='transpose' in flags
     )
-    scan_to_exit = compute_exit_frame_transform(geometry)
+    positions_to_exit = compute_exit_frame_transform(geometry)
     print(f'{geometry.regime.value.capitalize()} geometry {geometry}:')
     print(
-        f'  positions map to the exit frame by [[{scan_to_exit.a00:+.6f}, '
-        f'{scan_to_exit.a01:+.6f}], [{scan_to_exit.a10:+.6f}, {scan_to_exit.a11:+.6f}]]'
+        f'  positions map to the exit frame by [[{positions_to_exit.a00:+.6f}, '
+        f'{positions_to_exit.a01:+.6f}], '
+        f'[{positions_to_exit.a10:+.6f}, {positions_to_exit.a11:+.6f}]]'
     )
     matching = compute_geometry_mismatch(transform, geometry, orientation=orientation)
     forward = compute_geometry_mismatch(transform, ScatteringGeometry(), orientation=orientation)
@@ -409,7 +410,7 @@ def main() -> int:
 
     wavelength_m = energy_eV_to_wavelength_m(energy_eV)
     moments = _correct_beam_decay(_accumulate(dataset, args.bin_size_px), positions)
-    height_px, width_px = moments.mean_frame.shape
+    height_px, width_px = moments.mean_pattern.shape
     probe_geometry = ProbeGeometry.from_far_field(
         pixel_geometry,
         ImageExtent(width_px=width_px, height_px=height_px),

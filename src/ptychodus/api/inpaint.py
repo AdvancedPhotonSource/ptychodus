@@ -40,9 +40,9 @@ class BiharmonicInpainter:
 
     Calling it gives the same result as :func:`skimage.restoration.inpaint_biharmonic`
     on the interior holes, followed by zeroing the border regions: every pixel outside
-    an interior hole counts as known, border regions included, and each frame's fill is
+    an interior hole counts as known, border regions included, and each pattern's fill is
     clipped to the range of those pixels. The sparse system depends only on the mask, so
-    it is built and factorized here once. A call then solves for every frame together,
+    it is built and factorized here once. A call then solves for every pattern together,
     reading only the known pixels the stencils reach.
     """
 
@@ -132,7 +132,7 @@ class BiharmonicInpainter:
     ) -> DiffractionPattern | DiffractionPatterns:
         """Return *data* inpainted, in the shape and dtype it was given.
 
-        Takes a single frame or a stack sharing the mask. Integer values are rounded
+        Takes a single pattern or a stack sharing the mask. Integer values are rounded
         rather than truncated, which would bias every filled pixel low.
 
         With *overwrite_input*, a writeable C-contiguous float64 *data* is filled in
@@ -140,7 +140,7 @@ class BiharmonicInpainter:
         caller must use the return value either way.
 
         Raises:
-            ValueError: if *data* is not 2- or 3-dimensional or its frames do not match
+            ValueError: if *data* is not 2- or 3-dimensional or its patterns do not match
                 the mask.
         """
         if data.ndim not in (2, 3):
@@ -148,7 +148,7 @@ class BiharmonicInpainter:
 
         if data.shape[-2:] != self._shape:
             raise ValueError(
-                f'Frames of shape {data.shape[-2:]} do not match the {self._shape} mask!'
+                f'Patterns of shape {data.shape[-2:]} do not match the {self._shape} mask!'
             )
 
         can_overwrite = (
@@ -161,11 +161,11 @@ class BiharmonicInpainter:
 
         if self._solver is not None and self._band_stencils is not None:
             # `filled` is C-contiguous, so this is a view and writes land in it.
-            frames = filled.reshape(-1, self._known_pixels.size)
-            values = self._solver.solve(-(self._band_stencils @ frames[:, self._band].T)).T
-            lower = numpy.min(frames, axis=-1, where=self._known_pixels, initial=numpy.inf)
-            upper = numpy.max(frames, axis=-1, where=self._known_pixels, initial=-numpy.inf)
-            frames[:, self._unknown] = numpy.clip(
+            patterns = filled.reshape(-1, self._known_pixels.size)
+            values = self._solver.solve(-(self._band_stencils @ patterns[:, self._band].T)).T
+            lower = numpy.min(patterns, axis=-1, where=self._known_pixels, initial=numpy.inf)
+            upper = numpy.max(patterns, axis=-1, where=self._known_pixels, initial=-numpy.inf)
+            patterns[:, self._unknown] = numpy.clip(
                 values, lower[:, numpy.newaxis], upper[:, numpy.newaxis]
             )
 
@@ -173,7 +173,7 @@ class BiharmonicInpainter:
         dtype = data.dtype
 
         if numpy.issubdtype(dtype, numpy.integer):
-            # Fills are already confined to the range of each frame's known pixels, so
+            # Fills are already confined to the range of each pattern's known pixels, so
             # they are representable; the clip costs one pass and keeps the cast from
             # wrapping silently if that ever stops being true.
             # issubdtype does not narrow the pattern dtype union for the checker.

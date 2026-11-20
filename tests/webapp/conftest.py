@@ -25,7 +25,7 @@ from ptychodus.api.storage import StorageLayout
 
 @pytest.fixture
 def tmp_storage_root(tmp_path: Path) -> Path:
-    root = tmp_path / 'store'
+    root = tmp_path / 'storage'
     layout = StorageLayout(root)
     layout.ensure_kind_dirs()
     return root

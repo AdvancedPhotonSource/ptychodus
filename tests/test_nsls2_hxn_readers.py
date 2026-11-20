@@ -148,7 +148,7 @@ def test_style2_positions_carry_the_i0(tmp_path: Path) -> None:
     assert len(positions) == 7
     assert positions[2].x_m == pytest.approx(2.0 * MICROMETER_M)
     assert positions[2].y_m == pytest.approx(12.0 * MICROMETER_M)
-    assert positions[2].probe_photon_count == pytest.approx(1002.0)
+    assert positions[2].i0 == pytest.approx(1002.0)
 
 
 def test_a_mismatched_i0_is_dropped(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
@@ -157,7 +157,7 @@ def test_a_mismatched_i0_is_dropped(tmp_path: Path, caplog: pytest.LogCaptureFix
     with caplog.at_level(logging.WARNING):
         positions = NSLS2HXNPositionFileReader().read(path)
 
-    assert all(point.probe_photon_count is None for point in positions)
+    assert all(point.i0 is None for point in positions)
     assert '21 I0 values for 7 positions' in caplog.text
 
 
@@ -193,7 +193,7 @@ def test_style1_positions_take_the_i0_map_in_scan_order(tmp_path: Path) -> None:
 
     positions = NSLS2HXNPositionFileReader().read(path)
 
-    assert [point.probe_photon_count for point in positions] == [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+    assert [point.i0 for point in positions] == [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
     assert positions[4].x_m == pytest.approx(4.0 * MICROMETER_M)
     assert positions[4].y_m == pytest.approx(-4.0 * MICROMETER_M)
 

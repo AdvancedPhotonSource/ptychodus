@@ -19,7 +19,7 @@ from ptychodus.api.assemble import (
     allocate_assembled_data,
     assemble_dataset,
     compute_assembled_dtype,
-    compute_dataset_total_counts,
+    compute_dataset_detector_sums,
 )
 from ptychodus.api.diffraction import (
     DiffractionDatasetLayoutNode,
@@ -51,7 +51,7 @@ from ptychodus.plugins.pixel_maps import (
 from diffraction_dataset_fixtures import GEOMETRY, make_dataset
 from test_diffraction_loader import InlineTaskManager
 
-FRAME_SHAPE = (4, 4)
+PATTERN_SHAPE = (4, 4)
 
 
 def _uint16_array(values: numpy.ndarray, num_patterns: int = 2) -> SimpleDiffractionArray:
@@ -124,7 +124,7 @@ def test_non_finite_map_entries_mark_pixels_bad() -> None:
 
 def test_through_pipeline_sums_the_background_and_averages_the_flat_field() -> None:
     corrections = DetectorCorrections(
-        background=numpy.ones(FRAME_SHAPE), flat_field=numpy.arange(16.0).reshape(FRAME_SHAPE)
+        background=numpy.ones(PATTERN_SHAPE), flat_field=numpy.arange(16.0).reshape(PATTERN_SHAPE)
     )
     pipeline = DiffractionPrepPipeline(
         steps=(BinningStep(bin_size_x=2, bin_size_y=2), PaddingStep(pad_x=1, pad_y=0))
@@ -141,9 +141,9 @@ def test_through_pipeline_sums_the_background_and_averages_the_flat_field() -> N
 
 
 def test_unapplied_maps_are_carried_on_the_processed_grid() -> None:
-    background = numpy.full(FRAME_SHAPE, 2.0)
-    flat_field = numpy.full(FRAME_SHAPE, 0.5)
-    dataset = make_dataset([_uint16_array(numpy.full(FRAME_SHAPE, 9))], FRAME_SHAPE)
+    background = numpy.full(PATTERN_SHAPE, 2.0)
+    flat_field = numpy.full(PATTERN_SHAPE, 0.5)
+    dataset = make_dataset([_uint16_array(numpy.full(PATTERN_SHAPE, 9))], PATTERN_SHAPE)
     pipeline = DiffractionPrepPipeline(steps=(BinningStep(bin_size_x=2, bin_size_y=2),))
     corrections = DetectorCorrections(background=background, flat_field=flat_field)
 
@@ -157,11 +157,11 @@ def test_unapplied_maps_are_carried_on_the_processed_grid() -> None:
 
 
 def test_applied_maps_correct_the_patterns_and_are_dropped() -> None:
-    dataset = make_dataset([_uint16_array(numpy.full(FRAME_SHAPE, 9))], FRAME_SHAPE)
+    dataset = make_dataset([_uint16_array(numpy.full(PATTERN_SHAPE, 9))], PATTERN_SHAPE)
     pipeline = DiffractionPrepPipeline(steps=(BinningStep(bin_size_x=2, bin_size_y=2),))
     corrections = DetectorCorrections(
-        background=numpy.full(FRAME_SHAPE, 1.0),
-        flat_field=numpy.full(FRAME_SHAPE, 2.0),
+        background=numpy.full(PATTERN_SHAPE, 1.0),
+        flat_field=numpy.full(PATTERN_SHAPE, 2.0),
         subtract_background=True,
         divide_flat_field=True,
     )
@@ -177,12 +177,12 @@ def test_applied_maps_correct_the_patterns_and_are_dropped() -> None:
 
 def test_value_filters_act_on_measured_counts_not_corrected_ones() -> None:
     """An invalid-value marker is caught before the background shifts it."""
-    values = numpy.full(FRAME_SHAPE, 10)
+    values = numpy.full(PATTERN_SHAPE, 10)
     values[1, 1] = 65535
-    dataset = make_dataset([_uint16_array(values)], FRAME_SHAPE)
+    dataset = make_dataset([_uint16_array(values)], PATTERN_SHAPE)
     pipeline = DiffractionPrepPipeline(steps=(FilterValuesStep(lower_bound=0, upper_bound=65535),))
     corrections = DetectorCorrections(
-        background=numpy.full(FRAME_SHAPE, 4.0), subtract_background=True
+        background=numpy.full(PATTERN_SHAPE, 4.0), subtract_background=True
     )
 
     data = assemble_dataset(dataset, pipeline, corrections=corrections, max_workers=1)
@@ -192,9 +192,9 @@ def test_value_filters_act_on_measured_counts_not_corrected_ones() -> None:
 
 
 def test_unusable_flat_field_pixels_reach_the_stored_mask() -> None:
-    flat_field = numpy.ones(FRAME_SHAPE)
+    flat_field = numpy.ones(PATTERN_SHAPE)
     flat_field[2, 3] = 0.0
-    dataset = make_dataset([_uint16_array(numpy.full(FRAME_SHAPE, 3))], FRAME_SHAPE)
+    dataset = make_dataset([_uint16_array(numpy.full(PATTERN_SHAPE, 3))], PATTERN_SHAPE)
     corrections = DetectorCorrections(flat_field=flat_field, divide_flat_field=True)
 
     data = assemble_dataset(dataset, corrections=corrections, max_workers=1)
@@ -205,7 +205,7 @@ def test_unusable_flat_field_pixels_reach_the_stored_mask() -> None:
 
 
 def test_the_dataset_maps_are_carried_by_default() -> None:
-    background = numpy.full(FRAME_SHAPE, 1.5)
+    background = numpy.full(PATTERN_SHAPE, 1.5)
     source = SimpleDiffractionDataset(
         DiffractionMetadata(
             num_patterns_per_array=[1],
@@ -214,7 +214,7 @@ def test_the_dataset_maps_are_carried_by_default() -> None:
             detector_pixel_geometry=GEOMETRY,
         ),
         DiffractionDatasetLayoutNode.create_root(),
-        [_uint16_array(numpy.full(FRAME_SHAPE, 2), num_patterns=1)],
+        [_uint16_array(numpy.full(PATTERN_SHAPE, 2), num_patterns=1)],
         background=background,
     )
 
@@ -223,28 +223,28 @@ def test_the_dataset_maps_are_carried_by_default() -> None:
     numpy.testing.assert_array_equal(data.get_background(), background)
 
 
-def test_total_counts_are_measured_after_correction() -> None:
-    dataset = make_dataset([_uint16_array(numpy.full(FRAME_SHAPE, 5))], FRAME_SHAPE)
+def test_detector_sums_are_measured_after_correction() -> None:
+    dataset = make_dataset([_uint16_array(numpy.full(PATTERN_SHAPE, 5))], PATTERN_SHAPE)
     corrections = DetectorCorrections(
-        background=numpy.full(FRAME_SHAPE, 1.0), subtract_background=True
+        background=numpy.full(PATTERN_SHAPE, 1.0), subtract_background=True
     )
 
-    counts = compute_dataset_total_counts(dataset, corrections=corrections, max_workers=1)
+    counts = compute_dataset_detector_sums(dataset, corrections=corrections, max_workers=1)
 
-    numpy.testing.assert_allclose(counts.total_counts, [4.0 * 16] * 2)
+    numpy.testing.assert_allclose(counts.detector_sums, [4.0 * 16] * 2)
 
 
 def test_assembled_dtype_folds_the_pipeline_before_the_correction() -> None:
-    dataset = make_dataset([_uint16_array(numpy.ones(FRAME_SHAPE))], FRAME_SHAPE)
+    dataset = make_dataset([_uint16_array(numpy.ones(PATTERN_SHAPE))], PATTERN_SHAPE)
     pipeline = DiffractionPrepPipeline(steps=(BinningStep(bin_size_x=2, bin_size_y=2),))
-    corrections = DetectorCorrections(flat_field=numpy.ones(FRAME_SHAPE), divide_flat_field=True)
+    corrections = DetectorCorrections(flat_field=numpy.ones(PATTERN_SHAPE), divide_flat_field=True)
 
     assert compute_assembled_dtype(dataset, pipeline) == numpy.uint32
     assert compute_assembled_dtype(dataset, pipeline, corrections=corrections) == numpy.float32
 
 
 def test_a_map_of_the_wrong_shape_is_rejected() -> None:
-    dataset = make_dataset([_uint16_array(numpy.ones(FRAME_SHAPE))], FRAME_SHAPE)
+    dataset = make_dataset([_uint16_array(numpy.ones(PATTERN_SHAPE))], PATTERN_SHAPE)
 
     with pytest.raises(ValueError, match='Background shape'):
         allocate_assembled_data(
@@ -458,9 +458,9 @@ def test_command_line_maps_override_the_dataset_maps(tmp_path: Path) -> None:
     parser = argparse.ArgumentParser()
     add_detector_map_arguments(parser)
     flat_path = tmp_path / 'flat.npy'
-    numpy.save(flat_path, numpy.full(FRAME_SHAPE, 0.25))
+    numpy.save(flat_path, numpy.full(PATTERN_SHAPE, 0.25))
     args = parser.parse_args(['--flat-field-file', str(flat_path), '--divide-flat-field'])
-    background = numpy.full(FRAME_SHAPE, 1.0)
+    background = numpy.full(PATTERN_SHAPE, 1.0)
     source = SimpleDiffractionDataset(
         DiffractionMetadata(
             num_patterns_per_array=[0],

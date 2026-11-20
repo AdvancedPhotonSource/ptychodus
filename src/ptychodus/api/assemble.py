@@ -31,7 +31,7 @@ from .diffraction import (
     validate_pixel_map,
 )
 from .geometry import ImageExtent, PixelGeometry
-from .moments import FrameStatistics
+from .moments import PatternStatistics
 from .preprocess.diffraction import (
     DiffractionPrepPipeline,
     FilterValuesStep,
@@ -50,13 +50,13 @@ __all__ = [
     'CropSuggestion',
     'DetectorCorrections',
     'DiffractionSummary',
-    'DiffractionTotalCounts',
+    'DiffractionDetectorSums',
     'allocate_assembled_data',
     'assemble_dataset',
     'compute_array_offsets',
     'compute_assembled_dtype',
     'compute_assembled_patterns_shape',
-    'compute_dataset_total_counts',
+    'compute_dataset_detector_sums',
     'default_max_workers',
     'estimate_incident_photon_count',
     'preprocess_array',
@@ -79,7 +79,7 @@ def _read_only(array: _ArrayT) -> _ArrayT:
     return cast(_ArrayT, view)
 
 
-def compute_total_counts(
+def compute_detector_sums(
     patterns: DiffractionPatterns, bad_pixels: BadPixels
 ) -> DiffractionPatternCounts:
     """Sum each pattern over the good (non-bad) pixels."""
@@ -95,14 +95,16 @@ def compute_total_counts(
     return numpy.sum(patterns[:, good_pixels], axis=-1)
 
 
-def estimate_incident_photon_count(total_counts: RealArrayType, *, quantile: float = 0.99) -> float:
-    """Estimate the unattenuated incident photon count from per-pattern totals.
+def estimate_incident_photon_count(
+    detector_sums: RealArrayType, *, quantile: float = 0.99
+) -> float:
+    """Estimate the unattenuated incident photon count from per-pattern detector sums.
 
     A pattern recorded through empty beam -- or, failing that, through the most
     transparent part of the sample -- is among the brightest, so a high quantile of the
-    totals stands in for the incident flux. A quantile just below one keeps a single
-    saturated, cosmic-ray or otherwise anomalous frame from setting it; ``1.0`` takes
-    the brightest frame itself. NaN totals are ignored, and no finite total gives 0.
+    detector sums stands in for the incident flux. A quantile just below one keeps a single
+    saturated, cosmic-ray or otherwise anomalous pattern from setting it; ``1.0`` takes
+    the brightest pattern itself. NaN detector sums are ignored, and no finite detector sum gives 0.
 
     Raises:
         ValueError: if *quantile* is outside ``[0, 1]``.
@@ -110,7 +112,7 @@ def estimate_incident_photon_count(total_counts: RealArrayType, *, quantile: flo
     if not 0.0 <= quantile <= 1.0:
         raise ValueError(f'quantile must lie in [0, 1], got {quantile}')
 
-    finite = total_counts[numpy.isfinite(total_counts)]
+    finite = detector_sums[numpy.isfinite(detector_sums)]
 
     if finite.size == 0:
         return 0.0
@@ -274,14 +276,14 @@ class AssembledDiffractionData:
 
         return _read_only(self._patterns[self._indexes >= 0])
 
-    def get_total_counts(self) -> DiffractionPatternCounts:
-        return compute_total_counts(self.get_patterns(), self._bad_pixels)
+    def get_detector_sums(self) -> DiffractionPatternCounts:
+        return compute_detector_sums(self.get_patterns(), self._bad_pixels)
 
     def get_mean_pattern(self) -> DiffractionPattern:
-        """Mean over the assembled patterns, or a zero frame when none are assembled.
+        """Mean over the assembled patterns, or a zero pattern when none are assembled.
 
-        The empty case is reachable whenever the total-counts filter drops every
-        pattern of an array; `numpy.mean` would return an all-NaN frame there and
+        The empty case is reachable whenever the detector-sum filter drops every
+        pattern of an array; `numpy.mean` would return an all-NaN pattern there and
         poison every downstream display and weighted average.
         """
         assembled_patterns = self.get_patterns()
@@ -556,7 +558,7 @@ def compute_assembled_patterns_shape(
 ) -> tuple[int, int, int]:
     """Return the `(num_patterns, height, width)` shape an assembled buffer needs.
 
-    The frame dimensions come from the *processed* bad-pixel mask, so they already
+    The pattern dimensions come from the *processed* bad-pixel mask, so they already
     account for load-time cropping (`read_region`), binning, padding, and
     transposition. Detector corrections never change the shape.
     """
@@ -662,7 +664,7 @@ def compute_assembled_dtype(
 def _zero_nonfinite_values(
     patterns: DiffractionPatterns,
 ) -> tuple[DiffractionPatterns, BadPixels | None]:
-    """Zero every NaN or infinite value, and return the pixels that held one in any frame.
+    """Zero every NaN or infinite value, and return the pixels that held one in any pattern.
 
     Integer patterns cannot hold such values and are returned untouched, as are
     floating patterns that hold none; the second element is then None.
@@ -717,8 +719,8 @@ def _preprocess_patterns(
     *,
     raw_bad_pixels: BadPixels,
     processed_bad_pixels: BadPixels,
-    total_counts_lower_bound: int | None = None,
-    total_counts_upper_bound: int | None = None,
+    detector_sum_lower_bound: int | None = None,
+    detector_sum_upper_bound: int | None = None,
     read_region: CropRegion | None = None,
     corrections: DetectorCorrections | None = None,
 ) -> _PreprocessedPatterns:
@@ -728,22 +730,22 @@ def _preprocess_patterns(
     indexes and patterns, with no detector pixel geometry
     involved. Callers that need an :class:`AssembledDiffractionData` go through
     :func:`preprocess_array`; callers that keep only per-pattern reductions --
-    :func:`compute_dataset_total_counts` -- use this directly, and so need no
+    :func:`compute_dataset_detector_sums` -- use this directly, and so need no
     pixel geometry to run.
 
     Bad pixels are zeroed *before* the pipeline runs; when `read_region` is set,
     the reader is asked for the crop rectangle directly (HDF5 partial read) and
     `raw_bad_pixels` must already be the same-region slice of the detector mask.
     Zero-then-crop and crop-then-zero commute for per-pixel masks, so the result
-    matches full-frame preprocessing followed by cropping. Patterns outside the
-    (inclusive) total-counts bounds are dropped after the pipeline runs.
+    matches full-detector preprocessing followed by cropping. Patterns outside the
+    (inclusive) detector-sum bounds are dropped after the pipeline runs.
 
     A NaN or infinite value is zeroed before anything else touches it, and its
     pixel is masked for this array; the pixel is reported back so a caller can
     mask it for the whole dataset.
 
     `corrections`, already on the pipeline's output grid, are applied after the
-    pipeline and before the total-counts filter; the masks must already include the
+    pipeline and before the detector-sum filter; the masks must already include the
     pixels the corrections make unusable (see :func:`_resolve_bad_pixels`).
     """
     label = array.get_label()
@@ -766,11 +768,11 @@ def _preprocess_patterns(
 
     # Filter after the pipeline so counts reflect the same pattern the reconstructor sees;
     # filter every per-pattern array in lockstep to preserve the index/pattern 1:1 invariant.
-    lower = total_counts_lower_bound
-    upper = total_counts_upper_bound
+    lower = detector_sum_lower_bound
+    upper = detector_sum_upper_bound
 
     if lower is not None or upper is not None:
-        counts = compute_total_counts(patterns, block_bad_pixels)
+        counts = compute_detector_sums(patterns, block_bad_pixels)
         keep = numpy.ones(len(counts), dtype=bool)
 
         if lower is not None:
@@ -784,7 +786,7 @@ def _preprocess_patterns(
 
         if n_dropped:
             message = (
-                f'Total counts filter dropped {n_dropped}/{len(counts)} patterns '
+                f'Detector-sum filter dropped {n_dropped}/{len(counts)} patterns '
                 f"from '{label}' (kept {n_kept})."
             )
 
@@ -816,8 +818,8 @@ def preprocess_array(
     raw_bad_pixels: BadPixels,
     processed_bad_pixels: BadPixels,
     raw_pixel_geometry: PixelGeometry,
-    total_counts_lower_bound: int | None = None,
-    total_counts_upper_bound: int | None = None,
+    detector_sum_lower_bound: int | None = None,
+    detector_sum_upper_bound: int | None = None,
     read_region: CropRegion | None = None,
     corrections: DetectorCorrections | None = None,
     on_nonfinite_pixels: Callable[[BadPixels], None] | None = None,
@@ -837,8 +839,8 @@ def preprocess_array(
         pipeline,
         raw_bad_pixels=raw_bad_pixels,
         processed_bad_pixels=processed_bad_pixels,
-        total_counts_lower_bound=total_counts_lower_bound,
-        total_counts_upper_bound=total_counts_upper_bound,
+        detector_sum_lower_bound=detector_sum_lower_bound,
+        detector_sum_upper_bound=detector_sum_upper_bound,
         read_region=read_region,
         corrections=corrections,
     )
@@ -879,8 +881,8 @@ class ArrayPreprocessor:
     raw_pixel_geometry: PixelGeometry
     read_region: CropRegion | None
     corrections: DetectorCorrections
-    total_counts_lower_bound: int | None = None
-    total_counts_upper_bound: int | None = None
+    detector_sum_lower_bound: int | None = None
+    detector_sum_upper_bound: int | None = None
 
     @classmethod
     def from_dataset(
@@ -892,8 +894,8 @@ class ArrayPreprocessor:
         raw_pixel_geometry: PixelGeometry | None = None,
         read_region: CropRegion | None = None,
         corrections: DetectorCorrections | None = None,
-        total_counts_lower_bound: int | None = None,
-        total_counts_upper_bound: int | None = None,
+        detector_sum_lower_bound: int | None = None,
+        detector_sum_upper_bound: int | None = None,
     ) -> ArrayPreprocessor:
         """Resolve the preprocessing of *dataset*; the arguments mean what they do for
         :func:`assemble_dataset`.
@@ -919,8 +921,8 @@ class ArrayPreprocessor:
             ),
             read_region=read_region,
             corrections=resolved.processed,
-            total_counts_lower_bound=total_counts_lower_bound,
-            total_counts_upper_bound=total_counts_upper_bound,
+            detector_sum_lower_bound=detector_sum_lower_bound,
+            detector_sum_upper_bound=detector_sum_upper_bound,
         )
 
     @property
@@ -954,8 +956,8 @@ class ArrayPreprocessor:
             raw_bad_pixels=self.raw_bad_pixels,
             processed_bad_pixels=self.processed_bad_pixels,
             raw_pixel_geometry=self.raw_pixel_geometry,
-            total_counts_lower_bound=self.total_counts_lower_bound,
-            total_counts_upper_bound=self.total_counts_upper_bound,
+            detector_sum_lower_bound=self.detector_sum_lower_bound,
+            detector_sum_upper_bound=self.detector_sum_upper_bound,
             read_region=self.read_region,
             corrections=self.corrections,
             on_nonfinite_pixels=on_nonfinite_pixels,
@@ -1109,8 +1111,8 @@ def assemble_dataset(
     bad_pixels: BadPixels | None = None,
     raw_pixel_geometry: PixelGeometry | None = None,
     out: AssembledDiffractionData | None = None,
-    total_counts_lower_bound: int | None = None,
-    total_counts_upper_bound: int | None = None,
+    detector_sum_lower_bound: int | None = None,
+    detector_sum_upper_bound: int | None = None,
     read_region: CropRegion | None = None,
     corrections: DetectorCorrections | None = None,
     on_array_assembled: Callable[[int, str, AssembledDiffractionData], None] | None = None,
@@ -1128,11 +1130,11 @@ def assemble_dataset(
     is allocated and returned. `corrections` of None means the dataset's own maps,
     carried rather than applied.
 
-    A pixel holding a NaN or infinite value in any frame is masked for the whole
+    A pixel holding a NaN or infinite value in any pattern is masked for the whole
     dataset once every array is assembled, and its values are zeroed. The returned
     buffer's mask includes those pixels, and they are passed, in detector-extent
     coordinates, to `on_nonfinite_pixels` when there are any. Arrays assembled
-    before such a pixel turned up were filtered on total counts that still
+    before such a pixel turned up were filtered on detector sums that still
     included it.
 
     A missing array is logged and skipped. Any other per-array exception is
@@ -1159,8 +1161,8 @@ def assemble_dataset(
         raw_pixel_geometry=raw_pixel_geometry,
         read_region=read_region,
         corrections=corrections,
-        total_counts_lower_bound=total_counts_lower_bound,
-        total_counts_upper_bound=total_counts_upper_bound,
+        detector_sum_lower_bound=detector_sum_lower_bound,
+        detector_sum_upper_bound=detector_sum_upper_bound,
     )
 
     if out is None:
@@ -1225,9 +1227,9 @@ def assemble_dataset(
 class DiffractionSummary:
     """Per-pixel and per-pattern statistics for a diffraction dataset.
 
-    The frame-shaped arrays have bad-pixel positions filled by
+    The pattern-shaped arrays have bad-pixel positions filled by
     :func:`~ptychodus.api.preprocess.diffraction.inpaint_bad_pixels` so the maps stay smooth for display and
-    thresholding. Per-pattern ``total_counts`` sum only the good pixels.
+    thresholding. Per-pattern ``detector_sums`` sum only the good pixels.
 
     ``minimum_pattern`` and ``maximum_pattern`` carry the pattern dtype and
     ``mean_pattern`` is float64, whether or not the dataset had bad pixels and
@@ -1238,7 +1240,7 @@ class DiffractionSummary:
     mean_pattern: DiffractionPattern
     maximum_pattern: DiffractionPattern
     indexes: DiffractionIndexes
-    total_counts: DiffractionPatternCounts
+    detector_sums: DiffractionPatternCounts
 
 
 def summarize_dataset(
@@ -1253,9 +1255,9 @@ def summarize_dataset(
     """Summarize a diffraction dataset with per-pixel and per-pattern statistics.
 
     Streams the arrays on a thread pool so the full dataset never has to be held
-    in memory. Bad-pixel positions in the frame-shaped min/mean/max arrays are
-    inpainted with biharmonic fill; per-pattern totals are summed over the good
-    pixels only. A pixel holding a NaN or infinite value in any frame is zeroed
+    in memory. Bad-pixel positions in the pattern-shaped min/mean/max arrays are
+    inpainted with biharmonic fill; per-pattern detector sums are summed over the good
+    pixels only. A pixel holding a NaN or infinite value in any pattern is zeroed
     and treated as bad, as :func:`assemble_dataset` treats it.
 
     Per-pattern results are written at the offsets metadata reserves and then
@@ -1279,9 +1281,9 @@ def summarize_dataset(
 
     num_patterns_total = sum(num_patterns_per_array)
     indexes = -numpy.ones(num_patterns_total, dtype=numpy.intp)
-    total_counts = numpy.zeros(num_patterns_total, dtype=numpy.float64)
+    detector_sums = numpy.zeros(num_patterns_total, dtype=numpy.float64)
 
-    statistics = FrameStatistics(height, width)
+    statistics = PatternStatistics(height, width)
     offsets = compute_array_offsets(metadata)
     nonfinite_union = _NonfinitePixelUnion()
 
@@ -1303,14 +1305,14 @@ def summarize_dataset(
         # Reduce before publishing anything, so a read that fails partway leaves
         # this array's slots untouched rather than half-filled.
         array_indexes = array.get_indexes()
-        array_total_counts = compute_total_counts(
+        array_detector_sums = compute_detector_sums(
             patterns, _with_nonfinite_pixels(raw_bad_pixels, None, nonfinite_pixels)
         )
 
         offset = offsets[array_index]
         stop = offset + num_patterns
         indexes[offset:stop] = array_indexes
-        total_counts[offset:stop] = array_total_counts
+        detector_sums[offset:stop] = array_detector_sums
         statistics.add(patterns)
 
         if nonfinite_pixels is not None:
@@ -1326,9 +1328,9 @@ def summarize_dataset(
     )
 
     summarized = indexes >= 0
-    frames = statistics.get_frames()
+    extrema = statistics.get_statistics()
 
-    if frames is None:
+    if extrema is None:
         # Dtypes match the populated branch below, where the extrema come from
         # reductions over the patterns and the mean from a float64 accumulator.
         return DiffractionSummary(
@@ -1336,10 +1338,10 @@ def summarize_dataset(
             mean_pattern=numpy.zeros((height, width), dtype=numpy.float64),
             maximum_pattern=numpy.zeros((height, width), dtype=metadata.pattern_dtype),
             indexes=indexes[summarized],
-            total_counts=total_counts[summarized],
+            detector_sums=detector_sums[summarized],
         )
 
-    minimum_frame, mean_frame, maximum_frame = frames
+    minimum_pattern, mean_pattern, maximum_pattern = extrema
     nonfinite_pixels = nonfinite_union.get()
 
     if nonfinite_pixels is not None:
@@ -1348,30 +1350,30 @@ def summarize_dataset(
     summary_bad_pixels = _with_nonfinite_pixels(raw_bad_pixels, None, nonfinite_pixels)
 
     return DiffractionSummary(
-        minimum_pattern=inpaint_bad_pixels(minimum_frame, summary_bad_pixels),
-        mean_pattern=inpaint_bad_pixels(mean_frame, summary_bad_pixels),
-        maximum_pattern=inpaint_bad_pixels(maximum_frame, summary_bad_pixels),
+        minimum_pattern=inpaint_bad_pixels(minimum_pattern, summary_bad_pixels),
+        mean_pattern=inpaint_bad_pixels(mean_pattern, summary_bad_pixels),
+        maximum_pattern=inpaint_bad_pixels(maximum_pattern, summary_bad_pixels),
         indexes=indexes[summarized],
-        total_counts=total_counts[summarized],
+        detector_sums=detector_sums[summarized],
     )
 
 
 @dataclass(frozen=True)
-class DiffractionTotalCounts:
-    """Per-pattern good-pixel totals measured under a specific prep plan.
+class DiffractionDetectorSums:
+    """Per-pattern good-pixel detector sums measured under a specific prep plan.
 
-    Distinct from the ``total_counts`` field of :class:`DiffractionSummary`, which
+    Distinct from the ``detector_sums`` field of :class:`DiffractionSummary`, which
     sums the raw full detector: these are summed over exactly the patterns the
     assembler produces, after the load-time crop and after the pipeline. They are
-    therefore the numbers the total-counts filter actually compares its bounds
+    therefore the numbers the detector-sum filter actually compares its bounds
     against, and the ones robust statistics should be derived from.
     """
 
     indexes: DiffractionIndexes
-    total_counts: DiffractionPatternCounts
+    detector_sums: DiffractionPatternCounts
 
 
-def compute_dataset_total_counts(
+def compute_dataset_detector_sums(
     dataset: DiffractionDataset,
     pipeline: DiffractionPrepPipeline | None = None,
     *,
@@ -1382,14 +1384,14 @@ def compute_dataset_total_counts(
     on_array_error: Callable[[int, str, Exception], None] | None = None,
     should_stop: Callable[[], bool] | None = None,
     max_workers: int | None = None,
-) -> DiffractionTotalCounts:
-    """Measure per-pattern total counts as the assembler would see them.
+) -> DiffractionDetectorSums:
+    """Measure per-pattern detector sums as the assembler would see them.
 
     Runs the same :func:`_preprocess_patterns` core that :func:`assemble_dataset`
     reaches through :func:`preprocess_array` -- same load-time crop, same pipeline,
-    same processed bad-pixel mask -- but keeps only the per-pattern totals and
-    never applies the total-counts filter, since the point is to measure the
-    distribution the filter bounds will be chosen from. No frame-shaped
+    same processed bad-pixel mask -- but keeps only the per-pattern detector sums and
+    never applies the detector-sum filter, since the point is to measure the
+    distribution the filter bounds will be chosen from. No pattern-shaped
     statistics are accumulated and no assembled buffer is allocated, and when
     ``read_region`` is set a reader with partial-read support fetches only the
     crop rectangle, so this is markedly cheaper than :func:`summarize_dataset`
@@ -1400,7 +1402,7 @@ def compute_dataset_total_counts(
     with the slots of skipped and under-filling arrays elided.
 
     Unlike :func:`assemble_dataset` and :func:`allocate_assembled_data`, this pass
-    needs no detector pixel geometry: it keeps only per-pattern totals and never
+    needs no detector pixel geometry: it keeps only per-pattern detector sums and never
     builds a geometry-bearing block. So it runs against metadata that carries no
     `detector_pixel_geometry`, which most readers never set.
     """
@@ -1421,7 +1423,7 @@ def compute_dataset_total_counts(
 
     num_patterns_total = sum(num_patterns_per_array)
     indexes = -numpy.ones(num_patterns_total, dtype=numpy.intp)
-    total_counts = numpy.zeros(num_patterns_total, dtype=numpy.float64)
+    detector_sums = numpy.zeros(num_patterns_total, dtype=numpy.float64)
 
     offsets = compute_array_offsets(metadata)
 
@@ -1450,13 +1452,13 @@ def compute_dataset_total_counts(
 
         # Reduce before publishing anything, so a read that fails partway leaves
         # this array's slots untouched rather than half-filled. This is the same
-        # reduction AssembledDiffractionData.get_total_counts delegates to.
-        array_total_counts = compute_total_counts(preprocessed.patterns, preprocessed.bad_pixels)
+        # reduction AssembledDiffractionData.get_detector_sums delegates to.
+        array_detector_sums = compute_detector_sums(preprocessed.patterns, preprocessed.bad_pixels)
 
         offset = offsets[array_index]
         stop = offset + num_patterns
         indexes[offset:stop] = array_indexes
-        total_counts[offset:stop] = array_total_counts
+        detector_sums[offset:stop] = array_detector_sums
 
     _map_arrays(
         dataset,
@@ -1469,9 +1471,9 @@ def compute_dataset_total_counts(
 
     counted = indexes >= 0
 
-    return DiffractionTotalCounts(
+    return DiffractionDetectorSums(
         indexes=indexes[counted],
-        total_counts=total_counts[counted],
+        detector_sums=detector_sums[counted],
     )
 
 
@@ -1499,7 +1501,7 @@ def suggest_crop_region(
 ) -> CropSuggestion:
     """Suggest the power-of-two square about `beam_center` that holds the signal in a pattern.
 
-    `mean_pattern` is a raw-detector frame such as :attr:`DiffractionSummary.mean_pattern`.
+    `mean_pattern` is a full-detector pattern such as :attr:`DiffractionSummary.mean_pattern`.
     It is prepared as assembly prepares every pattern -- cut by `value_filter`, then
     corrected by `corrections` -- and `bad_pixels` is widened by the pixels the correction
     maps leave unusable, so the estimate sees what will be reconstructed. The maps must be

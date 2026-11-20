@@ -99,16 +99,16 @@ class DiffractionSettings(Observable, Observer):
             'ValueUpperBound', 65535, minimum=0
         )
 
-        self.total_counts_lower_bound_enabled = self._group.create_boolean_parameter(
+        self.detector_sum_lower_bound_enabled = self._group.create_boolean_parameter(
             'TotalCountsLowerBoundEnabled', False
         )
-        self.total_counts_lower_bound = self._group.create_integer_parameter(
+        self.detector_sum_lower_bound = self._group.create_integer_parameter(
             'TotalCountsLowerBound', 0, minimum=0
         )
-        self.total_counts_upper_bound_enabled = self._group.create_boolean_parameter(
+        self.detector_sum_upper_bound_enabled = self._group.create_boolean_parameter(
             'TotalCountsUpperBoundEnabled', False
         )
-        self.total_counts_upper_bound = self._group.create_integer_parameter(
+        self.detector_sum_upper_bound = self._group.create_integer_parameter(
             'TotalCountsUpperBound', 1_000_000_000, minimum=0
         )
 
