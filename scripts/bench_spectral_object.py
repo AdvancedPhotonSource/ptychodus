@@ -1,12 +1,14 @@
 #!/usr/bin/env python
-"""Benchmark object initializations against pty-chi LSQML reconstructions of real data.
+"""Benchmark initial objects against pty-chi LSQML reconstructions of real data.
 
 Each case is one PtychoPINN training directory, as written by the PtychoPINN data
 generator: ``<name>.npz`` holding the paired diffraction patterns as photon counts, and
 ``product.h5`` holding the long LSQML reconstruction they were exported from, which is the
-reference. An initialization is built on the reference's object canvas, from either the
-model probe a user would start from (``model``) or the reconstructed probe (``lsqml``),
-then aligned to the reference and scored:
+reference. An initial object is generated on the reference's object canvas from one of
+three probes -- the zone plate or disk the instrument's settings describe
+(``instrument``), the average-pattern probe at the parallax defocus
+(``average_pattern``), or the reference's own probe (``reference``) -- then aligned to
+the reference and scored:
 
 - ``corr``: complex correlation with the reference over the scoring region, after the
   shift, scale, phase offset and phase ramp are removed;
@@ -18,17 +20,19 @@ then aligned to the reference and scored:
   region; near the reference's own value is good, much larger is an estimate dominated
   by a few bright regions.
 
-``--warm-start-epochs`` also runs pty-chi LSQML from each initialization, with the model
-probe optimized, and scores the object at each listed epoch.
+``--reconstruct-epochs`` also runs pty-chi LSQML from a cold start: each initial object
+with ``--initial-probe`` (by default the probe the object was generated from) as the
+initial probe, optimized, scoring the object at each listed epoch.
 
 Example usage:
 
     uv run --no-sync python scripts/bench_spectral_object.py \\
         --data-root ../ptychodus-extra/PtychoPINN/out \\
         --output-dir /tmp/spectral --dataset nxs_data_ic_1_64 \\
-        --method stxm_dpc --method spectral --spectral tolerance=1e-4 --label tight
+        --probe average_pattern --method stxm_dpc --method spectral \\
+        --spectral iterations=6 --label six --reconstruct-epochs 5 10 25 100
 
-Needs matplotlib for figures and the ptychi extra for warm starts. Not shipped with
+Needs matplotlib for figures and the ptychi extra for reconstructions. Not shipped with
 the wheel.
 """
 
@@ -67,7 +71,11 @@ from ptychodus.api.parallax import estimate_defocus_from_assembled_data
 from ptychodus.api.probe import Probe, ProbeEnsemble, ProbeGeometry
 from ptychodus.api.probe_positions import ProbePosition
 from ptychodus.api.product import Product
-from ptychodus.api.propagate import compute_far_field_pixel_geometry
+from ptychodus.api.propagate import (
+    FresnelTransformPropagator,
+    PropagatorParameters,
+    compute_far_field_pixel_geometry,
+)
 from ptychodus.api.simulate.object import (
     compute_stxm_dpc_signals,
     generate_stxm_dpc_object,
@@ -91,8 +99,8 @@ MAX_SHIFT_PX = 8
 
 
 @dataclass(frozen=True)
-class ModelProbeSpec:
-    """The model probe the instrument's settings describe, before any reconstruction."""
+class InstrumentProbeSpec:
+    """The probe the instrument's settings describe, before any reconstruction."""
 
     zone_plate: FresnelZonePlate | None = None
     defocus_distance_m: float = 0.0
@@ -110,7 +118,7 @@ class ModelProbeSpec:
         )
 
 
-_APS_ZONE_PLATE = ModelProbeSpec(
+_APS_ZONE_PLATE = InstrumentProbeSpec(
     zone_plate=FresnelZonePlate(
         zone_plate_diameter_m=180e-6,
         outermost_zone_width_m=50e-9,
@@ -118,9 +126,12 @@ _APS_ZONE_PLATE = ModelProbeSpec(
     ),
     defocus_distance_m=0.8e-3,
 )
-_ALS_DISK = ModelProbeSpec(disk_diameter_m=1.0e-6)
+_ALS_DISK = InstrumentProbeSpec(disk_diameter_m=1.0e-6)
 
-MODEL_PROBES: Mapping[str, ModelProbeSpec] = {
+PROBE_NAMES = ('instrument', 'average_pattern', 'reference')
+"""The probes an initial object can be generated from, as ``Case.probes`` keys them."""
+
+INSTRUMENT_PROBES: Mapping[str, InstrumentProbeSpec] = {
     'als': _ALS_DISK,
     'fly001': _APS_ZONE_PLATE,
     'microLFPstack_single_exposure': _ALS_DISK,
@@ -135,13 +146,14 @@ MODEL_PROBES: Mapping[str, ModelProbeSpec] = {
 
 @dataclass(frozen=True)
 class Case:
-    """One dataset: its patterns, its LSQML reference and the probes to initialize from."""
+    """One dataset: its patterns, its LSQML reference and the probes initial guesses use."""
 
     name: str
     assembled_data: AssembledDiffractionData
     reference: Product
     probes: Mapping[str, Probe]
     mean_amplitude_transmission: float
+    mean_pattern: RealArrayType
 
     @property
     def wavelength_m(self) -> float:
@@ -189,8 +201,8 @@ def load_case(data_root: Path, name: str) -> Case:
     if len(indexes) != patterns.shape[0]:
         raise ValueError(f'{name}: {patterns.shape[0]} patterns but {len(indexes)} positions!')
 
-    lsqml_probe = reference.probes.get_mean_probe()
-    probe_pixel_geometry = lsqml_probe.get_pixel_geometry()
+    reference_probe = reference.probes.get_mean_probe()
+    probe_pixel_geometry = reference_probe.get_pixel_geometry()
     height_px, width_px = patterns.shape[-2:]
     extent = ImageExtent(width_px=width_px, height_px=height_px)
     metadata = reference.metadata
@@ -220,8 +232,10 @@ def load_case(data_root: Path, name: str) -> Case:
         pixel_width_m=probe_pixel_geometry.width_m,
         pixel_height_m=probe_pixel_geometry.height_m,
     )
-    model_probe = rescale_probe_intensity(
-        MODEL_PROBES[_instrument_name(name)].build(probe_geometry, metadata.photon_wavelength_m),
+    instrument_probe = rescale_probe_intensity(
+        INSTRUMENT_PROBES[_instrument_name(name)].build(
+            probe_geometry, metadata.photon_wavelength_m
+        ),
         beam.incident_photon_count,
     )
     defocus_m = _estimate_defocus_m(
@@ -244,8 +258,13 @@ def load_case(data_root: Path, name: str) -> Case:
         name=name,
         assembled_data=assembled_data,
         reference=reference,
-        probes={'model': model_probe, 'average': average_probe, 'lsqml': lsqml_probe},
+        probes={
+            'instrument': instrument_probe,
+            'average_pattern': average_probe,
+            'reference': reference_probe,
+        },
         mean_amplitude_transmission=beam.mean_amplitude_transmission,
+        mean_pattern=moments.mean_pattern,
     )
 
 
@@ -263,7 +282,7 @@ def _parse_overrides(pairs: Sequence[str]) -> dict[str, Any]:
     return overrides
 
 
-def build_flat(case: Case, probe: Probe, overrides: Mapping[str, Any]) -> Object:
+def build_uniform(case: Case, probe: Probe, overrides: Mapping[str, Any]) -> Object:
     return generate_uniform_object(case.reference.object_.get_geometry())
 
 
@@ -329,7 +348,7 @@ def build_spectral(case: Case, probe: Probe, overrides: Mapping[str, Any]) -> Ob
 
 
 BUILDERS: Mapping[str, Callable[[Case, Probe, Mapping[str, Any]], Object]] = {
-    'flat': build_flat,
+    'uniform': build_uniform,
     'stxm_dpc': build_stxm_dpc,
     'spectral': build_spectral,
 }
@@ -404,7 +423,7 @@ def _local_contrast(
     values: ComplexArrayType, mask: RealArrayType, sigma_px: float
 ) -> ComplexArrayType:
     """``x / S(x) - 1`` for a smoothing ``S`` over ``8 sigma``, after removing the phase
-    ramp: blind to ramps and slow envelopes, and zero for a flat object."""
+    ramp: blind to ramps and slow envelopes, and zero for a uniform object."""
     values = _remove_phase_ramp(values, mask)
     envelope = _smooth_within(values, mask, 8.0 * sigma_px)
     magnitude = numpy.abs(envelope)
@@ -535,9 +554,39 @@ def save_panel(path: Path, title: str, ref: ComplexArrayType, est: ComplexArrayT
     plt.close(fig)
 
 
-def run_warm_starts(
-    case: Case, initial: Object, epochs: Sequence[int], *, seed: int
+def compute_probe_consistency(case: Case, probe: Probe) -> float:
+    """Pearson's correlation of the mean pattern with ``sum_k |D P_k|^2``, the far-field
+    intensity the probe alone predicts; near one when the probe reproduces the beam."""
+    modes = probe.get_array()
+    pixel_geometry = probe.get_pixel_geometry()
+    propagator = FresnelTransformPropagator(
+        PropagatorParameters(
+            wavelength_m=case.wavelength_m,
+            width_px=modes.shape[-1],
+            height_px=modes.shape[-2],
+            pixel_width_m=pixel_geometry.width_m,
+            pixel_height_m=pixel_geometry.height_m,
+            propagation_distance_m=case.distance_m,
+        )
+    )
+    predicted = numpy.sum(numpy.square(numpy.abs(propagator.propagate(modes))), axis=0).ravel()
+    measured = numpy.asarray(case.mean_pattern, dtype=numpy.float64).ravel()
+    return float(numpy.corrcoef(measured, predicted)[0, 1])
+
+
+def run_reconstruction(
+    case: Case,
+    initial_object: Object,
+    initial_probe: Probe,
+    epochs: Sequence[int],
+    *,
+    seed: int,
 ) -> dict[str, Any]:
+    """pty-chi LSQML from a cold start, scoring the object at each of *epochs*.
+
+    *initial_probe* is split into four incoherent modes and optimized; the object is
+    scaled to the measured mean transmission.
+    """
     from ptychodus.api.plugins import PluginRegistry
     from ptychodus.api.reconstruct import prepare_reconstruct_input
 
@@ -559,14 +608,14 @@ def run_warm_starts(
     task.probe_position_options.optimizable = False
     options.num_sync_epochs = math.gcd(*epochs)
 
-    probe = generate_incoherent_probe_modes(case.probes['model'], 4)
+    probe = generate_incoherent_probe_modes(initial_probe, 4)
     product = replace(
         case.reference,
         probes=ProbeEnsemble.from_probe(probe),
         object_=Object(
-            array=initial.get_array() * case.mean_amplitude_transmission,
-            pixel_geometry=initial.get_pixel_geometry(),
-            center=initial.get_center(),
+            array=initial_object.get_array() * case.mean_amplitude_transmission,
+            pixel_geometry=initial_object.get_pixel_geometry(),
+            center=initial_object.get_center(),
         ),
         losses=[],
     )
@@ -600,21 +649,26 @@ def main() -> int:
     parser.add_argument('--data-root', type=Path, required=True)
     parser.add_argument('--output-dir', type=Path, required=True)
     parser.add_argument('--dataset', action='append', required=True)
-    parser.add_argument('--probe', action='append', choices=('model', 'average', 'lsqml'))
+    parser.add_argument('--probe', action='append', choices=PROBE_NAMES)
+    parser.add_argument(
+        '--initial-probe',
+        choices=PROBE_NAMES,
+        help="LSQML's initial probe; by default the probe the initial object used",
+    )
     parser.add_argument('--method', action='append', choices=tuple(BUILDERS))
     parser.add_argument('--spectral', action='append', default=[], metavar='KEY=VALUE')
     parser.add_argument('--stxm-dpc', action='append', default=[], metavar='KEY=VALUE')
     parser.add_argument('--label', default='baseline')
     parser.add_argument('--figures', action='store_true')
     parser.add_argument('--save-arrays', action='store_true')
-    parser.add_argument('--warm-start-epochs', type=int, nargs='*', default=[])
+    parser.add_argument('--reconstruct-epochs', type=int, nargs='*', default=[])
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--remove-ramp', action='store_true')
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(message)s')
     overrides = {
-        'flat': {},
+        'uniform': {},
         'stxm_dpc': _parse_overrides(args.stxm_dpc),
         'spectral': _parse_overrides(args.spectral),
     }
@@ -625,7 +679,7 @@ def main() -> int:
         for name in args.dataset:
             case = load_case(args.data_root, name)
 
-            for probe_name in args.probe or ['model']:
+            for probe_name in args.probe or ['instrument']:
                 for method in args.method or ['spectral']:
                     tic = time.perf_counter()
                     object_ = BUILDERS[method](case, case.probes[probe_name], overrides[method])
@@ -651,14 +705,31 @@ def main() -> int:
                     }
                     stem = f'{name}_{probe_name}_{method}'
 
-                    if args.warm_start_epochs:
-                        row['warm_start'] = run_warm_starts(
-                            case, object_, args.warm_start_epochs, seed=args.seed
+                    if args.reconstruct_epochs:
+                        initial_probe_name = args.initial_probe or probe_name
+                        initial_probe = case.probes[initial_probe_name]
+                        consistency = compute_probe_consistency(case, initial_probe)
+                        row['reconstruction'] = {
+                            'initial_probe': initial_probe_name,
+                            'initial_probe_consistency': consistency,
+                            'seed': args.seed,
+                            **run_reconstruction(
+                                case,
+                                object_,
+                                initial_probe,
+                                args.reconstruct_epochs,
+                                seed=args.seed,
+                            ),
+                        }
+                        print(
+                            f'{"":>16s} {"":>34s} LSQML initial probe {initial_probe_name}'
+                            f' (consistency {consistency:.3f}), seed {args.seed}',
+                            flush=True,
                         )
 
-                        for checkpoint in row['warm_start']['checkpoints']:
+                        for checkpoint in row['reconstruction']['checkpoints']:
                             print(
-                                f'{"":>16s} {"":>34s} warm start epoch {checkpoint["epoch"]:4d}'
+                                f'{"":>16s} {"":>34s} LSQML epoch {checkpoint["epoch"]:4d}'
                                 f'  loss={checkpoint["loss"]:.4g} detail={checkpoint["detail"]:.3f}'
                                 f' band={checkpoint["band"]:.3f} fine={checkpoint["fine"]:.3f}'
                                 f' ssim={checkpoint["phase_ssim"]:.3f}',
