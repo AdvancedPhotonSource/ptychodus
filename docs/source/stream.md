@@ -1,6 +1,6 @@
 # Streaming with ptychodus-stream
 
-`ptychodus-stream` estimates the probe and object while a scan is acquired, publishes them as images for viewing, and saves each finished scan to a storage root that `ptychodus-webapp` browses and `ptychodus-reconstruct` reconstructs from. It runs as one [PvaPy](https://github.com/epics-base/pvaPy) area-detector consumer.
+`ptychodus-stream` estimates the probe and object while a scan is acquired, publishes them as images for viewing, and saves each finished scan to a storage root that `ptychodus-webapp` browses and `ptychodus-reconstruct` reconstructs from. The probe is the back-propagated mean pattern and the object is STXM-DPC, each at the defaults of the GUI generator of that name. Optionally, a reconstruction library's algorithm — typically PtychoPINN inference, or a few pty-chi epochs — reconstructs each finished scan for fast feedback, published as images and never written. It runs as one [PvaPy](https://github.com/epics-base/pvaPy) area-detector consumer.
 
 The first half of this page is the PV contract a beamline must meet; the second walks through a replay of the fly001 example scan with `scripts/replay_scan.py`, the reference producer for that contract.
 
@@ -10,7 +10,7 @@ The first half of this page is the PV contract a beamline must meet; the second 
 uv sync --extra stream --extra webapp
 ```
 
-The `stream` extra installs pvapy; the `webapp` extra is only needed to browse the storage root.
+The `stream` extra installs pvapy; the `webapp` extra is only needed to browse the storage root. To reconstruct, install the library beside them, for example `--extra ptychi` (see {ref}`stream-reconstruction`).
 
 ## PV contract
 
@@ -77,12 +77,15 @@ Optional scalar PVs `scan_number_pv` and `tomography_angle_pv` (in degrees). Wri
 | `<output_pv_prefix>:probe:amplitude`, `:probe:phase` | Float32 2-D NTNDArray of the first probe mode |
 | `<output_pv_prefix>:object:amplitude`, `:object:phase` | Float32 2-D NTNDArray of the first object layer; it grows with the scan's extent |
 | `<output_pv_prefix>:scan` | `{label, diffraction_uuid, product_uuid, num_frames_paired, num_frames_dropped, written}` for each finished scan |
+| `<output_pv_prefix>:reconstruction:probe:amplitude`, `:reconstruction:probe:phase` | As `:probe:*`, for each output of a reconstruction |
+| `<output_pv_prefix>:reconstruction:object:amplitude`, `:reconstruction:object:phase` | As `:object:*`, for each output of a reconstruction |
+| `<output_pv_prefix>:reconstruction` | `{label, progress, progress_goal}` with each output; `label` names the scan, and a goal of 0 is unknown |
 | `<output_pv_prefix>:status` | The consumer's status, with the counters below |
 | `<output_pv_prefix>:control` | `{"command": "configure", "args": "<json>"}` applies a partial configuration |
 | `<output_directory>/diffraction/<uuid>/` | The scan's prepared patterns, `diffraction.h5`, with its manifest |
 | `<output_directory>/product/<uuid>/` | The estimated probe, object and positions, `product.h5`, derived from that diffraction |
 
-A `configure` names only the keys to change. It is validated first and rejected whole if invalid; a valid one discards the scan in progress and starts a new one, and `{}` is the reset. Changing a channel name needs a restart.
+A `configure` names only the keys to change. It is validated first and rejected whole if invalid; a valid one discards the scan in progress and starts a new one, and `{}` is the reset. One that changes only `reconstruction` and `trained_model_file` keeps the scan in progress. Changing a channel name needs a restart.
 
 ### Data handling
 
@@ -94,11 +97,12 @@ A `configure` names only the keys to change. It is validated first and rejected 
 | A frame of another shape or dtype | Rejected | `num_frames_rejected` |
 | A frame outside the detector-sum bounds | Filtered, as batch assembly does | `num_frames_filtered` |
 | A repeated or decreasing index | Kept, and logged once per scan | `num_frames_duplicated`, `num_frames_regressed` |
-| A mid-scan `configure` | The scan is discarded | `num_frames_discarded` |
+| A mid-scan `configure` | The scan is discarded, unless only the reconstruction changed | `num_frames_discarded` |
+| A scan finishes while another waits to be reconstructed | The waiting one is dropped; its data is still stored | `num_reconstructions_dropped` |
 | A trigger with no frames, or while settling | Acknowledged and ignored | none |
 | An acknowledgement that fails | Logged; the scan still finishes | `num_trigger_failures` |
 
-Further counters report the queue (`num_frames_queued`, `max_frames_queued`), the estimates (`num_estimates`, `last_estimate_duration_s`, `last_estimate_age_s`), storage (`num_scans_stored`), errors (`num_ingest_errors`, `num_worker_errors`) and thread health (`is_ingest_alive`, `is_worker_alive`).
+Further counters report the queue (`num_frames_queued`, `max_frames_queued`), the estimates (`num_estimates`, `last_estimate_duration_s`, `last_estimate_age_s`), storage (`num_scans_stored`), reconstruction (`num_reconstructions`, `last_reconstruction_duration_s`, `is_reconstructing`), errors (`num_ingest_errors`, `num_worker_errors`, `num_reconstruction_errors`) and thread health (`is_ingest_alive`, `is_worker_alive`, `is_reconstruct_alive`).
 
 ### Bring-up checklist
 
@@ -106,6 +110,34 @@ Further counters report the queue (`num_frames_queued`, `max_frames_queued`), th
 2. Point the configuration at the real detector, positioner and trigger, and compare `<prefix>:scan` against the replay for one scan.
 3. If `num_frames_dropped` is high, check `index_offset` (the detector's `uniqueId` often starts at 1) and that positions arrive within `settle_s` of the trigger.
 4. If `max_frames_queued` keeps growing, ingest is slower than acquisition: reduce `crop_width_px`/`crop_height_px` or bin in the `pipeline`.
+
+(stream-reconstruction)=
+
+## Reconstruction
+
+Set `reconstruction` to name a library, an algorithm and its options — the shape of an options document, so the body of a `reconstruct_options.yaml` (from `ptychodus-reconstruct --print-options`) can be pasted under it. An algorithm that reconstructs with a trained model, such as PtychoPINN's, also needs `trained_model_file`, a path on the processor's machine:
+
+```yaml
+reconstruction:
+  library: PtychoPINN
+  algorithm: Unsupervised
+  options: {}
+trained_model_file: /path/to/model.zip
+```
+
+Each finished scan is reconstructed from its estimate: the scan's prepared patterns, warm-started from the average-pattern probe and STXM-DPC object. Every output the algorithm yields is published on the `:reconstruction:*` channels — once for PtychoPINN, every `num_sync_epochs` for pty-chi — and nothing is written to the storage root; `ptychodus-reconstruct --product` reconstructs a stored scan there.
+
+- **One at a time.** A reconstruction runs to its end. One finished scan waits behind it; a newer scan replaces the waiting one, which is dropped and counted in `num_reconstructions_dropped`.
+- **In the stream's process**, on a thread of its own, so ingest and storage never wait for it. The library's own options choose its device among those the process sees (pty-chi's `task.reconstructor_options.default_device`, PtychoPINN's `training.accelerator`); set `CUDA_VISIBLE_DEVICES` before starting `ptychodus-stream` to limit them. An exception the library raises is logged and counted in `num_reconstruction_errors`, and the next scan is reconstructed as usual.
+- **Changed through `configure`**, without discarding the scan in progress. A library or algorithm left out is kept, and while both stay the same the options given merge at any depth onto the current ones; naming another algorithm starts from its defaults, and `null` turns reconstruction off. A scan reconstructs with the algorithm set when it finished.
+- **PtychoPINN's patterns** must be the size its trained model was trained on; choose the crop and any binning to match.
+- **On stop**, a reconstruction ends at its next output and a waiting one is dropped.
+
+Retune pty-chi's epochs without touching the scan:
+
+```sh
+pvput ptychodus:control '{"command": "configure", "args": "{\"reconstruction\": {\"options\": {\"task\": {\"reconstructor_options\": {\"num_epochs\": 20}}}}}"}'
+```
 
 ## Demonstration with fly001
 
@@ -150,7 +182,7 @@ output_directory: /path/to/storage
 campaign_label: fly001 demo
 ```
 
-The other keys keep their defaults: maps (`bad_pixels_file`, `background_file`, `flat_field_file`, each `{file_path, file_type}`), `pipeline` steps, detector-sum bounds (`total_counts_lower_bound`, `total_counts_upper_bound`), `index_offset`, `i0_name` and `i0_photons_per_count`, the generators (`probe_generator`, `object_generator` and their `*_options`; the probe takes no defocus option, since its defocus is the negated `focus_object_distance_m`, which each scan's parallax measures while it is unset and an explicit value, 0 included, skips), parallax thresholds, `unpaired_retention_s`, `num_frames_per_block`, `consumer_queue_size` and `queue_warning_frames`.
+The other keys keep their defaults: maps (`bad_pixels_file`, `background_file`, `flat_field_file`, each `{file_path, file_type}`), `pipeline` steps, detector-sum bounds (`total_counts_lower_bound`, `total_counts_upper_bound`), `index_offset`, `i0_name` and `i0_photons_per_count`, `focus_object_distance_m` (the negated probe defocus, which each scan's parallax measures while it is unset and an explicit value, 0 included, skips), `reconstruction` and `trained_model_file` (see {ref}`stream-reconstruction`), parallax thresholds, `unpaired_retention_s`, `num_frames_per_block`, `consumer_queue_size` and `queue_warning_frames`.
 
 ### Run
 
@@ -218,6 +250,6 @@ pvput ptychodus:control '{"command": "configure", "args": "{\"settle_s\": 3.0}"}
 
 ## Memory and throughput
 
-Only prepared frames are kept: cropped, binned by the pipeline, masked and filtered. A scan's frames are held until it is stored, alongside the next scan's while that happens; 10⁴ frames of 512×512 `uint16` are about 5 GB, and a crop or binning shrinks that in proportion. Frames waiting for positions are bounded by `unpaired_retention_s`.
+Only prepared frames are kept: cropped, binned by the pipeline, masked and filtered. A scan's frames are held until it is stored, alongside the next scan's while that happens; 10⁴ frames of 512×512 `uint16` are about 5 GB, and a crop or binning shrinks that in proportion. Frames waiting for positions are bounded by `unpaired_retention_s`. With a reconstruction set, the scan being reconstructed and the one waiting are held too, so up to two finished scans beyond those.
 
 Frames are queued as they arrive and prepared on a thread of their own, so a slow estimate or write never drops a frame; a backlog past `queue_warning_frames` is logged, and `max_frames_queued` records the worst so far. pvapy's own input queue, sized by `consumer_queue_size`, is the only place a frame can be lost, if it ever fills.

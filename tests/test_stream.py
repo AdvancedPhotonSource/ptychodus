@@ -6,10 +6,11 @@ streamed scan must give exactly what the same patterns give in one batch pass.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import replace
 from functools import cache
 from pathlib import Path
+import itertools
 import json
 import logging
 import threading
@@ -19,7 +20,7 @@ import numpy
 import numpy.testing
 import pytest
 import yaml
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from ptychodus.api.accumulate import DiffractionMoments, compute_diffraction_moments
 from ptychodus.api.assemble import AssembledDiffractionData, assemble_dataset
@@ -35,6 +36,14 @@ from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import BinningStep
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product
+from ptychodus.api.reconstruct import (
+    ReconstructInput,
+    ReconstructOutput,
+    Reconstructor,
+    ReconstructorLibrary,
+    TrainableReconstructor,
+    TrainOutput,
+)
 from ptychodus.cli._stream import (
     Axis,
     Frame,
@@ -47,6 +56,7 @@ from ptychodus.cli._stream import (
     ScanSetup,
     ScanSnapshot,
     StreamConfiguration,
+    StreamReconstruction,
     display_images,
     estimate_product,
     pack_batched_axes,
@@ -164,14 +174,185 @@ def test_merged_applies_a_partial_update_and_rejects_an_invalid_one() -> None:
         configuration.merged({'crop_center_x_px': 3})
 
 
-def test_a_setup_rejects_an_unknown_model_or_option() -> None:
-    with pytest.raises(LookupError):
-        _setup(probe_generator='no_such_model')
+def test_merged_merges_reconstruction_options_until_the_algorithm_changes() -> None:
+    configuration = _configuration(
+        reconstruction={
+            'library': 'Fake',
+            'algorithm': 'Echo',
+            'options': {'num_epochs': 4, 'probe': {'enabled': True, 'step': 0.5}},
+        }
+    )
 
-    with pytest.raises(ValueError, match='no_such_option'):
-        _setup(object_options={'no_such_option': 1.0})
+    retuned = configuration.merged({'reconstruction': {'options': {'probe': {'step': 0.1}}}})
+    assert retuned.reconstruction is not None
+    assert retuned.reconstruction.library == 'Fake'
+    assert retuned.reconstruction.algorithm == 'Echo'
+    assert retuned.reconstruction.options == {
+        'num_epochs': 4,
+        'probe': {'enabled': True, 'step': 0.1},
+    }
 
-    assert _setup(object_options={'regularization_fov_fraction': 0.5}).object_options
+    switched = configuration.merged({'reconstruction': {'algorithm': 'Other'}})
+    assert switched.reconstruction is not None
+    assert switched.reconstruction.library == 'Fake'
+    assert switched.reconstruction.options == {}
+
+    assert configuration.merged({'reconstruction': None}).reconstruction is None
+
+
+def test_only_reconstruction_keys_leave_the_scan_alone() -> None:
+    configuration = _configuration()
+    reconstructing = configuration.merged(
+        {'reconstruction': {'library': 'Fake'}, 'trained_model_file': '/models/model.zip'}
+    )
+    retimed = configuration.merged({'settle_s': 5.0})
+
+    assert not configuration.differs_for_scans(reconstructing)
+    assert configuration.differs_for_reconstruction(reconstructing)
+    assert configuration.differs_for_scans(retimed)
+    assert not configuration.differs_for_reconstruction(retimed)
+
+
+class _EchoOptions(BaseModel):
+    num_epochs: int = Field(2, ge=1)
+
+
+class _Echo(Reconstructor):
+    """Yields its initial guess once per epoch; holds before an epoch on cue."""
+
+    def __init__(self) -> None:
+        self.hold_before: int | None = None
+        self.holding = threading.Event()
+        self.release = threading.Event()
+
+    @property
+    def name(self) -> str:
+        return 'Echo'
+
+    def get_default_options(self) -> BaseModel:
+        return _EchoOptions()
+
+    def reconstruct(
+        self, input_: ReconstructInput, *, options: BaseModel
+    ) -> Iterator[ReconstructOutput]:
+        assert isinstance(options, _EchoOptions)
+
+        for epoch in range(1, options.num_epochs + 1):
+            if epoch == self.hold_before and not self.holding.is_set():
+                self.holding.set()
+                self.release.wait(timeout=60.0)
+
+            yield ReconstructOutput(
+                input_.product, progress=epoch, progress_goal=options.num_epochs
+            )
+
+
+class _Trained(TrainableReconstructor):
+    def __init__(self) -> None:
+        self.model_file: Path | None = None
+
+    @property
+    def name(self) -> str:
+        return 'Trained'
+
+    def reconstruct(
+        self, input_: ReconstructInput, *, options: BaseModel
+    ) -> Iterator[ReconstructOutput]:
+        yield ReconstructOutput(input_.product)
+
+    def is_model_loaded(self) -> bool:
+        return self.model_file is not None
+
+    def get_model_file_description(self) -> str:
+        return 'Fake Model'
+
+    def get_model_file_extensions(self) -> tuple[str, ...]:
+        return ('.zip',)
+
+    def load_model(self, file_path: Path) -> None:
+        self.model_file = file_path
+
+    def save_model(self, file_path: Path) -> None:
+        raise NotImplementedError
+
+    def train(
+        self, input_directory: Path, output_directory: Path, *, options: BaseModel
+    ) -> Iterator[TrainOutput]:
+        yield from ()
+
+
+class _FakeLibrary(ReconstructorLibrary):
+    def __init__(self, reconstructors: Iterable[Reconstructor]) -> None:
+        super().__init__('fake', 'fake-distribution')
+        self._offered = list(reconstructors)
+
+    def _build(self) -> Iterable[Reconstructor]:
+        return self._offered
+
+
+def _fake_registry(*reconstructors: Reconstructor) -> PluginRegistry:
+    registry = PluginRegistry()
+    registry.reconstructor_libraries.register_plugin(
+        _FakeLibrary(reconstructors), simple_name='fake', display_name='Fake'
+    )
+    registry.reconstructor_libraries.freeze()
+    return registry
+
+
+def test_a_reconstruction_resolves_with_its_options_applied() -> None:
+    registry = _fake_registry(_Echo())
+    configuration = _configuration(
+        reconstruction={'library': 'Fake', 'algorithm': 'Echo', 'options': {'num_epochs': 5}}
+    )
+
+    reconstruction = StreamReconstruction.from_configuration(configuration, registry)
+
+    assert reconstruction is not None
+    assert reconstruction.name == 'Fake Echo'
+    assert reconstruction.options == _EchoOptions(num_epochs=5)
+    assert StreamReconstruction.from_configuration(_configuration(), registry) is None
+
+
+@pytest.mark.parametrize(
+    ('overrides', 'match'),
+    [
+        ({'reconstruction': {'library': 'Missing'}}, 'Missing'),
+        ({'reconstruction': {'library': 'Fake', 'options': {'no_such': 1}}}, 'no_such'),
+        ({'reconstruction': {'library': 'Fake', 'options': {'num_epochs': 0}}}, 'num_epochs'),
+        ({'trained_model_file': '/models/model.zip'}, 'no reconstruction'),
+        (
+            {'reconstruction': {'library': 'Fake'}, 'trained_model_file': '/models/model.zip'},
+            'takes no trained model',
+        ),
+    ],
+)
+def test_a_reconstruction_that_cannot_run_is_refused(
+    overrides: dict[str, object], match: str
+) -> None:
+    with pytest.raises(ValueError, match=match):
+        StreamReconstruction.from_configuration(
+            _configuration(**overrides), _fake_registry(_Echo())
+        )
+
+
+def test_a_trained_model_is_loaded_into_a_copy() -> None:
+    trained = _Trained()
+    registry = _fake_registry(trained)
+
+    with pytest.raises(ValueError, match='set trained_model_file'):
+        StreamReconstruction.from_configuration(
+            _configuration(reconstruction={'library': 'Fake'}), registry
+        )
+
+    reconstruction = StreamReconstruction.from_configuration(
+        _configuration(reconstruction={'library': 'Fake'}, trained_model_file='/m/model.zip'),
+        registry,
+    )
+
+    assert reconstruction is not None
+    assert isinstance(reconstruction.reconstructor, _Trained)
+    assert reconstruction.reconstructor.model_file == Path('/m/model.zip')
+    assert trained.model_file is None
 
 
 # ---------------------------------------------------------------------------
@@ -364,8 +545,8 @@ def test_a_streamed_scan_equals_one_batch_pass() -> None:
         ProbePositionSequence(make_positions()),
         batch_moments,
     )
-    from_stream = estimate_product(streamed, setup, numpy.random.default_rng(0))
-    from_batch = estimate_product(batch, setup, numpy.random.default_rng(0))
+    from_stream = estimate_product(streamed, setup)
+    from_batch = estimate_product(batch, setup)
 
     numpy.testing.assert_allclose(
         from_stream.probes.get_array(), from_batch.probes.get_array(), rtol=1e-9, atol=1e-9
@@ -472,12 +653,20 @@ class _Recorder:
         with self.lock:
             self.events.append(('scan', report))
 
+    def publish_reconstruction(self, label: str, output: ReconstructOutput) -> None:
+        with self.lock:
+            self.events.append(('reconstruction', (label, output.progress)))
+
     def reports(self) -> list[ScanReport]:
         return [event for kind, event in self.events if isinstance(event, ScanReport)]
 
     def estimate_names(self) -> list[str]:
         with self.lock:
             return [str(event) for kind, event in self.events if kind == 'estimate']
+
+    def reconstructions(self) -> list[object]:
+        with self.lock:
+            return [event for kind, event in self.events if kind == 'reconstruction']
 
 
 class _HoldingRecorder(_Recorder):
@@ -535,7 +724,6 @@ def _pipeline(
         recorder,
         acknowledge_trigger=lambda: acknowledged.append('ack'),
         clock=time.monotonic if clock is None else clock,
-        rng=numpy.random.default_rng(0),
         idle_s=0.01,
     )
     return pipeline, acknowledged
@@ -755,7 +943,6 @@ def test_the_trigger_takes_the_scan_number_and_angle_and_survives_a_failed_ack(
         acknowledge_trigger=failing_ack,
         read_scan_number=lambda: 42,
         read_tomography_angle_deg=lambda: 37.5,
-        rng=numpy.random.default_rng(0),
         idle_s=0.01,
     )
     pipeline.start()
@@ -799,15 +986,8 @@ def test_positions_before_the_first_frame_are_kept_and_index_anomalies_counted()
     assert counters['num_frames_regressed'] == 1
 
 
-def test_a_probe_option_for_the_defocus_points_at_the_focus() -> None:
-    """The defocus is the product's, so a generator option for it is refused with a remedy."""
-    with pytest.raises(ValueError, match='focus_object_distance_m'):
-        _setup(probe_options={'defocus_distance_m': 1.0e-3})
-
-
 def test_the_parallax_is_not_measured_in_near_field(monkeypatch: pytest.MonkeyPatch) -> None:
-    # STXM-DPC, the default object, is far field only too.
-    setup = _setup(object_generator='random')
+    setup = _setup()
     session = _streamed_session(setup)
     metadata = setup.configuration.create_metadata('scan', tomography_angle_deg=0.0)
     snapshot = session.snapshot(replace(metadata, far_field=False))
@@ -818,7 +998,7 @@ def test_the_parallax_is_not_measured_in_near_field(monkeypatch: pytest.MonkeyPa
 
     monkeypatch.setattr('ptychodus.cli._stream._estimate_parallax', fail)
 
-    product = estimate_product(snapshot, setup, numpy.random.default_rng(0))
+    product = estimate_product(snapshot, setup)
 
     assert product.metadata.focus_object_distance_m == 0.0
 
@@ -837,7 +1017,7 @@ def test_an_explicit_zero_focus_skips_the_parallax(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr('ptychodus.cli._stream._estimate_parallax', fail)
 
-    product = estimate_product(snapshot, setup, numpy.random.default_rng(0))
+    product = estimate_product(snapshot, setup)
 
     assert product.metadata.focus_object_distance_m == 0.0
 
@@ -857,6 +1037,102 @@ def test_an_unset_focus_is_measured(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr('ptychodus.cli._stream._estimate_parallax', record)
 
-    estimate_product(snapshot, setup, numpy.random.default_rng(0))
+    estimate_product(snapshot, setup)
 
     assert len(calls) == 1
+
+
+# ---------------------------------------------------------------------------
+# Reconstruction
+# ---------------------------------------------------------------------------
+
+
+def _echo_reconstruction(echo: _Echo) -> StreamReconstruction:
+    return StreamReconstruction('Fake Echo', echo, _EchoOptions())
+
+
+def _numbered_pipeline(
+    recorder: _Recorder, clock: _Clock, reconstruction: StreamReconstruction | None
+) -> ScanPipeline:
+    return ScanPipeline(
+        _setup(settle_s=1.0),
+        recorder,
+        reconstruction=reconstruction,
+        read_scan_number=itertools.count(1).__next__,
+        clock=clock,
+        idle_s=0.01,
+    )
+
+
+def test_each_finished_scan_is_reconstructed_and_the_newest_waiting_one_wins() -> None:
+    echo = _Echo()
+    echo.hold_before = 1
+    clock = _Clock()
+    recorder = _Recorder()
+    pipeline = _numbered_pipeline(recorder, clock, _echo_reconstruction(echo))
+
+    for k in range(3):
+        clock.now = 3.0 * k
+        _submit_scan(pipeline, range(0, 100), offset=1000 * k)
+        clock.now += 1.0
+        pipeline.trigger()
+
+    clock.now = 10.0
+    pipeline.start()
+    # The first reconstruction is held while all three scans finish behind it.
+    assert _wait_until(lambda: len(recorder.reports()) == 3)
+    echo.release.set()
+    assert _wait_until(lambda: ('scan 3', 2) in recorder.reconstructions())
+    pipeline.stop(timeout_s=120.0)
+
+    assert recorder.reconstructions() == [
+        ('scan 1', 1),
+        ('scan 1', 2),
+        ('scan 3', 1),
+        ('scan 3', 2),
+    ]
+    counters = pipeline.get_counters()
+    assert counters['num_reconstructions'] == 2
+    assert counters['num_reconstructions_dropped'] == 1
+    assert counters['num_reconstruction_errors'] == 0
+
+
+def test_setting_a_reconstruction_mid_scan_keeps_the_scan() -> None:
+    clock = _Clock()
+    recorder = _Recorder()
+    pipeline = _numbered_pipeline(recorder, clock, None)
+    _submit_scan(pipeline, range(0, 100))
+    pipeline.set_reconstruction(_echo_reconstruction(_Echo()))
+    clock.now = 1.0
+    pipeline.trigger()
+    clock.now = 3.0
+    pipeline.start()
+    assert _wait_until(lambda: len(recorder.reconstructions()) == 2)
+    pipeline.stop(timeout_s=120.0)
+
+    assert [report.num_frames_paired for report in recorder.reports()] == [100]
+    assert pipeline.get_counters()['num_frames_discarded'] == 0
+    assert recorder.reconstructions() == [('scan 1', 1), ('scan 1', 2)]
+
+
+def test_stop_abandons_a_reconstruction_at_its_next_output() -> None:
+    echo = _Echo()
+    echo.hold_before = 2
+    clock = _Clock()
+    recorder = _Recorder()
+    pipeline = _numbered_pipeline(recorder, clock, _echo_reconstruction(echo))
+    _submit_scan(pipeline, range(0, 100))
+    clock.now = 1.0
+    pipeline.trigger()
+    clock.now = 3.0
+    pipeline.start()
+    assert echo.holding.wait(timeout=60.0), 'the reconstruction never started'
+    stopping = threading.Thread(target=pipeline.stop, kwargs={'timeout_s': 120.0})
+    stopping.start()
+    assert _wait_until(lambda: pipeline._is_stopping)
+    echo.release.set()
+    stopping.join(timeout=120.0)
+
+    assert recorder.reconstructions() == [('scan 1', 1), ('scan 1', 2)]
+    assert pipeline.get_counters()['num_reconstructions'] == 0
+    assert not pipeline.get_counters()['is_reconstruct_alive']

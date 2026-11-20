@@ -4,7 +4,9 @@ Runs one pvapy area-detector consumer whose processor, :class:`StreamProcessor`,
 :class:`~ptychodus.cli._stream.ScanPipeline`: detector frames arrive on the input
 channel, probe positions on their own channel, and a trigger PV marks the end of each
 scan. Probe and object images are published for viewing, and each finished scan is
-saved into the storage root the web service browses.
+saved into the storage root the web service browses. A configured reconstruction
+library's algorithm reconstructs each finished scan, and its images are published on
+channels of their own.
 
 Needs the ``stream`` extra (pvapy). The PV contract it follows is documented in the
 streaming guide, and ``scripts/replay_scan.py`` replays a recorded scan to it.
@@ -32,6 +34,7 @@ import ptychodus
 from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.product import Product
+from ptychodus.api.reconstruct import ReconstructOutput
 from ptychodus.cli import add_log_level_argument, configure_logging
 from ptychodus.cli._stream import (
     PvProtocol,
@@ -39,11 +42,13 @@ from ptychodus.cli._stream import (
     ScanReport,
     ScanSetup,
     StreamConfiguration,
+    StreamReconstruction,
     display_images,
     parse_positions,
 )
 
 __all__ = [
+    'RECONSTRUCTION_REPORT_TYPE',
     'SCAN_REPORT_TYPE',
     'StreamProcessor',
     'TRIGGER_TYPE',
@@ -70,6 +75,13 @@ SCAN_REPORT_TYPE: Final[dict[str, Any]] = {
     'written': pvaccess.BOOLEAN,
 }
 """The ``<prefix>:scan`` structure; a uuid is empty when nothing was saved."""
+
+RECONSTRUCTION_REPORT_TYPE: Final[dict[str, Any]] = {
+    'label': pvaccess.STRING,
+    'progress': pvaccess.ULONG,
+    'progress_goal': pvaccess.ULONG,
+}
+"""The ``<prefix>:reconstruction`` structure, updated with each output; a goal of 0 is unknown."""
 
 
 def make_batched_positions_type(axis_names: list[str]) -> dict[str, Any]:
@@ -145,16 +157,26 @@ class _Monitor:
 
 
 class _PvaPublisher:
-    """Publishes the four images and the scan report on a PVA server."""
+    """Publishes the estimate's and the reconstruction's images and their reports on PVA."""
 
     def __init__(self, server: Any, prefix: str) -> None:
         self._server = server
         self._image_names = {
             'probe': (f'{prefix}:probe:amplitude', f'{prefix}:probe:phase'),
             'object': (f'{prefix}:object:amplitude', f'{prefix}:object:phase'),
+            'reconstruction:probe': (
+                f'{prefix}:reconstruction:probe:amplitude',
+                f'{prefix}:reconstruction:probe:phase',
+            ),
+            'reconstruction:object': (
+                f'{prefix}:reconstruction:object:amplitude',
+                f'{prefix}:reconstruction:object:phase',
+            ),
         }
         self._scan_name = f'{prefix}:scan'
+        self._reconstruction_name = f'{prefix}:reconstruction'
         self._counter = 0
+        self._reconstruction_counter = 0
         placeholder = numpy.zeros((1, 1), dtype=numpy.float32)
 
         for names in self._image_names.values():
@@ -162,15 +184,38 @@ class _PvaPublisher:
                 server.addRecord(name, AdImageUtility.generateNtNdArray2D(0, placeholder))
 
         server.addRecord(self._scan_name, pvaccess.PvObject(SCAN_REPORT_TYPE))
+        server.addRecord(self._reconstruction_name, pvaccess.PvObject(RECONSTRUCTION_REPORT_TYPE))
 
-    def _update(self, names: tuple[str, str], array: numpy.ndarray) -> None:
+    def _update(self, names: tuple[str, str], array: numpy.ndarray, counter: int) -> None:
         for name, image in zip(names, display_images(array)):
-            self._server.update(name, AdImageUtility.generateNtNdArray2D(self._counter, image))
+            self._server.update(name, AdImageUtility.generateNtNdArray2D(counter, image))
 
     def publish_estimate(self, product: Product) -> None:
         self._counter += 1
-        self._update(self._image_names['probe'], product.probes.get_mean_probe().get_array())
-        self._update(self._image_names['object'], product.object_.get_array())
+        probe = product.probes.get_mean_probe().get_array()
+        self._update(self._image_names['probe'], probe, self._counter)
+        self._update(self._image_names['object'], product.object_.get_array(), self._counter)
+
+    def publish_reconstruction(self, label: str, output: ReconstructOutput) -> None:
+        self._reconstruction_counter += 1
+        counter = self._reconstruction_counter
+        product = output.product
+        probe = product.probes.get_mean_probe().get_array()
+        self._update(self._image_names['reconstruction:probe'], probe, counter)
+        self._update(
+            self._image_names['reconstruction:object'], product.object_.get_array(), counter
+        )
+        self._server.update(
+            self._reconstruction_name,
+            pvaccess.PvObject(
+                RECONSTRUCTION_REPORT_TYPE,
+                {
+                    'label': label,
+                    'progress': output.progress,
+                    'progress_goal': output.progress_goal,
+                },
+            ),
+        )
 
     def publish_scan(self, report: ScanReport) -> None:
         self._server.update(
@@ -220,6 +265,9 @@ class StreamProcessor(AdImageProcessor):
         self._registry = PluginRegistry.load_plugins()
         self._configuration = StreamConfiguration.model_validate(config_dict[_CONFIGURATION_KEY])
         self._setup = ScanSetup.from_configuration(self._configuration, self._registry)
+        self._reconstruction = StreamReconstruction.from_configuration(
+            self._configuration, self._registry
+        )
         self._lock = threading.Lock()
         self._pipeline: ScanPipeline | None = None
         self._monitors: list[_Monitor] = []
@@ -240,6 +288,7 @@ class StreamProcessor(AdImageProcessor):
         self._pipeline = ScanPipeline(
             self._setup,
             publisher,
+            reconstruction=self._reconstruction,
             acknowledge_trigger=self._acknowledge_trigger,
             read_scan_number=self._read_scan_number,
             read_tomography_angle_deg=self._read_tomography_angle_deg,
@@ -288,11 +337,32 @@ class StreamProcessor(AdImageProcessor):
             if changed:
                 raise ValueError(f'Restart to change {", ".join(sorted(changed))}.')
 
-            setup = ScanSetup.from_configuration(configuration, self._registry)
+            # A reconstruction is not part of a scan, so changing only it keeps the scan in
+            # progress; `{}` is the reset, so it restarts the scan.
+            setup: ScanSetup | None = None
+            reconstruction = self._reconstruction
+
+            if not overrides or self._configuration.differs_for_scans(configuration):
+                setup = ScanSetup.from_configuration(configuration, self._registry)
+
+            is_reconstruction_changed = self._configuration.differs_for_reconstruction(
+                configuration
+            )
+
+            if is_reconstruction_changed:
+                reconstruction = StreamReconstruction.from_configuration(
+                    configuration, self._registry
+                )
+
             self._configuration = configuration
+            self._reconstruction = reconstruction
 
         if self._pipeline is not None:
-            self._pipeline.configure(setup)
+            if setup is not None:
+                self._pipeline.configure(setup)
+
+            if is_reconstruction_changed:
+                self._pipeline.set_reconstruction(reconstruction)
 
     def process(self, pv_object: Any) -> Any:
         image_id, image, nx, _, _, _, _ = self.reshapeNtNdArray(pv_object)
@@ -353,7 +423,10 @@ class StreamProcessor(AdImageProcessor):
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description='Estimate the probe and object while a scan streams, and store each scan.'
+        description=(
+            'Estimate the probe and object while a scan streams, store each scan, and '
+            'optionally reconstruct it.'
+        )
     )
     parser.add_argument(
         '--config',
@@ -377,9 +450,11 @@ def main() -> ExitCode:
 
     try:
         configuration = StreamConfiguration.from_file(args.config)
-        # Loads the maps, resolves the generators and prepares the storage root, so a bad
-        # configuration fails here rather than inside the consumer.
-        ScanSetup.from_configuration(configuration, PluginRegistry.load_plugins())
+        # Loads the maps, prepares the storage root and resolves the reconstruction, so a
+        # bad configuration fails here rather than inside the consumer.
+        registry = PluginRegistry.load_plugins()
+        ScanSetup.from_configuration(configuration, registry)
+        StreamReconstruction.from_configuration(configuration, registry)
     except (OSError, ValueError, ValidationError, LookupError) as exc:
         logger.error(f'Invalid configuration {args.config}: {exc}')
         return ExitCode.USAGE

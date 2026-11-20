@@ -2,12 +2,15 @@
 
 A scan is collected from a stream of detector frames and probe positions, paired by
 scan index; a frame joins the scan only once positions cover its index. Each scan is
-prepared exactly as batch assembly prepares a dataset, its probe and object estimated
-by the same generator plugins the GUI runs, and the finished scan written into the
-webapp storage root as a diffraction resource and a product derived from it.
+prepared exactly as batch assembly prepares a dataset, its probe estimated from the
+mean pattern and its object by STXM-DPC, as the GUI's generators of those names do, and
+the finished scan written into the webapp storage root as a diffraction resource and a
+product derived from it. A configuration naming a reconstruction library's algorithm
+has each finished scan reconstructed from that estimate, for display only.
 
-Everything here is driven through :class:`ScanPipeline`, which owns two threads: one
-that ingests what the stream delivers and one that estimates, publishes and writes.
+Everything here is driven through :class:`ScanPipeline`, which owns three threads: one
+that ingests what the stream delivers, one that estimates, publishes and writes, and one
+that reconstructs.
 The PV contract -- the layouts the positions arrive in -- is defined here as plain
 dicts, so the processor and the replay script share one definition of it.
 """
@@ -21,6 +24,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol
 from uuid import UUID
+import copy
 import logging
 import queue
 import tempfile
@@ -48,6 +52,7 @@ from ptychodus.api.diffraction import (
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.interpolate import interpolate_at_indexes
 from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider, compute_object_geometry
+from ptychodus.api.options import apply_options_document
 from ptychodus.api.parallax import ParallaxEstimate, estimate_defocus_from_parallax
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import BinningStep, DiffractionPrepPipeline
@@ -55,8 +60,13 @@ from ptychodus.api.probe import ProbeEnsemble, ProbeGeometry, ProbeGeometryProvi
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.propagate import ProductGeometry, compute_product_geometry
-from ptychodus.api.simulate.object import ObjectGenerator
-from ptychodus.api.simulate.probe import ProbeGenerator, rescale_probe_intensity
+from ptychodus.api.reconstruct import (
+    ReconstructOutput,
+    Reconstructor,
+    TrainableReconstructor,
+    prepare_reconstruct_input,
+)
+from ptychodus.api.simulate.probe import rescale_probe_intensity
 from ptychodus.api.processing import RunState, create_run_record
 from ptychodus.api.typing import BooleanArrayType, IntegerArrayType, RealArrayType
 from ptychodus.api.storage import (
@@ -65,6 +75,9 @@ from ptychodus.api.storage import (
     save_diffraction_resource,
     save_product_resource,
 )
+from ptychodus.cli._options import resolve_reconstructor
+from ptychodus.plugins.object.phase_retrieval import STXMDPCObjectGenerator
+from ptychodus.plugins.probe.average_pattern import AveragePatternProbeGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +118,17 @@ class PixelMapSource(BaseModel):
 
     file_path: Path
     file_type: str
+
+
+class ReconstructionSelection(BaseModel):
+    """A library's algorithm and its options, in the shape of an options document."""
+
+    model_config = ConfigDict(extra='forbid', frozen=True)
+
+    library: str
+    # Unnamed, the library's only algorithm.
+    algorithm: str | None = None
+    options: dict[str, Any] = Field(default_factory=dict)
 
 
 class StreamConfiguration(BaseModel):
@@ -157,11 +181,9 @@ class StreamConfiguration(BaseModel):
     i0_name: str | None = None
     index_offset: int = 0
 
-    # Models
-    probe_generator: str = 'average_pattern'
-    probe_options: dict[str, Any] = Field(default_factory=dict)
-    object_generator: str = 'stxm_dpc'
-    object_options: dict[str, Any] = Field(default_factory=dict)
+    # Reconstruction; unset, scans are estimated only.
+    reconstruction: ReconstructionSelection | None = None
+    trained_model_file: Path | None = None
 
     # Parallax
     parallax_bin_size_px: int = Field(4, ge=0)
@@ -202,9 +224,44 @@ class StreamConfiguration(BaseModel):
     def merged(self, overrides: Mapping[str, Any]) -> StreamConfiguration:
         """This configuration with `overrides` replacing the keys they name, validated.
 
-        A nested key -- an axis, a pixel map, the pipeline -- is replaced whole.
+        A nested key -- an axis, a pixel map, the pipeline -- is replaced whole, but for
+        `reconstruction`: a library or algorithm it leaves out is kept, and while both stay
+        the same its options merge at any depth onto the current ones. Naming another
+        library or algorithm starts from that one's defaults.
         """
-        return type(self).model_validate({**self.model_dump(), **overrides})
+        values = {**self.model_dump(), **overrides}
+        current = self.reconstruction
+        update = overrides.get('reconstruction')
+
+        if current is not None and isinstance(update, Mapping):
+            library = update.get('library', current.library)
+            algorithm = update.get('algorithm', current.algorithm)
+            options = update.get('options', {})
+
+            if library == current.library and algorithm == current.algorithm:
+                options = _merge_options(current.options, options)
+
+            values['reconstruction'] = {
+                'library': library,
+                'algorithm': algorithm,
+                'options': options,
+            }
+
+        return type(self).model_validate(values)
+
+    def differs_for_scans(self, other: StreamConfiguration) -> bool:
+        """Whether `other` differs in a key a scan depends on, beyond its reconstruction."""
+        reconstruction_keys = {'reconstruction', 'trained_model_file'}
+        return self.model_dump(exclude=reconstruction_keys) != other.model_dump(
+            exclude=reconstruction_keys
+        )
+
+    def differs_for_reconstruction(self, other: StreamConfiguration) -> bool:
+        """Whether `other` names another reconstruction or trained model."""
+        return (self.reconstruction, self.trained_model_file) != (
+            other.reconstruction,
+            other.trained_model_file,
+        )
 
     def get_read_region(self) -> CropRegion | None:
         """The detector region frames are cropped to, or None for the whole frame."""
@@ -239,20 +296,18 @@ class StreamConfiguration(BaseModel):
         )
 
 
-def _validated_options(defaults: BaseModel, overrides: Mapping[str, Any], name: str) -> BaseModel:
-    unknown = sorted(set(overrides) - set(type(defaults).model_fields))
+def _merge_options(base: Mapping[str, Any], overrides: Mapping[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
 
-    if unknown:
-        # Options a generator once declared and the configuration now states elsewhere.
-        hints = {
-            'defocus_distance_m': (
-                'the defocus is the negated focus_object_distance_m, set on the configuration'
-            ),
-        }
-        remedies = ''.join(f' For {key}: {hints[key]}.' for key in unknown if key in hints)
-        raise ValueError(f'{name} accepts no option {", ".join(unknown)}.{remedies}')
+    for key, value in overrides.items():
+        current = merged.get(key)
 
-    return type(defaults).model_validate({**defaults.model_dump(), **overrides})
+        if isinstance(current, Mapping) and isinstance(value, Mapping):
+            merged[key] = _merge_options(current, value)
+        else:
+            merged[key] = value
+
+    return merged
 
 
 def prepare_storage_root(directory: Path) -> StorageLayout:
@@ -278,21 +333,16 @@ class ScanSetup:
     bad_pixels: BadPixels | None
     background: DetectorBackground | None
     flat_field: FlatField | None
-    probe_generator: ProbeGenerator
-    probe_options: BaseModel
-    object_generator: ObjectGenerator
-    object_options: BaseModel
     layout: StorageLayout | None
 
     @classmethod
     def from_configuration(
         cls, configuration: StreamConfiguration, registry: PluginRegistry
     ) -> ScanSetup:
-        """Load the maps, resolve the generators and prepare the storage root `configuration` names.
+        """Load the maps and prepare the storage root `configuration` names.
 
         Raises:
-            LookupError: if a reader or generator is not registered.
-            ValueError: if a generator option is unknown or invalid.
+            LookupError: if a reader is not registered.
             OSError: if a map cannot be read or the storage root is not writable.
         """
         bad_pixels = None
@@ -314,32 +364,65 @@ class ScanSetup:
             map_reader = registry.flat_field_file_readers.get_strategy_by_name(source.file_type)
             flat_field = map_reader.read(source.file_path)
 
-        probe_generator = registry.probe_generators.get_strategy_by_name(
-            configuration.probe_generator
-        )
-        object_generator = registry.object_generators.get_strategy_by_name(
-            configuration.object_generator
-        )
         output_directory = configuration.output_directory
         return cls(
             configuration=configuration,
             bad_pixels=bad_pixels,
             background=background,
             flat_field=flat_field,
-            probe_generator=probe_generator,
-            probe_options=_validated_options(
-                probe_generator.get_default_options(),
-                configuration.probe_options,
-                configuration.probe_generator,
-            ),
-            object_generator=object_generator,
-            object_options=_validated_options(
-                object_generator.get_default_options(),
-                configuration.object_options,
-                configuration.object_generator,
-            ),
             layout=None if output_directory is None else prepare_storage_root(output_directory),
         )
+
+
+@dataclass(frozen=True)
+class StreamReconstruction:
+    """The algorithm a configuration names, its options applied and any trained model loaded."""
+
+    name: str
+    reconstructor: Reconstructor
+    options: BaseModel
+
+    @classmethod
+    def from_configuration(
+        cls, configuration: StreamConfiguration, registry: PluginRegistry
+    ) -> StreamReconstruction | None:
+        """The reconstruction `configuration` names, or None when it names none.
+
+        Raises:
+            ValueError: if no installed library or algorithm answers to the names, an option
+                is undeclared or invalid, or a trained model is missing or not wanted.
+            OSError: if the trained model cannot be read.
+        """
+        selection = configuration.reconstruction
+        model_file = configuration.trained_model_file
+
+        if selection is None:
+            if model_file is not None:
+                raise ValueError('trained_model_file is set, but no reconstruction is.')
+
+            return None
+
+        plugin, reconstructor = resolve_reconstructor(
+            registry.reconstructor_libraries, selection.library, selection.algorithm
+        )
+        name = f'{plugin.display_name} {reconstructor.name}'
+        options = apply_options_document(
+            reconstructor.get_default_options(), selection.options, subject=name
+        )
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            if model_file is None:
+                raise ValueError(
+                    f'{name} reconstructs with a trained model; set trained_model_file.'
+                )
+
+            # A copy, so a reconstruction still running keeps the model it began with.
+            reconstructor = copy.copy(reconstructor)
+            reconstructor.load_model(model_file)
+        elif model_file is not None:
+            raise ValueError(f'{name} takes no trained model; unset trained_model_file.')
+
+        return cls(name, reconstructor, options)
 
 
 # ---------------------------------------------------------------------------
@@ -1085,9 +1168,7 @@ def _select(data: AssembledDiffractionData, mask: BooleanArrayType) -> Assembled
 # ---------------------------------------------------------------------------
 
 
-def estimate_product(
-    snapshot: ScanSnapshot, setup: ScanSetup, rng: numpy.random.Generator
-) -> Product:
+def estimate_product(snapshot: ScanSnapshot, setup: ScanSetup) -> Product:
     """A product from a scan's moments, by the GUI's sequence.
 
     1. The incident beam -- photon count and mean transmission -- from the detector sums,
@@ -1095,8 +1176,8 @@ def estimate_product(
     2. When the configuration states no focus, the patterns are far field and the moments
        were binned, the parallax defocus; a resolved estimate sets the focus, and an
        unresolved one leaves it at zero.
-    3. The probe from its generator, scaled to the incident photon count.
-    4. The object from its generator, with that probe.
+    3. The probe from the mean pattern, scaled to the incident photon count.
+    4. The object by STXM-DPC, with that probe; uniform in near field.
     """
     configuration = setup.configuration
     moments = snapshot.get_diffraction_moments()
@@ -1133,11 +1214,19 @@ def estimate_product(
                 'to state the focus.'
             )
 
+    probe_generator = AveragePatternProbeGenerator()
     probe = rescale_probe_intensity(
-        setup.probe_generator.generate(setup.probe_options, snapshot),
+        probe_generator.generate(probe_generator.get_default_options(), snapshot),
         metadata.probe_photon_count,
     )
-    object_ = setup.object_generator.generate(setup.object_options, snapshot, rng=rng, probe=probe)
+    object_generator = STXMDPCObjectGenerator()
+    object_ = object_generator.generate(
+        object_generator.get_default_options(),
+        snapshot,
+        # STXM-DPC draws nothing at random.
+        rng=numpy.random.default_rng(),
+        probe=probe,
+    )
     return Product(
         metadata=metadata,
         probe_positions=positions,
@@ -1203,11 +1292,13 @@ class _Campaign:
 
 
 class ScanPublisher(Protocol):
-    """Where a pipeline's results go; called from its worker thread only."""
+    """Where a pipeline's results go; called by one of its threads at a time."""
 
     def publish_estimate(self, product: Product) -> None: ...
 
     def publish_scan(self, report: ScanReport) -> None: ...
+
+    def publish_reconstruction(self, label: str, output: ReconstructOutput) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -1260,6 +1351,14 @@ class _StopJob:
 _Job = _CampaignJob | _FinishJob | _StopJob
 
 
+@dataclass(frozen=True)
+class _ReconstructJob:
+    label: str
+    data: AssembledDiffractionData
+    product: Product
+    reconstruction: StreamReconstruction
+
+
 @dataclass
 class _Settle:
     cut_s: float
@@ -1280,10 +1379,17 @@ class ScanPipeline:
     - **worker** is the only thread that estimates, publishes or writes files, so
       publishes are in order and storage writes are serialized.
 
+    - **reconstruct** runs the reconstruction, if one is set, on each scan the worker
+      finished, publishing every output it yields and writing nothing.
+
     A trigger is acknowledged at once, then the scan settles: whatever arrives within
     ``settle_s`` of the trigger still belongs to it. At the cut, frames still waiting
     for positions are dropped, the scan goes to the worker to be finished, and the
     next scan begins with the same configuration.
+
+    One reconstruction runs at a time, and one finished scan waits for it; a newer scan
+    replaces the waiting one, which is dropped. A reconstruction runs with the algorithm
+    set when its scan finished.
     """
 
     def __init__(
@@ -1291,19 +1397,20 @@ class ScanPipeline:
         setup: ScanSetup,
         publisher: ScanPublisher,
         *,
+        reconstruction: StreamReconstruction | None = None,
         acknowledge_trigger: Callable[[], None] = lambda: None,
         read_scan_number: Callable[[], int | None] = lambda: None,
         read_tomography_angle_deg: Callable[[], float | None] = lambda: None,
         clock: Callable[[], float] = time.monotonic,
-        rng: numpy.random.Generator | None = None,
         idle_s: float = 0.05,
     ) -> None:
         self._publisher = publisher
+        self._publish_lock = threading.Lock()
+        self._reconstruction = reconstruction
         self._acknowledge_trigger = acknowledge_trigger
         self._read_scan_number = read_scan_number
         self._read_tomography_angle_deg = read_tomography_angle_deg
         self._clock = clock
-        self._rng = numpy.random.default_rng() if rng is None else rng
         self._idle_s = idle_s
         self._items: queue.SimpleQueue[_Item] = queue.SimpleQueue()
         self._jobs: queue.SimpleQueue[_Job] = queue.SimpleQueue()
@@ -1312,6 +1419,13 @@ class ScanPipeline:
         self._settle: _Settle | None = None
         self._ingest_thread = threading.Thread(target=self._ingest, name='stream-ingest')
         self._worker_thread = threading.Thread(target=self._work, name='stream-worker')
+        self._reconstruct_thread = threading.Thread(
+            target=self._reconstruct, name='stream-reconstruct'
+        )
+        # Guards the two below.
+        self._reconstruct_ready = threading.Condition()
+        self._waiting_job: _ReconstructJob | None = None
+        self._is_stopping = False
         # Each counter has exactly one writing thread.
         self._num_frames_enqueued = 0  # producer
         self._num_frames_dequeued = 0  # ingest
@@ -1325,12 +1439,18 @@ class ScanPipeline:
         self._last_estimate_duration_s = 0.0  # worker
         self._num_scans_stored = 0  # worker
         self._num_worker_errors = 0  # worker
+        self._num_reconstructions_dropped = 0  # worker
+        self._num_reconstructions = 0  # reconstruct
+        self._last_reconstruction_duration_s = 0.0  # reconstruct
+        self._num_reconstruction_errors = 0  # reconstruct
+        self._is_reconstructing = False  # reconstruct
 
     # Producers ---------------------------------------------------------------
 
     def start(self) -> None:
         self._ingest_thread.start()
         self._worker_thread.start()
+        self._reconstruct_thread.start()
 
     def submit_frame(self, index: int, image: numpy.ndarray) -> None:
         """Enqueue a copy of one frame; returns at once."""
@@ -1347,11 +1467,28 @@ class ScanPipeline:
     def configure(self, setup: ScanSetup) -> None:
         self._items.put(_ConfigureItem(setup))
 
+    def set_reconstruction(self, reconstruction: StreamReconstruction | None) -> None:
+        """Reconstruct the scans finished from now on with `reconstruction`, or not at all.
+
+        The scan in progress is kept.
+        """
+        self._reconstruction = reconstruction
+
     def stop(self, timeout_s: float | None = None) -> None:
-        """Finish the scan in progress, store it, and stop both threads."""
+        """Finish the scan in progress, store it, and stop the threads.
+
+        A reconstruction in progress ends at its next output, unpublished beyond it, and
+        a waiting one is dropped: with the publisher gone, nobody would see them.
+        """
         self._items.put(_StopItem())
         self._ingest_thread.join(timeout_s)
         self._worker_thread.join(timeout_s)
+
+        with self._reconstruct_ready:
+            self._is_stopping = True
+            self._reconstruct_ready.notify()
+
+        self._reconstruct_thread.join(timeout_s)
 
     def get_counters(self) -> dict[str, int | float | bool]:
         session = self._session
@@ -1377,9 +1514,15 @@ class ScanPipeline:
             ),
             'num_scans_stored': self._num_scans_stored,
             'num_worker_errors': self._num_worker_errors,
+            'num_reconstructions': self._num_reconstructions,
+            'num_reconstructions_dropped': self._num_reconstructions_dropped,
+            'num_reconstruction_errors': self._num_reconstruction_errors,
+            'last_reconstruction_duration_s': self._last_reconstruction_duration_s,
             'is_settling': self._settle is not None,
+            'is_reconstructing': self._is_reconstructing,
             'is_ingest_alive': self._ingest_thread.is_alive(),
             'is_worker_alive': self._worker_thread.is_alive(),
+            'is_reconstruct_alive': self._reconstruct_thread.is_alive(),
         }
 
     # Ingest ------------------------------------------------------------------
@@ -1615,7 +1758,7 @@ class ScanPipeline:
             return None
 
         began_s = self._clock()
-        product = estimate_product(snapshot, session.setup, self._rng)
+        product = estimate_product(snapshot, session.setup)
         self._last_estimate_duration_s = self._clock() - began_s
         self._last_estimate_s = self._clock()
         self._num_estimates += 1
@@ -1637,13 +1780,20 @@ class ScanPipeline:
         if product is not None and session is self._session:
             self._publish(lambda: self._publisher.publish_estimate(product))
 
-    def _publish(self, publish: Callable[[], None]) -> None:
+    def _try_publish(self, publish: Callable[[], None]) -> bool:
         # Publishing is for display; its failure must not cost a scan its storage.
         try:
-            publish()
+            with self._publish_lock:
+                publish()
         except Exception:
-            self._num_worker_errors += 1
             logger.exception('Publishing failed.')
+            return False
+
+        return True
+
+    def _publish(self, publish: Callable[[], None]) -> None:
+        if not self._try_publish(publish):
+            self._num_worker_errors += 1
 
     def _finish(self, session: ScanSession, label: str, angle_deg: float) -> None:
         product: Product | None = None
@@ -1663,6 +1813,14 @@ class ScanPipeline:
         product_uuid: UUID | None = None
         written = False
         data = session.assemble()
+        reconstruction = self._reconstruction
+
+        # Offered before storing, which only reads the data the reconstruction reads too.
+        if reconstruction is not None and data is not None:
+            if product is None:
+                logger.warning(f'"{label}" has no estimate to reconstruct from.')
+            else:
+                self._offer(_ReconstructJob(label, data, product, reconstruction))
 
         if layout is not None and data is not None:
             configuration = session.setup.configuration
@@ -1706,3 +1864,61 @@ class ScanPipeline:
             written=written,
         )
         self._publish(lambda: self._publisher.publish_scan(report))
+
+    def _offer(self, job: _ReconstructJob) -> None:
+        with self._reconstruct_ready:
+            dropped = self._waiting_job
+            self._waiting_job = job
+            self._reconstruct_ready.notify()
+
+        if dropped is not None:
+            self._num_reconstructions_dropped += 1
+            logger.info(f'"{dropped.label}" was not reconstructed; "{job.label}" is newer.')
+
+    # Reconstruct -------------------------------------------------------------
+
+    def _reconstruct(self) -> None:
+        while True:
+            with self._reconstruct_ready:
+                self._reconstruct_ready.wait_for(
+                    lambda: self._waiting_job is not None or self._is_stopping
+                )
+                job, self._waiting_job = self._waiting_job, None
+
+            if self._is_stopping or job is None:
+                return
+
+            began_s = self._clock()
+            self._is_reconstructing = True
+
+            try:
+                if self._run_reconstruction(job):
+                    self._num_reconstructions += 1
+            except Exception:
+                self._num_reconstruction_errors += 1
+                logger.exception(f'Reconstructing "{job.label}" failed.')
+            finally:
+                self._is_reconstructing = False
+                self._last_reconstruction_duration_s = self._clock() - began_s
+
+    def _run_reconstruction(self, job: _ReconstructJob) -> bool:
+        """Publish each output reconstructing `job` yields; return whether it ran to the end."""
+        reconstruction = job.reconstruction
+        reconstruct_input = prepare_reconstruct_input(job.data, job.product)
+        logger.info(f'Reconstructing "{job.label}" with {reconstruction.name}.')
+        outputs = reconstruction.reconstructor.reconstruct(
+            reconstruct_input, options=reconstruction.options
+        )
+
+        for output in outputs:
+            if not self._try_publish(
+                lambda: self._publisher.publish_reconstruction(job.label, output)
+            ):
+                self._num_reconstruction_errors += 1
+
+            if self._is_stopping:
+                # Returning drops the generator, which closes it.
+                logger.info(f'Stopping; the reconstruction of "{job.label}" is abandoned.')
+                return False
+
+        return True
