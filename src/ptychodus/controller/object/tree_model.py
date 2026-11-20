@@ -63,7 +63,7 @@ class Column(Enum):
 
     NAME = ('Name', True)
     DISTANCE_M = ('Distance [m]', False)
-    BUILDER = ('Builder', True)
+    BUILDER = ('Source', True)
     DATA_TYPE = ('Data Type', False)
     WIDTH_PX = ('Width [px]', False)
     HEIGHT_PX = ('Height [px]', False)

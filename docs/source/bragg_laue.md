@@ -21,7 +21,7 @@ Three planes are involved:
 
 | Frame | Plane | What lives there |
 | --- | --- | --- |
-| Beam (lab) | Across the incident beam | The probe positions, as the instrument records them; a model probe's cross section. |
+| Beam (lab) | Across the incident beam | The probe positions, as the instrument records them; a generated probe's cross section. |
 | Exit | Across the exit beam, on the detector's axes | The 2D Fourier relation: the detector intensity is `|FFT(O · P)|²` on the ordinary far-field grid `λz / (NΔ)`. |
 | Surface | The sample surface | The physical sample. |
 
@@ -55,7 +55,7 @@ One function decides where the transform applies: {py:func}`ptychodus.api.scatte
 
 ## Preparing Instrument Data
 
-Two inputs arrive in the beam frame: the probe positions, and a model probe such as a zone plate. Both are carried into the exit frame.
+Two inputs arrive in the beam frame: the probe positions, and a generated probe such as a zone plate. Both are carried into the exit frame.
 
 A probe estimated from the patterns, such as `generate_average_pattern_probe`, is already in the exit frame the patterns define. So is a warm-start probe from an earlier product. Neither may be transformed.
 
@@ -161,7 +161,7 @@ A file that records no geometry reads as forward (0, 0, 90), a transmission prod
 ## GUI And Command Line
 
 - **Settings:** `[Products]` `TwoThetaInDegrees`, `DetectorGammaInDegrees` and `IncidenceAngleInDegrees`.
-- **Product editor:** rows for the three angles and a read-only **Scattering Geometry** row. Its tooltip lists any issues. Editing an angle remaps the positions exactly, and a zone-plate or other model probe is rebuilt in the new exit frame.
+- **Product editor:** rows for the three angles and a read-only **Scattering Geometry** row. Its tooltip lists any issues. Editing an angle remaps the positions exactly, and a zone-plate or other generated probe is regenerated in the new exit frame.
 - **Diffraction wizard:** imports the angles when a reader records them.
 - **Probe positions plot:** labels its axes as the exit frame when a product is off axis.
 - **Command line:** `ptychodus-reconstruct-26idc` and `ptychodus-reconstruct-34ide` accept `--two-theta-deg`, `--detector-gamma-deg` and `--incidence-angle-deg`. With `--prepare-only` they write a prepared directory whose `product.h5` carries the geometry, which `ptychodus-reconstruct` then honors.

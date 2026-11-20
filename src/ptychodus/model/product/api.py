@@ -66,7 +66,7 @@ class ProbePositionsAPI:
         try:
             builder = self._builder_factory.create(builder_name)
         except KeyError:
-            logger.warning(f'Failed to create builder {builder_name}!')
+            logger.warning(f'Unknown probe positions source "{builder_name}"!')
             return
 
         if builder_parameters is not None:
@@ -75,7 +75,7 @@ class ProbePositionsAPI:
                     parameter = builder.parameters()[parameter_name]
                 except KeyError:
                     logger.warning(
-                        f'Probe positions builder "{builder.get_name()}" does not have'
+                        f'Probe positions generator "{builder.get_name()}" does not have'
                         f' parameter "{parameter_name}"!'
                     )
                 else:
@@ -93,7 +93,7 @@ class ProbePositionsAPI:
         try:
             builder = self._builder_factory.create_from_settings()
         except KeyError:
-            logger.warning('Failed to create builder from settings!')
+            logger.warning('Unknown probe positions source in the settings!')
             return
 
         item.set_builder(builder)
@@ -178,7 +178,7 @@ class ProbeAPI:
                 builder_name, has_diffraction_data=dataset is not None
             )
         except (KeyError, RuntimeError) as exc:
-            logger.warning(f'Failed to create builder {builder_name}: {exc}')
+            logger.warning(f'Cannot use probe source "{builder_name}": {exc}')
             return
 
         if builder_parameters is not None:
@@ -187,7 +187,7 @@ class ProbeAPI:
                     parameter = builder.parameters()[parameter_name]
                 except KeyError:
                     logger.warning(
-                        f'Probe builder "{builder.get_name()}" does not have'
+                        f'Probe generator "{builder.get_name()}" does not have'
                         f' parameter "{parameter_name}"!'
                     )
                 else:
@@ -209,7 +209,7 @@ class ProbeAPI:
                 has_diffraction_data=dataset is not None
             )
         except (KeyError, RuntimeError) as exc:
-            logger.warning(f'Failed to create builder from settings: {exc}')
+            logger.warning(f'Cannot use the probe source in the settings: {exc}')
             return
 
         item.set_builder(builder)
@@ -319,7 +319,7 @@ class ObjectAPI:
                 builder_name, has_diffraction_data=dataset is not None
             )
         except (KeyError, RuntimeError) as exc:
-            logger.warning(f'Failed to create builder {builder_name}: {exc}')
+            logger.warning(f'Cannot use object source "{builder_name}": {exc}')
             return
 
         if builder_parameters is not None:
@@ -328,7 +328,7 @@ class ObjectAPI:
                     parameter = builder.parameters()[parameter_name]
                 except KeyError:
                     logger.warning(
-                        f'Object builder "{builder.get_name()}" does not have'
+                        f'Object generator "{builder.get_name()}" does not have'
                         f' parameter "{parameter_name}"!'
                     )
                 else:
@@ -350,7 +350,7 @@ class ObjectAPI:
                 has_diffraction_data=dataset is not None
             )
         except (KeyError, RuntimeError) as exc:
-            logger.warning(f'Failed to create builder from settings: {exc}')
+            logger.warning(f'Cannot use the object source in the settings: {exc}')
             return
 
         item.set_builder(builder)

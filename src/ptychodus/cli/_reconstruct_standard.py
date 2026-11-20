@@ -27,13 +27,14 @@ import logging
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 
 import numpy
 
 from ptychodus.api.options import OptionsError
 from ptychodus.api.affine import AffineTransform, transform_probe_positions
-from ptychodus.api.accumulate import AssemblyMomentAccumulator
+from ptychodus.api.accumulate import AssemblyMomentAccumulator, IncidentBeamEstimate
 from ptychodus.api.assemble import (
     AssembledDiffractionData,
     DetectorCorrections,
@@ -51,7 +52,7 @@ from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.typing import BooleanArrayType, RealArrayType
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.io import StandardFileLayout, save_product
-from ptychodus.api.object import compute_object_geometry
+from ptychodus.api.object import Object, ObjectGeometry, compute_object_geometry
 from ptychodus.api.propagate import compute_magnification
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import (
@@ -67,9 +68,12 @@ from ptychodus.api.scattering.frame import (
     transform_probe_to_exit_frame,
 )
 from ptychodus.api.scattering.geometry import ScatteringGeometry
-from ptychodus.api.simulate.object import generate_uniform_object
+from ptychodus.api.simulate.object import (
+    STXMDPCSignals,
+    generate_stxm_dpc_object,
+    generate_uniform_object,
+)
 from ptychodus.api.simulate.probe import (
-    generate_average_pattern_probe,
     generate_coherent_probe_modes,
     generate_fresnel_zone_plate_probe,
     generate_incoherent_probe_modes,
@@ -93,6 +97,7 @@ from ptychodus.cli._reconstruct_common import (
     add_print_options_argument,
     check_ptychi_options,
     estimate_incident_beam_from_assembled_data,
+    generate_average_pattern_initial_probe,
     invalid_count_threshold,
     is_main_process,
     pair_patterns_with_positions,
@@ -109,7 +114,21 @@ from ptychodus.cli._reconstruct_common import (
     save_reconstruct_options,
 )
 
-__all__ = ['InstrumentProfile', 'build_standard_parser', 'run_standard_reconstruction']
+__all__ = [
+    'InitialObject',
+    'InstrumentProfile',
+    'build_standard_parser',
+    'run_standard_reconstruction',
+]
+
+
+class InitialObject(StrEnum):
+    """What the reconstruction's initial object is generated from."""
+
+    STXM_DPC = 'stxm_dpc'
+    """The transmission and phase gradients of the patterns, by STXM-DPC."""
+    UNIFORM = 'uniform'
+    """The mean transmission alone."""
 
 
 @dataclass(frozen=True)
@@ -136,7 +155,9 @@ class InstrumentProfile:
     # existing run changes behavior.
     default_far_field: bool = True
 
-    default_fzp_preset: str = ''
+    # STXM-DPC everywhere, since every instrument here measures hard x-rays in transmission;
+    # an instrument whose data it misleads opts out here rather than in every command.
+    default_initial_object: InitialObject = InitialObject.STXM_DPC
     default_bad_pixels_reader: str = 'NPY_Bad_Pixels'
     # The detector's invalid-pixel marker by stored dtype name, where it is not the dtype
     # maximum; the default for --max-valid-count.
@@ -300,7 +321,7 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
     )
     parser.add_argument(
         '--fzp-preset',
-        default=profile.default_fzp_preset,
+        default='',
         help=profile.fzp_preset_help,
     )
     parser.add_argument(
@@ -349,6 +370,17 @@ def build_standard_parser(profile: InstrumentProfile) -> argparse.ArgumentParser
         type=positive_int,
         default=1,
         help='Coherent (OPR) probe modes; 1 disables OPR.',
+    )
+    parser.add_argument(
+        '--initial-object',
+        type=InitialObject,
+        choices=list(InitialObject),
+        default=profile.default_initial_object,
+        help=(
+            'What the initial object is generated from: stxm_dpc, the transmission and '
+            'phase gradients of the patterns, or uniform, the mean transmission alone. '
+            'Near-field data and Bragg or Laue geometry always generate a uniform object.'
+        ),
     )
     parser.add_argument(
         '--object-padding-px',
@@ -793,8 +825,8 @@ def _warn_unused_probe_propagation(
 ) -> None:
     """Say so when the propagation knob was set but the probe did not come from the data.
 
-    It applies to the back-propagated average pattern only, so on an instrument whose
-    profile carries a zone-plate preset it would otherwise be silently inert.
+    It applies to the back-propagated average pattern only, so with a zone-plate preset or
+    a probe file it would otherwise be silently inert.
     """
     if args.probe_propagation_distance_m == 0.0:
         return
@@ -812,6 +844,61 @@ def _warn_unused_probe_propagation(
         source,
         remedy,
     )
+
+
+def _generate_initial_object(
+    logger: logging.Logger,
+    initial_object: InitialObject,
+    object_geometry: ObjectGeometry,
+    incident_beam: IncidentBeamEstimate,
+    positions: ProbePositionSequence,
+    probe: Probe,
+    *,
+    detector_extent: ImageExtent,
+    far_field: bool,
+    scattering_geometry: ScatteringGeometry,
+) -> Object:
+    """The object the reconstruction starts from, scaled to the measured transmission.
+
+    STXM-DPC reads the incident-beam estimate's moments, already corrected for beam decay
+    by I0, and the probe sets the region it is supported on. It needs far-field data, and
+    a forward geometry: off axis the positions are in the exit frame while the centroids
+    are not. Where it cannot serve, or fails, the object is uniform. Either way it is not
+    transparent but scaled to the mean transmission the patterns imply, so the exit wave
+    predicts the detector sums recorded instead of the unobstructed beam; absorption
+    belongs here rather than in the probe, which has to go on meaning the incident
+    illumination that probe_photon_count states.
+    """
+    transmission = incident_beam.mean_amplitude_transmission
+
+    if initial_object is InitialObject.STXM_DPC:
+        if not far_field:
+            logger.info('STXM-DPC needs far-field data; generating a uniform initial object.')
+        elif not scattering_geometry.is_forward:
+            logger.info('STXM-DPC needs a forward geometry; generating a uniform initial object.')
+        else:
+            try:
+                object_ = generate_stxm_dpc_object(
+                    object_geometry,
+                    STXMDPCSignals.from_moments(incident_beam.moments),
+                    positions,
+                    detector_extent=detector_extent,
+                    probe=probe,
+                    correct_shadow=False,
+                )
+            except ValueError as exc:
+                logger.warning('STXM-DPC failed (%s); generating a uniform initial object.', exc)
+            else:
+                logger.info('Generated the initial object by STXM-DPC')
+                # STXM-DPC's modulus is a contrast map of mean one over its support.
+                return Object(
+                    array=object_.get_array() * transmission,
+                    pixel_geometry=object_.get_pixel_geometry(),
+                    center=object_.get_center(),
+                )
+
+    logger.info('Generated a uniform initial object')
+    return generate_uniform_object(object_geometry, amplitude=transmission)
 
 
 def _read_initial_probe(
@@ -896,32 +983,18 @@ def _build_initial_probe(
             ProbeEnsemble.from_probe(zone_plate_probe), scattering_geometry, far_field=far_field
         ).get_mean_probe()
 
-    # No zone-plate preset applies, so the cold start comes from the data:
-    # back-propagating the mean pattern estimates the probe without asserting an
-    # optic at all, which is what lets one script shape serve zone plates, KB
-    # mirrors and pinholes alike.
-    logger.info('Estimating the initial probe by back-propagating the mean pattern')
-    probe = generate_average_pattern_probe(
+    # No zone-plate preset was asked for, so the cold start comes from the data.
+    return generate_average_pattern_initial_probe(
+        logger,
         probe_geometry,
-        assembled_data.get_mean_pattern(),
-        detector_pixel_geometry=assembled_data.get_pixel_geometry(),
-        bad_pixels=assembled_data.get_bad_pixels(),
-        background=assembled_data.get_background(),
-        flat_field=assembled_data.get_flat_field(),
+        assembled_data,
         photon_wavelength_m=photon_wavelength_m,
         detector_distance_m=detector_distance_m,
         far_field=far_field,
-        # In far field the estimate is the beam at its waist, carried to the object by the
-        # defocus. In near field the back-propagation already lands it in the object plane
-        # of the equivalent geometry.
-        defocus_distance_m=(
-            (-focus_object_distance_m if far_field else 0.0) + args.probe_propagation_distance_m
-        ),
+        focus_object_distance_m=focus_object_distance_m,
+        probe_photon_count=probe_photon_count,
+        propagation_distance_m=args.probe_propagation_distance_m,
     )
-
-    # The mean pattern carries the mean transmitted photons, which is less than the
-    # incident photon count wherever the sample absorbs; the probe states the illumination.
-    return rescale_probe_intensity(probe, probe_photon_count)
 
 
 def _write_prepared_directory(
@@ -1274,12 +1347,16 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
     )
     logger.info('Probe: %s', probe_ensemble.get_array().shape)
 
-    # Uniform, but not transparent: scaled to the mean transmission the patterns imply,
-    # so the exit wave predicts the detector sums recorded instead of the
-    # unobstructed beam. Absorption belongs here rather than in the probe, which has to
-    # go on meaning the incident illumination that probe_photon_count states.
-    object_ = generate_uniform_object(
-        object_geometry, amplitude=incident_beam.mean_amplitude_transmission
+    object_ = _generate_initial_object(
+        logger,
+        args.initial_object,
+        object_geometry,
+        incident_beam,
+        positions,
+        probe,
+        detector_extent=assembled_data.get_image_extent(),
+        far_field=far_field,
+        scattering_geometry=scattering_geometry,
     )
 
     product = Product(

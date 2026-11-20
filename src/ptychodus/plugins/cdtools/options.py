@@ -197,7 +197,7 @@ class RefinementOptions(BaseModel):
         False,
         title='Refine Positions',
         description='Optimize a per-position offset. A position may only move within the '
-        "object canvas, so leave room with the object builder's extra padding.",
+        "object canvas, so leave room with the object's extra padding.",
     )
     translation_scale: float = Field(
         1.0,

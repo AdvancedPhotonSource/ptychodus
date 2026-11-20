@@ -14,7 +14,7 @@ class ProbeSettings(Observable, Observer):
         self._group = registry.create_group('Probe')
         self._group.add_observer(self)
 
-        self.builder = self._group.create_string_parameter('Builder', 'disk')
+        self.builder = self._group.create_string_parameter('Builder', 'average_pattern')
         self.file_path = self._group.create_path_parameter('FilePath', Path('/path/to/probe.npy'))
         self.file_type = self._group.create_string_parameter('FileType', 'NPY')
 

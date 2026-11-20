@@ -72,7 +72,7 @@ class Column(Enum):
 
     NAME = ('Name', True)
     RELATIVE_POWER = ('Relative Power', False)
-    BUILDER = ('Builder', True)
+    BUILDER = ('Source', True)
     DATA_TYPE = ('Data Type', False)
     WIDTH_PX = ('Width [px]', False)
     HEIGHT_PX = ('Height [px]', False)

@@ -115,7 +115,13 @@ class ObjectRepositoryItem(ParameterGroup):
             # startup state would be logged as a failure.
             return
         except Exception:
-            logger.exception('Failed to rebuild object!')
+            name = self._builder.get_name()
+            # A from_file or from_memory source loads; every other one is a generator.
+            logger.exception(
+                f'Failed to load the object from "{name}"!'
+                if name.startswith('from_')
+                else f'Failed to generate the object with "{name}"!'
+            )
             return
 
         _warn_if_pixel_size_disagrees(object_, self._geometry_provider, self._builder.get_name())
@@ -175,7 +181,7 @@ def _warn_if_pixel_size_disagrees(
         return
 
     logger.warning(
-        'Object from builder "%s" is sampled at %s x %s but this product samples at '
+        'Object from source "%s" is sampled at %s x %s but this product samples at '
         '%s x %s; it will reconstruct at the wrong scale.',
         builder_name,
         format_length(pixel_geometry.width_m),

@@ -104,7 +104,13 @@ class ProbeRepositoryItem(ParameterGroup):
             # startup state would be logged as a failure.
             return
         except Exception:
-            logger.exception('Failed to rebuild probe!')
+            name = self._builder.get_name()
+            # A from_file or from_memory source loads; every other one is a generator.
+            logger.exception(
+                f'Failed to load the probe from "{name}"!'
+                if name.startswith('from_')
+                else f'Failed to generate the probe with "{name}"!'
+            )
         else:
             self._probe_seq = probe_seq
             self.notify_observers()

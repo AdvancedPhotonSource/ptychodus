@@ -215,8 +215,20 @@ def test_every_generator_builds_into_a_builder_named_where_it_registered(
         assert factory.create(name, has_diffraction_data=True).get_name() == name
 
 
-def test_the_default_builder_is_named(registry: PluginRegistry) -> None:
-    assert _make_factory(registry).create_default().get_name() == 'random'
+def test_the_default_builder_estimates_from_the_data_when_there_is_some(
+    registry: PluginRegistry,
+) -> None:
+    factory = _make_factory(registry)
+
+    assert factory.create_default().get_name() == 'random'
+    assert factory.create_default(has_diffraction_data=True).get_name() == 'stxm_dpc'
+
+
+def test_the_default_setting_waits_for_data_without_an_error(registry: PluginRegistry) -> None:
+    factory = _make_factory(registry)
+
+    assert factory.create_from_settings(has_diffraction_data=False).get_name() == 'random'
+    assert factory.create_from_settings(has_diffraction_data=True).get_name() == 'stxm_dpc'
 
 
 def test_exactly_the_phase_retrievals_read_the_data_and_the_probe(

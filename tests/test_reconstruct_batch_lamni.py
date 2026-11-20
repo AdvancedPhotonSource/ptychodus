@@ -71,7 +71,7 @@ def test_a_minimal_file_is_valid_and_every_other_section_defaults() -> None:
     settings = _settings()
 
     assert settings.paths.experiment_folder == Path('/experiment')
-    assert settings.initial_probe.probe_source == 'simulated'
+    assert settings.initial_probe.probe_source == 'average_pattern'
     assert settings.initial_object.object_source == 'simulated'
     assert settings.initial_object.num_slices == 1
     assert settings.positions.affine_matrix is None
@@ -125,6 +125,63 @@ def test_load_batch_settings_reads_a_file(tmp_path: Path) -> None:
     settings_file.write_text(_MINIMAL)
 
     assert load_batch_settings(settings_file).paths.output_products_folder == Path('/output')
+
+
+def test_a_simulated_probe_source_is_still_read() -> None:
+    """An archived settings file naming the zone-plate preset keeps its meaning."""
+    settings = _settings('initial_probe:\n  probe_source: simulated\n')
+
+    assert settings.initial_probe.probe_source == 'simulated'
+    assert settings.initial_probe.simulated_probe.fzp_preset == 'APS 31-ID-E LamNI'
+
+
+def test_the_average_pattern_probe_is_the_standard_drivers() -> None:
+    """Both LamNI commands generate the same initial probe from the same patterns."""
+    import logging
+
+    import numpy
+
+    from ptychodus.api.assemble import AssembledDiffractionData
+    from ptychodus.api.geometry import PixelGeometry
+    from ptychodus.api.plugins import PluginRegistry
+    from ptychodus.api.probe import ProbeGeometry
+    from ptychodus.cli._batch_lamni_scan import _build_initial_probe
+    from ptychodus.cli._reconstruct_common import generate_average_pattern_initial_probe
+
+    rng = numpy.random.default_rng(0)
+    yy, xx = numpy.indices((32, 32)) - 15.5
+    patterns = rng.poisson(100.0 * (numpy.hypot(xx, yy) < 8), size=(6, 32, 32)).astype(float)
+    data = AssembledDiffractionData(
+        numpy.arange(6), patterns, PixelGeometry(75e-6, 75e-6), numpy.zeros((32, 32), bool)
+    )
+    geometry = ProbeGeometry.from_far_field(
+        data.get_pixel_geometry(), data.get_image_extent(), wavelength_m=1.24e-10, distance_m=2.0
+    )
+    common = dict(
+        photon_wavelength_m=1.24e-10,
+        detector_distance_m=2.0,
+        far_field=True,
+        focus_object_distance_m=-5e-4,
+        probe_photon_count=1.0e6,
+    )
+
+    batch = _build_initial_probe(
+        _settings(),
+        PluginRegistry.load_plugins(),
+        geometry,
+        data,
+        num_positions=6,
+        rng=numpy.random.default_rng(1),
+        **common,  # type: ignore[arg-type]
+    )
+    standard = generate_average_pattern_initial_probe(
+        logging.getLogger(__name__),
+        geometry,
+        data,
+        **common,  # type: ignore[arg-type]
+    )
+
+    numpy.testing.assert_allclose(batch.get_mean_probe().get_array(), standard.get_array())
 
 
 def test_a_probe_source_of_file_requires_a_path() -> None:

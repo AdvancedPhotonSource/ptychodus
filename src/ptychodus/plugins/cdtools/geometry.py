@@ -118,8 +118,8 @@ def _verify_windows_fit(product: Product) -> None:
         raise ValueError(
             f'{int(numpy.count_nonzero(outside))} probe position(s) place the probe '
             f'partly outside the {object_geometry.height_px} x {object_geometry.width_px} '
-            f'object canvas, the first at scan index {index}. Rebuild the object with '
-            'more ExtraPaddingX / ExtraPaddingY, or regenerate it to cover the scan.'
+            f'object canvas, the first at scan index {index}. Regenerate the object with '
+            'more ExtraPaddingX / ExtraPaddingY, so it covers the scan.'
         )
 
 

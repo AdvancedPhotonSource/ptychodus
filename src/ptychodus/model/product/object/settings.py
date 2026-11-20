@@ -14,7 +14,7 @@ class ObjectSettings(Observable, Observer):
         self._group = registry.create_group('Object')
         self._group.add_observer(self)
 
-        self.builder = self._group.create_string_parameter('Builder', 'random')
+        self.builder = self._group.create_string_parameter('Builder', 'stxm_dpc')
         self.file_path = self._group.create_path_parameter('FilePath', Path('/path/to/object.npy'))
         self.file_type = self._group.create_string_parameter('FileType', 'NPY')
 

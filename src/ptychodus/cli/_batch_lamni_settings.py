@@ -100,7 +100,9 @@ class SimulatedProbe(_Section):
 
 
 class InitialProbe(_Section):
-    probe_source: Literal['simulated', 'file'] = 'simulated'
+    # average_pattern back-propagates each scan's mean pattern; simulated generates the
+    # simulated_probe zone plate; file reads probe_from_file.
+    probe_source: Literal['average_pattern', 'simulated', 'file'] = 'average_pattern'
     probe_from_file: ProbeFromFile = Field(default_factory=ProbeFromFile)
     simulated_probe: SimulatedProbe = Field(default_factory=SimulatedProbe)
     num_probe_modes: int = Field(default=1, ge=1)

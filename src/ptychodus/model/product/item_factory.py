@@ -111,9 +111,14 @@ class ProductRepositoryItemFactory:
         )
         geometry = ProductGeometryProvider(metadata_item, probe_positions_item)
         self._bind_dataset_geometry(geometry, dataset)
-        probe_item = self._probe_item_factory.create(geometry)
+        has_diffraction_data = dataset is not None
+        probe_item = self._probe_item_factory.create(
+            geometry, has_diffraction_data=has_diffraction_data
+        )
         object_item = self._object_item_factory.create(
-            geometry, probe_supplier=probe_item.get_probes
+            geometry,
+            has_diffraction_data=has_diffraction_data,
+            probe_supplier=probe_item.get_probes,
         )
 
         return ProductRepositoryItem(

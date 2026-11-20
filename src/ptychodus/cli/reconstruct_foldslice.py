@@ -46,9 +46,9 @@ PROFILE = InstrumentProfile(
     diffraction_file_help='Preprocessed pattern file, normally data_roi<N>_Ndp<N>..._dp.hdf5.',
     position_file_help='Matching parameter file, normally the same stem with _para.hdf5.',
     fzp_preset_help=(
-        'FresnelZonePlate plugin preset for the model probe. This layout is written by '
-        'several instruments, so no one zone plate applies and this is empty by default. '
-        'Ignored with --probe-file.'
+        'Zone-plate preset to generate the initial probe from. Several instruments write this '
+        'layout, so no one zone plate applies. Empty by default, so the initial probe is '
+        'generated from the mean pattern. Ignored with --probe-file.'
     ),
     conditions_patterns=False,
     offers_detector_pixel_size=True,

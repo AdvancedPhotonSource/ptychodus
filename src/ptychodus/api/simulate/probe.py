@@ -1,6 +1,6 @@
 """Probe generation functions: geometric apertures, zone plates, KB mirrors, Zernike modes, Hermite-Gauss modes, and OPR ensembles.
 
-Also home to :class:`ProbeGenerator`, the interface a probe model is offered through. It
+Also home to :class:`ProbeGenerator`, the interface a probe generator is offered through. It
 sits beside the functions because it is how they are reached: a generator states what it
 accepts and turns one set of those values into a probe, and the functions below are what
 it turns them with.
@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProbeGenerator(ABC):
-    """A probe model, and the options it accepts.
+    """A probe generator, and the options it accepts.
 
     Stateless and configured per call: a generator holds no settings of its own, so it
     costs nothing to construct and two callers can drive the same one with different

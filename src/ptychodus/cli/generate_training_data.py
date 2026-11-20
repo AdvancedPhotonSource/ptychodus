@@ -326,8 +326,8 @@ def _build_parser(registry: PluginRegistry) -> argparse.ArgumentParser:
     )
     parser.add_argument(
         '--synthetic',
-        metavar='STRATEGY',
-        help='Synthesize the data, drawing objects from this object model instead of '
+        metavar='GENERATOR',
+        help='Synthesize the data, generating objects with this object generator instead of '
         'exporting the measured patterns. dead_leaves gives natural-image statistics.',
     )
     parser.add_argument(

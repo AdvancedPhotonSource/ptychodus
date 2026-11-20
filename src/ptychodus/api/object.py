@@ -189,12 +189,12 @@ class ObjectGeometryProvider(ABC):
     @property
     @abstractmethod
     def exit_wave_propagation_distance_m(self) -> float:
-        """Distance an object-plane builder propagates the exit wave to the detector.
+        """Distance an object generator propagates the exit wave to the detector.
 
         The lab-frame detector distance in far field, where the probe carries its own
         curvature and the magnification cancels from the sampling; ``z_d / M``, the
         equivalent parallel-beam distance, in near field. The two agree without a focusing
-        optic. Declared here so that a builder reads the experiment's own value rather than
+        optic. Declared here so that a generator reads the experiment's own value rather than
         carrying a duplicate setting that nothing keeps in step.
         """
 
@@ -215,15 +215,15 @@ class ObjectGeometryProvider(ABC):
     def get_assembled_data(self) -> AssembledDiffractionData | None:
         """The diffraction data the product is bound to, or None while it is bound to none.
 
-        Read at the point of use rather than kept, so a builder copied into another
-        product, or a product rebound to other data, sees the data it has now.
+        Read at the point of use rather than kept, so a generator run for another
+        product, or for a product rebound to other data, sees the data it has now.
         """
 
     @abstractmethod
     def get_diffraction_moments(self) -> DiffractionMoments | None:
         """The bound data's diffraction moments, or None while unbound or not yet computed.
 
-        Accumulated once from the assembled patterns, so a builder needing only their
+        Accumulated once from the assembled patterns, so a generator needing only their
         statistics does not pass over every pattern itself.
         """
 

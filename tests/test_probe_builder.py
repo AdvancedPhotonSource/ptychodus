@@ -1262,7 +1262,20 @@ class TestSizeEstimateFromDiffraction:
             factory.create('average_pattern')
 
         assert factory.create('average_pattern', has_diffraction_data=True).reads_diffraction_data
+
+    def test_the_default_builder_estimates_from_the_data_when_there_is_some(self) -> None:
+        factory = _make_factory(_make_settings())
+
         assert factory.create_default().get_name() == 'disk'
+        assert factory.create_default(has_diffraction_data=True).get_name() == 'average_pattern'
+
+    def test_the_default_setting_waits_for_data_without_an_error(self) -> None:
+        factory = _make_factory(_make_settings())
+
+        assert factory.create_from_settings(has_diffraction_data=False).get_name() == 'disk'
+        assert (
+            factory.create_from_settings(has_diffraction_data=True).get_name() == 'average_pattern'
+        )
 
 
 class TestAveragePatternOptions:

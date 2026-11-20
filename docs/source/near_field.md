@@ -52,15 +52,15 @@ A probe sampled past its focus states the same displacement in the opposite fram
 defocus_distance_m == -focus_object_distance_m
 ```
 
-Every probe builder reads the defocus from the product's focus, and the product editor shows the one value both ways, as **Focus-Object Distance** and **Defocus Distance**; editing either row sets it.
+Every probe generator reads the defocus from the product's focus, and the product editor shows the one value both ways, as **Focus-Object Distance** and **Defocus Distance**; editing either row sets it.
 
-In near field a builder works in the equivalent parallel-beam frame described [below](#why-z-is-not-z_d), the one the reconstruction runs in. The cone beam's spherical wave is what the magnification accounts for, so it is not left on the probe as well:
+In near field a probe generator works in the equivalent parallel-beam frame described [below](#why-z-is-not-z_d), the one the reconstruction runs in. The cone beam's spherical wave is what the magnification accounts for, so it is not left on the probe as well:
 
 - `fresnel_zone_plate` and `kb_mirror` simulate the optic at the defocus, which sets the footprint, then divide out the spherical wave of the focus with {py:func}`ptychodus.api.simulate.probe.remove_defocus_phase`, centred on the beam axis, pixel `N // 2`, where the Fresnel transform puts the focus. A KB pair's astigmatism stays in the probe.
 - `disk`, `rectangular` and `super_gaussian` stay flat-phased.
 - `average_pattern` back-propagates the hologram over `z_d / M`, which already lands it in the equivalent object plane.
 
-`propagation_distance_m`, offered by the aperture builders and `average_pattern`, propagates the formed field by that distance with the angular-spectrum propagator, after any defocus curvature, and leaves the product's focus and the object pixel size as they are.
+`propagation_distance_m`, offered by the aperture generators and `average_pattern`, propagates the formed field by that distance with the angular-spectrum propagator, after any defocus curvature, and leaves the product's focus and the object pixel size as they are.
 
 Near field needs the focus stated, because nothing in the data measures it there: the parallax estimate is far field only. A driver given near-field data and no focus, on the command line or in the file, stops with an error; state 0 for a parallel beam.
 
@@ -109,7 +109,7 @@ Products
 : Then read the accounting back off the derived rows. **Magnification** should be `1` for a parallel beam and should match the optic for a cone beam; **Object Plane Pixel Width** should equal the detector pixel divided by that magnification; **Object-Plane Propagation Distance [mm]** should be the detector distance divided by it; and **Fresnel Number** should be large. Four numbers you did not type, each one a check on one you did.
 
 Probe
-: `average_pattern` is the regime-aware builder and the right cold start for flat bright-field illumination. A focusing-optic builder is not wrong in itself — a defocused zone plate is exactly what a cone-beam instrument needs — so choose by the illumination, not by the regime. `rectangular` and `disk` work as a flat cold start.
+: `average_pattern` is the regime-aware generator and the right cold start for flat bright-field illumination. A focusing-optic generator is not wrong in itself — a defocused zone plate is exactly what a cone-beam instrument needs — so choose by the illumination, not by the regime. `rectangular` and `disk` work as a flat cold start.
 
 Object
 : `random` is fine. Near field needs little padding, because one frame already covers the full field of view.

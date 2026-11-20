@@ -599,6 +599,17 @@ class FresnelTransformPropagator(Propagator):
         self._A = C2 * C1 * C0 if is_forward else C2 * C1 / C0
         self._B = numpy.exp(ipi * Fr * (numpy.square(XX) + numpy.square(YY / ar)))
 
+    def get_input_plane_phase(self) -> ComplexArrayType:
+        """The quadratic phase ``B = exp(i pi Fr (X^2 + Y^2))`` on the propagator's grid.
+
+        Built from a positive distance, the transform multiplies ``B`` into the wavefield
+        before its Fourier transform, and its output-plane phase is unit modulus and
+        diagonal, so for real weights ``W`` on the output plane the forward transform
+        ``D`` satisfies ``D^H W D x = conj(B) * ifft2(ifftshift(W) * fft2(B * x))``.
+        Built from a negative distance, the inverse multiplies ``B`` into its output.
+        """
+        return self._B
+
     def propagate(self, wavefield: ComplexArrayType) -> ComplexArrayType:
         if self._is_forward:
             return self._A * fftshift(fft2(ifftshift(wavefield * self._B), norm='ortho'))

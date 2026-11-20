@@ -62,9 +62,9 @@ PROFILE = InstrumentProfile(
     diffraction_file_help='Any member of one scan TIFF series; the rest of the prefix is globbed.',
     position_file_help='EPICS MDA file, normally mda_files/34ide_NNNNNN.mda.',
     fzp_preset_help=(
-        'FresnelZonePlate plugin preset for the model probe. No zone-plate preset is '
-        'verified for this instrument, so this is empty by default and the probe is '
-        'estimated from the data instead. Ignored with --probe-file.'
+        'Zone-plate preset to generate the initial probe from. None is verified for this '
+        'instrument. Empty by default, so the initial probe is generated from the mean pattern. '
+        'Ignored with --probe-file.'
     ),
     default_detector_distance_m=1.04,
     default_detector_pixel_size_m=7.5e-05,

@@ -53,10 +53,13 @@ class ObjectRepositoryItemFactory:
         geometry_provider: ObjectGeometryProvider,
         object_: Object | None = None,
         *,
+        has_diffraction_data: bool = False,
         probe_supplier: Callable[[], ProbeEnsemble] | None = None,
     ) -> ObjectRepositoryItem:
         if object_ is None:
-            builder = self._builder_factory.create_default()
+            builder = self._builder_factory.create_default(
+                has_diffraction_data=has_diffraction_data
+            )
         else:
             self._warn_if_conditioning_ignored()
             builder = FromMemoryObjectBuilder(self._settings, object_)
@@ -78,7 +81,9 @@ class ObjectRepositoryItemFactory:
             )
         except Exception as exc:
             logger.error(''.join(exc.args))
-            builder = self._builder_factory.create_default()
+            builder = self._builder_factory.create_default(
+                has_diffraction_data=has_diffraction_data
+            )
 
         return ObjectRepositoryItem(
             geometry_provider, self._settings, builder, probe_supplier=probe_supplier

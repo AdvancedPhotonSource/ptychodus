@@ -640,15 +640,41 @@ def test_builder_passes_its_regularization_through(phase_scan: _Scan) -> None:
     assert not numpy.allclose(builder.build(provider, []).get_array(), default)
 
 
-def test_builder_rejects_near_field_before_the_signal_pass(phase_scan: _Scan) -> None:
+def test_near_field_builds_a_uniform_object_without_reading_the_data(
+    phase_scan: _Scan, caplog: pytest.LogCaptureFixture
+) -> None:
     provider = _StubProvider(phase_scan.positions, far_field=False, assembled_data=phase_scan.data)
     provider.get_assembled_data = MagicMock(return_value=phase_scan.data)  # type: ignore[method-assign]
     builder = _builder('stxm_dpc', _settings())
 
-    with pytest.raises(ValueError, match='far-field'):
-        builder.build(provider, [])
+    with caplog.at_level('WARNING'):
+        array = builder.build(provider, []).get_array()
 
+    assert 'needs far-field data' in caplog.text
+    # The builder's padding surrounds the generated canvas with zeros.
+    generated = array[array != 0]
+    numpy.testing.assert_allclose(generated, generated[0])
     provider.get_assembled_data.assert_not_called()
+
+
+def test_a_zero_probe_is_treated_as_none(
+    phase_scan: _Scan, caplog: pytest.LogCaptureFixture
+) -> None:
+    """An average-pattern probe from a crop that misses the beam bounds nothing."""
+    provider = _StubProvider(phase_scan.positions, assembled_data=phase_scan.data)
+    builder = _builder('stxm_dpc', _settings())
+    unbound = builder.build(provider, []).get_array()
+    zero = Probe(
+        array=numpy.zeros_like(phase_scan.probe.get_array()),
+        pixel_geometry=phase_scan.probe.get_pixel_geometry(),
+    )
+    builder.bind_probe_supplier(lambda: _ensemble(zero))
+
+    with caplog.at_level(logging.WARNING):
+        built = builder.build(provider, []).get_array()
+
+    assert 'The probe is zero' in caplog.text
+    numpy.testing.assert_array_equal(built, unbound)
 
 
 def test_builder_waits_for_data_rather_than_failing(phase_scan: _Scan) -> None:

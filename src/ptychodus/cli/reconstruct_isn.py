@@ -44,9 +44,9 @@ PROFILE = InstrumentProfile(
     ),
     position_file_help='HDF5 file, normally Processed/SOCKETSERVER/Scan_NNNN_position.h5.',
     fzp_preset_help=(
-        'FresnelZonePlate plugin preset for the model probe. This instrument focuses with '
-        'KB mirrors rather than a zone plate, so a zone-plate probe would be the wrong '
-        'model entirely and this is empty by default. Ignored with --probe-file.'
+        'Zone-plate preset to generate the initial probe from. This instrument focuses with KB '
+        'mirrors, so a zone plate is the wrong optic. Empty by default, so the initial probe is '
+        'generated from the mean pattern. Ignored with --probe-file.'
     ),
     default_detector_distance_m=6.16,
 )

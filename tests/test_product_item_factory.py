@@ -183,3 +183,26 @@ class TestSampleNameReachesTheMetadataItem:
         )
 
         assert kwargs['name'] == 'cRZP_star'
+
+
+class TestNewProductsStartFromTheirData:
+    """A product created with a dataset defaults to the builders that estimate from it."""
+
+    @pytest.mark.parametrize('dataset', [None, _dataset_named('sample')])
+    def test_the_dataset_decides_the_default_builders(self, dataset: MagicMock | None) -> None:
+        probe_item_factory = MagicMock()
+        object_item_factory = MagicMock()
+        factory = ProductRepositoryItemFactory(
+            settings=MagicMock(),
+            probe_positions_item_factory=MagicMock(),
+            probe_item_factory=probe_item_factory,
+            object_item_factory=object_item_factory,
+            repository=MagicMock(),
+            file_reader_chooser=MagicMock(),
+        )
+
+        _capture_metadata_kwargs(lambda: factory.create_from_values(dataset=dataset))
+
+        expected = dataset is not None
+        assert probe_item_factory.create.call_args.kwargs['has_diffraction_data'] is expected
+        assert object_item_factory.create.call_args.kwargs['has_diffraction_data'] is expected

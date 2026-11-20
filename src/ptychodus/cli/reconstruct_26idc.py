@@ -61,9 +61,9 @@ PROFILE = InstrumentProfile(
         'the frames for the metadata.'
     ),
     fzp_preset_help=(
-        'FresnelZonePlate plugin preset for a model probe, e.g. "CNM/APS 26-ID-C Hard '
-        'X-ray Nanoprobe". Empty by default, so the probe is estimated from the mean '
-        'pattern instead. Ignored with --probe-file.'
+        'Zone-plate preset to generate the initial probe from, e.g. "CNM/APS 26-ID-C Hard X-ray '
+        'Nanoprobe". Empty by default, so the initial probe is generated from the mean pattern. '
+        'Ignored with --probe-file.'
     ),
     diffraction_readers_by_suffix={
         '.gz': 'CNM_APS_HXN_TIFF',

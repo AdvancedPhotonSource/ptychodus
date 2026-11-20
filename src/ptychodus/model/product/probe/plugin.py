@@ -183,7 +183,7 @@ class PluginProbeBuilder(ProbeEnsembleBuilder):
         )
 
         if not presets:
-            raise KeyError(f'No preset "{label}" for probe builder "{self.get_name()}".')
+            raise KeyError(f'No preset "{label}" for probe generator "{self.get_name()}".')
 
         self._assign(presets[0].model_dump())
 

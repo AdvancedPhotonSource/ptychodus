@@ -24,7 +24,7 @@ class Column(Enum):
 
     NAME = ('Name', True)
     PLOT = ('Plot', False)
-    BUILDER = ('Builder', True)
+    BUILDER = ('Source', True)
     POSITIONS = ('Positions', False)
     LENGTH_M = ('Length [m]', False)
     SIZE = ('Size', False)

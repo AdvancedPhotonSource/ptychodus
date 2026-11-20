@@ -38,10 +38,10 @@ PROFILE = InstrumentProfile(
     diffraction_file_help='VelociProbe master HDF5 file (fly###_master.h5).',
     position_file_help='Position-encoder text file (fly###_0.txt).',
     fzp_preset_help=(
-        'FresnelZonePlate plugin preset for the model probe. Defaults to the VelociProbe '
-        'zone plate. Ignored with --probe-file.'
+        'Zone-plate preset to generate the initial probe from, e.g. "APS 33-ID-C VelociProbe". '
+        'Empty by default, so the initial probe is generated from the mean pattern. Ignored with '
+        '--probe-file.'
     ),
-    default_fzp_preset='APS 33-ID-C VelociProbe',
 )
 
 

@@ -68,7 +68,7 @@ class ProbePositionsBuilderFactory(Iterable[str]):
         plugin = self._generators.find_plugin(name)
 
         if plugin is None:
-            raise KeyError(f'Unknown probe positions builder "{name}"!')
+            raise KeyError(f'Unknown probe positions source "{name}"!')
 
         return PluginProbePositionsBuilder(
             self._rng,

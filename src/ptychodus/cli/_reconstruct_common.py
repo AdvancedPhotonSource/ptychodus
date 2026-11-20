@@ -69,7 +69,8 @@ from ptychodus.api.options import (
 from ptychodus.api.parallax import estimate_defocus_from_assembled_data
 from ptychodus.api.plugins import PluginCatalog
 from ptychodus.api.preprocess.diffraction import FilterValuesStep, estimate_beam_center
-from ptychodus.api.probe import ProbeGeometry
+from ptychodus.api.probe import Probe, ProbeGeometry
+from ptychodus.api.simulate.probe import generate_average_pattern_probe, rescale_probe_intensity
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import (
@@ -975,6 +976,47 @@ def estimate_incident_beam_from_assembled_data(
         positions.get_i0_by_index(),
         i0_photons_per_count=i0_photons_per_count,
     )
+
+
+def generate_average_pattern_initial_probe(
+    logger: logging.Logger,
+    probe_geometry: ProbeGeometry,
+    assembled_data: AssembledDiffractionData,
+    *,
+    photon_wavelength_m: float,
+    detector_distance_m: float,
+    far_field: bool,
+    focus_object_distance_m: float,
+    probe_photon_count: float,
+    propagation_distance_m: float = 0.0,
+) -> Probe:
+    """The cold-start probe, back-propagated from the mean pattern and normalized.
+
+    Back-propagating the mean pattern estimates the probe without asserting an optic at
+    all, so one command shape serves zone plates, KB mirrors and pinholes alike. In far
+    field the estimate is the beam at its waist, carried to the object by the defocus the
+    product states; in near field the back-propagation already lands it in the object
+    plane of the equivalent geometry. *propagation_distance_m* moves it further, to refine
+    where the probe plane sits. The mean pattern carries the mean transmitted photons,
+    which is less than the incident photon count wherever the sample absorbs, so the
+    probe is rescaled to *probe_photon_count*, the illumination it states.
+    """
+    logger.info('Generating the initial probe by back-propagating the mean pattern')
+    probe = generate_average_pattern_probe(
+        probe_geometry,
+        assembled_data.get_mean_pattern(),
+        detector_pixel_geometry=assembled_data.get_pixel_geometry(),
+        bad_pixels=assembled_data.get_bad_pixels(),
+        background=assembled_data.get_background(),
+        flat_field=assembled_data.get_flat_field(),
+        photon_wavelength_m=photon_wavelength_m,
+        detector_distance_m=detector_distance_m,
+        far_field=far_field,
+        defocus_distance_m=(
+            (-focus_object_distance_m if far_field else 0.0) + propagation_distance_m
+        ),
+    )
+    return rescale_probe_intensity(probe, probe_photon_count)
 
 
 def pair_patterns_with_positions(

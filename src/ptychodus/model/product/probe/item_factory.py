@@ -48,10 +48,16 @@ class ProbeRepositoryItemFactory:
             )
 
     def create(
-        self, geometry_provider: ProbeGeometryProvider, probe: ProbeEnsemble | None = None
+        self,
+        geometry_provider: ProbeGeometryProvider,
+        probe: ProbeEnsemble | None = None,
+        *,
+        has_diffraction_data: bool = False,
     ) -> ProbeRepositoryItem:
         if probe is None:
-            builder = self._builder_factory.create_default()
+            builder = self._builder_factory.create_default(
+                has_diffraction_data=has_diffraction_data
+            )
         else:
             self._warn_if_conditioning_ignored()
             builder = FromMemoryProbeBuilder(self._rng, self._settings, probe)
@@ -70,6 +76,8 @@ class ProbeRepositoryItemFactory:
             )
         except Exception as exc:
             logger.error(''.join(exc.args))
-            builder = self._builder_factory.create_default()
+            builder = self._builder_factory.create_default(
+                has_diffraction_data=has_diffraction_data
+            )
 
         return ProbeRepositoryItem(self._rng, geometry_provider, self._settings, builder)

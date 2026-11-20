@@ -22,7 +22,7 @@ import yaml
 
 from ptychodus.api.affine import AffineFitResult, estimate_affine_transform
 from ptychodus.api.accumulate import AssemblyMomentAccumulator
-from ptychodus.api.assemble import assemble_dataset
+from ptychodus.api.assemble import AssembledDiffractionData, assemble_dataset
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import BadPixels, CropRegion
 from ptychodus.api.geometry import PixelGeometry
@@ -55,6 +55,7 @@ from ptychodus.plugins.aps31id_lamni.diffraction_file import LamNIDiffractionFil
 from ptychodus.cli import CancellationToken
 from ptychodus.cli._reconstruct_common import (
     estimate_incident_beam_from_assembled_data,
+    generate_average_pattern_initial_probe,
     invalid_count_threshold,
     resolve_flag,
     estimate_focus_object_distance_m,
@@ -163,17 +164,34 @@ def _build_initial_probe(
     settings: BatchSettings,
     registry: PluginRegistry,
     probe_geometry: ProbeGeometry,
+    assembled_data: AssembledDiffractionData,
     *,
     photon_wavelength_m: float,
+    detector_distance_m: float,
     num_positions: int,
     rng: numpy.random.Generator,
     far_field: bool,
     focus_object_distance_m: float,
+    probe_photon_count: float,
 ) -> ProbeEnsemble:
-    """The starting probe: the zone-plate model, or one file shared by every scan."""
+    """The initial probe: generated from the scan's mean pattern or from the zone-plate
+    preset, or read from one file shared by every scan."""
     initial = settings.initial_probe
 
-    if initial.probe_source == 'simulated':
+    if initial.probe_source == 'average_pattern':
+        probes = ProbeEnsemble.from_probe(
+            generate_average_pattern_initial_probe(
+                logger,
+                probe_geometry,
+                assembled_data,
+                photon_wavelength_m=photon_wavelength_m,
+                detector_distance_m=detector_distance_m,
+                far_field=far_field,
+                focus_object_distance_m=focus_object_distance_m,
+                probe_photon_count=probe_photon_count,
+            )
+        )
+    elif initial.probe_source == 'simulated':
         preset = initial.simulated_probe.fzp_preset
         logger.info('Simulating the initial probe from zone plate preset "%s"', preset)
         zone_plate = registry.fresnel_zone_plates.get_strategy_by_name(preset)
@@ -450,19 +468,27 @@ def reconstruct_one_scan(
             source=focus_source,
         )
 
+    incident_beam = estimate_incident_beam_from_assembled_data(
+        assembled_data, positions, assembly_moments=assembly_moments
+    )
+    probe_photon_count = (
+        incident_beam.incident_photon_count
+        if overrides.probe_photon_count is None
+        else overrides.probe_photon_count
+    )
     rng = numpy.random.default_rng(settings.misc.seed)
     probe_ensemble = _build_initial_probe(
         settings,
         registry,
         probe_geometry,
+        assembled_data,
         photon_wavelength_m=photon_wavelength_m,
+        detector_distance_m=detector_distance_m,
         num_positions=len(positions),
         rng=rng,
         far_field=far_field,
         focus_object_distance_m=focus_object_distance_m,
-    )
-    incident_beam = estimate_incident_beam_from_assembled_data(
-        assembled_data, positions, assembly_moments=assembly_moments
+        probe_photon_count=probe_photon_count,
     )
     object_ = _build_initial_object(
         settings,
@@ -472,11 +498,6 @@ def reconstruct_one_scan(
     )
     logger.info('Object geometry: %d layer(s)', object_.num_layers)
 
-    probe_photon_count = (
-        incident_beam.incident_photon_count
-        if overrides.probe_photon_count is None
-        else overrides.probe_photon_count
-    )
     tomography_angle_deg = (
         request.encoder_angle_deg
         if overrides.tomography_angle_deg is None

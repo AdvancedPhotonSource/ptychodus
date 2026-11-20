@@ -69,11 +69,11 @@ class ProbeBuilderFactory(Iterable[str]):
         plugin = self._generators.find_plugin(name)
 
         if plugin is None:
-            raise KeyError(f'Unknown probe builder "{name}"!')
+            raise KeyError(f'Unknown probe source "{name}"!')
 
         if plugin.strategy.reads_diffraction_data and not has_diffraction_data:
             raise RuntimeError(
-                f'Probe builder "{name}" requires an associated diffraction dataset.'
+                f'Probe generator "{name}" requires an associated diffraction dataset.'
             )
 
         return PluginProbeBuilder(
@@ -86,11 +86,17 @@ class ProbeBuilderFactory(Iterable[str]):
             self._kb_mirror_chooser,
         )
 
-    def create_default(self) -> ProbeEnsembleBuilder:
+    def create_default(self, *, has_diffraction_data: bool = False) -> ProbeEnsembleBuilder:
+        """The probe model a product starts from: estimated from its diffraction data when
+        it has any, otherwise one that needs none."""
         # Named rather than taken as the first the chooser holds: the chooser sorts by
         # name, so that would silently make it whichever model sorts first.
-        default_generator: Final = 'disk'
-        return self.create(default_generator)
+        from_data: Final = 'average_pattern'
+        without_data: Final = 'disk'
+        return self.create(
+            from_data if has_diffraction_data else without_data,
+            has_diffraction_data=has_diffraction_data,
+        )
 
     def create_from_settings(self, *, has_diffraction_data: bool = False) -> ProbeEnsembleBuilder:
         name = self._settings.builder.get_value()
@@ -101,6 +107,21 @@ class ProbeBuilderFactory(Iterable[str]):
                 self._settings.file_path.get_value(),
                 self._settings.file_type.get_value(),
             )
+
+        plugin = self._generators.find_plugin(name_repaired)
+
+        if (
+            plugin is not None
+            and plugin.strategy.reads_diffraction_data
+            and not has_diffraction_data
+        ):
+            # The expected state of a product built before any data is loaded, not an error.
+            builder = self.create_default()
+            logger.info(
+                f'Probe generator "{name_repaired}" needs a diffraction dataset, which'
+                f' this product lacks; generating with "{builder.get_name()}" instead.'
+            )
+            return builder
 
         return self.create(name_repaired, has_diffraction_data=has_diffraction_data)
 

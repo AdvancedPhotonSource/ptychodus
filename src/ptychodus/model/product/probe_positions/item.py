@@ -169,7 +169,13 @@ class ProbePositionsRepositoryItem(ParameterGroup):
         try:
             probe_positions = self._builder.build()
         except Exception:
-            logger.exception('Failed to rebuild probe positions!')
+            name = self._builder.get_name()
+            # A from_file or from_memory source loads; every other one is a generator.
+            logger.exception(
+                f'Failed to load the probe positions from "{name}"!'
+                if name.startswith('from_')
+                else f'Failed to generate the probe positions with "{name}"!'
+            )
             return
 
         if self._exit_transform != AffineTransform.create_identity():

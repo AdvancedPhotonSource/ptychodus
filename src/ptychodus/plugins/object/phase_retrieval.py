@@ -2,13 +2,14 @@
 
 STXM-DPC and Paganin read the per-pattern detector sums the diffraction moments carry, and use
 the product's probe, when it is on the object's pixels, to bound the region the estimate
-is supported on. The spectral estimate reads every pixel of the assembled patterns, so it
-waits for the moments as the others do and then corrects the patterns as the moments
-were corrected; the probe is its sensing operator, so it needs one. All three correct for
-beam decay by the I0 the probe positions record.
+is supported on. The spectral refinement starts from the STXM-DPC estimate and reads every
+pixel of the assembled patterns, so it waits for the moments as the others do and then
+corrects the patterns as the moments were corrected; the probe is its sensing operator,
+so it needs one. All three correct for beam decay by the I0 the probe positions record.
 """
 
 from __future__ import annotations
+from enum import StrEnum
 import logging
 
 import numpy
@@ -20,11 +21,13 @@ from ptychodus.api.probe import Probe
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.simulate.object import (
     ObjectGenerator,
+    SpectralModulus,
     SpectralPreprocessing,
     STXMDPCSignals,
     generate_paganin_object,
     generate_spectral_object,
     generate_stxm_dpc_object,
+    generate_uniform_object,
 )
 
 from ._options import expect_options
@@ -93,8 +96,9 @@ class STXMDPCObjectGenerator(ObjectGenerator):
 
     The probe, when there is one, sets the supported region to its illumination and,
     with shadow correction on, removes the probe's own phase gradient from the
-    centroids. The object is not rebuilt when the probe changes, so rebuild it after
-    changing the probe.
+    centroids; a zero probe is treated as none. Near-field data gives a uniform object,
+    with a warning. The object is not rebuilt when the probe changes, so rebuild it
+    after changing the probe.
     """
 
     def get_default_options(self) -> BaseModel:
@@ -119,16 +123,23 @@ class STXMDPCObjectGenerator(ObjectGenerator):
         dpc = expect_options(options, STXMDPCOptions)
 
         if not geometry_provider.far_field:
-            raise ValueError(
-                'STXM-DPC requires far-field data: the centre-of-mass theorem relates a'
-                ' far-field centroid to the exit-wave phase gradient.'
-            )
+            # The centre-of-mass theorem relates a far-field centroid to the exit-wave
+            # phase gradient, so near field has nothing to estimate from.
+            logger.warning('STXM-DPC needs far-field data; generating a uniform object instead.')
+            return generate_uniform_object(geometry_provider.get_object_geometry())
 
         moments = geometry_provider.get_diffraction_moments()
 
         if moments is None:
             # Not yet bound, or the moments are still being computed; the build is retried.
             raise GeometryNotDefinedError('No diffraction moments to estimate the object from.')
+
+        if probe is not None and not numpy.any(probe.get_array()):
+            # An average-pattern probe from a crop that misses the beam, for one.
+            logger.warning(
+                'The probe is zero, so STXM-DPC bounds the estimate by the probe positions.'
+            )
+            probe = None
 
         if dpc.shadow_correction and probe is None:
             logger.warning('No probe to correct the STXM-DPC shadow term with; skipping it.')
@@ -197,20 +208,48 @@ class PaganinObjectGenerator(ObjectGenerator):
         )
 
 
+class SpectralStart(StrEnum):
+    """What the spectral refinement starts from."""
+
+    STXM_DPC = 'stxm_dpc'
+    """The STXM-DPC estimate, in far field; uniform in near field, with a warning."""
+    UNIFORM = 'uniform'
+    """The illuminated region, uniformly."""
+
+
 class SpectralOptions(BaseModel):
     # The wavelength, propagation distance and regime are the experiment's, read from the
     # provider at build time.
+    start: SpectralStart = Field(
+        SpectralStart.STXM_DPC,
+        title='Start:',
+        description=(
+            'The estimate the refinement iterates from: the STXM-DPC estimate, which'
+            ' supplies the low-resolution object, or a uniform object.'
+        ),
+    )
+    iterations: int = Field(
+        3,
+        ge=1,
+        le=100,
+        title='Iterations:',
+        description=(
+            'Products with the spectral covariance. More sharpen detail where the probe is'
+            ' right, amplify its error where it is not, and in the hundreds concentrate the'
+            ' estimate on the most strongly scattering regions.'
+        ),
+    )
     preprocessing: SpectralPreprocessing = Field(
-        SpectralPreprocessing.OPTIMAL,
+        SpectralPreprocessing.IDENTITY,
         title='Preprocessing:',
         description=(
-            'How each intensity, normalized to unit mean, is weighted: optimal is'
-            ' max(-floor, 1 - 1/y), threshold keeps the brightest fraction of pixels, and'
-            ' identity is the intensity itself.'
+            'How each intensity, normalized to unit mean, is weighted: identity is the'
+            ' intensity itself, optimal is max(-floor, 1 - 1/y), which gives the dark field'
+            ' no weight, and threshold keeps the brightest fraction of pixels.'
         ),
     )
     preprocessing_lower_bound: float = Field(
-        0.5,
+        0.25,
         ge=0.0,
         le=1.0,
         title='Lower Bound:',
@@ -226,32 +265,18 @@ class SpectralOptions(BaseModel):
         title='Threshold Fraction:',
         description='Fraction of good pixels the threshold preprocessing sets to one.',
     )
-    eigensolver_tolerance: float = Field(
-        1.0e-2,
-        ge=1.0e-8,
-        le=1.0,
-        title='Eigensolver Tolerance:',
-        description='Relative accuracy of the leading eigenvalue the Lanczos solver seeks.',
-    )
-    eigensolver_max_restarts: int = Field(
-        50,
-        ge=1,
-        le=1000,
-        title='Eigensolver Max Restarts:',
-        description='Restarts the Lanczos solver may take before it stops unconverged.',
-    )
-    reference_amplitude_correction: bool = Field(
-        False,
-        title='Reference Amplitude Correction',
+    modulus: SpectralModulus = Field(
+        SpectralModulus.START,
+        title='Modulus:',
         description=(
-            'Divide by the estimate from the probe alone, evening out pixels fewer'
-            ' patterns cover, at twice the cost.'
+            "Where the modulus comes from: the start's, smoothed over the probe's width, or"
+            " the refinement's own, which also measures how strongly the sample scatters."
         ),
     )
 
 
 class SpectralObjectGenerator(ObjectGenerator):
-    """The spectral estimate: the leading eigenvector of the intensity-weighted covariance.
+    """Spectral refinement of the STXM-DPC estimate with every pixel of the patterns.
 
     Reads every pixel of the assembled patterns, corrected for the detector maps they
     still carry and for beam decay by I0, and needs the product's probe on the object's
@@ -279,8 +304,9 @@ class SpectralObjectGenerator(ObjectGenerator):
         probe: Probe | None,
     ) -> Object:
         spectral = expect_options(options, SpectralOptions)
+        moments = geometry_provider.get_diffraction_moments()
 
-        if geometry_provider.get_diffraction_moments() is None:
+        if moments is None:
             # Not yet bound, or the moments are still being computed; the build is retried.
             raise GeometryNotDefinedError('No diffraction moments to estimate the object from.')
 
@@ -294,19 +320,38 @@ class SpectralObjectGenerator(ObjectGenerator):
                 "The spectral estimate needs the product's probe on the object's pixels."
             )
 
+        geometry = geometry_provider.get_object_geometry()
+        start: Object | None = None
+
+        if spectral.start is SpectralStart.STXM_DPC:
+            if geometry_provider.far_field:
+                height_px, width_px = moments.mean_pattern.shape
+                start = generate_stxm_dpc_object(
+                    geometry,
+                    compute_decay_corrected_signals(geometry_provider),
+                    geometry_provider.get_probe_positions(),
+                    detector_extent=ImageExtent(width_px=width_px, height_px=height_px),
+                    probe=probe,
+                    correct_shadow=False,
+                )
+            else:
+                logger.warning(
+                    'STXM-DPC needs far-field data; the spectral refinement iterates from a uniform object.'
+                )
+
         return generate_spectral_object(
-            geometry_provider.get_object_geometry(),
+            geometry,
             assembled_data,
             geometry_provider.get_probe_positions(),
             probe=probe,
             photon_wavelength_m=geometry_provider.photon_wavelength_m,
             propagation_distance_m=geometry_provider.exit_wave_propagation_distance_m,
             far_field=geometry_provider.far_field,
+            start=start,
+            num_iterations=spectral.iterations,
             preprocessing=spectral.preprocessing,
             lower_bound=spectral.preprocessing_lower_bound,
             threshold_fraction=spectral.threshold_fraction,
-            tolerance=spectral.eigensolver_tolerance,
-            max_restarts=spectral.eigensolver_max_restarts,
-            correct_amplitude=spectral.reference_amplitude_correction,
+            modulus=spectral.modulus,
             i0_by_index=_get_i0_by_index(geometry_provider),
         )

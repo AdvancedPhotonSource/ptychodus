@@ -8,6 +8,7 @@ module.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 import argparse
 import logging
@@ -29,7 +30,12 @@ from ptychodus.cli._reconstruct_common import invalid_count_threshold  # noqa: E
 from ptychodus.cli._reconstruct_standard import InstrumentProfile
 from ptychodus.plugins.aps31id_lamni.diffraction_file import LamNIDiffractionFileReader
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.probe import ProbeGeometry
+from ptychodus.api.probe import Probe, ProbeEnsemble, ProbeGeometry
+from ptychodus.api.accumulate import IncidentBeamEstimate, compute_diffraction_moments
+from ptychodus.api.object import Object, ObjectGeometry, compute_object_geometry
+from ptychodus.api.product import Product, ProductMetadata
+from ptychodus.api.scattering.geometry import ScatteringGeometry
+from ptychodus.api.simulate.diffraction import generate_diffraction_data
 from ptychodus.api.propagate import compute_magnification
 
 DETECTOR_PIXEL_M = 7.5e-5
@@ -218,9 +224,163 @@ def test_diffraction_reader_follows_the_file_suffix() -> None:
     assert isn.get_diffraction_reader(Path('anything.tif')) == isn.diffraction_reader
 
 
-def test_26idc_starts_from_the_average_pattern_probe() -> None:
-    """No zone-plate preset by default, so the probe is estimated from the mean pattern."""
-    assert _defaults(_profiles()['26idc']).fzp_preset == ''
+def test_no_profile_presets_a_zone_plate() -> None:
+    """Every driver generates its initial probe from the mean pattern unless told otherwise."""
+    for name, profile in _profiles().items():
+        assert _defaults(profile).fzp_preset == '', name
+        assert not hasattr(profile, 'default_fzp_preset'), name
+
+
+def test_every_profile_generates_the_initial_object_by_stxm_dpc() -> None:
+    for name, profile in _profiles().items():
+        assert _defaults(profile).initial_object is rs.InitialObject.STXM_DPC, name
+
+    parser = rs.build_standard_parser(_profiles()['bnp'])
+    base = ['--diffraction-file', 'd', '--position-file', 'p', '--output-directory', 'o']
+
+    assert parser.parse_args([*base, '--initial-object', 'uniform']).initial_object is (
+        rs.InitialObject.UNIFORM
+    )
+
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, '--initial-object', 'random'])
+
+
+# --- the initial object ----------------------------------------------------------------
+
+
+_TRANSMISSION = 0.9
+
+
+def _phase_scan() -> tuple[
+    ObjectGeometry, IncidentBeamEstimate, ProbePositionSequence, Probe, ImageExtent
+]:
+    """A smooth phase object under a defocused disk probe, its far-field patterns, and
+    the incident beam they imply with the transmission fixed."""
+    pixel_size_m = 50e-9
+    pixel_geometry = PixelGeometry(width_m=pixel_size_m, height_m=pixel_size_m)
+    probe_px = 32
+    yy, xx = numpy.indices((probe_px, probe_px)) - (probe_px - 1) / 2
+    probe = Probe(
+        array=(numpy.hypot(xx, yy) < 7).astype(complex) * numpy.exp(0.02j * (xx**2 + yy**2)),
+        pixel_geometry=pixel_geometry,
+    )
+    positions = ProbePositionSequence(
+        [
+            ProbePosition(
+                index=iy * 7 + ix,
+                x_m=(ix - 3) * 4 * pixel_size_m,
+                y_m=(iy - 3) * 4 * pixel_size_m,
+            )
+            for iy in range(7)
+            for ix in range(7)
+        ]
+    )
+    object_geometry = compute_object_geometry(
+        positions,
+        ProbeGeometry(
+            width_px=probe_px,
+            height_px=probe_px,
+            pixel_width_m=pixel_size_m,
+            pixel_height_m=pixel_size_m,
+        ),
+        padding_px=4,
+    )
+    oy, ox = numpy.indices((object_geometry.height_px, object_geometry.width_px))
+    phase = numpy.sin(ox / 6.0) * numpy.cos(oy / 9.0)
+    product = Product(
+        metadata=ProductMetadata(
+            name='phase',
+            comments='',
+            detector_distance_m=2.0,
+            photon_energy_eV=10_000.0,
+            probe_photon_count=1.0,
+            exposure_time_s=1.0,
+            mass_attenuation_m2_per_kg=0.0,
+            tomography_angle_deg=0.0,
+        ),
+        probe_positions=positions,
+        probes=ProbeEnsemble.from_probe(probe),
+        object_=Object(
+            array=numpy.exp(1j * phase)[numpy.newaxis],
+            pixel_geometry=pixel_geometry,
+            center=object_geometry.get_center(),
+        ),
+        losses=[],
+    )
+    data = generate_diffraction_data(product, None)
+    moments = compute_diffraction_moments(
+        data.get_indexes(), data.get_patterns(), bad_pixels=data.get_bad_pixels()
+    )
+    assert moments is not None
+    incident_beam = IncidentBeamEstimate(
+        moments=moments,
+        incident_photon_count=float(moments.detector_sums.max()),
+        mean_amplitude_transmission=_TRANSMISSION,
+        decay_corrected=False,
+    )
+    return object_geometry, incident_beam, positions, probe, data.get_image_extent()
+
+
+def _generate(
+    initial_object: rs.InitialObject,
+    *,
+    far_field: bool = True,
+    scattering_geometry: ScatteringGeometry | None = None,
+    incident_beam: IncidentBeamEstimate | None = None,
+) -> numpy.ndarray:
+    object_geometry, beam, positions, probe, extent = _phase_scan()
+    object_ = rs._generate_initial_object(
+        logger,
+        initial_object,
+        object_geometry,
+        beam if incident_beam is None else incident_beam,
+        positions,
+        probe,
+        detector_extent=extent,
+        far_field=far_field,
+        scattering_geometry=(
+            ScatteringGeometry() if scattering_geometry is None else scattering_geometry
+        ),
+    )
+    return object_.get_array()[0]
+
+
+def test_stxm_dpc_generates_a_structured_object_at_the_measured_transmission() -> None:
+    array = _generate(rs.InitialObject.STXM_DPC)
+
+    assert numpy.std(numpy.angle(array)) > 0.05
+    assert numpy.mean(numpy.abs(array)) == pytest.approx(_TRANSMISSION, rel=0.1)
+
+
+@pytest.mark.parametrize(
+    'kwargs',
+    [
+        dict(initial_object=rs.InitialObject.UNIFORM),
+        dict(initial_object=rs.InitialObject.STXM_DPC, far_field=False),
+        dict(
+            initial_object=rs.InitialObject.STXM_DPC,
+            scattering_geometry=ScatteringGeometry(two_theta_deg=30.0),
+        ),
+    ],
+)
+def test_otherwise_the_initial_object_is_uniform_at_the_transmission(kwargs: dict) -> None:
+    numpy.testing.assert_allclose(_generate(**kwargs), _TRANSMISSION)
+
+
+def test_a_failed_stxm_dpc_falls_back_to_uniform(caplog: pytest.LogCaptureFixture) -> None:
+    _, beam, *_ = _phase_scan()
+    # No signal anywhere: STXM-DPC refuses a mean intensity of zero.
+    empty = replace(
+        beam,
+        moments=replace(beam.moments, detector_sums=numpy.zeros_like(beam.moments.detector_sums)),
+    )
+
+    with caplog.at_level(logging.WARNING):
+        array = _generate(rs.InitialObject.STXM_DPC, incident_beam=empty)
+
+    assert 'STXM-DPC failed' in caplog.text
+    numpy.testing.assert_allclose(array, _TRANSMISSION)
 
 
 def test_logger_names_stay_per_driver() -> None:

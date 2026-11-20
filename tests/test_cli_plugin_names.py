@@ -52,7 +52,6 @@ _CATALOGS: dict[str, tuple[str, ...]] = {
     '_DEFAULT_FILE_TYPE': ('fluorescence_file_readers', 'fluorescence_file_writers'),
     # the standard drivers' profiles
     'InstrumentProfile.default_bad_pixels_reader': ('bad_pixels_file_readers',),
-    'InstrumentProfile.default_fzp_preset': ('fresnel_zone_plates',),
     'InstrumentProfile.diffraction_reader': ('diffraction_file_readers',),
     'InstrumentProfile.diffraction_readers_by_suffix': ('diffraction_file_readers',),
     'InstrumentProfile.position_reader': ('probe_position_file_readers',),

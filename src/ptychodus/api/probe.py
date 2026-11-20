@@ -1093,15 +1093,15 @@ class ProbeGeometryProvider(ABC):
     def get_assembled_data(self) -> AssembledDiffractionData | None:
         """The diffraction data the product is bound to, or None while it is bound to none.
 
-        Read at the point of use rather than kept, so a builder copied into another
-        product, or a product rebound to other data, sees the data it has now.
+        Read at the point of use rather than kept, so a generator run for another
+        product, or for a product rebound to other data, sees the data it has now.
         """
 
     @abstractmethod
     def get_diffraction_moments(self) -> DiffractionMoments | None:
         """The bound data's diffraction moments, or None while unbound or not yet computed.
 
-        Accumulated once from the assembled patterns, so a builder needing only their
+        Accumulated once from the assembled patterns, so a generator needing only their
         statistics does not pass over every pattern itself.
         """
 
@@ -1957,7 +1957,7 @@ def conform_opr_weights(
     """Re-express ``probes`` so its OPR weights describe ``num_positions`` probe positions.
 
     OPR weights carry one row per probe position, so a probe solved on one scan cannot
-    initialize a reconstruction of another without a decision about what those rows mean
+    be the initial guess for a reconstruction of another without a decision about what those rows mean
     there. ``policy`` names that decision; see :class:`OPRWeightPolicy`.
 
     The transform is unconditional: a probe whose weights already have ``num_positions``

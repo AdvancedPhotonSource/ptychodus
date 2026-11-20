@@ -41,10 +41,10 @@ PROFILE = InstrumentProfile(
     diffraction_file_help='Raw LamNI HDF5 file (APS 31-ID-E).',
     position_file_help='LamNI probe-position .dat file (Orchestra or softGlueZynq).',
     fzp_preset_help=(
-        'FresnelZonePlate plugin preset for the model probe. Defaults to the LamNI zone '
-        'plate. Ignored with --probe-file.'
+        'Zone-plate preset to generate the initial probe from, e.g. "APS 31-ID-E LamNI". Empty '
+        'by default, so the initial probe is generated from the mean pattern. Ignored with '
+        '--probe-file.'
     ),
-    default_fzp_preset='APS 31-ID-E LamNI',
     default_invalid_counts=LamNIDiffractionFileReader.INVALID_COUNTS,
 )
 

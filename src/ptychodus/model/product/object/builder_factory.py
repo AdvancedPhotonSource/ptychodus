@@ -55,11 +55,11 @@ class ObjectBuilderFactory(Iterable[str]):
         plugin = self._generators.find_plugin(name)
 
         if plugin is None:
-            raise KeyError(f'Unknown object builder "{name}"!')
+            raise KeyError(f'Unknown object source "{name}"!')
 
         if plugin.strategy.reads_diffraction_data and not has_diffraction_data:
             raise RuntimeError(
-                f'Object builder "{name}" requires an associated diffraction dataset.'
+                f'Object generator "{name}" requires an associated diffraction dataset.'
             )
 
         return PluginObjectBuilder(
@@ -70,11 +70,17 @@ class ObjectBuilderFactory(Iterable[str]):
             self._parameters[plugin.simple_name],
         )
 
-    def create_default(self) -> ObjectBuilder:
+    def create_default(self, *, has_diffraction_data: bool = False) -> ObjectBuilder:
+        """The object model a product starts from: estimated from its diffraction data when
+        it has any, otherwise one that needs none."""
         # Named rather than taken as the first the chooser holds: the chooser sorts by
         # name, so that would silently make it whichever model sorts first.
-        default_generator: Final = 'random'
-        return self.create(default_generator)
+        from_data: Final = 'stxm_dpc'
+        without_data: Final = 'random'
+        return self.create(
+            from_data if has_diffraction_data else without_data,
+            has_diffraction_data=has_diffraction_data,
+        )
 
     def create_from_settings(self, *, has_diffraction_data: bool = False) -> ObjectBuilder:
         name = self._settings.builder.get_value()
@@ -85,6 +91,21 @@ class ObjectBuilderFactory(Iterable[str]):
                 self._settings.file_path.get_value(),
                 self._settings.file_type.get_value(),
             )
+
+        plugin = self._generators.find_plugin(name_repaired)
+
+        if (
+            plugin is not None
+            and plugin.strategy.reads_diffraction_data
+            and not has_diffraction_data
+        ):
+            # The expected state of a product built before any data is loaded, not an error.
+            builder = self.create_default()
+            logger.info(
+                f'Object generator "{name_repaired}" needs a diffraction dataset, which'
+                f' this product lacks; generating with "{builder.get_name()}" instead.'
+            )
+            return builder
 
         return self.create(name_repaired, has_diffraction_data=has_diffraction_data)
 

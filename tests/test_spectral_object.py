@@ -1,4 +1,4 @@
-"""The spectral object estimate: its operator, its eigenvector, and what it recovers.
+"""The spectral object refinement: its operator, its iterations, and what it recovers.
 
 Recovery is checked on data simulated by the multislice forward model, with Poisson
 noise and detector gaps, so the operator is pinned against the model that produced the
@@ -16,16 +16,17 @@ from scipy.ndimage import gaussian_filter
 
 from ptychodus.api.accumulate import DiffractionMoments, compute_diffraction_moments
 from ptychodus.api.assemble import AssembledDiffractionData
-from ptychodus.api.constants import energy_eV_to_wavelength_m
+from ptychodus.api.constants import TWO_PI_J, energy_eV_to_wavelength_m
 from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter, ObjectGeometry, ObjectGeometryProvider
 from ptychodus.api.patch import accumulate_probe_intensity_on, iter_probe_patches_on
 from ptychodus.api.probe import Probe, ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.propagate import FresnelTransformPropagator, PropagatorParameters
+from ptychodus.api.propagate import PropagatorParameters
 from ptychodus.api.simulate.diffraction import generate_diffraction_data
 from ptychodus.api.simulate.object import (
+    SpectralModulus,
     SpectralPreprocessing,
     _build_propagator_pair,
     _compute_spectral_weights,
@@ -34,7 +35,11 @@ from ptychodus.api.simulate.object import (
     generate_stxm_dpc_object,
 )
 from ptychodus.api.simulate.probe import propagate_probe
-from ptychodus.plugins.object.phase_retrieval import SpectralObjectGenerator, SpectralOptions
+from ptychodus.plugins.object.phase_retrieval import (
+    SpectralObjectGenerator,
+    SpectralOptions,
+    SpectralStart,
+)
 
 _PHOTON_ENERGY_EV = 10_000.0
 _WAVELENGTH_M = energy_eV_to_wavelength_m(_PHOTON_ENERGY_EV)
@@ -272,9 +277,18 @@ def test_the_adjoint_is_the_adjoint(
     assert abs(lhs - rhs) <= 1e-12 * abs(lhs)
 
 
-def test_the_estimate_is_the_leading_eigenvector_of_the_dense_covariance() -> None:
-    """On a canvas small enough to write ``Z`` down, its top eigenvector is the estimate."""
-    extent_px, probe_px = 16, 8
+@pytest.mark.parametrize(
+    'far_field, distance_m',
+    [
+        (True, _FAR_FIELD_DISTANCE_M),  # Fresnel transform, as one FFT pair
+        (False, _NEAR_FIELD_DISTANCE_M),  # angular spectrum, through the propagators
+    ],
+)
+def test_the_refinement_is_repeated_products_of_the_dense_covariance(
+    far_field: bool, distance_m: float
+) -> None:
+    """On a canvas small enough to write ``Z`` down, the estimate is ``Z^n`` of the start."""
+    extent_px, probe_px, num_iterations = 16, 8, 3
     geometry = _geometry(extent_px)
     probe = _defocused_disk_probe(extent_px=probe_px)
     positions = [
@@ -291,20 +305,22 @@ def test_the_estimate_is_the_leading_eigenvector_of_the_dense_covariance() -> No
         _PIXEL_GEOMETRY,
         numpy.zeros((probe_px, probe_px), dtype=bool),
     )
-    lower_bound = 0.5
+    lower_bound = 0.25
     normalized = patterns / patterns.mean()
     with numpy.errstate(divide='ignore'):
-        weights = numpy.maximum(1.0 - 1.0 / normalized, -lower_bound)
+        # The optimal weights, offset by their floor to be non-negative.
+        weights = numpy.maximum(1.0 - 1.0 / normalized, -lower_bound) + lower_bound
 
-    propagator = FresnelTransformPropagator(
+    forward, _ = _build_propagator_pair(
         PropagatorParameters(
             wavelength_m=_WAVELENGTH_M,
             width_px=probe_px,
             height_px=probe_px,
             pixel_width_m=_PIXEL_SIZE_M,
             pixel_height_m=_PIXEL_SIZE_M,
-            propagation_distance_m=_FAR_FIELD_DISTANCE_M,
-        )
+            propagation_distance_m=distance_m,
+        ),
+        far_field=far_field,
     )
     covariance = numpy.zeros((extent_px**2, extent_px**2), dtype=complex)
     patches = iter_probe_patches_on(ProbeEnsemble.from_probe(probe), positions, geometry)
@@ -318,61 +334,99 @@ def test_the_estimate_is_the_leading_eigenvector_of_the_dense_covariance() -> No
             window = canvas.reshape(extent_px, extent_px)[
                 patch.bounds.y_slice, patch.bounds.x_slice
             ]
-            sensing[:, pixel] = propagator.propagate(patch.modes[0] * window).ravel()
+            sensing[:, pixel] = forward.propagate(patch.modes[0] * window).ravel()
 
         covariance += sensing.conj().T @ (weight.ravel()[:, None] * sensing)
-
-    _, eigenvectors = numpy.linalg.eigh(covariance)
-    expected = eigenvectors[:, -1].reshape(extent_px, extent_px)
-
-    estimate = _estimate(
-        data, positions, probe, geometry=geometry, lower_bound=lower_bound, tolerance=1e-12
-    )
 
     illumination = accumulate_probe_intensity_on(
         ProbeEnsemble.from_probe(probe), positions, geometry
     )
     support = illumination >= 0.05 * illumination.max()
-    a, b = estimate[support], expected[support]
-    assert abs(numpy.vdot(a, b)) / numpy.linalg.norm(a) / numpy.linalg.norm(b) > 1 - 1e-8
-
-
-def test_chunking_and_the_probe_cache_change_nothing() -> None:
-    probe, positions, data = _far_field_case()
-    reference = _estimate(data, positions, probe, tolerance=1e-10)
+    expected = numpy.linalg.matrix_power(covariance, num_iterations) @ support.ravel()
+    expected = expected.reshape(extent_px, extent_px)
 
     estimate = _estimate(
         data,
         positions,
         probe,
-        tolerance=1e-10,
-        max_patterns_per_chunk=5,
-        max_cached_bytes=0,
+        far_field=far_field,
+        geometry=geometry,
+        num_iterations=num_iterations,
+        preprocessing=SpectralPreprocessing.OPTIMAL,
+        lower_bound=lower_bound,
+        modulus=SpectralModulus.ESTIMATE,
     )
 
-    numpy.testing.assert_allclose(estimate, reference, atol=1e-6)
+    a, b = estimate[support], expected[support]
+    # Single-precision waves, double-precision accumulation.
+    assert abs(numpy.vdot(a, b)) / numpy.linalg.norm(a) / numpy.linalg.norm(b) > 1 - 1e-6
+
+
+def test_chunking_and_the_probe_cache_change_nothing() -> None:
+    probe, positions, data = _far_field_case()
+    reference = _estimate(data, positions, probe)
+
+    estimate = _estimate(data, positions, probe, max_patterns_per_chunk=5, max_cached_bytes=0)
+
+    # Each pattern's waves are single precision, so another chunking rounds differently.
+    numpy.testing.assert_allclose(estimate, reference, atol=1e-5)
 
 
 # -- recovery --------------------------------------------------------------------------
 
 
-def test_far_field_recovery_beats_a_flat_object_and_stxm_dpc() -> None:
-    probe, positions, data = _far_field_case()
-    stxm_dpc = generate_stxm_dpc_object(
+def _stxm_dpc(data: AssembledDiffractionData, positions: Sequence[ProbePosition]) -> Object:
+    return generate_stxm_dpc_object(
         _geometry(),
         compute_stxm_dpc_signals(data),
         positions,
         detector_extent=data.get_image_extent(),
-    ).get_array()[0]
+    )
+
+
+def test_far_field_refinement_beats_its_stxm_dpc_start_and_a_flat_object() -> None:
+    probe, positions, data = _far_field_case()
+    stxm_dpc = _stxm_dpc(data, positions)
     flat = numpy.ones_like(_truth())
 
-    spectral = _correlation(_estimate(data, positions, probe), _truth())
-    corrected = _correlation(_estimate(data, positions, probe, correct_amplitude=True), _truth())
+    spectral = _correlation(_estimate(data, positions, probe, start=stxm_dpc), _truth())
 
-    # Measured 0.906 raw, 0.962 corrected, 0.898 for STXM-DPC and 0.662 flat. Without
-    # the reference correction the estimate falls below STXM-DPC near the edge of a scan.
-    assert spectral > _correlation(flat, _truth()) + 0.1
-    assert corrected > _correlation(stxm_dpc, _truth()) + 0.03
+    # Measured 0.947 refined, 0.896 for STXM-DPC and 0.662 flat.
+    assert spectral > _correlation(stxm_dpc.get_array()[0], _truth()) + 0.03
+    assert spectral > _correlation(flat, _truth()) + 0.2
+
+
+def _hotness(estimate: numpy.ndarray, support: numpy.ndarray) -> float:
+    """p99 / p50 of the modulus smoothed over a few pixels: one for an even modulus."""
+    smoothed = gaussian_filter(numpy.abs(estimate), 4.0)[support]
+    return float(numpy.quantile(smoothed, 0.99) / numpy.median(smoothed))
+
+
+def test_the_refinements_own_modulus_concentrates_as_it_nears_the_eigenvector() -> None:
+    """The eigenvector's modulus measures scattering strength; the start's stays even."""
+    probe, positions, data = _far_field_case()
+    support = _support(probe, positions)
+    stxm_dpc = _stxm_dpc(data, positions)
+    hotness = {
+        (modulus, num_iterations): _hotness(
+            _estimate(
+                data,
+                positions,
+                probe,
+                start=stxm_dpc,
+                num_iterations=num_iterations,
+                modulus=modulus,
+            ),
+            support,
+        )
+        for modulus in SpectralModulus
+        for num_iterations in (3, 100)
+    }
+
+    # Measured 2.8 after three products and 4.2 after a hundred, against 1.01 for the
+    # start's modulus at either.
+    assert hotness[SpectralModulus.ESTIMATE, 100] > 1.3 * hotness[SpectralModulus.ESTIMATE, 3]
+    assert hotness[SpectralModulus.START, 100] < 1.1
 
 
 def test_near_field_recovery_with_structured_illumination() -> None:
@@ -383,6 +437,8 @@ def test_near_field_recovery_with_structured_illumination() -> None:
 
     spectral = _correlation(_estimate(data, positions, probe, far_field=False), _truth())
 
+    # Measured 0.907 from the uniform start near field takes, 0.97 after ten products,
+    # and 0.662 flat.
     assert spectral > _correlation(flat, _truth()) + 0.2
 
 
@@ -417,12 +473,12 @@ def test_a_multimode_probe_is_summed_over_its_modes() -> None:
 # -- normalization, pairing and detector corrections ----------------------------------
 
 
-@pytest.mark.parametrize('correct_amplitude', [False, True])
-def test_the_support_has_unit_mean_modulus_and_zero_net_phase(correct_amplitude: bool) -> None:
+@pytest.mark.parametrize('modulus', list(SpectralModulus))
+def test_the_support_has_unit_mean_modulus_and_zero_net_phase(modulus: SpectralModulus) -> None:
     probe, positions, data = _far_field_case()
     support = _support(probe, positions)
 
-    estimate = _estimate(data, positions, probe, correct_amplitude=correct_amplitude)
+    estimate = _estimate(data, positions, probe, start=_stxm_dpc(data, positions), modulus=modulus)
 
     assert numpy.mean(numpy.abs(estimate[support])) == pytest.approx(1.0)
     assert abs(numpy.angle(numpy.sum(estimate[support]))) < 1e-9
@@ -431,7 +487,7 @@ def test_the_support_has_unit_mean_modulus_and_zero_net_phase(correct_amplitude:
 
 def test_patterns_pair_with_positions_by_index_not_order() -> None:
     probe, positions, data = _far_field_case()
-    reference = _estimate(data, positions, probe, tolerance=1e-10)
+    reference = _estimate(data, positions, probe)
     order = numpy.random.default_rng(3).permutation(len(positions))
     shuffled = _with(
         data,
@@ -439,14 +495,12 @@ def test_patterns_pair_with_positions_by_index_not_order() -> None:
         patterns=numpy.array(data.get_patterns())[order],
     )
 
-    numpy.testing.assert_allclose(
-        _estimate(shuffled, positions, probe, tolerance=1e-10), reference, atol=1e-6
-    )
+    numpy.testing.assert_allclose(_estimate(shuffled, positions, probe), reference, atol=1e-6)
 
 
 def test_a_pattern_without_a_position_is_left_out() -> None:
     probe, positions, data = _far_field_case()
-    reference = _estimate(data, positions, probe, tolerance=1e-10)
+    reference = _estimate(data, positions, probe)
     stray = numpy.random.default_rng(5).uniform(0.0, 1.0e6, size=(1, _PROBE_PX, _PROBE_PX))
     with_stray = _with(
         data,
@@ -454,19 +508,17 @@ def test_a_pattern_without_a_position_is_left_out() -> None:
         patterns=numpy.concatenate([data.get_patterns(), stray]),
     )
 
-    numpy.testing.assert_allclose(
-        _estimate(with_stray, positions, probe, tolerance=1e-10), reference, atol=1e-6
-    )
+    numpy.testing.assert_allclose(_estimate(with_stray, positions, probe), reference, atol=1e-6)
 
 
 def test_bad_pixels_carry_no_weight() -> None:
     probe, positions, data = _far_field_case()
-    reference = _estimate(data, positions, probe, tolerance=1e-10)
+    reference = _estimate(data, positions, probe)
     patterns = numpy.array(data.get_patterns())
     patterns[:, data.get_bad_pixels()] = 1.0e6
 
     numpy.testing.assert_allclose(
-        _estimate(_with(data, patterns=patterns), positions, probe, tolerance=1e-10),
+        _estimate(_with(data, patterns=patterns), positions, probe),
         reference,
         atol=1e-6,
     )
@@ -474,12 +526,12 @@ def test_bad_pixels_carry_no_weight() -> None:
 
 def test_i0_removes_a_beam_decay() -> None:
     probe, positions, data = _far_field_case()
-    reference = _estimate(data, positions, probe, tolerance=1e-10)
+    reference = _estimate(data, positions, probe)
     decay = numpy.linspace(1.0, 0.6, len(positions))
     decayed = _with(data, patterns=numpy.array(data.get_patterns()) * decay[:, None, None])
     i0_by_index = {int(index): 500.0 * float(d) for index, d in zip(data.get_indexes(), decay)}
 
-    estimate = _estimate(decayed, positions, probe, tolerance=1e-10, i0_by_index=i0_by_index)
+    estimate = _estimate(decayed, positions, probe, i0_by_index=i0_by_index)
 
     numpy.testing.assert_allclose(estimate, reference, atol=1e-6)
 
@@ -511,11 +563,9 @@ def test_carried_detector_maps_are_applied_as_the_moments_apply_them() -> None:
     assert moments is not None
     numpy.testing.assert_array_equal(moments.bad_pixels, unusable)
 
-    expected = _estimate(_with(data, bad_pixels=unusable), positions, probe, tolerance=1e-10)
+    expected = _estimate(_with(data, bad_pixels=unusable), positions, probe)
 
-    numpy.testing.assert_allclose(
-        _estimate(carried, positions, probe, tolerance=1e-10), expected, atol=1e-6
-    )
+    numpy.testing.assert_allclose(_estimate(carried, positions, probe), expected, atol=1e-6)
 
 
 # -- refusals --------------------------------------------------------------------------
@@ -546,9 +596,7 @@ def test_the_probe_must_span_the_patterns() -> None:
         dict(lower_bound=1.1),
         dict(threshold_fraction=0.0),
         dict(threshold_fraction=1.5),
-        dict(tolerance=-1.0),
-        dict(max_restarts=0),
-        dict(num_lanczos_vectors=2),
+        dict(num_iterations=0),
         dict(support_fraction=0.0),
         dict(max_patterns_per_chunk=0),
         dict(max_cached_bytes=-1),
@@ -559,6 +607,34 @@ def test_out_of_range_tunables_are_refused(kwargs: dict[str, Any]) -> None:
 
     with pytest.raises(ValueError):
         _estimate(data, positions, probe, **kwargs)
+
+
+def test_a_probe_that_does_not_predict_the_mean_pattern_is_reported(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    probe, positions, data = _far_field_case()
+    # A tilt moves the probe's far field eight pixels off the measured beam.
+    tilt = numpy.exp(TWO_PI_J * 8.0 * numpy.arange(_PROBE_PX) / _PROBE_PX)
+    tilted = Probe(array=probe.get_array() * tilt, pixel_geometry=_PIXEL_GEOMETRY)
+
+    with caplog.at_level('WARNING', logger='ptychodus.api.simulate.object'):
+        _estimate(data, positions, probe)
+        assert 'predicts the mean diffraction pattern poorly' not in caplog.text
+        _estimate(data, positions, tilted)
+
+    assert 'predicts the mean diffraction pattern poorly' in caplog.text
+
+
+def test_the_start_must_be_on_the_canvas() -> None:
+    probe, positions, data = _far_field_case()
+    start = Object(
+        array=numpy.ones((1, _OBJECT_PX, _OBJECT_PX + 1), dtype=complex),
+        pixel_geometry=_PIXEL_GEOMETRY,
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
+    )
+
+    with pytest.raises(ValueError, match='not on the'):
+        _estimate(data, positions, probe, start=start)
 
 
 def test_far_field_needs_a_distance() -> None:
@@ -626,19 +702,35 @@ class _Provider(ObjectGeometryProvider):
         return self._moments
 
 
-def test_the_generator_matches_the_function() -> None:
+@pytest.mark.parametrize('start', list(SpectralStart))
+def test_the_generator_matches_the_function(start: SpectralStart) -> None:
     probe, positions, data = _far_field_case()
-    options = SpectralOptions(eigensolver_tolerance=1e-8)
 
     object_ = SpectralObjectGenerator().generate(
-        options, _Provider(data, positions), rng=numpy.random.default_rng(0), probe=probe
+        SpectralOptions(start=start),
+        _Provider(data, positions),
+        rng=numpy.random.default_rng(0),
+        probe=probe,
     )
 
-    numpy.testing.assert_allclose(
-        object_.get_array()[0],
-        _estimate(data, positions, probe, tolerance=1e-8),
-        atol=1e-6,
+    expected = _estimate(
+        data,
+        positions,
+        probe,
+        start=(
+            generate_stxm_dpc_object(
+                _geometry(),
+                compute_stxm_dpc_signals(data),
+                positions,
+                detector_extent=data.get_image_extent(),
+                probe=probe,
+                correct_shadow=False,
+            )
+            if start is SpectralStart.STXM_DPC
+            else None
+        ),
     )
+    numpy.testing.assert_allclose(object_.get_array()[0], expected, atol=1e-6)
 
 
 def test_the_generator_waits_for_the_moments() -> None:
