@@ -8,13 +8,10 @@ from uuid import UUID
 
 import shutil
 
-import pytest
 
 from ptychodus.webapp.db import repositories as repo
 from ptychodus.webapp.db.base import IngestState
 from ptychodus.webapp.ingest.reconciler import full_rescan
-
-pytestmark = pytest.mark.asyncio
 
 
 async def test_full_rescan_counts(

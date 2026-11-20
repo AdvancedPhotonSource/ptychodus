@@ -26,7 +26,7 @@ _TESTS_DIR = str(Path(__file__).parent)
 if _TESTS_DIR not in sys.path:
     sys.path.insert(0, _TESTS_DIR)
 
-from subprocess_child_fixtures import FakeTrainableReconstructor  # noqa: E402
+from subprocess_reconstructor_fixtures import FakeTrainableReconstructor  # noqa: E402
 
 
 def _reconstruct_input() -> ReconstructInput:

@@ -28,8 +28,6 @@ from ptychodus.webapp.mcp_server import (
 )
 from ptychodus.webapp.rendering.offload import RenderRunner
 
-pytestmark = pytest.mark.asyncio
-
 
 def _structured(result: ToolResult) -> dict[str, Any]:
     """The tool's structured payload, asserted present.

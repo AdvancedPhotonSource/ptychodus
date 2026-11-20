@@ -1359,7 +1359,9 @@ def compute_peak_signal_to_noise_ratio(
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
 
     effective_range = _infer_data_range(reference) if data_range is None else data_range
-    return float(peak_signal_noise_ratio(reference, test, data_range=effective_range))
+
+    with numpy.errstate(divide='ignore'):  # identical arrays divide by a zero error
+        return float(peak_signal_noise_ratio(reference, test, data_range=effective_range))
 
 
 def compute_structural_similarity(

@@ -1194,6 +1194,7 @@ class TestSizeEstimateFromDiffraction:
         assert builder.estimate_size_from_diffraction(_defocused_provider_with(mean_pattern))
 
         expected_m = 2.0 * 1.0e-10 * _ESTIMATE_DEFOCUS_M * 8.0 * _DQ
+        # The shadow's edge is sampled at one frequency pixel, about 2% of its radius.
         assert builder.parameters()['diameter_m'].get_value() == pytest.approx(expected_m, rel=0.05)
 
     def test_a_rectangle_takes_both_sides_of_its_shadow(self) -> None:

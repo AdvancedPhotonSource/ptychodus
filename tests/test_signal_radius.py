@@ -38,7 +38,8 @@ def test_radius_is_where_the_decay_meets_the_threshold() -> None:
     center = BeamCenter(x_px=128, y_px=128)
     signal = estimate_signal_radius(_gaussian_pattern(center), center)
 
-    assert signal.noise_floor.median == pytest.approx(_BACKGROUND, abs=1.0)
+    # The median of Poisson(5) counts is the integer 5; its standard error is tiny.
+    assert signal.noise_floor.median == pytest.approx(_BACKGROUND, abs=0.5)
     assert signal.threshold > 0.0
     assert abs(signal.radius_px - _crossing_radius(signal.threshold)) <= 2.0
 

@@ -543,6 +543,7 @@ def test_service_suggestion_subtracts_the_background_the_settings_ask_for() -> N
     subtracted = service.suggest_crop_region(_BEAM_CENTER).signal
 
     crossing = 8.0 * numpy.sqrt(2.0 * numpy.log(1000.0 / subtracted.threshold))
+    # A Poisson median sits about 1/3 above its mean, an offset subtraction keeps.
     assert subtracted.noise_floor.median == pytest.approx(5.0, abs=1.0)
     assert abs(subtracted.radius_px - crossing) <= 2.0
     assert subtracted.radius_px > kept.radius_px + 10

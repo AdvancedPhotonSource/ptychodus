@@ -2,7 +2,8 @@
 
 These tests spawn real subprocesses, so they exercise the pickling, log
 forwarding, sentinel/error paths and cleanup, but the work they run touches no
-GPU framework. See ``tests/subprocess_child_fixtures.py``.
+GPU framework. See ``tests/subprocess_child_fixtures.py`` and
+``tests/subprocess_reconstructor_fixtures.py``.
 """
 
 from __future__ import annotations
@@ -37,6 +38,7 @@ if _TESTS_DIR not in sys.path:
     sys.path.insert(0, _TESTS_DIR)
 
 import subprocess_child_fixtures as fixtures  # noqa: E402
+import subprocess_reconstructor_fixtures as reconstructor_fixtures  # noqa: E402
 
 
 def _minimal_product() -> Product:
@@ -104,7 +106,7 @@ def _record_processes(monkeypatch: pytest.MonkeyPatch) -> _ProcessRecordingConte
 
 
 def test_items_stream_back_in_order() -> None:
-    work = partial(fixtures.yield_outputs, _minimal_product(), 3)
+    work = partial(reconstructor_fixtures.yield_outputs, _minimal_product(), 3)
 
     outputs = list(iterate_in_subprocess(work))
 
@@ -113,7 +115,7 @@ def test_items_stream_back_in_order() -> None:
 
 def test_a_bound_method_runs_on_a_copy_of_its_object() -> None:
     """The object crosses as itself, so what it yields comes back and what it does to itself does not."""
-    reconstructor = fixtures.FakeTrainableReconstructor(num_outputs=2)
+    reconstructor = reconstructor_fixtures.FakeTrainableReconstructor(num_outputs=2)
     work = partial(reconstructor.reconstruct, _minimal_reconstruct_input(), options=NoOptions())
 
     outputs = list(iterate_in_subprocess(work))
@@ -122,7 +124,7 @@ def test_a_bound_method_runs_on_a_copy_of_its_object() -> None:
 
 
 def test_training_in_a_child_leaves_the_parent_object_untouched(tmp_path: Path) -> None:
-    reconstructor = fixtures.FakeTrainableReconstructor()
+    reconstructor = reconstructor_fixtures.FakeTrainableReconstructor()
     work = partial(reconstructor.train, tmp_path, tmp_path, options=NoOptions())
 
     outputs = list(iterate_in_subprocess(work))
@@ -185,7 +187,8 @@ def test_hanging_child_is_terminated_on_iterator_close(monkeypatch: pytest.Monke
     iterator = cast(
         Generator[ReconstructOutput, None, None],
         iterate_in_subprocess(
-            partial(fixtures.yield_one_then_hang, _minimal_product()), terminate_grace_sec=1.0
+            partial(reconstructor_fixtures.yield_one_then_hang, _minimal_product()),
+            terminate_grace_sec=1.0,
         ),
     )
 
@@ -206,7 +209,7 @@ def test_hanging_child_is_terminated_on_iterator_close(monkeypatch: pytest.Monke
 @pytest.mark.parametrize(
     'work',
     [
-        partial(fixtures.yield_outputs, _minimal_product(), 1),
+        partial(reconstructor_fixtures.yield_outputs, _minimal_product(), 1),
         partial(fixtures.raise_immediately, 'boom'),
     ],
 )
@@ -229,9 +232,11 @@ def test_finished_child_exits_on_its_own(monkeypatch: pytest.MonkeyPatch, work: 
 
 
 def test_child_log_is_forwarded_to_parent_logger(caplog: pytest.LogCaptureFixture) -> None:
-    work = partial(fixtures.log_then_yield, 'hello from the child', _minimal_product())
+    work = partial(
+        reconstructor_fixtures.log_then_yield, 'hello from the child', _minimal_product()
+    )
 
-    with caplog.at_level(logging.WARNING, logger=fixtures.__name__):
+    with caplog.at_level(logging.WARNING, logger=reconstructor_fixtures.__name__):
         outputs = list(iterate_in_subprocess(work))
 
     assert len(outputs) == 1

@@ -6,6 +6,7 @@ streamed scan must give exactly what the same patterns give in one batch pass.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 from functools import cache
 from pathlib import Path
@@ -457,16 +458,13 @@ class _Clock:
 
 
 class _Recorder:
-    """Records what the pipeline publishes, optionally taking its time over it."""
+    """Records what the pipeline publishes."""
 
-    def __init__(self, *, delay_s: float = 0.0) -> None:
+    def __init__(self) -> None:
         self.events: list[tuple[str, object]] = []
-        self.delay_s = delay_s
         self.lock = threading.Lock()
 
     def publish_estimate(self, product: Product) -> None:
-        time.sleep(self.delay_s)
-
         with self.lock:
             self.events.append(('estimate', product.metadata.name))
 
@@ -476,6 +474,39 @@ class _Recorder:
 
     def reports(self) -> list[ScanReport]:
         return [event for kind, event in self.events if isinstance(event, ScanReport)]
+
+    def estimate_names(self) -> list[str]:
+        with self.lock:
+            return [str(event) for kind, event in self.events if kind == 'estimate']
+
+
+class _HoldingRecorder(_Recorder):
+    """Holds the worker in its first publish until released, so the worker is busy on cue."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.holding = threading.Event()
+        self.release = threading.Event()
+
+    def publish_estimate(self, product: Product) -> None:
+        if not self.holding.is_set():
+            self.holding.set()
+            self.release.wait(timeout=60.0)
+
+        super().publish_estimate(product)
+
+
+def _wait_until(predicate: Callable[[], bool], *, timeout_s: float = 60.0) -> bool:
+    """Poll *predicate* until it holds or *timeout_s* passes; return whether it held."""
+    deadline_s = time.monotonic() + timeout_s
+
+    while not predicate():
+        if time.monotonic() > deadline_s:
+            return False
+
+        time.sleep(0.005)
+
+    return True
 
 
 def _submit_scan(
@@ -534,14 +565,16 @@ def test_the_settle_is_decided_by_arrival_even_when_ingest_is_backlogged() -> No
 
 
 def test_a_trigger_during_a_write_is_not_lost(tmp_path: Path) -> None:
-    recorder = _Recorder()
+    """The second scan and its trigger arrive while the worker is held finishing the first."""
+    recorder = _HoldingRecorder()
     pipeline, acknowledged = _pipeline(recorder, output_directory=str(tmp_path), settle_s=0.1)
     pipeline.start()
     _submit_scan(pipeline, range(0, 361))
     pipeline.trigger()
-    time.sleep(0.3)
+    assert recorder.holding.wait(timeout=60.0), 'the first scan never reached the worker'
     _submit_scan(pipeline, range(0, 361), offset=1000)
     pipeline.trigger()
+    recorder.release.set()
     pipeline.stop(timeout_s=120.0)
 
     reports = recorder.reports()
@@ -577,7 +610,8 @@ def test_frames_still_unpaired_at_the_cut_are_dropped_and_counted() -> None:
     pipeline.trigger()
     clock.now = 5.0
     pipeline.start()
-    time.sleep(0.2)
+    # The settle has expired, so ingest cuts on its own; a stop would cut too.
+    assert _wait_until(lambda: pipeline.get_counters()['num_frames_dropped'] > 0)
     pipeline.stop(timeout_s=120.0)
 
     (report,) = recorder.reports()
@@ -632,11 +666,12 @@ def test_publishes_are_ordered_and_failures_are_counted(tmp_path: Path) -> None:
     )
     pipeline.start()
     _submit_scan(pipeline, range(0, 361))
-    time.sleep(0.5)
+    # Order means something only once an in-progress estimate precedes the final one.
+    assert _wait_until(lambda: 'scan in progress' in recorder.estimate_names())
     pipeline.trigger()
     pipeline.stop(timeout_s=120.0)
 
-    names = [str(event) for kind, event in recorder.events if kind == 'estimate']
+    names = recorder.estimate_names()
     scan_at = next(k for k, (kind, _) in enumerate(recorder.events) if kind == 'scan')
     assert names[-1].startswith('scan ') and names[-1] != 'scan in progress'
     assert all(kind != 'estimate' for kind, _ in recorder.events[scan_at:])
@@ -752,7 +787,6 @@ def test_positions_before_the_first_frame_are_kept_and_index_anomalies_counted()
     indexes, patterns = _frames()
     pipeline.submit_positions(_position_updates())
     pipeline.start()
-    time.sleep(0.1)
 
     for k in (5, 6, 6, 3, 7):
         pipeline.submit_frame(int(indexes[k]), patterns[k])

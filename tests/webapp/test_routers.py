@@ -12,8 +12,6 @@ import pytest
 from ptychodus.api.processing import RunState, create_run_record
 from ptychodus.webapp.ingest.pipeline import ingest_manifest
 
-pytestmark = pytest.mark.asyncio
-
 
 async def _ingest(
     client, db_engine: AsyncEngine, layout: StorageLayout, manifest_path: Path

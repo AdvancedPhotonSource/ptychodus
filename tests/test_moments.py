@@ -172,7 +172,8 @@ def test_subtracting_the_floor_removes_a_pedestal_and_keeps_the_signal() -> None
 
     cleaned, statistics = subtract_noise_floor(pattern)
 
-    assert statistics.median == pytest.approx(50.0, abs=2.0)
+    # The median of integer counts is an integer; its standard error here is 0.07.
+    assert statistics.median == pytest.approx(50.0, abs=1.0)
     outside = cleaned[numpy.hypot(x, y) > 25.0].sum()
     inside = cleaned[numpy.hypot(x, y) < 15.0].sum()
     assert outside < 1.0e-3 * inside
@@ -203,7 +204,8 @@ def test_a_masked_pixel_stays_out_of_the_noise_statistics() -> None:
 
     _, masked = estimate_filtered_noise_floor(pattern, bad_pixels=bad_pixels)
 
-    assert masked.median == pytest.approx(10.0, abs=0.5)
+    # The median of 3584 unit normals has a standard error of 0.02.
+    assert masked.median == pytest.approx(10.0, abs=0.1)
 
 
 def test_subtracting_the_floor_rejects_a_negative_margin() -> None:

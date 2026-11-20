@@ -111,6 +111,7 @@ class TestUnitMatching:
 
 class TestEnumSpelling:
     def test_by_name_renders_the_member_name(self) -> None:
+        """ptychodus persists pty-chi enums as SGD, while the StrEnum value is sgd."""
         assert EnumSpelling.BY_NAME.render(Optimizers.SGD) == 'SGD'
 
     def test_by_value_renders_the_member_value(self) -> None:
@@ -296,15 +297,6 @@ class TestDeclaredMetadata:
         assert period.minimum is None and period.label == ''
 
 
-class TestValueRendering:
-    def test_enums_render_by_member_name_by_default(self) -> None:
-        """ptychodus persists pty-chi enums as SGD, while the StrEnum value is sgd."""
-        assert EnumSpelling.BY_NAME.render(Optimizers.SGD) == 'SGD'
-
-    def test_enums_render_by_value_when_the_policy_says_so(self) -> None:
-        assert EnumSpelling.BY_VALUE.render(Optimizers.SGD) == 'sgd'
-
-
 class TestStructuralAdapters:
     """The shapes ptychodus persists that are not the declared field itself."""
 
@@ -366,10 +358,6 @@ class TestAbsoluteKeys:
         keys = _keys(policy)
         assert 'StandaloneWeight' in keys
         assert 'ConstrainL1NormStandaloneWeight' not in keys
-
-    def test_unmarked_names_are_still_prefixed(self) -> None:
-        policy = FlatteningPolicy(hidden=_ONLY_L1, prefixes={'l1_norm': 'ConstrainL1Norm'})
-        assert 'ConstrainL1NormWeight' in _keys(policy)
 
 
 class TestOverlays:

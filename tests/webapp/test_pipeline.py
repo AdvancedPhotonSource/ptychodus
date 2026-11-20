@@ -9,15 +9,11 @@ from uuid import UUID
 
 import json
 
-import pytest
 
 from ptychodus.api.processing import RunState, create_run_record
 from ptychodus.webapp.db import repositories as repo
 from ptychodus.webapp.db.base import IngestState
 from ptychodus.webapp.ingest.pipeline import delete_manifest, ingest_manifest
-
-
-pytestmark = pytest.mark.asyncio
 
 
 async def test_ingest_diffraction_valid(

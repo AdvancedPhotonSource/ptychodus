@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from uuid import uuid4
 
 from sqlalchemy import inspect, select, text
@@ -35,7 +34,6 @@ def _database_url(tmp_path: Path) -> str:
     return f'sqlite+aiosqlite:///{tmp_path / "metadata.db"}'
 
 
-@pytest.mark.asyncio
 async def test_missing_column_rebuilds_the_table(tmp_path: Path) -> None:
     """Simulate a cache written before the column existed, then reopen it."""
     engine = create_engine(_database_url(tmp_path))
@@ -52,7 +50,6 @@ async def test_missing_column_rebuilds_the_table(tmp_path: Path) -> None:
     await engine.dispose()
 
 
-@pytest.mark.asyncio
 async def test_reopening_a_current_database_preserves_rows(tmp_path: Path) -> None:
     """The rebuild must trigger on drift only -- never on every start."""
     engine = create_engine(_database_url(tmp_path))

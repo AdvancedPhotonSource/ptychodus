@@ -1615,6 +1615,7 @@ class TestGenerateKbMirrorProbe:
         # At its own waist each axis reaches the uniform-slit limit for its aperture.
         expected_m = _SINC_FWHM_FACTOR * _KB_WAVELENGTH_M / (2.0 * 1.5e-3)
 
+        # Read off a grid whose pitch is a tenth of the focus, the FWHM is a few % off.
         assert min(widths_x) == pytest.approx(expected_m, rel=0.08)
         assert min(widths_y) == pytest.approx(expected_m, rel=0.08)
 

@@ -25,7 +25,6 @@ from ptychodus.webapp.db.session import SessionProvider
 from ptychodus.webapp.ingest.pipeline import ingest_manifest
 from ptychodus.webapp.rendering.schemas import PlotImageInfo, RenderedImageInfo
 
-pytestmark = pytest.mark.asyncio
 
 _API = '/api/v1'
 

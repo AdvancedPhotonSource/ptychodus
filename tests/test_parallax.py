@@ -123,6 +123,7 @@ def test_capping_the_bins_still_recovers_the_defocus_with_its_sign(defocus_m: fl
 
     assert estimate is not None
     assert estimate.num_bins <= 12
+    # A bright field sampled in 12 bins puts the fit about 3% off.
     assert estimate.defocus_distance_m == pytest.approx(defocus_m, rel=0.06)
     assert estimate.is_resolved()
 

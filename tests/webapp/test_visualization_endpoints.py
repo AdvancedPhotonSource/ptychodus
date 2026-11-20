@@ -16,8 +16,6 @@ from PIL import Image
 from ptychodus.api.processing import RunState, create_run_record
 from ptychodus.webapp.ingest.pipeline import ingest_manifest
 
-pytestmark = pytest.mark.asyncio
-
 
 async def _ingest(db_engine: AsyncEngine, layout: StorageLayout, manifest_path: Path) -> None:
     from sqlalchemy.ext.asyncio import async_sessionmaker

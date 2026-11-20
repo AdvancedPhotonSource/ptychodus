@@ -71,10 +71,10 @@ class TestEstimateProbeSize:
 
         numpy.testing.assert_allclose(metrics.rms_major_axis_length_m, expected_2sigma, rtol=0.02)
         numpy.testing.assert_allclose(metrics.rms_minor_axis_length_m, expected_2sigma, rtol=0.02)
-        numpy.testing.assert_allclose(metrics.fwhm_major_axis_length_m, expected_fwhm, rtol=0.05)
-        numpy.testing.assert_allclose(metrics.fwhm_minor_axis_length_m, expected_fwhm, rtol=0.05)
+        numpy.testing.assert_allclose(metrics.fwhm_major_axis_length_m, expected_fwhm, rtol=0.02)
+        numpy.testing.assert_allclose(metrics.fwhm_minor_axis_length_m, expected_fwhm, rtol=0.02)
         numpy.testing.assert_allclose(
-            metrics.encircled_energy_diameter_m, expected_encircled, rtol=0.05
+            metrics.encircled_energy_diameter_m, expected_encircled, rtol=0.02
         )
 
     def test_rms_and_fwhm_share_full_width_scale(self) -> None:
@@ -106,7 +106,7 @@ class TestEstimateProbeSize:
             metrics.rms_minor_axis_length_m, 2.0 * sigma_minor_px * PIXEL_M, rtol=0.02
         )
 
-        numpy.testing.assert_allclose(metrics.major_axis_tilt_rad, tilt, atol=0.05)
+        numpy.testing.assert_allclose(metrics.major_axis_tilt_rad, tilt, atol=1.0e-4)
         # Minor axis is perpendicular to major: |sin(major - minor)| ~ 1.
         delta = metrics.major_axis_tilt_rad - metrics.minor_axis_tilt_rad
         numpy.testing.assert_allclose(abs(numpy.sin(delta)), 1.0, atol=0.02)
@@ -128,12 +128,12 @@ class TestEstimateProbeSize:
         expected_fwhm = radius_px * numpy.sqrt(3.0) * PIXEL_M
         expected_encircled = 2.0 * radius_px * numpy.sqrt(0.8) * PIXEL_M
 
-        numpy.testing.assert_allclose(metrics.rms_major_axis_length_m, expected_2sigma, rtol=0.05)
-        numpy.testing.assert_allclose(metrics.rms_minor_axis_length_m, expected_2sigma, rtol=0.05)
-        numpy.testing.assert_allclose(metrics.fwhm_major_axis_length_m, expected_fwhm, rtol=0.05)
-        numpy.testing.assert_allclose(metrics.fwhm_minor_axis_length_m, expected_fwhm, rtol=0.05)
+        numpy.testing.assert_allclose(metrics.rms_major_axis_length_m, expected_2sigma, rtol=0.01)
+        numpy.testing.assert_allclose(metrics.rms_minor_axis_length_m, expected_2sigma, rtol=0.01)
+        numpy.testing.assert_allclose(metrics.fwhm_major_axis_length_m, expected_fwhm, rtol=0.01)
+        numpy.testing.assert_allclose(metrics.fwhm_minor_axis_length_m, expected_fwhm, rtol=0.01)
         numpy.testing.assert_allclose(
-            metrics.encircled_energy_diameter_m, expected_encircled, rtol=0.05
+            metrics.encircled_energy_diameter_m, expected_encircled, rtol=0.01
         )
 
     def test_uniform_disk_rms_to_fwhm_ratio(self) -> None:
@@ -150,7 +150,7 @@ class TestEstimateProbeSize:
         metrics = estimate_probe_size(disk, PIXEL_GEOMETRY)
 
         ratio = metrics.rms_major_axis_length_m / metrics.fwhm_major_axis_length_m
-        numpy.testing.assert_allclose(ratio, 1.0 / numpy.sqrt(3.0), rtol=0.05)
+        numpy.testing.assert_allclose(ratio, 1.0 / numpy.sqrt(3.0), rtol=1.0e-3)
 
     def test_elliptical_disk_round_trip(self) -> None:
         """For an axis-aligned uniform ellipse with semi-axes a >= b: the variance
@@ -168,9 +168,10 @@ class TestEstimateProbeSize:
         metrics = estimate_probe_size(ellipse, PIXEL_GEOMETRY)
 
         assert metrics.rms_major_axis_length_m > metrics.rms_minor_axis_length_m
-        numpy.testing.assert_allclose(metrics.rms_major_axis_length_m, a_px * PIXEL_M, rtol=0.05)
-        numpy.testing.assert_allclose(metrics.rms_minor_axis_length_m, b_px * PIXEL_M, rtol=0.05)
-        numpy.testing.assert_allclose(metrics.major_axis_tilt_rad, 0.0, atol=0.05)
+        numpy.testing.assert_allclose(metrics.rms_major_axis_length_m, a_px * PIXEL_M, rtol=0.01)
+        numpy.testing.assert_allclose(metrics.rms_minor_axis_length_m, b_px * PIXEL_M, rtol=0.01)
+        # An axis-aligned ellipse is symmetric, so its tilt is zero up to roundoff.
+        numpy.testing.assert_allclose(metrics.major_axis_tilt_rad, 0.0, atol=1.0e-9)
 
     @pytest.mark.parametrize('peak', [300.0, 2000.0])
     def test_noisy_gaussian_over_a_pedestal_keeps_its_widths(self, peak: float) -> None:
@@ -640,7 +641,8 @@ class TestComputePhaseDeviation:
 
         deviation = compute_phase_deviation_rad(wavefield)
 
-        numpy.testing.assert_allclose(deviation, 0.05, rtol=0.1)
+        # The sample deviation of 4096 draws has a relative standard error of 1/sqrt(8192).
+        numpy.testing.assert_allclose(deviation, 0.05, rtol=0.05)
         assert numpy.std(numpy.angle(wavefield)) > 3.0  # what the naive approach reports
 
     def test_is_dominated_by_the_bright_pixels(self) -> None:
@@ -771,7 +773,8 @@ class TestComputeProbeFocusCurves:
         plane = curves.get_focal_plane(ProbeFocusMetric.RMS_MAJOR)
 
         assert ProbeFocusMetric.RMS_MAJOR.si_unit == 'm'
-        numpy.testing.assert_allclose(plane.value, 8.0 * PIXEL_M, rtol=0.05)
+        # A sampled waist reads within a fraction of a percent of w.
+        numpy.testing.assert_allclose(plane.value, 8.0 * PIXEL_M, rtol=5.0e-3)
 
     def test_get_series_and_get_focal_plane_reject_an_unsampled_metric(self) -> None:
         curves = compute_probe_focus_curves(_caustic_probe(0.0))

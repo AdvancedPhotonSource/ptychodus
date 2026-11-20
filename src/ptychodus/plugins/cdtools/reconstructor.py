@@ -200,12 +200,14 @@ def _build_dataset(input_: ReconstructInput, frame: CDToolsFrame) -> Any:
     import torch
     from cdtools.datasets import Ptycho2DDataset
 
+    # Arrays, not tensors, for what the dataset copies with torch.tensor: the
+    # translations and the mask.
     return Ptycho2DDataset(
-        torch.as_tensor(frame.translations, dtype=torch.float32),
+        numpy.asarray(frame.translations, dtype=numpy.float32),
         torch.as_tensor(input_.diffraction_patterns, dtype=torch.float32),
         wavelength=frame.wavelength_m,
         detector_geometry=frame.get_detector_geometry(),
-        mask=torch.as_tensor(numpy.logical_not(input_.bad_pixels)),
+        mask=numpy.logical_not(input_.bad_pixels),
     )
 
 

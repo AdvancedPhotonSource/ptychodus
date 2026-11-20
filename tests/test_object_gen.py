@@ -1247,6 +1247,7 @@ class TestSiemensStarAntialiasing:
         # The disk spans half as many rows as columns when rows are twice as tall.
         rows = numpy.flatnonzero((tall.real < 0.999).any(axis=1))
         columns = numpy.flatnonzero((tall.real < 0.999).any(axis=0))
+        # Extents are whole pixels, so half an odd count is a pixel off either way.
         assert (rows[-1] - rows[0] + 1) == pytest.approx(
             0.5 * (columns[-1] - columns[0] + 1), abs=1
         )

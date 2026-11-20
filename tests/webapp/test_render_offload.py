@@ -34,7 +34,6 @@ class _SlowRender:
         return value * 2
 
 
-@pytest.mark.asyncio
 async def test_renders_run_off_the_event_loop_within_the_cap() -> None:
     runner = RenderRunner(2)
     render = _SlowRender()
@@ -46,7 +45,6 @@ async def test_renders_run_off_the_event_loop_within_the_cap() -> None:
     assert threading.get_ident() not in render.threads
 
 
-@pytest.mark.asyncio
 async def test_the_loop_answers_while_a_render_runs() -> None:
     runner = RenderRunner(1)
     render = _SlowRender()
@@ -57,7 +55,6 @@ async def test_the_loop_answers_while_a_render_runs() -> None:
     assert await task == 2
 
 
-@pytest.mark.asyncio
 async def test_an_error_reaches_the_caller() -> None:
     with pytest.raises(ZeroDivisionError):
         await RenderRunner(1).run(divmod, 1, 0)

@@ -200,6 +200,7 @@ class TestComputeFourierRingCorrelation:
 
         null_bias = 0.886 / numpy.sqrt(num_pixels)
         assert abs(signed.mean()) < 0.4 * null_bias
+        # A Rayleigh modulus has CV 0.52, so 64 realizations give the mean to 0.065.
         assert modulus.mean() == pytest.approx(null_bias, rel=0.25)
 
     def test_apodization_suppresses_shared_edge_leakage(self):
@@ -297,7 +298,8 @@ class TestPowerSpectralDensity:
                 psd.power_spectral_density_m2[populated] * psd.pixels_per_ring[populated]
             )
 
-        assert integrate(tapered) == pytest.approx(integrate(plain), rel=0.1)
+        # Normalized by the window power, the taper keeps the integral within a few percent.
+        assert integrate(tapered) == pytest.approx(integrate(plain), rel=0.05)
 
     def test_white_noise_spectrum_is_flat(self):
         rng = numpy.random.default_rng(23)
@@ -910,6 +912,7 @@ class TestComputeNormalizedMutualInformation:
         a = rng.standard_normal((128, 128))
         b = rng.standard_normal((128, 128))
         nmi = compute_normalized_mutual_information(a, b)
+        # The 100-bin histogram estimate lifts independent 128x128 arrays to about 1.02.
         assert nmi == pytest.approx(1.0, abs=0.05)
 
     def test_invariant_to_affine_remapping(self) -> None:

@@ -150,11 +150,12 @@ def test_a_device_carries_a_name_a_person_can_choose_between() -> None:
 # --- the probe itself --------------------------------------------------------
 
 
-def _probed_devices() -> list[Device]:
-    """Every probed device, CPU first."""
+@pytest.fixture(scope='module')
+def probed_devices() -> tuple[Device, ...]:
+    """Every probed device, CPU first, asked once: each probe spawns a child."""
     from ptychodus.api.devices import probe_devices
 
-    return list(probe_devices())
+    return tuple(probe_devices())
 
 
 def test_a_machine_without_torch_still_has_one_device(
@@ -173,9 +174,11 @@ def test_a_machine_without_torch_still_has_one_device(
     assert 'fail' not in caplog.text.lower()
 
 
-def test_the_probe_offers_a_cpu_whatever_the_machine_has() -> None:
+def test_the_probe_offers_a_cpu_whatever_the_machine_has(
+    probed_devices: tuple[Device, ...],
+) -> None:
     """So a bare install can still say where a run should go."""
-    assert _probed_devices()[0] == CPU
+    assert probed_devices[0] == CPU
 
 
 def test_a_probe_that_fails_still_reports_the_cpu(
@@ -193,9 +196,9 @@ def test_a_probe_that_fails_still_reports_the_cpu(
     assert 'raised in the parent' in caplog.text
 
 
-def _probed_gpus() -> list[Device]:
+def _probed_gpus(probed_devices: tuple[Device, ...]) -> list[Device]:
     pytest.importorskip('torch')
-    gpus = [d for d in _probed_devices() if d.identifier != CPU.identifier]
+    gpus = [d for d in probed_devices if d.identifier != CPU.identifier]
 
     if len(gpus) < 2:
         pytest.skip(f'Needs two or more GPUs to verify a restriction; probed {len(gpus)}.')
@@ -242,16 +245,16 @@ def _cuda_uuids(environment: dict[str, str]) -> list[str]:
     return uuids
 
 
-def test_a_restriction_reaches_the_child_and_not_merely_the_environment() -> None:
+def test_a_restriction_reaches_the_child_and_not_merely_the_environment(
+    probed_devices: tuple[Device, ...],
+) -> None:
     """Checked by UUID, because two cards of one model are not told apart by name.
 
     Asking the restricted child what it sees is the point: that the variable was
     set says nothing about whether the runtime read it, and it is read once.
     """
-    from ptychodus.api.devices import visibility_environment
-
-    gpus = _probed_gpus()
-    available = [d.identifier for d in _probed_devices()]
+    gpus = _probed_gpus(probed_devices)
+    available = [d.identifier for d in probed_devices]
     everything = _cuda_uuids({})
     assert len(everything) == len(gpus)
 
@@ -261,12 +264,12 @@ def test_a_restriction_reaches_the_child_and_not_merely_the_environment() -> Non
         assert seen == [everything[index]], f'{device.identifier} under {environment} saw {seen}.'
 
 
-def test_choosing_the_cpu_leaves_a_child_no_gpu_at_all() -> None:
+def test_choosing_the_cpu_leaves_a_child_no_gpu_at_all(
+    probed_devices: tuple[Device, ...],
+) -> None:
     """The whole point of listing the CPU: it is how a run says 'not on a GPU'."""
-    from ptychodus.api.devices import visibility_environment
-
-    _probed_gpus()
-    available = [d.identifier for d in _probed_devices()]
+    _probed_gpus(probed_devices)
+    available = [d.identifier for d in probed_devices]
     environment = visibility_environment([CPU.identifier], available, environ={})
 
     assert _cuda_uuids(environment) == []

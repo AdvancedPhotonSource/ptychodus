@@ -217,7 +217,8 @@ def test_the_probe_comes_back_in_ptychodus_gauge() -> None:
     parameters = make_input()
     outputs = _run(parameters, _short_options())
     power_in = float(numpy.sum(numpy.abs(parameters.product.probes.get_array()) ** 2))
-    assert _probe_power(outputs[-1]) == pytest.approx(power_in, rel=0.05)
+    # A short run moves the probe power under 1%; a gauge error would be a factor.
+    assert _probe_power(outputs[-1]) == pytest.approx(power_in, rel=0.02)
 
 
 def test_what_is_not_refined_comes_back_unchanged() -> None:

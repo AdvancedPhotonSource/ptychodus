@@ -107,6 +107,7 @@ def test_a_resolved_parallax_sets_the_focus_position(defocus_m: float) -> None:
     [(estimate, applied)] = results
     assert applied
     assert estimate is not None
+    # The parallax fit to the fixture's sampled bright field is about 3% off.
     assert estimate.defocus_distance_m == pytest.approx(defocus_m, rel=0.06)
     focus = item.get_metadata_item.return_value.focus_object_distance_m
     focus.set_value.assert_called_once_with(-estimate.defocus_distance_m)

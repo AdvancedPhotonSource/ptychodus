@@ -21,8 +21,6 @@ from ptychodus.webapp.ingest import watcher as watcher_module
 from ptychodus.webapp.ingest.pipeline import ingest_manifest
 from ptychodus.webapp.ingest.watcher import ManifestWatcher
 
-pytestmark = pytest.mark.asyncio
-
 
 async def _wait_until(predicate, *, timeout: float = 8.0, interval: float = 0.2):
     """Poll `predicate` (async callable) until truthy or timeout."""

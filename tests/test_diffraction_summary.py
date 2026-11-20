@@ -64,8 +64,8 @@ def test_inpaint_pattern_replaces_bad_positions_and_preserves_good() -> None:
     # not left as the extreme sentinels.
     assert result[3, 3] != pytest.approx(1.0e9)
     assert result[4, 4] != pytest.approx(-1.0e9)
-    assert result[3, 3] == pytest.approx(5.0, abs=1.0)
-    assert result[4, 4] == pytest.approx(5.0, abs=1.0)
+    assert result[3, 3] == pytest.approx(5.0)
+    assert result[4, 4] == pytest.approx(5.0)
 
 
 def test_inpaint_zeroes_a_bad_region_that_touches_the_border() -> None:
@@ -144,7 +144,8 @@ def test_inpaint_patterns_replaces_bad_positions_and_preserves_good() -> None:
 
     good = numpy.logical_not(bad)
     numpy.testing.assert_array_equal(result[:, good], patterns[:, good])
-    assert result[:, 3, 3] == pytest.approx(5.0, abs=1.0)
+    # Inpainting reproduces a constant field exactly.
+    assert result[:, 3, 3] == pytest.approx(5.0)
 
 
 @pytest.mark.parametrize('dtype', [numpy.uint16, numpy.int32, numpy.float32, numpy.float64])
