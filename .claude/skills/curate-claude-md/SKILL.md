@@ -7,7 +7,7 @@ description: Audit CLAUDE.md and .claude/skills/*/SKILL.md for drift against the
 
 CLAUDE.md and every `SKILL.md` description load into context on every turn, so each word costs tokens on every request and each stale claim misleads every session until someone notices. This skill audits both, reports `file:line` per finding with a proposed fix, and applies nothing without asking.
 
-Scope is [CLAUDE.md](../../CLAUDE.md) and [.claude/skills/](../../.claude/skills/). `README.md` and `docs/source/` belong to `pre-release` §4a, §5 and §5.5 — do not duplicate those checks here.
+Scope is [CLAUDE.md](../../../CLAUDE.md) and [.claude/skills/](../../../.claude/skills/). `README.md` and `docs/source/` belong to `pre-release` §4a, §5 and §5.5 — do not duplicate those checks here.
 
 ## What belongs in CLAUDE.md
 

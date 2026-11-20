@@ -75,8 +75,7 @@ Supported facility names are:
 python get_globus_token.py --print-token
 ```
 
-Use this only when needed, since terminal logs/history may expose tokens.
-The printed tokens correspond to the selected facilities. By default that means the NERSC IRI API token and the ALCF IRI API token.
+Use this only when needed, since terminal logs/history may expose tokens. The printed tokens correspond to the selected facilities. By default that means the NERSC IRI API token and the ALCF IRI API token.
 
 ## Force a new interactive login
 
@@ -92,8 +91,7 @@ This skips refresh and always performs browser auth.
 python get_globus_token.py --force-login --prompt-login
 ```
 
-This adds `prompt=login` to the Globus authorization URL so Globus forces a fresh login at the identity provider instead of reusing an existing browser session.
-This is useful when the server side shows an empty `session_info.authentications` object or when the IRI API returns `401` with a token that otherwise looks valid.
+This adds `prompt=login` to the Globus authorization URL so Globus forces a fresh login at the identity provider instead of reusing an existing browser session. This is useful when the server side shows an empty `session_info.authentications` object or when the IRI API returns `401` with a token that otherwise looks valid.
 
 ## Refresh saved tokens only
 
@@ -101,9 +99,7 @@ This is useful when the server side shows an empty `session_info.authentications
 python get_globus_token.py --refresh-only
 ```
 
-This attempts to refresh saved tokens without opening a browser login flow.
-It refreshes the top-level Globus Auth token when possible and also refreshes the selected facility tokens from `other_tokens` when their refresh tokens are available.
-If refresh is not possible, or if refresh does not return all requested facility tokens, the script exits with an error instead of starting interactive login.
+This attempts to refresh saved tokens without opening a browser login flow. It refreshes the top-level Globus Auth token when possible and also refreshes the selected facility tokens from `other_tokens` when their refresh tokens are available. If refresh is not possible, or if refresh does not return all requested facility tokens, the script exits with an error instead of starting interactive login.
 
 ## Validate the NERSC IRI token
 
@@ -113,12 +109,11 @@ python get_globus_token.py --validate-iri
 
 This calls:
 
-```sh
+```text
 GET https://api.iri.nersc.gov/api/v1/account/projects
 ```
 
-with the NERSC IRI access token from `other_tokens`.
-If the response includes `session_info.authentications: {}`, the script treats that as a bad session and exits with guidance to re-run using `--force-login --prompt-login`.
+with the NERSC IRI access token from `other_tokens`. If the response includes `session_info.authentications: {}`, the script treats that as a bad session and exits with guidance to re-run using `--force-login --prompt-login`.
 
 `--validate-iri` requires that `nersc` is included in `--facilities`.
 

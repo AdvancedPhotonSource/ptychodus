@@ -5,19 +5,19 @@ description: Add a navigation-bar icon to ptychodus in both the PyQt GUI and the
 
 # add-nav-icon
 
-Ptychodus has two navigation surfaces that share icon assets: the PyQt5 toolbar in `ViewCore` and the browser nav bar in `ptychodus.webapp`. SVGs live once in [`src/ptychodus/webapp/ui/icons/`](../../src/ptychodus/webapp/ui/icons/); the PyQt side pulls them in via a Qt resource file compiled to `resources.py`, and the web UI pulls them straight from the FastAPI static mount. This skill wires a new icon through both.
+Ptychodus has two navigation surfaces that share icon assets: the PyQt5 toolbar in `ViewCore` and the browser nav bar in `ptychodus.webapp`. SVGs live once in [`src/ptychodus/webapp/ui/icons/`](../../../src/ptychodus/webapp/ui/icons/); the PyQt side pulls them in via a Qt resource file compiled to `resources.py`, and the web UI pulls them straight from the FastAPI static mount. This skill wires a new icon through both.
 
 ## Step 1 — Add the SVG
 
-Drop the SVG into [`src/ptychodus/webapp/ui/icons/`](../../src/ptychodus/webapp/ui/icons/). Do not put icons anywhere else — the `.qrc` file uses a relative path (`../webapp/ui/icons/…`) to reach exactly this directory.
+Drop the SVG into [`src/ptychodus/webapp/ui/icons/`](../../../src/ptychodus/webapp/ui/icons/). Do not put icons anywhere else — the `.qrc` file uses a relative path (`../webapp/ui/icons/…`) to reach exactly this directory.
 
 - Kebab-case filename (e.g. `my-icon.svg`).
 - `fill="currentColor"` so CSS themes work.
-- Font Awesome 7.1.0 (CC BY 4.0) is the house style. See [`icons/Font-Awesome-LICENSE.txt`](../../src/ptychodus/webapp/ui/icons/Font-Awesome-LICENSE.txt) for attribution and [`icons/README.md`](../../src/ptychodus/webapp/ui/icons/README.md) for the update procedure.
+- Font Awesome 7.1.0 (CC BY 4.0) is the house style. See [`icons/Font-Awesome-LICENSE.txt`](../../../src/ptychodus/webapp/ui/icons/Font-Awesome-LICENSE.txt) for attribution and [`icons/README.md`](../../../src/ptychodus/webapp/ui/icons/README.md) for the update procedure.
 
 ## Step 2 — Register in the Qt resource file
 
-Add one line to [`src/ptychodus/view/resources.qrc`](../../src/ptychodus/view/resources.qrc), keeping the list alphabetized by `alias`:
+Add one line to [`src/ptychodus/view/resources.qrc`](../../../src/ptychodus/view/resources.qrc), keeping the list alphabetized by `alias`:
 
 ```xml
 <file alias="my-feature">../webapp/ui/icons/my-icon.svg</file>
@@ -52,11 +52,11 @@ def qCleanupResources() -> None:  # noqa: N802
 qInitResources()
 ```
 
-Two edits per function: append `-> None` to the signature and `# noqa: N802` to the same line. Leave the `WARNING! All changes made in this file will be lost!` header — the noqa comments and return annotations are the only manual patches, and this pattern must survive every regeneration. (The import site at [`view/core.py:30`](../../src/ptychodus/view/core.py#L30) uses `from . import resources  # noqa` for the same reason — it's imported for side effects.)
+Two edits per function: append `-> None` to the signature and `# noqa: N802` to the same line. Leave the `WARNING! All changes made in this file will be lost!` header — the noqa comments and return annotations are the only manual patches, and this pattern must survive every regeneration. (The import site at [`view/core.py:30`](../../../src/ptychodus/view/core.py#L30) uses `from . import resources  # noqa` for the same reason — it's imported for side effects.)
 
 ## Step 4 — Wire it into `ViewCore`
 
-Add a call to `self.navigation.add_panel(...)` in [`src/ptychodus/view/core.py`](../../src/ptychodus/view/core.py) `ViewCore.__init__`. Order matters — **the sequence of `add_panel` calls is the source of truth for the left/right stacked-panel indexes** (per CLAUDE.md). Mirror the fluorescence pattern at [`view/core.py:298-305`](../../src/ptychodus/view/core.py#L298-L305):
+Add a call to `self.navigation.add_panel(...)` in [`src/ptychodus/view/core.py`](../../../src/ptychodus/view/core.py) `ViewCore.__init__`. Order matters — **the sequence of `add_panel` calls is the source of truth for the left/right stacked-panel indexes** (per CLAUDE.md). Mirror the fluorescence pattern at [`view/core.py:298-305`](../../../src/ptychodus/view/core.py#L298-L305):
 
 ```python
 self.my_feature_view = MyFeatureView()
@@ -69,13 +69,13 @@ self.my_feature_action = self.navigation.add_panel(
 )
 ```
 
-If the new panel belongs nested under a parent (Products or Processing today), add its action to the existing `add_subview_group` call at [`view/core.py:325-342`](../../src/ptychodus/view/core.py#L325-L342). Otherwise it renders as a top-level toolbar button.
+If the new panel belongs nested under a parent (Products or Processing today), add its action to the existing `add_subview_group` call at [`view/core.py:325-342`](../../../src/ptychodus/view/core.py#L325-L342). Otherwise it renders as a top-level toolbar button.
 
 `ControllerCore` uses stacked-widget indexes matching `ViewCore`'s `add_panel` order — inserting a panel in the middle shifts every downstream index. Prefer appending, or run the app afterward and confirm nothing underneath shifted.
 
 ## Step 5 — Wire it into the web UI
 
-Add one entry to the `NAV` array in [`src/ptychodus/webapp/ui/src/nav.ts`](../../src/ptychodus/webapp/ui/src/nav.ts):
+Add one entry to the `NAV` array in [`src/ptychodus/webapp/ui/src/nav.ts`](../../../src/ptychodus/webapp/ui/src/nav.ts):
 
 ```typescript
 { route: 'my-feature', label: 'My Label', icon: 'my-icon.svg' },
@@ -96,7 +96,7 @@ Entries present in `ViewCore` but deliberately absent here are the panels that w
 
 Routing is keyed by `route`, and `main.ts` walks the tree, so a nested entry needs a `PAGES` entry exactly like a top-level one.
 
-The webapp needs no router change. FastAPI already serves `src/ptychodus/webapp/ui/` at `/ui/` via the `StaticFiles` mount in [`src/ptychodus/webapp/app.py`](../../src/ptychodus/webapp/app.py), so a new SVG in `ui/icons/` is automatically reachable at `/ui/icons/my-icon.svg`.
+The webapp needs no router change. FastAPI already serves `src/ptychodus/webapp/ui/` at `/ui/` via the `StaticFiles` mount in [`src/ptychodus/webapp/app.py`](../../../src/ptychodus/webapp/app.py), so a new SVG in `ui/icons/` is automatically reachable at `/ui/icons/my-icon.svg`.
 
 ## Step 6 — Rebuild the TypeScript
 

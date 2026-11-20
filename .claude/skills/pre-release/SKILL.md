@@ -271,22 +271,124 @@ Covered by 4a: `extras` also reads `--extra <name>`, so README's `uv sync` lines
 
 ### Section 5.5 — Markdown hygiene
 
-Docs are MyST Markdown; no reStructuredText should reappear, and every tracked `.md` must satisfy the house style codified in `CLAUDE.md`.
+Docs are MyST Markdown; no reStructuredText should reappear, and every tracked `.md` must satisfy the house style codified in `CLAUDE.md`. `pymarkdown` enforces the rules it has, pinned in `[tool.pymarkdown]`; a scan enforces the rest.
 
 ```sh
 # No stray reStructuredText anywhere in the repo:
 git ls-files '*.rst'
 
-# House style, mechanically enforced:
+# House style that pymarkdown checks:
 uv run pymarkdown scan $(git ls-files '*.md')
-
-# Shell fences use `sh`, not `bash`:
-git ls-files '*.md' | xargs grep -l '^```bash'
 ```
 
-`PASS` if the first and third commands print nothing and `pymarkdown` exits 0. `FAIL` otherwise, listing each offending file.
+The house-style scan covers what `pymarkdown` cannot. Run it from the checkout root. It reads every tracked `.md`, or only the paths given after `python -`:
 
-**Suggested fix**: for `.rst` files, convert to MyST Markdown and update every reference. For linter findings, apply the rule the message names — do not widen the `[tool.pymarkdown]` config in `pyproject.toml` to silence a real violation.
+```sh
+uv run python - <<'EOF'
+import os, re, subprocess, sys
+
+FENCE = re.compile(r'^(\s*)(`{3,}|~{3,})\s*([^\s`]*)')
+PROSE_DIRECTIVES = {'{note}', '{warning}', '{tip}', '{important}', '{caution}', '{seealso}', '{admonition}', '{attention}', '{hint}'}
+SHELL_TAGS = {'bash', 'shell', 'console', 'zsh'}
+LIST_ITEM = re.compile(r'^(\s*)([-*+]|\d+\.|:)(\s+)\S')
+STARTS_BLOCK = re.compile(r'^\s*(#|[-*+]\s|\d+\.\s|:\s|>|\||<|\{|:\w+:)')
+NOT_PROSE = re.compile(r'^\s*(#|\||<|\{|:\w+:)')
+TABLE_SEP = re.compile(r'^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$')
+CODE = re.compile(r'(`+).+?\1')
+LINK = re.compile(r'\]\(([^)\s]+)\)')
+
+files = sys.argv[1:] or subprocess.run(
+    ['git', 'ls-files', '*.md'], capture_output=True, text=True, check=True
+).stdout.split()
+findings = []
+for f in files:
+    lines = open(f, encoding='utf-8').read().split('\n')
+    start = 0
+    if lines[0] == '---':
+        start = lines.index('---', 1) + 1
+        if not re.fullmatch(r'\.claude/skills/[^/]+/SKILL\.md', f):
+            findings.append(f'{f}:1: FRONT-MATTER only skills carry front matter')
+    fence = directive = None
+    joinable = False
+    columns = []  # content column of each open list item, outermost first
+    for n, line in enumerate(lines[start:], start + 1):
+        fm = FENCE.match(line)
+        if fence:
+            if fm and not fm.group(3) and fm.group(2)[0] == fence[0] and len(fm.group(2)) >= len(fence):
+                fence = None
+            continue
+        stripped = line.strip()
+        if not stripped:
+            joinable = False
+            continue
+        indent = len(line) - len(line.lstrip())
+        item = LIST_ITEM.match(line)
+        while columns and columns[-1] > indent:
+            columns.pop()
+        if item:
+            if indent and (not columns or indent != columns[-1]):
+                findings.append(f'{f}:{n}: NESTED-INDENT list item at column {indent}')
+            columns.append(len(item.group(1)) + len(item.group(2)) + len(item.group(3)))
+        elif indent and (not columns or indent != columns[-1]):
+            findings.append(f'{f}:{n}: NESTED-INDENT column {indent}, expected {columns[-1] if columns else 0}')
+        elif not indent:
+            columns = []
+        if fm:
+            tag = fm.group(3)
+            if directive and not tag and len(fm.group(2)) >= len(directive):
+                directive = None
+            elif tag in PROSE_DIRECTIVES:
+                directive = fm.group(2)
+            else:
+                fence = fm.group(2)
+                if tag in SHELL_TAGS:
+                    findings.append(f'{f}:{n}: FENCE-SHELL tag shell fences sh, not {tag}')
+            joinable = False
+            continue
+        if joinable and not STARTS_BLOCK.match(line):
+            findings.append(f'{f}:{n}: HARD-WRAP join with the line above')
+        joinable = not NOT_PROSE.match(line)
+        if re.match(r'#{4,}\s', line) and not f.startswith('docs/source/'):
+            findings.append(f'{f}:{n}: HEADING-DEPTH ### is the deepest outside docs/source/')
+        if stripped.startswith('|') and not stripped.endswith('|'):
+            findings.append(f'{f}:{n}: TABLE-PIPES table rows start and end with |')
+        if TABLE_SEP.match(stripped) and stripped != '| --- ' * stripped.count('-' * 3) + '|':
+            findings.append(f'{f}:{n}: TABLE-SEP separator is | --- | per column')
+        text = CODE.sub('', re.sub(r'<!--|-->', '', line))
+        if re.search(r'(?<!-)--(?![-\w])', LINK.sub('', text)):
+            findings.append(f'{f}:{n}: DOUBLE-HYPHEN an aside takes an em dash')
+        for target in LINK.findall(text):
+            path = target.split('#')[0]
+            if re.match(r'[a-z][a-z0-9+.-]*:', target) or not path:
+                continue
+            if not os.path.exists(os.path.join(os.path.dirname(f), path)):
+                findings.append(f'{f}:{n}: BROKEN-LINK {target}')
+for line in findings:
+    print(line)
+print(f'files={len(files)} findings={len(findings)}')
+print('PASS' if not findings else 'FAIL')
+EOF
+```
+
+It skips front matter and fenced code, but reads the prose inside MyST admonitions (`{note}`, `{warning}` and kin). A `:` line is a MyST definition, a list item for indentation. Its rules:
+
+| Rule | Finding |
+| --- | --- |
+| `FRONT-MATTER` | Front matter outside `.claude/skills/*/SKILL.md` |
+| `FENCE-SHELL` | A fence tagged `bash`, `shell`, `console` or `zsh` rather than `sh` |
+| `HEADING-DEPTH` | `####` or deeper outside `docs/source/` |
+| `HARD-WRAP` | A line continuing the paragraph, list item or definition above it |
+| `TABLE-PIPES` | A table row without both outer pipes |
+| `TABLE-SEP` | A separator other than `\| --- \|` per column — no padding, no alignment colons |
+| `DOUBLE-HYPHEN` | `--` as a dash outside code; a CLI flag such as `--help` is not one |
+| `NESTED-INDENT` | Nested content off its parent's content column — 3 under `1.`, 2 under `-` |
+| `BROKEN-LINK` | A relative link or image whose target does not exist relative to the file |
+
+`PASS` if `git ls-files '*.rst'` prints nothing, `pymarkdown` exits 0 and the scan prints `PASS`. `FAIL` otherwise, with each finding.
+
+Some rules take judgment and no scan checks them: `**bold**` for identifiers, paths and warnings; backticks for code; an em dash `—` for asides that a single hyphen fakes; links inline rather than reference-style; and a fence tag that matches its content (an HTTP request line is `text`, not `sh`). Read `git diff "$(git describe --tags --abbrev=0)" -- '*.md'` for these and report what you find as `REVIEW` lines, which do not fail the gate.
+
+**Suggested fix**: for `.rst` files, convert to MyST Markdown and update every reference. For linter and scan findings, apply the rule the message names — do not widen the `[tool.pymarkdown]` config in `pyproject.toml`, or loosen the scan, to silence a real violation. Fix a `HARD-WRAP` by joining lines only, never by rewording, and confirm with `git diff -w --word-diff` that no word moved.
 
 ---
 
@@ -419,7 +521,7 @@ Print a summary in this exact format after all sections have run:
 3. Reader plugins in docs      PASS|FAIL   (<n> orphans)
 4. README/CLAUDE/pyproject     PASS|FAIL   (<one-line summary>)
 5. Install instructions        PASS|FAIL   (<one-line summary>)
-5.5 Markdown hygiene           PASS|FAIL   (<n> rst files, <n> lint findings)
+5.5 Markdown hygiene           PASS|FAIL   (<n> rst files, <n> lint findings, <n> style findings)
 6. Sphinx build (zero warns)   PASS|FAIL   (first warning if any)
 7. Full CI gate                PASS|FAIL
 8. Entry-point smoke tests     PASS|FAIL   (<pass>/<total>)

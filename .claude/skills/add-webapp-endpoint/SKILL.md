@@ -5,18 +5,18 @@ description: Add a matched pair of a FastAPI REST route and an MCP tool in the p
 
 # add-webapp-endpoint
 
-`ptychodus.webapp` exposes the same read-only surface through two channels: FastAPI REST under `/api/v1/*` (routers in `src/ptychodus/webapp/routers/`) and MCP tools at `/mcp` ([src/ptychodus/webapp/mcp_server.py](../../src/ptychodus/webapp/mcp_server.py)). They must return the same data for the same query. Adding one without the other silently drifts.
+`ptychodus.webapp` exposes the same read-only surface through two channels: FastAPI REST under `/api/v1/*` (routers in `src/ptychodus/webapp/routers/`) and MCP tools at `/mcp` ([src/ptychodus/webapp/mcp_server.py](../../../src/ptychodus/webapp/mcp_server.py)). They must return the same data for the same query. Adding one without the other silently drifts.
 
 ## Steps
 
 ### 1. Choose or create a router module
 
-- Existing resource? Extend an existing file in [src/ptychodus/webapp/routers/](../../src/ptychodus/webapp/routers/) (e.g. `diffraction.py`, `product.py`, `campaign.py`).
+- Existing resource? Extend an existing file in [src/ptychodus/webapp/routers/](../../../src/ptychodus/webapp/routers/) (e.g. `diffraction.py`, `product.py`, `campaign.py`).
 - New resource? Create `src/ptychodus/webapp/routers/<resource>.py`.
 
 ### 2. REST route
 
-Follow the pattern in [src/ptychodus/webapp/routers/diffraction.py](../../src/ptychodus/webapp/routers/diffraction.py):
+Follow the pattern in [src/ptychodus/webapp/routers/diffraction.py](../../../src/ptychodus/webapp/routers/diffraction.py):
 
 ```python
 from fastapi import APIRouter, HTTPException, Query
@@ -43,7 +43,7 @@ Use `SessionDep` for DB access and `LayoutDep` when you need the on-disk storage
 
 ### 3. Register the router
 
-In [src/ptychodus/webapp/app.py](../../src/ptychodus/webapp/app.py) inside `create_app()`, add:
+In [src/ptychodus/webapp/app.py](../../../src/ptychodus/webapp/app.py) inside `create_app()`, add:
 
 ```python
 app.include_router(<resource>.router, prefix=api_prefix)
@@ -53,11 +53,11 @@ Match the position/style of the existing `app.include_router(...)` calls (health
 
 ### 4. Schemas
 
-Add pydantic response models to [src/ptychodus/webapp/routers/schemas.py](../../src/ptychodus/webapp/routers/schemas.py) if a new `*Read` shape is needed. Reuse `Page[T]` for paginated list responses.
+Add pydantic response models to [src/ptychodus/webapp/routers/schemas.py](../../../src/ptychodus/webapp/routers/schemas.py) if a new `*Read` shape is needed. Reuse `Page[T]` for paginated list responses.
 
 ### 4b. TypeScript client
 
-A field added to a `*Read` model must also be declared on the matching interface in [src/ptychodus/webapp/ui/src/api.ts](../../src/ptychodus/webapp/ui/src/api.ts). Nothing links the two — different languages, different directories — and `tsc` compiles happily against a stale interface, so the field is simply unreachable from the browser. `tests/webapp/test_ts_client_parity.py` fails and names the missing field; it is the only thing that catches this.
+A field added to a `*Read` model must also be declared on the matching interface in [src/ptychodus/webapp/ui/src/api.ts](../../../src/ptychodus/webapp/ui/src/api.ts). Nothing links the two — different languages, different directories — and `tsc` compiles happily against a stale interface, so the field is simply unreachable from the browser. `tests/webapp/test_ts_client_parity.py` fails and names the missing field; it is the only thing that catches this.
 
 Shared bookkeeping belongs on `RowBase`, which the three mirrored interfaces extend. `CampaignRead` and `LineageRead` are deliberately unmirrored: campaigns and lineage are served to agents and scripts but not browsed.
 
@@ -65,11 +65,11 @@ A new render parameter also goes on `RenderParams` and into `renderQuery`, or th
 
 ### 5. Converters
 
-If your ORM row → pydantic conversion is non-trivial (or needs a session query for related data), add a helper in [src/ptychodus/webapp/routers/_convert.py](../../src/ptychodus/webapp/routers/_convert.py) — this is what keeps REST and MCP in sync, because both channels call the same converter.
+If your ORM row → pydantic conversion is non-trivial (or needs a session query for related data), add a helper in [src/ptychodus/webapp/routers/_convert.py](../../../src/ptychodus/webapp/routers/_convert.py) — this is what keeps REST and MCP in sync, because both channels call the same converter.
 
 ### 6. Matching MCP tool
 
-Immediately add the corresponding tool in [src/ptychodus/webapp/mcp_server.py](../../src/ptychodus/webapp/mcp_server.py) inside `create_mcp_server()`. Every REST route must have an MCP counterpart with the same behavior:
+Immediately add the corresponding tool in [src/ptychodus/webapp/mcp_server.py](../../../src/ptychodus/webapp/mcp_server.py) inside `create_mcp_server()`. Every REST route must have an MCP counterpart with the same behavior:
 
 ```python
 @mcp.tool()

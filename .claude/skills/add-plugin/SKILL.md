@@ -5,7 +5,7 @@ description: Scaffold a new file-format plugin (diffraction / probe / probe-posi
 
 # add-plugin
 
-Plugins are auto-discovered by `PluginRegistry.load_plugins()` in [src/ptychodus/api/plugins.py](../../src/ptychodus/api/plugins.py). Every module under `src/ptychodus/plugins/` that defines a module-level `register_plugins(registry)` function is imported and registered at startup; modules whose imports fail are logged and skipped (this is how optional-dependency plugins silently disable themselves).
+Plugins are auto-discovered by `PluginRegistry.load_plugins()` in [src/ptychodus/api/plugins.py](../../../src/ptychodus/api/plugins.py). Every module under `src/ptychodus/plugins/` that defines a module-level `register_plugins(registry)` function is imported and registered at startup; modules whose imports fail are logged and skipped (this is how optional-dependency plugins silently disable themselves).
 
 ## Steps
 
@@ -67,11 +67,11 @@ Plugins are auto-discovered by `PluginRegistry.load_plugins()` in [src/ptychodus
 
 Read one of these before writing new code — pick the closest match:
 
-- Simple single-file reader+writer pair: [src/ptychodus/plugins/csv_probe_file.py](../../src/ptychodus/plugins/csv_probe_file.py)
-- HDF5-backed diffraction: [src/ptychodus/plugins/h5_diffraction_file.py](../../src/ptychodus/plugins/h5_diffraction_file.py)
-- Product reader with adapters: [src/ptychodus/plugins/cxi_file.py](../../src/ptychodus/plugins/cxi_file.py), [src/ptychodus/plugins/h5_product_file.py](../../src/ptychodus/plugins/h5_product_file.py)
-- Beamline subpackage: [src/ptychodus/plugins/aps33id_velociprobe/](../../src/ptychodus/plugins/aps33id_velociprobe/)
-- Optional-dep plugin (fails cleanly if the dep is missing): [src/ptychodus/plugins/lcls_file_readers.py](../../src/ptychodus/plugins/lcls_file_readers.py)
+- Simple single-file reader+writer pair: [src/ptychodus/plugins/csv_probe_file.py](../../../src/ptychodus/plugins/csv_probe_file.py)
+- HDF5-backed diffraction: [src/ptychodus/plugins/h5_diffraction_file.py](../../../src/ptychodus/plugins/h5_diffraction_file.py)
+- Product reader with adapters: [src/ptychodus/plugins/cxi_file.py](../../../src/ptychodus/plugins/cxi_file.py), [src/ptychodus/plugins/h5_product_file.py](../../../src/ptychodus/plugins/h5_product_file.py)
+- Beamline subpackage: [src/ptychodus/plugins/aps33id_velociprobe/](../../../src/ptychodus/plugins/aps33id_velociprobe/)
+- Optional-dep plugin (fails cleanly if the dep is missing): [src/ptychodus/plugins/lcls_file_readers.py](../../../src/ptychodus/plugins/lcls_file_readers.py)
 
 ## Index preservation
 

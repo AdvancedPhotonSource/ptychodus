@@ -5,7 +5,7 @@ description: Diagnose why a ptychodus plugin isn't showing up in the file-format
 
 # check-plugin-load
 
-`PluginRegistry.load_plugins()` in [src/ptychodus/api/plugins.py](../../src/ptychodus/api/plugins.py) walks every module under `src/ptychodus/plugins/`, imports it, and calls `register_plugins(registry)`. Failures are logged at WARNING and skipped — so a broken plugin just silently vanishes from the GUI. This skill surfaces the warnings and then confirms registration.
+`PluginRegistry.load_plugins()` in [src/ptychodus/api/plugins.py](../../../src/ptychodus/api/plugins.py) walks every module under `src/ptychodus/plugins/`, imports it, and calls `register_plugins(registry)`. Failures are logged at WARNING and skipped — so a broken plugin just silently vanishes from the GUI. This skill surfaces the warnings and then confirms registration.
 
 ## Steps
 
@@ -56,8 +56,7 @@ for p in r.probe_file_readers:
 "
 ```
 
-Categories on `PluginRegistry` (see [src/ptychodus/api/plugins.py](../../src/ptychodus/api/plugins.py)):
-`bad_pixels_file_readers`, `diffraction_file_readers` / `_writers`, `probe_position_file_readers` / `_writers`, `fresnel_zone_plates`, `probe_file_readers` / `_writers`, `object_file_readers` / `_writers`, `product_file_readers` / `_writers`, `fluorescence_file_readers` / `_writers`, `fluorescence_enhancers`.
+Categories on `PluginRegistry` (see [src/ptychodus/api/plugins.py](../../../src/ptychodus/api/plugins.py)): `bad_pixels_file_readers`, `diffraction_file_readers` / `_writers`, `probe_position_file_readers` / `_writers`, `fresnel_zone_plates`, `probe_file_readers` / `_writers`, `object_file_readers` / `_writers`, `product_file_readers` / `_writers`, `fluorescence_file_readers` / `_writers`, `fluorescence_enhancers`.
 
 ### 5. Report findings
 

@@ -20,7 +20,7 @@ Run the `check-layers` skill after wiring to confirm you haven't accidentally in
 
 ### 1. Settings
 
-Create `src/ptychodus/model/<feature>/settings.py`. Follow the pattern in [src/ptychodus/model/analysis/settings.py](../../src/ptychodus/model/analysis/settings.py):
+Create `src/ptychodus/model/<feature>/settings.py`. Follow the pattern in [src/ptychodus/model/analysis/settings.py](../../../src/ptychodus/model/analysis/settings.py):
 
 ```python
 from ..observer import Observable, Observer
@@ -66,11 +66,11 @@ class <Feature>Core:
         # ... construct sub-components, wire observers
 ```
 
-For an example that composes many sub-components + `VisualizationEngine`s, see [src/ptychodus/model/analysis/core.py](../../src/ptychodus/model/analysis/core.py).
+For an example that composes many sub-components + `VisualizationEngine`s, see [src/ptychodus/model/analysis/core.py](../../../src/ptychodus/model/analysis/core.py).
 
 ### 3. Compose in ModelCore
 
-In [src/ptychodus/model/core.py](../../src/ptychodus/model/core.py), import your `<Feature>Core` and construct it in `ModelCore.__init__` in the correct dependency order — after everything it needs, before anything that needs it. `ModelCore` is the single composition root; do not construct components anywhere else.
+In [src/ptychodus/model/core.py](../../../src/ptychodus/model/core.py), import your `<Feature>Core` and construct it in `ModelCore.__init__` in the correct dependency order — after everything it needs, before anything that needs it. `ModelCore` is the single composition root; do not construct components anywhere else.
 
 ### 4. View
 
@@ -94,7 +94,7 @@ self.file_reader_parameter = PluginChooserParameter(file_reader_chooser, self.se
 
 A category the feature only looks plugins up in, with no selection, takes the read-only `PluginCatalog` from `api/plugins.py` instead of a chooser.
 
-`PluginChooserParameter` in [src/ptychodus/model/plugins.py](../../src/ptychodus/model/plugins.py) owns the two-way binding and the translation between the two name spaces: its own value space is display names, while the settings parameter stores the canonical simple name. The chooser itself holds no settings.
+`PluginChooserParameter` in [src/ptychodus/model/plugins.py](../../../src/ptychodus/model/plugins.py) owns the two-way binding and the translation between the two name spaces: its own value space is display names, while the settings parameter stores the canonical simple name. The chooser itself holds no settings.
 
 ## Verify
 
