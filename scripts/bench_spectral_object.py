@@ -22,7 +22,9 @@ the reference and scored:
 
 ``--reconstruct-epochs`` also runs pty-chi LSQML from a cold start: each initial object
 with ``--initial-probe`` (by default the probe the object was generated from) as the
-initial probe, optimized, scoring the object at each listed epoch.
+initial probe, split into ``--num-probe-modes`` incoherent modes (by default one, as the
+GUI and the CLI drivers start) and optimized, scoring the object at each listed epoch.
+LSQML loss is comparable only between runs with the same mode count.
 
 Example usage:
 
@@ -294,7 +296,7 @@ def build_stxm_dpc(case: Case, probe: Probe, overrides: Mapping[str, Any]) -> Ob
         case.reference.probe_positions,
         detector_extent=ImageExtent(width_px=width_px, height_px=height_px),
         probe=probe,
-        **{'correct_shadow': False, **overrides},
+        **overrides,
     )
 
 
@@ -581,11 +583,12 @@ def run_reconstruction(
     epochs: Sequence[int],
     *,
     seed: int,
+    num_probe_modes: int,
 ) -> dict[str, Any]:
     """pty-chi LSQML from a cold start, scoring the object at each of *epochs*.
 
-    *initial_probe* is split into four incoherent modes and optimized; the object is
-    scaled to the measured mean transmission.
+    *initial_probe* is split into *num_probe_modes* incoherent modes and optimized; the
+    object is scaled to the measured mean transmission.
     """
     from ptychodus.api.plugins import PluginRegistry
     from ptychodus.api.reconstruct import prepare_reconstruct_input
@@ -608,7 +611,7 @@ def run_reconstruction(
     task.probe_position_options.optimizable = False
     options.num_sync_epochs = math.gcd(*epochs)
 
-    probe = generate_incoherent_probe_modes(initial_probe, 4)
+    probe = generate_incoherent_probe_modes(initial_probe, num_probe_modes)
     product = replace(
         case.reference,
         probes=ProbeEnsemble.from_probe(probe),
@@ -662,6 +665,12 @@ def main() -> int:
     parser.add_argument('--figures', action='store_true')
     parser.add_argument('--save-arrays', action='store_true')
     parser.add_argument('--reconstruct-epochs', type=int, nargs='*', default=[])
+    parser.add_argument(
+        '--num-probe-modes',
+        type=int,
+        default=1,
+        help="incoherent modes of LSQML's initial probe; 1 is the GUI and CLI default",
+    )
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--remove-ramp', action='store_true')
     args = parser.parse_args()
@@ -712,6 +721,7 @@ def main() -> int:
                         row['reconstruction'] = {
                             'initial_probe': initial_probe_name,
                             'initial_probe_consistency': consistency,
+                            'num_probe_modes': args.num_probe_modes,
                             'seed': args.seed,
                             **run_reconstruction(
                                 case,
@@ -719,6 +729,7 @@ def main() -> int:
                                 initial_probe,
                                 args.reconstruct_epochs,
                                 seed=args.seed,
+                                num_probe_modes=args.num_probe_modes,
                             ),
                         }
                         print(

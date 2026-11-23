@@ -85,7 +85,7 @@ class STXMDPCOptions(BaseModel):
         ),
     )
     shadow_correction: bool = Field(
-        False,
+        True,
         title='Probe Shadow Correction',
         description="Subtract the probe's own phase gradient from the centroids.",
     )

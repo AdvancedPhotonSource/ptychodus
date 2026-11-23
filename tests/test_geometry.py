@@ -27,10 +27,10 @@ def test_str() -> None:
 
 
 def test_domain_masking() -> None:
-    """Points with distance <= 0 or distance > 1 return undefined_value."""
+    """Points with distance < 0 or distance > 1 return undefined_value."""
     mode = ZernikeMode(1.0, 0, 0)
-    angle = numpy.zeros(4)
-    distance = numpy.array([0.0, -0.5, 1.1, 2.0])
+    angle = numpy.zeros(3)
+    distance = numpy.array([-0.5, 1.1, 2.0])
     result = mode(distance, angle, undefined_value=numpy.nan)
     assert numpy.all(numpy.isnan(result))
 
@@ -42,6 +42,16 @@ def test_boundary_included() -> None:
     angle = numpy.array([0.0])
     result = mode(distance, angle, undefined_value=numpy.nan)
     assert numpy.isfinite(result[0])
+
+
+def test_centre_included() -> None:
+    """distance == 0 is the centre of the disk: piston is 1 and defocus -sqrt(3) there."""
+    distance = numpy.zeros(1)
+    angle = numpy.zeros(1)
+    piston = ZernikeMode(1.0, 0, 0)(distance, angle, undefined_value=numpy.nan)
+    defocus = ZernikeMode(1.0, 2, 0)(distance, angle, undefined_value=numpy.nan)
+    numpy.testing.assert_allclose(piston, [1.0])
+    numpy.testing.assert_allclose(defocus, [-numpy.sqrt(3)])
 
 
 @pytest.mark.parametrize(

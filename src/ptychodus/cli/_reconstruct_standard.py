@@ -884,7 +884,6 @@ def _generate_initial_object(
                     positions,
                     detector_extent=detector_extent,
                     probe=probe,
-                    correct_shadow=False,
                 )
             except ValueError as exc:
                 logger.warning('STXM-DPC failed (%s); generating a uniform initial object.', exc)

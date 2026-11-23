@@ -633,6 +633,17 @@ class TestGenerateAveragePatternProbe:
                 detector_distance_m=0.0,
             )
 
+    def test_a_mean_without_signal_raises(self) -> None:
+        """A crop that misses the beam would otherwise give an all-zero probe."""
+        patterns = numpy.zeros((2, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
+        with pytest.raises(ValueError, match='holds no signal'):
+            _average_pattern_probe(
+                _sample_plane_geometry(),
+                _assembled_data(patterns),
+                photon_wavelength_m=_BACKPROP_WAVELENGTH_M,
+                detector_distance_m=_BACKPROP_DISTANCE_M,
+            )
+
 
 # A near-field product samples the object on the detector grid itself, so the
 # "sample pitch" is the detector pitch demagnified rather than the reciprocal relation.
@@ -2629,6 +2640,19 @@ def test_every_generated_probe_is_centered_on_the_beam_axis(name: str, size_px: 
 
     assert float(moments.centroid_x_px) == pytest.approx(0.0, abs=1e-5)
     assert float(moments.centroid_y_px) == pytest.approx(0.0, abs=1e-5)
+
+
+@pytest.mark.parametrize('size_px', [16, 17])
+def test_a_zernike_piston_fills_the_disk_through_the_beam_axis(size_px: int) -> None:
+    """Pixel N // 2 sits at radius zero, the centre of the disk, not outside it."""
+    probe = generate_zernike_probe(
+        _axis_test_geometry(size_px), [ZernikeMode(1.0, 0, 0)], radius_m=4.0e-8
+    )
+    centre = size_px // 2
+
+    window = probe.get_array()[0, centre - 2 : centre + 3, centre - 2 : centre + 3]
+
+    numpy.testing.assert_array_equal(window, numpy.ones((5, 5)))
 
 
 def test_the_zone_plate_focus_is_on_the_beam_axis() -> None:

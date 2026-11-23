@@ -403,9 +403,10 @@ def generate_average_pattern_probe(
     beam at its waist, so the defocus is how far past the focus the object sits.
 
     Raises ValueError if the diffraction-pattern shape is inconsistent with *geometry*,
-    if the detector distance is zero, if a near-field mean has no detector pitch, or --
-    far field with a detector pitch -- if the implied sample-plane pixel size disagrees
-    with *geometry*.
+    if the detector distance is zero, if the corrected mean holds no signal -- a crop
+    that misses the beam, say -- if a near-field mean has no detector pitch, or -- far
+    field with a detector pitch -- if the implied sample-plane pixel size disagrees with
+    *geometry*.
     """
     if detector_distance_m == 0.0:
         raise ValueError(
@@ -429,6 +430,12 @@ def generate_average_pattern_probe(
             bad_pixels=usable_bad_pixels,
             mad_threshold=bright_field_mad_threshold,
             keep_filtered=False,
+        )
+
+    if not numpy.any(detector_intensity > 0.0):
+        raise ValueError(
+            'The mean diffraction pattern holds no signal once corrected; the probe would '
+            'be zero. Check that the detector crop contains the beam.'
         )
 
     height_px, width_px = detector_intensity.shape[-2:]

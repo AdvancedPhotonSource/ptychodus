@@ -208,6 +208,8 @@ class ZernikeMode:
     def __call__(
         self, distance: RealArrayType, angle: RealArrayType, undefined_value: complex = 0j
     ) -> ComplexArrayType:
+        """The mode on the closed unit disk, ``0 <= distance <= 1``, and *undefined_value*
+        beyond it; the centre is part of the disk."""
         rvalue = self._radial_polynomial(distance)
         avalue = self._angular_function(angle)
         nvalue_sq = self.radial_degree + 1
@@ -216,7 +218,7 @@ class ZernikeMode:
             nvalue_sq *= 2
 
         return numpy.where(
-            numpy.logical_and(0 < distance, distance <= 1),
+            numpy.logical_and(0 <= distance, distance <= 1),
             self.coefficient * numpy.sqrt(nvalue_sq) * rvalue * avalue,
             undefined_value,
         )
