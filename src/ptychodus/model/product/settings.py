@@ -74,6 +74,11 @@ class ProductSettings(Observable, Observer):
             'ParallaxMinDefocusDof', 1.0, minimum=0.0
         )
         self.parallax_rtol = self._group.create_real_parameter('ParallaxRtol', 0.5, minimum=0.0)
+        # Refine a resolved parallax defocus to the one whose average-pattern probe best
+        # explains the patterns; it keeps the parallax value near focus.
+        self.refine_defocus_by_autofocus = self._group.create_boolean_parameter(
+            'RefineDefocusByAutofocus', True
+        )
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:

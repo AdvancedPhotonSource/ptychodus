@@ -25,11 +25,10 @@ from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.propagate import PropagatorParameters
 from ptychodus.api.simulate.diffraction import generate_diffraction_data
+from ptychodus.api.spectral import SpectralPreprocessing, _compute_spectral_weights
 from ptychodus.api.simulate.object import (
     SpectralModulus,
-    SpectralPreprocessing,
     _build_propagator_pair,
-    _compute_spectral_weights,
     compute_stxm_dpc_signals,
     generate_spectral_object,
     generate_stxm_dpc_object,

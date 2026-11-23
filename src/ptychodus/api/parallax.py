@@ -1,4 +1,4 @@
-"""Defocus from the parallax between bright-field images, from accumulated moments alone.
+"""The parallax between bright-field images, measured from accumulated moments alone.
 
 A defocused probe carries a quadratic phase, so each point of the bright-field disk is
 lit by rays crossing the sample at a different place: the ray reaching spatial frequency
@@ -38,13 +38,11 @@ import numpy
 from scipy.ndimage import binary_erosion
 from skimage.registration import phase_cross_correlation
 
-from .accumulate import DiffractionMoments, compute_diffraction_moments, estimate_incident_beam
+from .accumulate import DiffractionMoments
 from .affine import AffineTransform, AffineTransformComponents
 from .fourier import fourier_shift_2d
 from .object import ObjectGeometry
-from .assemble import AssembledDiffractionData
 from .preprocess.diffraction import (
-    BinningStep,
     DiffractionPrepStep,
     HorizontalFlipStep,
     TransposeStep,
@@ -60,210 +58,13 @@ from .typing import BooleanArrayType, RealArrayType
 __all__ = [
     'DetectorOrientation',
     'OrientationCandidate',
-    'ParallaxEstimate',
     'ParallaxTransform',
     'compute_geometry_mismatch',
-    'estimate_defocus_from_assembled_data',
-    'estimate_defocus_from_parallax',
     'estimate_parallax_transform',
+    'measure_parallax_shifts',
 ]
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class ParallaxEstimate:
-    """A defocus fitted to the parallax of `num_bins` bright-field images.
-
-    `standard_error_m` is the defocus's standard error from the scatter of the shifts
-    about the fitted line; it is zero when the shifts lie on it exactly.
-    `depth_of_focus_m` is the probe's ``lambda / NA**2``, from the second moments of the
-    mean pattern as :attr:`ProbeExtent.depth_of_focus_m` measures it. Within about that
-    distance of focus the parallax is not a shift, so a fitted defocus no larger than
-    it is not evidence of one.
-    """
-
-    defocus_distance_m: float
-    standard_error_m: float
-    depth_of_focus_m: float
-    num_bins: int
-
-    @property
-    def significance(self) -> float:
-        """The defocus in units of its standard error; zero for a defocus of zero."""
-        if self.defocus_distance_m == 0.0:
-            return 0.0
-
-        if self.standard_error_m > 0.0:
-            return abs(self.defocus_distance_m) / self.standard_error_m
-
-        return math.inf
-
-    @property
-    def fresnel_number(self) -> float:
-        """The defocus in depths of focus, as :attr:`ProbeExtent.fresnel_number`."""
-        return abs(self.defocus_distance_m) / self.depth_of_focus_m
-
-    def is_resolved(
-        self, *, minimum_significance: float = 3.0, minimum_defocus_dof: float = 1.0
-    ) -> bool:
-        """Whether the defocus is both far enough from focus and statistically real.
-
-        *minimum_defocus_dof* is the number of depths of focus the defocus must reach,
-        and *minimum_significance* the number of its standard errors.
-        """
-        return (
-            self.fresnel_number >= minimum_defocus_dof and self.significance >= minimum_significance
-        )
-
-
-def estimate_defocus_from_assembled_data(
-    data: AssembledDiffractionData,
-    probe_positions: ProbePositionSequence,
-    object_geometry: ObjectGeometry,
-    probe_geometry: ProbeGeometry,
-    *,
-    photon_wavelength_m: float,
-    i0_photons_per_count: float = 0.0,
-    bin_size_px: int = 4,
-    max_bins: int = 64,
-    chunk_bins: int = 8,
-) -> ParallaxEstimate | None:
-    """Estimate the defocus from assembled far-field patterns, in one binned pass.
-
-    The patterns are binned *bin_size_px* detector pixels a side as their moments are
-    accumulated, with the data's own bad pixels, background and flat field; the detector sums are
-    corrected for beam decay by the I0 the positions carry, converted at
-    *i0_photons_per_count* (see :func:`estimate_incident_beam`); and the corrected moments
-    go to :func:`estimate_defocus_from_parallax`, which keeps at most *max_bins* of the
-    bright-field bins and maps them *chunk_bins* at a time. Larger bins cost less memory
-    but leave fewer inside the bright field.
-
-    Returns None when there are no patterns or the parallax gives no estimate.
-
-    Raises:
-        ValueError: where :func:`estimate_defocus_from_parallax` refuses the inputs.
-    """
-    moments = compute_diffraction_moments(
-        data.get_indexes(),
-        data.get_patterns(),
-        bad_pixels=data.get_bad_pixels(),
-        background=data.get_background(),
-        flat_field=data.get_flat_field(),
-        binning=BinningStep(bin_size_x=bin_size_px, bin_size_y=bin_size_px),
-    )
-
-    if moments is None:
-        return None
-
-    corrected = estimate_incident_beam(
-        moments,
-        probe_positions.get_i0_by_index(),
-        i0_photons_per_count=i0_photons_per_count,
-    ).moments
-    return estimate_defocus_from_parallax(
-        corrected,
-        probe_positions,
-        object_geometry,
-        probe_geometry,
-        photon_wavelength_m=photon_wavelength_m,
-        max_bins=max_bins,
-        chunk_bins=chunk_bins,
-    )
-
-
-def estimate_defocus_from_parallax(
-    moments: DiffractionMoments,
-    probe_positions: ProbePositionSequence,
-    object_geometry: ObjectGeometry,
-    probe_geometry: ProbeGeometry,
-    *,
-    photon_wavelength_m: float,
-    bright_field_fraction: float = 0.5,
-    upsample_factor: int = 20,
-    minimum_bins: int = 4,
-    max_bins: int = 64,
-    chunk_bins: int = 8,
-) -> ParallaxEstimate | None:
-    """Estimate the probe's defocus from the shifts between its bright-field images.
-
-    *moments* must have been accumulated with a binning step, from far-field patterns on
-    *probe_geometry*'s reciprocal grid, one detector pixel being ``1 / (N * dx)``; no
-    detector pitch is needed. Binned patterns are used as they are stored, so correct
-    them for beam decay by I0 first (:meth:`DiffractionMoments.normalize_by_i0`) if the
-    beam drifted.
-
-    1. The bright field is every bin whose mean reaches *bright_field_fraction* of the
-       brightest, less the bins on its edge, whose images mix the disk with the dark
-       field. Past *max_bins*, an evenly spread subset on a coarser lattice is kept,
-       which bounds the memory the images take: fewer bins scatter the slope more and
-       cost less.
-    2. Each kept bin's values are mapped onto *object_geometry* by
-       :func:`interpolate_position_values`, pairing patterns with *probe_positions* by
-       index, *chunk_bins* bins at a time, and cropped to the probe positions' hull before the
-       next chunk is mapped; a smaller chunk lowers the peak memory at no cost in the
-       result.
-    3. Each image is registered against their mean to ``1 / upsample_factor`` of a
-       pixel, and again against the mean of the images so aligned. The cross-correlation
-       is not normalized to its phase: whitening amplifies the interpolation's noise
-       until it pulls every shift toward zero.
-    4. The shifts are fitted by least squares to ``s_b = a - lambda * z * q_b``. The
-       offset ``a``, shared by every bin, absorbs both a common shift and wherever the
-       beam centre lies, so ``q_b`` is measured from the DC pixel ``N // 2``.
-    5. The depth of focus is :func:`estimate_probe_extent`'s, from the mean pattern.
-
-    A featureless sample gives shifts that are noise about zero, and a probe within the
-    depth of focus gives a defocus no larger than it; judge the result by
-    :meth:`ParallaxEstimate.is_resolved`.
-
-    Returns None when fewer than *minimum_bins* bright-field bins remain or fewer than
-    three positions pair with a pattern.
-
-    Raises:
-        ValueError: if *moments* holds no binned patterns, its patterns do not match
-            *probe_geometry*, or *max_bins* is below *minimum_bins*.
-    """
-    measured = _measure_bin_shifts(
-        moments,
-        probe_positions,
-        object_geometry,
-        probe_geometry,
-        bright_field_fraction=bright_field_fraction,
-        upsample_factor=upsample_factor,
-        minimum_bins=minimum_bins,
-        max_bins=max_bins,
-        chunk_bins=chunk_bins,
-    )
-
-    if measured is None:
-        return None
-
-    q_per_m, shifts_m = measured
-    num_bins = q_per_m.shape[0]
-    q_x_per_m, q_y_per_m = q_per_m[:, 0], q_per_m[:, 1]
-    shift_x_m, shift_y_m = shifts_m[:, 0], shifts_m[:, 1]
-
-    # Unknowns (a_x, a_y, c), one equation per bin and axis, with c = -lambda * z.
-    design = numpy.zeros((2 * num_bins, 3))
-    design[:num_bins, 0] = 1.0
-    design[:num_bins, 2] = q_x_per_m
-    design[num_bins:, 1] = 1.0
-    design[num_bins:, 2] = q_y_per_m
-    observed = numpy.concatenate((shift_x_m, shift_y_m))
-    solution, _, _, _ = numpy.linalg.lstsq(design, observed, rcond=None)
-    residual = observed - design @ solution
-    variance = float(residual @ residual) / (2 * num_bins - 3)
-    slope_variance = variance * float(numpy.linalg.inv(design.T @ design)[2, 2])
-    defocus_distance_m = float(-solution[2] / photon_wavelength_m)
-
-    return ParallaxEstimate(
-        defocus_distance_m=defocus_distance_m,
-        standard_error_m=math.sqrt(slope_variance) / photon_wavelength_m,
-        depth_of_focus_m=_depth_of_focus_m(
-            moments, probe_geometry, photon_wavelength_m, defocus_distance_m
-        ),
-        num_bins=num_bins,
-    )
 
 
 @dataclass(frozen=True)
@@ -424,14 +225,15 @@ def estimate_parallax_transform(
 ) -> ParallaxTransform | None:
     """Fit a full matrix to the shifts between the bright-field images, ``s = a + M q``.
 
-    The shifts are measured as :func:`estimate_defocus_from_parallax` measures them, with
-    ``q`` in the frame the patterns were recorded in; only the fit differs. Each axis of
-    the shifts is fitted by least squares to an offset and both components of ``q``.
-    *minimum_bins* must be at least four, so each axis's three unknowns leave a residual.
+    The shifts are measured by :func:`measure_parallax_shifts`, with ``q`` in the frame the
+    patterns were recorded in. Each axis of the shifts is fitted by least squares to an
+    offset and both components of ``q``. *minimum_bins* must be at least four, so each
+    axis's three unknowns leave a residual.
 
     The patterns need not be oriented: the orientation is what the result tells. Judge
-    it by :attr:`ParallaxTransform.fresnel_number`, as for the scalar fit. *max_bins* and
-    *chunk_bins* bound the memory as they do there.
+    it by :attr:`ParallaxTransform.fresnel_number`: within about one depth of focus the
+    bright-field images are not shifted copies, and the fit is no evidence of a defocus.
+    *max_bins* and *chunk_bins* bound the memory as they do in the measurement.
 
     Returns None when fewer than *minimum_bins* bright-field bins remain or fewer than
     three positions pair with a pattern.
@@ -444,7 +246,7 @@ def estimate_parallax_transform(
     if minimum_bins < 4:
         raise ValueError('A matrix fit needs at least four bins!')
 
-    measured = _measure_bin_shifts(
+    measured = measure_parallax_shifts(
         moments,
         probe_positions,
         object_geometry,
@@ -537,22 +339,48 @@ def _depth_of_focus_m(
     ).depth_of_focus_m
 
 
-def _measure_bin_shifts(
+def measure_parallax_shifts(
     moments: DiffractionMoments,
     probe_positions: ProbePositionSequence,
     object_geometry: ObjectGeometry,
     probe_geometry: ProbeGeometry,
     *,
-    bright_field_fraction: float,
-    upsample_factor: int,
-    minimum_bins: int,
-    max_bins: int,
-    chunk_bins: int,
+    bright_field_fraction: float = 0.5,
+    upsample_factor: int = 20,
+    minimum_bins: int = 4,
+    max_bins: int = 64,
+    chunk_bins: int = 8,
 ) -> tuple[RealArrayType, RealArrayType] | None:
-    """Each bright-field bin's spatial frequency and image shift, ``(x, y)`` per row.
+    """Each bright-field bin's spatial frequency and image shift, ``(x, y)`` per row, in 1/m and m.
 
-    Steps 1 to 3 of :func:`estimate_defocus_from_parallax`; ``q`` is measured from the
-    DC pixel ``N // 2``. None when too few bins or positions remain.
+    *moments* must have been accumulated with a binning step, from far-field patterns on
+    *probe_geometry*'s reciprocal grid, one detector pixel being ``1 / (N * dx)``; no
+    detector pitch is needed. Binned patterns are used as they are stored, so correct
+    them for beam decay by I0 first (:meth:`DiffractionMoments.normalize_by_i0`) if the
+    beam drifted.
+
+    1. The bright field is every bin whose mean reaches *bright_field_fraction* of the
+       brightest, less the bins on its edge, whose images mix the disk with the dark
+       field. Past *max_bins*, an evenly spread subset on a coarser lattice is kept,
+       which bounds the memory the images take: fewer bins scatter the shifts more and
+       cost less.
+    2. Each kept bin's values are mapped onto *object_geometry* by
+       :func:`interpolate_position_values`, pairing patterns with *probe_positions* by
+       index, *chunk_bins* bins at a time, and cropped to the probe positions' hull before the
+       next chunk is mapped; a smaller chunk lowers the peak memory at no cost in the
+       result.
+    3. Each image is registered against their mean to ``1 / upsample_factor`` of a
+       pixel, and again against the mean of the images so aligned. The cross-correlation
+       is not normalized to its phase: whitening amplifies the interpolation's noise
+       until it pulls every shift toward zero.
+
+    ``q`` is measured from the DC pixel ``N // 2``. Returns None when fewer than
+    *minimum_bins* bright-field bins remain or fewer than three positions pair with a
+    pattern.
+
+    Raises:
+        ValueError: if *moments* holds no binned patterns, its patterns do not match
+            *probe_geometry*, or *max_bins* is below *minimum_bins*.
     """
     if max_bins < minimum_bins:
         raise ValueError(f'max_bins ({max_bins}) is below minimum_bins ({minimum_bins})!')

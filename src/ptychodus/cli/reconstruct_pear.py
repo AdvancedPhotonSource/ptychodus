@@ -946,6 +946,7 @@ def main() -> ExitCode:
                 object_geometry,
                 probe_geometry,
                 photon_wavelength_m=wavelength_m,
+                detector_distance_m=detector_distance_m,
                 source='fzp_defocus_m',
             )
         else:

@@ -19,7 +19,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ptychodus.api.parallax import ParallaxEstimate
+from ptychodus.api.defocus import AutofocusEstimate, ParallaxEstimate
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import ProductMetadata
 from ptychodus.model.settings import SettingsRegistry
@@ -81,10 +81,12 @@ def _api(
 def _settings() -> ProductSettings:
     """Product settings with the bin size the fixture needs.
 
-    Bins of two pixels: the fixture's bright field is only eight pixels in radius.
+    Bins of two pixels: the fixture's bright field is only eight pixels in radius. Autofocus
+    is off, so these tests measure the parallax alone; it has tests of its own below.
     """
     settings = ProductSettings(SettingsRegistry())
     settings.parallax_bin_size_px.set_value(2)
+    settings.refine_defocus_by_autofocus.set_value(False)
     return settings
 
 
@@ -94,8 +96,8 @@ def _estimate(
     api, item = _api(defocus_m, metadata)
     results: list[tuple[ParallaxEstimate | None, bool]] = []
 
-    api.estimate_defocus_from_parallax(
-        0, on_finished=lambda estimate, applied: results.append((estimate, applied))
+    api.estimate_defocus(
+        0, on_finished=lambda estimate, refined, applied: results.append((estimate, applied))
     )
     return item, results
 
@@ -187,7 +189,7 @@ def _maybe_estimate(
     if not has_dataset:
         item.get_dataset.return_value = None
 
-    with patch.object(ProductAPI, 'estimate_defocus_from_parallax') as estimate:
+    with patch.object(ProductAPI, 'estimate_defocus') as estimate:
         api._maybe_estimate_defocus(0, block=True)
 
     return estimate
@@ -244,3 +246,95 @@ def test_a_product_from_settings_is_measured() -> None:
         index = api.insert_product_from_settings()
 
     maybe.assert_called_once_with(index, block=True)
+
+
+# ---------------------------------------------------------------------------
+# Autofocus
+# ---------------------------------------------------------------------------
+
+
+def _autofocus(
+    monkeypatch: pytest.MonkeyPatch,
+    refined: AutofocusEstimate | Exception,
+    defocus_m: float = 2.0e-3,
+) -> tuple[MagicMock, list[tuple[ParallaxEstimate | None, AutofocusEstimate | None, bool]]]:
+    """Estimate with autofocus on, *refined* standing in for its answer."""
+
+    def fake(*args: object, **kwargs: object) -> AutofocusEstimate:
+        if isinstance(refined, Exception):
+            raise refined
+
+        return refined
+
+    monkeypatch.setattr('ptychodus.model.product.api.estimate_defocus_by_autofocus', fake)
+    settings = _settings()
+    settings.refine_defocus_by_autofocus.set_value(True)
+    api, item = _api(defocus_m, settings=settings)
+    results: list[tuple[ParallaxEstimate | None, AutofocusEstimate | None, bool]] = []
+    api.estimate_defocus(
+        0,
+        on_finished=lambda estimate, autofocus, applied: results.append(
+            (estimate, autofocus, applied)
+        ),
+    )
+    return item, results
+
+
+_REFINED = AutofocusEstimate(
+    defocus_distance_m=2.6e-3,
+    candidates_m=(1.0e-3, 2.6e-3, 6.0e-3),
+    residuals=(0.3, 0.1, 0.3),
+    num_patterns=361,
+    kept_initial=False,
+    on_edge=False,
+)
+
+
+def test_autofocus_sets_the_focus_position_it_refines(monkeypatch: pytest.MonkeyPatch) -> None:
+    item, [(estimate, refined, applied)] = _autofocus(monkeypatch, _REFINED)
+
+    assert applied and estimate is not None
+    assert refined is _REFINED
+    item.get_metadata_item.return_value.focus_object_distance_m.set_value.assert_called_once_with(
+        -2.6e-3
+    )
+
+
+def test_autofocus_that_keeps_the_parallax_defocus_applies_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    item, [(estimate, refined, applied)] = _autofocus(
+        monkeypatch, replace(_REFINED, kept_initial=True)
+    )
+
+    assert applied and estimate is not None and refined is not None
+    item.get_metadata_item.return_value.focus_object_distance_m.set_value.assert_called_once_with(
+        -estimate.defocus_distance_m
+    )
+
+
+def test_a_failed_autofocus_applies_the_parallax_defocus(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level(logging.ERROR, logger='ptychodus.model.product.api'):
+        item, [(estimate, refined, applied)] = _autofocus(monkeypatch, ValueError('no pairs'))
+
+    assert applied and estimate is not None and refined is None
+    item.get_metadata_item.return_value.focus_object_distance_m.set_value.assert_called_once_with(
+        -estimate.defocus_distance_m
+    )
+    assert 'Autofocus failed' in caplog.text
+
+
+def test_an_unresolved_parallax_is_not_autofocused(monkeypatch: pytest.MonkeyPatch) -> None:
+    item, [(estimate, refined, applied)] = _autofocus(
+        monkeypatch, AssertionError('autofocus refines a resolved defocus only'), defocus_m=0.0
+    )
+
+    assert estimate is not None and refined is None and not applied
+    item.get_metadata_item.return_value.focus_object_distance_m.set_value.assert_not_called()
+
+
+def test_autofocus_is_on_by_default() -> None:
+    """It found the reference waist where the parallax misses it, on held-out data."""
+    assert ProductSettings(SettingsRegistry()).refine_defocus_by_autofocus.get_value()

@@ -66,6 +66,9 @@ The remaining arguments fall into four groups.
 `--parallax-bin-size-px`, `--parallax-min-significance`, `--parallax-min-defocus-dof`
 : When far-field data states no focus, the defocus is measured from the parallax between bright-field images, as the GUI's **Estimate Defocus** does (see [Measuring the Defocus](initial_guesses.md#measuring-the-defocus)), at the cost of one binned pass over the patterns. It is applied only when resolved by the significance and depth-of-focus thresholds; otherwise the focus is zero and a warning says so. Stating `--focus-object-distance-m`, 0 included, skips the measurement.
 
+`--defocus-estimate`
+: `autofocus` (the default) refines a resolved parallax defocus by autofocus, which keeps the parallax value near focus (see [Measuring the Defocus](initial_guesses.md#measuring-the-defocus)); `parallax` applies the parallax estimate alone.
+
 Five more control the run itself: `--options` chooses the reconstruction algorithm and its settings, `--num-sync-epochs` overrides how often the run checkpoints and reports progress, `--dry-run` reports the resolved configuration without reconstructing, `--prepare-only` writes a prepared directory and stops (see [Preparing and reconstructing separately](#preparing-and-reconstructing-separately)), and `--log-level` takes a Python logging level as an integer (`10` for DEBUG, `20` for INFO).
 
 ```{note}

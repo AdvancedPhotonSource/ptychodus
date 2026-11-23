@@ -22,7 +22,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 from uuid import UUID
 import copy
 import logging
@@ -53,7 +53,11 @@ from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.interpolate import interpolate_at_indexes
 from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider, compute_object_geometry
 from ptychodus.api.options import apply_options_document
-from ptychodus.api.parallax import ParallaxEstimate, estimate_defocus_from_parallax
+from ptychodus.api.defocus import (
+    ParallaxEstimate,
+    estimate_defocus_by_autofocus,
+    estimate_defocus_from_parallax,
+)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import BinningStep, DiffractionPrepPipeline
 from ptychodus.api.probe import ProbeEnsemble, ProbeGeometry, ProbeGeometryProvider
@@ -189,6 +193,9 @@ class StreamConfiguration(BaseModel):
     parallax_bin_size_px: int = Field(4, ge=0)
     parallax_min_significance: float = Field(3.0, ge=0.0)
     parallax_min_defocus_dof: float = Field(1.0, ge=0.0)
+    # Each scan's final estimate refines a resolved parallax defocus by autofocus, from all
+    # its patterns; periodic estimates, which see moments only, use the parallax alone.
+    defocus_estimate: Literal['autofocus', 'parallax'] = 'autofocus'
 
     # Timing
     estimate_period_s: float = Field(5.0, gt=0.0)
@@ -1168,14 +1175,21 @@ def _select(data: AssembledDiffractionData, mask: BooleanArrayType) -> Assembled
 # ---------------------------------------------------------------------------
 
 
-def estimate_product(snapshot: ScanSnapshot, setup: ScanSetup) -> Product:
+def estimate_product(
+    snapshot: ScanSnapshot,
+    setup: ScanSetup,
+    *,
+    assembled_data: AssembledDiffractionData | None = None,
+) -> Product:
     """A product from a scan's moments, by the GUI's sequence.
 
     1. The incident beam -- photon count and mean transmission -- from the detector sums,
        corrected for beam decay by the positions' I0.
     2. When the configuration states no focus, the patterns are far field and the moments
        were binned, the parallax defocus; a resolved estimate sets the focus, and an
-       unresolved one leaves it at zero.
+       unresolved one leaves it at zero. Given the scan's *assembled_data* and the
+       configuration's `defocus_estimate` of `autofocus`, a resolved defocus is first
+       refined by :func:`~ptychodus.api.defocus.estimate_defocus_by_autofocus`.
     3. The probe from the mean pattern, scaled to the incident photon count.
     4. The object by STXM-DPC, with that probe; uniform in near field.
     """
@@ -1204,7 +1218,12 @@ def estimate_product(snapshot: ScanSnapshot, setup: ScanSetup) -> Product:
             minimum_significance=configuration.parallax_min_significance,
             minimum_defocus_dof=configuration.parallax_min_defocus_dof,
         ):
-            metadata = replace(metadata, focus_object_distance_m=-parallax.defocus_distance_m)
+            defocus_m = parallax.defocus_distance_m
+
+            if assembled_data is not None and configuration.defocus_estimate == 'autofocus':
+                defocus_m = _refine_by_autofocus(snapshot, assembled_data, parallax)
+
+            metadata = replace(metadata, focus_object_distance_m=-defocus_m)
             snapshot = snapshot.with_metadata(
                 metadata, mean_amplitude_transmission=beam.mean_amplitude_transmission
             )
@@ -1234,6 +1253,34 @@ def estimate_product(snapshot: ScanSnapshot, setup: ScanSetup) -> Product:
         object_=object_,
         losses=[],
     )
+
+
+def _refine_by_autofocus(
+    snapshot: ScanSnapshot, assembled_data: AssembledDiffractionData, parallax: ParallaxEstimate
+) -> float:
+    """The autofocus defocus from the scan's patterns, or the parallax one where autofocus
+    keeps it or fails."""
+    try:
+        refined = estimate_defocus_by_autofocus(
+            assembled_data,
+            snapshot.get_probe_positions(),
+            snapshot.get_object_geometry(),
+            snapshot.get_probe_geometry(),
+            photon_wavelength_m=snapshot.photon_wavelength_m,
+            detector_distance_m=snapshot.metadata.detector_distance_m,
+            initial_defocus_m=parallax.defocus_distance_m,
+            depth_of_focus_m=parallax.depth_of_focus_m,
+        )
+    except ValueError as exc:
+        logger.warning(f'Autofocus failed ({exc}); keeping the parallax defocus.')
+        return parallax.defocus_distance_m
+
+    if refined.kept_initial:
+        logger.info('Autofocus keeps the parallax defocus, which lies near focus.')
+    else:
+        logger.info(f'Autofocus defocus {refined.defocus_distance_m * 1e3:.4g} mm.')
+
+    return refined.defocus_distance_m
 
 
 def _estimate_parallax(
@@ -1749,7 +1796,14 @@ class ScanPipeline:
                 self._num_worker_errors += 1
                 logger.exception('The worker failed on one job; continuing.')
 
-    def _estimate(self, session: ScanSession, label: str, angle_deg: float) -> Product | None:
+    def _estimate(
+        self,
+        session: ScanSession,
+        label: str,
+        angle_deg: float,
+        *,
+        assembled_data: AssembledDiffractionData | None = None,
+    ) -> Product | None:
         configuration = session.setup.configuration
         metadata = configuration.create_metadata(label, tomography_angle_deg=angle_deg)
         snapshot = session.snapshot(metadata)
@@ -1758,7 +1812,7 @@ class ScanPipeline:
             return None
 
         began_s = self._clock()
-        product = estimate_product(snapshot, session.setup)
+        product = estimate_product(snapshot, session.setup, assembled_data=assembled_data)
         self._last_estimate_duration_s = self._clock() - began_s
         self._last_estimate_s = self._clock()
         self._num_estimates += 1
@@ -1797,9 +1851,12 @@ class ScanPipeline:
 
     def _finish(self, session: ScanSession, label: str, angle_deg: float) -> None:
         product: Product | None = None
+        # Ingest has stopped, so every paired pattern can be gathered before the final
+        # estimate, which refines the defocus from them.
+        data = session.assemble()
 
         try:
-            product = self._estimate(session, label, angle_deg)
+            product = self._estimate(session, label, angle_deg, assembled_data=data)
         except Exception:
             self._num_worker_errors += 1
             logger.exception(f'The final estimate of "{label}" failed; storing its frames only.')
@@ -1812,7 +1869,6 @@ class ScanPipeline:
         diffraction_uuid: UUID | None = None
         product_uuid: UUID | None = None
         written = False
-        data = session.assemble()
         reconstruction = self._reconstruction
 
         # Offered before storing, which only reads the data the reconstruction reads too.

@@ -66,7 +66,10 @@ from ptychodus.api.options import (
     dump_options_document,
     parse_options_document,
 )
-from ptychodus.api.parallax import estimate_defocus_from_assembled_data
+from ptychodus.api.defocus import (
+    estimate_defocus_by_autofocus,
+    estimate_defocus_from_assembled_data,
+)
 from ptychodus.api.plugins import PluginCatalog
 from ptychodus.api.preprocess.diffraction import FilterValuesStep, estimate_beam_center
 from ptychodus.api.probe import Probe, ProbeGeometry
@@ -327,20 +330,24 @@ def estimate_focus_object_distance_m(
     probe_geometry: ProbeGeometry,
     *,
     photon_wavelength_m: float,
+    detector_distance_m: float,
     source: str,
     i0_photons_per_count: float = 0.0,
     bin_size_px: int = 4,
     minimum_significance: float = 3.0,
     minimum_defocus_dof: float = 1.0,
+    autofocus: bool = True,
 ) -> float:
-    """The focus position the far-field parallax measures, or zero when it resolves none.
+    """The focus position the far-field data measure, or zero when they resolve none.
 
-    One binned pass over the patterns (see
-    :func:`ptychodus.api.parallax.estimate_defocus_from_assembled_data`). The estimate is
-    applied only when it reaches *minimum_significance* standard errors and
-    *minimum_defocus_dof* depths of focus; otherwise the focus is zero -- indistinguishable
-    from the focus at those thresholds -- and a warning names *source*, where a value can
-    be stated instead.
+    The parallax gives the defocus in one binned pass over the patterns (see
+    :func:`ptychodus.api.defocus.estimate_defocus_from_assembled_data`). It is applied
+    only when it reaches *minimum_significance* standard errors and *minimum_defocus_dof*
+    depths of focus; otherwise the focus is zero -- indistinguishable from the focus at
+    those thresholds -- and a warning names *source*, where a value can be stated instead.
+    With *autofocus*, a resolved defocus is then refined by
+    :func:`ptychodus.api.defocus.estimate_defocus_by_autofocus`, which keeps it
+    near focus and is skipped, with a warning, if it fails.
     """
     remedy = f'Set {source} to state the focus.'
 
@@ -372,9 +379,45 @@ def estimate_focus_object_distance_m(
     if estimate.is_resolved(
         minimum_significance=minimum_significance, minimum_defocus_dof=minimum_defocus_dof
     ):
-        focus_object_distance_m = -estimate.defocus_distance_m
+        defocus_m = estimate.defocus_distance_m
+        method = 'parallax'
+
+        if autofocus:
+            try:
+                refined = estimate_defocus_by_autofocus(
+                    assembled_data,
+                    positions,
+                    object_geometry,
+                    probe_geometry,
+                    photon_wavelength_m=photon_wavelength_m,
+                    detector_distance_m=detector_distance_m,
+                    initial_defocus_m=defocus_m,
+                    depth_of_focus_m=estimate.depth_of_focus_m,
+                )
+            except ValueError as exc:
+                logger.warning('Autofocus failed (%s); keeping the parallax defocus.', exc)
+            else:
+                if refined.kept_initial:
+                    logger.info('Autofocus keeps the parallax defocus, which lies near focus.')
+                else:
+                    defocus_m = refined.defocus_distance_m
+                    method = 'autofocus'
+                    logger.info(
+                        'Autofocus defocus (m): %g, over %d patterns',
+                        defocus_m,
+                        refined.num_patterns,
+                    )
+
+                if refined.on_edge:
+                    logger.warning(
+                        'The autofocus minimum lies on its outermost candidate; the defocus '
+                        'may lie further from the parallax estimate. %s',
+                        remedy,
+                    )
+
+        focus_object_distance_m = -defocus_m
         logger.info(
-            'Focus-object distance (m): %g (from the parallax estimate)', focus_object_distance_m
+            'Focus-object distance (m): %g (from the %s estimate)', focus_object_distance_m, method
         )
         return focus_object_distance_m
 

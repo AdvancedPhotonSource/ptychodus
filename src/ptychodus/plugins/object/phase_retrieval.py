@@ -19,10 +19,10 @@ from ptychodus.api.geometry import GeometryNotDefinedError, ImageExtent
 from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.probe import Probe
 from ptychodus.api.probe_positions import ProbePositionSequence
+from ptychodus.api.spectral import SpectralPreprocessing
 from ptychodus.api.simulate.object import (
     ObjectGenerator,
     SpectralModulus,
-    SpectralPreprocessing,
     STXMDPCSignals,
     generate_paganin_object,
     generate_spectral_object,

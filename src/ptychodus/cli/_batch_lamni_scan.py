@@ -465,6 +465,7 @@ def reconstruct_one_scan(
             object_geometry,
             probe_geometry,
             photon_wavelength_m=photon_wavelength_m,
+            detector_distance_m=detector_distance_m,
             source=focus_source,
         )
 

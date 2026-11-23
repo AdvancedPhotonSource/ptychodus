@@ -32,6 +32,7 @@ from ptychodus.api.diffraction import (
 )
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.io import load_diffraction_data, load_product
+from ptychodus.api.defocus import AutofocusEstimate, ParallaxEstimate
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import BinningStep
 from ptychodus.api.probe_positions import ProbePositionSequence
@@ -1040,6 +1041,60 @@ def test_an_unset_focus_is_measured(monkeypatch: pytest.MonkeyPatch) -> None:
     estimate_product(snapshot, setup)
 
     assert len(calls) == 1
+
+
+_RESOLVED_PARALLAX = ParallaxEstimate(
+    defocus_distance_m=2.0e-3, standard_error_m=1.0e-5, depth_of_focus_m=1.0e-4, num_bins=9
+)
+
+
+def _estimate_with_autofocus(
+    monkeypatch: pytest.MonkeyPatch, *, final: bool, **overrides: object
+) -> Product:
+    """estimate_product with a resolved parallax and autofocus answering 2.6 mm."""
+    setup = _setup(**overrides)
+    session = _streamed_session(setup)
+    snapshot = session.snapshot(
+        setup.configuration.create_metadata('scan', tomography_angle_deg=0.0)
+    )
+    assert snapshot is not None
+    refined = AutofocusEstimate(
+        defocus_distance_m=2.6e-3,
+        candidates_m=(),
+        residuals=(),
+        num_patterns=1,
+        kept_initial=False,
+        on_edge=False,
+    )
+    monkeypatch.setattr(
+        'ptychodus.cli._stream._estimate_parallax', lambda *args: _RESOLVED_PARALLAX
+    )
+    monkeypatch.setattr(
+        'ptychodus.cli._stream.estimate_defocus_by_autofocus', lambda *args, **kwargs: refined
+    )
+    data = session.assemble() if final else None
+    return estimate_product(snapshot, setup, assembled_data=data)
+
+
+def test_the_final_estimate_refines_the_defocus_by_autofocus(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    product = _estimate_with_autofocus(monkeypatch, final=True)
+
+    assert product.metadata.focus_object_distance_m == pytest.approx(-2.6e-3)
+
+
+def test_a_periodic_estimate_uses_the_parallax_alone(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Periodic estimates see moments only, which autofocus cannot use."""
+    product = _estimate_with_autofocus(monkeypatch, final=False)
+
+    assert product.metadata.focus_object_distance_m == pytest.approx(-2.0e-3)
+
+
+def test_the_parallax_setting_skips_autofocus(monkeypatch: pytest.MonkeyPatch) -> None:
+    product = _estimate_with_autofocus(monkeypatch, final=True, defocus_estimate='parallax')
+
+    assert product.metadata.focus_object_distance_m == pytest.approx(-2.0e-3)
 
 
 # ---------------------------------------------------------------------------

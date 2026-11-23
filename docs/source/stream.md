@@ -182,7 +182,7 @@ output_directory: /path/to/storage
 campaign_label: fly001 demo
 ```
 
-The other keys keep their defaults: maps (`bad_pixels_file`, `background_file`, `flat_field_file`, each `{file_path, file_type}`), `pipeline` steps, detector-sum bounds (`total_counts_lower_bound`, `total_counts_upper_bound`), `index_offset`, `i0_name` and `i0_photons_per_count`, `focus_object_distance_m` (the negated probe defocus, which each scan's parallax measures while it is unset and an explicit value, 0 included, skips), `reconstruction` and `trained_model_file` (see {ref}`stream-reconstruction`), parallax thresholds, `unpaired_retention_s`, `num_frames_per_block`, `consumer_queue_size` and `queue_warning_frames`.
+The other keys keep their defaults: maps (`bad_pixels_file`, `background_file`, `flat_field_file`, each `{file_path, file_type}`), `pipeline` steps, detector-sum bounds (`total_counts_lower_bound`, `total_counts_upper_bound`), `index_offset`, `i0_name` and `i0_photons_per_count`, `focus_object_distance_m` (the negated probe defocus, which each scan's parallax measures while it is unset and an explicit value, 0 included, skips), `defocus_estimate` (`autofocus`, the default, refines each scan's final defocus from all its patterns; periodic estimates, which see moments only, use the parallax alone; `parallax` skips autofocus), `reconstruction` and `trained_model_file` (see {ref}`stream-reconstruction`), parallax thresholds, `unpaired_retention_s`, `num_frames_per_block`, `consumer_queue_size` and `queue_warning_frames`.
 
 ### Run
 
@@ -211,7 +211,7 @@ pvget ptychodus:probe:amplitude
 pvget ptychodus:scan
 ```
 
-The log reports the parallax defocus. fly001 records more frames than positions, so the frames past the last position are dropped at the end of the settle and counted in `num_frames_dropped`.
+The log reports the parallax defocus, and at each scan's end the autofocus one. fly001 records more frames than positions, so the frames past the last position are dropped at the end of the settle and counted in `num_frames_dropped`.
 
 ### Browse
 

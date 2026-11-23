@@ -69,7 +69,7 @@ from ptychodus.api.metrics import (
     estimate_reconstruction_ambiguities,
 )
 from ptychodus.api.object import Object, ObjectGeometry, ObjectGeometryProvider, shift_object
-from ptychodus.api.parallax import estimate_defocus_from_assembled_data
+from ptychodus.api.defocus import estimate_defocus_from_assembled_data
 from ptychodus.api.probe import Probe, ProbeEnsemble, ProbeGeometry
 from ptychodus.api.probe_positions import ProbePosition
 from ptychodus.api.product import Product

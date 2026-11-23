@@ -480,7 +480,15 @@ def _add_defocus_estimate_arguments(parser: argparse.ArgumentParser) -> None:
         'In far field, when neither --focus-object-distance-m nor the diffraction file states '
         'the focus, the defocus is measured from the parallax between bright-field images, '
         'in one binned pass over the patterns, and the focus set from it; an unresolved '
-        "estimate leaves the focus at zero. The defaults match the GUI's Products settings.",
+        'estimate leaves the focus at zero. A resolved estimate is then refined by autofocus: '
+        'the defocus whose average-pattern probe best explains the patterns. The defaults '
+        "match the GUI's Products settings.",
+    )
+    group.add_argument(
+        '--defocus-estimate',
+        choices=('autofocus', 'parallax'),
+        default='autofocus',
+        help='Refine the parallax defocus by autofocus, or apply the parallax estimate alone.',
     )
     group.add_argument(
         '--parallax-bin-size-px',
@@ -1312,11 +1320,13 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             object_geometry,
             probe_geometry,
             photon_wavelength_m=photon_wavelength_m,
+            detector_distance_m=detector_distance_m,
             source='--focus-object-distance-m',
             i0_photons_per_count=args.i0_photons_per_count,
             bin_size_px=args.parallax_bin_size_px,
             minimum_significance=args.parallax_min_significance,
             minimum_defocus_dof=args.parallax_min_defocus_dof,
+            autofocus=args.defocus_estimate == 'autofocus',
         )
 
     rng = numpy.random.default_rng(args.seed)

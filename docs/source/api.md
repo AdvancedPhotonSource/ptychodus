@@ -36,6 +36,15 @@
    :show-inheritance:
 ```
 
+## Defocus
+
+```{eval-rst}
+.. automodule:: ptychodus.api.defocus
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Devices
 
 ```{eval-rst}
@@ -287,6 +296,15 @@
 
 ```{eval-rst}
 .. automodule:: ptychodus.api.spawn
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+## Spectral
+
+```{eval-rst}
+.. automodule:: ptychodus.api.spectral
    :members:
    :undoc-members:
    :show-inheritance:

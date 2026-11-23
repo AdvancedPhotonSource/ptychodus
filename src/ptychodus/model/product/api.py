@@ -6,7 +6,12 @@ import math
 import threading
 
 from ptychodus.api.diffraction import Polarization
-from ptychodus.api.parallax import ParallaxEstimate, estimate_defocus_from_assembled_data
+from ptychodus.api.defocus import (
+    AutofocusEstimate,
+    ParallaxEstimate,
+    estimate_defocus_by_autofocus,
+    estimate_defocus_from_assembled_data,
+)
 from ptychodus.api.probe import OPRWeightPolicy
 from ptychodus.api.scattering.geometry import ScatteringGeometry
 from ptychodus.api.product import (
@@ -624,7 +629,7 @@ class ProductAPI:
     def get_item(self, product_index: int) -> ProductRepositoryItem:
         return self._repository[product_index]
 
-    def estimate_defocus_from_parallax(
+    def estimate_defocus(
         self,
         product_index: int,
         *,
@@ -632,19 +637,25 @@ class ProductAPI:
         bin_size_px: int | None = None,
         minimum_significance: float | None = None,
         minimum_defocus_dof: float | None = None,
-        on_finished: Callable[[ParallaxEstimate | None, bool], None] | None = None,
+        autofocus: bool | None = None,
+        on_finished: Callable[[ParallaxEstimate | None, AutofocusEstimate | None, bool], None]
+        | None = None,
     ) -> None:
-        """Measure the defocus from the parallax between bright-field images.
+        """Measure the defocus from the patterns and set the product's focus position.
 
         One pass over the bound patterns, binned *bin_size_px* detector pixels a side and
         corrected for beam decay by I0, gives :func:`estimate_defocus_from_assembled_data`'s
-        estimate. When :meth:`ParallaxEstimate.is_resolved` holds for the thresholds, the
-        product's focus position is set to the negated defocus; a focus the product
-        already stated is replaced, and a disagreement reported. Every threshold defaults
-        to the corresponding product setting. *on_finished* receives the estimate, None
-        when none could be made, and whether it was applied. Far field only.
+        parallax estimate. When :meth:`ParallaxEstimate.is_resolved` holds for the
+        thresholds, *autofocus* refines it by
+        :func:`~ptychodus.api.defocus.estimate_defocus_by_autofocus` (which keeps
+        it near focus), and the product's focus position is set to the negated defocus; a
+        focus the product already stated is replaced, and a disagreement reported. Every
+        threshold, and *autofocus*, defaults to the corresponding product setting.
+        *on_finished* receives the parallax estimate (None when none could be made), the
+        autofocus estimate (None when autofocus did not run or failed), and whether a
+        defocus was applied. Far field only.
 
-        The pass runs in the background unless *block*, which runs it inline so the focus
+        The work runs in the background unless *block*, which runs it inline so the focus
         position is set by the time this returns.
         """
         settings = self._settings
@@ -659,22 +670,27 @@ class ProductAPI:
             if minimum_defocus_dof is None
             else minimum_defocus_dof
         )
+        refine = (
+            settings.refine_defocus_by_autofocus.get_value() if autofocus is None else autofocus
+        )
         item = self._repository[product_index]
         dataset = item.get_dataset()
         metadata = item.get_metadata_item().get_metadata()
 
-        def finish(estimate: ParallaxEstimate | None, applied: bool) -> None:
+        def finish(
+            estimate: ParallaxEstimate | None, refined: AutofocusEstimate | None, applied: bool
+        ) -> None:
             if on_finished is not None:
-                on_finished(estimate, applied)
+                on_finished(estimate, refined, applied)
 
         if dataset is None:
             logger.warning('No diffraction data to estimate the defocus from.')
-            finish(None, False)
+            finish(None, None, False)
             return
 
         if not metadata.far_field:
-            logger.warning('The defocus is estimated from far-field parallax only.')
-            finish(None, False)
+            logger.warning('The defocus is estimated from far-field data only.')
+            finish(None, None, False)
             return
 
         data = dataset.get_assembled_data()
@@ -685,6 +701,7 @@ class ProductAPI:
 
         def estimate_in_background() -> Callable[[], None]:
             estimate: ParallaxEstimate | None = None
+            refined: AutofocusEstimate | None = None
 
             try:
                 estimate = estimate_defocus_from_assembled_data(
@@ -699,23 +716,49 @@ class ProductAPI:
             except Exception:
                 logger.exception('Failed to estimate the defocus from the parallax!')
 
-            def apply_in_foreground() -> None:
-                applied = estimate is not None and estimate.is_resolved(
-                    minimum_significance=significance,
-                    minimum_defocus_dof=defocus_dof,
-                )
+            resolved = estimate is not None and estimate.is_resolved(
+                minimum_significance=significance,
+                minimum_defocus_dof=defocus_dof,
+            )
 
+            if resolved and refine and estimate is not None:
+                try:
+                    refined = estimate_defocus_by_autofocus(
+                        data,
+                        positions,
+                        object_geometry,
+                        probe_geometry,
+                        photon_wavelength_m=metadata.photon_wavelength_m,
+                        detector_distance_m=metadata.detector_distance_m,
+                        initial_defocus_m=estimate.defocus_distance_m,
+                        depth_of_focus_m=estimate.depth_of_focus_m,
+                    )
+                except Exception:
+                    logger.exception('Autofocus failed; keeping the parallax defocus.')
+
+            def apply_in_foreground() -> None:
                 if estimate is None:
                     logger.warning('The parallax gives no defocus estimate.')
-                elif applied:
+                elif resolved:
+                    defocus_m = estimate.defocus_distance_m
                     logger.info(
-                        f'Parallax defocus {estimate.defocus_distance_m * 1e3:.4g} '
-                        f'+/- {estimate.standard_error_m * 1e3:.2g} mm; setting the focus position.'
+                        f'Parallax defocus {defocus_m * 1e3:.4g} '
+                        f'+/- {estimate.standard_error_m * 1e3:.2g} mm.'
                     )
-                    self._warn_if_defocus_disagrees(metadata, estimate.defocus_distance_m)
-                    item.get_metadata_item().focus_object_distance_m.set_value(
-                        -estimate.defocus_distance_m
-                    )
+
+                    if refined is not None and not refined.kept_initial:
+                        defocus_m = refined.defocus_distance_m
+                        logger.info(f'Autofocus defocus {defocus_m * 1e3:.4g} mm.')
+
+                    if refined is not None and refined.on_edge:
+                        logger.warning(
+                            'The autofocus minimum lies on its outermost candidate; the '
+                            'defocus may lie further from the parallax estimate.'
+                        )
+
+                    logger.info('Setting the focus position.')
+                    self._warn_if_defocus_disagrees(metadata, defocus_m)
+                    item.get_metadata_item().focus_object_distance_m.set_value(-defocus_m)
                 else:
                     logger.warning(
                         f'Parallax defocus {estimate.defocus_distance_m * 1e3:.4g} '
@@ -723,7 +766,7 @@ class ProductAPI:
                         'leaving the focus position.'
                     )
 
-                finish(estimate, applied)
+                finish(estimate, refined, resolved)
 
             return apply_in_foreground
 
@@ -750,7 +793,7 @@ class ProductAPI:
             measured_m - stated_m
         ) > rtol * abs(stated_m):
             logger.warning(
-                f'The parallax measures a defocus of {measured_m * 1e3:.4g} mm against the '
+                f'The data measure a defocus of {measured_m * 1e3:.4g} mm against the '
                 f'{stated_m * 1e3:.4g} mm the product stated; replacing it.'
             )
 
@@ -774,7 +817,7 @@ class ProductAPI:
         if metadata.focus_object_distance_m != 0.0 or not metadata.far_field:
             return
 
-        self.estimate_defocus_from_parallax(product_index, block=block)
+        self.estimate_defocus(product_index, block=block)
 
     def open_product(
         self,

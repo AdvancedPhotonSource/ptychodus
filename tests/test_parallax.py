@@ -44,13 +44,15 @@ from parallax_scan_fixtures import (
 )
 from ptychodus.api.accumulate import DiffractionMoments, compute_diffraction_moments
 from ptychodus.api.affine import AffineTransform
-from ptychodus.api.parallax import (
-    DetectorOrientation,
+from ptychodus.api.defocus import (
     ParallaxEstimate,
-    ParallaxTransform,
-    compute_geometry_mismatch,
     estimate_defocus_from_assembled_data,
     estimate_defocus_from_parallax,
+)
+from ptychodus.api.parallax import (
+    DetectorOrientation,
+    ParallaxTransform,
+    compute_geometry_mismatch,
     estimate_parallax_transform,
 )
 from ptychodus.api.preprocess.diffraction import BinningStep, DiffractionPrepPipeline

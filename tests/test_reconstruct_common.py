@@ -15,6 +15,7 @@ or build a real process group; both are stubbed at the one function that reports
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from collections.abc import Callable
 from typing import Any, Iterator
@@ -45,7 +46,7 @@ from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.preprocess.diffraction import FilterValuesStep, SignalRadius
 from ptychodus.api.preprocess.noise import RobustStatistics
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.parallax import ParallaxEstimate
+from ptychodus.api.defocus import AutofocusEstimate, ParallaxEstimate
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
@@ -1190,8 +1191,22 @@ class TestRequireNearFieldFocusObjectDistance:
 _UNREAD: Any = None
 
 
+_KEPT = AutofocusEstimate(
+    defocus_distance_m=2.0e-3,
+    candidates_m=(),
+    residuals=(),
+    num_patterns=0,
+    kept_initial=True,
+    on_edge=False,
+)
+
+
 def _estimate_with(
-    monkeypatch: pytest.MonkeyPatch, estimate: ParallaxEstimate | None | Exception
+    monkeypatch: pytest.MonkeyPatch,
+    estimate: ParallaxEstimate | None | Exception,
+    refined: AutofocusEstimate | Exception = _KEPT,
+    *,
+    autofocus: bool = True,
 ) -> float:
     def fake(*args: object, **kwargs: object) -> ParallaxEstimate | None:
         if isinstance(estimate, Exception):
@@ -1199,7 +1214,14 @@ def _estimate_with(
 
         return estimate
 
+    def fake_autofocus(*args: object, **kwargs: object) -> AutofocusEstimate:
+        if isinstance(refined, Exception):
+            raise refined
+
+        return refined
+
     monkeypatch.setattr(_reconstruct_common, 'estimate_defocus_from_assembled_data', fake)
+    monkeypatch.setattr(_reconstruct_common, 'estimate_defocus_by_autofocus', fake_autofocus)
     return estimate_focus_object_distance_m(
         logging.getLogger(),
         _UNREAD,
@@ -1207,8 +1229,15 @@ def _estimate_with(
         _UNREAD,
         _UNREAD,
         photon_wavelength_m=1.0e-10,
+        detector_distance_m=2.0,
         source='--focus-object-distance-m',
+        autofocus=autofocus,
     )
+
+
+_RESOLVED = ParallaxEstimate(
+    defocus_distance_m=2.0e-3, standard_error_m=1.0e-5, depth_of_focus_m=1.0e-4, num_bins=9
+)
 
 
 class TestEstimateFocusObjectDistance:
@@ -1217,11 +1246,42 @@ class TestEstimateFocusObjectDistance:
     def test_a_resolved_defocus_sets_the_negated_focus(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        estimate = ParallaxEstimate(
-            defocus_distance_m=2.0e-3, standard_error_m=1.0e-5, depth_of_focus_m=1.0e-4, num_bins=9
+        """Autofocus keeps it here, as it does near focus."""
+        assert _estimate_with(monkeypatch, _RESOLVED) == pytest.approx(-2.0e-3)
+
+    def test_autofocus_refines_a_resolved_defocus(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        refined = replace(_KEPT, defocus_distance_m=2.6e-3, num_patterns=100, kept_initial=False)
+
+        assert _estimate_with(monkeypatch, _RESOLVED, refined) == pytest.approx(-2.6e-3)
+
+    def test_a_failed_autofocus_keeps_the_parallax_defocus(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.WARNING):
+            focus_m = _estimate_with(monkeypatch, _RESOLVED, ValueError('no position pairs'))
+
+        assert focus_m == pytest.approx(-2.0e-3)
+        assert 'Autofocus failed' in caplog.text
+
+    def test_without_autofocus_the_parallax_defocus_is_applied(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        unused = AssertionError('autofocus is not asked for')
+
+        assert _estimate_with(monkeypatch, _RESOLVED, unused, autofocus=False) == pytest.approx(
+            -2.0e-3
         )
 
-        assert _estimate_with(monkeypatch, estimate) == pytest.approx(-2.0e-3)
+    def test_an_edge_minimum_is_applied_with_a_remedy(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        refined = replace(_KEPT, defocus_distance_m=6.0e-3, kept_initial=False, on_edge=True)
+
+        with caplog.at_level(logging.WARNING):
+            assert _estimate_with(monkeypatch, _RESOLVED, refined) == pytest.approx(-6.0e-3)
+
+        assert 'outermost candidate' in caplog.text
+        assert '--focus-object-distance-m' in caplog.text
 
     @pytest.mark.parametrize(
         'estimate',

@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import (
 
 from ptychodus.api.constants import LengthUnit
 from ptychodus.api.diffraction import Polarization
-from ptychodus.api.parallax import ParallaxEstimate
+from ptychodus.api.defocus import AutofocusEstimate, ParallaxEstimate
 from ptychodus.api.scattering.geometry import ScatteringIssue, find_scattering_issues
 from ptychodus.model.observer import Observable, Observer
 
@@ -555,25 +555,31 @@ class ProductEditorViewController(Observer, DiffractionDatasetRepositoryObserver
 
     def _estimate_defocus(self) -> None:
         self._dialog.actions_view.estimate_defocus_button.setEnabled(False)
-        self._product_api.estimate_defocus_from_parallax(
-            self._product_index, on_finished=self._report_defocus
-        )
+        self._product_api.estimate_defocus(self._product_index, on_finished=self._report_defocus)
 
-    def _report_defocus(self, estimate: ParallaxEstimate | None, applied: bool) -> None:
+    def _report_defocus(
+        self, estimate: ParallaxEstimate | None, refined: AutofocusEstimate | None, applied: bool
+    ) -> None:
         self._dialog.actions_view.estimate_defocus_button.setEnabled(True)
 
         if estimate is None:
             text = 'The parallax gives no defocus estimate; see the log.'
         else:
             text = (
-                f'Defocus {estimate.defocus_distance_m * 1e3:.4g} '
+                f'Parallax defocus {estimate.defocus_distance_m * 1e3:.4g} '
                 f'\u00b1 {estimate.standard_error_m * 1e3:.2g} mm\n'
                 f'Depth of focus {estimate.depth_of_focus_m * 1e3:.4g} mm\n'
-                + (
-                    'Resolved: the focus position is set.'
-                    if applied
-                    else 'Not resolved: the focus position is left as it was.'
-                )
+            )
+
+            if refined is not None and not refined.kept_initial:
+                text += f'Autofocus defocus {refined.defocus_distance_m * 1e3:.4g} mm\n'
+            elif refined is not None:
+                text += 'Autofocus keeps the parallax defocus, which lies near focus.\n'
+
+            text += (
+                'Resolved: the focus position is set.'
+                if applied
+                else 'Not resolved: the focus position is left as it was.'
             )
 
         QMessageBox.information(self._dialog, 'Estimate Defocus', text)
