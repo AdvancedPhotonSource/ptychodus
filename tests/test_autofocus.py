@@ -59,6 +59,15 @@ def test_recovers_the_defocus_from_a_wrong_initial_one(
     assert len(result.candidates_m) == len(result.residuals) == 9
 
 
+def test_the_pattern_cap_keeps_a_central_block() -> None:
+    """A cap of 200 of the 361 patterns keeps the central 13 x 13 block: 169 patterns, and
+    2.982 mm."""
+    result = _autofocus(TRUE_DEFOCUS_M, 0.6 * TRUE_DEFOCUS_M, min_defocus_dof=1.0, max_patterns=200)
+
+    assert 100 < result.num_patterns <= 200
+    assert result.defocus_distance_m == pytest.approx(TRUE_DEFOCUS_M, rel=0.05)
+
+
 def test_an_initial_defocus_within_the_depth_of_focus_is_kept_unevaluated() -> None:
     initial_m = 0.5 * DEPTH_OF_FOCUS_M
 
@@ -86,6 +95,7 @@ def test_a_minimum_near_focus_keeps_the_initial_defocus() -> None:
         ({'detector_distance_m': 0.0}, 'detector distance'),
         ({'depth_of_focus_m': 0.0}, 'depth of focus'),
         ({'num_candidates': 2}, 'candidates'),
+        ({'max_patterns': 0}, 'one pattern'),
     ],
 )
 def test_invalid_inputs_are_refused(kwargs: dict[str, float], match: str) -> None:

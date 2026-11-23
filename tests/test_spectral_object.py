@@ -701,12 +701,13 @@ class _Provider(ObjectGeometryProvider):
         return self._moments
 
 
+@pytest.mark.parametrize('shadow_correction', [True, False])
 @pytest.mark.parametrize('start', list(SpectralStart))
-def test_the_generator_matches_the_function(start: SpectralStart) -> None:
+def test_the_generator_matches_the_function(start: SpectralStart, shadow_correction: bool) -> None:
     probe, positions, data = _far_field_case()
 
     object_ = SpectralObjectGenerator().generate(
-        SpectralOptions(start=start),
+        SpectralOptions(start=start, shadow_correction=shadow_correction),
         _Provider(data, positions),
         rng=numpy.random.default_rng(0),
         probe=probe,
@@ -723,7 +724,7 @@ def test_the_generator_matches_the_function(start: SpectralStart) -> None:
                 positions,
                 detector_extent=data.get_image_extent(),
                 probe=probe,
-                correct_shadow=False,
+                correct_shadow=shadow_correction,
             )
             if start is SpectralStart.STXM_DPC
             else None

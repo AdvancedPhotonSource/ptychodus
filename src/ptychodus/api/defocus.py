@@ -300,7 +300,7 @@ class _AutofocusResidual:
         *,
         photon_wavelength_m: float,
         detector_distance_m: float,
-        max_pattern_pixels: int,
+        max_patterns: int,
         support_fraction: float,
         max_patterns_per_chunk: int,
     ) -> None:
@@ -313,9 +313,7 @@ class _AutofocusResidual:
             raise ValueError('No probe position pairs with any diffraction pattern index!')
 
         rows = numpy.flatnonzero(paired)
-        height_px, width_px = assembled_data.get_patterns().shape[-2:]
-        fraction = min(1.0, max_pattern_pixels / (rows.size * height_px * width_px))
-        keep = _select_central_rows(positions, fraction)
+        keep = _select_central_rows(positions, min(1.0, max_patterns / rows.size))
         self._pattern_rows = rows[keep]
         self._positions = ProbePositionSequence([positions[i] for i in keep])
         self._geometry = geometry
@@ -323,6 +321,7 @@ class _AutofocusResidual:
             slice(begin, min(begin + max_patterns_per_chunk, self._pattern_rows.size))
             for begin in range(0, self._pattern_rows.size, max_patterns_per_chunk)
         ]
+        height_px, width_px = assembled_data.get_patterns().shape[-2:]
         pixel_geometry = start_probe.get_pixel_geometry()
         self._propagator = FresnelTransformPropagator(
             PropagatorParameters(
@@ -440,7 +439,7 @@ def estimate_defocus_by_autofocus(
     num_candidates: int = 7,
     span_factor: float = 3.0,
     min_defocus_dof: float = 3.0,
-    max_pattern_pixels: int = 2500 * 64 * 64,
+    max_patterns: int = 2500,
     support_fraction: float = 0.05,
     max_patterns_per_chunk: int = 64,
     workers: int = -1,
@@ -466,9 +465,9 @@ def estimate_defocus_by_autofocus(
     defocus better than the initial estimate does. A minimum on the outermost candidate is
     returned, flagged in :attr:`AutofocusEstimate.on_edge`.
 
-    The residuals are measured over a central block of the scan of at most
-    `max_pattern_pixels` pattern pixels, which bounds the cost whatever the detector crop;
-    `max_patterns_per_chunk` bounds the working memory and `workers` is the number of FFT
+    The residuals are measured over the central block of the scan holding about
+    `max_patterns` patterns, whatever the detector crop, so the cost grows with the pixels
+    per pattern; `max_patterns_per_chunk` bounds the working memory and `workers` is the number of FFT
     threads, as :func:`scipy.fft.set_workers` takes it. Detector background and flat field
     are corrected as the spectral refinement corrects them; I0 is not applied.
 
@@ -482,8 +481,10 @@ def estimate_defocus_by_autofocus(
     if not depth_of_focus_m > 0.0:
         raise ValueError('Autofocus needs a positive depth of focus!')
 
-    if num_candidates < 3 or not span_factor > 1.0 or max_pattern_pixels < 1:
-        raise ValueError('Autofocus needs at least 3 candidates, a span above 1 and a budget!')
+    if num_candidates < 3 or not span_factor > 1.0 or max_patterns < 1:
+        raise ValueError(
+            'Autofocus needs at least 3 candidates, a span above 1 and at least one pattern!'
+        )
 
     if abs(initial_defocus_m) <= depth_of_focus_m:
         return AutofocusEstimate(initial_defocus_m, (), (), 0, kept_initial=True, on_edge=False)
@@ -513,7 +514,7 @@ def estimate_defocus_by_autofocus(
             average_pattern_probe(defocus_distance_m=initial_defocus_m),
             photon_wavelength_m=photon_wavelength_m,
             detector_distance_m=detector_distance_m,
-            max_pattern_pixels=max_pattern_pixels,
+            max_patterns=max_patterns,
             support_fraction=support_fraction,
             max_patterns_per_chunk=max_patterns_per_chunk,
         )

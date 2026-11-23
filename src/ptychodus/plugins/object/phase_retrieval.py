@@ -228,6 +228,13 @@ class SpectralOptions(BaseModel):
             ' supplies the low-resolution object, or a uniform object.'
         ),
     )
+    shadow_correction: bool = Field(
+        True,
+        title='Start Shadow Correction',
+        description=(
+            "Subtract the probe's own phase gradient from the centroids of the STXM-DPC start."
+        ),
+    )
     iterations: int = Field(
         3,
         ge=1,
@@ -332,7 +339,7 @@ class SpectralObjectGenerator(ObjectGenerator):
                     geometry_provider.get_probe_positions(),
                     detector_extent=ImageExtent(width_px=width_px, height_px=height_px),
                     probe=probe,
-                    correct_shadow=False,
+                    correct_shadow=spectral.shadow_correction,
                 )
             else:
                 logger.warning(
