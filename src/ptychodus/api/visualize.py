@@ -285,7 +285,17 @@ class VisualizationProduct:
         values = display_values[..., y_begin:y_end, x_begin:x_end]
         values = values.reshape(values.shape[-3], -1) if values.ndim > 2 else values.reshape(-1)
 
-        return KernelDensityEstimate(values.min(), values.max(), gaussian_kde(values))
+        if values.shape[-1] < 2 or not numpy.all(numpy.ptp(values, axis=-1) > 0):
+            raise ValueError(
+                'The selection must hold at least two distinct values to estimate a density!'
+            )
+
+        try:
+            kde = gaussian_kde(values)
+        except numpy.linalg.LinAlgError as exc:
+            raise ValueError(f'Cannot estimate a density over the selection: {exc}') from exc
+
+        return KernelDensityEstimate(values.min(), values.max(), kde)
 
 
 class ComplexComponent(Enum):
@@ -371,19 +381,32 @@ class ScalarTransformation(Enum):
         return text
 
     def transform(self, array: RealArrayType) -> RealArrayType:
-        nil = numpy.zeros_like(array)
+        """Apply the transformation, keeping it monotonic over values that are not positive.
+
+        The square root takes them to zero, its value at zero. A logarithm has none
+        there, so they take its value at the smallest positive value instead, and draw as
+        the darkest colour rather than above the dim pixels a fixed zero would sit over.
+        """
+        positive = array > 0
+        logarithm: numpy.ufunc
 
         match self:
             case ScalarTransformation.SQRT:
-                return numpy.sqrt(array, out=nil, where=(array > 0))
+                return numpy.sqrt(array, out=numpy.zeros_like(array), where=positive)
             case ScalarTransformation.LOG2:
-                return numpy.log2(array, out=nil, where=(array > 0))
+                logarithm = numpy.log2
             case ScalarTransformation.LOG:
-                return numpy.log(array, out=nil, where=(array > 0))
+                logarithm = numpy.log
             case ScalarTransformation.LOG10:
-                return numpy.log10(array, out=nil, where=(array > 0))
+                logarithm = numpy.log10
+            case _:
+                return array
 
-        return array
+        if not positive.any():
+            return numpy.zeros_like(array)
+
+        floor = logarithm(numpy.min(array[positive]))
+        return logarithm(array, out=numpy.full_like(array, floor), where=positive)
 
 
 def linear_colormap_names() -> Iterator[str]:
@@ -426,6 +449,9 @@ def _normalize(
     if not mask.all():
         num_nonfinite = numpy.count_nonzero(numpy.logical_not(mask))
         logger.warning(f'Encountered {num_nonfinite} non-finite value(s) during normalization!')
+
+        if not mask.any() and value_min is None and value_max is None:
+            return numpy.zeros_like(values), Interval[float](0.0, 0.0)
 
     if value_min is None:
         value_min = float(numpy.min(values[mask]))

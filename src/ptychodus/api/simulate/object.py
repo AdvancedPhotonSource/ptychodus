@@ -25,7 +25,9 @@ from pydantic import BaseModel
 from ..accumulate import DiffractionMoments, compute_diffraction_moments, compute_i0_scale
 from ..assemble import AssembledDiffractionData, DetectorCorrections
 from ..constants import PI, TWO_PI
+from ..fourier import fourier_gradient
 from ..geometry import ImageExtent, PixelGeometry
+from ..moments import compute_intensity_moments
 from ..object import Object, ObjectGeometry, ObjectGeometryProvider, resample_object_layers
 from ..patch import (
     accumulate_probe_intensity_on,
@@ -355,17 +357,12 @@ def _compute_probe_shadow_gradient(
     Derivatives are spectral, which a far-field probe supports because it is periodic on
     its FFT grid by construction.
     """
-    probe_geometry = probes.get_geometry()
     pixel_geometry = probes.get_pixel_geometry()
-    kx = TWO_PI * fftfreq(probe_geometry.width_px, d=pixel_geometry.width_m)
-    ky = TWO_PI * fftfreq(probe_geometry.height_px, d=pixel_geometry.height_m)
     shadow = numpy.zeros((len(positions), 2))
 
     for index, patch in enumerate(iter_probe_patches_on(probes, positions, geometry)):
         modes = patch.modes
-        spectrum = fft2(modes)
-        d_dx = numpy.asarray(ifft2(1j * kx[numpy.newaxis, numpy.newaxis, :] * spectrum))
-        d_dy = numpy.asarray(ifft2(1j * ky[numpy.newaxis, :, numpy.newaxis] * spectrum))
+        d_dy, d_dx = fourier_gradient(modes, pixel_geometry)
         conjugate = numpy.conj(modes)
         local = transmission[patch.bounds.y_slice, patch.bounds.x_slice]
         weight = numpy.sum(local * numpy.sum(numpy.square(numpy.abs(modes)), axis=0))
@@ -646,18 +643,26 @@ def generate_paganin_object(
         raise ValueError('Mean STXM intensity must be positive!')
 
     intensity_normalized = intensity / mean_intensity
+    # Mirrored to twice its size, the image is even and periodic, so the FFT filter
+    # carries no edge across to the opposite one.
+    extended = numpy.block(
+        [
+            [intensity_normalized, intensity_normalized[:, ::-1]],
+            [intensity_normalized[::-1, :], intensity_normalized[::-1, ::-1]],
+        ]
+    )
 
     pixel_geometry = geometry.get_pixel_geometry()
-    kx = TWO_PI * fftfreq(geometry.width_px, d=pixel_geometry.width_m)
-    ky = TWO_PI * fftfreq(geometry.height_px, d=pixel_geometry.height_m)
+    kx = TWO_PI * fftfreq(2 * geometry.width_px, d=pixel_geometry.width_m)
+    ky = TWO_PI * fftfreq(2 * geometry.height_px, d=pixel_geometry.height_m)
     KY, KX = numpy.meshgrid(ky, kx, indexing='ij')  # noqa: N806
     K2 = numpy.square(KX) + numpy.square(KY)  # noqa: N806
 
     filter_denominator = (
         1.0 + delta_over_beta * propagation_distance_m * photon_wavelength_m * K2 / (4 * PI)
     )
-    filtered = numpy.real(numpy.asarray(ifft2(fft2(intensity_normalized) / filter_denominator)))
-    filtered = numpy.clip(filtered, small_value, None)
+    filtered = numpy.real(numpy.asarray(ifft2(fft2(extended) / filter_denominator)))
+    filtered = numpy.clip(filtered[: geometry.height_px, : geometry.width_px], small_value, None)
 
     exponent = 0.5 * (1.0 + 1j * delta_over_beta)
     array = numpy.power(filtered.astype(complex), exponent)[numpy.newaxis, :, :]
@@ -730,14 +735,18 @@ def _iterate_power(
 
 
 def _compute_rms_radius_px(probe_modes: ComplexArrayType) -> float:
-    """The RMS radius of the probe's summed intensity, in pixels."""
+    """The RMS radius of the probe's summed intensity about its centroid, in pixels.
+
+    Raises:
+        ValueError: if the probe carries no intensity.
+    """
     intensity = numpy.sum(numpy.square(numpy.abs(probe_modes)), axis=0)
-    total = float(numpy.sum(intensity))
-    y, x = numpy.indices(intensity.shape)
-    center_y = numpy.sum(y * intensity) / total
-    center_x = numpy.sum(x * intensity) / total
-    radius2 = numpy.square(y - center_y) + numpy.square(x - center_x)
-    return math.sqrt(float(numpy.sum(radius2 * intensity)) / total)
+    moments = compute_intensity_moments(intensity)
+
+    if moments.total <= 0.0:
+        raise ValueError('Probe carries no intensity!')
+
+    return math.sqrt(float(moments.covariance_xx_px2 + moments.covariance_yy_px2))
 
 
 def generate_spectral_object(
@@ -1099,7 +1108,12 @@ def generate_random_object(
 def generate_gaussian_random_field_object(
     rng: numpy.random.Generator, geometry: ObjectGeometry, *, correlation_length_px: float
 ) -> Object:
-    """Generate a complex-valued Gaussian random field via spectral synthesis."""
+    """Generate a complex-valued Gaussian random field via spectral synthesis.
+
+    The field has zero mean, and its real and imaginary parts each have unit variance
+    whatever the canvas size: the power spectrum is scaled to unit mean and the inverse
+    transform is orthonormal, so the variance is the spectrum's mean.
+    """
     # white noise in Fourier space
     object_shape = (1, geometry.height_px, geometry.width_px)
     noise = rng.normal(size=object_shape) + 1j * rng.normal(size=object_shape)
@@ -1113,9 +1127,13 @@ def generate_gaussian_random_field_object(
     # power spectrum: Gaussian envelope to control correlation length
     power_spectrum = numpy.exp(-0.5 * (TWO_PI * correlation_length_px) ** 2 * K2)
     power_spectrum[0, 0] = 0  # zero mean
+    mean_power = numpy.mean(power_spectrum)
+
+    if mean_power > 0.0:
+        power_spectrum /= mean_power
 
     # shape noise with power spectrum and back-transform
-    field = numpy.asarray(ifft2(noise * numpy.sqrt(power_spectrum)))
+    field = numpy.asarray(ifft2(noise * numpy.sqrt(power_spectrum), norm='ortho'))
 
     return Object(
         array=field,
@@ -1700,11 +1718,14 @@ def generate_layers(object_: Object, layer_spacing_m: Sequence[float]) -> Object
 
 
 def pad_object(object_: Object, pad_x: int, pad_y: int) -> Object:
-    """Return a zero-padded copy of *object_* with *pad_x* / *pad_y* pixels added on each side."""
+    """Return a copy of *object_* with *pad_x* / *pad_y* pixels of vacuum added on each side.
+
+    Vacuum (unit transmission) is the only fill that leaves the layer product unchanged.
+    """
     pad_width = [(0, 0), (pad_y, pad_y), (pad_x, pad_x)]
 
     return Object(
-        array=numpy.pad(object_.get_array(), pad_width),
+        array=numpy.pad(object_.get_array(), pad_width, constant_values=1.0),
         pixel_geometry=object_.get_pixel_geometry(),
         center=object_.get_center(),
         layer_spacing_m=object_.layer_spacing_m,

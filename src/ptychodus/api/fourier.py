@@ -7,6 +7,11 @@ from .constants import TWO_PI_J
 from .geometry import PixelGeometry
 from .typing import ComplexArrayType, RealArrayType
 
+__all__ = [
+    'fourier_gradient',
+    'fourier_shift_2d',
+]
+
 
 def fourier_gradient(
     image: ComplexArrayType, pixel_geometry: PixelGeometry | None = None

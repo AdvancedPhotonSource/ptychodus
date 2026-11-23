@@ -145,10 +145,8 @@ class ObjectBuilder(ParameterGroup):
         A spacing equal to the object's own leaves it untouched, so rebuilding an
         already-sliced object does not resample it again.
 
-        Note the padding is applied earlier, in `_build_raw`, so the order here is
-        pad-then-layers rather than the layers-then-pad of the original
-        `_create_object`. The two do not commute, because a zero-amplitude border
-        changes the resampled result near the edges.
+        Note the padding is applied earlier, in `_build_raw`, so the object is
+        padded before it is layered.
         """
         if list(layer_spacing_m) == list(object_.layer_spacing_m):
             return object_

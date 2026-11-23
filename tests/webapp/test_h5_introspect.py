@@ -126,10 +126,10 @@ def test_introspect_product_mirrors_the_gui_property_table(tmp_path: Path) -> No
     assert result['probe_pixel_height_m'] == pytest.approx(9e-9)
     # The GUI lists the incoherent modes of the first coherent mode.
     assert result['probe_shape'] == (2, 8, 8)
-    # Mode powers 4:1, so the shares are 0.8 and 0.2 and the coherence their root
-    # sum of squares.
+    # Mode powers 4:1, so the shares are 0.8 and 0.2. Both modes are flat, hence
+    # parallel: they describe one coherent state, whose purity is one.
     assert result['probe_mode_relative_power'] == pytest.approx([0.8, 0.2])
-    assert result['probe_coherence'] == pytest.approx(np.sqrt(0.8**2 + 0.2**2))
+    assert result['probe_coherence'] == pytest.approx(1.0)
 
 
 def test_introspect_product_without_i0_calibration(tmp_path: Path) -> None:

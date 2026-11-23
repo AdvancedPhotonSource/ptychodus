@@ -70,8 +70,8 @@ export async function mountProbe(root: HTMLElement, uuid: string | null): Promis
         id: `probe:${p.uuid}`,
         label: p.name ?? p.uuid.slice(0, 8),
         state,
-        // The probe's own row reports its coherence, the root of the summed squared
-        // mode powers; each mode reports its share.
+        // The probe's own row reports its coherence, the purity of its orthogonalized
+        // modes; each mode reports its share.
         cells: [
           fmtPercent(p.probe_coherence),
           p.probe_dtype ?? '—',

@@ -209,6 +209,17 @@ class TestGrfOutputShapeAndDtype:
         assert not numpy.any(numpy.isinf(obj.get_array()))
 
 
+class TestGrfScale:
+    @pytest.mark.parametrize('size_px', [64, 512])
+    def test_parts_have_unit_variance_whatever_the_canvas_size(self, size_px: int) -> None:
+        obj = generate_gaussian_random_field_object(
+            _rng(), _make_geometry(size_px, size_px), correlation_length_px=2.0
+        )
+        array = obj.get_array()
+        assert numpy.std(array.real) == pytest.approx(1.0, rel=0.15)
+        assert numpy.std(array.imag) == pytest.approx(1.0, rel=0.15)
+
+
 class TestGrfReproducibility:
     def test_same_seed_identical_output(self) -> None:
         geom = _make_geometry()
@@ -925,6 +936,23 @@ class TestPaganinObject:
                 propagation_distance_m=1.0,
                 delta_over_beta=100.0,
             )
+
+    def test_filter_carries_no_edge_across_to_the_opposite_one(self) -> None:
+        """A ramp stays monotonic: a periodic filter would pull each edge toward the other."""
+        geometry = _make_geometry(64, 64)
+        positions = _make_probe_positions_grid(geometry, (5, 5), margin_frac=0.0)
+        counts = [1000 + 1000 * (index % 5) for index in range(len(positions))]
+        obj = generate_paganin_object(
+            geometry,
+            compute_stxm_dpc_signals(_make_assembled_data(counts)),
+            positions,
+            photon_wavelength_m=1.0e-10,
+            propagation_distance_m=1.0e-6,
+            delta_over_beta=500.0,
+        )
+        amplitude = numpy.abs(obj.get_array()[0, geometry.height_px // 2])
+        assert numpy.all(numpy.diff(amplitude) >= 0.0)
+        assert amplitude[-1] - amplitude[0] > 0.04
 
     def test_low_pass_behavior(self) -> None:
         """Paganin filter should suppress high frequencies relative to raw STXM."""

@@ -12,6 +12,7 @@ import scipy.ndimage
 import scipy.signal
 from scipy.spatial import KDTree
 
+from .accumulate import compute_i0_scale
 from .typing import RealArrayType
 from .geometry import PixelGeometry
 from .object import ObjectCenter
@@ -85,26 +86,26 @@ def compute_illumination_map(
     probe intensities at every probe position, packaged with the metadata needed to
     derive fluence and dose quantities.
 
-    Pass ``i0_by_index`` (per-scan-index photon counts) to weight
-    each probe-position contribution by its true exposure. Weights are normalized to
-    the mean of the provided counts so the total photon budget across the canvas
-    matches the uniform-weight case; a scan index missing from the mapping gets
-    the unit weight. Without a mapping the accumulation is uniform, matching the
-    prior behavior.
+    Pass ``i0_by_index`` (I0 readings keyed by scan index) to weight each
+    probe-position contribution by its exposure, ``I0_j / mean(I0)`` -- the inverse of
+    :func:`~ptychodus.api.accumulate.compute_i0_scale`, under the same rule: the mean is
+    over the usable (finite, positive) readings paired with the probe positions, so the
+    photon budget across the canvas matches the uniform-weight case, and a position
+    whose reading is unusable or missing takes unit weight. Without a mapping the
+    accumulation is uniform.
     """
     object_geometry = product.object_.get_geometry()
     weights: RealArrayType | None = None
 
     if i0_by_index:
-        mean_counts = float(numpy.mean(list(i0_by_index.values())))
-
-        if mean_counts > 0.0:
-            weights = numpy.array(
-                [
-                    i0_by_index.get(position.index, mean_counts) / mean_counts
-                    for position in product.probe_positions
-                ]
-            )
+        position_indexes = numpy.array(
+            [position.index for position in product.probe_positions], dtype=numpy.intp
+        )
+        weights = 1.0 / compute_i0_scale(
+            position_indexes,
+            numpy.fromiter(i0_by_index.keys(), dtype=numpy.intp),
+            numpy.fromiter(i0_by_index.values(), dtype=numpy.float64),
+        )
 
     canvas = accumulate_probe_intensity(product, weights=weights)
 

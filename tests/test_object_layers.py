@@ -542,7 +542,7 @@ def test_resample_object_layers_increments_do_not_reverse() -> None:
 
 
 def test_resample_object_layers_tolerates_a_zero_amplitude_border() -> None:
-    """pad_object pads with zeros, whose logarithm is -inf; the floor keeps it finite."""
+    """A zero-amplitude border has logarithm -inf; the floor keeps it finite."""
     obj = _make_layered_object(4)
     padded = _make_object(
         numpy.pad(obj.get_array(), ((0, 0), (2, 2), (2, 2))), list(obj.layer_spacing_m)

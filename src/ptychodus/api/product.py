@@ -265,7 +265,7 @@ def _resample_object(
     target pixel is built explicitly: take the target pixel's physical coordinate, map it back
     through the inverse of *transform*, and express the result in the source's fractional pixel
     indexes under the centered-pixel convention. Target pixels falling outside the source array
-    are filled with zeros, which is what padding an object does elsewhere.
+    are vacuum, the only fill that leaves a transmission function's layer product unchanged.
     """
     coordinates = target_geometry.get_transverse_coordinates()
     x_m = target_geometry.center_x_m + coordinates.x_m
@@ -281,7 +281,7 @@ def _resample_object(
         source_geometry.height_px - 1
     ) / 2
 
-    # 'constant' returns zero for a coordinate a hair outside the array, so round-off in
+    # 'constant' returns the fill for a coordinate a hair outside the array, so round-off in
     # the round trip through physical coordinates must not push an edge pixel out.
     edge_tolerance_px = 1.0e-9
     column = _snap_to_edges(column, source_geometry.width_px, edge_tolerance_px)
@@ -293,9 +293,9 @@ def _resample_object(
 
     for index, layer in enumerate(array):
         # 'constant' rather than the helper's 'grid-constant': a target pixel past the source
-        # edge is zero outright rather than a fade toward it.
+        # edge is vacuum outright rather than a fade toward it.
         resampled[index] = resample_complex_at(
-            layer, row, column, order=interpolation_order, mode='constant'
+            layer, row, column, order=interpolation_order, mode='constant', fill_value=1.0
         )
 
     return resampled

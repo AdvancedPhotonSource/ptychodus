@@ -1183,6 +1183,21 @@ def test_transform_product_changes_the_object_shape_on_each_axis_independently()
     assert after[1] != after[2]
 
 
+def test_transform_product_fills_beyond_the_source_object_with_vacuum() -> None:
+    """Target pixels the warp maps outside the source take unit transmission."""
+    positions = _grid_positions(6, 1.0e-6, (0.0, 0.0))
+    geometry = compute_object_geometry(positions, _probe_geometry())
+    absorbing = numpy.full((1, geometry.height_px, geometry.width_px), 0.5 + 0.0j)
+    product = _make_product(positions, object_array=absorbing)
+
+    corrected = transform_product(product, AffineTransform.from_components(_CALIBRATION_COMPONENTS))
+
+    array = corrected.object_.get_array()[0]
+    assert array[0, 0] == 1.0
+    assert array[-1, -1] == 1.0
+    numpy.testing.assert_allclose(array[array.shape[0] // 2, array.shape[1] // 2], 0.5)
+
+
 @pytest.mark.parametrize('padding_px,oversize_px', [(0, 0), (4, 0), (0, 1024)])
 def test_transform_product_identity_is_an_exact_no_op(padding_px: int, oversize_px: int) -> None:
     """An identity transform must not crop, pad, shift or smooth the object.

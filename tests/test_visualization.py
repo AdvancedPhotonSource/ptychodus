@@ -343,6 +343,16 @@ class TestEstimateKernelDensity:
         assert kde.value_lower == pytest.approx(phase_rad.min(), rel=1e-4)
         assert kde.value_upper == pytest.approx(phase_rad.max(), rel=1e-4)
 
+    @pytest.mark.parametrize('width', [1, 8])
+    def test_degenerate_selection_raises(self, width: int):
+        values = numpy.full((8, 8), 0.5, dtype=numpy.float32)
+        rgba = numpy.ones((8, 8, 4), dtype=numpy.float32)
+        vp = VisualizationProduct('u', values, rgba, _pixel_geo(), Interval[float](0.0, 1.0))
+        box = Box2D(x=0, y=0, width=width - 1, height=width - 1)
+
+        with pytest.raises(ValueError, match='distinct values'):
+            vp.estimate_kernel_density(box)
+
     def test_cylindrical_model_uses_amplitude(self):
         # A histogram has one value axis, so the Complex renderer keeps showing amplitude.
         rng = numpy.random.default_rng(13)
@@ -436,10 +446,19 @@ class TestScalarTransformation:
         result = ScalarTransformation.LOG10.transform(arr)
         numpy.testing.assert_allclose(result, numpy.log10(arr), rtol=1e-5)
 
-    def test_zero_input_yields_zero_for_log(self):
-        arr = numpy.array([[0.0, 1.0]], dtype=numpy.float32)
-        result = ScalarTransformation.LOG.transform(arr)
-        assert result[0, 0] == pytest.approx(0.0)
+    @pytest.mark.parametrize(
+        'transform',
+        [ScalarTransformation.LOG2, ScalarTransformation.LOG, ScalarTransformation.LOG10],
+    )
+    def test_logarithm_stays_monotonic_over_nonpositive_values(self, transform):
+        arr = numpy.array([-2.0, 0.0, 0.01, 0.5, 1.0])
+        result = transform.transform(arr)
+        assert numpy.all(numpy.diff(result) >= 0.0)
+        numpy.testing.assert_array_equal(result[:3], transform.transform(numpy.array([0.01]))[0])
+
+    def test_logarithm_of_nothing_positive_is_zero(self):
+        result = ScalarTransformation.LOG.transform(numpy.array([-1.0, 0.0]))
+        numpy.testing.assert_array_equal(result, [0.0, 0.0])
 
     def test_decorate_text_identity(self):
         assert ScalarTransformation.IDENTITY.decorate_text('I') == 'I'
@@ -575,6 +594,13 @@ class TestCylindricalColorModel:
 
 
 class TestVisualizeRealValues:
+    def test_no_finite_values_render_without_raising(self):
+        values = numpy.full((8, 8), numpy.nan, dtype=numpy.float32)
+        vp = visualize_real_values('I', values, _pixel_geo())
+        color_range = vp.get_color_value_range()
+        assert (color_range.lower, color_range.upper) == (0.0, 0.0)
+        assert vp.get_image_rgba().shape == (8, 8, 4)
+
     def test_rgba_shape(self):
         values = numpy.ones((8, 8), dtype=numpy.float32)
         vp = visualize_real_values('I', values, _pixel_geo())

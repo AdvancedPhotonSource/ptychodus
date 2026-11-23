@@ -10,13 +10,14 @@ Behaviors verified:
   - subtract_noise_floor removes a pedestal and keeps the full height of the signal above it
   - with keep_filtered=False the measured heights survive, only the mask is filtered
   - estimate_beam_center ignores a hot pixel once it is masked
+  - compute_ring_indexes keeps a radius a hair below an exact ring edge in the upper ring
 """
 
 import numpy
 import pytest
 
 from ptychodus.api.diffraction import BadPixels
-from ptychodus.api.moments import compute_intensity_moments
+from ptychodus.api.moments import compute_intensity_moments, compute_ring_indexes
 from ptychodus.api.preprocess.diffraction import estimate_beam_center
 from ptychodus.api.preprocess.noise import (
     estimate_filtered_noise_floor,
@@ -235,3 +236,13 @@ def test_a_beam_between_two_pixels_lands_on_the_dc_pixel(size: int) -> None:
     center = estimate_beam_center(pattern)
 
     assert (center.x_px, center.y_px) == (size // 2, size // 2)
+
+
+def test_ring_indexes_keep_an_exact_edge_in_its_own_ring() -> None:
+    # 0.3 / 0.1 is 2.9999999999999996 in double precision; the radius is on ring 3's edge.
+    radii = numpy.array([0.0, 0.05, 0.1, 0.3, 0.34999])
+
+    numpy.testing.assert_array_equal(compute_ring_indexes(radii, 0.1), [0, 0, 1, 3, 3])
+    numpy.testing.assert_array_equal(
+        compute_ring_indexes(radii, 0.1, ring_edge_tolerance=0.0), [0, 0, 1, 2, 3]
+    )

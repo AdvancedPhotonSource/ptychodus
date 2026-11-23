@@ -1,4 +1,5 @@
-"""Intensity moments of images: totals, centroids and central second moments."""
+"""Intensity moments of images: totals, centroids and central second moments, and the ring
+assignment radial profiles bin by."""
 
 from __future__ import annotations
 from dataclasses import dataclass
@@ -7,12 +8,13 @@ import threading
 import numpy
 
 from .diffraction import DiffractionPattern, DiffractionPatterns
-from .typing import BooleanArrayType, NumberArrayType, RealArrayType
+from .typing import BooleanArrayType, IntegerArrayType, NumberArrayType, RealArrayType
 
 __all__ = [
     'PatternStatistics',
     'IntensityMoments',
     'compute_intensity_moments',
+    'compute_ring_indexes',
 ]
 
 
@@ -89,6 +91,19 @@ def compute_intensity_moments(
         covariance_xy_px2=_nan_where_empty(covariance_xy_px2 / safe_total, positive),
         covariance_yy_px2=_nan_where_empty(covariance_yy_px2 / safe_total, positive),
     )
+
+
+def compute_ring_indexes(
+    radii: RealArrayType, bin_size: float, *, ring_edge_tolerance: float = 1.0e-9
+) -> IntegerArrayType:
+    """The ring each non-negative radius falls in, rings being *bin_size* wide from zero.
+
+    Ring ``k`` holds radii in ``[k * bin_size, (k + 1) * bin_size)``. A radius that is
+    an exact multiple of the bin width -- an axis pixel at a whole-pixel distance, say --
+    is exact only in real arithmetic, and *ring_edge_tolerance*, in units of the bin
+    width, keeps it in the ring it belongs to rather than the one below.
+    """
+    return numpy.floor(radii / bin_size + ring_edge_tolerance).astype(numpy.intp, copy=False)
 
 
 class PatternStatistics:

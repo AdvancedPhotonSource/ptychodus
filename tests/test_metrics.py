@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import warnings
 
 import numpy
 import numpy.testing
@@ -347,6 +348,20 @@ class TestIlluminationScoringRegion:
         assert (region.row_begin, region.row_end) == (6, 26)
         assert (region.column_begin, region.column_end) == (10, 34)
         assert region.weights.shape == (20, 24)
+
+    def test_roundoff_does_not_count_as_illumination(self):
+        # The rim sits just under half the illuminated mean; counting the round-off a
+        # Fourier shift leaves on the empty canvas would halve that mean and admit it.
+        photon_number = numpy.full((32, 32), 1.0e-14)
+        photon_number[4:28, 4:28] = 30.0
+        photon_number[8:24, 8:24] = 100.0
+
+        region = compute_illumination_scoring_region(
+            _make_illumination_map(photon_number), (32, 32), taper_fraction=0.0
+        )
+
+        assert (region.row_begin, region.row_end) == (8, 24)
+        assert (region.column_begin, region.column_end) == (8, 24)
 
     def test_erosion_pulls_the_boundary_inward(self):
         photon_number = numpy.zeros((32, 32))
@@ -1694,6 +1709,22 @@ class TestPixelwiseMetrics:
 
         assert metrics.root_mean_square_error == 0.0
         assert metrics.mean_absolute_error == 0.0
+
+    @pytest.mark.parametrize('noise', [0.0, 0.01])
+    def test_constant_reference_leaves_range_metrics_undefined(self, noise: float) -> None:
+        reference = numpy.full((16, 16), 0.7)
+        test = reference + noise * numpy.random.default_rng(0).standard_normal(reference.shape)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter('error')
+            metrics = compute_pixelwise_metrics(reference, test)
+
+        assert metrics.root_mean_square_error == pytest.approx(
+            numpy.sqrt(numpy.mean(numpy.square(test - reference)))
+        )
+        assert numpy.isnan(metrics.peak_signal_to_noise_ratio_dB)
+        assert numpy.isnan(metrics.structural_similarity)
+        assert numpy.isnan(metrics.normalized_mutual_information)
 
     def test_structural_similarity_is_nan_below_its_window(self) -> None:
         image = numpy.arange(30.0).reshape(5, 6)

@@ -530,12 +530,11 @@ def _register_images(images: RealArrayType, upsample_factor: int) -> RealArrayTy
     is sharper than a mean of images that disagree by the very shifts being measured.
     """
     shifts = _register_to(numpy.mean(images, axis=0), images, upsample_factor)
-    aligned = numpy.stack(
-        [
-            fourier_shift_2d(image.astype(numpy.complex128), dx=-dx, dy=-dy).real
-            for image, (dy, dx) in zip(images, shifts)
-        ]
-    )
+    aligned = fourier_shift_2d(
+        images.astype(numpy.complex128),
+        dx=-shifts[:, 1, numpy.newaxis, numpy.newaxis],
+        dy=-shifts[:, 0, numpy.newaxis, numpy.newaxis],
+    ).real
     return _register_to(numpy.mean(aligned, axis=0), images, upsample_factor)
 
 

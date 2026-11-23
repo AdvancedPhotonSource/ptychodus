@@ -184,7 +184,13 @@ class VisualizationController(Observer):
             return
 
         value_label = product.get_value_label()
-        kde = product.estimate_kernel_density(box)
+
+        try:
+            kde = product.estimate_kernel_density(box)
+        except ValueError as exc:
+            logger.warning(exc)
+            return
+
         values = numpy.linspace(kde.value_lower, kde.value_upper, 1000)
 
         ax = self._histogram_dialog.axes

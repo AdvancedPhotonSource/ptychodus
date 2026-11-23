@@ -11,6 +11,7 @@ import math
 import numpy
 from scipy.interpolate import PchipInterpolator
 from scipy.ndimage import gaussian_filter
+from scipy.signal.windows import tukey
 from skimage.registration import phase_cross_correlation
 from skimage.restoration import unwrap_phase
 
@@ -441,6 +442,28 @@ def _remove_gaussian_background(image: InexactArrayType, sigma_px: float) -> Ine
     return image - background
 
 
+def _prepare_for_correlation(image: InexactArrayType, taper_fraction: float) -> InexactArrayType:
+    """*image* less its background, under a separable Tukey window.
+
+    Left in, the background -- vacuum, or the mean transmission -- correlates as the
+    overlap of the two frames, which peaks at zero shift whatever the content; a hard
+    frame edge is a feature that does not move either. The background is the mean over
+    the band the taper rolls off, weighted by how far it rolls off, so a compact feature
+    on an empty frame leaves it at zero rather than raising a window-shaped plateau.
+    Without a taper it is the mean over the frame. Either mean is linear, so a global
+    phase factor on the image passes through unchanged and leaves the correlation
+    magnitude as it was.
+    """
+    if taper_fraction > 0.0:
+        alpha = min(taper_fraction, 1.0)
+        window = numpy.multiply.outer(tukey(image.shape[-2], alpha), tukey(image.shape[-1], alpha))
+        band = 1.0 - window
+        background = numpy.sum(band * image) / numpy.sum(band)
+        return (image - background) * window
+
+    return image - numpy.mean(image)
+
+
 def estimate_object_alignment_shift(
     reference_object: Object,
     moving_object: Object,
@@ -448,12 +471,21 @@ def estimate_object_alignment_shift(
     upsample_factor: int = 100,
     registration_quantity: RegistrationQuantity = RegistrationQuantity.COMPLEX,
     high_pass_sigma_px: float = 0.0,
+    taper_fraction: float = 0.2,
 ) -> tuple[float, float]:
     """Estimate the sub-pixel shift ``(dy, dx)``, in pixels, that aligns moving to reference.
 
     Both objects must already share a common ``(height, width)``; use
     :func:`center_crop_object` first if they do not. Layers are collapsed with
     :meth:`Object.get_layers_flattened` before registration.
+
+    The quantity's background is removed, the frame is tapered, and the two are
+    cross-correlated without spectral whitening. Whitening flattens the spectrum to unit
+    modulus, so where a smooth object has no content it amplifies whatever does not
+    move with it -- the frame edge, the taper -- and pulls the estimate toward zero
+    shift by up to a pixel on a weak phase object. The estimate is invariant to a global
+    phase offset between the two objects, a reconstruction ambiguity, for every quantity
+    except ``PHASE``, whose wrapped values depend on the offset before any of this.
 
     Args:
         reference_object: The object whose array indices define the target frame.
@@ -465,11 +497,12 @@ def estimate_object_alignment_shift(
         high_pass_sigma_px: Sigma, in pixels, of a Gaussian background
             subtracted from the quantity before correlation, to suppress a
             slowly varying transmission or illumination envelope that differs
-            between the two reconstructions. Disabled (``0.0``) by default:
-            ``phase_cross_correlation`` normalizes the cross-power spectrum by
-            its own modulus, which already whitens the spectrum, and stacking a
-            small-sigma high-pass on top of that leaves only noise. Useful
+            between the two reconstructions. Disabled (``0.0``) by default, since
+            removing the mean already takes out a constant background. Useful
             values are a sizeable fraction of the array, not a few pixels.
+        taper_fraction: Fraction of each axis tapered by a Tukey window, ``0.0`` for
+            none. An untapered frame edge is a feature that does not move, which pulls
+            the estimate toward zero shift.
 
     Returns:
         ``(shift_y_px, shift_x_px)``, the translation to apply to
@@ -483,15 +516,19 @@ def estimate_object_alignment_shift(
             f'Arrays must have same shape; got {reference_flat.shape} vs {moving_flat.shape}!'
         )
 
-    reference_image = _remove_gaussian_background(
-        registration_quantity.extract(reference_flat), high_pass_sigma_px
+    reference_image = _prepare_for_correlation(
+        _remove_gaussian_background(
+            registration_quantity.extract(reference_flat), high_pass_sigma_px
+        ),
+        taper_fraction,
     )
-    moving_image = _remove_gaussian_background(
-        registration_quantity.extract(moving_flat), high_pass_sigma_px
+    moving_image = _prepare_for_correlation(
+        _remove_gaussian_background(registration_quantity.extract(moving_flat), high_pass_sigma_px),
+        taper_fraction,
     )
 
     shift_yx, _, _ = phase_cross_correlation(
-        reference_image, moving_image, upsample_factor=upsample_factor
+        reference_image, moving_image, upsample_factor=upsample_factor, normalization=None
     )
 
     return float(shift_yx[0]), float(shift_yx[1])
@@ -611,9 +648,9 @@ def resample_object(
     at the source's border -- a fill sliver from rounding a pixel count -- spreads a few
     pixels inward, decaying about fourfold per pixel at order 3.
 
-    Target pixels falling outside the source take ``fill_value``. Zero is what padding an
-    object does elsewhere; pass ``1.0`` for vacuum, the only fill that leaves a
-    transmission function's layer product unchanged.
+    Target pixels falling outside the source take ``fill_value``. Pass ``1.0`` for vacuum,
+    the only fill that leaves a transmission function's layer product unchanged, and what
+    padding an object does elsewhere.
 
     Evaluating the spline at its own grid nodes is exact only to round-off, so a target that
     repeats the source grid is not a bit-exact no-op. Callers that rebuild on every
@@ -1242,6 +1279,7 @@ def align_objects(
     upsample_factor: int = 100,
     registration_quantity: RegistrationQuantity = RegistrationQuantity.COMPLEX,
     high_pass_sigma_px: float = 0.0,
+    taper_fraction: float = 0.2,
 ) -> tuple[Object, Object]:
     """Sub-pixel align ``moving_object`` to ``reference_object`` on a common shape.
 
@@ -1287,6 +1325,8 @@ def align_objects(
             featureless for a phase-contrast sample.
         high_pass_sigma_px: Gaussian-background sigma in pixels, ``0.0`` to
             disable. See :func:`estimate_object_alignment_shift`.
+        taper_fraction: Tukey taper fraction, ``0.0`` to disable. See
+            :func:`estimate_object_alignment_shift`.
 
     Returns:
         ``(cropped_reference, aligned_moving)``: both objects sharing the
@@ -1312,6 +1352,7 @@ def align_objects(
         upsample_factor=upsample_factor,
         registration_quantity=registration_quantity,
         high_pass_sigma_px=high_pass_sigma_px,
+        taper_fraction=taper_fraction,
     )
     logger.info(f'align_objects sub-pixel shift (y, x) = {(shift_y_px, shift_x_px)} px')
 

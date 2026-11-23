@@ -222,14 +222,18 @@ def compute_probe_metrics_report(product: Product) -> ProbeMetricsReport:
 
 
 def _center_crop_or_pad(array: ComplexArrayType, height_px: int, width_px: int) -> ComplexArrayType:
-    """Cut or zero-pad the trailing two axes of *array* to ``(height_px, width_px)`` about its center."""
+    """Cut or zero-pad the trailing two axes of *array* to ``(height_px, width_px)`` about its beam axis.
+
+    The beam axis is pixel ``N // 2`` of each axis, so it lands on pixel ``N // 2`` of
+    the result whatever the parity of either size.
+    """
     source_height_px, source_width_px = array.shape[-2:]
     kept_height_px = min(source_height_px, height_px)
     kept_width_px = min(source_width_px, width_px)
-    source_row = (source_height_px - kept_height_px) // 2
-    source_column = (source_width_px - kept_width_px) // 2
-    target_row = (height_px - kept_height_px) // 2
-    target_column = (width_px - kept_width_px) // 2
+    source_row = source_height_px // 2 - kept_height_px // 2
+    source_column = source_width_px // 2 - kept_width_px // 2
+    target_row = height_px // 2 - kept_height_px // 2
+    target_column = width_px // 2 - kept_width_px // 2
     result = numpy.zeros((*array.shape[:-2], height_px, width_px), dtype=array.dtype)
     result[
         ...,

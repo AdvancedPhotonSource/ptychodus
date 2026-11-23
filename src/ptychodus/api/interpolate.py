@@ -1,6 +1,6 @@
 """Sub-pixel array interpolation utilities."""
 
-from typing import Final, Generic, TypeVar, overload
+from typing import Generic, TypeVar, overload
 import math
 
 import numpy.typing
@@ -22,18 +22,33 @@ __all__ = [
     'match_at_indexes',
     'resample_complex_at',
     'resample_complex_on_grid',
+    'split_whole_pixel',
 ]
 
 
 _InexactT = TypeVar('_InexactT', bound=numpy.inexact)
 
-# An offset this close to a whole pixel is treated as landing on it. A coordinate that
-# is an exact integer in real arithmetic reaches here a few ULP away from one, and
-# keeping that residue would demand an interpolation sample the array is not required
-# to hold. Five orders above worst-case double round-off on a canvas of ~1e4 pixels and
-# five below any physically meaningful sub-pixel shift, so the exact value is immaterial;
-# it would narrow on a canvas beyond ~1e7 pixels.
-_INTEGER_SNAP_TOLERANCE_PX: Final[float] = 1.0e-9
+
+def split_whole_pixel(coordinate_px: float, *, snap_tolerance_px: float) -> tuple[int, float]:
+    """Split *coordinate_px* into its floor and a residual in ``[0, 1)``, snapped near a whole pixel.
+
+    A residual within *snap_tolerance_px* of a whole pixel is taken as that pixel. A
+    coordinate that is an exact integer in real arithmetic arrives a few ULP away from
+    one, and keeping that residue would demand a sub-pixel shift or interpolation sample
+    nothing asked for. ``1e-9`` sits five orders above worst-case double round-off on a
+    canvas of ~1e4 pixels and five below any physically meaningful sub-pixel shift; it
+    would narrow on a canvas beyond ~1e7 pixels.
+    """
+    whole = math.floor(coordinate_px)
+    frac = coordinate_px - whole
+
+    if frac > 1.0 - snap_tolerance_px:
+        return whole + 1, 0.0
+
+    if frac < snap_tolerance_px:
+        return whole, 0.0
+
+    return whole, frac
 
 
 @overload
@@ -120,22 +135,15 @@ def resample_complex_on_grid(
     resampled = numpy.empty((*array.shape[:-2], *output_shape), dtype=numpy.result_type(array, 1j))
 
     for index in numpy.ndindex(array.shape[:-2]):
-        plane = array[index]
-        parts = []
-
-        for values in (plane.real, plane.imag):
-            parts.append(
-                affine_transform(
-                    values,
-                    numpy.array([row_scale, column_scale]),
-                    offset=(row_offset, column_offset),
-                    output_shape=output_shape,
-                    order=order,
-                    mode='mirror',
-                )
-            )
-
-        resampled[index] = numpy.where(outside, fill_value, parts[0] + 1j * parts[1])
+        plane = affine_transform(
+            array[index].astype(resampled.dtype, copy=False),
+            numpy.array([row_scale, column_scale]),
+            offset=(row_offset, column_offset),
+            output_shape=output_shape,
+            order=order,
+            mode='mirror',
+        )
+        resampled[index] = numpy.where(outside, fill_value, plane)
 
     return resampled
 
@@ -147,8 +155,9 @@ def resample_complex_at(
     *,
     order: int,
     mode: str = 'grid-constant',
+    fill_value: complex = 0j,
 ) -> ComplexArrayType:
-    """Sample a 2D complex array at fractional ``(row, column)`` indexes, as zero beyond its edge.
+    """Sample a 2D complex array at fractional ``(row, column)`` indexes, as *fill_value* beyond its edge.
 
     The real and imaginary parts are each a B-spline of *order* through
     :func:`scipy.ndimage.map_coordinates`. That makes the result linear in the field: it
@@ -156,18 +165,19 @@ def resample_complex_at(
     reconstruction settles on, and resampled probe modes still mix by their OPR weights as
     the originals do. *row* and *column* may have any shape; the result takes it.
 
-    *mode* is how the edge is treated. ``'grid-constant'`` interpolates toward the zeros
-    beyond the array, so a field fades out across the edge -- over a pixel at order 1, and
-    over a geometrically decaying tail of the spline's prefilter at higher orders.
-    ``'constant'`` interpolates only within the array and returns exactly zero outside it.
+    *mode* is how the edge is treated. ``'grid-constant'`` interpolates toward the fill
+    beyond the array, so a field fades into it across the edge -- over a pixel at order 1,
+    and over a geometrically decaying tail of the spline's prefilter at higher orders.
+    ``'constant'`` interpolates only within the array and returns exactly *fill_value*
+    outside it.
 
     A gather only: it has no adjoint. Where an operator's transpose must be exact, use
     :class:`BarycentricArrayInterpolator`.
     """
-    coordinates = (row, column)
-    real = map_coordinates(array.real, coordinates, order=order, mode=mode, cval=0.0)
-    imaginary = map_coordinates(array.imag, coordinates, order=order, mode=mode, cval=0.0)
-    return real + 1j * imaginary
+    complex_array = array.astype(numpy.result_type(array, 1j), copy=False)
+    return map_coordinates(
+        complex_array, (row, column), order=order, mode=mode, cval=complex(fill_value)
+    )
 
 
 def _validate_indexed_values(source_indexes: IntegerArrayType, values: RealArrayType) -> None:
@@ -286,7 +296,9 @@ def match_at_indexes(
     return found, matched.reshape((matched.shape[0], *values.shape[1:]))
 
 
-def _calculate_support_frac(x: float, n: int, extent: int) -> tuple[slice, float]:
+def _calculate_support_frac(
+    x: float, n: int, extent: int, *, snap_tolerance_px: float
+) -> tuple[slice, float]:
     """Return the integer support slice and sub-pixel offset for a width-``n`` window centered at ``x`` on an axis of ``extent`` samples.
 
     The window's axis pixel ``n // 2`` falls on ``x``, as
@@ -294,7 +306,7 @@ def _calculate_support_frac(x: float, n: int, extent: int) -> tuple[slice, float
     Bilinear interpolation across the window reads one sample past its far edge, so
     the support spans ``n + 1`` samples -- except at a zero offset, where that sample
     carries zero weight and the support is exactly ``n`` wide. An offset within
-    ``_INTEGER_SNAP_TOLERANCE_PX`` of a whole pixel is taken as zero.
+    *snap_tolerance_px* of a whole pixel is taken as zero (:func:`split_whole_pixel`).
 
     Raises:
         ValueError: when the support leaves ``[0, extent)``. Such a window is an
@@ -303,16 +315,7 @@ def _calculate_support_frac(x: float, n: int, extent: int) -> tuple[slice, float
             and a negative lower bound is a valid Python slice that wraps around to
             the far end of the axis.
     """
-    lower = x - n // 2
-    whole = math.floor(lower)
-    frac = lower - whole
-
-    if frac > 1.0 - _INTEGER_SNAP_TOLERANCE_PX:
-        whole += 1
-        frac = 0.0
-    elif frac < _INTEGER_SNAP_TOLERANCE_PX:
-        frac = 0.0
-
+    whole, frac = split_whole_pixel(x - n // 2, snap_tolerance_px=snap_tolerance_px)
     stop = whole + n + 1 if frac > 0.0 else whole + n
 
     if whole < 0 or stop > extent:
@@ -337,17 +340,28 @@ def _axis_terms(frac: float) -> tuple[tuple[slice, float], ...]:
 
 
 class BarycentricArrayInterpolator(Generic[_InexactT]):
-    """Extract patches from an array using bilinear (barycentric) sub-pixel interpolation."""
+    """Extract patches from an array using bilinear (barycentric) sub-pixel interpolation.
 
-    def __init__(self, array: numpy.typing.NDArray[_InexactT]) -> None:
+    A patch offset within *snap_tolerance_px* of a whole pixel is taken as that pixel
+    (:func:`split_whole_pixel`).
+    """
+
+    def __init__(
+        self, array: numpy.typing.NDArray[_InexactT], *, snap_tolerance_px: float = 1.0e-9
+    ) -> None:
         super().__init__()
         self._array = array
+        self._snap_tolerance_px = snap_tolerance_px
 
     def get_patch(
         self, center_x: float, center_y: float, width: int, height: int
     ) -> numpy.typing.NDArray[_InexactT]:
-        x_support, x_frac = _calculate_support_frac(center_x, width, self._array.shape[-1])
-        y_support, y_frac = _calculate_support_frac(center_y, height, self._array.shape[-2])
+        x_support, x_frac = _calculate_support_frac(
+            center_x, width, self._array.shape[-1], snap_tolerance_px=self._snap_tolerance_px
+        )
+        y_support, y_frac = _calculate_support_frac(
+            center_y, height, self._array.shape[-2], snap_tolerance_px=self._snap_tolerance_px
+        )
 
         support = self._array[..., y_support, x_support]
 
@@ -377,10 +391,16 @@ class BarycentricArrayInterpolator(Generic[_InexactT]):
     ) -> None:
         """Bilinear-scatter *patch* back into the underlying array (transpose of get_patch)."""
         x_support, x_frac = _calculate_support_frac(
-            center_x, patch.shape[-1], self._array.shape[-1]
+            center_x,
+            patch.shape[-1],
+            self._array.shape[-1],
+            snap_tolerance_px=self._snap_tolerance_px,
         )
         y_support, y_frac = _calculate_support_frac(
-            center_y, patch.shape[-2], self._array.shape[-2]
+            center_y,
+            patch.shape[-2],
+            self._array.shape[-2],
+            snap_tolerance_px=self._snap_tolerance_px,
         )
 
         support = self._array[..., y_support, x_support]

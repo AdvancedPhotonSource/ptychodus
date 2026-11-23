@@ -460,19 +460,29 @@ def test_estimate_xmcd_is_invariant_to_lcp_shift_and_phase_offset(
     registration_quantity: RegistrationQuantity,
 ) -> None:
     """Shifting the LCP object and offsetting its phase leaves the decomposition unchanged."""
+    # Built on a larger canvas and cropped, so the shifted LCP object is not a circular
+    # shift of the unshifted one, as two reconstructions of one sample are not.
     rng = numpy.random.default_rng(10)
-    y = numpy.arange(48)[:, None]
-    x = numpy.arange(48)[None, :]
-    amp = numpy.exp(-(((y - 24) ** 2 + (x - 24) ** 2) / 60.0))
-    o_struct = (amp * (0.7 + 0.05 * rng.standard_normal(amp.shape))).astype(numpy.complex128)
-    m_factor = (1.0 + 0.05 * amp) * numpy.exp(0.05j * amp * numpy.tanh((x - 24) / 4.0))
+    y = numpy.arange(144)[:, None]
+    x = numpy.arange(144)[None, :]
+    canvas_amp = numpy.exp(-(((y - 72) ** 2 + (x - 72) ** 2) / 60.0))
+    canvas_struct = (canvas_amp * (0.7 + 0.05 * rng.standard_normal(canvas_amp.shape))).astype(
+        numpy.complex128
+    )
+    canvas_factor = (1.0 + 0.05 * canvas_amp) * numpy.exp(
+        0.05j * canvas_amp * numpy.tanh((x - 72) / 4.0)
+    )
+    crop = (slice(48, 96), slice(48, 96))
+    amp = canvas_amp[crop]
+    o_struct = canvas_struct[crop]
+    m_factor = canvas_factor[crop]
     rcp = _product(o_struct, m_factor, name='rcp', polarization=Polarization.RIGHT_CIRCULAR)
     lcp = _product(o_struct, m_factor, name='lcp', polarization=Polarization.LEFT_CIRCULAR)
+    moved_canvas = numpy.roll(canvas_struct / canvas_factor, shift=(3, -2), axis=(-2, -1))
     moved_lcp = replace(
         lcp,
         object_=Object(
-            array=numpy.roll(lcp.object_.get_array(), shift=(3, -2), axis=(-2, -1))
-            * numpy.exp(0.3j),
+            array=moved_canvas[crop][numpy.newaxis] * numpy.exp(0.3j),
             pixel_geometry=lcp.object_.get_pixel_geometry(),
             center=lcp.object_.get_center(),
         ),

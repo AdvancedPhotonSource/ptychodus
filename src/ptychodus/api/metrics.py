@@ -31,6 +31,7 @@ from .illumination import IlluminationMap, compute_illumination_map
 from .patch import accumulate_probe_intensity
 from .simulate.diffraction import generate_diffraction_data
 from .geometry import PixelGeometry
+from .moments import compute_ring_indexes
 from .object import (
     ObjectCenter,
     RegistrationQuantity,
@@ -663,8 +664,8 @@ def _compute_ring_geometry(
         if bin_size_per_m <= 0.0:
             raise ValueError('Arrays must have at least two pixels along one axis!')
 
-        rings = numpy.floor(inside_radii_per_m / bin_size_per_m + ring_edge_tolerance).astype(
-            numpy.intp, copy=False
+        rings = compute_ring_indexes(
+            inside_radii_per_m, bin_size_per_m, ring_edge_tolerance=ring_edge_tolerance
         )
         resolved_num_bins = int(rings.max()) + 1
     else:
@@ -673,8 +674,8 @@ def _compute_ring_geometry(
 
         resolved_num_bins = num_bins
         bin_size_per_m = nyquist_per_m / num_bins
-        rings = numpy.floor(inside_radii_per_m / bin_size_per_m + ring_edge_tolerance).astype(
-            numpy.intp, copy=False
+        rings = compute_ring_indexes(
+            inside_radii_per_m, bin_size_per_m, ring_edge_tolerance=ring_edge_tolerance
         )
         numpy.clip(rings, 0, num_bins - 1, out=rings)
 
@@ -1106,14 +1107,13 @@ def _largest_true_rectangle(mask: BooleanArrayType) -> tuple[int, int, int, int]
     """
     grid = numpy.asarray(mask, dtype=bool)
     height_px, width_px = grid.shape
-    heights = [0] * (width_px + 1)
+    column_heights = numpy.zeros(width_px + 1, dtype=numpy.intp)
     best_area = 0
     best = (0, 0, 0, 0)
 
     for row in range(height_px):
-        for column in range(width_px):
-            heights[column] = heights[column] + 1 if grid[row, column] else 0
-
+        column_heights[:width_px] = numpy.where(grid[row], column_heights[:width_px] + 1, 0)
+        heights = column_heights.tolist()
         stack: list[int] = []
 
         for column in range(width_px + 1):
@@ -1140,6 +1140,7 @@ def compute_illumination_scoring_region(
     smoothing_px: float = 0.0,
     taper_fraction: float = 0.2,
     min_region_px: int = 8,
+    roundoff_floor: float = 1.0e-12,
 ) -> ScoringRegion:
     """Derive a rectangular, tapered scoring window from where the probe actually was.
 
@@ -1151,8 +1152,9 @@ def compute_illumination_scoring_region(
     both.
 
     The mask is ``photon_number > threshold_fraction * mean(photon_number)``
-    over the illuminated pixels, optionally smoothed and eroded to pull the
-    boundary in off the ragged edge of the outermost probe positions, and then
+    over the illuminated pixels -- those above ``roundoff_floor`` times the
+    peak -- optionally smoothed and eroded to pull the boundary in off the
+    ragged edge of the outermost probe positions, and then
     reduced to its largest inscribed rectangle so the result is still FFT-able.
     The rectangle is finally multiplied by a Tukey taper.
 
@@ -1173,6 +1175,11 @@ def compute_illumination_scoring_region(
         min_region_px: Smallest rectangle edge, in pixels, worth returning.
             Below this an FFT has too few rings to say anything, and the
             caller is better off scoring the whole array.
+        roundoff_floor: Fraction of the peak below which a pixel counts as
+            unilluminated. Subpixel Fourier shifts leave round-off of order 1e-16
+            relative to the peak on pixels no probe reaches; counted as illuminated,
+            they would lower the mean and with it the threshold. The default sits
+            far under any physical signal and far over double-precision round-off.
 
     Raises:
         ValueError: If the illumination map is smaller than ``array_shape``,
@@ -1200,7 +1207,7 @@ def compute_illumination_scoring_region(
     if smoothing_px > 0.0:
         photon_number = gaussian_filter(photon_number, smoothing_px)
 
-    illuminated = photon_number > 0.0
+    illuminated = photon_number > numpy.max(photon_number) * roundoff_floor
 
     if not illuminated.any():
         raise ValueError('Illumination map carries no photons!')
@@ -1353,12 +1360,16 @@ def compute_peak_signal_to_noise_ratio(
     Real-valued inputs only. When ``data_range`` is ``None``, infers
     ``reference.max() - reference.min()`` so floating-point inputs do not
     trigger scikit-image's data-range warning. Returns ``+inf`` when the two
-    arrays are identical.
+    arrays are identical, and NaN when the data range is not positive -- a constant
+    reference, say -- since there is no peak to measure the error against.
     """
     if reference.shape != test.shape:
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
 
     effective_range = _infer_data_range(reference) if data_range is None else data_range
+
+    if not effective_range > 0.0:
+        return float('nan')
 
     with numpy.errstate(divide='ignore'):  # identical arrays divide by a zero error
         return float(peak_signal_noise_ratio(reference, test, data_range=effective_range))
@@ -1374,12 +1385,17 @@ def compute_structural_similarity(
 
     Real-valued inputs only. When ``data_range`` is ``None``, infers
     ``reference.max() - reference.min()``. Returns a scalar in ``[-1, 1]``;
-    ``1.0`` for identical inputs.
+    ``1.0`` for identical inputs, and NaN when the data range is not positive, which
+    leaves the index's stabilizing constants at zero and its ratio undefined.
     """
     if reference.shape != test.shape:
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
 
     effective_range = _infer_data_range(reference) if data_range is None else data_range
+
+    if not effective_range > 0.0:
+        return float('nan')
+
     return float(structural_similarity(reference, test, data_range=effective_range))
 
 
@@ -1397,10 +1413,14 @@ def compute_normalized_mutual_information(
     SSIM/PSNR, NMI is insensitive to monotonic intensity remappings, so it
     scores residual amplitude scale ambiguity less harshly. ``bins`` controls
     the joint-histogram resolution; the scikit-image default of 100 is
-    preserved.
+    preserved. Returns NaN for a constant reference, which carries no information
+    for the test to share.
     """
     if reference.shape != test.shape:
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
+
+    if not numpy.ptp(reference) > 0.0:
+        return float('nan')
 
     return float(normalized_mutual_information(reference, test, bins=bins))
 
@@ -1414,11 +1434,14 @@ class PixelwiseMetrics:
     mean_absolute_error: float
     """``mean(|test - reference|)``, in the images' units."""
     peak_signal_to_noise_ratio_dB: float  # noqa: N815
-    """Peak signal-to-noise ratio over the data range; ``inf`` for identical images."""
+    """Peak signal-to-noise ratio over the data range; ``inf`` for identical images, NaN
+    when the data range is not positive."""
     structural_similarity: float
-    """Mean structural similarity, in ``[-1, 1]``; NaN when the images are too small."""
+    """Mean structural similarity, in ``[-1, 1]``; NaN when the images are too small or
+    the data range is not positive."""
     normalized_mutual_information: float
-    """Studholme normalized mutual information, from 1 (independent) to 2 (identical)."""
+    """Studholme normalized mutual information, from 1 (independent) to 2 (identical);
+    NaN for a constant reference."""
 
 
 def compute_pixelwise_metrics(
@@ -1433,7 +1456,9 @@ def compute_pixelwise_metrics(
     Every metric is taken over the pixels ``mask`` selects, or over all of them. The
     structural similarity is computed on the whole images, since its window needs
     neighbours, and its per-pixel map is averaged over the mask; it is NaN when either
-    side of the images is shorter than the 7-pixel window.
+    side of the images is shorter than the 7-pixel window. A reference constant over the
+    scored pixels has no data range, so without an explicit ``data_range`` the peak
+    signal-to-noise ratio, structural similarity and mutual information are NaN.
 
     Args:
         reference: The image treated as ground truth.
@@ -1461,7 +1486,7 @@ def compute_pixelwise_metrics(
     test_scored = test[scored]
     effective_range = _infer_data_range(reference_scored) if data_range is None else data_range
 
-    if min(reference.shape) < 7:
+    if min(reference.shape) < 7 or not effective_range > 0.0:
         similarity = float('nan')
     else:
         _, similarity_map = structural_similarity(

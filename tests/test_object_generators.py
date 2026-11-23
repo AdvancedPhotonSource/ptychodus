@@ -19,8 +19,8 @@ import pytest
 
 from ptychodus.api.accumulate import DiffractionMoments
 from ptychodus.api.assemble import AssembledDiffractionData
-from ptychodus.api.geometry import GeometryNotDefinedError
-from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider
+from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry
+from ptychodus.api.object import Object, ObjectCenter, ObjectGeometry, ObjectGeometryProvider
 from ptychodus.api.plugins import PluginList, PluginRegistry
 from ptychodus.api.probe_positions import ProbePosition
 from ptychodus.api.simulate.object import ObjectGenerator, pad_object
@@ -287,3 +287,20 @@ def test_a_builder_name_synced_to_settings_is_found_again(registry: PluginRegist
     for name in factory:
         factory.create(name, has_diffraction_data=True).sync_to_settings()
         assert factory.create_from_settings(has_diffraction_data=True).get_name() == name
+
+
+def test_pad_object_pads_with_vacuum() -> None:
+    raw = Object(
+        array=numpy.full((2, 4, 5), 0.5 + 0.5j),
+        pixel_geometry=PixelGeometry(width_m=1.0e-8, height_m=1.0e-8),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
+        layer_spacing_m=[1.0e-6],
+    )
+
+    padded = pad_object(raw, 3, 2).get_array()
+
+    assert padded.shape == (2, 4 + 2 * 2, 5 + 2 * 3)
+    numpy.testing.assert_array_equal(padded[:, 2:-2, 3:-3], raw.get_array())
+    border = numpy.ones(padded.shape, dtype=bool)
+    border[:, 2:-2, 3:-3] = False
+    numpy.testing.assert_array_equal(padded[border], 1.0)

@@ -19,7 +19,7 @@ from .constants import PI, format_length
 from .files import FileReader, FileWriter
 from .fourier import fourier_shift_2d
 from .geometry import ImageExtent, PixelGeometry
-from .interpolate import resample_complex_on_grid
+from .interpolate import resample_complex_on_grid, split_whole_pixel
 from .moments import compute_intensity_moments
 from .preprocess.diffraction import inpaint_bad_pixels
 from .preprocess.noise import subtract_noise_floor
@@ -104,13 +104,7 @@ def compute_amplitude_deviation(wavefield: ComplexArrayType) -> float:
         The normalized amplitude deviation, or ``0.0`` when the mean amplitude is not
         positive.
     """
-    amplitude = numpy.absolute(numpy.asarray(wavefield))
-    mean = amplitude.mean()
-
-    if mean <= 0.0:
-        return 0.0
-
-    return float(amplitude.std() / mean)
+    return compute_rms_contrast(numpy.absolute(numpy.asarray(wavefield)))
 
 
 def compute_phase_deviation_rad(wavefield: ComplexArrayType) -> float:
@@ -874,20 +868,6 @@ def _axis_offset_px(size_px: int) -> float:
     return size_px // 2 - (size_px - 1) / 2
 
 
-def _split_patch_corner(lower: float, snap_tolerance_px: float) -> tuple[int, float]:
-    """The floored corner and its residual in ``[0, 1)``, snapped near a whole pixel."""
-    whole = math.floor(lower)
-    frac = lower - whole
-
-    if frac > 1.0 - snap_tolerance_px:
-        return whole + 1, 0.0
-
-    if frac < snap_tolerance_px:
-        return whole, 0.0
-
-    return whole, frac
-
-
 @dataclass(frozen=True)
 class PatchBounds:
     """Indexing bounds and sub-pixel offset for a probe-sized patch anchored at a float object-pixel center.
@@ -1006,8 +986,12 @@ class ProbeGeometry:
         coordinate does not turn an aligned placement into a near-full-pixel Fourier
         shift that wraps an edge of the probe.
         """
-        x_lower, dx = _split_patch_corner(cx - self.width_px // 2, snap_tolerance_px)
-        y_lower, dy = _split_patch_corner(cy - self.height_px // 2, snap_tolerance_px)
+        x_lower, dx = split_whole_pixel(
+            cx - self.width_px // 2, snap_tolerance_px=snap_tolerance_px
+        )
+        y_lower, dy = split_whole_pixel(
+            cy - self.height_px // 2, snap_tolerance_px=snap_tolerance_px
+        )
         return PatchBounds(
             x_slice=slice(x_lower, x_lower + self.width_px),
             y_slice=slice(y_lower, y_lower + self.height_px),
@@ -1194,7 +1178,17 @@ class Probe:
         return self._mode_relative_power[number]
 
     def get_coherence(self) -> float:
-        return numpy.sqrt(numpy.sum(numpy.square(self._mode_relative_power)))
+        """The purity of the probe's state: ``sum(p**2)`` over the relative powers of its
+        orthogonalized modes, one when coherent and ``1/N`` for N equally powerful modes.
+
+        The orthogonalized powers do not depend on how a reconstruction split the state
+        into modes; see :func:`compute_probe_mode_spectrum`. NaN when the probe carries no
+        power.
+        """
+        try:
+            return compute_probe_mode_spectrum(self).purity
+        except ValueError:
+            return float('nan')
 
     def get_intensity(self) -> RealArrayType:
         return numpy.sum(intensity(self._array), axis=-3)

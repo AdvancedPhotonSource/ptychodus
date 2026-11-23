@@ -54,6 +54,30 @@ def _fft_shift_2d(array_2d: numpy.ndarray, shift_yx: tuple[float, float]) -> num
     return numpy.fft.ifft2(numpy.fft.fft2(array_2d) * phase_ramp)
 
 
+def _shifted_crops(
+    canvas: numpy.ndarray,
+    shift_yx: tuple[float, float],
+    reference_shape: tuple[int, int],
+    moving_shape: tuple[int, int] | None = None,
+) -> tuple[numpy.ndarray, numpy.ndarray]:
+    """Central crops of *canvas* and of *canvas* shifted by *shift_yx*.
+
+    Neither crop is periodic, as two reconstructions of one sample are not; a
+    whole-array circular shift would let an untapered correlation be exact by
+    construction.
+    """
+    moving_shape = reference_shape if moving_shape is None else moving_shape
+    shifted = _fft_shift_2d(canvas, shift_yx)
+    crops = []
+
+    for array, (height, width) in ((canvas, reference_shape), (shifted, moving_shape)):
+        row = canvas.shape[0] // 2 - height // 2
+        column = canvas.shape[1] // 2 - width // 2
+        crops.append(array[row : row + height, column : column + width])
+
+    return crops[0], crops[1]
+
+
 def test_align_objects_identity_returns_unchanged_array_and_center() -> None:
     rng = numpy.random.default_rng(42)
     array = (rng.standard_normal((1, 16, 16)) + 1j * rng.standard_normal((1, 16, 16))).astype(
@@ -194,16 +218,16 @@ def test_align_objects_probe_position_consistency_world_coordinate_invariant() -
 
 def test_align_objects_preserves_complex_phase() -> None:
     """The FFT phase-ramp shift must preserve complex phase content, not just amplitude."""
-    rng = numpy.random.default_rng(7)
     height, width = 32, 32
-    # Smooth complex pattern: amplitude AND non-trivial phase.
-    y = numpy.arange(height)[:, None]
-    x = numpy.arange(width)[None, :]
-    amplitude = numpy.exp(-(((y - 16) ** 2 + (x - 16) ** 2) / 50.0))
+    # Smooth complex pattern on a larger canvas: amplitude AND non-trivial phase.
+    y = numpy.arange(3 * height)[:, None]
+    x = numpy.arange(3 * width)[None, :]
+    amplitude = numpy.exp(-(((y - 48) ** 2 + (x - 48) ** 2) / 50.0))
     phase = 0.5 * numpy.sin(TWO_PI * y / height) + 0.3 * numpy.cos(TWO_PI * x / width)
-    reference_layer = (amplitude * numpy.exp(1j * phase)).astype(numpy.complex128)
+    canvas = (amplitude * numpy.exp(1j * phase)).astype(numpy.complex128)
     shift_yx = (2.0, -3.0)  # integer pixels keeps interpolation noise low
-    moving_layer = _fft_shift_2d(reference_layer, shift_yx=shift_yx)
+    reference_layer, moving_layer = _shifted_crops(canvas, shift_yx, (height, width))
+    amplitude = numpy.abs(reference_layer)
 
     pixel_geom = PixelGeometry(width_m=1.0e-9, height_m=1.0e-9)
     center = ObjectCenter(x_m=0.0, y_m=0.0)
@@ -212,7 +236,9 @@ def test_align_objects_preserves_complex_phase() -> None:
     )
     moving = Object(array=moving_layer[numpy.newaxis], pixel_geometry=pixel_geom, center=center)
 
-    _, aligned = align_objects(reference, moving)
+    # The feature fades out before the frame edge, so no taper is needed, and without one
+    # the estimate is exact; this test is about the shift preserving phase, not the estimate.
+    _, aligned = align_objects(reference, moving, taper_fraction=0.0)
     aligned_layer = aligned.get_array()[0]
 
     # Reference and aligned should match in both amplitude and phase across the support region.
@@ -225,8 +251,6 @@ def test_align_objects_preserves_complex_phase() -> None:
         numpy.angle(reference_layer)[support],
         atol=1.0e-5,
     )
-    # silence unused-rng warning
-    del rng
 
 
 def test_align_objects_new_center_independent_of_reference_center() -> None:
@@ -374,13 +398,12 @@ def test_align_objects_subpixel_alignment_survives_trimming() -> None:
     align_objects recovers the reference after center-cropping to the common
     shape and applying the sub-pixel Fourier shift.
     """
-    reference_layer = _make_gaussian_feature((1, 32, 32), center_yx=(16.0, 16.0), sigma_px=3.0)[0]
-    # Same content as reference, shifted sub-pixel; embed in a 34x34 array with a 1-pixel
-    # border on every side so center-cropping to 32x32 recovers the shifted content exactly.
+    canvas = _make_gaussian_feature((1, 96, 96), center_yx=(48.0, 48.0), sigma_px=3.0)[0]
+    # Same content as reference, shifted sub-pixel, cropped one pixel wider on every side
+    # so center-cropping to 32x32 recovers the shifted content exactly.
     shift_yx = (0.5, -0.25)
-    shifted_layer = _fft_shift_2d(reference_layer, shift_yx=shift_yx)
-    moving_layer_full = numpy.zeros((1, 34, 34), dtype=numpy.complex128)
-    moving_layer_full[0, 1:33, 1:33] = shifted_layer
+    reference_layer, moving_layer = _shifted_crops(canvas, shift_yx, (32, 32), (34, 34))
+    moving_layer_full = moving_layer[numpy.newaxis]
 
     pixel_geom = PixelGeometry(width_m=1.0e-9, height_m=1.0e-9)
     center = ObjectCenter(x_m=0.0, y_m=0.0)
@@ -422,10 +445,10 @@ def _phase_contrast_object(shape: tuple[int, int], seed: int) -> numpy.ndarray:
 )
 def test_estimate_shift_on_a_phase_only_object(quantity: RegistrationQuantity) -> None:
     """Amplitude is flat here, so a quantity that only sees it cannot register."""
-    shape = (64, 64)
-    reference_layer = _phase_contrast_object(shape, seed=3)
     shift_yx = (-1.5, 0.75)
-    moving_layer = _fft_shift_2d(reference_layer, shift_yx=shift_yx)
+    reference_layer, moving_layer = _shifted_crops(
+        _phase_contrast_object((192, 192), seed=3), shift_yx, (64, 64)
+    )
 
     pixel_geom = PixelGeometry(width_m=1.0e-9, height_m=1.0e-9)
     center = ObjectCenter(x_m=0.0, y_m=0.0)
@@ -439,6 +462,77 @@ def test_estimate_shift_on_a_phase_only_object(quantity: RegistrationQuantity) -
     # align_objects shifts the moving object back onto the reference, so the
     # estimate is the negative of the shift that produced it.
     numpy.testing.assert_allclose(estimated, (-shift_yx[0], -shift_yx[1]), atol=0.2)
+
+
+def _particles_on_vacuum(size: int, seed: int) -> numpy.ndarray:
+    """Weakly absorbing, phase-shifting particles scattered on vacuum near the canvas center."""
+    rng = numpy.random.default_rng(seed)
+    y, x = numpy.mgrid[:size, :size]
+    log_transmission = numpy.zeros((size, size), dtype=numpy.complex128)
+
+    for _ in range(30):
+        center_y, center_x = rng.uniform(size / 3 - 8, 2 * size / 3 + 8, size=2)
+        radius = rng.uniform(2.0, 5.0)
+        log_transmission += (-0.3 + 1.0j) * numpy.exp(
+            -((y - center_y) ** 2 + (x - center_x) ** 2) / (2 * radius**2)
+        )
+
+    return numpy.exp(log_transmission)
+
+
+@pytest.mark.parametrize('quantity', [RegistrationQuantity.COMPLEX, RegistrationQuantity.AMPLITUDE])
+def test_estimate_shift_on_particles_on_vacuum(quantity: RegistrationQuantity) -> None:
+    """Vacuum is a background both frames share at zero shift; it must not hold the estimate there.
+
+    Plain correlation of these broad blobs lands within a few tenths of a pixel; a
+    background left in, or a whitened spectrum, keeps the estimate near zero.
+    """
+    shift_yx = (2.4, -1.7)
+    reference_layer, moving_layer = _shifted_crops(
+        _particles_on_vacuum(192, seed=0), shift_yx, (64, 64)
+    )
+    pixel_geom = PixelGeometry(width_m=1.0e-9, height_m=1.0e-9)
+    center = ObjectCenter(x_m=0.0, y_m=0.0)
+    reference = Object(
+        array=reference_layer[numpy.newaxis], pixel_geometry=pixel_geom, center=center
+    )
+    moving = Object(array=moving_layer[numpy.newaxis], pixel_geometry=pixel_geom, center=center)
+
+    estimated = estimate_object_alignment_shift(reference, moving, registration_quantity=quantity)
+
+    numpy.testing.assert_allclose(estimated, (-shift_yx[0], -shift_yx[1]), atol=0.4)
+
+
+@pytest.mark.parametrize(
+    'quantity', [s for s in RegistrationQuantity if s is not RegistrationQuantity.PHASE]
+)
+def test_estimate_shift_is_invariant_to_a_global_phase_offset(
+    quantity: RegistrationQuantity,
+) -> None:
+    """A global phase offset is a reconstruction ambiguity; it must not move the estimate."""
+    reference_layer, moving_layer = _shifted_crops(
+        _particles_on_vacuum(192, seed=1), (1.3, 0.6), (64, 64)
+    )
+    pixel_geom = PixelGeometry(width_m=1.0e-9, height_m=1.0e-9)
+    center = ObjectCenter(x_m=0.0, y_m=0.0)
+    reference = Object(
+        array=reference_layer[numpy.newaxis], pixel_geometry=pixel_geom, center=center
+    )
+    estimates = [
+        estimate_object_alignment_shift(
+            reference,
+            Object(
+                array=moving_layer[numpy.newaxis] * numpy.exp(1j * offset_rad),
+                pixel_geometry=pixel_geom,
+                center=center,
+            ),
+            registration_quantity=quantity,
+        )
+        for offset_rad in (0.0, 0.7, 2.0, -2.9)
+    ]
+
+    for estimate in estimates[1:]:
+        numpy.testing.assert_allclose(estimate, estimates[0], atol=1.0e-12)
 
 
 def test_amplitude_quantity_cannot_register_a_phase_only_object() -> None:

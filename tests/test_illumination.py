@@ -370,7 +370,7 @@ class TestComputeIlluminationMap:
         )
 
     def test_i0_missing_index_gets_unit_weight(self) -> None:
-        """A scan index absent from the mapping is weighted by the provided mean."""
+        """A scan index absent from the mapping takes unit weight."""
         probe = _gaussian_probe(8, 8, sigma=1.0)
         pixel_size_m = 1.0e-7
         positions = [
@@ -383,10 +383,30 @@ class TestComputeIlluminationMap:
             positions=positions,
             pixel_size_m=pixel_size_m,
         )
-        # Only index 0 is in the mapping; index 1 gets the mean of the mapping (=100)
-        # divided by the mean (=100) -> unit weight.
+        # Only index 0 is in the mapping; index 1 has no reading, so unit weight.
         weighted = compute_illumination_map(product, i0_by_index={0: 100.0})
         expected_patch = numpy.abs(probe) ** 2
+        numpy.testing.assert_allclose(weighted.photon_number[4:12, 20:28], expected_patch)
+
+    @pytest.mark.parametrize('unusable', [-5.0, 0.0, float('nan')])
+    def test_i0_unusable_and_off_scan_readings_do_not_weight(self, unusable: float) -> None:
+        """Only finite, positive readings paired with a position enter the mean."""
+        probe = _gaussian_probe(8, 8, sigma=1.0)
+        pixel_size_m = 1.0e-7
+        positions = [
+            ProbePosition(index=0, x_m=-8 * pixel_size_m, y_m=0.0),
+            ProbePosition(index=1, x_m=+8 * pixel_size_m, y_m=0.0),
+        ]
+        product = _make_product(
+            object_array=_delta_object(16, 32),
+            probe_array=probe,
+            positions=positions,
+            pixel_size_m=pixel_size_m,
+        )
+        # Index 7 is off the scan; index 1's reading cannot weight anything.
+        weighted = compute_illumination_map(product, i0_by_index={0: 100.0, 1: unusable, 7: 900.0})
+        expected_patch = numpy.abs(probe) ** 2
+        numpy.testing.assert_allclose(weighted.photon_number[4:12, 4:12], expected_patch)
         numpy.testing.assert_allclose(weighted.photon_number[4:12, 20:28], expected_patch)
 
 

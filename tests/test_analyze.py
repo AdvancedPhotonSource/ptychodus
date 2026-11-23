@@ -9,6 +9,7 @@ import numpy.testing
 import pytest
 
 from ptychodus.api.analyze import (
+    _center_crop_or_pad,
     compute_object_comparison_report,
     compute_object_metrics_report,
     compute_probe_comparison_report,
@@ -258,8 +259,15 @@ class TestObjectComparisonReport:
         _assert_json_ready(report.scalars)
 
     def test_recovers_a_subpixel_shift(self) -> None:
-        reference = _make_product()
-        shifted = fourier_shift_2d(reference.object_.get_array(), dx=0.4, dy=-0.3)
+        # Crops of one larger canvas, so neither object is periodic, as two
+        # reconstructions of one sample are not.
+        shape = (3 * _OBJECT_PX, 3 * _OBJECT_PX)
+        canvas = (
+            (0.8 + 0.05 * _smooth_field(0, shape)) * numpy.exp(0.5j * _smooth_field(1, shape))
+        ).astype(numpy.complex128)
+        crop = slice(_OBJECT_PX, 2 * _OBJECT_PX)
+        reference = _make_product(object_array=canvas[numpy.newaxis, crop, crop])
+        shifted = fourier_shift_2d(canvas, dx=0.4, dy=-0.3)[numpy.newaxis, crop, crop]
         test = _make_product(object_array=shifted * numpy.exp(0.5j))
 
         report = compute_object_comparison_report(reference, test)
@@ -412,3 +420,18 @@ class TestProbePositionsComparisonReport:
 
         with pytest.raises(ValueError, match='share no scan index'):
             compute_probe_positions_comparison_report(reference, test)
+
+
+@pytest.mark.parametrize(
+    ('source_px', 'target_px'), [(8, 7), (7, 8), (8, 6), (7, 5), (6, 9), (9, 6), (8, 8)]
+)
+def test_center_crop_or_pad_keeps_beam_axis_on_beam_axis(source_px: int, target_px: int) -> None:
+    array = numpy.zeros((2, source_px, source_px), dtype=numpy.complex128)
+    array[:, source_px // 2, source_px // 2] = 1.0
+
+    result = _center_crop_or_pad(array, target_px, target_px)
+
+    assert result.shape == (2, target_px, target_px)
+    expected = numpy.zeros_like(result)
+    expected[:, target_px // 2, target_px // 2] = 1.0
+    numpy.testing.assert_array_equal(result, expected)

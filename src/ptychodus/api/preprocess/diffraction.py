@@ -41,7 +41,7 @@ from ..diffraction import (
 )
 from ..geometry import ImageExtent, PixelGeometry
 from ..inpaint import BiharmonicInpainter
-from ..moments import compute_intensity_moments
+from ..moments import compute_intensity_moments, compute_ring_indexes
 from ..typing import AnyArrayType, RealArrayType
 from .noise import RobustStatistics, estimate_filtered_noise_floor, subtract_noise_floor
 
@@ -553,7 +553,7 @@ def estimate_signal_radius(
 
     pixel_y = numpy.arange(height).reshape(-1, 1) - beam_center.y_px
     pixel_x = numpy.arange(width).reshape(1, -1) - beam_center.x_px
-    ring_index = numpy.hypot(pixel_x, pixel_y).astype(numpy.intp)[good_pixels]
+    ring_index = compute_ring_indexes(numpy.hypot(pixel_x, pixel_y)[good_pixels], 1.0)
 
     num_rings = int(ring_index.max()) + 1 if ring_index.size > 0 else 0
     ring_sums = numpy.bincount(ring_index, weights=good_values, minlength=num_rings)

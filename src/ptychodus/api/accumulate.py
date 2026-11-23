@@ -792,12 +792,12 @@ def compute_i0_scale(
 
     if usable.any():
         scale[usable] = numpy.mean(i0[usable]) / i0[usable]
-        logger.info('Correcting for beam decay by I0.')
+        logger.info('Scaling by I0.')
 
     if not usable.all():
         logger.warning(
             f'{int(numpy.count_nonzero(~usable))} I0 readings are missing or not positive;'
-            ' leaving those patterns uncorrected.'
+            ' those patterns keep unit scale.'
         )
 
     return scale

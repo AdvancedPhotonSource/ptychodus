@@ -1568,3 +1568,19 @@ class TestGetMeanProbe:
             mean_probe[0], numpy.tensordot(weights.mean(axis=0), array[:, 0], axes=1)
         )
         numpy.testing.assert_array_equal(mean_probe[1], array[0, 1])
+
+
+def test_coherence_is_the_purity_of_the_orthogonalized_modes() -> None:
+    """Two equally powerful orthogonal modes give 1/2; the same span split unevenly too."""
+    first = numpy.zeros((8, 8), dtype=complex)
+    first[:4] = 1.0
+    second = numpy.zeros((8, 8), dtype=complex)
+    second[4:] = 1.0
+    pixel_geometry = PixelGeometry(width_m=1.0e-8, height_m=1.0e-8)
+
+    orthogonal = Probe(numpy.stack([first, second]), pixel_geometry)
+    mixed = Probe(numpy.stack([first + second, first - second]) / numpy.sqrt(2), pixel_geometry)
+
+    assert orthogonal.get_coherence() == pytest.approx(0.5)
+    assert mixed.get_coherence() == pytest.approx(0.5)
+    assert numpy.isnan(Probe(numpy.zeros((1, 8, 8), dtype=complex), pixel_geometry).get_coherence())
