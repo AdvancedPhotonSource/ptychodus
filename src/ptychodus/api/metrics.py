@@ -81,7 +81,8 @@ def _estimate_phase_offset_and_ramp(
     high-frequency content; its magnitude provides the natural amplitude
     weighting. The ramp is recovered from per-pixel complex differences along
     each axis (so unwrapping is unnecessary), then ``phi`` is recovered as the
-    weighted circular mean of the de-ramped signal.
+    weighted circular mean of the de-ramped signal. The differences recover a ramp only
+    while it advances by less than pi per pixel; a steeper one aliases.
     """
     # Differential phase along x: arg(S[:, x+1] * conj(S[:, x])) carries
     # k_x * pixel_width_m modulo 2pi without ever wrapping per-pair.
@@ -151,6 +152,11 @@ def estimate_reconstruction_ambiguities(
     of complex weighted sums) and so requires no phase unwrapping. Pixels
     of zero amplitude contribute exactly zero to the relevant sums and are
     therefore ignored automatically.
+
+    The ramp is measured from the phase step between neighbouring pixels, so it must
+    advance by less than pi per pixel along each axis (``|k_x| * dx < pi``, likewise in
+    y); a steeper ramp aliases to a shallower one. A mean phase gradient genuinely in
+    the sample is indistinguishable from the ramp ambiguity and is removed with it.
 
     Args:
         product: Product whose ambiguities are being measured. The result
@@ -1005,8 +1011,10 @@ def compute_power_spectral_density(
     The 2D density is ``dx dy |F|^2 / (N mean(w^2))``. Dividing by the mean
     squared window compensates the power the apodization removes, so the
     reported level does not depend on the window choice. Because nothing is
-    zero-padded, Parseval holds exactly: integrating the unwindowed density over
-    spatial frequency recovers ``mean(|array - mean(array)|^2)``. Units are the
+    zero-padded, Parseval holds exactly for the 2D density: integrating it, unwindowed,
+    over the whole frequency grid recovers ``mean(|array - mean(array)|^2)``. The radial
+    profile covers only the inscribed Nyquist circle, so integrating it omits the power
+    in the grid's corners. Units are the
     input units squared times m^2; a reconstructed object is a dimensionless
     complex transmission, so the result is in m^2.
 

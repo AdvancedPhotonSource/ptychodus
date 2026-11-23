@@ -755,8 +755,9 @@ def estimate_focal_plane(
     if numpy.absolute(offset) > 1.0:
         return grid_plane
 
-    # Half the span of the bracketing pair, so a locally uneven grid still gives the
-    # right step size without assuming the whole axis is uniform.
+    # The vertex formula assumes the even spacing the coordinates are documented to
+    # have, which half the span of the bracketing pair measures; on an uneven grid the
+    # refinement is only approximate.
     spacing_m = 0.5 * (coordinates[index + 1] - coordinates[index - 1])
     focus_m = coordinates[index] + offset * spacing_m
     # Vertex of the same parabola: y(x*) = y_here - (y_left - y_right) * x* / 4.
