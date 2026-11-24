@@ -12,6 +12,7 @@ uv sync --extra globus --extra gui --extra ptychi-cuda130  # GPU: match nvidia-s
 uv run ptychodus                                    # GUI
 uv run ptychodus-reconstruct -i <in> -o <out>       # headless — any library, over a prepared directory
 uv run pytest                                       # tests
+uv run pytest -m browser tests/webapp/browser       # web UI in system Chrome; tsc first
 uv run ruff check . && uv run ruff format --check . # lint + format
 uv run mypy src/ptychodus scripts tests             # types (wider than CI's)
 ```
@@ -23,6 +24,8 @@ Other entry points (`ptychodus-reconstruct`, `ptychodus-webapp` and the rest) ar
 ### Testing
 
 Tests cover `api/`, `model/`, `view/widgets/` and the Qt-free `controller/rendering/` (tested at `tests/` root, on a bare install), plus the two `controller/` modules with real logic: [controller/parameters.py](src/ptychodus/controller/parameters.py) (unit conversion, signedness inference, complex amplitude/phase editing) and [controller/processing/generated.py](src/ptychodus/controller/processing/generated.py), the mostly pure `Sequence[DescribedField] -> list[_Item]` pipeline laying out each library's panel. A reusable widget with logic of its own belongs in `view/widgets/`, like `DecimalRangeSlider`. **Do not add tests for anything else under `view/` or `controller/`**, controller helper functions included. [tests/conftest.py](tests/conftest.py) drops `tests/view/`, `tests/controller/` and `tests/webapp/` via `collect_ignore` when their extra is missing, and hosts the session-scoped `qapp` fixture, which imports `QApplication` inside so the conftest imports on a bare install. `pytest tests/` must pass on a bare `pip install .` (what CI runs), so nothing reachable from `ptychodus.model` at import time may need an optional dependency — an optional subsystem defers its import, as a reconstruction library does inside `_build()`. Guard a test that needs an optional library with `pytest.importorskip('ptychi')`; drop an optional-extra directory with `collect_ignore` in the conftest — `importorskip` there is reported as an error, not a skip.
+
+**Web UI tests.** [tests/webapp/test_ts_route_parity.py](tests/webapp/test_ts_route_parity.py), in the normal suite, holds every URL `ui/src/api.ts` builds to a route and to that route's declared query parameters — the service ignores an undeclared one and answers 200. [tests/webapp/browser/](tests/webapp/browser/) drives the served UI in a real browser through pytest-playwright (dev group), in the system Chrome where there is one; `addopts` deselects its `browser` marker, so it runs only under `-m browser`, and it fails rather than compiles when `ui/dist/` is older than `ui/src/`, so run `tsc` first. Each browser test seeds a storage root, serves it with [tests/webapp_ui_fixtures.py](tests/webapp_ui_fixtures.py), and ends with `ServedPage.assert_clean`, which fails on an uncaught exception, an unexpected error status, or a request no route declares.
 
 ## Architecture
 

@@ -415,6 +415,15 @@ Invoke the `pre-push` skill. Both of its tiers must be green — Tier 1 (ruff ch
 
 `PASS` if `pre-push` finishes clean. `FAIL` on any failing step; hand the failure back to the user without attempting fixes here (the `pre-push` skill knows how to offer format fixes; deeper fixes belong outside the release gate).
 
+Then run the web UI tier, which `pre-push` offers only for webapp diffs and a release runs regardless, since the compiled UI ships in the wheel:
+
+```sh
+(cd src/ptychodus/webapp/ui && tsc)
+uv run pytest -m browser tests/webapp/browser -q
+```
+
+`PASS` if it is green. `SKIP` with the reason if no browser launches — neither `google-chrome` on `PATH` nor a Chromium from `uv run playwright install chromium`. `FAIL` on any failing test.
+
 ---
 
 ### Section 8 — Entry-point smoke test

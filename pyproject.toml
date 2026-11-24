@@ -264,6 +264,7 @@ dev = [
     "pyqt5-stubs",
     "pytest",
     "pytest-asyncio",
+    "pytest-playwright",
     "pytest-xdist",
     "ruff",
     "types-psutil",
@@ -272,3 +273,6 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# Browser tests drive the web UI in Chrome; a later `-m browser` on the command line opts in.
+addopts = "-m 'not browser'"
+markers = ["browser: drives the web UI in a real browser; run with -m browser"]

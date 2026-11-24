@@ -104,11 +104,14 @@ def _write_product_h5(path: Path) -> None:
         f.create_dataset('loss_values', data=np.array([0.3, 0.2, 0.1]))
 
 
-def _write_analyzable_product_h5(path: Path, position_shift_x_m: float) -> None:
+def _write_analyzable_product_h5(
+    path: Path, position_shift_x_m: float, *, modes: int = 1, layers: int = 1
+) -> None:
     """A product every analysis report can describe, with no I0.
 
-    A Gaussian probe over a random-phase object, at a 4 x 4 grid of probe positions 6 px
-    apart, shifted in x by `position_shift_x_m`.
+    A Gaussian probe of `modes` modes, each half the last's amplitude, over a random-phase
+    object of `layers` layers 1 um apart, at a 4 x 4 grid of probe positions 6 px apart,
+    shifted in x by `position_shift_x_m`.
     """
     pixel_size_m = 1e-9
     rng = np.random.default_rng(0)
@@ -122,15 +125,18 @@ def _write_analyzable_product_h5(path: Path, position_shift_x_m: float) -> None:
         f.attrs['exposure_time_s'] = 0.1
         f.attrs['mass_attenuation_m2_per_kg'] = 0.0
         f.attrs['tomography_angle_deg'] = 0.0
-        phase = 0.3 * rng.standard_normal((1, 64, 64))
+        phase = 0.3 * rng.standard_normal((layers, 64, 64))
         obj = f.create_dataset('object', data=np.exp(1j * phase).astype(np.complex64))
         obj.attrs['pixel_width_m'] = pixel_size_m
         obj.attrs['pixel_height_m'] = pixel_size_m
         obj.attrs['center_x_m'] = 0.0
         obj.attrs['center_y_m'] = 0.0
+        f.create_dataset('object_layer_spacing_m', data=np.full(layers - 1, 1e-6))
         y_px, x_px = np.mgrid[:16, :16] - 8
         gaussian = np.exp(-(x_px**2 + y_px**2) / (2 * 3.0**2))
-        probe = f.create_dataset('probe', data=gaussian[np.newaxis].astype(np.complex64))
+        amplitudes = 0.5 ** np.arange(modes)
+        probe_array = amplitudes[:, np.newaxis, np.newaxis] * gaussian
+        probe = f.create_dataset('probe', data=probe_array.astype(np.complex64))
         probe.attrs['pixel_width_m'] = pixel_size_m
         probe.attrs['pixel_height_m'] = pixel_size_m
         grid_m = (np.arange(4) - 1.5) * 6 * pixel_size_m
@@ -224,17 +230,22 @@ def seed_product(tmp_storage_root: Path) -> Callable[..., UUID]:
         run: RunRecord | None = None,
         analyzable: bool = False,
         position_shift_x_m: float = 0.0,
+        modes: int = 1,
+        layers: int = 1,
     ) -> UUID:
         """`data_file` is the file the manifest names, `None` for a run with no data yet.
 
-        The product is blank, with a probe carrying no power, unless `analyzable`.
+        The product is blank, with a probe carrying no power, unless `analyzable`, which
+        alone honors `modes` and `layers`.
         """
         uuid = uuid or uuid4()
         folder = tmp_storage_root / 'product' / str(uuid)
         folder.mkdir(parents=True)
         if write_h5 and data_file is not None:
             if analyzable:
-                _write_analyzable_product_h5(folder / data_file, position_shift_x_m)
+                _write_analyzable_product_h5(
+                    folder / data_file, position_shift_x_m, modes=modes, layers=layers
+                )
             else:
                 _write_product_h5(folder / data_file)
         manifest: dict = {

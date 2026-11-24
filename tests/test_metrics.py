@@ -941,6 +941,21 @@ class TestComputeNormalizedMutualInformation:
         nmi_scaled = compute_normalized_mutual_information(reference, 3.0 * test + 5.0)
         assert nmi_scaled == pytest.approx(nmi_raw, rel=1e-6)
 
+    @pytest.mark.filterwarnings('error')
+    def test_reference_constant_to_rounding_is_constant(self) -> None:
+        # A pure-phase object's amplitude in single precision varies only by rounding,
+        # a few ULPs, which collapses every histogram bin.
+        rng = numpy.random.default_rng(4)
+        phase = 0.3 * rng.standard_normal((64, 64))
+        amplitude = numpy.abs(numpy.exp(1j * phase).astype(numpy.complex64))
+        assert numpy.ptp(amplitude) > 0.0
+        assert numpy.isnan(compute_normalized_mutual_information(amplitude, amplitude))
+
+    def test_floor_is_relative_to_the_reference_magnitude(self) -> None:
+        rng = numpy.random.default_rng(5)
+        arr = 1e-9 * rng.standard_normal((32, 32))
+        assert compute_normalized_mutual_information(arr, arr) == pytest.approx(2.0)
+
     def test_explicit_bins_is_honored(self) -> None:
         rng = numpy.random.default_rng(3)
         a = rng.standard_normal((32, 32))

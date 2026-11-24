@@ -22,7 +22,6 @@ class Settings(BaseSettings):
     host: str = '127.0.0.1'
     port: int = 8000
     mcp_mount_path: str = '/mcp'
-    api_prefix: str = '/api/v1'
     auto_reconcile_on_startup: bool = True
     render_concurrency: int = Field(4, ge=1)
     """How many bounded operations, renders and reports, may run at once, each in a worker

@@ -81,7 +81,8 @@ async def get_fluorescence_summary_image(
 
 
 @router.get(
-    '/{uuid}/elements/{name}/image',
+    # A path parameter, so a name with a slash, which arrives decoded, still matches.
+    '/{uuid}/elements/{name:path}/image',
     response_model=RenderedImage,
     openapi_extra=openapi_operation(ResourceService.render_fluorescence_element),
 )

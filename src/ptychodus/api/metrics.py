@@ -1412,6 +1412,7 @@ def compute_normalized_mutual_information(
     test: RealArrayType,
     *,
     bins: int = 100,
+    relative_range_floor: float = 1e-6,
 ) -> float:
     """Normalized mutual information via :func:`skimage.metrics.normalized_mutual_information`.
 
@@ -1422,12 +1423,14 @@ def compute_normalized_mutual_information(
     scores residual amplitude scale ambiguity less harshly. ``bins`` controls
     the joint-histogram resolution; the scikit-image default of 100 is
     preserved. Returns NaN for a constant reference, which carries no information
-    for the test to share.
+    for the test to share: one whose range is at most ``relative_range_floor`` times
+    its largest magnitude, which counts a constant rounded to single precision, such as
+    a pure-phase object's amplitude, as the constant it is.
     """
     if reference.shape != test.shape:
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
 
-    if not numpy.ptp(reference) > 0.0:
+    if not numpy.ptp(reference) > relative_range_floor * numpy.max(numpy.abs(reference)):
         return float('nan')
 
     return float(normalized_mutual_information(reference, test, bins=bins))

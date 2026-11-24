@@ -262,9 +262,23 @@ async function get<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+/** Every row of a listing, fetched a page at a time up to the routes' cap on `limit`. */
+async function getAll<T>(path: string): Promise<Page<T>> {
+  const limit = 200;
+  const items: T[] = [];
+  let total = 0;
+  do {
+    const page = await get<Page<T>>(`${path}?limit=${limit}&offset=${items.length}`);
+    items.push(...page.items);
+    total = page.total;
+    // A listing that shrank while it was read ends here rather than looping.
+    if (page.items.length === 0) break;
+  } while (items.length < total);
+  return { items, total, limit: items.length, offset: 0 };
+}
+
 export const api = {
-  listDiffraction: (limit = 200, offset = 0) =>
-    get<Page<DiffractionRead>>(`/diffraction?limit=${limit}&offset=${offset}`),
+  listDiffraction: () => getAll<DiffractionRead>('/diffraction'),
   getDiffraction: (uuid: string) => get<DiffractionRead>(`/diffraction/${uuid}`),
   diffractionAggregateImage: (uuid: string, params: Partial<RenderParams> = {}) =>
     get<RenderedImage>(`/diffraction/${uuid}/patterns/aggregate/image?${renderQuery(params)}`),
@@ -272,8 +286,7 @@ export const api = {
     get<RenderedImage>(`/diffraction/${uuid}/patterns/${index}/image?${renderQuery(params)}`),
   diffractionFileUrl: (uuid: string) => `${API}/diffraction/${uuid}/files/diffraction`,
 
-  listProduct: (limit = 200, offset = 0) =>
-    get<Page<ProductRead>>(`/product?limit=${limit}&offset=${offset}`),
+  listProduct: () => getAll<ProductRead>('/product'),
   getProduct: (uuid: string) => get<ProductRead>(`/product/${uuid}`),
   // The product of every layer, which the GUI shows for the object itself.
   productObjectFlattenedImage: (uuid: string, params: Partial<RenderParams> = {}) =>
@@ -315,8 +328,7 @@ export const api = {
     ),
 
   visualizationOptions: () => get<VisualizationOptions>('/visualization/options'),
-  listFluorescence: (limit = 200, offset = 0) =>
-    get<Page<FluorescenceRead>>(`/fluorescence?limit=${limit}&offset=${offset}`),
+  listFluorescence: () => getAll<FluorescenceRead>('/fluorescence'),
   getFluorescence: (uuid: string) => get<FluorescenceRead>(`/fluorescence/${uuid}`),
   // product_uuid supplies the pixel geometry; without it the service falls back to a
   // 1 um placeholder and the caption's physical size is wrong.

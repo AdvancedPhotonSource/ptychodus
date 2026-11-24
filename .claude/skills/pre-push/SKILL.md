@@ -48,6 +48,17 @@ Measured on a 16-core machine: mypy 55s, pytest 187s serial or 99s under xdist, 
 
 `--dist loadfile` distributes whole test **files**, so same-file tests keep sharing module state and fixture ordering. Per-test distribution (`--dist load`) is faster on paper but is not what this suite has been verified against.
 
+### Tier 3 — web UI in a browser (optional, about 20s)
+
+Offer this when the diff touches `src/ptychodus/webapp/` or `tests/webapp/`. CI never runs it, and Tier 2 does not either: `addopts` in `pyproject.toml` deselects the `browser` marker, so it runs only on request. Rebuild the UI first, since the tests fail on a `dist/` older than its source rather than compile it:
+
+```sh
+(cd src/ptychodus/webapp/ui && tsc)
+uv run pytest -m browser tests/webapp/browser -q
+```
+
+Run it serially: the tests share one file, so `--dist loadfile` gives them one worker and only adds start-up time. It drives the system Chrome; where there is none, `uv run playwright install chromium` provides one.
+
 ## Handling failures
 
 A tier reports **every** check that failed, not just the first — that is the point of running them together. Fix them as a batch.
@@ -74,7 +85,7 @@ Use this only when the user asks for a fast local check on WIP; the full sweep a
 
 ## Notes
 
-- Ruff rules for this repo: `F, N, NPY`; single-quoted strings; 100-char lines; py311 target (see `pyproject.toml`).
+- Ruff rules for this repo: `F, N, NPY, TID251`; single-quoted strings; 100-char lines; py311 target (see `pyproject.toml`).
 - `pytest-xdist` is in `[dependency-groups] dev`, so `uv sync` installs it. It is deliberately **not** in `[tool.pytest.ini_options] addopts`: CI installs with `pip install . pytest` and has no xdist, so a global `addopts` would break every CI run. Parallelism stays a command-line flag the skill passes.
 - `--warn-unused-ignores` is a local-only flag, not a `pyproject.toml` setting: whether a `# type: ignore` is needed depends on which optional extras are installed, so turning it on globally would fire differently for every environment. One module is exempted in `pyproject.toml` — `ptychodus.plugins.mda.mda_position_file`, whose xdrlib import pair always has one dead half (`[import-not-found]` on <=3.12, `[no-redef]` on 3.13).
 - The local `mypy` target is wider than CI's. Here it covers `src/ptychodus` (`webapp/` included), `scripts/` and `tests/`; CI's job runs only `mypy src/ptychodus scripts`, because its bare install has neither pytest nor the `webapp` extra. A type error in `tests/` therefore fails this gate and nothing else — do not skip the mypy tier on the assumption CI will catch it.

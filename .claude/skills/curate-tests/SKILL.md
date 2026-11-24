@@ -142,6 +142,7 @@ grep -nE 'importorskip' tests/conftest.py tests/*/conftest.py
 - `@pytest.mark.asyncio` is redundant under `asyncio_mode = "auto"` in `pyproject.toml`; remove it.
 - An `xfail` needs `strict=True` and a reason naming the defect, or it hides the day the defect is fixed.
 - `importorskip` in a conftest is reported as an error, not a skip — the conftest uses `collect_ignore` instead. A comment saying so is not a hit.
+- `browser` is a deliberate opt-in marker: `addopts` deselects it, and only `tests/webapp/browser/` carries it. Audit those tests with `-m browser` rather than reading their absence from the default run as a skip, and keep their seconds out of the default suite's baseline. Each ends with `ServedPage.assert_clean`; one that does not checks less than it appears to.
 
 ## Phase B — dynamic checks
 

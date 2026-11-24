@@ -127,7 +127,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.service = service
     add_service_error_handlers(app)
 
-    api_prefix = settings.api_prefix
+    # Fixed, because the web UI's client spells it.
+    api_prefix = '/api/v1'
     app.include_router(health.router, prefix=api_prefix)
     app.include_router(campaign.router, prefix=api_prefix)
     app.include_router(diffraction.router, prefix=api_prefix)

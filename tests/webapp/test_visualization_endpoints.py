@@ -227,6 +227,21 @@ async def test_fluorescence_element_image(
     _decode_png(resp.json(), expected_h=6, expected_w=10)
 
 
+async def test_fluorescence_element_with_a_slash_in_its_name(
+    app_client: AsyncClient,
+    db_engine: AsyncEngine,
+    layout: StorageLayout,
+    seed_fluorescence: Callable[..., UUID],
+) -> None:
+    # The web UI percent-encodes the name, and the server decodes %2F before routing.
+    f = seed_fluorescence(elements=['Fe', 'K/L'])
+    await _ingest(db_engine, layout, layout.manifest_path('fluorescence', f))
+
+    resp = await app_client.get(f'/api/v1/fluorescence/{f}/elements/K%2FL/image')
+    assert resp.status_code == 200
+    _decode_png(resp.json(), expected_h=6, expected_w=10)
+
+
 async def test_fluorescence_element_missing(
     app_client: AsyncClient,
     db_engine: AsyncEngine,

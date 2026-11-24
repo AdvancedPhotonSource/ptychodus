@@ -54,6 +54,10 @@ collect_ignore = []
 if any(find_spec(name) is None for name in _WEBAPP_TEST_DEPS) or not _has_fastmcp_server():
     collect_ignore.append('webapp')
 
+# tests/webapp/browser/ drives the web UI through pytest-playwright, from the dev group.
+if find_spec('pytest_playwright') is None:
+    collect_ignore.append('webapp/browser')
+
 if find_spec('PyQt5') is None:
     collect_ignore.append('view')
     collect_ignore.append('controller')

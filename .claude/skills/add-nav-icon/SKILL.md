@@ -110,5 +110,5 @@ No bundler, no framework — plain `tsc` compiles `src/**/*.ts` into `dist/` (se
 ## Verify
 
 - **PyQt:** `uv run ptychodus` — the new icon appears at the correct toolbar position (top-level or nested), highlights on click, and swaps in the associated left/right panels.
-- **Web UI:** run the `webapp-dev` skill, load the browser UI, confirm the icon renders in the nav bar (network tab should show a 200 for `/ui/icons/my-icon.svg`).
+- **Web UI:** run the `webapp-dev` skill, load the browser UI, confirm the icon renders in the nav bar (network tab should show a 200 for `/ui/icons/my-icon.svg`). Then, after `tsc`, run `uv run pytest -m browser tests/webapp/browser`: its boot test clicks every nav entry it finds on an empty storage root and fails on a 404 icon or an uncaught exception, so the new entry is covered with no test change.
 - **CI gate:** run the `pre-push` skill. If `pyrcc5` wiped the typing fix, `ruff` will fail with `N802` on `qInitResources` / `qCleanupResources` — reapply Step 3 and re-run.

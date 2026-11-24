@@ -144,4 +144,4 @@ def test_frames_must_match_the_mask() -> None:
         inpainter(numpy.zeros((2, 10, 10)))
 
     with pytest.raises(ValueError):
-        inpainter(numpy.zeros((1, 1, *_SHAPE)))  # type: ignore[call-overload]
+        inpainter(numpy.zeros((1, 1, *_SHAPE)))

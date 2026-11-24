@@ -83,7 +83,15 @@ A genuinely new resource also needs a SQLAlchemy model in `src/ptychodus/webapp/
 
 ## Testing
 
-`uv run pytest tests/webapp/` runs both parity suites. Against a running webapp (see `webapp-dev`):
+`uv run pytest tests/webapp/` runs the parity suites: REST against MCP, the TypeScript client's fields against the schemas, and `test_ts_route_parity.py`, which holds every URL `api.ts` builds to a route and to the query parameters that route declares. The last catches what no status code shows — the service ignores an undeclared query parameter and answers 200 with the default.
+
+After changing `api.ts` or a page, rebuild with `tsc` and run the browser tier, which drives each page in Chrome and fails on any request no route declares:
+
+```sh
+uv run pytest -m browser tests/webapp/browser
+```
+
+Against a running webapp (see `webapp-dev`):
 
 ```sh
 curl -sf http://localhost:8000/api/v1/<resource>/<uuid>/<thing>

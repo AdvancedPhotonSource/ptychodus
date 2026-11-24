@@ -57,6 +57,35 @@ cd src/ptychodus/webapp/ui && tsc --watch
 
 `dist/` is build output — never commit it.
 
+## Check the UI in a browser
+
+`pytest-playwright` comes with the dev group, and the browser tests drive the system Chrome, so nothing is downloaded. After `tsc`:
+
+```sh
+uv run pytest -m browser tests/webapp/browser
+```
+
+They serve their own seeded storage root, so they need no running service. Without `-m browser`, `addopts` deselects every one; a stale `dist/` fails them with a reminder to run `tsc`.
+
+To see a page of the running service — after a layout change, say — screenshot it, print what its console logs, and Read the PNG:
+
+```sh
+uv run python - <<'EOF'
+from playwright.sync_api import sync_playwright
+
+with sync_playwright() as p:
+    browser = p.chromium.launch(channel='chrome')
+    page = browser.new_page(viewport={'width': 1400, 'height': 900})
+    page.on('console', lambda message: print(message.type, message.text))
+    page.goto('http://localhost:8000/ui/#product')
+    page.wait_for_load_state('networkidle')
+    page.screenshot(path='/tmp/ptychodus-ui.png', full_page=True)
+    browser.close()
+EOF
+```
+
+Drop `channel='chrome'` where there is no Chrome, after `uv run playwright install chromium`.
+
 ## Stopping
 
 The service is a foreground blocker unless backgrounded. Use `TaskStop` on the background task id when the user is done, or tell them to `Ctrl+C` if they launched it interactively.

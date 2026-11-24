@@ -89,7 +89,6 @@ All settings come from `PTYCHODUS_WEBAPP_*` environment variables (or a `.env` f
 | `PTYCHODUS_WEBAPP_HOST` | str | `127.0.0.1` | Bind address (`0.0.0.0` to expose beyond localhost) |
 | `PTYCHODUS_WEBAPP_PORT` | int | `8000` | Bind port |
 | `PTYCHODUS_WEBAPP_LOG_LEVEL` | str | `INFO` | Python + uvicorn log level |
-| `PTYCHODUS_WEBAPP_API_PREFIX` | str | `/api/v1` | REST route prefix |
 | `PTYCHODUS_WEBAPP_MCP_MOUNT_PATH` | str | `/mcp` | MCP HTTP mount path |
 | `PTYCHODUS_WEBAPP_POLLING_INTERVAL_S` | float | `2.0` | Watchdog observer poll interval |
 | `PTYCHODUS_WEBAPP_DEBOUNCE_WINDOW_S` | float | `1.0` | Manifest-change debounce window |
@@ -193,6 +192,12 @@ cd src/ptychodus/webapp/ui && tsc --watch    # incremental during dev
 ```
 
 The compiled output at `src/ptychodus/webapp/ui/dist/` is git-ignored. It reaches the sdist through `[tool.setuptools.package-data]`, which is why the `sdist` command compiles it too — `setuptools` finalizes `build_py` to collect package data but never runs it.
+
+To check the UI in a browser, run the opt-in browser tests after `tsc`. They use the system Chrome where there is one, and otherwise the Chromium that `uv run playwright install chromium` downloads:
+
+```sh
+uv run pytest -m browser tests/webapp/browser
+```
 
 ## Running in production
 
