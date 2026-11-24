@@ -92,7 +92,9 @@ Add one entry to the `NAV` array in [`src/ptychodus/webapp/ui/src/nav.ts`](../..
 Diffraction          Products (children: Positions, Probe, Object)          Fluorescence
 ```
 
-Entries present in `ViewCore` but deliberately absent here are the panels that write or dispatch — Settings, Processing, Globus, Genesis, Agent — and `src/ptychodus/webapp/README.md` says so. A new panel of that kind needs no `nav.ts` entry; add it to that list instead.
+Entries present in `ViewCore` but deliberately absent here are the panels that write or dispatch — Settings, Processing, Globus, Genesis — and `src/ptychodus/webapp/README.md` says so. A new panel of that kind needs no `nav.ts` entry; add it to that list instead.
+
+The rail's Agent button is not a page: `ChatPanel.toggleButton()` builds it and `renderNav` places it above the About menu, so it has no `NAV` entry.
 
 Routing is keyed by `route`, and `main.ts` walks the tree, so a nested entry needs a `PAGES` entry exactly like a top-level one.
 

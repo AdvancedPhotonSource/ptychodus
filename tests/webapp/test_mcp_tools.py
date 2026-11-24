@@ -12,10 +12,12 @@ from ptychodus.api.storage import StorageLayout
 from uuid import UUID
 
 import base64
+import json
 from io import BytesIO
 
 import pytest
 from fastmcp.exceptions import ToolError
+from mcp.types import TextContent
 from PIL import Image
 
 from ptychodus.webapp.ingest.pipeline import ingest_manifest
@@ -34,8 +36,12 @@ def _structured(result: ToolResult) -> dict[str, Any]:
 
 
 def _decode_image_content(result: ToolResult, expected_h: int, expected_w: int) -> Image.Image:
-    assert len(result.content) == 1
-    item = result.content[0]
+    # The scales come first as JSON text, for clients that read only content blocks.
+    assert [item.type for item in result.content] == ['text', 'image']
+    text = result.content[0]
+    assert isinstance(text, TextContent)
+    assert json.loads(text.text) == result.structured_content
+    item = result.content[1]
     assert item.type == 'image'
     assert item.mime_type == 'image/png'
     png_bytes = base64.b64decode(item.data)

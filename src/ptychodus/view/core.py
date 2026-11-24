@@ -26,7 +26,6 @@ from PyQt5.QtWidgets import (
 )
 
 from . import resources  # noqa
-from .agent import AgentView, AgentChatView
 from .diffraction import DiffractionView, DiffractionImageView
 from .fluorescence import FluorescenceView
 from .dashboard import PlotView
@@ -284,15 +283,6 @@ class ViewCore(QMainWindow):
             'Fluorescence',
             left=self.fluorescence_view,
             right=self.fluorescence_image_view,
-        )
-
-        self.agent_view = AgentView()
-        self.agent_chat_view = AgentChatView()
-        self.agent_action = self.navigation.add_panel(
-            QIcon(':/icons/sparkles'),
-            'Agent',
-            left=self.agent_view,
-            right=self.agent_chat_view,
         )
 
         #####

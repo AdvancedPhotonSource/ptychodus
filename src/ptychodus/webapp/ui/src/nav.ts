@@ -36,7 +36,13 @@ const ABOUT_LINKS: AboutLink[] = [
   { href: 'https://ptychodus.readthedocs.io/', label: 'Documentation' },
 ];
 
-export function renderNav(root: HTMLElement, current: string, onSelect: (route: string) => void): void {
+/** Renders the rail, with `tools` (buttons that are not pages) above the About menu. */
+export function renderNav(
+  root: HTMLElement,
+  current: string,
+  onSelect: (route: string) => void,
+  tools: HTMLElement[] = []
+): void {
   root.replaceChildren();
 
   const button = (entry: NavEntry): HTMLButtonElement => {
@@ -73,6 +79,7 @@ export function renderNav(root: HTMLElement, current: string, onSelect: (route: 
   spacer.className = 'nav-spacer';
   root.appendChild(spacer);
 
+  for (const tool of tools) root.appendChild(tool);
   root.appendChild(buildAboutMenu());
 }
 

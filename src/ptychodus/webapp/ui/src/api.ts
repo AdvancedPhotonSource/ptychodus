@@ -301,11 +301,16 @@ export const api = {
   productProbeModesImage: (uuid: string, params: Partial<RenderParams> = {}) =>
     get<RenderedImage>(`/product/${uuid}/probe/modes/image?${renderQuery(params)}`),
   // Takes a list so the Positions page can overlay checked products on shared axes.
-  productPositionsImage: (uuids: string[], connectPath = true) =>
+  productPositionsImage: (
+    uuids: string[],
+    connectPath = true,
+    sizePx?: { width: number; height: number }
+  ) =>
     get<PlotImage>(
       `/product/positions/image?${uuids
         .map((u) => `uuid=${encodeURIComponent(u)}`)
-        .join('&')}&connect_path=${connectPath}`
+        .join('&')}&connect_path=${connectPath}` +
+        (sizePx ? `&width_px=${sizePx.width}&height_px=${sizePx.height}` : '')
     ),
   productFileUrl: (uuid: string) => `${API}/product/${uuid}/files/product`,
   productProbeMetrics: (uuid: string) =>

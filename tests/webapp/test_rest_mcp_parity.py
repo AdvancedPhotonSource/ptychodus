@@ -12,6 +12,7 @@ validates a response against its schema.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -285,9 +286,10 @@ async def test_a_render_tool_returns_the_route_s_image_and_scales(
 ) -> None:
     rest, result = await _both(app_client, bound_mcp, tool, _arguments(resources, raw))
 
-    assert [item.type for item in result.content] == ['image']
-    assert result.content[0].data == rest['png_base64']
+    assert [item.type for item in result.content] == ['text', 'image']
+    assert result.content[1].data == rest['png_base64']
     assert _structured(result) == {name: rest[name] for name in RenderedImageInfo.model_fields}
+    assert json.loads(result.content[0].text) == _structured(result)
 
 
 async def test_the_probe_positions_tool_returns_the_route_s_plot_and_size(
@@ -296,8 +298,9 @@ async def test_the_probe_positions_tool_returns_the_route_s_plot_and_size(
     arguments = _arguments(resources, {'uuid': ['succeeded_product', 'imported_product']})
     rest, result = await _both(app_client, bound_mcp, 'render_probe_positions', arguments)
 
-    assert result.content[0].data == rest['png_base64']
+    assert result.content[1].data == rest['png_base64']
     assert _structured(result) == {name: rest[name] for name in PlotImageInfo.model_fields}
+    assert json.loads(result.content[0].text) == _structured(result)
 
 
 def _tool_error_text(detail: Any) -> str:

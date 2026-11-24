@@ -13,9 +13,6 @@ from ptychodus.api.language_model import (
     WireProtocol,
 )
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.model.agent import AgentSettings, LanguageModelProviderSelection
-from ptychodus.model.plugins import PluginChooser
-from ptychodus.model.settings import SettingsRegistry
 from ptychodus.plugins.language_models import (
     AnthropicLanguageModelProvider,
     ArgoLanguageModelProvider,
@@ -95,47 +92,9 @@ def test_registering_and_resolving_touch_no_network(
         'OpenAICompatible',
     }
 
-    settings_registry = SettingsRegistry()
-    selection = LanguageModelProviderSelection(
-        settings_registry, AgentSettings(settings_registry), PluginChooser(catalog)
-    )
-
-    for options in selection:
-        options.model.set_value('some-model')
-        options.resolve_endpoint()
-
-
-def test_selection_persists_each_provider_in_its_own_group() -> None:
-    settings_registry = SettingsRegistry()
-    settings = AgentSettings(settings_registry)
-    catalog = PluginRegistry.load_plugins().language_model_providers
-    selection = LanguageModelProviderSelection(settings_registry, settings, PluginChooser(catalog))
-
-    assert selection.get_current().plugin.simple_name == 'Argo'
-
-    selection.provider.set_value('OpenAI-compatible (local)')
-
-    assert settings.provider.get_value() == 'OpenAICompatible'
-    assert settings_registry['AgentArgo'].parameters()['Model'].get_value() == 'claudesonnet55'
-
-    base_url = settings_registry['AgentOpenAICompatible'].parameters()['BaseUrl']
-    base_url.set_value('http://10.0.0.5:8000/v1')
-    selection.get_current_model().set_value('llama')
-    endpoint = selection.resolve_endpoint()
-
-    assert endpoint.base_url == 'http://10.0.0.5:8000/v1'
-    assert endpoint.model_id == 'llama'
-
-
-def test_selection_refuses_empty_model() -> None:
-    settings_registry = SettingsRegistry()
-    settings = AgentSettings(settings_registry)
-    settings.provider.set_value('OpenAI')
-    catalog = PluginRegistry.load_plugins().language_model_providers
-    selection = LanguageModelProviderSelection(settings_registry, settings, PluginChooser(catalog))
-
-    with pytest.raises(LanguageModelProviderError, match='Choose'):
-        selection.resolve_endpoint()
+    for plugin in catalog:
+        provider = plugin.strategy
+        provider.resolve(provider.get_default_options(), 'some-model')
 
 
 # Argo

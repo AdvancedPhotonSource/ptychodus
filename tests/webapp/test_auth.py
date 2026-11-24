@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,7 @@ from ptychodus.webapp.auth import (
 )
 from ptychodus.webapp.cli import main
 from ptychodus.webapp.config import Settings
+from ptychodus.webapp.mcp_server import FORWARDED_USER_HEADER
 
 _MCP_HEADERS = {
     'content-type': 'application/json',
@@ -182,3 +184,37 @@ def test_mcp_without_tokens_is_open_only_when_allowed(tmp_storage_root: Path) ->
 def test_mcp_without_tokens_is_refused_on_any_host(tmp_storage_root: Path, host: str) -> None:
     with pytest.raises(RuntimeError, match='PTYCHODUS_WEBAPP_MCP_ALLOW_UNAUTHENTICATED'):
         create_app(_settings(tmp_storage_root, host=host))
+
+
+def _call_tool(client: TestClient, token: str, extra_headers: dict[str, str]) -> None:
+    headers = {**_MCP_HEADERS, 'authorization': f'Bearer {token}'}
+    response = client.post('/mcp/', headers=headers, json=_INITIALIZE)
+    assert response.status_code == 200
+    headers['mcp-session-id'] = response.headers['mcp-session-id']
+    client.post(
+        '/mcp/', headers=headers, json={'jsonrpc': '2.0', 'method': 'notifications/initialized'}
+    )
+    call = {
+        'jsonrpc': '2.0',
+        'id': 2,
+        'method': 'tools/call',
+        'params': {'name': 'get_resource_stats', 'arguments': {}},
+    }
+    response = client.post('/mcp/', headers={**headers, **extra_headers}, json=call)
+    assert response.status_code == 200, response.text
+
+
+def test_a_tool_call_is_logged_with_its_client_and_forwarded_user(
+    client_with_tokens: TestClient,
+    agent_token: tuple[Path, str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.INFO, logger='ptychodus.webapp.mcp_server'):
+        _call_tool(client_with_tokens, agent_token[1], {FORWARDED_USER_HEADER: 'jdoe'})
+        _call_tool(client_with_tokens, agent_token[1], {})
+        _call_tool(client_with_tokens, agent_token[1], {FORWARDED_USER_HEADER: 'a\x1bb'})
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert 'tool get_resource_stats called by agent for jdoe' in messages
+    assert 'tool get_resource_stats called by agent' in messages
+    assert 'tool get_resource_stats called by agent for (unprintable)' in messages

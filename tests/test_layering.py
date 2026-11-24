@@ -9,7 +9,13 @@ taking the GUI session along. Three subpackages must therefore never import
 - ``ptychodus.plugins``, which registers into ``api``'s plugin catalogs and is loaded by
   ``api`` -- a plugin reaching back into ``model`` would make the catalogs depend on the
   layer that builds selection over them;
-- ``ptychodus.webapp``, the read-only web service, which reads ``api`` only.
+- ``ptychodus.webapp``, the read-only web service, which reads ``api`` only;
+- ``ptychodus.agent``, the agent service, which reaches the storage root only through the
+  webapp's MCP server.
+
+The two services never import each other: each ships with its own extra and runs as its
+own process, and the agent's only view of the webapp is the MCP contract outside agents
+share.
 
 The stream processor's modules in ``ptychodus.cli`` are held to the same boundary: it
 runs inside a beamline pipeline, and needs no GUI session to do it.
@@ -66,8 +72,12 @@ def _imported_modules(path: Path, package: str) -> Iterator[tuple[int, str]]:
                 yield node.lineno, base
 
 
-def _module_violations(path: Path, package: str, base: Path) -> list[str]:
-    forbidden = ('ptychodus.model', 'ptychodus.view', 'ptychodus.controller')
+_ABOVE_API = ('ptychodus.model', 'ptychodus.view', 'ptychodus.controller')
+
+
+def _module_violations(
+    path: Path, package: str, base: Path, forbidden: tuple[str, ...] = _ABOVE_API
+) -> list[str]:
     return [
         f'{path.relative_to(base)}:{line} imports {module}'
         for line, module in _imported_modules(path, package)
@@ -75,18 +85,24 @@ def _module_violations(path: Path, package: str, base: Path) -> list[str]:
     ]
 
 
-def _violations(root: Path, package: str) -> list[str]:
+def _violations(root: Path, package: str, forbidden: tuple[str, ...] = _ABOVE_API) -> list[str]:
     found: list[str] = []
 
     for path, containing_package in _modules(root, package):
-        found.extend(_module_violations(path, containing_package, root.parent))
+        found.extend(_module_violations(path, containing_package, root.parent, forbidden))
 
     return found
 
 
-@pytest.mark.parametrize('subpackage', ['api', 'plugins', 'webapp'])
+@pytest.mark.parametrize('subpackage', ['api', 'plugins', 'webapp', 'agent'])
 def test_subpackage_imports_nothing_above_api(subpackage: str) -> None:
     assert _violations(_PTYCHODUS_ROOT / subpackage, f'ptychodus.{subpackage}') == []
+
+
+@pytest.mark.parametrize(('service', 'other'), [('webapp', 'agent'), ('agent', 'webapp')])
+def test_the_services_never_import_each_other(service: str, other: str) -> None:
+    root = _PTYCHODUS_ROOT / service
+    assert _violations(root, f'ptychodus.{service}', (f'ptychodus.{other}',)) == []
 
 
 @pytest.mark.parametrize('module', ['_stream', 'stream'])

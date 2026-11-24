@@ -54,6 +54,20 @@ collect_ignore = []
 if any(find_spec(name) is None for name in _WEBAPP_TEST_DEPS) or not _has_fastmcp_server():
     collect_ignore.append('webapp')
 
+# tests/agent/ needs the "agent" extra, and runs the agent against the real webapp, so it
+# needs the webapp's tests' dependencies too.
+_AGENT_TEST_DEPS = (
+    'ag_ui',
+    'latex2mathml',
+    'markdown_it',
+    'mdit_py_plugins',
+    'nh3',
+    'pydantic_ai',
+)
+
+if 'webapp' in collect_ignore or any(find_spec(name) is None for name in _AGENT_TEST_DEPS):
+    collect_ignore.append('agent')
+
 # tests/webapp/browser/ drives the web UI through pytest-playwright, from the dev group.
 if find_spec('pytest_playwright') is None:
     collect_ignore.append('webapp/browser')

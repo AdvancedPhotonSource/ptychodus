@@ -19,8 +19,6 @@
         <file alias="rectangle">../webapp/ui/icons/object-group.svg</file>
         <file alias="ruler">../webapp/ui/icons/ruler.svg</file>
         <file alias="save">../webapp/ui/icons/floppy-disk.svg</file>
-        <file alias="send">../webapp/ui/icons/paper-plane.svg</file>
         <file alias="settings">../webapp/ui/icons/gear.svg</file>
-        <file alias="sparkles">../webapp/ui/icons/wand-magic-sparkles.svg</file>
     </qresource>
 </RCC>

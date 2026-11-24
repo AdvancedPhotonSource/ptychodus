@@ -20,11 +20,13 @@ Some GUI details are absent because the files cannot supply them:
 - The raw detector's extent and **Physical Pixel** pitch. `diffraction.h5` holds the assembled patterns, after cropping and binning, so Width, Height and **Processed Pixel** describe those instead.
 - The diffraction pattern arrays, whose labels are not persisted. Patterns hang directly beneath their dataset.
 
+The rail's **Agent** button opens a chat drawer beside the viewer, served by the separate agent service at `/agent/*` on the same origin (see [Running in production](#running-in-production) and the [agent service README](../agent/README.md)); without it, the drawer says the agent service is unavailable and every page works as before.
+
 Others are absent by choice: the image tools (pan and zoom, save, ruler, rectangle histogram, line cut, Fourier) and the Measured/Enhanced fluorescence toggle, since enhancing is computation. The web viewer adds what the GUI lacks: a **clip** option, a caption with the physical pixel size, and an About menu on the rail.
 
 The analysis dialogs' reports are served as numbers: the metrics panel beneath the Probe, Object and Positions views lists every scalar a report computes, as REST and MCP return them. The dialogs' plots — spectra, Fourier ring correlations, displacement fields — remain GUI-only.
 
-Panels with no web counterpart are the ones that write or dispatch: Settings, Processing, Globus, Genesis and Agent. Those remain GUI-only (`uv run ptychodus`). Campaigns and lineage are the reverse — a webapp-only grouping with no GUI counterpart, served over REST and MCP for agents and scripts but not browsed. Any writes to the storage root happen out of band: the GUI, the reconstruct commands (`uv run ptychodus-reconstruct ...`), or the streaming processor.
+Panels with no web counterpart are the ones that write or dispatch: Settings, Processing, Globus and Genesis. Those remain GUI-only (`uv run ptychodus`). Campaigns and lineage are the reverse — a webapp-only grouping with no GUI counterpart, served over REST and MCP for agents and scripts but not browsed. Any writes to the storage root happen out of band: the GUI, the reconstruct commands (`uv run ptychodus-reconstruct ...`), or the streaming processor.
 
 ## Install
 
@@ -115,7 +117,13 @@ A client sends the token on every request:
 Authorization: Bearer <token>
 ```
 
-A missing or unknown token is answered with 401, and each tool call is logged with the client its token names. With no token file, the webapp refuses to start unless `PTYCHODUS_WEBAPP_MCP_ALLOW_UNAUTHENTICATED=true`, which serves MCP to every caller and logs a warning. Set it only for local development: binding `127.0.0.1` does not keep a caller out once a reverse proxy on the same host forwards to it.
+A missing or unknown token is answered with 401, and each tool call is logged with the client its token names. A client acting for someone may name them in an `X-Ptychodus-User` header, as the agent service does for the user of each turn; the log records it beside the client (`tool render_probe called by agent for jdoe`). It is the client's claim and authorizes nothing.
+
+The agent service is one such client:
+
+```sh
+uv run ptychodus-webapp mint-token agent        # set it as PTYCHODUS_AGENT_MCP_TOKEN
+``` With no token file, the webapp refuses to start unless `PTYCHODUS_WEBAPP_MCP_ALLOW_UNAUTHENTICATED=true`, which serves MCP to every caller and logs a warning. Set it only for local development: binding `127.0.0.1` does not keep a caller out once a reverse proxy on the same host forwards to it.
 
 ## Start
 
@@ -232,3 +240,29 @@ uv run pytest -m browser tests/webapp/browser
 - **Storage-root permissions.** The service user must be able to create per-kind subdirectories under `PTYCHODUS_WEBAPP_STORAGE_ROOT` on first start.
 - **Storage root on NFS.** Set `HDF5_USE_FILE_LOCKING=FALSE` for the service and for every process writing into the storage root. HDF5's `flock` can fail on NFS, and locking buys nothing here: a data file is immutable once a manifest names it. Expect a reader to see a new manifest only after the client's attribute-cache interval.
 - **Authentication.** REST and the web UI authenticate no one; keep them behind a reverse proxy that enforces the facility's single sign-on. MCP checks its own bearer tokens (see [MCP access](#mcp-access)), so exempt `/mcp` from browser sign-on at the proxy, and do not let the proxy buffer its streamed responses. Never set `PTYCHODUS_WEBAPP_MCP_ALLOW_UNAUTHENTICATED` behind a proxy.
+- **The agent service shares the origin.** The proxy routes `/agent/` to `ptychodus-agent`, unbuffered, behind the same sign-on, and sets the signed-in user in the header `PTYCHODUS_AGENT_USER_HEADER` names; setting it replaces any copy the client sent. A sketch for nginx with `auth_request`, whose SSO response carries the user in `X-Auth-Request-User`:
+
+  ```nginx
+  location /agent/ {
+      auth_request /oauth2/auth;
+      auth_request_set $user $upstream_http_x_auth_request_user;
+      proxy_pass http://127.0.0.1:8001;
+      proxy_http_version 1.1;
+      proxy_set_header X-Forwarded-User $user;
+      proxy_buffering off;
+      proxy_read_timeout 1h;
+  }
+
+  location /mcp {
+      proxy_pass http://127.0.0.1:8000;
+      proxy_http_version 1.1;
+      proxy_buffering off;
+  }
+
+  location / {
+      auth_request /oauth2/auth;
+      proxy_pass http://127.0.0.1:8000;
+  }
+  ```
+
+  The agent service believes that header, so anyone who can reach its port directly can claim any user, read that user's conversations and spend the shared quota. Deploy it where only the proxy can connect — on a shared host, every local user can reach a loopback port.

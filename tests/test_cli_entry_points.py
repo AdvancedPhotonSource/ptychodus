@@ -38,8 +38,9 @@ _ANY_LIBRARY_MODULES = frozenset(
 def test_entry_point_imports_and_exposes_its_callable(
     command: str, module: str, function: str
 ) -> None:
-    if module.startswith('ptychodus.webapp'):
-        pytest.importorskip('fastapi')
+    # Each service's cli.py imports its pydantic-settings configuration at module scope.
+    if module.startswith(('ptychodus.webapp', 'ptychodus.agent')):
+        pytest.importorskip('pydantic_settings')
 
     if module.startswith('ptychodus.cli.reconstruct_') and module not in _ANY_LIBRARY_MODULES:
         pytest.importorskip('ptychi')
@@ -55,8 +56,9 @@ def test_entry_point_imports_and_exposes_its_callable(
 def test_entry_point_prints_help_and_exits_zero(
     command: str, module: str, function: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    if module.startswith('ptychodus.webapp'):
-        pytest.importorskip('fastapi')
+    # Each service's cli.py imports its pydantic-settings configuration at module scope.
+    if module.startswith(('ptychodus.webapp', 'ptychodus.agent')):
+        pytest.importorskip('pydantic_settings')
 
     if module.startswith('ptychodus.cli.reconstruct_') and module not in _ANY_LIBRARY_MODULES:
         pytest.importorskip('ptychi')

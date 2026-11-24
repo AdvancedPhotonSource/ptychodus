@@ -17,7 +17,6 @@ import numpy
 
 from ptychodus.api.plugins import PluginRegistry
 
-from .agent import AgentCore
 from .analysis import AnalysisCore
 from .diffraction import DiffractionCore
 from .fluorescence import FluorescenceCore
@@ -129,10 +128,6 @@ class ModelCore:
             self.settings_registry,
             self.product_core.product_api,
             self.processing_core.processing_api,
-        )
-        self.agent_core = AgentCore(
-            self.settings_registry,
-            PluginChooser(self.plugin_registry.language_model_providers),
         )
 
         if settings_file:

@@ -28,18 +28,19 @@ API_PREFIX = '/api/v1'
 """The prefix the webapp serves its REST routes under."""
 
 
-def webapp_settings(storage_root: Path) -> Settings:
+def webapp_settings(storage_root: Path, *, mcp_tokens_file: Path | None = None) -> Settings:
     """Settings serving `storage_root`, fixed against the developer's environment.
 
-    Each field a shell variable or a `.env` file could set to break the UI or reach real
-    data is given explicitly, since keyword arguments outrank both.
+    MCP requires the tokens in `mcp_tokens_file`, or serves every caller without one. Each
+    field a shell variable or a `.env` file could set to break the UI or reach real data
+    is given explicitly, since keyword arguments outrank both.
     """
     return Settings(
         storage_root=storage_root,
         database_url='sqlite+aiosqlite:///:memory:',
         auto_reconcile_on_startup=True,
-        mcp_tokens_file=None,
-        mcp_allow_unauthenticated=True,
+        mcp_tokens_file=mcp_tokens_file,
+        mcp_allow_unauthenticated=mcp_tokens_file is None,
         _env_file=None,
     )
 
@@ -98,10 +99,14 @@ class ApiOperations:
 
 
 class WebappServer:
-    """The webapp serving a storage root on a loopback port, from a thread of its own."""
+    """The webapp serving a storage root on a loopback port, from a thread of its own.
 
-    def __init__(self, storage_root: Path) -> None:
+    MCP requires the tokens in `mcp_tokens_file`, or serves every caller without one.
+    """
+
+    def __init__(self, storage_root: Path, *, mcp_tokens_file: Path | None = None) -> None:
         self._storage_root = storage_root
+        self._mcp_tokens_file = mcp_tokens_file
         self._server: uvicorn.Server | None = None
         self._thread: threading.Thread | None = None
         self._socket: socket.socket | None = None
@@ -116,7 +121,8 @@ class WebappServer:
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.bind(('127.0.0.1', 0))
         config = uvicorn.Config(
-            create_app(webapp_settings(self._storage_root)), log_level='warning'
+            create_app(webapp_settings(self._storage_root, mcp_tokens_file=self._mcp_tokens_file)),
+            log_level='warning',
         )
         self._server = uvicorn.Server(config)
         self._thread = threading.Thread(

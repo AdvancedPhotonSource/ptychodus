@@ -11,10 +11,10 @@ from uuid import UUID
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth import AuthProvider
-from fastmcp.server.dependencies import get_access_token
+from fastmcp.server.dependencies import get_access_token, get_http_headers
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools import ToolResult
-from mcp.types import CallToolRequestParams, ImageContent
+from mcp.types import CallToolRequestParams, ImageContent, TextContent
 from pydantic import BaseModel, Field
 
 from ptychodus.api.diffraction import Polarization
@@ -131,9 +131,14 @@ def _render_params(
 
 
 def _image_result(png_base64: str, info: BaseModel) -> ToolResult:
-    """The PNG as image content beside `info` as the structured result."""
+    """The PNG as image content beside `info`, as JSON text and as the structured result.
+
+    The text block carries the scales to a client that reads only content blocks, as
+    pydantic-ai's does whenever a result holds an image.
+    """
+    text = TextContent(type='text', text=info.model_dump_json())
     image = ImageContent(type='image', data=png_base64, mime_type='image/png')
-    return ToolResult(content=[image], structured_content=info.model_dump(mode='json'))
+    return ToolResult(content=[text, image], structured_content=info.model_dump(mode='json'))
 
 
 def _rendered_result(rendered: RenderedImage) -> ToolResult:
@@ -142,8 +147,14 @@ def _rendered_result(rendered: RenderedImage) -> ToolResult:
     )
 
 
+FORWARDED_USER_HEADER = 'X-Ptychodus-User'
+"""The header in which a client names the user it calls a tool for. It is the client's
+claim, logged beside the client its token names, and authorizes nothing."""
+
+
 class _CallLog(Middleware):
-    """Logs each tool call with the client its bearer token names."""
+    """Logs each tool call with the client its bearer token names, and the user the client
+    says it calls for."""
 
     async def on_call_tool(
         self,
@@ -152,7 +163,16 @@ class _CallLog(Middleware):
     ) -> ToolResult:
         token = get_access_token()
         client_id = token.client_id if token is not None else '(unauthenticated)'
-        logger.info('tool %s called by %s', context.message.name, client_id)
+        user = get_http_headers().get(FORWARDED_USER_HEADER.lower(), '')
+
+        if user:
+            if len(user) > 256 or not user.isprintable():
+                user = '(unprintable)'
+
+            logger.info('tool %s called by %s for %s', context.message.name, client_id, user)
+        else:
+            logger.info('tool %s called by %s', context.message.name, client_id)
+
         return await call_next(context)
 
 

@@ -1,6 +1,6 @@
 ---
 name: webapp-dev
-description: Bootstrap and launch the ptychodus-webapp REST + MCP + web UI service locally against a storage root. Use when the user says "start the webapp", "run ptychodus-webapp", "serve the webapp", or wants to iterate on ptychodus.webapp code (routers, MCP tools, or the TypeScript UI in src/ptychodus/webapp/ui/).
+description: Bootstrap and launch the ptychodus-webapp REST + MCP + web UI service locally against a storage root, and optionally the ptychodus-agent service behind a local nginx for the chat drawer. Use when the user says "start the webapp", "run ptychodus-webapp", "serve the webapp", "start the agent", or wants to iterate on ptychodus.webapp or ptychodus.agent code (routers, MCP tools, the agent service, or the TypeScript UI in src/ptychodus/webapp/ui/).
 ---
 
 # webapp-dev
@@ -46,6 +46,61 @@ Ask the user for the storage root path if not already provided. Options, in prio
    ```
 
    (Port defaults per `src/ptychodus/webapp/config.py`; if the user configured `PTYCHODUS_WEBAPP_*` env vars for host/port, use those.)
+
+## The agent service and the chat drawer
+
+The chat drawer calls `/agent/*` on the webapp's own origin, which only a reverse proxy provides. Locally that is nginx under podman, standing in for the facility's proxy with a fixed user. On a shared machine, pick free ports; these use 8100 for the webapp, 8101 for the agent and 8180 for nginx.
+
+1. **Mint the agent's token** and start the webapp requiring tokens:
+
+   ```sh
+   uv sync --extra webapp --extra agent
+   uv run ptychodus-webapp mint-token agent --tokens-file /tmp/ptychodus-dev/tokens.json > /tmp/ptychodus-dev/agent-token
+   PTYCHODUS_WEBAPP_STORAGE_ROOT=<path> PTYCHODUS_WEBAPP_MCP_TOKENS_FILE=/tmp/ptychodus-dev/tokens.json PTYCHODUS_WEBAPP_PORT=8100 uv run ptychodus-webapp serve
+   ```
+
+2. **Start the agent** (background), with a language-model provider's credential in the environment:
+
+   ```sh
+   PTYCHODUS_AGENT_USER_HEADER=X-Forwarded-User PTYCHODUS_AGENT_PORT=8101 \
+   PTYCHODUS_AGENT_MCP_URL=http://127.0.0.1:8100/mcp/ \
+   PTYCHODUS_AGENT_MCP_TOKEN="$(cat /tmp/ptychodus-dev/agent-token)" \
+   uv run ptychodus-agent serve
+   ```
+
+   With no language model to hand, `create_app(language_model=...)` takes any pydantic-ai model: `tests/agent_fixtures.py::ScriptedLanguageModel` calls tools and streams Markdown with math, launched from a one-off script calling `uvicorn.run(create_app(language_model=scripted.model()), port=8101)`.
+
+3. **Start nginx** — development only, since it signs every request in as one fixed user. Save as `/tmp/ptychodus-dev/nginx.conf`:
+
+   ```nginx
+   server {
+       listen 127.0.0.1:8180;
+
+       location /agent/ {
+           proxy_pass http://127.0.0.1:8101;
+           proxy_http_version 1.1;
+           proxy_set_header X-Forwarded-User "dev-user";
+           proxy_buffering off;
+           proxy_read_timeout 1h;
+       }
+
+       location / {
+           proxy_pass http://127.0.0.1:8100;
+           proxy_http_version 1.1;
+           proxy_set_header Host $host;
+       }
+   }
+   ```
+
+   ```sh
+   podman run -d --rm --name ptychodus-dev-nginx --network host \
+       -v /tmp/ptychodus-dev/nginx.conf:/etc/nginx/conf.d/default.conf:ro,Z \
+       docker.io/library/nginx:1.29-alpine
+   ```
+
+   Ask before the first `podman pull`. Open <http://127.0.0.1:8180/ui/> and press **Agent** on the rail. Stop with `podman stop ptychodus-dev-nginx`.
+
+To drive the drawer in headless Chrome over the DevTools protocol instead of Playwright, start `google-chrome --headless=new --remote-debugging-port=9223`, percent-encode the page URL passed to `/json/new?` (a bare `#` ends the query there), and reload with `Page.reload` and `ignoreCache: true` after each `tsc`.
 
 ## Frontend iteration
 

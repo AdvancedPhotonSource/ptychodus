@@ -1,3 +1,4 @@
+import { ChatPanel } from './chat/chat_panel.js';
 import { NAV, renderNav } from './nav.js';
 import { mountDiffraction } from './pages/diffraction.js';
 import { mountFluorescence } from './pages/fluorescence.js';
@@ -19,6 +20,9 @@ const PAGES: Record<string, Mount> = {
   fluorescence: mountFluorescence,
 };
 
+const chatEl = document.getElementById('chat');
+const chat = chatEl ? new ChatPanel(chatEl) : null;
+
 function currentRoute(): Route {
   const route = parseRoute(window.location.hash);
   if (route && Object.hasOwn(PAGES, route.page)) return route;
@@ -37,7 +41,7 @@ function render(route: Route): void {
   const navEl = document.getElementById('nav');
   const contentEl = document.getElementById('content');
   if (!navEl || !contentEl) return;
-  renderNav(navEl, route.page, navigate);
+  renderNav(navEl, route.page, navigate, chat ? [chat.toggleButton()] : []);
   contentEl.replaceChildren();
   const mount = PAGES[route.page];
   if (mount) {

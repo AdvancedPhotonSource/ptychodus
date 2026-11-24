@@ -6,7 +6,6 @@ from PyQt5.QtWidgets import QAction
 
 from ..model import ModelCore
 from ..view import ViewCore
-from .agent import AgentChatController, AgentController
 from .data import FileDialogFactory
 from .diffraction.core import DiffractionController
 from .fluorescence import FluorescenceController
@@ -181,15 +180,6 @@ class ControllerCore:
             view.genesis_status_view,
             self._file_dialog_factory,
         )
-        self._agent_controller = AgentController(
-            model.agent_core.settings,
-            model.agent_core.provider_selection,
-            model.agent_core.catalog,
-            view.agent_view,
-        )
-        self._agent_chat_controller = AgentChatController(
-            model.agent_core.repository, model.agent_core.terminal, view.agent_chat_view
-        )
 
         self._one_second_counter = 0
         self._run_tasks_timer = QTimer()
@@ -213,7 +203,6 @@ class ControllerCore:
             lambda action: self._swap_central_widgets(action)
         )
 
-        view.agent_action.setVisible(is_developer_mode_enabled)
         view.probe_positions_view.button_box.analyze_button.setEnabled(is_developer_mode_enabled)
 
     def show_main_window(self, window_title: str) -> None:

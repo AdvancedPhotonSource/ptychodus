@@ -47,7 +47,8 @@ def test_every_page_boots_on_an_empty_storage_root(open_ui: OpenUI) -> None:
     ui = open_ui()
     ui.goto()
     page = ui.page
-    buttons = page.locator('#nav button:not(.nav-logo)')
+    # The Agent button opens the chat drawer, not a page.
+    buttons = page.locator('#nav button:not(.nav-logo):not(.nav-chat)')
     labels = buttons.evaluate_all('(nodes) => nodes.map((n) => n.getAttribute("aria-label"))')
     assert labels, 'the nav bar offers no pages'
 

@@ -7,19 +7,9 @@ from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModel
 
+from ptychodus.agent.config import ThinkingLevel
+from ptychodus.agent.endpoint import create_chat_model, create_model_settings
 from ptychodus.api.language_model import LanguageModelEndpoint, WireProtocol
-from ptychodus.model.agent import AgentSettings, ThinkingLevel
-from ptychodus.model.agent.endpoint import (
-    create_chat_model,
-    create_model_settings,
-    get_mcp_server_url,
-)
-from ptychodus.model.settings import SettingsRegistry
-
-
-@pytest.fixture
-def settings() -> AgentSettings:
-    return AgentSettings(SettingsRegistry())
 
 
 @pytest.mark.parametrize(
@@ -78,31 +68,12 @@ def test_endpoint_repr_omits_key() -> None:
     assert 'secret' not in repr(endpoint)
 
 
-@pytest.mark.parametrize(
-    ('url', 'expected'),
-    [
-        ('', ''),
-        ('http://localhost:8000/mcp', 'http://localhost:8000/mcp'),
-        ('https://example.com/mcp', 'https://example.com/mcp'),
-        ('http://example.com/mcp', ''),
-    ],
-)
-def test_mcp_server_url_requires_confidential_url(
-    settings: AgentSettings, url: str, expected: str
-) -> None:
-    settings.mcp_server_url.set_value(url)
-
-    assert get_mcp_server_url(settings) == expected
+def test_model_settings_default_to_model_choice() -> None:
+    assert create_model_settings(ThinkingLevel.DEFAULT, 0) == {}
 
 
-def test_model_settings_default_to_model_choice(settings: AgentSettings) -> None:
-    assert create_model_settings(settings) == {}
-
-
-def test_model_settings_pass_max_tokens(settings: AgentSettings) -> None:
-    settings.max_tokens.set_value(4096)
-
-    assert create_model_settings(settings) == {'max_tokens': 4096}
+def test_model_settings_pass_max_tokens() -> None:
+    assert create_model_settings(ThinkingLevel.DEFAULT, 4096) == {'max_tokens': 4096}
 
 
 @pytest.mark.parametrize(
@@ -114,15 +85,5 @@ def test_model_settings_pass_max_tokens(settings: AgentSettings) -> None:
         (ThinkingLevel.HIGH, 'high'),
     ],
 )
-def test_model_settings_map_thinking_level(
-    settings: AgentSettings, level: ThinkingLevel, expected: bool | str
-) -> None:
-    settings.thinking.set_value(level)
-
-    assert create_model_settings(settings) == {'thinking': expected}
-
-
-def test_model_settings_ignore_unknown_thinking_level(settings: AgentSettings) -> None:
-    settings.thinking.set_value('Ludicrous')
-
-    assert create_model_settings(settings) == {}
+def test_model_settings_map_thinking_level(level: ThinkingLevel, expected: bool | str) -> None:
+    assert create_model_settings(level, 0) == {'thinking': expected}

@@ -1,11 +1,11 @@
-"""The agent's one meeting point with pydantic-ai.
+"""The agent's one meeting point with pydantic-ai's language models.
 
 A provider hands back a framework-neutral :class:`LanguageModelEndpoint`; this turns it
 into a pydantic-ai model. Replacing the agent framework means replacing this module and
-the terminal that drives it, and no provider.
+the agent loop that drives it, and no provider.
 """
 
-import logging
+from __future__ import annotations
 
 from pydantic_ai.models import Model
 from pydantic_ai.models.anthropic import AnthropicModel
@@ -16,28 +16,53 @@ from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.settings import ModelSettings
 
-from ptychodus.api.language_model import LanguageModelEndpoint, WireProtocol, is_confidential_url
+from ptychodus.api.language_model import (
+    LanguageModelEndpoint,
+    LanguageModelProvider,
+    LanguageModelProviderError,
+    WireProtocol,
+)
+from ptychodus.api.options import OptionsError, apply_options_document
+from ptychodus.api.plugins import Plugin
 
-from .settings import AgentSettings, ThinkingLevel
-
-logger = logging.getLogger(__name__)
+from .config import Settings, ThinkingLevel
 
 __all__ = [
     'create_chat_model',
     'create_model_settings',
-    'get_mcp_server_url',
+    'resolve_endpoint',
 ]
 
 
-def get_mcp_server_url(settings: AgentSettings) -> str:
-    """Return the MCP server URL, or an empty string when unset or insecure."""
-    url = settings.mcp_server_url.get_value().strip()
+def resolve_endpoint(
+    settings: Settings, provider: Plugin[LanguageModelProvider]
+) -> LanguageModelEndpoint:
+    """Resolve the configured language model on `provider`, without touching the network.
 
-    if url and not is_confidential_url(url):
-        logger.warning(f'Ignoring insecure MCP server "{url}"; use an https:// URL.')
-        return ''
+    Raises:
+        LanguageModelProviderError: if the options are refused, no language model is
+            named and the provider has no default, or the provider's credentials are
+            missing.
+    """
+    strategy = provider.strategy
 
-    return url
+    try:
+        options = apply_options_document(
+            strategy.get_default_options(),
+            settings.provider_options,
+            subject=f'PTYCHODUS_AGENT_PROVIDER_OPTIONS for {provider.display_name}',
+        )
+    except OptionsError as exc:
+        raise LanguageModelProviderError(str(exc)) from exc
+
+    model_id = settings.model_id or strategy.get_default_model()
+
+    if not model_id:
+        raise LanguageModelProviderError(
+            f'{provider.display_name} has no default language model; set PTYCHODUS_AGENT_MODEL_ID.'
+        )
+
+    return strategy.resolve(options, model_id)
 
 
 def create_chat_model(endpoint: LanguageModelEndpoint) -> Model:
@@ -74,19 +99,17 @@ def create_chat_model(endpoint: LanguageModelEndpoint) -> Model:
     raise ValueError(f'Unsupported wire protocol "{endpoint.protocol}".')
 
 
-def create_model_settings(settings: AgentSettings) -> ModelSettings:
-    """Return generation settings, leaving out whatever the model should choose itself.
+def create_model_settings(thinking: ThinkingLevel, max_tokens: int) -> ModelSettings:
+    """Return generation settings, leaving out whatever the language model should choose.
 
-    No sampling parameters are sent: current models variously drop, reject or pin
-    ``temperature`` and ``top_p``.
+    No sampling parameters are sent: current language models variously drop, reject or
+    pin ``temperature`` and ``top_p``. A `max_tokens` of 0 leaves the response length to
+    the language model.
     """
     model_settings = ModelSettings()
-    max_tokens = settings.max_tokens.get_value()
 
     if max_tokens > 0:
         model_settings['max_tokens'] = max_tokens
-
-    thinking = settings.thinking.get_value()
 
     match thinking:
         case ThinkingLevel.DEFAULT:
@@ -99,7 +122,5 @@ def create_model_settings(settings: AgentSettings) -> ModelSettings:
             model_settings['thinking'] = 'medium'
         case ThinkingLevel.HIGH:
             model_settings['thinking'] = 'high'
-        case _:
-            logger.warning(f'Ignoring unknown thinking level "{thinking}".')
 
     return model_settings
