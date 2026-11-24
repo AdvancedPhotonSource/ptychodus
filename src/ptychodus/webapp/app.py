@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastmcp.server.http import StarletteWithLifespan
 
 from ptychodus import __version__
-from ptychodus.webapp.auth import ClientTokenVerifier, is_loopback_host, load_client_tokens
+from ptychodus.webapp.auth import ClientTokenVerifier, load_client_tokens
 from ptychodus.webapp.config import Settings, get_settings
 from ptychodus.webapp.db.session import SessionProvider, create_engine, create_schema
 from ptychodus.webapp.ingest.reconciler import full_rescan
@@ -46,28 +46,27 @@ def _configure_logging(level: str) -> None:
 
 
 def _mcp_token_verifier(settings: Settings) -> ClientTokenVerifier | None:
-    """The verifier of MCP bearer tokens, or None to serve MCP unauthenticated on loopback.
+    """The verifier of MCP bearer tokens, or None to serve MCP to every caller.
 
     Raises:
-        RuntimeError: If no token file is set and the webapp binds a host other than loopback.
+        RuntimeError: If neither a token file nor unauthenticated MCP is configured.
     """
     if settings.mcp_tokens_file is not None:
         verifier = ClientTokenVerifier(load_client_tokens(settings.mcp_tokens_file))
         logger.info('MCP accepts bearer tokens of clients: %s', ', '.join(verifier.client_ids))
         return verifier
 
-    if is_loopback_host(settings.host):
+    if settings.mcp_allow_unauthenticated:
         logger.warning(
-            'PTYCHODUS_WEBAPP_MCP_TOKENS_FILE is unset, so MCP authenticates no one; it is '
-            'served only because the webapp binds the loopback host %s.',
-            settings.host,
+            'PTYCHODUS_WEBAPP_MCP_ALLOW_UNAUTHENTICATED is set, so MCP authenticates no one; '
+            'every caller that reaches the webapp may use it.'
         )
         return None
 
     raise RuntimeError(
-        f'The webapp binds {settings.host}, which is not loopback, so MCP requires bearer '
-        'tokens: set PTYCHODUS_WEBAPP_MCP_TOKENS_FILE to a token file, which '
-        '`ptychodus-webapp mint-token <client_id>` creates.'
+        'MCP requires bearer tokens: set PTYCHODUS_WEBAPP_MCP_TOKENS_FILE to a token file, '
+        'which `ptychodus-webapp mint-token <client_id>` creates, or, for development only, '
+        'set PTYCHODUS_WEBAPP_MCP_ALLOW_UNAUTHENTICATED=true.'
     )
 
 

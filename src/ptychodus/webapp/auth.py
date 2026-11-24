@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import ipaddress
 import json
 import os
 import secrets
 import stat
+import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -23,7 +23,6 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 __all__ = [
     'ClientToken',
     'ClientTokenVerifier',
-    'is_loopback_host',
     'load_client_tokens',
     'mint_client_token',
     'revoke_client_token',
@@ -72,10 +71,10 @@ def _save_client_tokens(file_path: Path, tokens: Sequence[ClientToken]) -> None:
     """Replace the token file atomically, readable by its owner alone."""
     data = json.dumps([token.model_dump(mode='json') for token in tokens], indent=2)
     file_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    temporary_path = file_path.with_name(f'.{file_path.name}.tmp')
-    # O_EXCL and O_NOFOLLOW refuse a file or symlink planted at the temporary path, so the
-    # tokens are only ever written to a file created here with owner-only permissions.
-    fd = os.open(temporary_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    # mkstemp creates a file of its own under a fresh name, exclusively and readable by its
+    # owner alone, so neither a planted file nor one left by an interrupted write is reused.
+    fd, temporary_name = tempfile.mkstemp(dir=file_path.parent, prefix=f'.{file_path.name}.')
+    temporary_path = Path(temporary_name)
 
     try:
         with open(fd, 'w') as f:
@@ -142,14 +141,3 @@ class ClientTokenVerifier(TokenVerifier):
             return None
 
         return AccessToken(token=token, client_id=match.client_id, scopes=[])
-
-
-def is_loopback_host(host: str) -> bool:
-    """Whether `host` names the loopback interface, which only this machine can reach."""
-    if host == 'localhost':
-        return True
-
-    try:
-        return ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        return False

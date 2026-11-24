@@ -80,7 +80,10 @@ async def get_product(uuid: UUID, service: ServiceDep) -> ProductRead:
     return await service.get_product(uuid)
 
 
-@router.get('/{uuid}/files/product')
+@router.get(
+    '/{uuid}/files/product',
+    openapi_extra=openapi_operation(ResourceService.resource_file),
+)
 async def get_product_file(uuid: UUID, service: ServiceDep) -> FileResponse:
     """The product's current file: its final one, or the newest checkpoint while it runs."""
     path = await service.resource_file(ResourceKind.PRODUCT, uuid)

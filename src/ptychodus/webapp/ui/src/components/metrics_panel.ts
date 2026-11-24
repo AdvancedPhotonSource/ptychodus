@@ -104,7 +104,8 @@ export function createMetricsPanel(view: MetricsView): MetricsPanel {
     const none = new Option(MISSING, '');
     const others = products
       .filter((p) => p.uuid !== product.uuid && p.ingest_state === 'VALID')
-      .map((p) => new Option(p.name ?? p.uuid.slice(0, 8), p.uuid));
+      // Products often share a name, a copy or a rerun, so each also shows its uuid's start.
+      .map((p) => new Option(`${p.name ?? 'Unnamed'} · ${p.uuid.slice(0, 8)}`, p.uuid));
     const previous = select.value;
     select.replaceChildren(none, ...others);
     select.value = others.some((o) => o.value === previous) ? previous : '';
@@ -170,16 +171,32 @@ const UNITS: Unit[] = [
   { suffix: '_rad', render: (x) => `${fmt(x)} rad` },
   { suffix: '_deg', render: (x) => `${fmt(x)}°` },
   { suffix: '_px', render: (x) => `${fmt(x)} px` },
+  { suffix: '_dB', render: (x) => `${fmt(x)} dB` },
 ];
 
+/**
+ * A key's words and its unit, which ends the key (`width_m`) or precedes a condition on
+ * the quantity (`resolution_m_at_snr`, a length read where the SNR crosses its threshold).
+ */
+function splitUnit(key: string): { stem: string; unit: Unit | undefined } {
+  for (const unit of UNITS) {
+    if (key.endsWith(unit.suffix)) return { stem: key.slice(0, -unit.suffix.length), unit };
+
+    const condition = key.indexOf(`${unit.suffix}_at_`);
+    if (condition > 0) {
+      const rest = key.slice(condition + unit.suffix.length);
+      return { stem: key.slice(0, condition) + rest, unit };
+    }
+  }
+  return { stem: key, unit: undefined };
+}
+
 function unitOf(key: string): Unit | undefined {
-  return UNITS.find((u) => key.endsWith(u.suffix));
+  return splitUnit(key).unit;
 }
 
 function labelFor(key: string): string {
-  const unit = unitOf(key);
-  const stem = unit === undefined ? key : key.slice(0, -unit.suffix.length);
-  const text = stem
+  const text = splitUnit(key).stem
     .split('_')
     .map((word) => WORDS[word] ?? word)
     .join(' ');

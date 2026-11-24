@@ -4,6 +4,10 @@ Each tool is paired with its REST route. Over one shared set of resources, a too
 route take the same parameters (names, types, defaults and bounds), return the same data,
 and refuse the same requests with the same reason. A route or tool that is not paired fails
 here unless it is listed as an intended difference.
+
+The report tools also declare an output schema whose numbers admit null, which their routes'
+OpenAPI schemas do not: both send an undefined statistic as null, and only an MCP client
+validates a response against its schema.
 """
 
 from __future__ import annotations
@@ -471,6 +475,15 @@ async def test_a_tool_states_its_route_s_operation_class(
         operation_class = spec['paths'][_API + route]['get']['x-operation-class']
         description = tools[name].description or ''
         assert description.endswith(f'Operation class: {operation_class}.'), name
+
+
+async def test_a_download_states_the_instant_class(app_client: AsyncClient) -> None:
+    spec = await _openapi(app_client)
+    downloads = [path for method, path in _REST_ONLY if '/files/' in path]
+
+    assert downloads
+    for path in downloads:
+        assert spec['paths'][_API + path]['get']['x-operation-class'] == 'instant', path
 
 
 async def test_every_route_and_tool_is_paired_or_an_intended_difference(

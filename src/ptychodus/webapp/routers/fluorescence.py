@@ -53,7 +53,10 @@ async def get_fluorescence(uuid: UUID, service: ServiceDep) -> FluorescenceRead:
     return await service.get_fluorescence(uuid)
 
 
-@router.get('/{uuid}/files/fluorescence')
+@router.get(
+    '/{uuid}/files/fluorescence',
+    openapi_extra=openapi_operation(ResourceService.resource_file),
+)
 async def get_fluorescence_file(uuid: UUID, service: ServiceDep) -> FileResponse:
     path = await service.resource_file(ResourceKind.FLUORESCENCE, uuid)
     return FileResponse(path, media_type='application/x-hdf5', filename=path.name)

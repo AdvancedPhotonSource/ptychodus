@@ -32,8 +32,10 @@ Ask the user for the storage root path if not already provided. Options, in prio
 3. **Launch the service** — this is a long-running process; run it in the background so you can continue helping the user:
 
    ```sh
-   PTYCHODUS_WEBAPP_STORAGE_ROOT=<path> uv run ptychodus-webapp serve
+   PTYCHODUS_WEBAPP_STORAGE_ROOT=<path> PTYCHODUS_WEBAPP_MCP_ALLOW_UNAUTHENTICATED=true uv run ptychodus-webapp serve
    ```
+
+   The flag serves MCP without bearer tokens, which is right for local development only; without it, or a token file from `ptychodus-webapp mint-token`, the service refuses to start.
 
    Use `run_in_background: true` on the Bash call. Report the process id and log file path.
 

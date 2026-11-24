@@ -95,7 +95,8 @@ All settings come from `PTYCHODUS_WEBAPP_*` environment variables (or a `.env` f
 | `PTYCHODUS_WEBAPP_DEBOUNCE_WINDOW_S` | float | `1.0` | Manifest-change debounce window |
 | `PTYCHODUS_WEBAPP_AUTO_RECONCILE_ON_STARTUP` | bool | `true` | Run a full rescan at boot |
 | `PTYCHODUS_WEBAPP_RENDER_CONCURRENCY` | int | `4` | Bounded operations — renders and reports — run in worker threads, at most this many at once |
-| `PTYCHODUS_WEBAPP_MCP_TOKENS_FILE` | path | *(unset)* | The MCP client token file (see [MCP access](#mcp-access)); unset, MCP is served unauthenticated on a loopback host only |
+| `PTYCHODUS_WEBAPP_MCP_TOKENS_FILE` | path | *(unset)* | The MCP client token file (see [MCP access](#mcp-access)); MCP requires it unless the next setting is on |
+| `PTYCHODUS_WEBAPP_MCP_ALLOW_UNAUTHENTICATED` | bool | `false` | Serve MCP to every caller when no token file is set — development only |
 
 ## MCP access
 
@@ -115,14 +116,14 @@ A client sends the token on every request:
 Authorization: Bearer <token>
 ```
 
-A missing or unknown token is answered with 401, and each tool call is logged with the client its token names. With no token file, the webapp serves MCP unauthenticated only when it binds a loopback address (`127.0.0.1`, `::1` or `localhost`), as in development, and refuses to start on any other host.
+A missing or unknown token is answered with 401, and each tool call is logged with the client its token names. With no token file, the webapp refuses to start unless `PTYCHODUS_WEBAPP_MCP_ALLOW_UNAUTHENTICATED=true`, which serves MCP to every caller and logs a warning. Set it only for local development: binding `127.0.0.1` does not keep a caller out once a reverse proxy on the same host forwards to it.
 
 ## Start
 
-Foreground (dev / interactive):
+Foreground (dev / interactive), with MCP open to every caller (see [MCP access](#mcp-access)):
 
 ```sh
-PTYCHODUS_WEBAPP_STORAGE_ROOT=/data/ptycho-storage uv run ptychodus-webapp serve
+PTYCHODUS_WEBAPP_STORAGE_ROOT=/data/ptycho-storage PTYCHODUS_WEBAPP_MCP_ALLOW_UNAUTHENTICATED=true uv run ptychodus-webapp serve
 ```
 
 The service prints `Uvicorn running on http://127.0.0.1:8000` when ready. Open `http://127.0.0.1:8000/` in a browser — the root redirects to `/ui/`.
@@ -225,4 +226,4 @@ The compiled output at `src/ptychodus/webapp/ui/dist/` is git-ignored. It reache
 - **No built-in TLS.** Front with nginx or Caddy if you're exposing beyond `127.0.0.1`. To bind all interfaces set `PTYCHODUS_WEBAPP_HOST=0.0.0.0`.
 - **Storage-root permissions.** The service user must be able to create per-kind subdirectories under `PTYCHODUS_WEBAPP_STORAGE_ROOT` on first start.
 - **Storage root on NFS.** Set `HDF5_USE_FILE_LOCKING=FALSE` for the service and for every process writing into the storage root. HDF5's `flock` can fail on NFS, and locking buys nothing here: a data file is immutable once a manifest names it. Expect a reader to see a new manifest only after the client's attribute-cache interval.
-- **Authentication.** REST and the web UI authenticate no one; keep them behind a reverse proxy that enforces the facility's single sign-on. MCP checks its own bearer tokens (see [MCP access](#mcp-access)), so exempt `/mcp` from browser sign-on at the proxy, and do not let the proxy buffer its streamed responses.
+- **Authentication.** REST and the web UI authenticate no one; keep them behind a reverse proxy that enforces the facility's single sign-on. MCP checks its own bearer tokens (see [MCP access](#mcp-access)), so exempt `/mcp` from browser sign-on at the proxy, and do not let the proxy buffer its streamed responses. Never set `PTYCHODUS_WEBAPP_MCP_ALLOW_UNAUTHENTICATED` behind a proxy.

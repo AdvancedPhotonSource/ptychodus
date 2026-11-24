@@ -68,7 +68,10 @@ async def get_diffraction(uuid: UUID, service: ServiceDep) -> DiffractionRead:
     return await service.get_diffraction(uuid)
 
 
-@router.get('/{uuid}/files/diffraction')
+@router.get(
+    '/{uuid}/files/diffraction',
+    openapi_extra=openapi_operation(ResourceService.resource_file),
+)
 async def get_diffraction_file(uuid: UUID, service: ServiceDep) -> FileResponse:
     path = await service.resource_file(ResourceKind.DIFFRACTION, uuid)
     return FileResponse(path, media_type='application/x-hdf5', filename=path.name)

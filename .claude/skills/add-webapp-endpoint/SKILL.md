@@ -89,7 +89,7 @@ A genuinely new resource also needs a SQLAlchemy model in `src/ptychodus/webapp/
 curl -sf http://localhost:8000/api/v1/<resource>/<uuid>/<thing>
 ```
 
-On loopback with no token file, MCP needs no token; otherwise send `Authorization: Bearer <token>` from `ptychodus-webapp mint-token`.
+With `PTYCHODUS_WEBAPP_MCP_ALLOW_UNAUTHENTICATED=true`, as `webapp-dev` launches it, MCP needs no token; otherwise send `Authorization: Bearer <token>` from `ptychodus-webapp mint-token`.
 
 ## Do not
 

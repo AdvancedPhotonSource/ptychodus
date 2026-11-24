@@ -29,7 +29,18 @@ class Settings(BaseSettings):
     thread holding its resources."""
     mcp_tokens_file: Path | None = None
     """The owner-only JSON file of MCP client token digests that ``ptychodus-webapp
-    mint-token`` writes. Unset, MCP authenticates no one and is served only on loopback."""
+    mint-token`` writes. MCP requires one unless `mcp_allow_unauthenticated` is set."""
+    mcp_allow_unauthenticated: bool = False
+    """Serve MCP to every caller when no token file is set. For development only: a
+    reverse proxy in front of the webapp would expose MCP to everyone it reaches."""
+
+
+class TokenFileSettings(BaseSettings):
+    """The one setting the token commands read, so they need no storage root."""
+
+    model_config = Settings.model_config
+
+    mcp_tokens_file: Path | None = None
 
 
 @lru_cache(maxsize=1)

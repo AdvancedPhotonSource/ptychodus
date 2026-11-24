@@ -13,11 +13,11 @@ from fastapi.testclient import TestClient
 from ptychodus.webapp.app import create_app
 from ptychodus.webapp.auth import (
     ClientTokenVerifier,
-    is_loopback_host,
     load_client_tokens,
     mint_client_token,
     revoke_client_token,
 )
+from ptychodus.webapp.cli import main
 from ptychodus.webapp.config import Settings
 
 _MCP_HEADERS = {
@@ -101,18 +101,29 @@ def test_a_token_file_naming_a_client_twice_is_refused(tmp_path: Path) -> None:
         load_client_tokens(tokens_file)
 
 
-@pytest.mark.parametrize(
-    ('host', 'expected'),
-    [
-        ('127.0.0.1', True),
-        ('::1', True),
-        ('localhost', True),
-        ('0.0.0.0', False),
-        ('mcp.example', False),
-    ],
-)
-def test_only_the_loopback_host_counts_as_loopback(host: str, expected: bool) -> None:
-    assert is_loopback_host(host) is expected
+def test_a_file_left_by_an_interrupted_write_does_not_block_minting(tmp_path: Path) -> None:
+    tokens_file = tmp_path / 'tokens.json'
+    (tmp_path / '.tokens.json.tmp').write_text('partial')
+
+    mint_client_token(tokens_file, 'agent')
+
+    assert [t.client_id for t in load_client_tokens(tokens_file)] == ['agent']
+
+
+def test_the_token_commands_need_only_the_token_file_setting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    tokens_file = tmp_path / 'tokens.json'
+    monkeypatch.chdir(tmp_path)  # no .env file supplies a storage root
+    monkeypatch.delenv('PTYCHODUS_WEBAPP_STORAGE_ROOT', raising=False)
+    monkeypatch.setenv('PTYCHODUS_WEBAPP_MCP_TOKENS_FILE', str(tokens_file))
+
+    assert main(['mint-token', 'agent']) == 0
+    assert capsys.readouterr().out.strip()
+    assert [t.client_id for t in load_client_tokens(tokens_file)] == ['agent']
+
+    assert main(['revoke-token', 'agent']) == 0
+    assert load_client_tokens(tokens_file) == []
 
 
 def _settings(tmp_storage_root: Path, **overrides: Any) -> Settings:
@@ -134,7 +145,7 @@ def agent_token(tmp_path: Path) -> tuple[Path, str]:
 def client_with_tokens(
     tmp_storage_root: Path, agent_token: tuple[Path, str]
 ) -> Iterator[TestClient]:
-    settings = _settings(tmp_storage_root, mcp_tokens_file=agent_token[0], host='0.0.0.0')
+    settings = _settings(tmp_storage_root, mcp_tokens_file=agent_token[0])
     with TestClient(create_app(settings)) as client:
         yield client
 
@@ -161,11 +172,13 @@ def test_rest_stays_open_when_mcp_requires_tokens(client_with_tokens: TestClient
     assert client_with_tokens.get('/api/v1/health').status_code == 200
 
 
-def test_mcp_without_tokens_is_open_on_loopback(tmp_storage_root: Path) -> None:
-    with TestClient(create_app(_settings(tmp_storage_root, host='127.0.0.1'))) as client:
+def test_mcp_without_tokens_is_open_only_when_allowed(tmp_storage_root: Path) -> None:
+    settings = _settings(tmp_storage_root, mcp_allow_unauthenticated=True)
+    with TestClient(create_app(settings)) as client:
         assert _initialize(client, None) == 200
 
 
-def test_mcp_without_tokens_is_refused_beyond_loopback(tmp_storage_root: Path) -> None:
-    with pytest.raises(RuntimeError, match='PTYCHODUS_WEBAPP_MCP_TOKENS_FILE'):
-        create_app(_settings(tmp_storage_root, host='0.0.0.0'))
+@pytest.mark.parametrize('host', ['127.0.0.1', '0.0.0.0'])
+def test_mcp_without_tokens_is_refused_on_any_host(tmp_storage_root: Path, host: str) -> None:
+    with pytest.raises(RuntimeError, match='PTYCHODUS_WEBAPP_MCP_ALLOW_UNAUTHENTICATED'):
+        create_app(_settings(tmp_storage_root, host=host))

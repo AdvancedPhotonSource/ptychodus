@@ -8,7 +8,7 @@ import logging
 import sys
 from pathlib import Path
 
-from ptychodus.webapp.config import get_settings
+from ptychodus.webapp.config import TokenFileSettings, get_settings
 
 
 def _serve(_args: argparse.Namespace) -> None:
@@ -53,7 +53,7 @@ def _tokens_file(args: argparse.Namespace) -> Path:
     if args.tokens_file is not None:
         return Path(args.tokens_file)
 
-    tokens_file = get_settings().mcp_tokens_file
+    tokens_file = TokenFileSettings().mcp_tokens_file
 
     if tokens_file is None:
         raise SystemExit(

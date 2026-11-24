@@ -32,6 +32,7 @@ def client(tmp_storage_root: Path) -> Iterator[TestClient]:
         storage_root=tmp_storage_root,
         database_url='sqlite+aiosqlite:///:memory:',
         auto_reconcile_on_startup=False,
+        mcp_allow_unauthenticated=True,
     )
     # Entering the client runs the application's lifespan, as uvicorn does.
     with TestClient(create_app(settings)) as client:
