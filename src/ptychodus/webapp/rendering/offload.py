@@ -1,4 +1,4 @@
-"""Running rendering off the event loop, a bounded number at a time."""
+"""Running bounded operations off the event loop, a limited number at a time."""
 
 from __future__ import annotations
 
@@ -15,11 +15,11 @@ _T = TypeVar('_T')
 
 
 class RenderRunner:
-    """Runs blocking render work in worker threads, at most `concurrency` at once.
+    """Runs blocking bounded work in worker threads, at most `concurrency` at once.
 
-    A render reads an HDF5 file and builds an image, which would stall every other request
-    if it ran on the event loop; in a thread it does not, and the cap bounds how many
-    products are held in memory at once. One runner serves every transport in a process.
+    A render or a report reads an HDF5 file and computes on it, which would stall every
+    other request if it ran on the event loop; in a thread it does not, and the cap bounds
+    how many resources are held in memory at once. One runner serves a whole process.
     """
 
     def __init__(self, concurrency: int) -> None:

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Request
 from sqlalchemy import text
 
 from ptychodus.webapp.routers.deps import SessionDep
-from ptychodus.webapp.routers.schemas import HealthRead
+from ptychodus.webapp.service.schemas import HealthRead
 
 router = APIRouter(tags=['health'])
 

@@ -1,10 +1,12 @@
-"""The rendered views of stored resources, shared by the REST routes and the MCP tools.
+"""The rendered views of stored resources, the bounded operations that draw them.
 
 Each view loads a resource's current file, selects what it shows and builds the image,
-synchronously: the HDF5 read and the rendering are blocking work, so a transport runs a
-view in a worker thread (:class:`~ptychodus.webapp.rendering.offload.RenderRunner`) and maps
-its errors to its own shape. A view takes the file to read rather than a resource's uuid,
-because which file is current is the manifest's to say and a transport looks that up first.
+synchronously: the HDF5 read and the rendering are blocking work, so each runs in a worker
+thread (:class:`~ptychodus.webapp.rendering.offload.RenderRunner`). What a view was asked
+to show but the resource lacks, an index out of range say, raises
+:class:`~ptychodus.webapp.service.errors.ResourceNotFoundError`. A view takes the file to
+read rather than a resource's uuid, because which file is current is the manifest's to say
+and is looked up first.
 """
 
 from __future__ import annotations
@@ -29,10 +31,10 @@ from ptychodus.webapp.rendering.render import (
     to_rendered_image,
 )
 from ptychodus.webapp.rendering.schemas import PlotImage, RenderedImage
+from ptychodus.webapp.service.errors import ResourceNotFoundError
 
 __all__ = [
     'DEFAULT_FLUORESCENCE_PIXEL_GEOMETRY',
-    'RenderLookupError',
     'diffraction_aggregate_view',
     'diffraction_pattern_view',
     'fluorescence_element_view',
@@ -53,24 +55,12 @@ DEFAULT_FLUORESCENCE_PIXEL_GEOMETRY = PixelGeometry(
 """The pixel geometry of a fluorescence map rendered without a product to take one from."""
 
 
-class RenderLookupError(LookupError):
-    """What a view was asked to show is not in the resource: an index out of range, say.
-
-    `available` names the choices there were, where they have names.
-    """
-
-    def __init__(self, message: str, *, available: Sequence[str] = ()) -> None:
-        super().__init__(message)
-        self.message = message
-        self.available = list(available)
-
-
 def diffraction_pattern_view(path: Path, index: int, params: RenderParams) -> VisualizationProduct:
     data = load_diffraction_data(path)
     num_patterns = data.get_patterns_shape()[0]
 
     if not 0 <= index < num_patterns:
-        raise RenderLookupError(f'pattern index {index} out of range [0, {num_patterns})')
+        raise ResourceNotFoundError(f'pattern index {index} out of range [0, {num_patterns})')
 
     return build_visualization_real(
         data.get_pattern(index), data.get_pixel_geometry(), params, value_label='Counts'
@@ -89,7 +79,7 @@ def probe_view(path: Path, incoherent: int, params: RenderParams) -> Visualizati
     probe = product.probes.get_mean_probe()
 
     if not 0 <= incoherent < probe.num_incoherent_modes:
-        raise RenderLookupError(
+        raise ResourceNotFoundError(
             f'incoherent mode {incoherent} out of range [0, {probe.num_incoherent_modes})'
         )
 
@@ -119,7 +109,7 @@ def object_layer_view(path: Path, layer: int, params: RenderParams) -> Visualiza
     num_layers = product.object_.num_layers
 
     if not 0 <= layer < num_layers:
-        raise RenderLookupError(f'object layer {layer} out of range [0, {num_layers})')
+        raise ResourceNotFoundError(f'object layer {layer} out of range [0, {num_layers})')
 
     return build_visualization_complex(
         product.object_.get_layer(layer), product.object_.get_pixel_geometry(), params
@@ -140,7 +130,7 @@ def fluorescence_summary_view(
     dataset = load_fluorescence_data(path)
 
     if not len(dataset):
-        raise RenderLookupError('fluorescence dataset has no element maps')
+        raise ResourceNotFoundError('fluorescence dataset has no element maps')
 
     summary = numpy.sum([emap.counts_per_second for emap in dataset], axis=0)
     return build_visualization_real(
@@ -155,7 +145,7 @@ def fluorescence_element_view(
     matches = [emap for emap in dataset if emap.name == name]
 
     if not matches:
-        raise RenderLookupError(
+        raise ResourceNotFoundError(
             f'element {name!r} not found', available=[emap.name for emap in dataset]
         )
 
@@ -179,7 +169,7 @@ def probe_positions_view(
         positions = product.probe_positions
 
         if len(positions) == 0:
-            raise RenderLookupError(f'product {label} has no probe positions')
+            raise ResourceNotFoundError(f'product {label} has no probe positions')
 
         traces.append(
             ProbePositionsTrace(

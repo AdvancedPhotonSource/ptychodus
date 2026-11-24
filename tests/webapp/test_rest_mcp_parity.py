@@ -50,6 +50,12 @@ _ROUTES: dict[str, str] = {
     'render_probe_positions': '/product/positions/image',
     'render_fluorescence_summary': '/fluorescence/{uuid}/image',
     'render_fluorescence_element': '/fluorescence/{uuid}/elements/{name}/image',
+    'get_probe_metrics': '/product/{uuid}/probe/metrics',
+    'get_object_metrics': '/product/{uuid}/object/metrics',
+    'get_probe_positions_metrics': '/product/{uuid}/positions/metrics',
+    'compare_probe': '/product/{uuid}/probe/comparison',
+    'compare_object': '/product/{uuid}/object/comparison',
+    'compare_probe_positions': '/product/{uuid}/positions/comparison',
 }
 
 # Intended differences. Downloads and administration are not for agents; the xraydb tools
@@ -85,6 +91,8 @@ class _Resources:
     running_product: UUID
     imported_product: UUID
     fluorescence: UUID
+    analyzable_product: UUID
+    shifted_product: UUID
 
 
 async def _ingest_all(
@@ -125,6 +133,8 @@ async def resources(
     f1 = seed_fluorescence(
         derived_from=[{'kind': 'product', 'uuid': str(p1)}], elements=['Fe', 'Cu']
     )
+    p4 = seed_product(analyzable=True)
+    p5 = seed_product(analyzable=True, position_shift_x_m=0.5e-9)
     await _ingest_all(
         session_provider,
         layout,
@@ -137,9 +147,11 @@ async def resources(
             ('product', p2),
             ('product', p3),
             ('fluorescence', f1),
+            ('product', p4),
+            ('product', p5),
         ],
     )
-    return _Resources(c1, c2, d1, d2, p1, p2, p3, f1)
+    return _Resources(c1, c2, d1, d2, p1, p2, p3, f1, p4, p5)
 
 
 def _structured(result: Any) -> dict[str, Any]:
@@ -218,6 +230,20 @@ _DATA_CASES = [
     ('get_lineage', {'uuid': 'succeeded_product'}),
     ('get_resource_stats', {}),
     ('get_visualization_options', {}),
+    # The analyzable products have no I0 and an object comparison defines no resolution,
+    # so these also carry null statistics.
+    ('get_probe_metrics', {'uuid': 'analyzable_product'}),
+    ('get_object_metrics', {'uuid': 'analyzable_product', 'erosion_divisor': 4}),
+    ('get_probe_positions_metrics', {'uuid': 'analyzable_product'}),
+    ('compare_probe', {'uuid': 'shifted_product', 'reference_uuid': 'analyzable_product'}),
+    (
+        'compare_object',
+        {'uuid': 'shifted_product', 'reference_uuid': 'analyzable_product', 'convention': 'repeat'},
+    ),
+    (
+        'compare_probe_positions',
+        {'uuid': 'shifted_product', 'reference_uuid': 'analyzable_product'},
+    ),
 ]
 
 
@@ -306,6 +332,12 @@ _REFUSAL_CASES = [
         {'uuid': 'succeeded_product', 'component': 'phase_rad', 'color_model': 'hsv_value'},
         400,
     ),
+    # Analysis: unknown products, a run with no data yet, and a probe carrying no power
+    ('get_probe_metrics', {'uuid': _MISSING}, 404),
+    ('get_probe_positions_metrics', {'uuid': 'running_product'}, 404),
+    ('compare_probe_positions', {'uuid': 'analyzable_product', 'reference_uuid': _MISSING}, 404),
+    ('get_probe_metrics', {'uuid': 'succeeded_product'}, 400),
+    ('compare_probe', {'uuid': 'succeeded_product', 'reference_uuid': 'analyzable_product'}, 400),
 ]
 
 
@@ -342,6 +374,20 @@ _INVALID_CASES = [
     ('render_probe', {'uuid': 'succeeded_product', 'incoherent': -1}),
     ('render_probe_positions', {'uuid': ['succeeded_product'], 'width_px': 64}),
     ('render_probe_positions', {'uuid': ['not-a-uuid']}),
+    ('get_object_metrics', {'uuid': 'analyzable_product', 'erosion_divisor': 0}),
+    ('compare_probe', {'uuid': 'analyzable_product'}),
+    (
+        'compare_probe',
+        {'uuid': 'analyzable_product', 'reference_uuid': 'shifted_product', 'mad_threshold': 0},
+    ),
+    (
+        'compare_object',
+        {'uuid': 'analyzable_product', 'reference_uuid': 'shifted_product', 'snr_threshold': 0},
+    ),
+    (
+        'compare_object',
+        {'uuid': 'analyzable_product', 'reference_uuid': 'shifted_product', 'convention': 'bogus'},
+    ),
 ]
 
 
@@ -413,6 +459,18 @@ async def test_a_tool_takes_its_route_s_parameters(
             for param, param_schema in schema.get('properties', {}).items()
         }
         assert mcp == rest, name
+
+
+async def test_a_tool_states_its_route_s_operation_class(
+    app_client: AsyncClient, bound_mcp: FastMCP
+) -> None:
+    spec = await _openapi(app_client)
+    tools = {tool.name: tool for tool in await bound_mcp.list_tools()}
+
+    for name, route in _ROUTES.items():
+        operation_class = spec['paths'][_API + route]['get']['x-operation-class']
+        description = tools[name].description or ''
+        assert description.endswith(f'Operation class: {operation_class}.'), name
 
 
 async def test_every_route_and_tool_is_paired_or_an_intended_difference(

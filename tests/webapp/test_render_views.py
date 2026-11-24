@@ -9,8 +9,8 @@ from uuid import UUID
 import pytest
 
 from ptychodus.webapp.rendering import coerce_render_params
+from ptychodus.webapp.service.errors import ResourceNotFoundError
 from ptychodus.webapp.rendering.views import (
-    RenderLookupError,
     diffraction_pattern_view,
     fluorescence_element_view,
     fluorescence_summary_view,
@@ -61,7 +61,7 @@ def test_an_index_outside_the_resource_is_a_lookup_error(
     uuid = seed_diffraction() if kind == 'diffraction' else seed_product()
     params = _REAL if kind == 'diffraction' else _COMPLEX
 
-    with pytest.raises(RenderLookupError) as caught:
+    with pytest.raises(ResourceNotFoundError) as caught:
         view(_file(tmp_storage_root, kind, uuid), argument, params)
 
     assert caught.value.message == message
@@ -73,7 +73,7 @@ def test_a_missing_element_names_the_ones_there_are(
 ) -> None:
     path = _file(tmp_storage_root, 'fluorescence', seed_fluorescence(elements=['Fe', 'Cu']))
 
-    with pytest.raises(RenderLookupError) as caught:
+    with pytest.raises(ResourceNotFoundError) as caught:
         fluorescence_element_view(path, 'Au', None, _REAL)
 
     assert caught.value.available == ['Fe', 'Cu']

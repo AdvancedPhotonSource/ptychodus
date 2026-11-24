@@ -12,7 +12,7 @@ export type IngestState =
 /** Mirrors RunState in ptychodus.api.processing. */
 export type RunState = 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 
-/** How a processed resource came to be; see RunRead in routers/schemas.py. */
+/** How a processed resource came to be; see RunRead in service/schemas.py. */
 export interface RunRead {
   state: RunState;
   reason: string | null;
@@ -75,7 +75,7 @@ export function renderQuery(params: Partial<RenderParams>): string {
   return parts.join('&');
 }
 
-/** Bookkeeping every indexed row carries; see _RowBase in routers/schemas.py. */
+/** Bookkeeping every indexed row carries; see _RowBase in service/schemas.py. */
 export interface RowBase {
   uuid: string;
   folder_path: string;
@@ -219,6 +219,35 @@ export interface RenderedImage {
   legend_cyclic: boolean;
 }
 
+/**
+ * A report's scalars, in SI units: numbers, booleans, nested groups and lists of them.
+ * A statistic the report cannot define, such as I0 on a product without it, is null.
+ */
+export type ScalarValue = number | boolean | string | null | ScalarValue[] | Scalars;
+export interface Scalars {
+  [key: string]: ScalarValue;
+}
+
+/** One product's report; see _MetricsRead in service/schemas.py. */
+export interface MetricsRead {
+  uuid: string;
+  run: RunRead | null;
+  scalars: Scalars;
+}
+
+/** A product's report against a reference product; see _ComparisonRead. */
+export interface ComparisonRead extends MetricsRead {
+  reference_uuid: string;
+  reference_run: RunRead | null;
+}
+
+export interface ProbeMetricsRead extends MetricsRead {}
+export interface ObjectMetricsRead extends MetricsRead {}
+export interface ProbePositionsMetricsRead extends MetricsRead {}
+export interface ProbeComparisonRead extends ComparisonRead {}
+export interface ObjectComparisonRead extends ComparisonRead {}
+export interface ProbePositionsComparisonRead extends ComparisonRead {}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API}${path}`, { headers: { accept: 'application/json' } });
   if (!res.ok) {
@@ -266,6 +295,24 @@ export const api = {
         .join('&')}&connect_path=${connectPath}`
     ),
   productFileUrl: (uuid: string) => `${API}/product/${uuid}/files/product`,
+  productProbeMetrics: (uuid: string) =>
+    get<ProbeMetricsRead>(`/product/${uuid}/probe/metrics`),
+  productObjectMetrics: (uuid: string) =>
+    get<ObjectMetricsRead>(`/product/${uuid}/object/metrics`),
+  productPositionsMetrics: (uuid: string) =>
+    get<ProbePositionsMetricsRead>(`/product/${uuid}/positions/metrics`),
+  productProbeComparison: (uuid: string, referenceUuid: string) =>
+    get<ProbeComparisonRead>(
+      `/product/${uuid}/probe/comparison?reference_uuid=${encodeURIComponent(referenceUuid)}`
+    ),
+  productObjectComparison: (uuid: string, referenceUuid: string) =>
+    get<ObjectComparisonRead>(
+      `/product/${uuid}/object/comparison?reference_uuid=${encodeURIComponent(referenceUuid)}`
+    ),
+  productPositionsComparison: (uuid: string, referenceUuid: string) =>
+    get<ProbePositionsComparisonRead>(
+      `/product/${uuid}/positions/comparison?reference_uuid=${encodeURIComponent(referenceUuid)}`
+    ),
 
   visualizationOptions: () => get<VisualizationOptions>('/visualization/options'),
   listFluorescence: (limit = 200, offset = 0) =>

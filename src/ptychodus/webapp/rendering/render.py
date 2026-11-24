@@ -21,9 +21,10 @@ from ptychodus.api.visualize import (
 
 from ptychodus.webapp.rendering.params import RenderParams
 from ptychodus.webapp.rendering.schemas import RenderedImage
+from ptychodus.webapp.service.errors import InvalidRequestError
 
 
-class RenderParamsError(ValueError):
+class RenderParamsError(InvalidRequestError):
     """Raised when the RenderParams are inconsistent with the array being rendered."""
 
 

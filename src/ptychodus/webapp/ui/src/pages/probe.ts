@@ -1,5 +1,6 @@
 import { api, type ProductRead, type RenderParams } from '../api.js';
 import { createImagePanel } from '../components/image_panel.js';
+import { createMetricsPanel } from '../components/metrics_panel.js';
 import { createTree, type TreeNode } from '../components/tree.js';
 import { buildPageLayout, infoLabel } from '../layout.js';
 import { findLinked, showLink } from '../routes.js';
@@ -21,7 +22,11 @@ export async function mountProbe(root: HTMLElement, uuid: string | null): Promis
   root.replaceChildren(page);
 
   const image = createImagePanel();
-  right.replaceChildren(image.el);
+  const metrics = createMetricsPanel('probe');
+  const split = document.createElement('div');
+  split.className = 'with-metrics';
+  split.append(image.el, metrics.el);
+  right.replaceChildren(split);
   image.setEmpty('Select a probe or one of its modes.');
 
   let redraw: ((params: Partial<RenderParams>) => void) | null = null;
@@ -58,6 +63,7 @@ export async function mountProbe(root: HTMLElement, uuid: string | null): Promis
     };
     setActiveTab('right');
     showLink('probe', p.uuid);
+    metrics.show(p, items);
     redraw = draw;
     draw(image.params());
   };

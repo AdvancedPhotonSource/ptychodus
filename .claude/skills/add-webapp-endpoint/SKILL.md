@@ -1,121 +1,98 @@
 ---
 name: add-webapp-endpoint
-description: Add a matched pair of a FastAPI REST route and an MCP tool in the ptychodus.webapp service. Use when the user says "add an endpoint to the webapp", "add a route to the webapp", "expose X in the API", or "add an MCP tool for Y" — because REST and MCP surfaces must stay in sync.
+description: Add a read operation to the ptychodus.webapp service — a ResourceService method with its operation class, exposed as a matched FastAPI REST route and MCP tool. Use when the user says "add an endpoint to the webapp", "add a route to the webapp", "expose X in the API", or "add an MCP tool for Y" — because REST and MCP surfaces must stay in sync.
 ---
 
 # add-webapp-endpoint
 
-`ptychodus.webapp` exposes the same read-only surface through two channels: FastAPI REST under `/api/v1/*` (routers in `src/ptychodus/webapp/routers/`) and MCP tools at `/mcp` ([src/ptychodus/webapp/mcp_server.py](../../../src/ptychodus/webapp/mcp_server.py)). They must return the same data for the same query. Adding one without the other silently drifts.
+`ptychodus.webapp` serves one read-only surface through two transports: FastAPI REST under `/api/v1/*` (routers in `src/ptychodus/webapp/routers/`) and MCP tools at `/mcp` ([src/ptychodus/webapp/mcp_server.py](../../../src/ptychodus/webapp/mcp_server.py)). Both are thin calls into one service, [service/resources.py](../../../src/ptychodus/webapp/service/resources.py)'s `ResourceService`, so an operation's logic is written once. [tests/webapp/test_rest_mcp_parity.py](../../../tests/webapp/test_rest_mcp_parity.py) fails on a route without a tool, or a tool without a route, unless it is listed as an intended difference.
 
 ## Steps
 
-### 1. Choose or create a router module
+### 1. The service method
 
-- Existing resource? Extend an existing file in [src/ptychodus/webapp/routers/](../../../src/ptychodus/webapp/routers/) (e.g. `diffraction.py`, `product.py`, `campaign.py`).
-- New resource? Create `src/ptychodus/webapp/routers/<resource>.py`.
+Add a method to `ResourceService` and decorate it with its operation class:
 
-### 2. REST route
-
-Follow the pattern in [src/ptychodus/webapp/routers/diffraction.py](../../../src/ptychodus/webapp/routers/diffraction.py):
+- `@_INSTANT` — reads only the metadata cache (`list_*`, `get_*`, counts, options).
+- `@_BOUNDED` — also reads a resource's files and computes on them (renders, reports). Look the resources up first (`resource_file`, `_product_file_and_run`), then run the blocking work through `self._runner.run(view, *args)`, never on the event loop.
 
 ```python
-from fastapi import APIRouter, HTTPException, Query
-from ptychodus.webapp.db import repositories as repo
-from ptychodus.webapp.routers._convert import <resource>_to_read
-from ptychodus.webapp.routers.deps import SessionDep, LayoutDep
-from ptychodus.webapp.routers.schemas import <Resource>Read, Page
-from ptychodus.api.storage import ResourceKind
-
-router = APIRouter(prefix='/<resource>', tags=['<resource>'])
-
-
-@router.get('', response_model=Page[<Resource>Read])
-async def list_<resource>(
-    session: SessionDep,
-    limit: int = Query(50, ge=1, le=200),
-    offset: int = Query(0, ge=0),
-    # ... filter params
-) -> Page[<Resource>Read]:
-    ...
+@_BOUNDED
+async def get_<thing>(self, uuid: UUID, *, <tunable>: int) -> <Thing>Read:
+    """<One line an agent reads as the tool's description.>"""
+    path, run = await self._product_file_and_run(uuid)
+    scalars = await self._runner.run(<thing>_view, path, <tunable>)
+    return <Thing>Read(uuid=uuid, run=run, scalars=scalars)
 ```
 
-Use `SessionDep` for DB access and `LayoutDep` when you need the on-disk storage layout. Filtering uses SQLAlchemy `where` clauses built up from optional query params — see the diffraction router for the canonical shape.
+The docstring becomes the MCP tool's description, followed by `Operation class: <class>.`, so write it for an agent.
 
-### 3. Register the router
+Refuse with the service's errors from [service/errors.py](../../../src/ptychodus/webapp/service/errors.py), never `HTTPException` or `ToolError`: `ResourceNotFoundError` (404; pass `available=` to list the choices there were) or `InvalidRequestError` (400). Each transport maps them to its own shape.
 
-In [src/ptychodus/webapp/app.py](../../../src/ptychodus/webapp/app.py) inside `create_app()`, add:
+A blocking view takes the file it reads, not a uuid, and lives beside its kind: renders in [rendering/views.py](../../../src/ptychodus/webapp/rendering/views.py), reports in [service/analysis.py](../../../src/ptychodus/webapp/service/analysis.py).
+
+### 2. Schemas and converters
+
+Response models go in [service/schemas.py](../../../src/ptychodus/webapp/service/schemas.py); reuse `Page[T]` for listings. ORM row → model conversion that needs a session goes in [service/convert.py](../../../src/ptychodus/webapp/service/convert.py). A parameter description both transports show is a `*_DESCRIPTION` constant there too.
+
+A model whose float fields can hold NaN or infinity serializes them as `null`; give its tool `output_schema=nullable_numbers_schema(<Model>)`, or an MCP client refuses the response.
+
+### 3. REST route
+
+In the resource's router (e.g. [routers/product.py](../../../src/ptychodus/webapp/routers/product.py)), a route is a signature and one call:
 
 ```python
-app.include_router(<resource>.router, prefix=api_prefix)
+@router.get(
+    '/{uuid}/<thing>',
+    response_model=<Thing>Read,
+    openapi_extra=openapi_operation(ResourceService.get_<thing>),
+)
+async def get_<thing>(
+    uuid: UUID, service: ServiceDep, <tunable>: int = Query(8, ge=1)
+) -> <Thing>Read:
+    return await service.get_<thing>(uuid, <tunable>=<tunable>)
 ```
 
-Match the position/style of the existing `app.include_router(...)` calls (health, campaign, diffraction, product, fluorescence, lineage, admin, visualization).
+`openapi_operation` states the operation class as `x-operation-class`. A new router module is registered in `create_app()` in [app.py](../../../src/ptychodus/webapp/app.py) and in the `app_client` fixture of [tests/webapp/conftest.py](../../../tests/webapp/conftest.py).
 
-### 4. Schemas
+### 4. MCP tool
 
-Add pydantic response models to [src/ptychodus/webapp/routers/schemas.py](../../../src/ptychodus/webapp/routers/schemas.py) if a new `*Read` shape is needed. Reuse `Page[T]` for paginated list responses.
-
-### 4b. TypeScript client
-
-A field added to a `*Read` model must also be declared on the matching interface in [src/ptychodus/webapp/ui/src/api.ts](../../../src/ptychodus/webapp/ui/src/api.ts). Nothing links the two — different languages, different directories — and `tsc` compiles happily against a stale interface, so the field is simply unreachable from the browser. `tests/webapp/test_ts_client_parity.py` fails and names the missing field; it is the only thing that catches this.
-
-Shared bookkeeping belongs on `RowBase`, which the three mirrored interfaces extend. `CampaignRead` and `LineageRead` are deliberately unmirrored: campaigns and lineage are served to agents and scripts but not browsed.
-
-A new render parameter also goes on `RenderParams` and into `renderQuery`, or the viewer ribbon cannot send it.
-
-### 5. Converters
-
-If your ORM row → pydantic conversion is non-trivial (or needs a session query for related data), add a helper in [src/ptychodus/webapp/routers/_convert.py](../../../src/ptychodus/webapp/routers/_convert.py) — this is what keeps REST and MCP in sync, because both channels call the same converter.
-
-### 6. Matching MCP tool
-
-Immediately add the corresponding tool in [src/ptychodus/webapp/mcp_server.py](../../../src/ptychodus/webapp/mcp_server.py) inside `create_mcp_server()`. Every REST route must have an MCP counterpart with the same behavior:
+In `create_mcp_server()`, the tool takes the route's parameters with the same names, types, defaults and bounds — bounds as `Annotated[int, Field(ge=1)]` where the route has `Query(ge=1)`:
 
 ```python
-@mcp.tool()
-async def list_<resource>(
-    limit: int = 50,
-    offset: int = 0,
-    # ... same filter params as REST route
-) -> Page[<Resource>Read]:
-    """<one-line docstring — shown to MCP clients>"""
-    async with _session() as session:
-        # ... same repo calls, same converter, same response
+@mcp.tool(**_tool_options(service.get_<thing>, 'Get <thing>'))
+async def get_<thing>(uuid: UUID, <tunable>: Annotated[int, Field(ge=1)] = 8) -> <Thing>Read:
+    return await _served(service.get_<thing>(uuid, <tunable>=<tunable>))
 ```
 
-Rules:
+`_tool_options` gives the tool its title, the read-only annotations and the description from the service method. `_served` turns the service's errors into the `ToolError` text that matches REST's detail. A render tool returns `_rendered_result(...)` with `output_schema=RenderedImageInfo.model_json_schema()`.
 
-- MCP tools take `uuid: str` (they lack FastAPI's UUID coercion) — convert with `UUID(uuid_str)` inside the tool.
-- Use the same `_convert` helper as the REST route. Do not duplicate business logic.
-- Raise `ToolError` for MCP-side errors (not `HTTPException`).
+### 5. TypeScript client
+
+A field added to a mirrored `*Read` model must also be declared on the matching interface in [ui/src/api.ts](../../../src/ptychodus/webapp/ui/src/api.ts), or the browser cannot reach it; `tests/webapp/test_ts_client_parity.py` names the missing field. A mirror may inherit through `extends` (`RowBase`, `MetricsRead`, `ComparisonRead`). `CampaignRead` and `LineageRead` are deliberately unmirrored. A new render parameter also goes on `RenderParams` and into `renderQuery`.
+
+Rebuild the frontend after touching `ui/src/`: `cd src/ptychodus/webapp/ui && tsc`.
+
+### 6. Parity cases
+
+Add the pair to `_ROUTES` in `test_rest_mcp_parity.py`, with a data case, the refusals the route makes (404, 400) and the arguments it rejects (422). The parameter-schema and operation-class checks then cover the pair automatically.
 
 ### 7. DB model (only if adding a new resource type)
 
-If this is a genuinely new resource (not a new query over an existing one), you also need:
-
-- SQLAlchemy model in `src/ptychodus/webapp/db/models.py` (UUID PK, `ingest_state`, metadata fields).
-- New `ResourceKind` enum variant in `src/ptychodus/api/storage.py`.
-- Ingestion path in `src/ptychodus/webapp/ingest/` (reconciler + watcher will pick it up automatically once the kind is registered).
+A genuinely new resource also needs a SQLAlchemy model in `src/ptychodus/webapp/db/models.py`, a `ResourceKind` member in `src/ptychodus/api/storage.py`, and an ingestion path in `src/ptychodus/webapp/ingest/`.
 
 ## Testing
 
-Health check after launching (see `webapp-dev` skill):
+`uv run pytest tests/webapp/` runs both parity suites. Against a running webapp (see `webapp-dev`):
 
 ```sh
-curl -sf http://localhost:8000/api/v1/<resource>
-curl -sf http://localhost:8000/api/v1/<resource>/<uuid>
+curl -sf http://localhost:8000/api/v1/<resource>/<uuid>/<thing>
 ```
 
-For the MCP tool, `fastmcp inspect http://localhost:8000/mcp` (or invoke via an MCP client) should list the new tool and return matching data.
-
-Two parity tests run with `pytest tests/webapp/` and will fail before any of that:
-
-- `test_mcp_tools.py::test_mcp_list_tools_accept_every_rest_filter` — a query parameter on a list route needs the same argument on its tool.
-- `test_ts_client_parity.py` — a `*Read` field needs the same name in `api.ts`.
-
-Rebuild the frontend after touching `api.ts`: `cd src/ptychodus/webapp/ui && tsc`.
+On loopback with no token file, MCP needs no token; otherwise send `Authorization: Bearer <token>` from `ptychodus-webapp mint-token`.
 
 ## Do not
 
-- Do not import from `ptychodus.model` or `ptychodus.view` — `ptychodus.webapp` is read-only from `ptychodus.api` only.
+- Do not import from `ptychodus.model`, `ptychodus.view` or `ptychodus.controller` — the webapp reads from `ptychodus.api` only.
+- Do not put query or business logic in a router or a tool; it belongs in the service, once.
 - Do not add write endpoints without user confirmation — the webapp surface is intentionally read-only.

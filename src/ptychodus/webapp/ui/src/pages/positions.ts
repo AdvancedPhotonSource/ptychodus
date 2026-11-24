@@ -1,5 +1,6 @@
 import { api, type ProductRead } from '../api.js';
 import { createImagePanel } from '../components/image_panel.js';
+import { createMetricsPanel } from '../components/metrics_panel.js';
 import { createTable } from '../components/table.js';
 import { buildPageLayout, infoLabel } from '../layout.js';
 import { findLinked, showLink } from '../routes.js';
@@ -10,7 +11,11 @@ export async function mountPositions(root: HTMLElement, uuid: string | null): Pr
   root.replaceChildren(page);
 
   const image = createImagePanel();
-  right.replaceChildren(image.el);
+  const metrics = createMetricsPanel('positions');
+  const split = document.createElement('div');
+  split.className = 'with-metrics';
+  split.append(image.el, metrics.el);
+  right.replaceChildren(split);
   image.setEmpty('Tick one or more products to plot them.');
 
   let items: ProductRead[] = [];
@@ -63,9 +68,12 @@ export async function mountPositions(root: HTMLElement, uuid: string | null): Pr
         numeric: true,
       },
     ],
-    // As in the GUI, a click only selects, and links to the row; the Plot checkboxes
-    // choose what is drawn, in table order.
-    (row) => showLink('positions', row.uuid),
+    // As in the GUI, a click only selects, links to the row and describes it; the Plot
+    // checkboxes choose what is drawn, in table order.
+    (row) => {
+      showLink('positions', row.uuid);
+      metrics.show(row, items);
+    },
     { checkbox: { header: 'Plot', onChange: plot, position: 1 }, rowState: ingestRowState }
   );
 
@@ -79,6 +87,7 @@ export async function mountPositions(root: HTMLElement, uuid: string | null): Pr
   if (found.linked !== null) {
     table.setSelected(items.indexOf(found.linked));
     table.setChecked([found.linked]);
+    metrics.show(found.linked, items);
   }
   if (found.error !== null) image.setError(found.error);
 }

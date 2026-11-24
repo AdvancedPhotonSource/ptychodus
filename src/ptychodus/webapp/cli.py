@@ -1,4 +1,4 @@
-"""Argparse-based CLI: serve | rebuild-index."""
+"""Argparse-based CLI: serve | rebuild-index | mint-token | revoke-token."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import logging
 import sys
+from pathlib import Path
 
 from ptychodus.webapp.config import get_settings
 
@@ -48,6 +49,50 @@ def _rebuild_index(_args: argparse.Namespace) -> None:
     asyncio.run(_run())
 
 
+def _tokens_file(args: argparse.Namespace) -> Path:
+    if args.tokens_file is not None:
+        return Path(args.tokens_file)
+
+    tokens_file = get_settings().mcp_tokens_file
+
+    if tokens_file is None:
+        raise SystemExit(
+            'Name the token file with --tokens-file or PTYCHODUS_WEBAPP_MCP_TOKENS_FILE.'
+        )
+
+    return tokens_file
+
+
+def _mint_token(args: argparse.Namespace) -> None:
+    from ptychodus.webapp.auth import mint_client_token
+
+    tokens_file = _tokens_file(args)
+    token = mint_client_token(tokens_file, args.client_id)
+    print(token)
+    print(
+        f'Recorded {args.client_id!r} in {tokens_file}. The token is shown only now; the webapp '
+        'accepts it after a restart.',
+        file=sys.stderr,
+    )
+
+
+def _revoke_token(args: argparse.Namespace) -> None:
+    from ptychodus.webapp.auth import revoke_client_token
+
+    tokens_file = _tokens_file(args)
+
+    try:
+        revoke_client_token(tokens_file, args.client_id)
+    except LookupError as exc:
+        raise SystemExit(str(exc)) from exc
+
+    print(
+        f'Removed {args.client_id!r} from {tokens_file}; the webapp refuses its token after a '
+        'restart.',
+        file=sys.stderr,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog='ptychodus-webapp')
     subparsers = parser.add_subparsers(dest='cmd', required=True)
@@ -59,6 +104,18 @@ def main(argv: list[str] | None = None) -> int:
         'rebuild-index', help='full reconciliation of the DB cache from disk'
     )
     rebuild.set_defaults(func=_rebuild_index)
+
+    for name, func, help_text in (
+        ('mint-token', _mint_token, 'print a new MCP bearer token for a client and record it'),
+        ('revoke-token', _revoke_token, "remove a client's MCP bearer token"),
+    ):
+        token_parser = subparsers.add_parser(name, help=help_text)
+        token_parser.add_argument('client_id', help='the client the token identifies, e.g. agent')
+        token_parser.add_argument(
+            '--tokens-file',
+            help='the token file; defaults to PTYCHODUS_WEBAPP_MCP_TOKENS_FILE',
+        )
+        token_parser.set_defaults(func=func)
 
     args = parser.parse_args(argv if argv is not None else sys.argv[1:])
     args.func(args)

@@ -1,13 +1,21 @@
-"""Pydantic response models for the REST API."""
+"""Pydantic read models of the indexed resources and of the reports about them."""
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Generic, Literal, TypeVar
+from typing import Any, Generic, Literal, TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ptychodus.api.analyze import (
+    ObjectComparisonScalars,
+    ObjectMetricsScalars,
+    ProbeComparisonScalars,
+    ProbeMetricsScalars,
+    ProbePositionsComparisonScalars,
+    ProbePositionsMetricsScalars,
+)
 from ptychodus.api.diffraction import Polarization
 from ptychodus.api.processing import RunState
 from ptychodus.api.scattering.geometry import ScatteringRegime
@@ -223,3 +231,102 @@ class HealthRead(BaseModel):
 class ReindexResponse(BaseModel):
     status: Literal['accepted']
     job_id: str
+
+
+_UNDEFINED_AS_NULL = (
+    'Statistics a report cannot define, such as I0 on a product without it, are null.'
+)
+
+
+class _MetricsRead(BaseModel):
+    uuid: UUID
+    run: RunRead | None = Field(description='The run record of the product analyzed.')
+
+
+class ProbeMetricsRead(_MetricsRead):
+    """A product's probe: its size, entropy, mode spectrum and scan overlap."""
+
+    scalars: ProbeMetricsScalars = Field(description=_UNDEFINED_AS_NULL)
+
+
+class ObjectMetricsRead(_MetricsRead):
+    """A product's object over the region its scan illuminated, ambiguities removed."""
+
+    scalars: ObjectMetricsScalars = Field(description=_UNDEFINED_AS_NULL)
+
+
+class ProbePositionsMetricsRead(_MetricsRead):
+    """A product's probe positions: their extent, spacing, scan indexes and I0."""
+
+    scalars: ProbePositionsMetricsScalars = Field(description=_UNDEFINED_AS_NULL)
+
+
+class _ComparisonRead(_MetricsRead):
+    reference_uuid: UUID
+    reference_run: RunRead | None = Field(description='The run record of the reference.')
+
+
+class ProbeComparisonRead(_ComparisonRead):
+    """A product's probe compared with a reference product's."""
+
+    scalars: ProbeComparisonScalars = Field(description=_UNDEFINED_AS_NULL)
+
+
+class ObjectComparisonRead(_ComparisonRead):
+    """A product's projected object compared with a reference product's."""
+
+    scalars: ObjectComparisonScalars = Field(description=_UNDEFINED_AS_NULL)
+
+
+class ProbePositionsComparisonRead(_ComparisonRead):
+    """How a product's probe positions are displaced from a reference product's."""
+
+    scalars: ProbePositionsComparisonScalars = Field(description=_UNDEFINED_AS_NULL)
+
+
+SpectralSNRConventionName = Literal['half_split', 'repeat']
+"""A :class:`~ptychodus.api.metrics.SpectralSNRConvention` member, by its lowercase name."""
+
+# What each analysis parameter means, stated once for every transport.
+REFERENCE_UUID_DESCRIPTION = 'The reference product the product is compared with.'
+EROSION_DIVISOR_DESCRIPTION = (
+    'The illuminated region is eroded by the smaller probe extent divided by this before scoring.'
+)
+RESAMPLE_TEST_DESCRIPTION = (
+    "Resample the product onto the reference's grids where they differ; otherwise a mismatch "
+    'is refused.'
+)
+MAD_THRESHOLD_DESCRIPTION = (
+    'Significance threshold of the phase support, in median absolute deviations above the '
+    'background.'
+)
+CONVENTION_DESCRIPTION = (
+    'half_split for reconstructions from complementary halves of one dataset, repeat for '
+    'independent repeat scans.'
+)
+SNR_THRESHOLD_DESCRIPTION = 'The spectral SNR at which the resolution is read.'
+
+
+def _widen_numbers(schema: Any) -> Any:
+    if isinstance(schema, list):
+        return [_widen_numbers(item) for item in schema]
+
+    if not isinstance(schema, dict):
+        return schema
+
+    widened = {key: _widen_numbers(value) for key, value in schema.items()}
+
+    if widened.get('type') == 'number':
+        del widened['type']
+        widened['anyOf'] = [{'type': 'number'}, {'type': 'null'}]
+
+    return widened
+
+
+def nullable_numbers_schema(model: type[BaseModel]) -> dict[str, Any]:
+    """The JSON schema of `model` with every number also admitting null.
+
+    JSON has no NaN or infinity, so a float field holding one serializes as null, which a
+    client validating against the plain schema would refuse.
+    """
+    return _widen_numbers(model.model_json_schema())

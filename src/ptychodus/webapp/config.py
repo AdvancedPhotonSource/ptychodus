@@ -25,7 +25,11 @@ class Settings(BaseSettings):
     api_prefix: str = '/api/v1'
     auto_reconcile_on_startup: bool = True
     render_concurrency: int = Field(4, ge=1)
-    """How many renders may run at once, each in a worker thread holding one resource."""
+    """How many bounded operations, renders and reports, may run at once, each in a worker
+    thread holding its resources."""
+    mcp_tokens_file: Path | None = None
+    """The owner-only JSON file of MCP client token digests that ``ptychodus-webapp
+    mint-token`` writes. Unset, MCP authenticates no one and is served only on loopback."""
 
 
 @lru_cache(maxsize=1)

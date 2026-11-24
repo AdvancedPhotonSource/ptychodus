@@ -1,44 +1,53 @@
 from __future__ import annotations
 
-from functools import partial
-from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from fastapi.responses import FileResponse
-from sqlalchemy import exists, select
-
-from ptychodus.api.scattering.geometry import ScatteringRegime
 
 from ptychodus.api.processing import RunState
-
-from ptychodus.webapp.db import repositories as repo
-from ptychodus.webapp.db.base import IngestState
-from ptychodus.webapp.db.models import DerivationEdge, Product
-from ptychodus.webapp.rendering import RenderedImage
-from ptychodus.webapp.rendering.schemas import PlotImage
-from ptychodus.webapp.rendering.params import RenderParamsDep
-from ptychodus.webapp.rendering.views import (
-    object_layer_view,
-    object_view,
-    probe_modes_view,
-    probe_view,
-    probe_positions_view,
-    view_as_rendered_image,
-)
-from ptychodus.webapp.routers._convert import product_to_read
-from ptychodus.webapp.routers._render import render_or_http_error, resource_file_or_404
-from ptychodus.webapp.routers.deps import LayoutDep, RenderRunnerDep, SessionDep
-from ptychodus.webapp.routers.schemas import Page, ProductRead
+from ptychodus.api.scattering.geometry import ScatteringRegime
 from ptychodus.api.storage import ResourceKind
+
+from ptychodus.webapp.db.base import IngestState
+from ptychodus.webapp.rendering import RenderedImage
+from ptychodus.webapp.rendering.params import RenderParamsDep
+from ptychodus.webapp.rendering.schemas import PlotImage
+from ptychodus.webapp.routers.deps import ServiceDep, openapi_operation
+from ptychodus.webapp.service.resources import ResourceService
+from ptychodus.webapp.service.schemas import (
+    CONVENTION_DESCRIPTION,
+    EROSION_DIVISOR_DESCRIPTION,
+    MAD_THRESHOLD_DESCRIPTION,
+    REFERENCE_UUID_DESCRIPTION,
+    RESAMPLE_TEST_DESCRIPTION,
+    SNR_THRESHOLD_DESCRIPTION,
+    ObjectComparisonRead,
+    ObjectMetricsRead,
+    Page,
+    ProbeComparisonRead,
+    ProbeMetricsRead,
+    ProbePositionsComparisonRead,
+    ProbePositionsMetricsRead,
+    ProductRead,
+    SpectralSNRConventionName,
+)
 
 router = APIRouter(prefix='/product', tags=['product'])
 
+_REFERENCE_UUID = Query(description=REFERENCE_UUID_DESCRIPTION)
+_EROSION_DIVISOR = Query(8, ge=1, description=EROSION_DIVISOR_DESCRIPTION)
+_RESAMPLE_TEST = Query(True, description=RESAMPLE_TEST_DESCRIPTION)
 
-@router.get('', response_model=Page[ProductRead])
+
+@router.get(
+    '',
+    response_model=Page[ProductRead],
+    openapi_extra=openapi_operation(ResourceService.list_product),
+)
 async def list_product(
-    session: SessionDep,
+    service: ServiceDep,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     derived_from_uuid: UUID | None = None,
@@ -50,115 +59,89 @@ async def list_product(
     photon_energy_eV_max: float | None = Query(None, alias='photon_energy_eV_max'),  # noqa: N803
     scattering_regime: ScatteringRegime | None = None,
 ) -> Page[ProductRead]:
-    where = []
-    if scattering_regime is not None:
-        where.append(Product.scattering_regime == scattering_regime.value)
-    if ingest_state is not None:
-        where.append(Product.ingest_state == ingest_state)
-    if run_state:
-        where.append(Product.run_state.in_([s.value for s in run_state]))
-    if photon_energy_eV_min is not None:
-        where.append(Product.photon_energy_eV >= photon_energy_eV_min)
-    if photon_energy_eV_max is not None:
-        where.append(Product.photon_energy_eV <= photon_energy_eV_max)
-    if derived_from_uuid is not None:
-        edge_subq = select(DerivationEdge.source_uuid).where(
-            DerivationEdge.source_uuid == Product.uuid,
-            DerivationEdge.target_uuid == derived_from_uuid,
-        )
-        where.append(exists(edge_subq))
-
-    items, total = await repo.list_rows(session, Product, limit=limit, offset=offset, where=where)
-    reads = [await product_to_read(session, i) for i in items]
-    return Page(items=reads, total=total, limit=limit, offset=offset)
+    return await service.list_product(
+        limit=limit,
+        offset=offset,
+        derived_from_uuid=derived_from_uuid,
+        ingest_state=ingest_state,
+        run_state=run_state,
+        photon_energy_eV_min=photon_energy_eV_min,
+        photon_energy_eV_max=photon_energy_eV_max,
+        scattering_regime=scattering_regime,
+    )
 
 
-@router.get('/{uuid}', response_model=ProductRead)
-async def get_product(uuid: UUID, session: SessionDep) -> ProductRead:
-    row = await repo.get_row(session, Product, uuid)
-    if row is None:
-        raise HTTPException(status_code=404, detail=f'product {uuid} not found')
-    return await product_to_read(session, row)
+@router.get(
+    '/{uuid}',
+    response_model=ProductRead,
+    openapi_extra=openapi_operation(ResourceService.get_product),
+)
+async def get_product(uuid: UUID, service: ServiceDep) -> ProductRead:
+    return await service.get_product(uuid)
 
 
 @router.get('/{uuid}/files/product')
-async def get_product_file(uuid: UUID, session: SessionDep, layout: LayoutDep) -> FileResponse:
-    path = await _product_file_or_404(uuid, session, layout)
+async def get_product_file(uuid: UUID, service: ServiceDep) -> FileResponse:
+    """The product's current file: its final one, or the newest checkpoint while it runs."""
+    path = await service.resource_file(ResourceKind.PRODUCT, uuid)
     return FileResponse(path, media_type='application/x-hdf5', filename=path.name)
 
 
-async def _product_file_or_404(uuid: UUID, session: SessionDep, layout: LayoutDep) -> Path:
-    """The product's current file: its final one, or the newest checkpoint while it runs."""
-    row = await repo.get_row(session, Product, uuid)
-    if row is None:
-        raise HTTPException(status_code=404, detail=f'product {uuid} not found')
-    return resource_file_or_404(layout, ResourceKind.PRODUCT, uuid)
-
-
-@router.get('/{uuid}/probe/image', response_model=RenderedImage)
+@router.get(
+    '/{uuid}/probe/image',
+    response_model=RenderedImage,
+    openapi_extra=openapi_operation(ResourceService.render_probe),
+)
 async def get_probe_image(
     uuid: UUID,
-    session: SessionDep,
-    layout: LayoutDep,
-    runner: RenderRunnerDep,
+    service: ServiceDep,
     params: RenderParamsDep,
     incoherent: int = Query(0, ge=0, description='Incoherent probe mode index.'),
 ) -> RenderedImage:
-    path = await _product_file_or_404(uuid, session, layout)
-    return await render_or_http_error(
-        runner, view_as_rendered_image, probe_view, (path, incoherent), params, True
-    )
+    return await service.render_probe(uuid, incoherent, params)
 
 
-@router.get('/{uuid}/probe/modes/image', response_model=RenderedImage)
+@router.get(
+    '/{uuid}/probe/modes/image',
+    response_model=RenderedImage,
+    openapi_extra=openapi_operation(ResourceService.render_probe_modes),
+)
 async def get_probe_modes_image(
-    uuid: UUID,
-    session: SessionDep,
-    layout: LayoutDep,
-    runner: RenderRunnerDep,
-    params: RenderParamsDep,
+    uuid: UUID, service: ServiceDep, params: RenderParamsDep
 ) -> RenderedImage:
-    path = await _product_file_or_404(uuid, session, layout)
-    return await render_or_http_error(
-        runner, view_as_rendered_image, probe_modes_view, (path,), params, True
-    )
+    return await service.render_probe_modes(uuid, params)
 
 
-@router.get('/{uuid}/object/image', response_model=RenderedImage)
+@router.get(
+    '/{uuid}/object/image',
+    response_model=RenderedImage,
+    openapi_extra=openapi_operation(ResourceService.render_object),
+)
 async def get_object_image(
-    uuid: UUID,
-    session: SessionDep,
-    layout: LayoutDep,
-    runner: RenderRunnerDep,
-    params: RenderParamsDep,
+    uuid: UUID, service: ServiceDep, params: RenderParamsDep
 ) -> RenderedImage:
     """Render the object as the product of its layers, the transmission of the whole stack."""
-    path = await _product_file_or_404(uuid, session, layout)
-    return await render_or_http_error(
-        runner, view_as_rendered_image, object_view, (path,), params, True
-    )
+    return await service.render_object(uuid, params)
 
 
-@router.get('/{uuid}/object/{layer}/image', response_model=RenderedImage)
+@router.get(
+    '/{uuid}/object/{layer}/image',
+    response_model=RenderedImage,
+    openapi_extra=openapi_operation(ResourceService.render_object_layer),
+)
 async def get_object_layer_image(
-    uuid: UUID,
-    layer: int,
-    session: SessionDep,
-    layout: LayoutDep,
-    runner: RenderRunnerDep,
-    params: RenderParamsDep,
+    uuid: UUID, layer: int, service: ServiceDep, params: RenderParamsDep
 ) -> RenderedImage:
-    path = await _product_file_or_404(uuid, session, layout)
-    return await render_or_http_error(
-        runner, view_as_rendered_image, object_layer_view, (path, layer), params, True
-    )
+    return await service.render_object_layer(uuid, layer, params)
 
 
-@router.get('/positions/image', response_model=PlotImage)
+@router.get(
+    '/positions/image',
+    response_model=PlotImage,
+    openapi_extra=openapi_operation(ResourceService.render_probe_positions),
+)
 async def get_positions_image(
-    session: SessionDep,
-    layout: LayoutDep,
-    runner: RenderRunnerDep,
+    service: ServiceDep,
     uuid: Annotated[
         list[UUID],
         Query(
@@ -170,14 +153,98 @@ async def get_positions_image(
     height_px: int = Query(640, ge=128, le=2048),
 ) -> PlotImage:
     """Plot one or more products' probe positions, one color and legend entry per product."""
-    entries = [
-        (await _product_file_or_404(product_uuid, session, layout), str(product_uuid)[:8])
-        for product_uuid in uuid
-    ]
-    return await render_or_http_error(
-        runner,
-        partial(
-            probe_positions_view, connect_path=connect_path, width_px=width_px, height_px=height_px
-        ),
-        entries,
+    return await service.render_probe_positions(
+        uuid, connect_path=connect_path, width_px=width_px, height_px=height_px
     )
+
+
+@router.get(
+    '/{uuid}/probe/metrics',
+    response_model=ProbeMetricsRead,
+    openapi_extra=openapi_operation(ResourceService.get_probe_metrics),
+)
+async def get_probe_metrics(uuid: UUID, service: ServiceDep) -> ProbeMetricsRead:
+    """Describe the product's probe: its size, entropy, mode spectrum and scan overlap."""
+    return await service.get_probe_metrics(uuid)
+
+
+@router.get(
+    '/{uuid}/object/metrics',
+    response_model=ObjectMetricsRead,
+    openapi_extra=openapi_operation(ResourceService.get_object_metrics),
+)
+async def get_object_metrics(
+    uuid: UUID, service: ServiceDep, erosion_divisor: int = _EROSION_DIVISOR
+) -> ObjectMetricsRead:
+    """Describe the product's object over the region its scan illuminated."""
+    return await service.get_object_metrics(uuid, erosion_divisor=erosion_divisor)
+
+
+@router.get(
+    '/{uuid}/positions/metrics',
+    response_model=ProbePositionsMetricsRead,
+    openapi_extra=openapi_operation(ResourceService.get_probe_positions_metrics),
+)
+async def get_probe_positions_metrics(uuid: UUID, service: ServiceDep) -> ProbePositionsMetricsRead:
+    """Describe the product's probe positions: their extent, spacing, scan indexes and I0."""
+    return await service.get_probe_positions_metrics(uuid)
+
+
+@router.get(
+    '/{uuid}/probe/comparison',
+    response_model=ProbeComparisonRead,
+    openapi_extra=openapi_operation(ResourceService.compare_probe),
+)
+async def compare_probe(
+    uuid: UUID,
+    service: ServiceDep,
+    reference_uuid: UUID = _REFERENCE_UUID,
+    erosion_divisor: int = _EROSION_DIVISOR,
+    mad_threshold: float = Query(4.5, gt=0.0, description=MAD_THRESHOLD_DESCRIPTION),
+    resample_test: bool = _RESAMPLE_TEST,
+) -> ProbeComparisonRead:
+    """Compare the product's probe with a reference product's."""
+    return await service.compare_probe(
+        uuid,
+        reference_uuid,
+        erosion_divisor=erosion_divisor,
+        mad_threshold=mad_threshold,
+        resample_test=resample_test,
+    )
+
+
+@router.get(
+    '/{uuid}/object/comparison',
+    response_model=ObjectComparisonRead,
+    openapi_extra=openapi_operation(ResourceService.compare_object),
+)
+async def compare_object(
+    uuid: UUID,
+    service: ServiceDep,
+    reference_uuid: UUID = _REFERENCE_UUID,
+    convention: SpectralSNRConventionName = Query('half_split', description=CONVENTION_DESCRIPTION),
+    snr_threshold: float = Query(2.0, gt=0.0, description=SNR_THRESHOLD_DESCRIPTION),
+    erosion_divisor: int = _EROSION_DIVISOR,
+    resample_test: bool = _RESAMPLE_TEST,
+) -> ObjectComparisonRead:
+    """Compare the product's projected object with a reference product's."""
+    return await service.compare_object(
+        uuid,
+        reference_uuid,
+        convention=convention,
+        snr_threshold=snr_threshold,
+        erosion_divisor=erosion_divisor,
+        resample_test=resample_test,
+    )
+
+
+@router.get(
+    '/{uuid}/positions/comparison',
+    response_model=ProbePositionsComparisonRead,
+    openapi_extra=openapi_operation(ResourceService.compare_probe_positions),
+)
+async def compare_probe_positions(
+    uuid: UUID, service: ServiceDep, reference_uuid: UUID = _REFERENCE_UUID
+) -> ProbePositionsComparisonRead:
+    """Measure how the product's probe positions are displaced from a reference product's."""
+    return await service.compare_probe_positions(uuid, reference_uuid)

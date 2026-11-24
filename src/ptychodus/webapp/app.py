@@ -14,16 +14,12 @@ from fastapi.staticfiles import StaticFiles
 from fastmcp.server.http import StarletteWithLifespan
 
 from ptychodus import __version__
+from ptychodus.webapp.auth import ClientTokenVerifier, is_loopback_host, load_client_tokens
 from ptychodus.webapp.config import Settings, get_settings
 from ptychodus.webapp.db.session import SessionProvider, create_engine, create_schema
 from ptychodus.webapp.ingest.reconciler import full_rescan
 from ptychodus.webapp.ingest.watcher import ManifestWatcher
-from ptychodus.webapp.mcp_server import (
-    bind_layout,
-    bind_render_runner,
-    bind_session_provider,
-    create_mcp_server,
-)
+from ptychodus.webapp.mcp_server import create_mcp_server
 from ptychodus.webapp.rendering.offload import RenderRunner
 from ptychodus.webapp.routers import (
     admin,
@@ -35,6 +31,8 @@ from ptychodus.webapp.routers import (
     visualization,
 )
 from ptychodus.webapp.routers import product as product_router
+from ptychodus.webapp.routers.errors import add_service_error_handlers
+from ptychodus.webapp.service.resources import ResourceService
 from ptychodus.api.storage import StorageLayout
 
 logger = logging.getLogger(__name__)
@@ -47,6 +45,32 @@ def _configure_logging(level: str) -> None:
     )
 
 
+def _mcp_token_verifier(settings: Settings) -> ClientTokenVerifier | None:
+    """The verifier of MCP bearer tokens, or None to serve MCP unauthenticated on loopback.
+
+    Raises:
+        RuntimeError: If no token file is set and the webapp binds a host other than loopback.
+    """
+    if settings.mcp_tokens_file is not None:
+        verifier = ClientTokenVerifier(load_client_tokens(settings.mcp_tokens_file))
+        logger.info('MCP accepts bearer tokens of clients: %s', ', '.join(verifier.client_ids))
+        return verifier
+
+    if is_loopback_host(settings.host):
+        logger.warning(
+            'PTYCHODUS_WEBAPP_MCP_TOKENS_FILE is unset, so MCP authenticates no one; it is '
+            'served only because the webapp binds the loopback host %s.',
+            settings.host,
+        )
+        return None
+
+    raise RuntimeError(
+        f'The webapp binds {settings.host}, which is not loopback, so MCP requires bearer '
+        'tokens: set PTYCHODUS_WEBAPP_MCP_TOKENS_FILE to a token file, which '
+        '`ptychodus-webapp mint-token <client_id>` creates.'
+    )
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     _configure_logging(settings.log_level)
@@ -55,13 +79,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     engine = create_engine(settings.database_url)
     session_provider = SessionProvider(engine)
     render_runner = RenderRunner(settings.render_concurrency)
+    service = ResourceService(session_provider, layout, render_runner)
+    mcp_auth = _mcp_token_verifier(settings)
 
     # Built before the lifespan below so that lifespan can run the MCP app's own: a
     # mounted Starlette app's lifespan is never run by its parent, and without it the
     # streamable-HTTP session manager has no task group and every request fails.
     mcp_app: StarletteWithLifespan | None = None
     try:
-        mcp_app = create_mcp_server().http_app(path='/')
+        mcp_app = create_mcp_server(service, auth=mcp_auth).http_app(path='/')
     except Exception:  # noqa: BLE001
         logger.exception('failed to build MCP server; continuing without it')
 
@@ -72,9 +98,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await stack.enter_async_context(mcp_app.lifespan(mcp_app))
 
             await create_schema(engine)
-            bind_session_provider(session_provider)
-            bind_layout(layout)
-            bind_render_runner(render_runner)
             layout.ensure_kind_dirs()
 
             if settings.auto_reconcile_on_startup:
@@ -102,7 +125,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.layout = layout
     app.state.session_provider = session_provider
-    app.state.render_runner = render_runner
+    app.state.service = service
+    add_service_error_handlers(app)
 
     api_prefix = settings.api_prefix
     app.include_router(health.router, prefix=api_prefix)

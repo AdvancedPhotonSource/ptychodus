@@ -252,6 +252,34 @@ body {
 .image-panel .status { padding: 1rem; color: var(--fg-muted); font-size: 0.85em; }
 .image-panel .error { color: #ff8080; padding: 1rem; font-size: 0.85em; }
 
+/* -- metrics panel beneath an image (probe, object, positions) -- */
+.with-metrics { display: flex; flex-direction: column; height: 100%; gap: 0.5rem; }
+.with-metrics > .image-panel { flex: 1 1 auto; height: auto; min-height: 12rem; }
+.metrics-panel {
+  flex: 0 1 auto;
+  max-height: 45%;
+  overflow: auto;
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+}
+.metrics-panel h3 {
+  margin: 0 0 0.375rem;
+  font-size: 0.95em;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.metrics-panel .metrics-compare { margin: 0.75rem 0 0.375rem; font-size: 0.875em; color: var(--fg-muted); }
+.metrics-panel select {
+  background: var(--bg-panel);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0.125rem 0.25rem;
+}
+.metrics-panel .metrics-group { grid-column: 1 / -1; color: var(--fg); font-weight: 600; margin-top: 0.25rem; }
+.metrics-panel .metrics-status { color: var(--fg-muted); font-size: 0.85em; }
+.metrics-panel .metrics-error { color: #ff8080; font-size: 0.85em; }
+
 /* -- responsive collapse: single column with tab strip -- */
 @media (max-width: 56.25rem) {
   .content {

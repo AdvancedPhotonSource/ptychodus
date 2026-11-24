@@ -10,6 +10,8 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from pydantic import BaseModel
 
+from ptychodus.webapp.mcp_tools.annotations import READ_ONLY_ANNOTATIONS
+
 
 class ElementInfo(BaseModel):
     symbol: str
@@ -89,7 +91,7 @@ def create_xraydb_mcp() -> FastMCP:
     """Build the xraydb MCP sub-server. Caller mounts it with ``namespace='xraydb'``."""
     mcp: FastMCP = FastMCP(name='xraydb')
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_ANNOTATIONS)
     async def element_info(element: str | int) -> ElementInfo:
         """Return atomic number, symbol, atomic mass (AMU), and elemental density (g/cm^3).
 
@@ -107,7 +109,7 @@ def create_xraydb_mcp() -> FastMCP:
             density_g_per_cm3=float(density),
         )
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_ANNOTATIONS)
     async def xray_absorption_edges(element: str | int) -> list[XrayEdgeInfo]:
         """List all tabulated absorption edges (K, L1-L3, M1-M5, ...) for an element.
 
@@ -128,7 +130,7 @@ def create_xraydb_mcp() -> FastMCP:
             for name, row in edges.items()
         ]
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_ANNOTATIONS)
     async def xray_emission_lines(
         element: str | int,
         excitation_energy_eV: float | None = None,  # noqa: N803
@@ -157,7 +159,7 @@ def create_xraydb_mcp() -> FastMCP:
             for name, row in lines.items()
         ]
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_ANNOTATIONS)
     async def anomalous_scattering_factors(
         element: str | int,
         energies_eV: list[float],  # noqa: N803
@@ -185,7 +187,7 @@ def create_xraydb_mcp() -> FastMCP:
             for e, a, b in zip(energies_eV, f1, f2, strict=True)
         ]
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_ANNOTATIONS)
     async def mass_attenuation_coefficient(
         element: str | int,
         energies_eV: list[float],  # noqa: N803
@@ -208,7 +210,7 @@ def create_xraydb_mcp() -> FastMCP:
             for e, v in zip(energies_eV, mu, strict=True)
         ]
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_ANNOTATIONS)
     async def material_refractive_index(
         formula: str,
         density_g_per_cm3: float,
@@ -237,7 +239,7 @@ def create_xraydb_mcp() -> FastMCP:
             attenuation_length_m=float(atlen_cm) * 1e-2,
         )
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_ANNOTATIONS)
     async def material_attenuation(
         name_or_formula: str,
         energies_eV: list[float],  # noqa: N803
@@ -270,7 +272,7 @@ def create_xraydb_mcp() -> FastMCP:
             for e, v in zip(energies_eV, mu, strict=True)
         ]
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_ANNOTATIONS)
     async def effective_fluorescence_yield(
         element: str | int,
         edge: str,
@@ -305,7 +307,7 @@ def create_xraydb_mcp() -> FastMCP:
             net_probability=float(net_prob),
         )
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_ANNOTATIONS)
     async def identify_element_by_edge_energy(
         observed_energy_eV: float,  # noqa: N803
         edges: list[str] | None = None,
@@ -326,7 +328,7 @@ def create_xraydb_mcp() -> FastMCP:
             raise ToolError(f'guess_edge failed: {exc}') from exc
         return ElementIdentification(symbol=str(symbol), edge=str(edge))
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_ANNOTATIONS)
     async def core_hole_width(element: str | int, edge: str | None = None) -> float:
         """Natural core-hole linewidth in eV. Returns the K-edge width if edge omitted.
 
@@ -341,7 +343,7 @@ def create_xraydb_mcp() -> FastMCP:
             raise ToolError(f'core_width failed for {symbol!r}: {exc}') from exc
         return float(width)
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_ANNOTATIONS)
     async def parse_chemical_formula(formula: str) -> dict[str, float]:
         """Parse a chemical formula into an {element_symbol: stoichiometric_count} map.
 
@@ -356,7 +358,7 @@ def create_xraydb_mcp() -> FastMCP:
             raise ToolError(f'chemparse failed for {formula!r}: {exc}') from exc
         return {str(k): float(v) for k, v in parsed.items()}
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_ANNOTATIONS)
     async def list_named_materials() -> list[NamedMaterialInfo]:
         """Enumerate xraydb's built-in named materials (e.g. 'kapton', 'water', 'silicon').
 

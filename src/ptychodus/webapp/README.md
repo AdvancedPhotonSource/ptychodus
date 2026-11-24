@@ -2,9 +2,9 @@
 
 FastAPI service that indexes the resources in a ptychodus storage root (campaigns, diffraction datasets, products, fluorescence datasets), exposes them through a REST API, an MCP server, and a minimal web UI, and keeps a SQLite metadata cache in sync with the storage root via a filesystem watcher.
 
-- **REST**: `/api/v1/*` — list / get / render endpoints per resource kind
-- **MCP**: `/mcp` — read-only tools taking the REST routes' parameters and refusing what they refuse; a render tool returns the PNG with its scales as structured content
-- **Web UI**: `/ui/` — Diffraction, Products (with Positions, Probe and Object nested beneath it) and Fluorescence, served from compiled TypeScript. Deep links mirror the REST paths: `/ui/#product/<uuid>` selects a product, `/ui/#product/<uuid>/probe` (or `/object`, `/positions`) opens that view of it, and `/ui/#diffraction/<uuid>` and `/ui/#fluorescence/<uuid>` theirs; the address bar follows the selection
+- **REST**: `/api/v1/*` — list / get / render endpoints per resource kind, and a product's probe, object and probe-position metrics and their comparisons with a reference product (`/product/<uuid>/probe/metrics`, `/product/<uuid>/probe/comparison?reference_uuid=…`, and likewise `object` and `positions`)
+- **MCP**: `/mcp` — read-only tools taking the REST routes' parameters and refusing what they refuse; a render tool returns the PNG with its scales as structured content. Each tool is annotated read-only and its description ends with its operation class — **instant** for metadata, **bounded** for renders and reports, which read resource data — and the server's instructions describe the storage root to an agent. Callers present a bearer token (see [MCP access](#mcp-access))
+- **Web UI**: `/ui/` — Diffraction, Products (with Positions, Probe and Object nested beneath it) and Fluorescence, served from compiled TypeScript. Deep links mirror the REST paths: `/ui/#product/<uuid>` selects a product, `/ui/#product/<uuid>/probe` (or `/object`, `/positions`) opens that view of it, and `/ui/#diffraction/<uuid>` and `/ui/#fluorescence/<uuid>` theirs; the address bar follows the selection. Beneath the Probe, Object and Positions images, the selected product's metrics, and its comparison with another product chosen under **Compare with**
 - **OpenAPI**: `/openapi.json` and interactive docs at `/docs`
 
 ## Scope of the web UI
@@ -22,7 +22,9 @@ Some GUI details are absent because the files cannot supply them:
 
 Others are absent by choice: the image tools (pan and zoom, save, ruler, rectangle histogram, line cut, Fourier) and the Measured/Enhanced fluorescence toggle, since enhancing is computation. The web viewer adds what the GUI lacks: a **clip** option, a caption with the physical pixel size, and an About menu on the rail.
 
-Panels with no web counterpart are the ones that write or dispatch: Settings, Processing, Globus, Genesis and Agent, along with every analysis dialog. Those remain GUI-only (`uv run ptychodus`). Campaigns and lineage are the reverse — a webapp-only grouping with no GUI counterpart, served over REST and MCP for agents and scripts but not browsed. Any writes to the storage root happen out of band: the GUI, the reconstruct commands (`uv run ptychodus-reconstruct ...`), or the streaming processor.
+The analysis dialogs' reports are served as numbers: the metrics panel beneath the Probe, Object and Positions views lists every scalar a report computes, as REST and MCP return them. The dialogs' plots — spectra, Fourier ring correlations, displacement fields — remain GUI-only.
+
+Panels with no web counterpart are the ones that write or dispatch: Settings, Processing, Globus, Genesis and Agent. Those remain GUI-only (`uv run ptychodus`). Campaigns and lineage are the reverse — a webapp-only grouping with no GUI counterpart, served over REST and MCP for agents and scripts but not browsed. Any writes to the storage root happen out of band: the GUI, the reconstruct commands (`uv run ptychodus-reconstruct ...`), or the streaming processor.
 
 ## Install
 
@@ -92,7 +94,28 @@ All settings come from `PTYCHODUS_WEBAPP_*` environment variables (or a `.env` f
 | `PTYCHODUS_WEBAPP_POLLING_INTERVAL_S` | float | `2.0` | Watchdog observer poll interval |
 | `PTYCHODUS_WEBAPP_DEBOUNCE_WINDOW_S` | float | `1.0` | Manifest-change debounce window |
 | `PTYCHODUS_WEBAPP_AUTO_RECONCILE_ON_STARTUP` | bool | `true` | Run a full rescan at boot |
-| `PTYCHODUS_WEBAPP_RENDER_CONCURRENCY` | int | `4` | Renders run in worker threads, at most this many at once |
+| `PTYCHODUS_WEBAPP_RENDER_CONCURRENCY` | int | `4` | Bounded operations — renders and reports — run in worker threads, at most this many at once |
+| `PTYCHODUS_WEBAPP_MCP_TOKENS_FILE` | path | *(unset)* | The MCP client token file (see [MCP access](#mcp-access)); unset, MCP is served unauthenticated on a loopback host only |
+
+## MCP access
+
+MCP authenticates every caller by a bearer token; REST and the web UI do not. Each client — an integrated agent service, Claude Code, Open WebUI — gets a token of its own from the operator, who records it in the token file:
+
+```sh
+export PTYCHODUS_WEBAPP_MCP_TOKENS_FILE=/etc/ptychodus/mcp_tokens.json
+uv run ptychodus-webapp mint-token claude-code   # prints the token once
+uv run ptychodus-webapp revoke-token claude-code
+```
+
+`mint-token` prints a new token on stdout and records only its SHA-256 digest, so the file grants nothing by itself; minting for a client already in the file replaces its token. Either subcommand also takes `--tokens-file PATH`. The file is JSON, written atomically and readable by its owner alone, and the webapp refuses to start if anyone else may read it. It is read at startup, so restart the service after a change.
+
+A client sends the token on every request:
+
+```text
+Authorization: Bearer <token>
+```
+
+A missing or unknown token is answered with 401, and each tool call is logged with the client its token names. With no token file, the webapp serves MCP unauthenticated only when it binds a loopback address (`127.0.0.1`, `::1` or `localhost`), as in development, and refuses to start on any other host.
 
 ## Start
 
@@ -202,4 +225,4 @@ The compiled output at `src/ptychodus/webapp/ui/dist/` is git-ignored. It reache
 - **No built-in TLS.** Front with nginx or Caddy if you're exposing beyond `127.0.0.1`. To bind all interfaces set `PTYCHODUS_WEBAPP_HOST=0.0.0.0`.
 - **Storage-root permissions.** The service user must be able to create per-kind subdirectories under `PTYCHODUS_WEBAPP_STORAGE_ROOT` on first start.
 - **Storage root on NFS.** Set `HDF5_USE_FILE_LOCKING=FALSE` for the service and for every process writing into the storage root. HDF5's `flock` can fail on NFS, and locking buys nothing here: a data file is immutable once a manifest names it. Expect a reader to see a new manifest only after the client's attribute-cache interval.
-- **No auth today.** The current service is unauthenticated; keep it behind a reverse proxy that enforces auth if the data warrants it.
+- **Authentication.** REST and the web UI authenticate no one; keep them behind a reverse proxy that enforces the facility's single sign-on. MCP checks its own bearer tokens (see [MCP access](#mcp-access)), so exempt `/mcp` from browser sign-on at the proxy, and do not let the proxy buffer its streamed responses.

@@ -17,15 +17,16 @@ from ptychodus.api.visualize import (
 )
 
 from ptychodus.webapp.rendering.schemas import OptionsRead
+from ptychodus.webapp.service.errors import InvalidRequestError
 
 E = TypeVar('E', bound=Enum)
 
 
-class InvalidRenderParamError(ValueError):
+class InvalidRenderParamError(InvalidRequestError):
     """Raised when a raw render-param string cannot be coerced to its enum / colormap."""
 
     def __init__(self, message: str, detail: dict[str, Any]) -> None:
-        super().__init__(message)
+        super().__init__(message, detail=detail)
         self.detail = detail
 
 

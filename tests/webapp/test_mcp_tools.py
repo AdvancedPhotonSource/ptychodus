@@ -5,7 +5,7 @@ from typing import Any
 from fastmcp.tools import ToolResult
 
 from collections.abc import Callable
-from fastmcp import FastMCP
+from fastmcp import Client, FastMCP
 from pathlib import Path
 from ptychodus.webapp.db.session import SessionProvider
 from ptychodus.api.storage import StorageLayout
@@ -20,13 +20,6 @@ from PIL import Image
 
 from ptychodus.webapp.ingest.pipeline import ingest_manifest
 from ptychodus.api.processing import RunState, create_run_record
-from ptychodus.webapp.mcp_server import (
-    bind_layout,
-    bind_render_runner,
-    bind_session_provider,
-    create_mcp_server,
-)
-from ptychodus.webapp.rendering.offload import RenderRunner
 
 
 def _structured(result: ToolResult) -> dict[str, Any]:
@@ -55,6 +48,7 @@ def _decode_image_content(result: ToolResult, expected_h: int, expected_w: int) 
 async def test_mcp_tools_registered_and_callable(
     session_provider: SessionProvider,
     layout: StorageLayout,
+    bound_mcp: FastMCP,
     seed_campaign: Callable[..., UUID],
     seed_diffraction: Callable[..., UUID],
     seed_product: Callable[..., UUID],
@@ -69,10 +63,7 @@ async def test_mcp_tools_registered_and_callable(
         await ingest_manifest(session, layout, layout.manifest_path('product', p))
         await session.commit()
 
-    bind_session_provider(session_provider)
-    bind_layout(layout)
-    bind_render_runner(RenderRunner(4))
-    mcp = create_mcp_server()
+    mcp = bound_mcp
     tools_list = await mcp.list_tools()
     names = {t.name for t in tools_list}
     expected = {
@@ -322,3 +313,46 @@ async def test_mcp_render_of_a_running_product_without_data(
     await _ingest(session_provider, layout, layout.manifest_path('product', p))
     with pytest.raises(ToolError, match='no product data yet'):
         await bound_mcp.call_tool('render_object', {'uuid': str(p)})
+
+
+async def test_a_report_s_undefined_statistics_pass_the_client_s_output_validation(
+    session_provider: SessionProvider,
+    layout: StorageLayout,
+    bound_mcp: FastMCP,
+    seed_product: Callable[..., UUID],
+) -> None:
+    """NaN serializes as null, which a client checks against the tool's output schema."""
+    p = seed_product(analyzable=True)
+    await _ingest(session_provider, layout, layout.manifest_path('product', p))
+
+    async with Client(bound_mcp) as client:
+        result = await client.call_tool('get_probe_positions_metrics', {'uuid': str(p)})
+
+    scalars = result.structured_content['scalars']
+    assert scalars['num_positions'] == 16
+    assert scalars['i0_mean'] is None
+
+
+async def test_a_product_compared_with_itself_matches_it(
+    session_provider: SessionProvider,
+    layout: StorageLayout,
+    bound_mcp: FastMCP,
+    seed_product: Callable[..., UUID],
+) -> None:
+    p = seed_product(analyzable=True)
+    await _ingest(session_provider, layout, layout.manifest_path('product', p))
+    arguments = {'uuid': str(p), 'reference_uuid': str(p)}
+
+    probe = _structured(await bound_mcp.call_tool('compare_probe', arguments))
+    positions = _structured(await bound_mcp.call_tool('compare_probe_positions', arguments))
+
+    assert probe['scalars']['normalized_fidelity'] == pytest.approx(1.0)
+    assert positions['scalars']['num_matched'] == 16
+    assert positions['scalars']['maximum_magnitude_m'] == 0.0
+
+
+async def test_every_tool_is_annotated_read_only(bound_mcp: FastMCP) -> None:
+    for tool in await bound_mcp.list_tools():
+        assert tool.annotations is not None, tool.name
+        assert tool.annotations.read_only_hint is True, tool.name
+        assert tool.annotations.destructive_hint is False, tool.name

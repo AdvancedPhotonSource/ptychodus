@@ -13,10 +13,9 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from ptychodus.webapp.ingest.pipeline import ingest_manifest
 from ptychodus.webapp.ingest.reconciler import full_rescan
 from ptychodus.webapp.routers.deps import LayoutDep, get_session_provider
-from ptychodus.webapp.routers.schemas import ReindexResponse, ResourceStats
-from ptychodus.webapp.db import repositories as repo
-from ptychodus.webapp.db.models import Campaign, Diffraction, Fluorescence, Product
-from ptychodus.webapp.routers.deps import SessionDep
+from ptychodus.webapp.routers.deps import ServiceDep, SessionDep, openapi_operation
+from ptychodus.webapp.service.resources import ResourceService
+from ptychodus.webapp.service.schemas import ReindexResponse, ResourceStats
 from ptychodus.api.storage import LayoutError
 from fastapi import Request
 
@@ -69,12 +68,10 @@ async def rescan_one(
     return {'status': 'rescanned', 'kind': kind, 'uuid': str(uuid)}
 
 
-@router.get('/stats', response_model=ResourceStats)
-async def stats(session: SessionDep) -> ResourceStats:
-    return ResourceStats(
-        campaign_count=await repo.count_rows(session, Campaign),
-        diffraction_count=await repo.count_rows(session, Diffraction),
-        product_count=await repo.count_rows(session, Product),
-        fluorescence_count=await repo.count_rows(session, Fluorescence),
-        invalid_count=await repo.count_invalid_rows(session),
-    )
+@router.get(
+    '/stats',
+    response_model=ResourceStats,
+    openapi_extra=openapi_operation(ResourceService.get_resource_stats),
+)
+async def stats(service: ServiceDep) -> ResourceStats:
+    return await service.get_resource_stats()

@@ -13,7 +13,7 @@ from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.propagate import compute_product_geometry
 
 from ptychodus.webapp.db.models import Diffraction, Fluorescence, Product, RunColumns
-from ptychodus.webapp.routers.schemas import (
+from ptychodus.webapp.service.schemas import (
     CampaignRead,
     DerivedFromEdge,
     DiffractionRead,
@@ -40,7 +40,7 @@ async def _edges_for(session: AsyncSession, uuid: UUID) -> list[DerivedFromEdge]
     return out
 
 
-def _run_for(row: RunColumns) -> RunRead | None:
+def run_to_read(row: RunColumns) -> RunRead | None:
     """The row's run record, or None for imported data, which has none."""
     if (
         row.run_state is None
@@ -64,7 +64,7 @@ def _run_for(row: RunColumns) -> RunRead | None:
 async def diffraction_to_read(session: AsyncSession, row: Diffraction) -> DiffractionRead:
     data = DiffractionRead.model_validate(row)
     data.derived_from = await _edges_for(session, row.uuid)
-    data.run = _run_for(row)
+    data.run = run_to_read(row)
     return data
 
 
@@ -112,7 +112,7 @@ def _finite_or_none(value: float) -> float | None:
 async def product_to_read(session: AsyncSession, row: Product) -> ProductRead:
     data = ProductRead.model_validate(row)
     data.derived_from = await _edges_for(session, row.uuid)
-    data.run = _run_for(row)
+    data.run = run_to_read(row)
 
     if row.object_layers is not None:
         # N layers are separated by N-1 spacings, so a single layer is zero thick.
@@ -168,7 +168,7 @@ async def product_to_read(session: AsyncSession, row: Product) -> ProductRead:
 async def fluorescence_to_read(session: AsyncSession, row: Fluorescence) -> FluorescenceRead:
     data = FluorescenceRead.model_validate(row)
     data.derived_from = await _edges_for(session, row.uuid)
-    data.run = _run_for(row)
+    data.run = run_to_read(row)
     return data
 
 
