@@ -10,8 +10,9 @@ from ptychodus.api.simulate.probe import (
     ProbeGenerator,
     generate_average_pattern_probe,
 )
+from ptychodus.api.options import expect_options
 
-from ._options import expect_options, propagation_distance_field
+from ._options import propagation_distance_field
 
 
 class AveragePatternOptions(BaseModel):

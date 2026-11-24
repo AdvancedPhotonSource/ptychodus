@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 import pytest
 
 from ptychodus.api.reconstruct import (
-    NoOptions,
     ReconstructInput,
     ReconstructOutput,
     Reconstructor,
@@ -19,6 +18,10 @@ from ptychodus.model.processing.parameter_store import (
     OptionsSection,
     ProcessingParameterStore,
 )
+
+
+class _EmptyOptions(BaseModel):
+    """Options declaring no fields, for a reconstructor with nothing to configure."""
 
 
 class ObjectBranch(BaseModel):
@@ -67,14 +70,14 @@ class TestUndeclaredReconstructors:
     ) -> None:
         """An empty section would appear in every saved settings file and mean nothing."""
         store = ProcessingParameterStore(registry)
-        store.register('lib', FakeReconstructor('algo', NoOptions()), [OptionsSection('Algo')])
+        store.register('lib', FakeReconstructor('algo', _EmptyOptions()), [OptionsSection('Algo')])
         assert list(registry) == []
 
     def test_its_options_are_still_served(self, registry: SettingsRegistry) -> None:
         store = ProcessingParameterStore(registry)
-        reconstructor = FakeReconstructor('algo', NoOptions())
+        reconstructor = FakeReconstructor('algo', _EmptyOptions())
         store.register('lib', reconstructor, [OptionsSection('Algo')])
-        assert isinstance(store.get_options('lib', 'algo'), NoOptions)
+        assert isinstance(store.get_options('lib', 'algo'), _EmptyOptions)
 
 
 class TestSingleSection:
@@ -155,7 +158,7 @@ class TestLookup:
 
     def test_membership_reports_what_is_registered(self, registry: SettingsRegistry) -> None:
         store = ProcessingParameterStore(registry)
-        store.register('lib', FakeReconstructor('algo', NoOptions()), [])
+        store.register('lib', FakeReconstructor('algo', _EmptyOptions()), [])
         assert store.is_registered('lib', 'algo')
         assert not store.is_registered('lib', 'other')
 

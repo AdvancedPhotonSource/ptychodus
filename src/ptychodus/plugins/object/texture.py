@@ -19,8 +19,7 @@ from ptychodus.api.simulate.object import (
     generate_gaussian_random_field_object,
     generate_random_object,
 )
-
-from ._options import expect_options
+from ptychodus.api.options import expect_options
 
 
 class RandomOptions(BaseModel):

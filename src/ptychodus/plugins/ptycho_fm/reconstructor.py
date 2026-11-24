@@ -43,6 +43,7 @@ from ptychodus.api.preprocess.diffraction import zero_bad_pixels
 from ptychodus.api.object import Object
 from ptychodus.api.product import LossValue, Product
 from ptychodus.api.typing import ComplexArrayType, NumberArrayType, RealArrayType
+from ptychodus.api.options import expect_options
 from ptychodus.api.reconstruct import (
     ReconstructInput,
     ReconstructOutput,
@@ -108,20 +109,6 @@ def build_train_config(name: str, options: PtychoFMOptions) -> dict[str, Any]:
     never looks at the inference knobs.
     """
     return _build_config(name, options, sections=frozenset({'data', 'model', 'training'}))
-
-
-def _declared(options: BaseModel) -> PtychoFMOptions:
-    """Narrow the options a call was given to what this reconstructor declares.
-
-    Checked rather than asserted: the dispatching layer validates the type
-    against what ``get_default_options`` returns, so a mismatch here means
-    those two have drifted apart, and saying so beats an attribute error
-    several frames later.
-    """
-    if not isinstance(options, PtychoFMOptions):
-        raise TypeError(f'Expected PtychoFMOptions, got {type(options).__name__}.')
-
-    return options
 
 
 logger = logging.getLogger(__name__)
@@ -743,11 +730,11 @@ class PtychoFMReconstructor(TrainableReconstructor):
         if self._model_path is None:
             raise RuntimeError('Cannot reconstruct: no PtychoFM model has been loaded.')
 
-        config = build_reconstruct_config(self._name, _declared(options))
+        config = build_reconstruct_config(self._name, expect_options(options, PtychoFMOptions))
         yield from _reconstruct(input_, config, self._model_path)
 
     def train(
         self, input_directory: Path, output_directory: Path, *, options: BaseModel
     ) -> Iterator[TrainOutput]:
-        config = build_train_config(self._name, _declared(options))
+        config = build_train_config(self._name, expect_options(options, PtychoFMOptions))
         yield from _train(input_directory, output_directory, config)

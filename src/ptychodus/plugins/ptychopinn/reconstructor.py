@@ -35,6 +35,7 @@ from pydantic import BaseModel
 from ptychodus.api.object import Object, ObjectCenter, ObjectGeometry, ObjectPosition
 from ptychodus.api.preprocess.diffraction import inpaint_bad_pixels
 from ptychodus.api.product import LossValue, Product
+from ptychodus.api.options import expect_options
 from ptychodus.api.reconstruct import (
     ReconstructInput,
     ReconstructOutput,
@@ -65,20 +66,6 @@ _NO_AUXILIARY_LOSS = 'none'
 
 def _optional_auxiliary_loss(value: str) -> str | None:
     return None if value.casefold() == _NO_AUXILIARY_LOSS else value
-
-
-def _declared(options: BaseModel) -> PtychoPINNOptions:
-    """Narrow the options a call was given to what this reconstructor declares.
-
-    Checked rather than asserted: the dispatching layer validates the type
-    against what ``get_default_options`` returns, so a mismatch here means
-    those two have drifted apart, and saying so beats an attribute error
-    several frames later.
-    """
-    if not isinstance(options, PtychoPINNOptions):
-        raise TypeError(f'Expected PtychoPINNOptions, got {type(options).__name__}.')
-
-    return options
 
 
 def _build_settings(model_training_mode: str, options: PtychoPINNOptions) -> dict[str, Any]:
@@ -504,7 +491,7 @@ class PtychoPINNReconstructor(TrainableReconstructor):
         if self._bundle_dir is None:
             raise RuntimeError('Cannot reconstruct: no PtychoPINN model has been loaded.')
 
-        declared = _declared(options)
+        declared = expect_options(options, PtychoPINNOptions)
 
         from ptycho_torch.inference import ReconstructionRuntimeParams, reconstruct_from_arrays
         from ptycho_torch.workflows.bundle_io import load_inference_bundle_torch
@@ -585,7 +572,7 @@ class PtychoPINNReconstructor(TrainableReconstructor):
         -- and removed afterwards. A supervised bank carries ground-truth patches;
         an unsupervised one needs none.
         """
-        declared = _declared(options)
+        declared = expect_options(options, PtychoPINNOptions)
         settings = _build_settings(self._mode, declared)
 
         from ptycho_torch.execution_request import ExecutionRequest

@@ -15,8 +15,7 @@ from ptychodus.api.simulate.probe import (
     generate_hermite_gauss_probe,
     generate_zernike_probe,
 )
-
-from ._options import expect_options
+from ptychodus.api.options import expect_options
 
 
 class HermiteGaussOptions(BaseModel):

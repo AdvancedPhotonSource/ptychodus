@@ -65,6 +65,7 @@ from ptychi.api import (
 from ptychi.api.options.task import PtychographyTaskOptions
 from pydantic import BaseModel
 
+from ptychodus.api.options import expect_options
 from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput, Reconstructor
 
 from .options import PtyChiOptions, apply_to_task, default_options
@@ -228,20 +229,6 @@ def task_options_classes() -> dict[str, type[PtychographyTaskOptions]]:
     return {cls.spec.display_name: cls.spec.task_options_cls for cls in _ALGORITHM_CLASSES}
 
 
-def _declared(options: BaseModel) -> PtyChiOptions:
-    """Narrow the options a call was given to what this reconstructor declares.
-
-    Checked rather than asserted: the dispatching layer validates the type
-    against what ``get_default_options`` returns, so a mismatch here means
-    those two have drifted apart, and saying so beats an attribute error
-    several frames later.
-    """
-    if not isinstance(options, PtyChiOptions):
-        raise TypeError(f'Expected PtyChiOptions, got {type(options).__name__}.')
-
-    return options
-
-
 def _resolve_default_device(task_options: PtychographyTaskOptions) -> None:
     """Keep the device the options name, unless they name a GPU and none is visible here.
 
@@ -286,7 +273,7 @@ class PtyChiReconstructor(Reconstructor):
     def reconstruct(
         self, input_: ReconstructInput, *, options: BaseModel
     ) -> Iterator[ReconstructOutput]:
-        declared = _declared(options)
+        declared = expect_options(options, PtyChiOptions)
         # Every field that must agree with the product rather than with a setting
         # is applied here, in one place, rather than being read off the product
         # wherever it happens to be needed.

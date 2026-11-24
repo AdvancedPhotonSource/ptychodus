@@ -12,6 +12,7 @@ from ptychodus.api.language_model import (
     read_credential,
     require_confidential_url,
 )
+from ptychodus.api.options import expect_options
 
 from ._listing import fetch_json, read_data_ids
 
@@ -46,9 +47,7 @@ class OpenAILanguageModelProvider(LanguageModelProvider):
         )
 
     def _read(self, options: BaseModel) -> tuple[str, str]:
-        if not isinstance(options, OpenAIOptions):
-            raise TypeError(f'Expected OpenAIOptions, got {type(options).__name__}.')
-
-        base_url = options.base_url.rstrip('/')
+        declared = expect_options(options, OpenAIOptions)
+        base_url = declared.base_url.rstrip('/')
         require_confidential_url(base_url)
         return base_url, read_credential('OPENAI_API_KEY')

@@ -11,6 +11,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from ptychodus.api.constants import PI
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
 from ptychodus.api.simulate.probe import (
     FresnelZonePlate,
@@ -21,13 +22,12 @@ from ptychodus.api.simulate.probe import (
     generate_kb_mirror_probe,
     to_reconstruction_frame,
 )
-
-from ._options import expect_options
+from ptychodus.api.options import expect_options
 
 
 class FresnelZonePlateOptions(BaseModel):
-    zone_plate_diameter_m: float = Field(180e-6, ge=0.0, title='Zone Plate Diameter:')
-    outermost_zone_width_m: float = Field(50e-9, ge=0.0, title='Outermost Zone Width:')
+    zone_plate_diameter_m: float = Field(180e-6, gt=0.0, title='Zone Plate Diameter:')
+    outermost_zone_width_m: float = Field(50e-9, gt=0.0, title='Outermost Zone Width:')
     central_beamstop_diameter_m: float = Field(60e-6, ge=0.0, title='Central Beamstop Diameter:')
 
 
@@ -60,13 +60,13 @@ class FresnelZonePlateProbeGenerator(ProbeGenerator):
 
 def _mirror_length_field(default: float, title: str) -> Any:
     # Shown in millimeters, the unit an optics log records them in.
-    return Field(default, ge=0.0, title=title, json_schema_extra={'display_unit': 'MILLIMETER'})
+    return Field(default, gt=0.0, title=title, json_schema_extra={'display_unit': 'MILLIMETER'})
 
 
 def _grazing_angle_field(title: str) -> Any:
-    # A floor only: the few milliradians a grazing angle is sit far below any useful
-    # ceiling, and the editor reads and writes it in whichever angle unit is chosen.
-    return Field(3e-3, ge=0.0, title=title)
+    # KirkpatrickBaezMirror's bounds: positive and below normal incidence. Real values are
+    # a few milliradians; the editor reads and writes it in whichever angle unit is chosen.
+    return Field(3e-3, gt=0.0, lt=0.5 * PI, title=title)
 
 
 class KBMirrorOptions(BaseModel):

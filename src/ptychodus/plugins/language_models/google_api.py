@@ -13,6 +13,7 @@ from ptychodus.api.language_model import (
     read_credential,
     require_confidential_url,
 )
+from ptychodus.api.options import expect_options
 
 from ._listing import fetch_json
 
@@ -61,9 +62,7 @@ class GoogleLanguageModelProvider(LanguageModelProvider):
         )
 
     def _read(self, options: BaseModel) -> tuple[str, str]:
-        if not isinstance(options, GoogleOptions):
-            raise TypeError(f'Expected GoogleOptions, got {type(options).__name__}.')
-
-        base_url = options.base_url.rstrip('/')
+        declared = expect_options(options, GoogleOptions)
+        base_url = declared.base_url.rstrip('/')
         require_confidential_url(base_url)
         return base_url, read_credential('GEMINI_API_KEY', 'GOOGLE_API_KEY')

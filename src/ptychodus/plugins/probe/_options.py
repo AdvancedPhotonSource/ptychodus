@@ -1,12 +1,10 @@
-"""Field declarations and checks shared by every probe generator in this package."""
+"""Field declarations shared by every probe generator in this package."""
 
 from __future__ import annotations
 
-from typing import Any, TypeVar
+from typing import Any
 
-from pydantic import BaseModel, Field
-
-OptionsT = TypeVar('OptionsT', bound=BaseModel)
+from pydantic import Field
 
 
 def propagation_distance_field() -> Any:
@@ -24,11 +22,3 @@ def propagation_distance_field() -> Any:
         ),
         json_schema_extra={'display_unit': 'MICROMETER'},
     )
-
-
-def expect_options(options: BaseModel, kind: type[OptionsT]) -> OptionsT:
-    """Return *options* as *kind*, refusing options declared for another generator."""
-    if not isinstance(options, kind):
-        raise TypeError(f'Expected {kind.__name__}, got {type(options).__name__}.')
-
-    return options

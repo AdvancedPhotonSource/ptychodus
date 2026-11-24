@@ -1378,6 +1378,10 @@ class TestWarnIfPropagationRegimeDisagrees:
         assert caplog.records == []
 
 
+class _EmptyOptions(BaseModel):
+    """Options declaring no fields, for a reconstructor with nothing to configure."""
+
+
 def _library(
     requires: tuple[str, ...] = (), build: BaseException | None = None
 ) -> ReconstructorLibrary:
@@ -1387,6 +1391,9 @@ def _library(
         @property
         def name(self) -> str:
             return 'algo'
+
+        def get_default_options(self) -> BaseModel:
+            return _EmptyOptions()
 
         def reconstruct(
             self, input_: ReconstructInput, *, options: BaseModel

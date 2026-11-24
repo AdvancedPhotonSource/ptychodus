@@ -20,6 +20,7 @@ from ptychodus.api.language_model import (
     WireProtocol,
     require_confidential_url,
 )
+from ptychodus.api.options import expect_options
 
 from ._listing import fetch_json, read_data_ids
 
@@ -97,7 +98,5 @@ class ArgoLanguageModelProvider(LanguageModelProvider):
         return LanguageModelEndpoint(protocol, f'{gateway_url}/v1', model_id, api_key=user)
 
     def _get_gateway_url(self, options: BaseModel) -> str:
-        if not isinstance(options, ArgoOptions):
-            raise TypeError(f'Expected ArgoOptions, got {type(options).__name__}.')
-
-        return get_gateway_url(options.base_url)
+        declared = expect_options(options, ArgoOptions)
+        return get_gateway_url(declared.base_url)

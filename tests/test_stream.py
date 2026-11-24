@@ -248,6 +248,10 @@ class _Echo(Reconstructor):
             )
 
 
+class _EmptyOptions(BaseModel):
+    """Options declaring no fields, for a reconstructor with nothing to configure."""
+
+
 class _Trained(TrainableReconstructor):
     def __init__(self) -> None:
         self.model_file: Path | None = None
@@ -255,6 +259,9 @@ class _Trained(TrainableReconstructor):
     @property
     def name(self) -> str:
         return 'Trained'
+
+    def get_default_options(self) -> BaseModel:
+        return _EmptyOptions()
 
     def reconstruct(
         self, input_: ReconstructInput, *, options: BaseModel

@@ -8,6 +8,7 @@ from enum import IntEnum
 import numpy
 from pydantic import BaseModel, Field
 
+from ptychodus.api.options import expect_options
 from ptychodus.api.probe_positions import ProbePosition
 from ptychodus.api.simulate.probe_positions import (
     ProbePositionsGenerator,
@@ -70,25 +71,21 @@ class CartesianProbePositionsGenerator(ProbePositionsGenerator):
         return CartesianOptions()
 
     def generate(self, options: BaseModel) -> Sequence[ProbePosition]:
-        if not isinstance(options, EquilateralCartesianOptions):
-            raise TypeError(f'Expected EquilateralCartesianOptions, got {type(options).__name__}.')
-
-        step_size_x_m = options.step_size_x_m
+        grid = expect_options(options, EquilateralCartesianOptions)
+        step_size_x_m = grid.step_size_x_m
 
         if self._variant.is_equilateral:
             step_size_y_m = step_size_x_m
 
             if self._variant.is_staggered:
                 step_size_y_m *= numpy.sqrt(0.75)
-        elif isinstance(options, CartesianOptions):
-            step_size_y_m = options.step_size_y_m
         else:
-            raise TypeError(f'Expected CartesianOptions, got {type(options).__name__}.')
+            step_size_y_m = expect_options(options, CartesianOptions).step_size_y_m
 
         return [
             *generate_cartesian_probe_positions(
-                options.num_points_x,
-                options.num_points_y,
+                grid.num_points_x,
+                grid.num_points_y,
                 step_size_x_m,
                 step_size_y_m,
                 snake=self._variant.is_snaked,

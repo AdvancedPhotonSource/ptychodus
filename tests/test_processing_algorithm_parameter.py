@@ -27,6 +27,10 @@ from ptychodus.model.settings import SettingsRegistry
 from ptychodus.model.processing.api import ProcessingAlgorithmParameter
 
 
+class _EmptyOptions(BaseModel):
+    """Options declaring no fields, for a reconstructor with nothing to configure."""
+
+
 class _Reconstructor(Reconstructor):
     def __init__(self, name: str) -> None:
         self._name = name
@@ -34,6 +38,9 @@ class _Reconstructor(Reconstructor):
     @property
     def name(self) -> str:
         return self._name
+
+    def get_default_options(self) -> BaseModel:
+        return _EmptyOptions()
 
     def reconstruct(
         self, input_: ReconstructInput, *, options: BaseModel

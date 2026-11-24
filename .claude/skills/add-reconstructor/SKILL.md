@@ -79,11 +79,7 @@ In `reconstructor.py`, a module-level class whose `reconstruct` (and, for a trai
 - **Every other method imports no GPU framework.** `get_default_options`, `load_model` and `save_model` run in the application process. `load_model` records the path (and may unpack an archive); the model is loaded inside `reconstruct`.
 
 ```python
-def _declared(options: BaseModel) -> <Library>Options:
-    if not isinstance(options, <Library>Options):
-        raise TypeError(f'Expected <Library>Options, got {type(options).__name__}.')
-
-    return options
+from ptychodus.api.options import expect_options
 
 
 class <Library>Reconstructor(Reconstructor):
@@ -101,7 +97,7 @@ class <Library>Reconstructor(Reconstructor):
     def reconstruct(
         self, input_: ReconstructInput, *, options: BaseModel
     ) -> Iterator[ReconstructOutput]:
-        declared = _declared(options)
+        declared = expect_options(options, <Library>Options)
         import torch  # here, never at module scope
         ...
         yield ReconstructOutput(product=product, progress=epoch, progress_goal=num_epochs)

@@ -12,6 +12,7 @@ from ptychodus.api.language_model import (
     read_credential,
     require_confidential_url,
 )
+from ptychodus.api.options import expect_options
 
 from ._listing import fetch_json, read_data_ids
 
@@ -50,9 +51,7 @@ class AnthropicLanguageModelProvider(LanguageModelProvider):
         )
 
     def _read(self, options: BaseModel) -> tuple[str, str]:
-        if not isinstance(options, AnthropicOptions):
-            raise TypeError(f'Expected AnthropicOptions, got {type(options).__name__}.')
-
-        base_url = options.base_url.rstrip('/').removesuffix('/v1')
+        declared = expect_options(options, AnthropicOptions)
+        base_url = declared.base_url.rstrip('/').removesuffix('/v1')
         require_confidential_url(base_url)
         return base_url, read_credential('ANTHROPIC_API_KEY')

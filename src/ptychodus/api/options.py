@@ -21,13 +21,15 @@ resolutions. A document that leaves a value as it was leaves its set-ness as it 
 
 **A frozen field is not a document's to change.** A document giving a field declared
 ``Field(frozen=True)`` any value is refused.
+
+:func:`expect_options` narrows options typed as the base model to the type a plugin declared.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 import sys
 
 from pydantic import BaseModel, ValidationError
@@ -37,13 +39,33 @@ __all__ = [
     'OptionsError',
     'apply_options_document',
     'dump_options_document',
+    'expect_options',
     'parse_options_document',
     'read_options_document',
 ]
 
 
+_OptionsT = TypeVar('_OptionsT', bound=BaseModel)
+
+
 class OptionsError(ValueError):
     """An options document that cannot be used, reported as a usage error."""
+
+
+def expect_options(options: BaseModel, kind: type[_OptionsT]) -> _OptionsT:
+    """Return *options* as *kind*, refusing options declared for another plugin.
+
+    Every options-taking interface types ``options`` as the base model, so this is what ties
+    an implementation to the options it declared; a mismatch fails here rather than as an
+    attribute error several frames later.
+
+    Raises:
+        TypeError: if *options* is not an instance of *kind*.
+    """
+    if not isinstance(options, kind):
+        raise TypeError(f'Expected {kind.__name__}, got {type(options).__name__}.')
+
+    return options
 
 
 def _frozen_fields(model: BaseModel) -> dict[str, Any]:

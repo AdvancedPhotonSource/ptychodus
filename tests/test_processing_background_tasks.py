@@ -18,7 +18,7 @@ from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.reconstruct import NoOptions, ReconstructInput
+from ptychodus.api.reconstruct import ReconstructInput
 from ptychodus.model.processing.monitor import ReconstructBackgroundTask, TrainBackgroundTask
 
 # The child resolves the fixtures module by name against the sys.path it inherits.
@@ -26,7 +26,7 @@ _TESTS_DIR = str(Path(__file__).parent)
 if _TESTS_DIR not in sys.path:
     sys.path.insert(0, _TESTS_DIR)
 
-from subprocess_reconstructor_fixtures import FakeTrainableReconstructor  # noqa: E402
+from subprocess_reconstructor_fixtures import EmptyOptions, FakeTrainableReconstructor  # noqa: E402
 
 
 def _reconstruct_input() -> ReconstructInput:
@@ -79,7 +79,7 @@ def test_reconstruct_streams_what_the_child_yields() -> None:
         _reconstruct_input(),
         product_item,
         None,
-        NoOptions(),
+        EmptyOptions(),
         dict,
     )
 
@@ -92,7 +92,13 @@ def test_reconstruct_streams_what_the_child_yields() -> None:
 def test_train_loads_the_model_the_child_names(tmp_path: Path) -> None:
     reconstructor = FakeTrainableReconstructor()
     task = TrainBackgroundTask(
-        _task_monitor(), reconstructor, _reconstruct_input(), tmp_path, tmp_path, NoOptions(), dict
+        _task_monitor(),
+        reconstructor,
+        _reconstruct_input(),
+        tmp_path,
+        tmp_path,
+        EmptyOptions(),
+        dict,
     )
 
     task()
@@ -109,7 +115,7 @@ def test_a_stopped_training_run_loads_nothing(tmp_path: Path) -> None:
         _reconstruct_input(),
         tmp_path,
         tmp_path,
-        NoOptions(),
+        EmptyOptions(),
         dict,
     )
 

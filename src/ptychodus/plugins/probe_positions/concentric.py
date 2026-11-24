@@ -6,6 +6,7 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel, Field
 
+from ptychodus.api.options import expect_options
 from ptychodus.api.probe_positions import ProbePosition
 from ptychodus.api.simulate.probe_positions import (
     ProbePositionsGenerator,
@@ -26,13 +27,11 @@ class ConcentricProbePositionsGenerator(ProbePositionsGenerator):
         return ConcentricOptions()
 
     def generate(self, options: BaseModel) -> Sequence[ProbePosition]:
-        if not isinstance(options, ConcentricOptions):
-            raise TypeError(f'Expected ConcentricOptions, got {type(options).__name__}.')
-
+        concentric = expect_options(options, ConcentricOptions)
         return [
             *generate_concentric_probe_positions(
-                options.radial_step_size_m,
-                options.num_shells,
-                options.num_points_in_first_shell,
+                concentric.radial_step_size_m,
+                concentric.num_shells,
+                concentric.num_points_in_first_shell,
             )
         ]

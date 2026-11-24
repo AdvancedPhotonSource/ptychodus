@@ -15,8 +15,7 @@ from ptychodus.api.fluorescence import (
     FluorescenceEnhancerOutput,
     VSPILinearOperator,
 )
-
-from ._options import expect_options
+from ptychodus.api.options import expect_options
 
 logger = logging.getLogger(__name__)
 

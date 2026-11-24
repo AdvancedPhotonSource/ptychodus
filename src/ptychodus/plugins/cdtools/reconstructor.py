@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from ptychodus.api.object import Object
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.product import LossValue, Product
+from ptychodus.api.options import expect_options
 from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput, Reconstructor
 from ptychodus.api.typing import ComplexArrayType, RealArrayType
 
@@ -332,19 +333,6 @@ def _give_the_model_unit_weights(model: Any, num_positions: int, device: str) ->
         model.weights = torch.ones(num_positions, device=device)
 
 
-def _declared(options: BaseModel) -> CDToolsOptions:
-    """Narrow the options a call was given to what this reconstructor declares.
-
-    Checked rather than asserted: the dispatching layer validates the type against what
-    ``get_default_options`` returns, so a mismatch here means those two have drifted
-    apart, and saying so beats an attribute error several frames later.
-    """
-    if not isinstance(options, CDToolsOptions):
-        raise TypeError(f'Expected CDToolsOptions, got {type(options).__name__}.')
-
-    return options
-
-
 class CDToolsReconstructor(Reconstructor):
     """cdtools' FancyPtycho model, run stage by stage."""
 
@@ -359,7 +347,7 @@ class CDToolsReconstructor(Reconstructor):
         self, input_: ReconstructInput, *, options: BaseModel
     ) -> Iterator[ReconstructOutput]:
         """Run every stage, yielding a ReconstructOutput as it goes."""
-        declared = _declared(options)
+        declared = expect_options(options, CDToolsOptions)
 
         # Checked before torch is reached for, so a product FancyPtycho cannot take is
         # refused at once, and so is a schedule with nothing in it.

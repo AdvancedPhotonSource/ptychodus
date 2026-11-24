@@ -26,7 +26,7 @@ from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.reconstruct import NoOptions, ReconstructInput, ReconstructOutput
+from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
 from ptychodus.api.spawn import ChildError, iterate_in_subprocess
 
 # The spawned child resolves the fixtures module by name against the sys.path it
@@ -116,7 +116,11 @@ def test_items_stream_back_in_order() -> None:
 def test_a_bound_method_runs_on_a_copy_of_its_object() -> None:
     """The object crosses as itself, so what it yields comes back and what it does to itself does not."""
     reconstructor = reconstructor_fixtures.FakeTrainableReconstructor(num_outputs=2)
-    work = partial(reconstructor.reconstruct, _minimal_reconstruct_input(), options=NoOptions())
+    work = partial(
+        reconstructor.reconstruct,
+        _minimal_reconstruct_input(),
+        options=reconstructor_fixtures.EmptyOptions(),
+    )
 
     outputs = list(iterate_in_subprocess(work))
 
@@ -125,7 +129,9 @@ def test_a_bound_method_runs_on_a_copy_of_its_object() -> None:
 
 def test_training_in_a_child_leaves_the_parent_object_untouched(tmp_path: Path) -> None:
     reconstructor = reconstructor_fixtures.FakeTrainableReconstructor()
-    work = partial(reconstructor.train, tmp_path, tmp_path, options=NoOptions())
+    work = partial(
+        reconstructor.train, tmp_path, tmp_path, options=reconstructor_fixtures.EmptyOptions()
+    )
 
     outputs = list(iterate_in_subprocess(work))
 

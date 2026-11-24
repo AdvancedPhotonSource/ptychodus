@@ -32,7 +32,6 @@ from .scattering.geometry import find_scattering_issues
 from .typing import RealArrayType
 
 __all__ = [
-    'NoOptions',
     'PositionIndexFilter',
     'ReconstructInput',
     'ReconstructionAmbiguities',
@@ -48,16 +47,6 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
-
-
-class NoOptions(BaseModel):
-    """Declared by a reconstructor that does not yet describe its options.
-
-    A reconstructor states what it accepts by returning a pydantic object from
-    :meth:`Reconstructor.get_default_options`. Until a library declares one it keeps
-    reading whatever configuration it already holds, and this stands in so that
-    callers can build the ``options`` argument uniformly.
-    """
 
 
 @dataclass(frozen=True)
@@ -113,6 +102,7 @@ class Reconstructor(ABC):
     def name(self) -> str:
         pass
 
+    @abstractmethod
     def get_default_options(self) -> BaseModel:
         """Return this reconstructor's options, populated with their defaults.
 
@@ -124,10 +114,7 @@ class Reconstructor(ABC):
         An instance rather than the class, because a field declared with a
         ``default_factory`` reports its class-level default as undefined. Only
         an instance carries the value such a field actually starts at.
-
-        Override when the library declares its options.
         """
-        return NoOptions()
 
     @abstractmethod
     def reconstruct(

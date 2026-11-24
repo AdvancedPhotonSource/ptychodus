@@ -18,7 +18,6 @@ from pydantic import BaseModel
 
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import (
-    NoOptions,
     ReconstructInput,
     ReconstructOutput,
     TrainableReconstructor,
@@ -26,6 +25,10 @@ from ptychodus.api.reconstruct import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class EmptyOptions(BaseModel):
+    """Options declaring no fields, for a reconstructor with nothing to configure."""
 
 
 def yield_outputs(product: Product, count: int) -> Iterator[ReconstructOutput]:
@@ -71,7 +74,7 @@ class FakeTrainableReconstructor(TrainableReconstructor):
         return 'Fake'
 
     def get_default_options(self) -> BaseModel:
-        return NoOptions()
+        return EmptyOptions()
 
     def reconstruct(
         self, input_: ReconstructInput, *, options: BaseModel

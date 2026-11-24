@@ -9,8 +9,7 @@ from ptychodus.api.constants import PI
 from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.probe import Probe
 from ptychodus.api.simulate.object import ObjectGenerator, generate_siemens_star_object
-
-from ._options import expect_options
+from ptychodus.api.options import expect_options
 
 
 class SiemensStarOptions(BaseModel):

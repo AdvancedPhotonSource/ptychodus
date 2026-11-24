@@ -30,7 +30,7 @@ from ptychodus.api.simulate.probe import (
 from ptychodus.model.observer import Observable, Observer
 from ptychodus.model.plugins import PluginChooser
 from ptychodus.model.settings import SettingsRegistry
-from ptychodus.model.declared import ParameterDescription, describe, fields_of
+from ptychodus.model.declared import ParameterDescription, describe, fields_of, read_bounds
 from ptychodus.model.product.probe.builder_factory import ProbeBuilderFactory
 from ptychodus.model.product.probe.plugin import PluginProbeBuilder
 from ptychodus.model.product.probe.settings import ProbeSettings
@@ -330,9 +330,11 @@ def test_each_preset_type_fits_exactly_one_generator(registry: PluginRegistry) -
 
             if set(preset_fields) <= set(described):
                 fitting.append(plugin.simple_name)
+                option_fields = fields_of(type(plugin.strategy.get_default_options()))
 
                 for name, info in preset_fields.items():
                     assert described[name].annotation == info.annotation, name
+                    assert read_bounds(option_fields[name]) == read_bounds(info), name
 
         assert len(fitting) == 1, f'{preset_type.__name__} fits {fitting}'
 

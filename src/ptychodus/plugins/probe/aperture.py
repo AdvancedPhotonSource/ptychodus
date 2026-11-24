@@ -18,8 +18,9 @@ from ptychodus.api.simulate.probe import (
     generate_super_gaussian_probe,
     propagate_probe,
 )
+from ptychodus.api.options import expect_options
 
-from ._options import expect_options, propagation_distance_field
+from ._options import propagation_distance_field
 
 
 def _shape_parametric_field(

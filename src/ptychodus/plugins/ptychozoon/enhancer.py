@@ -21,6 +21,7 @@ from ptychodus.api.fluorescence import (
     FluorescenceEnhancerInput,
     FluorescenceEnhancerOutput,
 )
+from ptychodus.api.options import expect_options
 
 from .options import PtychozoonOptions
 
@@ -62,8 +63,7 @@ class PtychozoonFluorescenceEnhancer(FluorescenceEnhancer):
         Raises:
             RuntimeError: if the device mask leaves no CUDA device visible.
         """
-        if not isinstance(options, PtychozoonOptions):
-            raise TypeError(f'Expected PtychozoonOptions, got {type(options).__name__}.')
+        declared = expect_options(options, PtychozoonOptions)
 
         # Which build produced a result is the first question asked when two machines
         # disagree, so it is recorded where the run's own log records it.
@@ -115,11 +115,11 @@ class PtychozoonFluorescenceEnhancer(FluorescenceEnhancer):
         )
 
         settings = DeconvolutionEnhancementSettings()
-        settings.lsmr.damping_factor = options.damping_factor
-        settings.lsmr.max_iter = options.max_iter
-        settings.lsmr.atol = options.atol
-        settings.lsmr.btol = options.btol
-        settings.lsmr.checkpoint_interval = options.checkpoint_interval
+        settings.lsmr.damping_factor = declared.damping_factor
+        settings.lsmr.max_iter = declared.max_iter
+        settings.lsmr.atol = declared.atol
+        settings.lsmr.btol = declared.btol
+        settings.lsmr.checkpoint_interval = declared.checkpoint_interval
 
         # Placement is decided outside the enhancer and applied as a device mask, so
         # device 0 is the first device the mask admits.
@@ -142,5 +142,5 @@ class PtychozoonFluorescenceEnhancer(FluorescenceEnhancer):
                     channel_names_path=dataset.channel_names_path,
                 ),
                 progress=int(iteration),
-                progress_goal=options.max_iter,
+                progress_goal=declared.max_iter,
             )

@@ -6,6 +6,7 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel, Field
 
+from ptychodus.api.options import expect_options
 from ptychodus.api.probe_positions import ProbePosition
 from ptychodus.api.simulate.probe_positions import (
     ProbePositionsGenerator,
@@ -29,16 +30,14 @@ class LissajousProbePositionsGenerator(ProbePositionsGenerator):
         return LissajousOptions()
 
     def generate(self, options: BaseModel) -> Sequence[ProbePosition]:
-        if not isinstance(options, LissajousOptions):
-            raise TypeError(f'Expected LissajousOptions, got {type(options).__name__}.')
-
+        lissajous = expect_options(options, LissajousOptions)
         return [
             *generate_lissajous_probe_positions(
-                options.num_points,
-                options.amplitude_x_m,
-                options.amplitude_y_m,
-                options.angular_step_x_deg,
-                options.angular_step_y_deg,
-                options.angular_shift_deg,
+                lissajous.num_points,
+                lissajous.amplitude_x_m,
+                lissajous.amplitude_y_m,
+                lissajous.angular_step_x_deg,
+                lissajous.angular_step_y_deg,
+                lissajous.angular_shift_deg,
             )
         ]

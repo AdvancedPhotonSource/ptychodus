@@ -29,8 +29,7 @@ from ptychodus.api.simulate.object import (
     generate_stxm_dpc_object,
     generate_uniform_object,
 )
-
-from ._options import expect_options
+from ptychodus.api.options import expect_options
 
 logger = logging.getLogger(__name__)
 

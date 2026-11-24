@@ -6,6 +6,7 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel, Field
 
+from ptychodus.api.options import expect_options
 from ptychodus.api.probe_positions import ProbePosition
 from ptychodus.api.simulate.probe_positions import (
     ProbePositionsGenerator,
@@ -27,7 +28,5 @@ class SpiralProbePositionsGenerator(ProbePositionsGenerator):
         return SpiralOptions()
 
     def generate(self, options: BaseModel) -> Sequence[ProbePosition]:
-        if not isinstance(options, SpiralOptions):
-            raise TypeError(f'Expected SpiralOptions, got {type(options).__name__}.')
-
-        return [*generate_spiral_probe_positions(options.num_points, options.radius_scalar_m)]
+        spiral = expect_options(options, SpiralOptions)
+        return [*generate_spiral_probe_positions(spiral.num_points, spiral.radius_scalar_m)]

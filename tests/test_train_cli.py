@@ -48,12 +48,19 @@ class _Options(BaseModel):
     training: _Training = Field(default_factory=_Training)
 
 
+class _EmptyOptions(BaseModel):
+    """Options declaring no fields, for a reconstructor with nothing to configure."""
+
+
 class _Solver(Reconstructor):
     """An algorithm the library offers that cannot train."""
 
     @property
     def name(self) -> str:
         return 'Solve'
+
+    def get_default_options(self) -> BaseModel:
+        return _EmptyOptions()
 
     def reconstruct(
         self, input_: ReconstructInput, *, options: BaseModel

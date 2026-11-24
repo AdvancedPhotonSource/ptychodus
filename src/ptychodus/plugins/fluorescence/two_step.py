@@ -13,8 +13,7 @@ from ptychodus.api.fluorescence import (
     FluorescenceEnhancerInput,
     FluorescenceEnhancerOutput,
 )
-
-from ._options import expect_options
+from ptychodus.api.options import expect_options
 from .deconvolution import DeconvolutionMethod, deconvolve
 from .upscaling import UpscalingMethod, upscale
 
