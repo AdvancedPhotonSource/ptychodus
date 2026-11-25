@@ -105,8 +105,8 @@ def test_the_services_never_import_each_other(service: str, other: str) -> None:
     assert _violations(root, f'ptychodus.{service}', (f'ptychodus.{other}',)) == []
 
 
-@pytest.mark.parametrize('module', ['_stream', 'stream'])
-def test_the_stream_processor_imports_nothing_above_api(module: str) -> None:
+@pytest.mark.parametrize('module', ['_stream', 'stream', 'import_resources'])
+def test_model_free_commands_import_nothing_above_api(module: str) -> None:
     path = _PTYCHODUS_ROOT / 'cli' / f'{module}.py'
     assert _module_violations(path, 'ptychodus.cli', _PTYCHODUS_ROOT) == []
 

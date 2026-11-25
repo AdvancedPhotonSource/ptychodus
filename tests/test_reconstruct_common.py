@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any, Iterator
 
 import logging
@@ -109,13 +109,21 @@ class _FakeOptions(BaseModel):
 
 
 class _FakeReconstructor(Reconstructor):
-    """Yields every `num_sync_epochs` epochs, calling `on_epoch` first, as a reconstructor would."""
+    """Yields every `num_sync_epochs` epochs, calling `on_epoch` first, as a reconstructor would.
+
+    With `progress_values` it yields those progress values instead, in order.
+    """
 
     def __init__(
-        self, *, on_epoch: Callable[[int], None] | None = None, empty: bool = False
+        self,
+        *,
+        on_epoch: Callable[[int], None] | None = None,
+        empty: bool = False,
+        progress_values: Sequence[int] | None = None,
     ) -> None:
         self._on_epoch = on_epoch
         self._empty = empty
+        self._progress_values = progress_values
         self.sync_points: list[int] = []
 
     @property
@@ -133,9 +141,11 @@ class _FakeReconstructor(Reconstructor):
         if self._empty:
             return
 
-        for epoch in range(
+        progress_values = self._progress_values or range(
             options.num_sync_epochs, options.num_epochs + 1, options.num_sync_epochs
-        ):
+        )
+
+        for epoch in progress_values:
             if self._on_epoch is not None:
                 self._on_epoch(epoch)
 
@@ -513,6 +523,77 @@ def test_the_sync_hook_reports_no_checkpoint_on_a_secondary_rank(
     )
 
     assert [checkpoint for _, checkpoint in syncs] == [None, None]
+
+
+def _run_with_progress(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    progress_values: Sequence[int],
+    *,
+    published_progress: int | None = None,
+) -> list[tuple[int, Path | None]]:
+    """Run the tail on the main process yielding `progress_values`; report the sync hook's view."""
+    syncs: list[tuple[int, Path | None]] = []
+    _set_rank(monkeypatch, 0, rank_variable=None)
+    run_reconstruction(
+        logging.getLogger('test'),
+        _resolved(_FakeReconstructor(progress_values=progress_values)),
+        _make_reconstruct_input(),
+        tmp_path,
+        on_sync=lambda output, checkpoint: syncs.append((output.progress, checkpoint)),
+        published_progress=published_progress,
+    )
+    return syncs
+
+
+def test_a_published_run_resource_is_never_rewritten(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # A run resource publishes its options document and a copy of the input product as
+    # checkpoint 0 before the run starts, and readers may already hold either. Rewriting
+    # one with a truncating open would pull it out from under them.
+    published = {'product.000000.h5': b'input product', 'reconstruct_options.yaml': b'options'}
+
+    for name, content in published.items():
+        (tmp_path / name).write_bytes(content)
+
+    syncs = _run_with_progress(monkeypatch, tmp_path, [0, 2, 2, 4], published_progress=0)
+
+    for name, content in published.items():
+        assert (tmp_path / name).read_bytes() == content
+
+    assert sorted(p.name for p in tmp_path.glob('product.*.h5')) == [
+        'product.000000.h5',
+        'product.000002.h5',
+        'product.000004.h5',
+    ]
+    assert (tmp_path / 'product.h5').is_file()
+    assert [(progress, None if c is None else c.name) for progress, c in syncs] == [
+        (0, None),
+        (2, 'product.000002.h5'),
+        (2, None),
+        (4, 'product.000004.h5'),
+    ]
+
+
+def test_an_output_that_does_not_advance_keeps_its_checkpoint(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # The fake yields the same product every time, so the bytes on disk cannot show a
+    # rewrite; count the saves instead.
+    saved: list[str] = []
+    save_product = _reconstruct_common.save_product
+
+    def spy(file_path: Path, product: Product) -> None:
+        saved.append(file_path.name)
+        save_product(file_path, product)
+
+    monkeypatch.setattr(_reconstruct_common, 'save_product', spy)
+    syncs = _run_with_progress(monkeypatch, tmp_path, [2, 2, 4])
+
+    assert saved == ['product.000002.h5', 'product.000004.h5', 'product.h5']
+    assert [checkpoint is None for _, checkpoint in syncs] == [False, True, False]
+    assert (tmp_path / 'reconstruct_options.yaml').is_file()
 
 
 def test_a_run_with_no_token_never_touches_the_collective(

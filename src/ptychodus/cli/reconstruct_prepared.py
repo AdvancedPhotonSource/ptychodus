@@ -21,8 +21,10 @@ product's lineage. The result then goes into the same storage root, as a new pro
 resource derived from the diffraction data and the input product, and that resource's
 folder is the run's output directory: its uuid is printed as the run starts, each checkpoint
 becomes its current result as soon as it is written, and it ends ``succeeded``,
-``cancelled`` or ``failed`` with whatever the run produced. A trainable reconstructor has no
-model to load in this mode.
+``cancelled`` or ``failed`` with whatever the run produced. Without ``--options``, the run
+takes the options document the stored product names -- the one a reconstruction ran with,
+or the one an imported prepared directory held -- and the stock options when it names none.
+A trainable reconstructor has no model to load in this mode.
 
 ``ptychodus-reconstruct-subprocess`` reconstructs the same input for a launching process,
 reporting progress as an event stream; this command logs to the console instead.
@@ -124,8 +126,8 @@ def _build_parser() -> argparse.ArgumentParser:
     add_options_argument(
         parser,
         default_note=(
-            'Defaults to the one in INPUT_DIR, else to stock pty-chi LSQML, or BH for a '
-            'near-field product.'
+            'Defaults to the one in INPUT_DIR, or the one a --product names, else to stock '
+            'pty-chi LSQML, or BH for a near-field product.'
         ),
     )
     add_print_options_argument(parser)
@@ -209,6 +211,7 @@ def _reconstruct_into_storage(
             folder,
             cancellation=cancellation,
             on_sync=committer,
+            published_progress=run.progress,
         )
     except Exception as exc:
         logger.exception('Reconstruction failed; product %s keeps its last checkpoint.', uuid)
@@ -302,11 +305,13 @@ def main() -> ExitCode:
     # A named or staged document is read before the data are, so options that do not
     # parse fail in seconds rather than after loading several gigabytes. Without one, the
     # stock algorithm follows the propagation regime, which only the product states.
-    options_file = (
-        args.options
-        if input_directory is None
-        else find_options_document(args.options, input_directory)
-    )
+    if input_directory is not None:
+        options_file = find_options_document(args.options, input_directory)
+    elif args.options is None and inputs is not None and inputs.options_file is not None:
+        logger.info('Using the options stored with product %s', args.product)
+        options_file = inputs.options_file
+    else:
+        options_file = args.options
 
     try:
         resolved = None if options_file is None else read_reconstruction(libraries, options_file)

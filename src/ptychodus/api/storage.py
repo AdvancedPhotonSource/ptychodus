@@ -29,7 +29,7 @@ replaced under it; a manifest names a resource's current data in its ``files``, 
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from enum import StrEnum
 from functools import partial
@@ -45,7 +45,13 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from .assemble import AssembledDiffractionData
 from .diffraction import Polarization
 from .fluorescence import FluorescenceDataset
-from .io import StandardFileLayout, save_diffraction_data, save_fluorescence_data, save_product
+from .io import (
+    FluorescenceFileKeys,
+    StandardFileLayout,
+    save_diffraction_data,
+    save_fluorescence_data,
+    save_product,
+)
 from .processing import RunRecord, RunState
 from .product import Product
 
@@ -75,6 +81,7 @@ __all__ = [
     'save_diffraction_resource',
     'save_fluorescence_resource',
     'save_manifest',
+    'save_prepared_resources',
     'save_product_resource',
     'start_run',
 ]
@@ -507,11 +514,17 @@ def resolve_resource_file(layout: StorageLayout, uuid: UUID, kind: str) -> Path:
 
 @dataclass(frozen=True)
 class StorageInputs:
-    """What a stored product reconstructs from: its diffraction resource and both files."""
+    """What a stored product reconstructs from: its diffraction resource and both files.
+
+    `options_file` is the options document the product names, or ``None`` when it names
+    none: a run's result names the options it ran with, and an imported prepared product
+    the options it was prepared with.
+    """
 
     diffraction_uuid: UUID
     diffraction_file: Path
     product_file: Path
+    options_file: Path | None = None
 
 
 def resolve_storage_inputs(layout: StorageLayout, product_uuid: UUID) -> StorageInputs:
@@ -521,7 +534,8 @@ def resolve_storage_inputs(layout: StorageLayout, product_uuid: UUID) -> Storage
 
     Raises:
         LayoutError: if `product_uuid` names no product, the product names no single
-            diffraction resource, or either has no data yet.
+            diffraction resource, either has no data yet, or the product names its options
+            document by anything but a plain file name.
         ManifestLoadError: if a manifest fails to load.
     """
     product_folder, product = _load_located(layout, product_uuid, ResourceKind.PRODUCT)
@@ -547,7 +561,22 @@ def resolve_storage_inputs(layout: StorageLayout, product_uuid: UUID) -> Storage
         diffraction_uuid=sources[0].uuid,
         diffraction_file=_data_file(diffraction_folder, diffraction, ResourceKind.DIFFRACTION),
         product_file=_data_file(product_folder, product, ResourceKind.PRODUCT),
+        options_file=_options_file(product_folder, product),
     )
+
+
+def _options_file(folder: Path, manifest: ProductManifest) -> Path | None:
+    """The options document `manifest` names, if it names one that exists."""
+    name = manifest.files.get('options')
+
+    if name is None:
+        return None
+
+    if name != Path(name).name or name in ('', '.', '..'):
+        raise LayoutError(f'Resource {manifest.uuid} names its options as {name!r}, not a file.')
+
+    options_file = folder / name
+    return options_file if options_file.is_file() else None
 
 
 # ---------------------------------------------------------------------------
@@ -687,29 +716,83 @@ def save_product_resource(
     product: Product,
     *,
     derived_from: Sequence[UUID] = (),
+    options_document: str | None = None,
     run: RunRecord | None = None,
 ) -> UUID:
     """Save a product as a resource; return its uuid.
 
-    `run` records the process that produced the product.
+    `options_document`, when given, is saved beside the product as the reconstruct options
+    document and named in the manifest's ``files``, as a run's result names its own. `run`
+    records the process that produced the product, and is ``None`` for imported data.
 
     Raises:
         LayoutError: if a `derived_from` resource is missing or of a kind nothing
             derives from; nothing is written then.
     """
+    files = {'product': StandardFileLayout.PRODUCT.value}
+
+    if options_document is not None:
+        files['options'] = StandardFileLayout.RECONSTRUCT_OPTIONS.value
+
     manifest = ProductManifest(
         uuid=uuid4(),
         created_at=datetime.now(timezone.utc),
         derived_from=_derived_from(layout, derived_from),
+        files=files,
         run=run,
     )
-    file_name = manifest.files['product']
-    return _save_resource(
+    save_files = partial(_write_product, product=product, options_document=options_document)
+    return _save_resource(layout, ResourceKind.PRODUCT, manifest, save_files)
+
+
+def _write_product(folder: Path, *, product: Product, options_document: str | None) -> None:
+    """Write a product resource's file and, when given, its options document."""
+    save_product(StandardFileLayout.PRODUCT.path(folder), product)
+
+    if options_document is not None:
+        options_file = StandardFileLayout.RECONSTRUCT_OPTIONS.path(folder)
+        options_file.write_text(options_document, encoding='utf-8')
+
+
+def save_prepared_resources(
+    layout: StorageLayout,
+    data: AssembledDiffractionData,
+    product: Product,
+    *,
+    label: str = '',
+    comments: str = '',
+    options_document: str | None = None,
+) -> tuple[UUID, UUID]:
+    """Save prepared data as imported resources; return the diffraction and product uuids.
+
+    A prepared directory holds assembled diffraction data and the product it pairs with.
+    The diffraction resource is saved first, with the scan metadata the product carries,
+    since the diffraction file holds none of it; the product follows, derived from it, so
+    :func:`resolve_storage_inputs` finds the patterns. `label` and `comments` describe the
+    diffraction resource, and `options_document` is saved with the product. Neither
+    resource carries a run. If the product fails to save, the diffraction resource is
+    already published and stays.
+
+    Raises:
+        LayoutError: if a resource cannot be created; nothing more is written then.
+    """
+    metadata = product.metadata
+    diffraction = save_diffraction_resource(
         layout,
-        ResourceKind.PRODUCT,
-        manifest,
-        lambda folder: save_product(folder / file_name, product),
+        data,
+        label=label,
+        comments=comments,
+        detector_distance_m=metadata.detector_distance_m,
+        photon_energy_eV=metadata.photon_energy_eV,
+        exposure_time_s=metadata.exposure_time_s,
+        tomography_angle_deg=metadata.tomography_angle_deg,
+        tilt_angle_deg=metadata.tilt_angle_deg,
+        polarization=metadata.polarization,
     )
+    product_uuid = save_product_resource(
+        layout, product, derived_from=[diffraction], options_document=options_document
+    )
+    return diffraction, product_uuid
 
 
 def save_fluorescence_resource(
@@ -723,8 +806,10 @@ def save_fluorescence_resource(
 ) -> UUID:
     """Save a fluorescence dataset as a resource; return its uuid.
 
-    `run` records the process that produced the dataset, and is ``None`` for measured
-    data imported as it was recorded.
+    The file is written in XRF-Maps' NNLS layout (:class:`FluorescenceFileKeys`) whatever
+    paths the dataset was read from, so every reader of the resource can load it. `run`
+    records the process that produced the dataset, and is ``None`` for measured data
+    imported as it was recorded.
 
     Raises:
         LayoutError: if a `derived_from` resource is missing or of a kind nothing
@@ -739,11 +824,16 @@ def save_fluorescence_resource(
         run=run,
     )
     file_name = manifest.files['fluorescence']
+    canonical = replace(
+        dataset,
+        counts_per_second_path=FluorescenceFileKeys.COUNTS_PER_SECOND,
+        channel_names_path=FluorescenceFileKeys.CHANNEL_NAMES,
+    )
     return _save_resource(
         layout,
         ResourceKind.FLUORESCENCE,
         manifest,
-        lambda folder: save_fluorescence_data(folder / file_name, dataset),
+        lambda folder: save_fluorescence_data(folder / file_name, canonical),
     )
 
 

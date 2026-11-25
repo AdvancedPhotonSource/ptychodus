@@ -268,8 +268,14 @@ def _stored_run(monkeypatch: pytest.MonkeyPatch, mode: str) -> dict[str, Any]:
         *,
         cancellation: CancellationToken,
         on_sync: Any = None,
+        published_progress: int | None = None,
     ) -> Product | None:
-        captured.update(reconstruct_input=reconstruct_input, output_directory=output_directory)
+        captured.update(
+            reconstruct_input=reconstruct_input,
+            output_directory=output_directory,
+            published_progress=published_progress,
+            resolved=resolved,
+        )
 
         if mode == 'cancelled before output':
             cancellation.cancel('SIGTERM')
@@ -341,6 +347,8 @@ def test_a_stored_product_reconstructs_into_a_new_resource(
     assert folder.parent == layout.kind_dir(ResourceKind.PRODUCT)
     assert capsys.readouterr().out.strip() == folder.name
     assert captured['reconstruct_input'].diffraction_patterns.shape[0] == NUM_PATTERNS
+    # Published with its options and checkpoint 0 before the run; neither may be rewritten.
+    assert captured['published_progress'] == 0
 
     manifest = _manifest(folder)
     diffraction = _manifest_source(layout, product)
@@ -364,6 +372,60 @@ def test_a_stored_product_reconstructs_into_a_new_resource(
     if mode != 'cancelled before output':
         assert captured['commits'] == ['product.000001.h5', 'product.000002.h5']
         assert (manifest.run.progress, manifest.run.progress_goal) == (2, 4)
+
+
+def _store_with_options(root: Path, options_document: str) -> UUID:
+    """A stored product naming `options_document`, as an imported prepared directory does."""
+    layout = StorageLayout(root)
+    diffraction = save_diffraction_resource(layout, _assembled_data(), label='scan 1')
+    return save_product_resource(
+        layout, _product(), derived_from=[diffraction], options_document=options_document
+    )
+
+
+def test_a_stored_product_reconstructs_with_the_options_it_names(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = tmp_path / 'storage'
+    product = _store_with_options(root, 'library: PtyChi\nalgorithm: ePIE\n')
+    captured = _stored_run(monkeypatch, 'succeeded')
+
+    assert _main_stored(monkeypatch, root, product) is ExitCode.SUCCESS
+    assert captured['resolved'].reconstructor.name == 'ePIE'
+
+
+def test_explicit_options_override_the_ones_a_stored_product_names(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = tmp_path / 'storage'
+    product = _store_with_options(root, 'library: PtyChi\nalgorithm: ePIE\n')
+    options_file = tmp_path / 'options.yaml'
+    options_file.write_text('library: PtyChi\nalgorithm: DM\n')
+    captured = _stored_run(monkeypatch, 'succeeded')
+
+    code = _main(
+        monkeypatch,
+        '--storage-root',
+        str(root),
+        '--product',
+        str(product),
+        '--options',
+        str(options_file),
+    )
+
+    assert code is ExitCode.SUCCESS
+    assert captured['resolved'].reconstructor.name == 'DM'
+
+
+def test_a_stored_product_naming_no_options_takes_the_stock_ones(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = tmp_path / 'storage'
+    product = _store(root)
+    captured = _stored_run(monkeypatch, 'succeeded')
+
+    assert _main_stored(monkeypatch, root, product) is ExitCode.SUCCESS
+    assert captured['resolved'].reconstructor.name == 'LSQML'
 
 
 def _manifest_source(layout: StorageLayout, product: UUID) -> UUID:

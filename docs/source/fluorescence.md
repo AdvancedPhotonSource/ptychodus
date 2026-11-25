@@ -20,6 +20,8 @@ $ ptychodus-enhance-xrf --product <product_uuid> --fluorescence <fluorescence_uu
     --algorithm vspi
 ```
 
+A measured dataset reaches the storage root through `ptychodus-import fluorescence <file>`, in any format a fluorescence reader takes (`--file-type`), and a prepared directory's product through `ptychodus-import prepared <directory>`; each prints the uuid to pass here.
+
 The resource exists from the start, `running` until its first result, and its folder holds the options document, the log and a checkpoint for each result the enhancer yields. It ends `succeeded`, `cancelled` (on Ctrl-C or SIGTERM, saving the last result, if any, as the final one) or `failed` (keeping its last checkpoint, if any). `-o` and `--file-type` are refused with uuids, and the inputs are both files or both uuids.
 
 An enhancer runs at its default options unless an options file is given. `--print-options` writes one, naming the enhancer and its fields by their declared names:

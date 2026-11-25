@@ -64,6 +64,17 @@ diffraction = save_diffraction_resource(layout, data, label='scan 42', campaign=
 product = save_product_resource(layout, product, derived_from=[diffraction])
 ```
 
+`ptychodus-import` publishes data prepared elsewhere through the same savers, as **imported data**: resources that carry no `run` and record nothing of where they came from. A prepared directory becomes a diffraction resource, with the scan metadata its `product.h5` carries, and a product derived from it; a `reconstruct_options.yaml` there is kept with the product as `files['options']`, and `ptychodus-reconstruct --product` reconstructs with it unless given `--options`. Each uuid is printed as it is published:
+
+```sh
+ptychodus-import prepared fly042/ --storage-root /data/storage
+ptychodus-import diffraction scan9.h5 --photon-energy-eV 8800
+ptychodus-import product reconstruction.h5 --diffraction <uuid>
+ptychodus-import fluorescence scan2D_1.h5 --file-type PyXRF
+```
+
+A fluorescence dataset is stored in XRF-Maps' NNLS layout whatever format it was read in, and is linked to nothing.
+
 A processing run is written as a **run resource** instead, published at the start so its progress can be watched: `ptychodus-reconstruct --product <uuid>` and `ptychodus-enhance-xrf` given uuids each make one through `start_run`, `commit_checkpoint` and `finish_run`. Its folder is the run's standard output directory — the options document, the log, and one immutable checkpoint per committed `progress` value beside the final file:
 
 ```text
@@ -76,7 +87,7 @@ product/<uuid>/
   product.h5
 ```
 
-The manifest is replaced atomically after each checkpoint, its `files` entry naming the newest one, so every reader resolves a resource's data through its manifest rather than a fixed file name. Its `run` record gives the `state` — `pending`, `running`, `succeeded`, `failed` or `cancelled`, with a `reason` — the `progress` against a `progress_goal` (0 when unknown), the command, ptychodus version, user and options document, and `updated_at`; a `running` resource whose `updated_at` stops advancing belongs to a process that died. A finished or cancelled run names its final file; a failed one keeps its last checkpoint. Every resource a process produces carries a `run`, including `ptychodus-stream`'s; imported data carries none.
+The manifest is replaced atomically after each checkpoint, its `files` entry naming the newest one, so every reader resolves a resource's data through its manifest rather than a fixed file name. Its `run` record gives the `state` — `pending`, `running`, `succeeded`, `failed` or `cancelled`, with a `reason` — the `progress` against a `progress_goal` (0 when unknown), the command, ptychodus version, user and options document, and `updated_at`; a `running` resource whose `updated_at` stops advancing belongs to a process that died. A finished or cancelled run names its final file; a failed one keeps its last checkpoint. Every resource a processing command produces carries a `run`, including `ptychodus-stream`'s; imported data — what `ptychodus-import` publishes — carries none.
 
 The service exposes the record read-only: the `run` object on product, diffraction and fluorescence reads, a repeatable `run_state=` filter on their listings (REST and MCP), and a badge in the web UI. A running resource with no checkpoint yet is ingested as `AWAITING_DATA`, and its renders answer 404 until one is committed.
 

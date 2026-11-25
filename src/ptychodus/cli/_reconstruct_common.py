@@ -1111,14 +1111,20 @@ def run_reconstruction(
     *,
     cancellation: CancellationToken | None = None,
     on_sync: Callable[[ReconstructOutput, Path | None], None] | None = None,
+    published_progress: int | None = None,
 ) -> Product | None:
     """Run `resolved` to completion in this process, and write the outputs.
 
     Assumes `output_directory` already exists, and does not touch `diffraction.h5`: that
     file depends on the assembled dataset rather than on the reconstruction, so it is
     written by :func:`save_assembled_diffraction` before this runs. Writes the options to
-    ``reconstruct_options.yaml``, a ``product.NNNNNN.h5`` checkpoint at every output the
-    reconstructor yields, then the final ``product.h5``. Returns the final product.
+    ``reconstruct_options.yaml``, a ``product.NNNNNN.h5`` checkpoint at every output whose
+    progress exceeds the last one written, then the final ``product.h5``. Returns the final
+    product. A checkpoint is never rewritten: an output that does not advance the progress
+    keeps the checkpoint already written for it.
+
+    `published_progress` marks `output_directory` as a published run resource, whose options
+    document and checkpoint at that progress are already published; neither is rewritten.
 
     Output files are written once, by the main process. Only the filesystem writes are
     gated: every rank runs the reconstruction to completion and returns the same product.
@@ -1130,12 +1136,15 @@ def run_reconstruction(
     case; an *uncancelled* run that produces nothing is still an error.
 
     `on_sync` is called at each output with it and the checkpoint path written for it,
-    which is `None` on a rank that writes nothing. It is how a caller reports progress
-    without reimplementing this loop.
+    which is `None` where none was written: on a rank that writes nothing, or for an output
+    that does not advance the progress. It is how a caller reports progress without
+    reimplementing this loop.
     """
     main_process = is_main_process()
     product_file = StandardFileLayout.PRODUCT.path(output_directory)
-    save_reconstruct_options(logger, resolved, output_directory)
+
+    if published_progress is None:
+        save_reconstruct_options(logger, resolved, output_directory)
 
     logger.info(
         'Starting reconstruction: %s %s on %d patterns',
@@ -1150,6 +1159,7 @@ def run_reconstruction(
         return None
 
     final_output = None
+    last_written_progress = published_progress
 
     for output in resolved.reconstructor.reconstruct(reconstruct_input, options=resolved.options):
         losses = output.product.losses
@@ -1157,12 +1167,14 @@ def run_reconstruction(
         logger.info('Iteration %d/%d: loss=%.6g', output.progress, output.progress_goal, last_loss)
 
         checkpoint_file: Path | None = None
+        advanced = last_written_progress is None or output.progress > last_written_progress
 
-        if main_process:
+        if main_process and advanced:
             checkpoint_file = StandardFileLayout.PRODUCT.checkpoint_path(
                 output_directory, output.progress
             )
             save_product(checkpoint_file, output.product)
+            last_written_progress = output.progress
 
         if on_sync is not None:
             on_sync(output, checkpoint_file)

@@ -6,6 +6,7 @@ command-line writers write, so it is tested on a bare install.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -21,6 +22,7 @@ from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.fluorescence import ElementMap, FluorescenceDataset
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import (
+    FluorescenceFileKeys,
     load_diffraction_data,
     load_fluorescence_data,
     load_product,
@@ -52,6 +54,7 @@ from ptychodus.api.storage import (
     save_diffraction_resource,
     save_fluorescence_resource,
     save_manifest,
+    save_prepared_resources,
     save_product_resource,
     start_run,
 )
@@ -603,6 +606,85 @@ def test_a_resource_file_resolves_through_its_manifest(tmp_path: Path) -> None:
 
     with pytest.raises(LayoutError, match='not a product'):
         resolve_resource_file(layout, diffraction, ResourceKind.PRODUCT)
+
+
+def test_prepared_data_is_saved_as_a_resolvable_pair_carrying_its_scan_metadata(
+    tmp_path: Path,
+) -> None:
+    layout = StorageLayout(tmp_path)
+    product = _product()
+
+    diffraction, product_uuid = save_prepared_resources(
+        layout, _data(), product, label='scan 7', options_document='library: pty-chi\n'
+    )
+
+    manifest = _load(layout, ResourceKind.DIFFRACTION, diffraction)
+    assert isinstance(manifest, DiffractionManifest)
+    assert manifest.run is None and manifest.label == 'scan 7'
+    assert manifest.detector_distance_m == product.metadata.detector_distance_m
+    assert manifest.photon_energy_eV == product.metadata.photon_energy_eV
+    assert manifest.exposure_time_s == product.metadata.exposure_time_s
+    assert manifest.tomography_angle_deg == product.metadata.tomography_angle_deg
+    assert manifest.tilt_angle_deg == product.metadata.tilt_angle_deg
+    assert manifest.crop_center_x_px is None
+
+    inputs = resolve_storage_inputs(layout, product_uuid)
+    assert inputs.diffraction_uuid == diffraction
+    assert inputs.options_file is not None
+    assert inputs.options_file.read_text() == 'library: pty-chi\n'
+    assert _load(layout, ResourceKind.PRODUCT, product_uuid).run is None
+
+
+def test_a_product_names_an_options_document_only_when_given_one(tmp_path: Path) -> None:
+    layout = StorageLayout(tmp_path)
+    diffraction = save_diffraction_resource(layout, _data())
+    bare = save_product_resource(layout, _product(), derived_from=[diffraction])
+
+    assert _load(layout, ResourceKind.PRODUCT, bare).files == {'product': 'product.h5'}  # type: ignore[union-attr]
+    assert resolve_storage_inputs(layout, bare).options_file is None
+
+
+def test_a_run_s_result_names_the_options_it_ran_with(tmp_path: Path) -> None:
+    layout = StorageLayout(tmp_path)
+    input_file = tmp_path / 'input.h5'
+    save_product(input_file, _product())
+    uuid, folder = _start_product_run(layout, input_file)
+
+    assert resolve_storage_inputs(layout, uuid).options_file == folder / 'reconstruct_options.yaml'
+
+
+def test_an_options_document_named_outside_its_folder_is_refused(tmp_path: Path) -> None:
+    layout = StorageLayout(tmp_path)
+    diffraction = save_diffraction_resource(layout, _data())
+    uuid = save_product_resource(layout, _product(), derived_from=[diffraction])
+    manifest_path = layout.manifest_path(ResourceKind.PRODUCT, uuid)
+    manifest = _load(layout, ResourceKind.PRODUCT, uuid)
+    assert isinstance(manifest, ProductManifest)
+    save_manifest(
+        manifest_path,
+        manifest.model_copy(update={'files': {**manifest.files, 'options': '../options.yaml'}}),
+    )
+
+    with pytest.raises(LayoutError, match='not a file'):
+        resolve_storage_inputs(layout, uuid)
+
+
+def test_a_fluorescence_dataset_is_stored_where_every_reader_finds_it(tmp_path: Path) -> None:
+    # A dataset read by a format plugin carries that format's paths, which the stored
+    # file's readers do not know.
+    layout = StorageLayout(tmp_path)
+    foreign = replace(
+        _dataset(),
+        counts_per_second_path='/xrfmap/detsum/xrf_fit',
+        channel_names_path='/xrfmap/detsum/xrf_fit_name',
+    )
+
+    uuid = save_fluorescence_resource(layout, foreign)
+
+    stored = load_fluorescence_data(resolve_resource_file(layout, uuid, ResourceKind.FLUORESCENCE))
+    assert stored.counts_per_second_path == FluorescenceFileKeys.COUNTS_PER_SECOND
+    assert stored.channel_names_path == FluorescenceFileKeys.CHANNEL_NAMES
+    assert [element_map.name for element_map in stored] == ['Fe', 'Cu']
 
 
 # ---------------------------------------------------------------------------
