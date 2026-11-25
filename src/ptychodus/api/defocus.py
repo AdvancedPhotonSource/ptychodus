@@ -23,12 +23,7 @@ from .assemble import AssembledDiffractionData, DetectorCorrections
 from .geometry import ImageExtent
 from .object import ObjectGeometry
 from .parallax import measure_parallax_shifts
-from .patch import (
-    accumulate_probe_intensity_on,
-    compute_patch_pixel_indexes,
-    resolve_probe_patch_bounds_on,
-    shift_probe_onto_patches,
-)
+from .patch import accumulate_probe_intensity_on, resolve_probe_patch_bounds_on
 from .preprocess.diffraction import BinningStep
 from .probe import Probe, ProbeEnsemble, ProbeGeometry, estimate_probe_extent
 from .probe_positions import ProbePosition, ProbePositionSequence
@@ -323,17 +318,18 @@ class _AutofocusResidual:
         ]
         height_px, width_px = assembled_data.get_patterns().shape[-2:]
         pixel_geometry = start_probe.get_pixel_geometry()
-        self._propagator = FresnelTransformPropagator(
-            PropagatorParameters(
-                wavelength_m=photon_wavelength_m,
-                width_px=width_px,
-                height_px=height_px,
-                pixel_width_m=pixel_geometry.width_m,
-                pixel_height_m=pixel_geometry.height_m,
-                propagation_distance_m=detector_distance_m,
+        self._sandwich = FourierSandwich(
+            FresnelTransformPropagator(
+                PropagatorParameters(
+                    wavelength_m=photon_wavelength_m,
+                    width_px=width_px,
+                    height_px=height_px,
+                    pixel_width_m=pixel_geometry.width_m,
+                    pixel_height_m=pixel_geometry.height_m,
+                    propagation_distance_m=detector_distance_m,
+                )
             )
         )
-        self._sandwich = FourierSandwich(self._propagator)
         ensemble = ProbeEnsemble.from_probe(start_probe)
         self._bounds = resolve_probe_patch_bounds_on(
             ensemble.get_geometry(), self._positions, geometry
@@ -391,39 +387,13 @@ class _AutofocusResidual:
             preprocessing=SpectralPreprocessing.IDENTITY,
             lower_bound=0.0,
             threshold_fraction=1.0,
-            weight_offset=0.0,
             cache_weights=True,
         )
         refined = covariance.matvec(self._start.ravel()).reshape(self._start.shape)
         estimate = numpy.where(
             self._region, self._start_modulus * numpy.exp(1j * numpy.angle(refined)), 1.0
-        ).ravel()
-        cross = model_power = data_power = 0.0
-        amplitudes = []
-
-        for chunk in self._chunks:
-            pixel_indexes = compute_patch_pixel_indexes(self._bounds[chunk], self._geometry)
-            exit_waves = (
-                shift_probe_onto_patches(modes, self._bounds[chunk])
-                * estimate[pixel_indexes][:, numpy.newaxis]
-            )
-            predicted = numpy.sqrt(
-                numpy.sum(numpy.square(numpy.abs(self._propagator.propagate(exit_waves))), axis=1)
-            )[:, self._good_pixels]
-            measured = numpy.sqrt(numpy.maximum(self._intensities(chunk), 0.0))[
-                :, self._good_pixels
-            ]
-            cross += float(numpy.sum(predicted * measured))
-            model_power += float(numpy.sum(predicted * predicted))
-            data_power += float(numpy.sum(measured * measured))
-            amplitudes.append((predicted, measured))
-
-        if not (model_power > 0.0 and data_power > 0.0):
-            return math.inf
-
-        scale = cross / model_power
-        misfit = sum(float(numpy.sum(numpy.square(m - scale * p))) for p, m in amplitudes)
-        return misfit / data_power
+        )
+        return covariance.measure_amplitude_residual(estimate)
 
 
 def estimate_defocus_by_autofocus(

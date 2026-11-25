@@ -12,7 +12,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from functools import partial
-from typing import Final
+from typing import Any, Final
 import logging
 import math
 
@@ -681,6 +681,10 @@ class SpectralModulus(StrEnum):
     """The start's, smoothed over the probe's RMS radius; uniform without a start."""
     ESTIMATE = 'estimate'
     """The refinement's own, which also measures how strongly the sample scatters."""
+    REFERENCE = 'reference'
+    """The refinement's own divided pixel by pixel by the same refinement of an empty
+    object, which cancels how unevenly the probe positions sample the canvas; L. Valzania,
+    J. Dong and S. Gigan, Opt. Lett. 46, 1357 (2021), Appendix E."""
 
 
 def _build_propagator_pair(
@@ -719,19 +723,122 @@ def _correlate(a: RealArrayType, b: RealArrayType) -> float:
     return float(numpy.sum(a * b)) / denominator if denominator > 0.0 else 0.0
 
 
-def _iterate_power(
-    covariance: SpectralCovariance, *, start: ComplexArrayType, num_iterations: int
-) -> ComplexArrayType:
-    """*num_iterations* products of *covariance*, each normalized, from *start*."""
-    vector = start / numpy.linalg.norm(start)
+def _predict_empty_intensities(
+    chunk: slice, *, probes: ShiftedProbeStack, sandwich: PropagatorSandwich | FourierSandwich
+) -> RealArrayType:
+    """``sum_k |D P_jk|^2`` for the placements in *chunk*: the patterns of an empty object."""
+    return sandwich.predict_intensities(probes.get(chunk))
 
-    for iteration in range(num_iterations):
-        product = covariance.matvec(vector)
-        rayleigh = float(numpy.vdot(vector, product).real)
-        vector = product / numpy.linalg.norm(product)
-        logger.debug(f'Spectral iteration {iteration + 1}: Rayleigh quotient {rayleigh:.6g}.')
 
-    return vector
+class _SpectralRefinement:
+    """Power-method steps with ``Z + shift I``, each finalized as the estimate is returned.
+
+    With a *reference* operator, the refinement of an empty object steps in lockstep from
+    the support, and the estimate's modulus is divided by its; with a *start_modulus*,
+    the estimate takes that modulus and keeps only its phase.
+    """
+
+    def __init__(
+        self,
+        covariance: SpectralCovariance,
+        *,
+        reference: SpectralCovariance | None,
+        shift: float,
+        support: BooleanArrayType,
+        start_modulus: RealArrayType | None,
+        reference_floor: float,
+    ) -> None:
+        self._covariance = covariance
+        self._reference = reference
+        self._shift = shift
+        self._support = support
+        self._start_modulus = start_modulus
+        self._reference_floor = reference_floor
+
+    def _step(self, covariance: SpectralCovariance, vector: ComplexArrayType) -> ComplexArrayType:
+        product = covariance.matvec(vector) + self._shift * vector
+        return product / numpy.linalg.norm(product)
+
+    def finalize(
+        self, vector: ComplexArrayType, reference_vector: ComplexArrayType | None
+    ) -> ComplexArrayType:
+        """The canvas the generator returns for *vector*: its modulus replaced or divided as
+        configured, its phase fixed so the sum over the support is real and positive, unit
+        mean modulus over the support and one beyond it.
+
+        Raises:
+            ValueError: if the estimate vanishes on the support.
+        """
+        estimate = vector.reshape(self._support.shape)
+
+        if self._start_modulus is not None:
+            estimate = self._start_modulus * numpy.exp(1j * numpy.angle(estimate))
+        elif reference_vector is not None:
+            reference_modulus = numpy.abs(reference_vector.reshape(self._support.shape))
+            floor = self._reference_floor * float(reference_modulus[self._support].max())
+            estimate = estimate / numpy.maximum(reference_modulus, floor)
+
+        supported_sum = numpy.sum(estimate[self._support])
+
+        if abs(supported_sum) > 0.0:
+            estimate = estimate * (abs(supported_sum) / supported_sum)
+
+        mean_modulus = float(numpy.mean(numpy.abs(estimate[self._support])))
+
+        if not mean_modulus > 0.0:
+            raise ValueError('The spectral estimate vanishes on the illuminated region!')
+
+        return numpy.where(self._support, estimate / mean_modulus, 1.0 + 0.0j)
+
+    def run(
+        self, start: ComplexArrayType, *, num_iterations: int, stop_when_residual_rises: bool
+    ) -> ComplexArrayType:
+        """The finalized estimate after *num_iterations* steps from *start*, or, when
+        *stop_when_residual_rises*, after the step whose amplitude residual is lowest before
+        the first that does not lower it; never before the first step."""
+        vector = start / numpy.linalg.norm(start)
+        reference_vector: ComplexArrayType | None = (
+            None
+            if self._reference is None
+            else self._support.ravel().astype(numpy.complex128)
+            / math.sqrt(numpy.count_nonzero(self._support))
+        )
+        best: ComplexArrayType | None = None
+        best_iteration = 0
+        best_residual = math.inf
+        residuals: list[float] = []
+
+        for iteration in range(1, num_iterations + 1):
+            vector = self._step(self._covariance, vector)
+
+            if self._reference is not None and reference_vector is not None:
+                reference_vector = self._step(self._reference, reference_vector)
+
+            estimate = self.finalize(vector, reference_vector)
+
+            if not stop_when_residual_rises:
+                best, best_iteration = estimate, iteration
+                continue
+
+            residual = self._covariance.measure_amplitude_residual(estimate)
+            residuals.append(residual)
+
+            if best is None or residual < best_residual:
+                best, best_iteration, best_residual = estimate, iteration, residual
+            else:
+                break
+
+        if best is None:
+            raise ValueError('The refinement needs at least one iteration!')
+
+        if stop_when_residual_rises:
+            logger.debug(f'Spectral amplitude residuals {residuals}.')
+            logger.info(
+                f'Spectral refinement stopped after {best_iteration} of {num_iterations}'
+                f' iterations at amplitude residual {best_residual:.4g}.'
+            )
+
+        return best
 
 
 def _compute_rms_radius_px(probe_modes: ComplexArrayType) -> float:
@@ -760,12 +867,14 @@ def generate_spectral_object(
     far_field: bool,
     start: Object | None = None,
     num_iterations: int = 3,
+    stop_when_residual_rises: bool = False,
     preprocessing: SpectralPreprocessing = SpectralPreprocessing.IDENTITY,
     lower_bound: float = 0.25,
-    threshold_fraction: float = 0.02,
+    threshold_fraction: float = 0.2,
     modulus: SpectralModulus = SpectralModulus.START,
     i0_by_index: Mapping[int, float] | None = None,
     support_fraction: float = 0.05,
+    reference_floor: float = 1e-6,
     max_patterns_per_chunk: int = 64,
     max_cached_bytes: int = 1 << 30,
     workers: int = -1,
@@ -773,20 +882,30 @@ def generate_spectral_object(
 ) -> Object:
     """Generate a complex object by spectral refinement of *start* with every pixel of the patterns.
 
-    The refinement takes `num_iterations` power-method steps with the weighted covariance
+    The refinement takes power-method steps with ``Z + sigma I``, where
 
-        Z = sum_j sum_k S_jk^H diag(T(y_j) + c) S_jk,    S_jk psi = D(P_jk * psi[patch_j]),
+        Z = sum_j sum_k S_jk^H diag(T(y_j)) S_jk,    S_jk psi = D(P_jk * psi[patch_j]),
 
-    where ``P_jk`` is incoherent mode ``k`` of the `probe`, placed at position ``j`` as
-    the multislice forward model places it, ``D`` the detector propagator, ``T`` the
-    `preprocessing` of the normalized intensities ``y_j``, and ``c`` the offset that makes
-    every weight non-negative (``lower_bound`` for :attr:`SpectralPreprocessing.OPTIMAL`,
-    zero otherwise), so the steps follow the largest eigenvalues rather than the most
-    negative. ``Z`` is the operator of L. Valzania, J. Dong and S. Gigan, Opt. Lett. 46,
-    1357 (2021), Appendix C (reference code https://github.com/laboGigan/ptychography-spectral),
-    applied matrix-free: a forward pass, a weight and an adjoint pass per pattern, batched
-    over `max_patterns_per_chunk` patterns at once. A Fresnel-transform ``D`` needs one FFT
-    pair per pattern and mode, its quadratic phases folded into the probe and the weights.
+    ``P_jk`` is incoherent mode ``k`` of the `probe`, placed at position ``j`` as the
+    multislice forward model places it, ``D`` the detector propagator and ``T`` the
+    `preprocessing` of the normalized intensities ``y_j``. The shift ``sigma`` is
+    ``lower_bound`` times the peak summed illumination for
+    :attr:`SpectralPreprocessing.OPTIMAL`, whose weights are no lower than
+    ``-lower_bound``, and zero otherwise: it makes ``Z + sigma I`` positive semidefinite
+    without changing its eigenvectors, so the steps follow the largest eigenvalues rather
+    than the most negative. ``Z`` is the operator of L. Valzania, J. Dong and S. Gigan,
+    Opt. Lett. 46, 1357 (2021), Appendix C (reference code
+    https://github.com/comediaLKB/ptychography-spectral), applied matrix-free: a forward
+    pass, a weight and an adjoint pass per pattern, batched over `max_patterns_per_chunk`
+    patterns at once. A Fresnel-transform ``D`` needs one FFT pair per pattern and mode,
+    its quadratic phases folded into the probe and the weights.
+
+    With `stop_when_residual_rises`, as the paper stops, each step's estimate -- finalized
+    as it would be returned -- is scored by its amplitude residual
+    (:meth:`~ptychodus.api.spectral.SpectralCovariance.measure_amplitude_residual`), and
+    the steps stop at the first that does not lower it, or after `num_iterations`; the
+    estimate with the lowest residual is returned, never before the first step. Without
+    it, exactly `num_iterations` steps are taken.
 
     The spectral estimate proper is ``Z``'s leading eigenvector, and on measured data it
     is the wrong target. With a focused probe on a canvas many probe widths across,
@@ -796,16 +915,23 @@ def generate_spectral_object(
     than transmission. A few steps from a start spread over the whole field resolve the
     local structure, whose gaps are large, before the global competition, whose gaps are
     small, can concentrate the estimate; every further step sharpens detail where the
-    probe is right and amplifies its error where it is not. `start`, an object on
-    *geometry*'s canvas such as the STXM-DPC estimate, supplies the low-resolution
-    object; without one the steps start from the illuminated region, uniformly.
+    probe is right and amplifies its error where it is not, which the residual measures.
+    `start`, an object on *geometry*'s canvas such as the STXM-DPC estimate, supplies
+    the low-resolution object; without one the steps start from the illuminated region,
+    uniformly.
 
     The estimate's phase is the refinement's. Its modulus is the start's smoothed over
     the probe's RMS radius with :attr:`SpectralModulus.START`, which keeps the
     low-resolution transmission the start measured and drops detail finer than the
     probe that a noisy start carries, and uniform without a start; with
     :attr:`SpectralModulus.ESTIMATE` it is the refinement's own, which carries an
-    absorbing sample's transmission but also the scattering-strength bias above.
+    absorbing sample's transmission but also the scattering-strength bias above. With
+    :attr:`SpectralModulus.REFERENCE` it is the refinement's own divided pixel by pixel
+    by that of the same number of steps on an empty object, whose patterns are
+    ``sum_k |D P_jk|^2``, from the illuminated region, uniformly (the paper's Appendix
+    E). That cancels how unevenly the positions sample the canvas, not the start's own
+    modulus, and not the scattering-strength bias; the divisor is floored at
+    `reference_floor` of its peak over the support.
 
     The intensities are corrected for any detector background or flat field the data
     still carries, as ``(pattern - background) / flat_field`` clipped at zero, and their
@@ -822,9 +948,7 @@ def generate_spectral_object(
     dark field, where the detail finer than the probe is recorded, takes part.
     :attr:`SpectralPreprocessing.OPTIMAL` floors every intensity below ``1 / (1 +
     lower_bound)`` of the mean at ``-lower_bound``, the shot-noise-limited and zero
-    counts of a photon-counting detector among them; offset to be non-negative, the
-    floored pixels take no weight, which slows the refinement as more of the detector
-    lies in the dark field.
+    counts of a photon-counting detector among them.
     :attr:`SpectralPreprocessing.THRESHOLD` sets the brightest `threshold_fraction` of
     good pixels to one, found over a float32 copy of every good pixel, the one temporary
     the size of the data. Patterns pair with positions by index; one outside the range
@@ -838,9 +962,10 @@ def generate_spectral_object(
     scaled to a mean of one there; pixels beyond the support are one.
 
     Up to `max_cached_bytes`, what every product reuses is computed once and kept: the
-    weights first, at four bytes a detector pixel, then the probe shifted onto every
-    position, at eight a pixel and mode; each pattern's waves are single precision, and
-    the products accumulate in double. What does not fit is recomputed for each chunk
+    weights first, at four bytes a detector pixel, then the empty object's weights for
+    :attr:`SpectralModulus.REFERENCE`, then the probe shifted onto every position, at
+    eight a pixel and mode; each pattern's waves are single precision, and the products
+    accumulate in double. What does not fit is recomputed for each chunk
     of every product, which changes the cost but not the result. `workers` is the number
     of FFT threads, as :func:`scipy.fft.set_workers` takes it.
 
@@ -860,6 +985,9 @@ def generate_spectral_object(
 
     if not 0.0 < support_fraction <= 1.0:
         raise ValueError('Support fraction must lie in (0, 1]!')
+
+    if not 0.0 < reference_floor < 1.0:
+        raise ValueError('The reference floor must lie in (0, 1)!')
 
     if max_patterns_per_chunk < 1:
         raise ValueError('Chunks must hold at least one pattern!')
@@ -954,13 +1082,34 @@ def generate_spectral_object(
         else PropagatorSandwich(forward, backward)
     )
 
+    # The cache holds the weights first, then the empty object's, then the shifted probes.
     weight_bytes = (
         pattern_rows.size * math.prod(probe_extent_px) * numpy.dtype(numpy.float32).itemsize
     )
-    caches_weights = weight_bytes <= max_cached_bytes
-    probe_budget = max_cached_bytes - weight_bytes if caches_weights else max_cached_bytes
+    budget = max_cached_bytes
+    caches_weights = weight_bytes <= budget
+    budget -= weight_bytes if caches_weights else 0
+    caches_reference_weights = modulus is SpectralModulus.REFERENCE and weight_bytes <= budget
+    budget -= weight_bytes if caches_reference_weights else 0
+    covariance_options: dict[str, Any] = dict(
+        chunks=chunks,
+        bounds=patch_bounds,
+        geometry=geometry,
+        sandwich=sandwich,
+        good_pixels=good_pixels,
+        preprocessing=preprocessing,
+        lower_bound=lower_bound,
+        threshold_fraction=threshold_fraction,
+    )
 
     with set_workers(workers):
+        probes = ShiftedProbeStack(
+            modes,
+            patch_bounds,
+            chunks,
+            prepare=sandwich.prepare_probes,
+            cached=pattern_rows.size * modes.size * numpy.dtype(numpy.complex64).itemsize <= budget,
+        )
         covariance = SpectralCovariance(
             intensities=partial(
                 measure_corrected_intensities,
@@ -969,36 +1118,47 @@ def generate_spectral_object(
                 corrections=corrections,
                 i0_scale=i0_scale,
             ),
-            chunks=chunks,
-            bounds=patch_bounds,
-            geometry=geometry,
-            probes=ShiftedProbeStack(
-                modes,
-                patch_bounds,
-                chunks,
-                prepare=sandwich.prepare_probes,
-                cached=(
-                    pattern_rows.size * modes.size * numpy.dtype(numpy.complex64).itemsize
-                    <= probe_budget
-                ),
-            ),
-            sandwich=sandwich,
-            good_pixels=good_pixels,
-            preprocessing=preprocessing,
-            lower_bound=lower_bound,
-            threshold_fraction=threshold_fraction,
-            weight_offset=(lower_bound if preprocessing == SpectralPreprocessing.OPTIMAL else 0.0),
+            probes=probes,
             cache_weights=caches_weights,
+            **covariance_options,
         )
-        estimate = _iterate_power(
+        reference = (
+            SpectralCovariance(
+                intensities=partial(_predict_empty_intensities, probes=probes, sandwich=sandwich),
+                probes=probes,
+                cache_weights=caches_reference_weights,
+                **covariance_options,
+            )
+            if modulus is SpectralModulus.REFERENCE
+            else None
+        )
+        refinement = _SpectralRefinement(
             covariance,
-            start=(
+            reference=reference,
+            # The optimal weights are no lower than -lower_bound and D^H D is at most the
+            # identity, so Z is no lower than -lower_bound times the peak illumination.
+            shift=lower_bound * peak if preprocessing == SpectralPreprocessing.OPTIMAL else 0.0,
+            support=support,
+            start_modulus=(
+                (
+                    numpy.ones(canvas_shape)
+                    if start_array is None
+                    else gaussian_filter(numpy.abs(start_array), _compute_rms_radius_px(modes))
+                )
+                if modulus is SpectralModulus.START
+                else None
+            ),
+            reference_floor=reference_floor,
+        )
+        array = refinement.run(
+            (
                 support.astype(numpy.complex128)
                 if start_array is None
                 else start_array.astype(numpy.complex128)
             ).ravel(),
             num_iterations=num_iterations,
-        ).reshape(canvas_shape)
+            stop_when_residual_rises=stop_when_residual_rises,
+        )
         predicted = numpy.sum(numpy.square(numpy.abs(forward.propagate(modes))), axis=0)
 
     consistency = _correlate(covariance.mean_pattern[good_pixels], predicted[good_pixels])
@@ -1010,30 +1170,6 @@ def generate_spectral_object(
             f' {consistency:.2f}), so the spectral refinement follows its errors; an'
             ' average-pattern probe at the measured defocus reproduces it.'
         )
-
-    match modulus:
-        case SpectralModulus.START:
-            magnitude = (
-                numpy.ones(canvas_shape)
-                if start_array is None
-                else gaussian_filter(numpy.abs(start_array), _compute_rms_radius_px(modes))
-            )
-            estimate = magnitude * numpy.exp(1j * numpy.angle(estimate))
-        case SpectralModulus.ESTIMATE:
-            pass
-
-    supported = estimate[support]
-    supported_sum = numpy.sum(supported)
-
-    if abs(supported_sum) > 0.0:
-        estimate = estimate * (abs(supported_sum) / supported_sum)
-
-    mean_modulus = float(numpy.mean(numpy.abs(estimate[support])))
-
-    if not mean_modulus > 0.0:
-        raise ValueError('The spectral estimate vanishes on the illuminated region!')
-
-    array = numpy.where(support, estimate / mean_modulus, 1.0 + 0.0j)
 
     return Object(
         array=array[numpy.newaxis, :, :].astype(complex),

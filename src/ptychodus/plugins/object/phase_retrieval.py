@@ -240,9 +240,18 @@ class SpectralOptions(BaseModel):
         le=100,
         title='Iterations:',
         description=(
-            'Products with the spectral covariance. More sharpen detail where the probe is'
-            ' right, amplify its error where it is not, and in the hundreds concentrate the'
-            ' estimate on the most strongly scattering regions.'
+            'Products with the spectral covariance, at most when stopping on the residual.'
+            ' More sharpen detail where the probe is right, amplify its error where it is'
+            ' not, and in the hundreds concentrate the estimate on the most strongly'
+            ' scattering regions.'
+        ),
+    )
+    stop_when_residual_rises: bool = Field(
+        False,
+        title='Stop When Residual Rises',
+        description=(
+            'Stop at the first product that does not lower the amplitude residual, and keep'
+            ' the estimate with the lowest.'
         ),
     )
     preprocessing: SpectralPreprocessing = Field(
@@ -265,7 +274,7 @@ class SpectralOptions(BaseModel):
         ),
     )
     threshold_fraction: float = Field(
-        0.02,
+        0.2,
         ge=0.01,
         le=1.0,
         title='Threshold Fraction:',
@@ -275,8 +284,10 @@ class SpectralOptions(BaseModel):
         SpectralModulus.START,
         title='Modulus:',
         description=(
-            "Where the modulus comes from: the start's, smoothed over the probe's width, or"
-            " the refinement's own, which also measures how strongly the sample scatters."
+            "Where the modulus comes from: the start's, smoothed over the probe's width; the"
+            " refinement's own, which also measures how strongly the sample scatters; or the"
+            " refinement's own divided by that of an empty object, which cancels uneven"
+            ' sampling.'
         ),
     )
 
@@ -355,6 +366,7 @@ class SpectralObjectGenerator(ObjectGenerator):
             far_field=geometry_provider.far_field,
             start=start,
             num_iterations=spectral.iterations,
+            stop_when_residual_rises=spectral.stop_when_residual_rises,
             preprocessing=spectral.preprocessing,
             lower_bound=spectral.preprocessing_lower_bound,
             threshold_fraction=spectral.threshold_fraction,

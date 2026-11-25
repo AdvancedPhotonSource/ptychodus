@@ -5,9 +5,10 @@ noise and detector gaps, so the operator is pinned against the model that produc
 data rather than against itself.
 """
 
-from collections.abc import Sequence
-from functools import cache
+from collections.abc import Callable, Sequence
+from functools import cache, partial
 from typing import Any
+import re
 
 import numpy
 import numpy.testing
@@ -15,17 +16,29 @@ import pytest
 from scipy.ndimage import gaussian_filter
 
 from ptychodus.api.accumulate import DiffractionMoments, compute_diffraction_moments
-from ptychodus.api.assemble import AssembledDiffractionData
+from ptychodus.api.assemble import AssembledDiffractionData, DetectorCorrections
 from ptychodus.api.constants import TWO_PI_J, energy_eV_to_wavelength_m
 from ptychodus.api.geometry import GeometryNotDefinedError, PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter, ObjectGeometry, ObjectGeometryProvider
-from ptychodus.api.patch import accumulate_probe_intensity_on, iter_probe_patches_on
+from ptychodus.api.patch import (
+    accumulate_probe_intensity_on,
+    iter_probe_patches_on,
+    resolve_probe_patch_bounds_on,
+)
 from ptychodus.api.probe import Probe, ProbeEnsemble
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.propagate import PropagatorParameters
+from ptychodus.api.propagate import FresnelTransformPropagator, PropagatorParameters
 from ptychodus.api.simulate.diffraction import generate_diffraction_data
-from ptychodus.api.spectral import SpectralPreprocessing, _compute_spectral_weights
+from ptychodus.api.spectral import (
+    FourierSandwich,
+    PropagatorSandwich,
+    ShiftedProbeStack,
+    SpectralCovariance,
+    SpectralPreprocessing,
+    _compute_spectral_weights,
+    measure_corrected_intensities,
+)
 from ptychodus.api.simulate.object import (
     SpectralModulus,
     _build_propagator_pair,
@@ -115,6 +128,7 @@ def _simulate(
     *,
     far_field: bool = True,
     with_noise: bool = True,
+    truth: numpy.ndarray | None = None,
 ) -> AssembledDiffractionData:
     metadata = ProductMetadata(
         name='spectral',
@@ -134,7 +148,7 @@ def _simulate(
             array=probe.get_array()[numpy.newaxis], opr_weights=None, pixel_geometry=_PIXEL_GEOMETRY
         ),
         object_=Object(
-            array=_truth()[numpy.newaxis],
+            array=(_truth() if truth is None else truth)[numpy.newaxis],
             pixel_geometry=_PIXEL_GEOMETRY,
             center=ObjectCenter(x_m=0.0, y_m=0.0),
         ),
@@ -286,7 +300,8 @@ def test_the_adjoint_is_the_adjoint(
 def test_the_refinement_is_repeated_products_of_the_dense_covariance(
     far_field: bool, distance_m: float
 ) -> None:
-    """On a canvas small enough to write ``Z`` down, the estimate is ``Z^n`` of the start."""
+    """On a canvas small enough to write ``Z`` down, the estimate is ``(Z + sigma I)^n`` of
+    the start, ``sigma`` the floor of the optimal weights times the peak illumination."""
     extent_px, probe_px, num_iterations = 16, 8, 3
     geometry = _geometry(extent_px)
     probe = _defocused_disk_probe(extent_px=probe_px)
@@ -307,8 +322,7 @@ def test_the_refinement_is_repeated_products_of_the_dense_covariance(
     lower_bound = 0.25
     normalized = patterns / patterns.mean()
     with numpy.errstate(divide='ignore'):
-        # The optimal weights, offset by their floor to be non-negative.
-        weights = numpy.maximum(1.0 - 1.0 / normalized, -lower_bound) + lower_bound
+        weights = numpy.maximum(1.0 - 1.0 / normalized, -lower_bound)
 
     forward, _ = _build_propagator_pair(
         PropagatorParameters(
@@ -341,7 +355,10 @@ def test_the_refinement_is_repeated_products_of_the_dense_covariance(
         ProbeEnsemble.from_probe(probe), positions, geometry
     )
     support = illumination >= 0.05 * illumination.max()
-    expected = numpy.linalg.matrix_power(covariance, num_iterations) @ support.ravel()
+    shifted = covariance + lower_bound * illumination.max() * numpy.eye(extent_px**2)
+    # The shift bounds the spectrum below by zero.
+    assert numpy.linalg.eigvalsh(shifted).min() > -1e-9 * numpy.linalg.eigvalsh(shifted).max()
+    expected = numpy.linalg.matrix_power(shifted, num_iterations) @ support.ravel()
     expected = expected.reshape(extent_px, extent_px)
 
     estimate = _estimate(
@@ -351,6 +368,7 @@ def test_the_refinement_is_repeated_products_of_the_dense_covariance(
         far_field=far_field,
         geometry=geometry,
         num_iterations=num_iterations,
+        stop_when_residual_rises=False,
         preprocessing=SpectralPreprocessing.OPTIMAL,
         lower_bound=lower_bound,
         modulus=SpectralModulus.ESTIMATE,
@@ -369,6 +387,93 @@ def test_chunking_and_the_probe_cache_change_nothing() -> None:
 
     # Each pattern's waves are single precision, so another chunking rounds differently.
     numpy.testing.assert_allclose(estimate, reference, atol=1e-5)
+
+
+@pytest.mark.parametrize(
+    'far_field, distance_m',
+    [
+        (True, _FAR_FIELD_DISTANCE_M),  # Fresnel transform, as one FFT pair
+        (False, _NEAR_FIELD_DISTANCE_M),  # angular spectrum, through the propagators
+    ],
+)
+def test_the_amplitude_residual_is_the_scaled_misfit_of_the_predicted_amplitudes(
+    far_field: bool, distance_m: float
+) -> None:
+    extent_px, probe_px = 16, 8
+    geometry = _geometry(extent_px)
+    probe = _defocused_disk_probe(extent_px=probe_px)
+    positions = [
+        ProbePosition(index=index, x_m=x_px * _PIXEL_SIZE_M, y_m=y_px * _PIXEL_SIZE_M)
+        for index, (x_px, y_px) in enumerate(
+            [(-3.2, -2.9), (0.1, -3.0), (3.3, -3.1), (-2.8, 0.2), (0.0, 0.0), (3.1, 0.3)]
+        )
+    ]
+    rng = numpy.random.default_rng(8)
+    patterns = rng.poisson(50.0 * rng.uniform(size=(len(positions), probe_px, probe_px)))
+    patterns = patterns.astype(float)
+    bad_pixels = numpy.zeros((probe_px, probe_px), dtype=bool)
+    bad_pixels[2, :] = True
+    patterns[:, bad_pixels] = 1.0e6
+    canvas = rng.uniform(0.5, 1.0, (extent_px, extent_px)) * numpy.exp(
+        1j * rng.uniform(-1.0, 1.0, (extent_px, extent_px))
+    )
+    forward, backward = _build_propagator_pair(
+        PropagatorParameters(
+            wavelength_m=_WAVELENGTH_M,
+            width_px=probe_px,
+            height_px=probe_px,
+            pixel_width_m=_PIXEL_SIZE_M,
+            pixel_height_m=_PIXEL_SIZE_M,
+            propagation_distance_m=distance_m,
+        ),
+        far_field=far_field,
+    )
+    ensemble = ProbeEnsemble.from_probe(probe)
+    bounds = resolve_probe_patch_bounds_on(ensemble.get_geometry(), positions, geometry)
+    chunks = [slice(0, 4), slice(4, len(positions))]
+    sandwich = (
+        FourierSandwich(forward)
+        if isinstance(forward, FresnelTransformPropagator)
+        else PropagatorSandwich(forward, backward)
+    )
+    covariance = SpectralCovariance(
+        intensities=partial(
+            measure_corrected_intensities,
+            patterns=patterns,
+            pattern_rows=numpy.arange(len(positions)),
+            corrections=DetectorCorrections(),
+            i0_scale=numpy.ones(len(positions)),
+        ),
+        chunks=chunks,
+        bounds=bounds,
+        geometry=geometry,
+        probes=ShiftedProbeStack(
+            probe.get_array(), bounds, chunks, prepare=sandwich.prepare_probes, cached=False
+        ),
+        sandwich=sandwich,
+        good_pixels=~bad_pixels,
+        preprocessing=SpectralPreprocessing.IDENTITY,
+        lower_bound=0.0,
+        threshold_fraction=1.0,
+        cache_weights=False,
+    )
+
+    predicted = numpy.stack(
+        [
+            numpy.abs(
+                forward.propagate(
+                    patch.modes[0] * canvas[patch.bounds.y_slice, patch.bounds.x_slice]
+                )
+            )
+            for patch in iter_probe_patches_on(ensemble, positions, geometry)
+        ]
+    )[:, ~bad_pixels]
+    measured = numpy.sqrt(patterns[:, ~bad_pixels])
+    scale = numpy.sum(predicted * measured) / numpy.sum(predicted**2)
+    expected = numpy.sum((measured - scale * predicted) ** 2) / numpy.sum(measured**2)
+
+    # Single-precision waves.
+    assert covariance.measure_amplitude_residual(canvas) == pytest.approx(expected, rel=1e-5)
 
 
 # -- recovery --------------------------------------------------------------------------
@@ -414,11 +519,12 @@ def test_the_refinements_own_modulus_concentrates_as_it_nears_the_eigenvector() 
                 probe,
                 start=stxm_dpc,
                 num_iterations=num_iterations,
+                stop_when_residual_rises=False,
                 modulus=modulus,
             ),
             support,
         )
-        for modulus in SpectralModulus
+        for modulus in (SpectralModulus.START, SpectralModulus.ESTIMATE)
         for num_iterations in (3, 100)
     }
 
@@ -439,6 +545,56 @@ def test_near_field_recovery_with_structured_illumination() -> None:
     # Measured 0.907 from the uniform start near field takes, 0.97 after ten products,
     # and 0.662 flat.
     assert spectral > _correlation(flat, _truth()) + 0.2
+
+
+@pytest.mark.parametrize(
+    'far_field, probe_factory',
+    [(True, _defocused_disk_probe), (False, _diffuser_probe)],
+)
+def test_the_reference_modulus_of_an_empty_object_is_one(
+    far_field: bool, probe_factory: Callable[[], Probe]
+) -> None:
+    """The refinement of an empty object is its own reference, at subpixel positions."""
+    probe = probe_factory()
+    positions = _grid_positions(14, 4)
+    empty = numpy.ones((_OBJECT_PX, _OBJECT_PX), dtype=complex)
+    data = _simulate(probe, positions, far_field=far_field, with_noise=False, truth=empty)
+    support = _support(probe, positions)
+
+    estimate = _estimate(
+        data,
+        positions,
+        probe,
+        far_field=far_field,
+        num_iterations=5,
+        stop_when_residual_rises=False,
+        modulus=SpectralModulus.REFERENCE,
+    )
+
+    # Single-precision waves; measured 3e-7 far field and 4e-6 near field.
+    numpy.testing.assert_allclose(numpy.abs(estimate[support]), 1.0, atol=2e-5)
+
+
+def test_the_reference_modulus_cancels_uneven_sampling_of_a_phase_object() -> None:
+    probe = _defocused_disk_probe()
+    positions = _grid_positions(14, 4, seed=3)
+    data = _simulate(probe, positions, truth=numpy.exp(1j * numpy.angle(_truth())))
+    support = _support(probe, positions)
+    spread: dict[SpectralModulus, float] = {}
+
+    for modulus in (SpectralModulus.ESTIMATE, SpectralModulus.REFERENCE):
+        estimate = _estimate(
+            data,
+            positions,
+            probe,
+            num_iterations=3,
+            stop_when_residual_rises=False,
+            modulus=modulus,
+        )
+        spread[modulus] = float(numpy.std(numpy.abs(estimate[support])))
+
+    # Measured 0.33 against 0.92, about unit mean modulus either way.
+    assert spread[SpectralModulus.REFERENCE] < 0.5 * spread[SpectralModulus.ESTIMATE]
 
 
 @pytest.mark.parametrize('preprocessing', list(SpectralPreprocessing))
@@ -467,6 +623,66 @@ def test_a_multimode_probe_is_summed_over_its_modes() -> None:
     assert estimate.shape == (_OBJECT_PX, _OBJECT_PX)
     assert numpy.isfinite(estimate).all()
     assert _correlation(estimate, _truth()) > _correlation(numpy.ones_like(_truth()), _truth())
+
+
+# -- stopping --------------------------------------------------------------------------
+
+
+def _stopped_after(caplog: pytest.LogCaptureFixture) -> int:
+    match = re.search(r'stopped after (\d+) of', caplog.text)
+    assert match is not None
+    return int(match.group(1))
+
+
+def test_the_refinement_runs_to_the_cap_while_the_residual_falls(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    probe, positions, data = _far_field_case()
+    start = _stxm_dpc(data, positions)
+
+    with caplog.at_level('INFO', logger='ptychodus.api.simulate.object'):
+        stopped = _estimate(
+            data, positions, probe, start=start, num_iterations=6, stop_when_residual_rises=True
+        )
+
+    # Measured to fall through fourteen products.
+    assert _stopped_after(caplog) == 6
+    fixed = _estimate(
+        data, positions, probe, start=start, num_iterations=6, stop_when_residual_rises=False
+    )
+    numpy.testing.assert_array_equal(stopped, fixed)
+
+
+def test_the_refinement_stops_at_the_last_step_that_lowers_the_residual(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    _, positions, data = _far_field_case()
+    start = _stxm_dpc(data, positions)
+    # A disk twice the radius the data were simulated with.
+    disk = (_radius_px(_PROBE_PX) < 2 * _PROBE_PX / 5) * 30.0
+    too_wide = propagate_probe(
+        Probe(array=disk.astype(complex), pixel_geometry=_PIXEL_GEOMETRY),
+        photon_wavelength_m=_WAVELENGTH_M,
+        propagation_distance_m=20e-6,
+    )
+
+    with caplog.at_level('INFO', logger='ptychodus.api.simulate.object'):
+        stopped = _estimate(
+            data, positions, too_wide, start=start, num_iterations=10, stop_when_residual_rises=True
+        )
+
+    # Measured to stop after five.
+    num_iterations = _stopped_after(caplog)
+    assert 1 <= num_iterations < 10
+    fixed = _estimate(
+        data,
+        positions,
+        too_wide,
+        start=start,
+        num_iterations=num_iterations,
+        stop_when_residual_rises=False,
+    )
+    numpy.testing.assert_array_equal(stopped, fixed)
 
 
 # -- normalization, pairing and detector corrections ----------------------------------
@@ -599,6 +815,8 @@ def test_the_probe_must_span_the_patterns() -> None:
         dict(support_fraction=0.0),
         dict(max_patterns_per_chunk=0),
         dict(max_cached_bytes=-1),
+        dict(reference_floor=0.0),
+        dict(reference_floor=1.0),
     ],
 )
 def test_out_of_range_tunables_are_refused(kwargs: dict[str, Any]) -> None:

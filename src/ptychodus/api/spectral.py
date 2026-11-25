@@ -1,12 +1,13 @@
 """The spectral covariance of ptychographic data, applied matrix-free.
 
-The weighted covariance ``Z = sum_j sum_k S_jk^H diag(T(y_j) + c) S_jk`` of L. Valzania, J.
+The weighted covariance ``Z = sum_j sum_k S_jk^H diag(T(y_j)) S_jk`` of L. Valzania, J.
 Dong and S. Gigan, Opt. Lett. 46, 1357 (2021), where ``S_jk`` places incoherent probe mode
 ``k`` at position ``j``, multiplies it into the object and propagates it to the detector.
 :class:`SpectralCovariance` applies it as a :class:`scipy.sparse.linalg.LinearOperator`,
-one forward pass, a weight and one adjoint pass per pattern; :class:`ShiftedProbeStack`
-supplies the placed probe modes, and :class:`FourierSandwich` or
-:class:`PropagatorSandwich` the detector propagator and its adjoint.
+one forward pass, a weight and one adjoint pass per pattern, and measures how well an
+object predicts the measured amplitudes; :class:`ShiftedProbeStack` supplies the placed
+probe modes, and :class:`FourierSandwich` or :class:`PropagatorSandwich` the detector
+propagator and its adjoint.
 """
 
 from __future__ import annotations
@@ -14,9 +15,10 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+import math
 
 import numpy
-from scipy.fft import fft2, ifft2, ifftshift
+from scipy.fft import fft2, fftshift, ifft2, ifftshift
 from scipy.sparse.linalg import LinearOperator
 
 from .assemble import DetectorCorrections
@@ -163,6 +165,10 @@ class PropagatorSandwich:
     def apply(self, exit_waves: ComplexArrayType, weights: RealArrayType) -> ComplexArrayType:
         return self._backward.propagate(weights * self._forward.propagate(exit_waves))
 
+    def predict_intensities(self, exit_waves: ComplexArrayType) -> RealArrayType:
+        """``sum_k |D w_k|^2`` of prepared exit waves ``(n, modes, height, width)``."""
+        return numpy.sum(numpy.square(numpy.abs(self._forward.propagate(exit_waves))), axis=1)
+
 
 class FourierSandwich:
     """``D^H diag(w) D`` for a Fresnel-transform ``D``, as one FFT pair per wave.
@@ -183,6 +189,13 @@ class FourierSandwich:
 
     def apply(self, exit_waves: ComplexArrayType, weights: RealArrayType) -> ComplexArrayType:
         return ifft2(weights * fft2(exit_waves))
+
+    def predict_intensities(self, exit_waves: ComplexArrayType) -> RealArrayType:
+        """``sum_k |D w_k|^2`` of prepared exit waves ``(n, modes, height, width)``, up to
+        a constant factor: the output-plane phase and the transform's centering are unit
+        modulus, so only the input-plane phase the probes carry and the order remain."""
+        intensities = numpy.sum(numpy.square(numpy.abs(fft2(exit_waves))), axis=1)
+        return fftshift(intensities, axes=(-2, -1))
 
 
 class ShiftedProbeStack:
@@ -223,15 +236,14 @@ class ShiftedProbeStack:
 
 
 class SpectralCovariance(LinearOperator):
-    """The weighted covariance ``sum_j sum_k S_jk^H diag(T(y_j) + c) S_jk``, matrix-free.
+    """The weighted covariance ``sum_j sum_k S_jk^H diag(T(y_j)) S_jk``, matrix-free.
 
     ``S_jk`` places mode ``k`` of the shifted probe at placement ``j``, multiplies it into
     the object and propagates it to the detector. The intensities are normalized to unit
-    mean over the good pixels when the operator is built; their weights, offset by
-    `weight_offset` ``c`` and zero at every bad pixel, are kept as float32 when
-    `cache_weights` asks and recomputed per product otherwise. ``Z`` is Hermitian, so its
-    adjoint is itself. `num_products` counts the products taken, and `mean_pattern` is
-    the mean of the corrected intensities.
+    mean over the good pixels when the operator is built; their weights, zero at every bad
+    pixel, are kept as float32 when `cache_weights` asks and recomputed per product
+    otherwise. ``Z`` is Hermitian, so its adjoint is itself. `num_products` counts the
+    products taken, and `mean_pattern` is the mean of the intensities.
     """
 
     def __init__(
@@ -247,7 +259,6 @@ class SpectralCovariance(LinearOperator):
         preprocessing: SpectralPreprocessing,
         lower_bound: float,
         threshold_fraction: float,
-        weight_offset: float,
         cache_weights: bool,
     ) -> None:
         num_pixels = geometry.height_px * geometry.width_px
@@ -261,7 +272,6 @@ class SpectralCovariance(LinearOperator):
         self._bad_pixels = numpy.logical_not(good_pixels)
         self._preprocessing = preprocessing
         self._lower_bound = lower_bound
-        self._weight_offset = weight_offset
         scale = _measure_intensity_scale(
             (intensities(chunk) for chunk in chunks),
             good_pixels,
@@ -286,7 +296,6 @@ class SpectralCovariance(LinearOperator):
             lower_bound=self._lower_bound,
             threshold=self._threshold,
         )
-        weights += self._weight_offset
         weights[:, self._bad_pixels] = 0.0
         return self._sandwich.prepare_weights(weights)
 
@@ -317,3 +326,37 @@ class SpectralCovariance(LinearOperator):
 
     def _rmatvec(self, x: ComplexArrayType) -> ComplexArrayType:
         return self._matvec(x)
+
+    def measure_amplitude_residual(self, estimate: ComplexArrayType) -> float:
+        """``sum_j ||sqrt(y_j) - s |S_j O||||^2 / sum_j y_j`` over the good pixels.
+
+        ``|S_j O|`` is the amplitude the canvas *estimate* predicts at placement ``j``,
+        summed over the modes in quadrature, and ``s`` the scale that fits it best, which
+        also absorbs any constant factor of the propagator. The intensities are the
+        corrected ones the operator was built from, before normalization. Infinite when
+        either the prediction or the data holds no signal.
+        """
+        canvas = numpy.ravel(estimate)
+        cross = model_power = data_power = 0.0
+
+        for chunk in self._chunks:
+            pixel_indexes = compute_patch_pixel_indexes(self._bounds[chunk], self._geometry)
+            values = canvas[pixel_indexes].astype(numpy.complex64)
+            exit_waves = self._probes.get(chunk) * values[:, numpy.newaxis]
+            predicted = numpy.sqrt(
+                self._sandwich.predict_intensities(exit_waves)[:, ~self._bad_pixels],
+                dtype=numpy.float64,
+            )
+            measured = numpy.sqrt(
+                numpy.maximum(self._intensities(chunk)[:, ~self._bad_pixels], 0.0),
+                dtype=numpy.float64,
+            )
+            cross += float(numpy.sum(predicted * measured))
+            model_power += float(numpy.sum(numpy.square(predicted)))
+            data_power += float(numpy.sum(numpy.square(measured)))
+
+        if not (model_power > 0.0 and data_power > 0.0):
+            return math.inf
+
+        # With s = cross / model_power fitted, the misfit is data_power - cross^2 / model_power.
+        return max(1.0 - cross * cross / (model_power * data_power), 0.0)
